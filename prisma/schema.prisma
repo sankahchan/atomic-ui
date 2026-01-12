@@ -1,0 +1,363 @@
+// Atomic-UI Database Schema
+// Advanced Outline VPN Management Platform
+// Author: sankahchan
+//
+// Note: SQLite doesn't support native enums, so we use String types
+// with application-level validation instead. Valid values are documented
+// in comments for each field.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Authentication & Users
+// ============================================
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  email        String?   @unique
+  passwordHash String
+  role         String    @default("ADMIN") // Valid: ADMIN, STAFF, VIEWER
+  totpSecret   String?
+  totpEnabled  Boolean   @default(false)
+  lastLoginAt  DateTime?
+  lastLoginIp  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  ip        String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// Server Management
+// ============================================
+
+model Server {
+  id            String   @id @default(cuid())
+  name          String
+  apiUrl        String
+  apiCertSha256 String
+  location      String?
+  countryCode   String?
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  maxKeys       Int?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  tags        ServerTag[]
+  accessKeys  AccessKey[]
+  healthCheck HealthCheck?
+  metrics     ServerMetric[]
+
+  // Cached server info from Outline API
+  outlineServerId       String?
+  outlineName           String?
+  outlineVersion        String?
+  hostnameForAccessKeys String?
+  portForNewAccessKeys  Int?
+  metricsEnabled        Boolean   @default(true)
+  lastSyncAt            DateTime?
+}
+
+model Tag {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  color       String      @default("#06b6d4") // Cyan default
+  description String?
+  servers     ServerTag[]
+  createdAt   DateTime    @default(now())
+}
+
+model ServerTag {
+  serverId String
+  tagId    String
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([serverId, tagId])
+}
+
+// ============================================
+// Access Key Management
+// ============================================
+
+model AccessKey {
+  id           String  @id @default(cuid())
+  outlineKeyId String // ID from Outline API
+  name         String
+  email        String?
+  telegramId   String?
+  notes        String?
+
+  // Server relation
+  serverId String
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  // Access key details from Outline
+  accessUrl String?
+  password  String?
+  port      Int?
+  method    String?
+
+  // Traffic limits (in bytes)
+  dataLimitBytes BigInt?
+  usedBytes      BigInt  @default(0)
+
+  // Expiration settings
+  // Valid expirationType: NEVER, FIXED_DATE, DURATION_FROM_CREATION, START_ON_FIRST_USE
+  expirationType String    @default("NEVER")
+  expiresAt      DateTime?
+  durationDays   Int? // For START_ON_FIRST_USE
+
+  // Status tracking
+  // Valid status: ACTIVE, DISABLED, EXPIRED, DEPLETED, PENDING
+  status      String    @default("ACTIVE")
+  firstUsedAt DateTime?
+  lastUsedAt  DateTime?
+
+  // Dynamic key association
+  dynamicKeyId String?
+  dynamicKey   DynamicAccessKey? @relation(fields: [dynamicKeyId], references: [id], onDelete: SetNull)
+
+  // Prefix for obfuscation
+  prefix String?
+
+  // Subscription
+  subscriptionToken String? @unique
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  trafficLogs TrafficLog[]
+
+  @@unique([serverId, outlineKeyId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model DynamicAccessKey {
+  id   String @id @default(cuid())
+  name String
+  type String @default("SELF_MANAGED") // Valid: SELF_MANAGED, MANUAL
+
+  // Contact information (for tracking/notification purposes)
+  email      String?
+  telegramId String?
+  notes      String?
+
+  // For tag-based server selection (stored as JSON string)
+  serverTagsJson String @default("[]")
+
+  // Limits
+  dataLimitBytes BigInt?
+  usedBytes      BigInt    @default(0)
+  expiresAt      DateTime?
+  durationDays   Int?
+  expirationType String    @default("NEVER") // Same values as AccessKey
+
+  // Status
+  status      String    @default("ACTIVE") // Same values as AccessKey
+  firstUsedAt DateTime?
+
+  // Dynamic URL
+  dynamicUrl String? @unique
+
+  // Protocol obfuscation prefix (for protocol obfuscation)
+  prefix String?
+
+  // Encryption method for Shadowsocks
+  method String @default("chacha20-ietf-poly1305")
+
+  accessKeys AccessKey[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TrafficLog {
+  id          String    @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+
+  bytesUsed  BigInt
+  recordedAt DateTime @default(now())
+
+  @@index([accessKeyId, recordedAt])
+}
+
+// ============================================
+// Archived Keys (for expired/deleted/depleted keys)
+// ============================================
+
+model ArchivedKey {
+  id             String   @id @default(cuid())
+  originalKeyId  String   // Original AccessKey ID
+  outlineKeyId   String   // ID from Outline API
+  name           String
+  email          String?
+  telegramId     String?
+  notes          String?
+
+  // Server info (stored since original might be deleted)
+  serverName     String
+  serverLocation String?
+
+  // Access key details
+  accessUrl      String?
+
+  // Traffic data
+  dataLimitBytes BigInt?
+  usedBytes      BigInt   @default(0)
+
+  // Expiration info
+  expirationType String
+  expiresAt      DateTime?
+  durationDays   Int?
+
+  // Archive reason: EXPIRED, DEPLETED, DELETED, DISABLED
+  archiveReason  String
+
+  // Status at time of archival
+  originalStatus String
+
+  // Timestamps
+  firstUsedAt    DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  // Original creation date
+  archivedAt     DateTime  @default(now())
+
+  // Auto-delete after 3 months
+  deleteAfter    DateTime
+
+  @@index([archiveReason])
+  @@index([archivedAt])
+  @@index([deleteAfter])
+}
+
+// ============================================
+// Health Monitoring
+// ============================================
+
+model HealthCheck {
+  id       String @id @default(cuid())
+  serverId String @unique
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  isEnabled          Boolean @default(true)
+  checkIntervalMins  Int     @default(5)
+  notifyCooldownMins Int     @default(30)
+  latencyThresholdMs Int     @default(500)
+
+  // Valid lastStatus: UP, DOWN, SLOW, UNKNOWN
+  lastStatus     String    @default("UNKNOWN")
+  lastLatencyMs  Int?
+  lastCheckedAt  DateTime?
+  lastNotifiedAt DateTime?
+
+  uptimePercent    Float @default(100)
+  totalChecks      Int   @default(0)
+  successfulChecks Int   @default(0)
+  failedChecks     Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServerMetric {
+  id       String @id @default(cuid())
+  serverId String
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  cpuPercent    Float?
+  memoryPercent Float?
+  diskPercent   Float?
+  bytesIn       BigInt?
+  bytesOut      BigInt?
+  activeKeys    Int?
+
+  recordedAt DateTime @default(now())
+
+  @@index([serverId, recordedAt])
+}
+
+// ============================================
+// Notifications
+// ============================================
+
+model NotificationChannel {
+  id       String  @id @default(cuid())
+  type     String // Valid: TELEGRAM, EMAIL, WEBHOOK
+  name     String
+  config   String // JSON config (bot token, chat ID, etc.)
+  events   String // JSON array of NotificationEvent
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channelId String?
+  event     String
+  message   String
+  status    String // SUCCESS, FAILED
+  error     String?
+  sentAt    DateTime @default(now())
+}
+
+// ============================================
+// Settings & Misc
+// ============================================
+
+model Settings {
+  key   String @id
+  value String // JSON value
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String? // JSON
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ============================================
+// Type Definitions (for application-level validation)
+// ============================================
+// 
+// Role values: ADMIN, STAFF, VIEWER
+// KeyStatus values: ACTIVE, DISABLED, EXPIRED, DEPLETED, PENDING
+// ExpirationType values: NEVER, FIXED_DATE, DURATION_FROM_CREATION, START_ON_FIRST_USE
+// DakType values: SELF_MANAGED, MANUAL
+// HealthStatus values: UP, DOWN, SLOW, UNKNOWN
+// NotificationType values: TELEGRAM, EMAIL, WEBHOOK

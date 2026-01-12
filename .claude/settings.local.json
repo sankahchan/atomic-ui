@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run lint)",
+      "Bash(dir:*)",
+      "Bash(npm install)",
+      "Bash(npx next lint:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run setup:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(taskkill:*)",
+      "Bash(cat:*)",
+      "Bash(npx prisma studio)",
+      "Bash(npx tsx:*)",
+      "Bash(findstr:*)",
+      "Bash(npx prisma generate)",
+      "Bash(tasklist:*)",
+      "Bash(del \"C:\\\\Users\\\\Sankah Chan\\\\Desktop\\\\atomic-ui\\\\src\\\\app\\\\\\(dashboard\\)\\\\dashboard\\\\tags\\\\page.tsx\")",
+      "Bash(wmic process where \"name=''node.exe''\" get processid)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npm run build:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(tar:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git archive:*)",
+      "Bash(unzip:*)"
+    ]
+  }
+}

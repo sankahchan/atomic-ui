@@ -1,0 +1,62 @@
+# Atomic-UI Docker Compose Configuration
+# 
+# This file defines the services needed to run Atomic-UI in a containerized
+# environment. It's designed for both development and production use.
+#
+# Quick Start:
+#   docker-compose up -d
+#
+# The application will be available at http://localhost:3000
+#
+# For production deployment:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # Main Atomic-UI Application
+  atomic-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atomic-ui
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Database URL - SQLite file stored in volume
+      - DATABASE_URL=file:/app/data/atomic-ui.db
+      # JWT Secret - CHANGE THIS IN PRODUCTION!
+      - JWT_SECRET=${JWT_SECRET:-atomic-ui-change-this-secret-in-production}
+      # Session expiry in days
+      - SESSION_EXPIRY_DAYS=${SESSION_EXPIRY_DAYS:-7}
+      # Application URL (for subscription links)
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      # Telegram Bot Token (optional)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      # Health check settings
+      - HEALTH_CHECK_ENABLED=${HEALTH_CHECK_ENABLED:-true}
+      - HEALTH_CHECK_INTERVAL_MINS=${HEALTH_CHECK_INTERVAL_MINS:-5}
+      # Node environment
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      # Persist database and user data
+      - atomic-ui-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - atomic-network
+
+# Named volumes for data persistence
+volumes:
+  atomic-ui-data:
+    driver: local
+
+# Network configuration
+networks:
+  atomic-network:
+    driver: bridge

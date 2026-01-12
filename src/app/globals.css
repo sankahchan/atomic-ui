@@ -1,0 +1,479 @@
+/**
+ * Global Styles for Atomic-UI
+ * 
+ * This file defines the core design system for the application using CSS
+ * custom properties (variables). The theme is built around an "atomic"
+ * aesthetic with cyan/teal accent colors representing atomic energy.
+ * 
+ * The design system supports both light and dark modes, with dark mode
+ * being the default for this VPN management interface.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * CSS Custom Properties (Design Tokens)
+ * 
+ * These variables define the color palette, spacing, and other design
+ * tokens used throughout the application. They're referenced in the
+ * Tailwind config and component styles.
+ */
+@layer base {
+  :root {
+    /* Background and foreground - Light theme */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    /* Card surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    /* Popover and dropdown surfaces */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Primary brand color - Atomic Cyan */
+    --primary: 187 94% 43%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Secondary/muted elements */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    /* Muted text and backgrounds */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    /* Accent color for highlights */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    /* Destructive actions (delete, error) */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Borders and inputs */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 187 94% 43%;
+
+    /* Border radius */
+    --radius: 0.5rem;
+  }
+
+  /**
+   * Dark Theme
+   * 
+   * The dark theme uses deep blue-gray backgrounds with cyan accents.
+   * This creates a modern, professional look suitable for admin interfaces.
+   */
+  .dark {
+    /* Deep space background */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    /* Slightly elevated card surfaces */
+    --card: 222.2 84% 6%;
+    --card-foreground: 210 40% 98%;
+
+    /* Popover surfaces with more elevation */
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Atomic cyan primary */
+    --primary: 187 94% 43%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    /* Dark secondary elements */
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    /* Muted elements */
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    /* Accent highlights */
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    /* Error/destructive */
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Subtle borders */
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 187 94% 43%;
+  }
+}
+
+/**
+ * Base Element Styles
+ * 
+ * These apply default styles to base HTML elements using the design
+ * tokens defined above.
+ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling with reduced motion support */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/**
+ * Custom Utility Classes
+ * 
+ * These provide additional utilities not available in Tailwind by default.
+ */
+@layer utilities {
+  /* Hide scrollbar while keeping scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom scrollbar styling for dark theme */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+
+  /* Atomic glow effect for important elements */
+  .atomic-glow {
+    box-shadow: 
+      0 0 20px rgba(6, 182, 212, 0.15),
+      0 0 40px rgba(6, 182, 212, 0.1),
+      0 0 60px rgba(6, 182, 212, 0.05);
+  }
+
+  .atomic-glow-sm {
+    box-shadow: 
+      0 0 10px rgba(6, 182, 212, 0.1),
+      0 0 20px rgba(6, 182, 212, 0.05);
+  }
+
+  /* Text gradient for headings */
+  .text-gradient-atomic {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Animated gradient background */
+  .bg-gradient-animated {
+    background: linear-gradient(
+      -45deg,
+      hsl(var(--background)),
+      hsl(222.2 84% 6%),
+      hsl(217.2 32.6% 10%),
+      hsl(var(--background))
+    );
+    background-size: 400% 400%;
+    animation: gradient-shift 15s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  /* Grid pattern background */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Subtle noise texture overlay */
+  .noise-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Loading shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Status indicator pulse */
+  .status-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+/**
+ * Component Styles
+ * 
+ * These define reusable component patterns that are used across the app.
+ */
+@layer components {
+  /* Card with subtle hover effect */
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+
+  .card-hover:hover {
+    @apply shadow-lg;
+    transform: translateY(-2px);
+  }
+
+  /* Sidebar navigation item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground;
+    @apply transition-colors duration-150;
+  }
+
+  .nav-item:hover {
+    @apply bg-muted text-foreground;
+  }
+
+  .nav-item.active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* Data table styles */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table th {
+    @apply text-left text-muted-foreground font-medium px-4 py-3 border-b;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b border-border/50;
+  }
+
+  .data-table tr:hover {
+    @apply bg-muted/50;
+  }
+
+  /* Form input focus ring */
+  .input-focus-ring {
+    @apply focus:ring-2 focus:ring-primary/20 focus:border-primary;
+    @apply transition-all duration-150;
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-colors duration-150;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-colors duration-150;
+  }
+
+  .btn-outline {
+    @apply border border-border bg-transparent hover:bg-muted;
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-colors duration-150;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-muted;
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-colors duration-150;
+  }
+
+  .btn-destructive {
+    @apply bg-destructive text-destructive-foreground hover:bg-destructive/90;
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-colors duration-150;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply border;
+  }
+
+  .badge-success {
+    @apply bg-green-500/20 text-green-400 border-green-500/30;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-500/20 text-yellow-400 border-yellow-500/30;
+  }
+
+  .badge-danger {
+    @apply bg-red-500/20 text-red-400 border-red-500/30;
+  }
+
+  .badge-info {
+    @apply bg-blue-500/20 text-blue-400 border-blue-500/30;
+  }
+
+  .badge-neutral {
+    @apply bg-gray-500/20 text-gray-400 border-gray-500/30;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply bg-card rounded-xl border p-6;
+    @apply transition-all duration-200;
+  }
+
+  .stat-card:hover {
+    @apply border-primary/30 atomic-glow-sm;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 bg-muted rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-300;
+  }
+}
+
+/**
+ * X-UI Style Wave Animation
+ *
+ * Animated wave background for the login page (inspired by x-ui).
+ */
+@keyframes wave-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/**
+ * Slow spin animation for atomic logo
+ */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/**
+ * Animation Classes
+ *
+ * Custom animations for page transitions and micro-interactions.
+ */
+@layer utilities {
+  .animate-in {
+    animation: animate-in 0.2s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.15s ease-out;
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
