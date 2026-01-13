@@ -44,27 +44,27 @@ import { useTheme } from 'next-themes';
  * Each item represents a section in the sidebar navigation
  */
 const navItems = [
-  { 
-    href: '/dashboard', 
-    label: 'Dashboard', 
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
     icon: LayoutDashboard,
     description: 'Overview and statistics'
   },
-  { 
-    href: '/dashboard/servers', 
-    label: 'Servers', 
+  {
+    href: '/dashboard/servers',
+    label: 'Servers',
     icon: Server,
     description: 'Manage Outline servers'
   },
-  { 
-    href: '/dashboard/keys', 
-    label: 'Access Keys', 
+  {
+    href: '/dashboard/keys',
+    label: 'Access Keys',
     icon: Key,
     description: 'Manage VPN access keys'
   },
-  { 
-    href: '/dashboard/dynamic-keys', 
-    label: 'Dynamic Keys', 
+  {
+    href: '/dashboard/dynamic-keys',
+    label: 'Dynamic Keys',
     icon: KeyRound,
     description: 'Dynamic access key pools'
   },
@@ -74,21 +74,21 @@ const navItems = [
     icon: Archive,
     description: 'View expired and deleted keys'
   },
-  { 
-    href: '/dashboard/health', 
-    label: 'Health', 
+  {
+    href: '/dashboard/health',
+    label: 'Health',
     icon: Activity,
     description: 'Server health monitoring'
   },
-  { 
-    href: '/dashboard/notifications', 
-    label: 'Notifications', 
+  {
+    href: '/dashboard/notifications',
+    label: 'Notifications',
     icon: Bell,
     description: 'Alert settings'
   },
-  { 
-    href: '/dashboard/settings', 
-    label: 'Settings', 
+  {
+    href: '/dashboard/settings',
+    label: 'Settings',
     icon: Settings,
     description: 'Application settings'
   },
@@ -100,13 +100,13 @@ const navItems = [
  * The collapsible sidebar contains the main navigation for the dashboard.
  * It features a logo, navigation links, and a collapse toggle.
  */
-function Sidebar({ 
-  isCollapsed, 
+function Sidebar({
+  isCollapsed,
   onToggle,
   isMobile = false,
   onClose,
-}: { 
-  isCollapsed: boolean; 
+}: {
+  isCollapsed: boolean;
   onToggle: () => void;
   isMobile?: boolean;
   onClose?: () => void;
@@ -134,14 +134,14 @@ function Sidebar({
             </span>
           )}
         </Link>
-        
+
         {/* Mobile close button */}
         {isMobile && onClose && (
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         )}
-        
+
         {/* Desktop collapse toggle */}
         {!isMobile && (
           <Button
@@ -162,9 +162,9 @@ function Sidebar({
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || 
+            const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
-            
+
             return (
               <li key={item.href}>
                 <Link
@@ -211,11 +211,11 @@ function Sidebar({
  * The top header contains the mobile menu toggle, page title,
  * theme switcher, and user actions.
  */
-function Header({ 
+function Header({
   onMenuClick,
   user,
   onLogout,
-}: { 
+}: {
   onMenuClick: () => void;
   user: { username: string; role: string } | null;
   onLogout: () => void;
@@ -304,11 +304,21 @@ export default function DashboardLayout({
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
-  // Fetch current user
-  const { data: user, isLoading } = trpc.auth.me.useQuery(undefined, {
-    retry: false,
+  // Fetch current user with error handling
+  const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
+    retry: 1,
+    retryDelay: 500,
   });
+
+  // Handle tRPC errors
+  useEffect(() => {
+    if (isError && error) {
+      console.error('Dashboard auth error:', error);
+      setHasError(true);
+    }
+  }, [isError, error]);
 
   // Logout mutation
   const logoutMutation = trpc.auth.logout.useMutation({
@@ -346,6 +356,27 @@ export default function DashboardLayout({
     );
   }
 
+  // Show error state if authentication check failed
+  if (hasError || isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center p-8">
+          <Atom className="h-12 w-12 text-red-500" />
+          <h2 className="text-xl font-semibold text-foreground">Connection Error</h2>
+          <p className="text-muted-foreground max-w-md">
+            Unable to connect to the server. Please check your connection and try again.
+          </p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="mt-4"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Don't render dashboard if not authenticated
   if (!user) {
     return null;
@@ -365,7 +396,7 @@ export default function DashboardLayout({
       {mobileMenuOpen && (
         <Sidebar
           isCollapsed={false}
-          onToggle={() => {}}
+          onToggle={() => { }}
           isMobile
           onClose={() => setMobileMenuOpen(false)}
         />
