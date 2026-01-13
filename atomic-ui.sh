@@ -604,6 +604,7 @@ update_service() {
     cp .env .env.backup 2>/dev/null || true
     cp -r prisma/data prisma/data.backup 2>/dev/null || true
     cp .panel_port .panel_port.backup 2>/dev/null || true
+    cp .panel_path .panel_path.backup 2>/dev/null || true
     
     print_step "Downloading latest version..."
     git fetch origin
@@ -612,6 +613,7 @@ update_service() {
     # Restore backups
     cp .env.backup .env 2>/dev/null || true
     cp .panel_port.backup .panel_port 2>/dev/null || true
+    cp .panel_path.backup .panel_path 2>/dev/null || true
     
     print_step "Installing dependencies..."
     rm -rf node_modules .next package-lock.json
@@ -796,6 +798,9 @@ main() {
         status)
             show_status
             ;;
+        info)
+            show_status
+            ;;
         logs)
             show_logs
             ;;
@@ -830,6 +835,7 @@ main() {
             echo "  stop       - Stop service"
             echo "  restart    - Restart service"
             echo "  status     - Show status"
+            echo "  info       - Show panel URL, port and path"
             echo "  logs       - View logs"
             echo "  port       - Show current port"
             echo "  port <num> - Change port to <num>"
