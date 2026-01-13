@@ -8,7 +8,12 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "darwin-arm64"]
+  // Binary targets for different platforms:
+  // - native: Current development machine
+  // - darwin-arm64: macOS Apple Silicon
+  // - debian-openssl-3.0.x: Ubuntu 22.04+ / Debian 12+
+  // - linux-musl-openssl-3.0.x: Alpine Linux
+  binaryTargets = ["native", "darwin-arm64", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
