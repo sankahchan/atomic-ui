@@ -37,6 +37,12 @@ generate_random_port() {
     done
 }
 
+# Generate random path for security (like 3x-ui)
+generate_random_path() {
+    # Generate a random 8-character alphanumeric string
+    openssl rand -hex 4
+}
+
 echo -e "${CYAN}"
 echo "============================================================="
 echo "                                                             "
@@ -65,6 +71,11 @@ fi
 echo -e "${BLUE}[*]${NC} Generating secure random port..."
 PANEL_PORT=$(generate_random_port)
 echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC}"
+
+# Generate random path for security
+echo -e "${BLUE}[*]${NC} Generating secure random path..."
+PANEL_PATH=$(generate_random_path)
+echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
 
 # Check for port conflicts
 echo -e "${BLUE}[*]${NC} Checking for port conflicts..."
@@ -126,6 +137,13 @@ else
     sed -i "s|^PORT=.*|PORT=${PANEL_PORT}|g" .env
 fi
 
+# Add PANEL_PATH to .env for the random URL path
+if ! grep -q "^PANEL_PATH=" .env; then
+    echo "PANEL_PATH=/${PANEL_PATH}" >> .env
+else
+    sed -i "s|^PANEL_PATH=.*|PANEL_PATH=/${PANEL_PATH}|g" .env
+fi
+
 echo -e "${GREEN}[✓]${NC} Environment configured"
 
 # Setup database
@@ -157,6 +175,7 @@ Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=${PANEL_PORT}
+Environment=PANEL_PATH=/${PANEL_PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -178,8 +197,9 @@ if command -v ufw &> /dev/null; then
     echo -e "${GREEN}[✓]${NC} Firewall configured for port ${PANEL_PORT}"
 fi
 
-# Save port to a config file for the management script
+# Save port and path to config files for the management script
 echo "${PANEL_PORT}" > "$INSTALL_DIR/.panel_port"
+echo "/${PANEL_PATH}" > "$INSTALL_DIR/.panel_path"
 
 # Done!
 echo ""
@@ -189,18 +209,20 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
-echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}${NC}"
+echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PANEL_PORT}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Default login credentials:${NC}"
 echo -e "${CYAN}│${NC}  Username: ${GREEN}admin${NC}"
 echo -e "${CYAN}│${NC}  Password: ${GREEN}admin123${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${RED}⚠ IMPORTANT: Change the password after first login!${NC}"
+echo -e "${CYAN}│${NC}  ${RED}⚠ SAVE YOUR PANEL PATH - You need it to access the panel!${NC}"
 echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
 echo ""
 echo -e "${YELLOW}  Management:${NC}"
 echo -e "  Run ${BLUE}atomic-ui${NC} to access the management menu"
-echo -e "  Run ${BLUE}atomic-ui port${NC} to view/change the port"
+echo -e "  Run ${BLUE}atomic-ui info${NC} to view panel URL and path"
 echo ""

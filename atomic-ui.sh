@@ -21,7 +21,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/atomic-ui"
 SERVICE_NAME="atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="1.2.0"
 
 # Get current port from saved file or default
 get_current_port() {
@@ -37,7 +37,22 @@ get_current_port() {
     fi
 }
 
+# Get current path from saved file or default
+get_current_path() {
+    if [ -f "$INSTALL_DIR/.panel_path" ]; then
+        cat "$INSTALL_DIR/.panel_path"
+    else
+        # Try to get from systemd service
+        if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
+            grep "Environment=PANEL_PATH=" /etc/systemd/system/${SERVICE_NAME}.service 2>/dev/null | cut -d'=' -f3 || echo ""
+        else
+            echo ""
+        fi
+    fi
+}
+
 CURRENT_PORT=$(get_current_port)
+CURRENT_PATH=$(get_current_path)
 
 # Print banner
 print_banner() {
@@ -396,6 +411,7 @@ restart_service() {
 # Show status
 show_status() {
     CURRENT_PORT=$(get_current_port)
+    CURRENT_PATH=$(get_current_path)
     SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "Unknown")
     
     echo ""
@@ -416,7 +432,12 @@ show_status() {
     fi
     
     echo -e "${CYAN}│${NC}  Port:       ${BLUE}${CURRENT_PORT}${NC}"
-    echo -e "${CYAN}│${NC}  Panel URL:  ${BLUE}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+    if [ -n "$CURRENT_PATH" ]; then
+        echo -e "${CYAN}│${NC}  Path:       ${BLUE}${CURRENT_PATH}${NC}"
+        echo -e "${CYAN}│${NC}  Panel URL:  ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${CURRENT_PATH}/${NC}"
+    else
+        echo -e "${CYAN}│${NC}  Panel URL:  ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+    fi
     
     if [ -d "$INSTALL_DIR" ]; then
         if [ -f "$INSTALL_DIR/package.json" ]; then
