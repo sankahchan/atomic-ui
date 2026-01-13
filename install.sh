@@ -25,6 +25,18 @@ NC='\033[0m'
 INSTALL_DIR="/opt/atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
 
+# Generate random port between 10000-65000
+generate_random_port() {
+    while true; do
+        PORT=$((RANDOM % 55000 + 10000))
+        # Check if port is available
+        if ! lsof -i :$PORT > /dev/null 2>&1; then
+            echo $PORT
+            return
+        fi
+    done
+}
+
 echo -e "${CYAN}"
 echo "============================================================="
 echo "                                                             "
@@ -49,21 +61,17 @@ else
     echo -e "${YELLOW}[!]${NC} Could not detect OS"
 fi
 
+# Generate random port
+echo -e "${BLUE}[*]${NC} Generating secure random port..."
+PANEL_PORT=$(generate_random_port)
+echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC}"
+
 # Check for port conflicts
 echo -e "${BLUE}[*]${NC} Checking for port conflicts..."
-if command -v lsof &> /dev/null && lsof -i :3000 > /dev/null 2>&1; then
-    echo -e "${YELLOW}[!]${NC} Port 3000 is in use. Attempting to resolve..."
-    
-    # Check if it's a docker container
-    if lsof -i :3000 | grep -q docker; then
-        echo -e "${YELLOW}[!]${NC} Docker container detected on port 3000"
-        CONTAINER_IDS=$(docker ps --filter "publish=3000" -q 2>/dev/null)
-        if [ -n "$CONTAINER_IDS" ]; then
-            echo -e "${BLUE}[*]${NC} Stopping Docker containers..."
-            docker stop $CONTAINER_IDS
-            echo -e "${GREEN}[✓]${NC} Docker containers stopped"
-        fi
-    fi
+if command -v lsof &> /dev/null && lsof -i :${PANEL_PORT} > /dev/null 2>&1; then
+    echo -e "${YELLOW}[!]${NC} Port ${PANEL_PORT} is in use, generating another..."
+    PANEL_PORT=$(generate_random_port)
+    echo -e "${GREEN}[✓]${NC} New panel port: ${CYAN}${PANEL_PORT}${NC}"
 fi
 
 # Install dependencies
@@ -97,14 +105,27 @@ rm -rf node_modules .next package-lock.json 2>/dev/null || true
 npm install --production=false --silent > /dev/null 2>&1
 echo -e "${GREEN}[✓]${NC} Dependencies installed"
 
-# Setup environment
-if [ ! -f .env ]; then
-    cp .env.example .env
-    JWT_SECRET=$(openssl rand -base64 32)
-    sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
-    sed -i "s|http://localhost:3000|http://${SERVER_IP}:3000|g" .env
+# Setup environment with random port
+echo -e "${BLUE}[*]${NC} Configuring environment..."
+cp .env.example .env
+
+# Generate secure JWT secret
+JWT_SECRET=$(openssl rand -base64 32)
+sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
+
+# Get server IP
+SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+
+# Set the random port in .env
+sed -i "s|http://localhost:3000|http://${SERVER_IP}:${PANEL_PORT}|g" .env
+
+# Add PORT to .env if not exists
+if ! grep -q "^PORT=" .env; then
+    echo "PORT=${PANEL_PORT}" >> .env
+else
+    sed -i "s|^PORT=.*|PORT=${PANEL_PORT}|g" .env
 fi
+
 echo -e "${GREEN}[✓]${NC} Environment configured"
 
 # Setup database
@@ -120,7 +141,7 @@ echo -e "${BLUE}[*]${NC} Building application..."
 npm run build > /dev/null 2>&1
 echo -e "${GREEN}[✓]${NC} Build complete"
 
-# Create service
+# Create service with random port
 echo -e "${BLUE}[*]${NC} Creating systemd service..."
 cat > /etc/systemd/system/atomic-ui.service << EOF
 [Unit]
@@ -135,7 +156,7 @@ ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=${PANEL_PORT}
 
 [Install]
 WantedBy=multi-user.target
@@ -144,38 +165,42 @@ EOF
 systemctl daemon-reload
 systemctl enable atomic-ui > /dev/null 2>&1
 systemctl start atomic-ui
-echo -e "${GREEN}[✓]${NC} Service started"
+echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 
 # Install management script
 chmod +x "$INSTALL_DIR/atomic-ui.sh"
 cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
 echo -e "${GREEN}[✓]${NC} Management script installed"
 
-# Firewall
+# Firewall - add the random port
 if command -v ufw &> /dev/null; then
-    ufw allow 3000/tcp > /dev/null 2>&1
-    echo -e "${GREEN}[✓]${NC} Firewall configured"
+    ufw allow ${PANEL_PORT}/tcp > /dev/null 2>&1
+    echo -e "${GREEN}[✓]${NC} Firewall configured for port ${PANEL_PORT}"
 fi
 
-# Done!
-SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "YOUR_SERVER_IP")
+# Save port to a config file for the management script
+echo "${PANEL_PORT}" > "$INSTALL_DIR/.panel_port"
 
+# Done!
 echo ""
-echo -e "${GREEN}=============================================================${NC}"
-echo -e "${GREEN}          INSTALLATION COMPLETE!                             ${NC}"
-echo -e "${GREEN}=============================================================${NC}"
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║              INSTALLATION COMPLETE!                          ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}────────────────────────────────────────────────────────────${NC}"
-echo -e "${YELLOW}  Access your panel:${NC}"
-echo -e "  URL: ${GREEN}http://${SERVER_IP}:3000${NC}"
-echo ""
-echo -e "${YELLOW}  Default login credentials:${NC}"
-echo -e "  Username: ${GREEN}admin${NC}"
-echo -e "  Password: ${GREEN}admin123${NC}"
-echo ""
-echo -e "${RED}  ⚠ IMPORTANT: Change the password after first login!${NC}"
-echo -e "${CYAN}────────────────────────────────────────────────────────────${NC}"
+echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
+echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}${NC}"
+echo -e "${CYAN}│${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PANEL_PORT}${NC}"
+echo -e "${CYAN}│${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Default login credentials:${NC}"
+echo -e "${CYAN}│${NC}  Username: ${GREEN}admin${NC}"
+echo -e "${CYAN}│${NC}  Password: ${GREEN}admin123${NC}"
+echo -e "${CYAN}│${NC}"
+echo -e "${CYAN}│${NC}  ${RED}⚠ IMPORTANT: Change the password after first login!${NC}"
+echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
 echo ""
 echo -e "${YELLOW}  Management:${NC}"
 echo -e "  Run ${BLUE}atomic-ui${NC} to access the management menu"
+echo -e "  Run ${BLUE}atomic-ui port${NC} to view/change the port"
 echo ""

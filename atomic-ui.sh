@@ -5,7 +5,7 @@
 # X-UI Style Management for Atomic-UI
 #
 # Usage: atomic-ui [command]
-# Commands: install, uninstall, update, start, stop, restart, status, logs, enable, disable
+# Commands: install, uninstall, update, start, stop, restart, status, logs, port, enable, disable
 #############################################
 
 # Colors for output
@@ -20,26 +20,41 @@ NC='\033[0m' # No Color
 # Configuration
 INSTALL_DIR="/opt/atomic-ui"
 SERVICE_NAME="atomic-ui"
-DEFAULT_PORT=3000
 GITHUB_REPO="sankahchan/atomic-ui"
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
+
+# Get current port from saved file or default
+get_current_port() {
+    if [ -f "$INSTALL_DIR/.panel_port" ]; then
+        cat "$INSTALL_DIR/.panel_port"
+    else
+        # Try to get from systemd service
+        if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
+            grep "Environment=PORT=" /etc/systemd/system/${SERVICE_NAME}.service 2>/dev/null | cut -d'=' -f3 || echo "3000"
+        else
+            echo "3000"
+        fi
+    fi
+}
+
+CURRENT_PORT=$(get_current_port)
 
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
-    echo "================================================================"
-    echo "                                                                "
-    echo "     ███╗   ██╗████████╗ ██████╗ ███╗   ███╗██╗ ██████╗        "
-    echo "     ████╗  ██║╚══██╔══╝██╔═══██╗████╗ ████║██║██╔════╝        "
-    echo "     ██╔██╗ ██║   ██║   ██║   ██║██╔████╔██║██║██║             "
-    echo "     ██║╚██╗██║   ██║   ██║   ██║██║╚██╔╝██║██║██║             "
-    echo "     ██║ ╚████║   ██║   ╚██████╔╝██║ ╚═╝ ██║██║╚██████╗        "
-    echo "     ╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚═╝ ╚═════╝        "
-    echo "                                                                "
-    echo "              Atomic-UI Management Script v${SCRIPT_VERSION}    "
-    echo "              Outline VPN Management Panel                      "
-    echo "                                                                "
-    echo "================================================================"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                                                              ║"
+    echo "║     ███╗   ██╗████████╗ ██████╗ ███╗   ███╗██╗ ██████╗       ║"
+    echo "║     ████╗  ██║╚══██╔══╝██╔═══██╗████╗ ████║██║██╔════╝       ║"
+    echo "║     ██╔██╗ ██║   ██║   ██║   ██║██╔████╔██║██║██║            ║"
+    echo "║     ██║╚██╗██║   ██║   ██║   ██║██║╚██╔╝██║██║██║            ║"
+    echo "║     ██║ ╚████║   ██║   ╚██████╔╝██║ ╚═╝ ██║██║╚██████╗       ║"
+    echo "║     ╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚═╝ ╚═════╝       ║"
+    echo "║                                                              ║"
+    echo "║          Atomic-UI Management Script v${SCRIPT_VERSION}              ║"
+    echo "║          Outline VPN Management Panel                        ║"
+    echo "║                                                              ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
@@ -76,11 +91,21 @@ check_root() {
     fi
 }
 
+# Generate random port
+generate_random_port() {
+    while true; do
+        PORT=$((RANDOM % 55000 + 10000))
+        if ! lsof -i :$PORT > /dev/null 2>&1; then
+            echo $PORT
+            return
+        fi
+    done
+}
+
 # Check system requirements
 check_system() {
     print_step "Checking system requirements..."
 
-    # Check OS
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         OS=$ID
@@ -94,7 +119,6 @@ check_system() {
         print_warning "This script is designed for Ubuntu/Debian. Other systems may work but are not officially supported."
     fi
 
-    # Check architecture
     ARCH=$(uname -m)
     if [[ "$ARCH" != "x86_64" && "$ARCH" != "aarch64" ]]; then
         print_error "Unsupported architecture: $ARCH"
@@ -106,35 +130,36 @@ check_system() {
 
 # Check for port conflicts
 check_port_conflict() {
-    print_step "Checking for port conflicts on ${DEFAULT_PORT}..."
+    local PORT_TO_CHECK=$1
     
-    if lsof -i :${DEFAULT_PORT} > /dev/null 2>&1; then
-        print_warning "Port ${DEFAULT_PORT} is already in use!"
+    if lsof -i :${PORT_TO_CHECK} > /dev/null 2>&1; then
+        # Check if it's our own service
+        if lsof -i :${PORT_TO_CHECK} | grep -q "node"; then
+            return 0  # It's probably atomic-ui, OK
+        fi
         
-        # Check if it's docker
-        if lsof -i :${DEFAULT_PORT} | grep -q docker; then
-            print_warning "Docker container is using port ${DEFAULT_PORT}"
+        print_warning "Port ${PORT_TO_CHECK} is already in use!"
+        
+        if lsof -i :${PORT_TO_CHECK} | grep -q docker; then
+            print_warning "Docker container is using port ${PORT_TO_CHECK}"
             read -p "Do you want to stop Docker containers using this port? (y/n): " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                # Find and stop containers using port 3000
-                CONTAINER_IDS=$(docker ps --filter "publish=${DEFAULT_PORT}" -q 2>/dev/null)
+                CONTAINER_IDS=$(docker ps --filter "publish=${PORT_TO_CHECK}" -q 2>/dev/null)
                 if [ -n "$CONTAINER_IDS" ]; then
                     docker stop $CONTAINER_IDS
                     print_success "Stopped Docker containers"
                 fi
             else
-                print_error "Cannot proceed with port conflict"
-                exit 1
+                return 1
             fi
         else
-            print_error "Another service is using port ${DEFAULT_PORT}. Please stop it first."
-            lsof -i :${DEFAULT_PORT}
-            exit 1
+            print_error "Another service is using port ${PORT_TO_CHECK}"
+            lsof -i :${PORT_TO_CHECK}
+            return 1
         fi
-    else
-        print_success "Port ${DEFAULT_PORT} is available"
     fi
+    return 0
 }
 
 # Install Node.js
@@ -150,8 +175,6 @@ install_nodejs() {
     fi
 
     print_step "Installing Node.js 20.x..."
-
-    # Install Node.js via NodeSource
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
 
@@ -161,10 +184,8 @@ install_nodejs() {
 # Install system dependencies
 install_dependencies() {
     print_step "Installing system dependencies..."
-
     apt-get update
     apt-get install -y git curl wget unzip openssl lsof
-
     print_success "Dependencies installed"
 }
 
@@ -187,83 +208,74 @@ setup_repository() {
 
     git clone "https://github.com/${GITHUB_REPO}.git" "$INSTALL_DIR"
     print_success "Repository cloned to $INSTALL_DIR"
-
     cd "$INSTALL_DIR"
 }
 
-# Install npm dependencies (full clean install)
+# Install npm dependencies
 install_npm_deps() {
     print_step "Installing npm dependencies (clean install)..."
-
     cd "$INSTALL_DIR"
-    
-    # Remove old cache and modules for clean install
     rm -rf node_modules .next package-lock.json
-    
     npm install --production=false
-
     print_success "npm dependencies installed"
 }
 
 # Setup environment
 setup_environment() {
+    local NEW_PORT=$1
     print_step "Setting up environment..."
 
     cd "$INSTALL_DIR"
 
     if [ ! -f .env ]; then
         cp .env.example .env
-
-        # Generate secure JWT secret
         JWT_SECRET=$(openssl rand -base64 32)
         sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
-
-        # Get server IP for APP_URL
-        SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
-        sed -i "s|http://localhost:3000|http://${SERVER_IP}:${DEFAULT_PORT}|g" .env
-
-        print_success "Environment configured"
-        print_warning "Edit $INSTALL_DIR/.env to customize settings"
-    else
-        print_warning ".env file already exists, skipping"
     fi
+    
+    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+    
+    # Update port in .env
+    if grep -q "^PORT=" .env; then
+        sed -i "s|^PORT=.*|PORT=${NEW_PORT}|g" .env
+    else
+        echo "PORT=${NEW_PORT}" >> .env
+    fi
+    
+    # Update APP_URL with new port
+    sed -i "s|http://localhost:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+
+    # Save port to file
+    echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
+
+    print_success "Environment configured with port ${NEW_PORT}"
 }
 
 # Setup database
 setup_database() {
     print_step "Setting up database..."
-
     cd "$INSTALL_DIR"
-
-    # Create data directory
     mkdir -p prisma/data
-
-    # Generate Prisma client and push schema
     npx prisma generate
     npx prisma db push
-
-    # Run setup script to create admin user
     npm run setup
-
     print_success "Database setup complete"
 }
 
 # Build application
 build_app() {
     print_step "Building application..."
-
     cd "$INSTALL_DIR"
-    
-    # Clean build
     rm -rf .next
     npm run build
-
     print_success "Application built successfully"
 }
 
-# Create systemd service
+# Create systemd service with specified port
 create_service() {
-    print_step "Creating systemd service..."
+    local PORT=$1
+    print_step "Creating systemd service with port ${PORT}..."
 
     cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
 [Unit]
@@ -281,7 +293,7 @@ StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=${SERVICE_NAME}
 Environment=NODE_ENV=production
-Environment=PORT=${DEFAULT_PORT}
+Environment=PORT=${PORT}
 
 [Install]
 WantedBy=multi-user.target
@@ -291,27 +303,25 @@ EOF
     systemctl enable ${SERVICE_NAME}
     systemctl start ${SERVICE_NAME}
 
-    print_success "Service created and started"
+    print_success "Service created and started on port ${PORT}"
 }
 
 # Install management script globally
 install_management_script() {
     print_step "Installing management script..."
-    
-    # Copy this script to /usr/local/bin
     cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
     chmod +x /usr/local/bin/atomic-ui
-    
     print_success "Management script installed. Use 'atomic-ui' command to manage."
 }
 
 # Setup firewall
 setup_firewall() {
-    print_step "Configuring firewall..."
+    local PORT=$1
+    print_step "Configuring firewall for port ${PORT}..."
 
     if command -v ufw &> /dev/null; then
-        ufw allow ${DEFAULT_PORT}/tcp
-        print_success "Firewall rule added for port ${DEFAULT_PORT}"
+        ufw allow ${PORT}/tcp > /dev/null 2>&1
+        print_success "Firewall rule added for port ${PORT}"
     else
         print_warning "UFW not found, skipping firewall configuration"
     fi
@@ -319,33 +329,30 @@ setup_firewall() {
 
 # Print completion message
 print_completion() {
+    local PORT=$1
     SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "YOUR_SERVER_IP")
 
     echo ""
-    echo -e "${GREEN}================================================================${NC}"
-    echo -e "${GREEN}          INSTALLATION COMPLETE!                               ${NC}"
-    echo -e "${GREEN}================================================================${NC}"
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║              INSTALLATION COMPLETE!                          ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
-    echo -e "${YELLOW}  Access your panel:${NC}"
-    echo -e "  URL: ${GREEN}http://${SERVER_IP}:${DEFAULT_PORT}${NC}"
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
+    echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PORT}${NC}"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PORT}${NC}"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Default login credentials:${NC}"
+    echo -e "${CYAN}│${NC}  Username: ${GREEN}admin${NC}"
+    echo -e "${CYAN}│${NC}  Password: ${GREEN}admin123${NC}"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${RED}⚠ IMPORTANT: Change the password after first login!${NC}"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
     echo ""
-    echo -e "${YELLOW}  Default login credentials:${NC}"
-    echo -e "  Username: ${GREEN}admin${NC}"
-    echo -e "  Password: ${GREEN}admin123${NC}"
-    echo ""
-    echo -e "${RED}  ⚠ IMPORTANT: Change the password after first login!${NC}"
-    echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
-    echo ""
-    echo -e "${YELLOW}  Management commands:${NC}"
-    echo -e "  ${BLUE}atomic-ui${NC}          - Show management menu"
-    echo -e "  ${BLUE}atomic-ui status${NC}   - Check service status"
-    echo -e "  ${BLUE}atomic-ui logs${NC}     - View logs"
-    echo -e "  ${BLUE}atomic-ui restart${NC}  - Restart service"
-    echo -e "  ${BLUE}atomic-ui update${NC}   - Update to latest version"
-    echo ""
-    echo -e "${YELLOW}  Configuration file:${NC}"
-    echo -e "  ${BLUE}${INSTALL_DIR}/.env${NC}"
+    echo -e "${YELLOW}  Management:${NC}"
+    echo -e "  Run ${BLUE}atomic-ui${NC} to access the management menu"
+    echo -e "  Run ${BLUE}atomic-ui port${NC} to view/change the port"
     echo ""
 }
 
@@ -357,6 +364,7 @@ print_completion() {
 start_service() {
     print_step "Starting Atomic-UI..."
     systemctl start ${SERVICE_NAME}
+    sleep 2
     if systemctl is-active --quiet ${SERVICE_NAME}; then
         print_success "Atomic-UI started successfully"
     else
@@ -387,34 +395,39 @@ restart_service() {
 
 # Show status
 show_status() {
+    CURRENT_PORT=$(get_current_port)
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "Unknown")
+    
     echo ""
-    echo -e "${CYAN}Atomic-UI Service Status${NC}"
-    echo -e "${CYAN}────────────────────────${NC}"
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Atomic-UI Service Status${NC}"
+    echo -e "${CYAN}├──────────────────────────────────────────────────────────────┤${NC}"
     
     if systemctl is-active --quiet ${SERVICE_NAME}; then
-        echo -e "Status: ${GREEN}Running${NC}"
+        echo -e "${CYAN}│${NC}  Status:     ${GREEN}● Running${NC}"
     else
-        echo -e "Status: ${RED}Stopped${NC}"
+        echo -e "${CYAN}│${NC}  Status:     ${RED}○ Stopped${NC}"
     fi
     
     if systemctl is-enabled --quiet ${SERVICE_NAME} 2>/dev/null; then
-        echo -e "Auto-start: ${GREEN}Enabled${NC}"
+        echo -e "${CYAN}│${NC}  Auto-start: ${GREEN}Enabled${NC}"
     else
-        echo -e "Auto-start: ${YELLOW}Disabled${NC}"
+        echo -e "${CYAN}│${NC}  Auto-start: ${YELLOW}Disabled${NC}"
     fi
+    
+    echo -e "${CYAN}│${NC}  Port:       ${BLUE}${CURRENT_PORT}${NC}"
+    echo -e "${CYAN}│${NC}  Panel URL:  ${BLUE}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
     
     if [ -d "$INSTALL_DIR" ]; then
-        echo -e "Install Dir: ${BLUE}${INSTALL_DIR}${NC}"
         if [ -f "$INSTALL_DIR/package.json" ]; then
             VERSION=$(grep '"version"' "$INSTALL_DIR/package.json" | cut -d'"' -f4)
-            echo -e "Version: ${BLUE}${VERSION}${NC}"
+            echo -e "${CYAN}│${NC}  Version:    ${BLUE}${VERSION}${NC}"
         fi
     else
-        echo -e "Install Dir: ${RED}Not Found${NC}"
+        echo -e "${CYAN}│${NC}  Install:    ${RED}Not Found${NC}"
     fi
     
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "Unknown")
-    echo -e "Panel URL: ${BLUE}http://${SERVER_IP}:${DEFAULT_PORT}${NC}"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
     echo ""
 }
 
@@ -439,6 +452,119 @@ disable_service() {
     print_success "Atomic-UI will not start automatically on boot"
 }
 
+# ============================================
+# Port Management
+# ============================================
+
+# Change port
+change_port() {
+    local NEW_PORT=$1
+    CURRENT_PORT=$(get_current_port)
+    
+    echo ""
+    echo -e "${CYAN}Port Management${NC}"
+    echo -e "${CYAN}────────────────${NC}"
+    echo -e "Current port: ${GREEN}${CURRENT_PORT}${NC}"
+    echo ""
+    
+    if [ -z "$NEW_PORT" ]; then
+        # Interactive mode
+        read -p "Enter new port (10000-65000) or press Enter to keep current: " NEW_PORT
+        
+        if [ -z "$NEW_PORT" ]; then
+            print_info "Keeping current port: ${CURRENT_PORT}"
+            return
+        fi
+    fi
+    
+    # Validate port number
+    if ! [[ "$NEW_PORT" =~ ^[0-9]+$ ]] || [ "$NEW_PORT" -lt 1 ] || [ "$NEW_PORT" -gt 65535 ]; then
+        print_error "Invalid port number: ${NEW_PORT}"
+        return 1
+    fi
+    
+    if [ "$NEW_PORT" -lt 1024 ]; then
+        print_warning "Ports below 1024 may require special permissions"
+    fi
+    
+    if [ "$NEW_PORT" == "$CURRENT_PORT" ]; then
+        print_info "Port is already set to ${NEW_PORT}"
+        return
+    fi
+    
+    # Check if new port is available
+    if ! check_port_conflict "$NEW_PORT"; then
+        print_error "Cannot use port ${NEW_PORT}"
+        return 1
+    fi
+    
+    print_step "Changing port from ${CURRENT_PORT} to ${NEW_PORT}..."
+    
+    # Stop service
+    systemctl stop ${SERVICE_NAME}
+    
+    # Remove old firewall rule
+    if command -v ufw &> /dev/null; then
+        ufw delete allow ${CURRENT_PORT}/tcp > /dev/null 2>&1
+    fi
+    
+    # Update .env
+    cd "$INSTALL_DIR"
+    if grep -q "^PORT=" .env; then
+        sed -i "s|^PORT=.*|PORT=${NEW_PORT}|g" .env
+    else
+        echo "PORT=${NEW_PORT}" >> .env
+    fi
+    
+    # Update APP_URL
+    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    
+    # Save new port
+    echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
+    
+    # Update systemd service
+    sed -i "s|Environment=PORT=.*|Environment=PORT=${NEW_PORT}|g" /etc/systemd/system/${SERVICE_NAME}.service
+    systemctl daemon-reload
+    
+    # Add new firewall rule
+    if command -v ufw &> /dev/null; then
+        ufw allow ${NEW_PORT}/tcp > /dev/null 2>&1
+        print_success "Firewall updated for port ${NEW_PORT}"
+    fi
+    
+    # Start service
+    systemctl start ${SERVICE_NAME}
+    sleep 2
+    
+    if systemctl is-active --quiet ${SERVICE_NAME}; then
+        print_success "Port changed successfully!"
+        echo ""
+        echo -e "New panel URL: ${GREEN}http://${SERVER_IP}:${NEW_PORT}${NC}"
+        echo ""
+    else
+        print_error "Service failed to start with new port"
+        systemctl status ${SERVICE_NAME}
+    fi
+}
+
+# Show port info
+show_port() {
+    CURRENT_PORT=$(get_current_port)
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+    
+    echo ""
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Port Information${NC}"
+    echo -e "${CYAN}├──────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${CYAN}│${NC}  Current Port: ${GREEN}${CURRENT_PORT}${NC}"
+    echo -e "${CYAN}│${NC}  Panel URL:    ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+    echo -e "To change port, run: ${BLUE}atomic-ui port <new-port>${NC}"
+    echo ""
+}
+
 # Update to latest version
 update_service() {
     print_step "Updating Atomic-UI to latest version..."
@@ -448,39 +574,39 @@ update_service() {
         exit 1
     fi
     
+    CURRENT_PORT=$(get_current_port)
     cd "$INSTALL_DIR"
     
-    # Stop service
     systemctl stop ${SERVICE_NAME}
     
-    # Backup .env and database
     print_step "Backing up configuration..."
     cp .env .env.backup 2>/dev/null || true
     cp -r prisma/data prisma/data.backup 2>/dev/null || true
+    cp .panel_port .panel_port.backup 2>/dev/null || true
     
-    # Pull latest code
     print_step "Downloading latest version..."
     git fetch origin
     git reset --hard origin/main
     
-    # Restore .env
+    # Restore backups
     cp .env.backup .env 2>/dev/null || true
+    cp .panel_port.backup .panel_port 2>/dev/null || true
     
-    # Clean install
     print_step "Installing dependencies..."
     rm -rf node_modules .next package-lock.json
     npm install --production=false
     
-    # Regenerate Prisma and migrate
     print_step "Updating database..."
     npx prisma generate
     npx prisma db push
     
-    # Rebuild
     print_step "Building application..."
     npm run build
     
-    # Restart service
+    # Update management script
+    cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
+    chmod +x /usr/local/bin/atomic-ui
+    
     systemctl start ${SERVICE_NAME}
     
     print_success "Atomic-UI updated successfully!"
@@ -489,6 +615,8 @@ update_service() {
 
 # Uninstall
 uninstall_service() {
+    CURRENT_PORT=$(get_current_port)
+    
     echo ""
     echo -e "${RED}⚠ WARNING: This will completely remove Atomic-UI${NC}"
     echo ""
@@ -513,6 +641,11 @@ uninstall_service() {
     print_step "Removing service file..."
     rm -f /etc/systemd/system/${SERVICE_NAME}.service
     systemctl daemon-reload
+    
+    # Remove firewall rule
+    if command -v ufw &> /dev/null; then
+        ufw delete allow ${CURRENT_PORT}/tcp > /dev/null 2>&1
+    fi
     
     if [[ $KEEP_DB =~ ^[Yy]$ ]]; then
         print_step "Backing up database..."
@@ -552,19 +685,20 @@ show_menu() {
     echo ""
     echo -e "  ${GREEN}4)${NC} View Logs"
     echo -e "  ${GREEN}5)${NC} Check Status"
+    echo -e "  ${GREEN}6)${NC} Change Port"
     echo ""
-    echo -e "  ${GREEN}6)${NC} Enable Auto-start"
-    echo -e "  ${GREEN}7)${NC} Disable Auto-start"
+    echo -e "  ${GREEN}7)${NC} Enable Auto-start"
+    echo -e "  ${GREEN}8)${NC} Disable Auto-start"
     echo ""
-    echo -e "  ${GREEN}8)${NC} Update Atomic-UI"
-    echo -e "  ${GREEN}9)${NC} Reinstall Atomic-UI"
+    echo -e "  ${GREEN}9)${NC} Update Atomic-UI"
+    echo -e "  ${GREEN}10)${NC} Reinstall Atomic-UI"
     echo ""
-    echo -e "  ${RED}10)${NC} Uninstall Atomic-UI"
+    echo -e "  ${RED}11)${NC} Uninstall Atomic-UI"
     echo ""
     echo -e "  ${GREEN}0)${NC} Exit"
     echo ""
     
-    read -p "Please enter your choice [0-10]: " choice
+    read -p "Please enter your choice [0-11]: " choice
     
     case $choice in
         1) start_service ;;
@@ -572,11 +706,12 @@ show_menu() {
         3) restart_service ;;
         4) show_logs ;;
         5) show_status ;;
-        6) enable_service ;;
-        7) disable_service ;;
-        8) update_service ;;
-        9) install_full ;;
-        10) uninstall_service ;;
+        6) change_port ;;
+        7) enable_service ;;
+        8) disable_service ;;
+        9) update_service ;;
+        10) install_full ;;
+        11) uninstall_service ;;
         0) exit 0 ;;
         *) print_error "Invalid option" ;;
     esac
@@ -586,21 +721,25 @@ show_menu() {
 install_full() {
     print_banner
     
+    # Generate random port
+    NEW_PORT=$(generate_random_port)
+    print_info "Generated random port: ${NEW_PORT}"
+    
     check_root
     check_system
-    check_port_conflict
+    check_port_conflict "$NEW_PORT"
     install_dependencies
     install_nodejs
     setup_repository
     install_npm_deps
-    setup_environment
+    setup_environment "$NEW_PORT"
     setup_database
     build_app
-    create_service
+    create_service "$NEW_PORT"
     install_management_script
-    setup_firewall
+    setup_firewall "$NEW_PORT"
 
-    print_completion
+    print_completion "$NEW_PORT"
 }
 
 # ============================================
@@ -639,6 +778,14 @@ main() {
         logs)
             show_logs
             ;;
+        port)
+            if [ -z "$2" ]; then
+                show_port
+            else
+                check_root
+                change_port "$2"
+            fi
+            ;;
         enable)
             check_root
             enable_service
@@ -648,7 +795,6 @@ main() {
             disable_service
             ;;
         "")
-            # No argument - show menu
             check_root
             show_menu
             ;;
@@ -664,6 +810,8 @@ main() {
             echo "  restart    - Restart service"
             echo "  status     - Show status"
             echo "  logs       - View logs"
+            echo "  port       - Show current port"
+            echo "  port <num> - Change port to <num>"
             echo "  enable     - Enable auto-start"
             echo "  disable    - Disable auto-start"
             echo ""
