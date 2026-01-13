@@ -44,7 +44,12 @@ A modern, feature-rich web application for managing Outline VPN servers. Built w
 Install Atomic-UI with a single command on Ubuntu/Debian VPS:
 
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
+```
+
+**Alternative method (if wget is not available):**
+```bash
+curl -sSL https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh -o /tmp/install.sh && sudo bash /tmp/install.sh
 ```
 
 This will automatically:
@@ -52,21 +57,28 @@ This will automatically:
 - Clone the repository
 - Install dependencies
 - Configure environment with secure JWT secret
-- Setup SQLite database
+- Setup SQLite database with random port (10000-65000)
 - Create admin user
 - Build for production
 - Create systemd service
 - Configure firewall
 
-After installation, you'll see your login URL and credentials.
+After installation, you'll see your login URL, port, and credentials.
 
 ### Management Commands
 
+After installation, use the `atomic-ui` command to manage:
+
 ```bash
-systemctl status atomic-ui    # Check status
-systemctl restart atomic-ui   # Restart the panel
-systemctl stop atomic-ui      # Stop the panel
-journalctl -u atomic-ui -f    # View logs
+atomic-ui              # Show management menu
+atomic-ui status       # Check status
+atomic-ui start        # Start the panel
+atomic-ui stop         # Stop the panel
+atomic-ui restart      # Restart the panel
+atomic-ui logs         # View logs
+atomic-ui port         # View/change port
+atomic-ui update       # Update to latest version
+atomic-ui uninstall    # Uninstall completely
 ```
 
 ### Manual Installation
