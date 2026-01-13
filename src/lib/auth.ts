@@ -7,6 +7,19 @@ import { db } from './db';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'atomic-ui-default-secret');
 const SESSION_COOKIE_NAME = 'atomic-session';
 const SESSION_EXPIRY_DAYS = parseInt(process.env.SESSION_EXPIRY_DAYS || '7');
+const COOKIE_SECURE_SETTING = process.env.COOKIE_SECURE;
+
+function resolveCookieSecureSetting(): boolean {
+  if (COOKIE_SECURE_SETTING === 'true') {
+    return true;
+  }
+
+  if (COOKIE_SECURE_SETTING === 'false') {
+    return false;
+  }
+
+  return process.env.NODE_ENV === 'production';
+}
 
 // Types for authentication
 export interface SessionPayload {
@@ -137,7 +150,7 @@ export async function setSessionCookie(token: string): Promise<void> {
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: resolveCookieSecureSetting(),
     sameSite: 'lax',
     maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // Convert days to seconds
     path: '/',

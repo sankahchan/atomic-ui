@@ -167,6 +167,7 @@ atomic-ui/
 | `DATABASE_URL` | SQLite database path | `file:./data/atomic-ui.db` |
 | `JWT_SECRET` | Secret for JWT signing | (required) |
 | `SESSION_EXPIRY_DAYS` | Session duration | `7` |
+| `COOKIE_SECURE` | Force secure cookies (`true`/`false`) | `NODE_ENV === production` |
 | `APP_URL` | Public URL for subscription links | `http://localhost:3000` |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot for notifications | (optional) |
 | `HEALTH_CHECK_ENABLED` | Enable health monitoring | `true` |
