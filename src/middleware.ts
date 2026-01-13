@@ -107,7 +107,7 @@ export async function middleware(request: NextRequest) {
         )
       : NextResponse.redirect(new URL('/login', request.url));
 
-    response.cookies.delete('session');
+    response.cookies.delete('atomic-session');
     return response;
   }
 }
