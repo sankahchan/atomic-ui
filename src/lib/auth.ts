@@ -130,6 +130,21 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 /**
+ * Get the current session token from the session cookie.
+ * Returns null if no session cookie is present.
+ */
+export async function getSessionToken(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
+
+    return sessionCookie?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Set the session cookie after successful login
  */
 export async function setSessionCookie(token: string): Promise<void> {
