@@ -24,18 +24,7 @@ NC='\033[0m'
 # Config
 INSTALL_DIR="/opt/atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
-
-# Generate random port between 10000-65000
-generate_random_port() {
-    while true; do
-        PORT=$((RANDOM % 55000 + 10000))
-        # Check if port is available
-        if ! lsof -i :$PORT > /dev/null 2>&1; then
-            echo $PORT
-            return
-        fi
-    done
-}
+DEFAULT_PORT=2053  # Fixed port like 3x-ui
 
 # Generate random path for security (like 3x-ui)
 generate_random_path() {
@@ -67,10 +56,9 @@ else
     echo -e "${YELLOW}[!]${NC} Could not detect OS"
 fi
 
-# Generate random port
-echo -e "${BLUE}[*]${NC} Generating secure random port..."
-PANEL_PORT=$(generate_random_port)
-echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC}"
+# Use fixed port 2053
+PANEL_PORT=${DEFAULT_PORT}
+echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC} (fixed)"
 
 # Generate random path for security
 echo -e "${BLUE}[*]${NC} Generating secure random path..."
@@ -80,9 +68,9 @@ echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
 # Check for port conflicts
 echo -e "${BLUE}[*]${NC} Checking for port conflicts..."
 if command -v lsof &> /dev/null && lsof -i :${PANEL_PORT} > /dev/null 2>&1; then
-    echo -e "${YELLOW}[!]${NC} Port ${PANEL_PORT} is in use, generating another..."
-    PANEL_PORT=$(generate_random_port)
-    echo -e "${GREEN}[✓]${NC} New panel port: ${CYAN}${PANEL_PORT}${NC}"
+    echo -e "${RED}[✗]${NC} Port ${PANEL_PORT} is already in use!"
+    echo -e "${YELLOW}[!]${NC} Please stop the service using port ${PANEL_PORT} and try again."
+    exit 1
 fi
 
 # Install dependencies
