@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
-  },
+  // Note: 'standalone' output removed - causes server action issues in production
+  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
   images: {
     remotePatterns: [
       {
@@ -19,3 +17,4 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+
