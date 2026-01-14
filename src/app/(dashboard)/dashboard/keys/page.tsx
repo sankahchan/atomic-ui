@@ -31,6 +31,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatBytes, formatRelativeTime, formatDateTime, getCountryFlag } from '@/lib/utils';
+import { useLocale } from '@/hooks/use-locale';
 import {
   Plus,
   Key,
@@ -83,27 +84,27 @@ const statusConfig = {
   ACTIVE: {
     color: 'bg-green-500/20 text-green-400 border-green-500/30',
     icon: CheckCircle2,
-    label: 'Active'
+    labelKey: 'keys.status.active'
   },
   DISABLED: {
     color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     icon: XCircle,
-    label: 'Disabled'
+    labelKey: 'keys.status.disabled'
   },
   EXPIRED: {
     color: 'bg-red-500/20 text-red-400 border-red-500/30',
     icon: Clock,
-    label: 'Expired'
+    labelKey: 'keys.status.expired'
   },
   DEPLETED: {
     color: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     icon: AlertTriangle,
-    label: 'Depleted'
+    labelKey: 'keys.status.depleted'
   },
   PENDING: {
     color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     icon: Clock,
-    label: 'Pending'
+    labelKey: 'keys.status.pending'
   },
 };
 
@@ -148,6 +149,7 @@ function CreateKeyDialog({
 
   // Fetch servers for selection
   const { data: servers } = trpc.servers.list.useQuery();
+  const { t } = useLocale();
 
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
@@ -214,17 +216,17 @@ function CreateKeyDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="w-5 h-5 text-primary" />
-            Create Access Key
+            {t('keys.dialog.create.title')}
           </DialogTitle>
           <DialogDescription>
-            Create a new VPN access key for a client.
+            {t('keys.dialog.create.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Server selection */}
           <div className="space-y-2">
-            <Label>Server *</Label>
+            <Label>{t('keys.form.server')} *</Label>
             <Select
               value={formData.serverId}
               onValueChange={(value) => setFormData({ ...formData, serverId: value })}
@@ -245,7 +247,7 @@ function CreateKeyDialog({
 
           {/* Key name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Name *</Label>
+            <Label htmlFor="name">{t('keys.form.name')} *</Label>
             <Input
               id="name"
               placeholder="e.g., John's Phone"
@@ -256,7 +258,7 @@ function CreateKeyDialog({
 
           {/* Encryption method */}
           <div className="space-y-2">
-            <Label>Encryption Method</Label>
+            <Label>{t('keys.form.method')}</Label>
             <Select
               value={formData.method}
               onValueChange={(value) => setFormData({ ...formData, method: value })}
@@ -280,7 +282,7 @@ function CreateKeyDialog({
           {/* Contact info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('keys.form.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -290,7 +292,7 @@ function CreateKeyDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="telegramId">Telegram ID</Label>
+              <Label htmlFor="telegramId">{t('keys.form.telegram')}</Label>
               <Input
                 id="telegramId"
                 placeholder="@username or ID"
@@ -302,7 +304,7 @@ function CreateKeyDialog({
 
           {/* Data limit */}
           <div className="space-y-2">
-            <Label htmlFor="dataLimit">Data Limit (GB)</Label>
+            <Label htmlFor="dataLimit">{t('keys.form.data_limit')}</Label>
             <Input
               id="dataLimit"
               type="number"
@@ -319,7 +321,7 @@ function CreateKeyDialog({
 
           {/* Expiration type */}
           <div className="space-y-2">
-            <Label>Expiration</Label>
+            <Label>{t('keys.form.expiration')}</Label>
             <Select
               value={formData.expirationType}
               onValueChange={(value: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') =>
@@ -330,7 +332,7 @@ function CreateKeyDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NEVER">Never expires</SelectItem>
+                <SelectItem value="NEVER">{t('keys.never_expires')}</SelectItem>
                 <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
                 <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
               </SelectContent>
@@ -355,7 +357,7 @@ function CreateKeyDialog({
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('keys.form.notes')}</Label>
             <Input
               id="notes"
               placeholder="Optional notes about this key"
@@ -370,13 +372,13 @@ function CreateKeyDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('keys.cancel')}
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              Create Key
+              {t('keys.create')}
             </Button>
           </DialogFooter>
         </form>
@@ -403,6 +405,7 @@ function QRCodeDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
 
   // Fetch QR code
   const { data, isLoading } = trpc.keys.generateQRCode.useQuery(
@@ -420,8 +423,8 @@ function QRCodeDialog({
     if (keyData?.accessUrl) {
       await navigator.clipboard.writeText(keyData.accessUrl);
       toast({
-        title: 'Copied!',
-        description: 'Access URL copied to clipboard.',
+        title: t('keys.toast.copied'),
+        description: t('keys.toast.copied_desc'),
       });
     }
   };
@@ -527,6 +530,7 @@ function KeyRow({
   isTogglingStatus: boolean;
   isOnline: boolean;
 }) {
+  const { t } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
 
@@ -583,7 +587,7 @@ function KeyRow({
       <td className="px-4 py-3">
         <Badge className={cn('border', config.color)}>
           <StatusIcon className="w-3 h-3 mr-1" />
-          {config.label}
+          {t(config.labelKey)}
         </Badge>
       </td>
 
@@ -723,6 +727,7 @@ export default function KeysPage() {
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const { t } = useLocale();
 
   const pageSize = 20;
 
@@ -752,13 +757,13 @@ export default function KeysPage() {
           </div>
           <Badge className={cn('border', config.color)}>
             <StatusIcon className="w-3 h-3 mr-1" />
-            {config.label}
+            {t(config.labelKey)}
           </Badge>
         </div>
 
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Usage</span>
+            <span className="text-muted-foreground">{t('keys.table.usage')}</span>
             <span>{formatBytes(key.usedBytes)} / {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : '∞'}</span>
           </div>
           {key.dataLimitBytes && (
@@ -773,10 +778,10 @@ export default function KeysPage() {
           <div className="text-xs text-muted-foreground">
             {key.expiresAt ? (
               <span className={cn(key.isExpiringSoon && 'text-red-500')}>
-                Expires: {formatRelativeTime(key.expiresAt)}
+                {t('keys.expires_in')} {formatRelativeTime(key.expiresAt)}
               </span>
             ) : (
-              <span>Never expires</span>
+              <span>{t('keys.never_expires')}</span>
             )}
           </div>
 
@@ -951,7 +956,7 @@ export default function KeysPage() {
   });
 
   const handleDelete = (keyId: string, keyName: string) => {
-    if (confirm(`Are you sure you want to delete "${keyName}"?\n\nThis will also remove the key from the Outline server.`)) {
+    if (confirm(`${t('keys.confirm_delete')} "${keyName}"?`)) {
       deleteMutation.mutate({ id: keyId });
     }
   };
@@ -963,7 +968,7 @@ export default function KeysPage() {
 
   const handleBulkDelete = () => {
     if (selectedKeys.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedKeys.size} keys?\n\nThis will also remove them from the Outline servers.`)) {
+    if (confirm(t('keys.confirm_bulk_delete'))) {
       bulkDeleteMutation.mutate({ ids: Array.from(selectedKeys) });
     }
   };
@@ -1035,14 +1040,14 @@ export default function KeysPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Access Keys</h1>
+          <h1 className="text-2xl font-bold">{t('keys.title')}</h1>
           <p className="text-muted-foreground">
-            Manage VPN access keys across all servers.
+            {t('keys.subtitle')}
           </p>
         </div>
         <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Create Key
+          {t('keys.create')}
         </Button>
       </div>
 
@@ -1052,14 +1057,14 @@ export default function KeysPage() {
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <Key className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="text-sm text-muted-foreground">{t('keys.total')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.total}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <p className="text-sm text-green-500">Active</p>
+              <p className="text-sm text-green-500">{t('keys.active')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.active}</p>
           </Card>
@@ -1069,35 +1074,35 @@ export default function KeysPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <p className="text-sm text-green-500">Online</p>
+              <p className="text-sm text-green-500">{t('keys.online')}</p>
             </div>
             <p className="text-2xl font-bold">{onlineData?.onlineCount || 0}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-500" />
-              <p className="text-sm text-blue-500">Pending</p>
+              <p className="text-sm text-blue-500">{t('keys.pending')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.pending}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
-              <p className="text-sm text-orange-500">Depleted</p>
+              <p className="text-sm text-orange-500">{t('keys.depleted')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.depleted}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <XCircle className="w-4 h-4 text-red-500" />
-              <p className="text-sm text-red-500">Expired</p>
+              <p className="text-sm text-red-500">{t('keys.expired')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.expired}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-primary" />
-              <p className="text-sm text-muted-foreground">Total Usage</p>
+              <p className="text-sm text-muted-foreground">{t('keys.total_usage')}</p>
             </div>
             <p className="text-2xl font-bold">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
           </Card>
@@ -1109,7 +1114,7 @@ export default function KeysPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or email..."
+            placeholder={t('keys.search_placeholder')}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -1127,15 +1132,15 @@ export default function KeysPage() {
           }}
         >
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder={t('keys.status_filter')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="DEPLETED">Depleted</SelectItem>
-            <SelectItem value="EXPIRED">Expired</SelectItem>
-            <SelectItem value="DISABLED">Disabled</SelectItem>
+            <SelectItem value="all">{t('keys.status_filter')}</SelectItem>
+            <SelectItem value="ACTIVE">{t('keys.status.active')}</SelectItem>
+            <SelectItem value="PENDING">{t('keys.status.pending')}</SelectItem>
+            <SelectItem value="DEPLETED">{t('keys.status.depleted')}</SelectItem>
+            <SelectItem value="EXPIRED">{t('keys.status.expired')}</SelectItem>
+            <SelectItem value="DISABLED">{t('keys.status.disabled')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -1147,10 +1152,10 @@ export default function KeysPage() {
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Servers" />
+            <SelectValue placeholder={t('keys.server_filter')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Servers</SelectItem>
+            <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
             {servers?.map((server) => (
               <SelectItem key={server.id} value={server.id}>
                 {server.countryCode && getCountryFlag(server.countryCode)}{' '}
@@ -1167,7 +1172,7 @@ export default function KeysPage() {
             onClick={clearFilters}
           >
             <X className="w-4 h-4 mr-1" />
-            Clear
+            {t('keys.clear_filters')}
           </Button>
         )}
 
@@ -1176,17 +1181,17 @@ export default function KeysPage() {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
               <Download className="w-4 h-4 mr-2" />
-              Export
+              {t('keys.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleExport('json')}>
               <FileJson className="w-4 h-4 mr-2" />
-              Export as JSON
+              {t('keys.export_json')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport('csv')}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export as CSV
+              {t('keys.export_csv')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1223,7 +1228,7 @@ export default function KeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            Sync
+            {t('keys.sync')}
           </Button>
         </div>
       </div>
@@ -1232,7 +1237,7 @@ export default function KeysPage() {
       {selectedKeys.size > 0 && (
         <div className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
           <span className="text-sm font-medium">
-            {selectedKeys.size} key{selectedKeys.size > 1 ? 's' : ''} selected
+            {selectedKeys.size} {t('keys.selected_count')}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -1246,7 +1251,7 @@ export default function KeysPage() {
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
-              Delete Selected
+              {t('keys.delete_selected')}
             </Button>
           </div>
           <Button
@@ -1255,7 +1260,7 @@ export default function KeysPage() {
             onClick={() => setSelectedKeys(new Set())}
             className="ml-auto"
           >
-            Clear selection
+            {t('keys.clear_selection')}
           </Button>
         </div>
       )}
@@ -1296,12 +1301,12 @@ export default function KeysPage() {
                     )}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Name</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Server</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Usage</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Expires</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Actions</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.name')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.server')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.status')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.usage')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.expires')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1333,8 +1338,8 @@ export default function KeysPage() {
                     <Key className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">
                       {hasActiveFilters
-                        ? 'No keys match your filters.'
-                        : 'No access keys yet.'}
+                        ? t('keys.empty.no_match')
+                        : t('keys.empty.no_keys')}
                     </p>
                     {!hasActiveFilters && (
                       <Button
@@ -1342,7 +1347,7 @@ export default function KeysPage() {
                         onClick={() => setCreateDialogOpen(true)}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Create Your First Key
+                        {t('keys.empty.create_first')}
                       </Button>
                     )}
                   </td>
