@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import {
   Settings,
   Bell,
@@ -44,37 +45,38 @@ import {
  */
 export default function SettingsPage() {
   const { toast } = useToast();
-  
+  const { t } = useLocale();
+
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
-  
+
   // Get current user
   const { data: currentUser } = trpc.auth.me.useQuery();
-  
+
   // Update setting mutation
   const updateMutation = trpc.settings.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Settings saved',
-        description: 'Your changes have been saved successfully.',
+        title: t('settings.toast.saved'),
+        description: t('settings.toast.saved_desc'),
       });
       refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to save',
+        title: t('settings.toast.failed_save'),
         description: error.message,
         variant: 'destructive',
       });
     },
   });
-  
+
   // Password change mutation
   const passwordMutation = trpc.auth.changePassword.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Password changed',
-        description: 'Your password has been updated. Please log in again.',
+        title: t('settings.toast.password_changed'),
+        description: t('settings.toast.password_changed_desc'),
       });
       // Clear form
       setCurrentPassword('');
@@ -83,13 +85,13 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to change password',
+        title: t('settings.toast.failed_save'),
         description: error.message,
         variant: 'destructive',
       });
     },
   });
-  
+
   // Password change form state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -108,13 +110,13 @@ export default function SettingsPage() {
   const testConnectionMutation = trpc.telegramBot.testConnection.useMutation({
     onSuccess: (data) => {
       toast({
-        title: 'Connection successful',
+        title: t('settings.toast.connection_success'),
         description: `Connected to @${data.botUsername}`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Connection failed',
+        title: t('settings.toast.connection_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -124,14 +126,14 @@ export default function SettingsPage() {
   const updateTelegramMutation = trpc.telegramBot.updateSettings.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Telegram settings saved',
-        description: 'Your Telegram bot settings have been updated.',
+        title: t('settings.toast.telegram_saved'),
+        description: t('settings.toast.telegram_saved_desc'),
       });
       refetchTelegram();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to save',
+        title: t('settings.toast.failed_save'),
         description: error.message,
         variant: 'destructive',
       });
@@ -141,14 +143,14 @@ export default function SettingsPage() {
   const setWebhookMutation = trpc.telegramBot.setWebhook.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Webhook set',
-        description: 'Telegram webhook has been configured.',
+        title: t('settings.toast.webhook_set'),
+        description: t('settings.toast.webhook_set_desc'),
       });
       refetchWebhook();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to set webhook',
+        title: t('settings.toast.failed_save'),
         description: error.message,
         variant: 'destructive',
       });
@@ -158,8 +160,8 @@ export default function SettingsPage() {
   const deleteWebhookMutation = trpc.telegramBot.deleteWebhook.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Webhook deleted',
-        description: 'Telegram webhook has been removed.',
+        title: t('settings.toast.webhook_deleted'),
+        description: t('settings.toast.webhook_deleted_desc'),
       });
       refetchWebhook();
     },
@@ -187,32 +189,32 @@ export default function SettingsPage() {
   const webhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/telegram/webhook`
     : '';
-  
+
   const handleSaveSetting = (key: string, value: unknown) => {
     updateMutation.mutate({ key, value });
   };
-  
+
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       toast({
-        title: 'Passwords do not match',
-        description: 'Please make sure your new passwords match.',
+        title: t('settings.toast.password_mismatch'),
+        description: t('settings.toast.password_mismatch_desc'),
         variant: 'destructive',
       });
       return;
     }
-    
+
     if (newPassword.length < 6) {
       toast({
-        title: 'Password too short',
-        description: 'Password must be at least 6 characters.',
+        title: t('settings.toast.password_short'),
+        description: t('settings.toast.password_short_desc'),
         variant: 'destructive',
       });
       return;
     }
-    
+
     passwordMutation.mutate({
       currentPassword,
       newPassword,
@@ -232,9 +234,9 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
         <p className="text-muted-foreground">
-          Configure your Atomic-UI installation and preferences.
+          {t('settings.subtitle')}
         </p>
       </div>
 
@@ -244,28 +246,28 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
-              General Settings
+              {t('settings.general.title')}
             </CardTitle>
             <CardDescription>
-              Basic application configuration
+              {t('settings.general.desc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="siteName">Site Name</Label>
+                <Label htmlFor="siteName">{t('settings.general.site_name')}</Label>
                 <Input
                   id="siteName"
                   defaultValue={settings?.siteName as string || 'Atomic-UI'}
                   onBlur={(e) => handleSaveSetting('siteName', e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  The name displayed in the browser title and header
+                  {t('settings.general.site_name_desc')}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="defaultTheme">Default Theme</Label>
+                <Label htmlFor="defaultTheme">{t('settings.general.theme')}</Label>
                 <Select
                   defaultValue={settings?.defaultTheme as string || 'dark'}
                   onValueChange={(value) => handleSaveSetting('defaultTheme', value)}
@@ -274,20 +276,20 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="light">{t('settings.general.theme.light')}</SelectItem>
+                    <SelectItem value="dark">{t('settings.general.theme.dark')}</SelectItem>
+                    <SelectItem value="system">{t('settings.general.theme.system')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Default color theme for new users
+                  {t('settings.general.theme_desc')}
                 </p>
               </div>
             </div>
-            
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="defaultLanguage">Default Language</Label>
+                <Label htmlFor="defaultLanguage">{t('settings.general.language')}</Label>
                 <Select
                   defaultValue={settings?.defaultLanguage as string || 'en'}
                   onValueChange={(value) => handleSaveSetting('defaultLanguage', value)}
@@ -310,16 +312,16 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
-              Health Monitoring
+              {t('settings.health.title')}
             </CardTitle>
             <CardDescription>
-              Configure server health check behavior
+              {t('settings.health.desc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="healthCheckInterval">Check Interval (minutes)</Label>
+                <Label htmlFor="healthCheckInterval">{t('settings.health.interval')}</Label>
                 <Input
                   id="healthCheckInterval"
                   type="number"
@@ -329,12 +331,12 @@ export default function SettingsPage() {
                   onBlur={(e) => handleSaveSetting('healthCheckIntervalMins', parseInt(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  How often to check server health (1-60 minutes)
+                  {t('settings.health.interval_desc')}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="keyExpiryWarning">Expiry Warning (days)</Label>
+                <Label htmlFor="keyExpiryWarning">{t('settings.health.expiry')}</Label>
                 <Input
                   id="keyExpiryWarning"
                   type="number"
@@ -344,14 +346,14 @@ export default function SettingsPage() {
                   onBlur={(e) => handleSaveSetting('keyExpiryWarningDays', parseInt(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Days before expiry to show warning
+                  {t('settings.health.expiry_desc')}
                 </p>
               </div>
             </div>
-            
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="trafficWarning">Traffic Warning (%)</Label>
+                <Label htmlFor="trafficWarning">{t('settings.health.traffic')}</Label>
                 <Input
                   id="trafficWarning"
                   type="number"
@@ -361,7 +363,7 @@ export default function SettingsPage() {
                   onBlur={(e) => handleSaveSetting('trafficWarningPercent', parseInt(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Usage percentage to trigger warning
+                  {t('settings.health.traffic_desc')}
                 </p>
               </div>
             </div>
@@ -373,26 +375,26 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-primary" />
-              Notifications
+              {t('settings.notifications.title')}
             </CardTitle>
             <CardDescription>
-              Configure alert and notification settings
+              {t('settings.notifications.desc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Configure notification channels in the{' '}
+              {t('settings.notifications.info')}{' '}
               <a href="/dashboard/notifications" className="text-primary hover:underline">
-                Notifications
+                {t('settings.notifications.link')}
               </a>{' '}
-              section.
+              {t('settings.notifications.section')}
             </p>
 
             <div className="flex items-center gap-4">
               <Button variant="outline" asChild>
                 <a href="/dashboard/notifications">
                   <Bell className="w-4 h-4 mr-2" />
-                  Configure Notifications
+                  {t('settings.notifications.btn')}
                 </a>
               </Button>
             </div>
@@ -404,21 +406,21 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-primary" />
-              Telegram Bot
+              {t('settings.telegram.title')}
             </CardTitle>
             <CardDescription>
-              Allow users to get their VPN keys via Telegram bot
+              {t('settings.telegram.desc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Bot Token */}
             <div className="space-y-2">
-              <Label htmlFor="botToken">Bot Token</Label>
+              <Label htmlFor="botToken">{t('settings.telegram.token')}</Label>
               <div className="flex gap-2">
                 <Input
                   id="botToken"
                   type="password"
-                  placeholder="Enter your Telegram bot token"
+                  placeholder={t('settings.telegram.token_placeholder')}
                   defaultValue={telegramSettings?.botToken || ''}
                   onChange={(e) => setBotToken(e.target.value)}
                 />
@@ -430,12 +432,12 @@ export default function SettingsPage() {
                   {testConnectionMutation.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    'Test'
+                    t('settings.telegram.test')
                   )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Get a token from{' '}
+                {t('settings.telegram.help')}{' '}
                 <a
                   href="https://t.me/BotFather"
                   target="_blank"
@@ -449,17 +451,17 @@ export default function SettingsPage() {
 
             {/* Webhook Status */}
             <div className="space-y-2">
-              <Label>Webhook Status</Label>
+              <Label>{t('settings.telegram.webhook_status')}</Label>
               <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
                 {webhookInfo?.webhookSet ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">Webhook active</span>
+                    <span className="text-sm">{t('settings.telegram.webhook_active')}</span>
                   </>
                 ) : (
                   <>
                     <XCircle className="w-4 h-4 text-red-500" />
-                    <span className="text-sm">Webhook not set</span>
+                    <span className="text-sm">{t('settings.telegram.webhook_inactive')}</span>
                   </>
                 )}
               </div>
@@ -474,7 +476,7 @@ export default function SettingsPage() {
                   size="icon"
                   onClick={() => {
                     navigator.clipboard.writeText(webhookUrl);
-                    toast({ title: 'Copied!', description: 'Webhook URL copied to clipboard.' });
+                    toast({ title: t('settings.toast.copied'), description: t('settings.toast.copied_desc') });
                   }}
                 >
                   <Copy className="w-4 h-4" />
@@ -490,7 +492,7 @@ export default function SettingsPage() {
                   {setWebhookMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
-                  Set Webhook
+                  {t('settings.telegram.set_webhook')}
                 </Button>
                 {webhookInfo?.webhookSet && (
                   <Button
@@ -499,7 +501,7 @@ export default function SettingsPage() {
                     onClick={() => deleteWebhookMutation.mutate()}
                     disabled={deleteWebhookMutation.isPending}
                   >
-                    Remove Webhook
+                    {t('settings.telegram.remove_webhook')}
                   </Button>
                 )}
               </div>
@@ -507,10 +509,10 @@ export default function SettingsPage() {
 
             {/* Welcome Message */}
             <div className="space-y-2">
-              <Label htmlFor="welcomeMessage">Welcome Message</Label>
+              <Label htmlFor="welcomeMessage">{t('settings.telegram.welcome')}</Label>
               <Input
                 id="welcomeMessage"
-                placeholder="Welcome! Send /mykey to get your VPN key."
+                placeholder={t('settings.telegram.welcome_placeholder')}
                 defaultValue={telegramSettings?.welcomeMessage || ''}
                 onChange={(e) => setWelcomeMessage(e.target.value)}
               />
@@ -518,10 +520,10 @@ export default function SettingsPage() {
 
             {/* Key Not Found Message */}
             <div className="space-y-2">
-              <Label htmlFor="keyNotFoundMessage">Key Not Found Message</Label>
+              <Label htmlFor="keyNotFoundMessage">{t('settings.telegram.not_found')}</Label>
               <Input
                 id="keyNotFoundMessage"
-                placeholder="No key found for your account."
+                placeholder={t('settings.telegram.not_found_placeholder')}
                 defaultValue={telegramSettings?.keyNotFoundMessage || ''}
                 onChange={(e) => setKeyNotFoundMessage(e.target.value)}
               />
@@ -535,7 +537,7 @@ export default function SettingsPage() {
               {updateTelegramMutation.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              Save Telegram Settings
+              {t('settings.telegram.save')}
             </Button>
           </CardContent>
         </Card>
@@ -545,10 +547,10 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Key className="w-5 h-5 text-primary" />
-              Account Security
+              {t('settings.security.title')}
             </CardTitle>
             <CardDescription>
-              Change your password and manage security settings
+              {t('settings.security.desc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -564,49 +566,49 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-              
+
               <form onSubmit={handlePasswordChange} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Label htmlFor="currentPassword">{t('settings.security.current')}</Label>
                   <Input
                     id="currentPassword"
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter your current password"
+                    placeholder={t('settings.security.current_placeholder')}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="newPassword">{t('settings.security.new')}</Label>
                   <Input
                     id="newPassword"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter your new password"
+                    placeholder={t('settings.security.new_placeholder')}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Label htmlFor="confirmPassword">{t('settings.security.confirm')}</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm your new password"
+                    placeholder={t('settings.security.confirm_placeholder')}
                   />
                 </div>
-                
-                <Button 
-                  type="submit" 
+
+                <Button
+                  type="submit"
                   disabled={passwordMutation.isPending || !currentPassword || !newPassword || !confirmPassword}
                 >
                   {passwordMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  Change Password
+                  {t('settings.security.change_btn')}
                 </Button>
               </form>
             </div>
@@ -618,19 +620,19 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary" />
-              About Atomic-UI
+              {t('settings.about.title')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Version</span>
+                <span className="text-muted-foreground">{t('settings.about.version')}</span>
                 <span className="font-mono">1.0.0</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Author</span>
-                <a 
-                  href="https://github.com/sankahchan" 
+                <span className="text-muted-foreground">{t('settings.about.author')}</span>
+                <a
+                  href="https://github.com/sankahchan"
                   className="text-primary hover:underline"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -639,9 +641,9 @@ export default function SettingsPage() {
                 </a>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Repository</span>
-                <a 
-                  href="https://github.com/sankahchan/atomic-ui" 
+                <span className="text-muted-foreground">{t('settings.about.repo')}</span>
+                <a
+                  href="https://github.com/sankahchan/atomic-ui"
                   className="text-primary hover:underline"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -650,7 +652,7 @@ export default function SettingsPage() {
                 </a>
               </div>
               <div className="flex items-center justify-between py-2">
-                <span className="text-muted-foreground">License</span>
+                <span className="text-muted-foreground">{t('settings.about.license')}</span>
                 <span>MIT</span>
               </div>
             </div>
