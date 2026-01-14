@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
+import { useLocale } from '@/hooks/use-locale';
 import {
   Plus,
   Server,
@@ -52,16 +53,17 @@ import { formatBytes } from '@/lib/utils';
  * paste the full JSON configuration from Outline Manager or manually enter
  * the API URL and certificate fingerprint.
  */
-function AddServerDialog({ 
-  open, 
+function AddServerDialog({
+  open,
   onOpenChange,
   onSuccess,
-}: { 
+}: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [name, setName] = useState('');
   const [apiUrl, setApiUrl] = useState('');
   const [certSha256, setCertSha256] = useState('');
@@ -76,8 +78,8 @@ function AddServerDialog({
       setApiUrl(data.apiUrl);
       setCertSha256(data.certSha256);
       toast({
-        title: 'Configuration parsed',
-        description: 'API URL and certificate extracted successfully.',
+        title: t('servers.toast.parsed'),
+        description: t('servers.toast.parsed_desc'),
       });
     },
     onError: (error: { message: string }) => {
@@ -93,8 +95,8 @@ function AddServerDialog({
   const createMutation = trpc.servers.create.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server added',
-        description: 'The Outline server has been added successfully.',
+        title: t('servers.toast.added'),
+        description: t('servers.toast.added_desc'),
       });
       onSuccess();
       onOpenChange(false);
@@ -126,7 +128,7 @@ function AddServerDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name || !apiUrl || !certSha256) {
       toast({
         title: 'Validation error',
@@ -151,10 +153,10 @@ function AddServerDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="w-5 h-5 text-primary" />
-            Add Outline Server
+            {t('servers.dialog.add.title')}
           </DialogTitle>
           <DialogDescription>
-            Connect a new Outline VPN server to manage its access keys.
+            {t('servers.dialog.add.desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -165,32 +167,32 @@ function AddServerDialog({
               type="button"
               className={cn(
                 'flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                inputMode === 'json' 
-                  ? 'bg-background shadow-sm' 
+                inputMode === 'json'
+                  ? 'bg-background shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               )}
               onClick={() => setInputMode('json')}
             >
-              Paste Config
+              {t('servers.dialog.paste_config')}
             </button>
             <button
               type="button"
               className={cn(
                 'flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                inputMode === 'manual' 
-                  ? 'bg-background shadow-sm' 
+                inputMode === 'manual'
+                  ? 'bg-background shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               )}
               onClick={() => setInputMode('manual')}
             >
-              Manual Entry
+              {t('servers.dialog.manual_entry')}
             </button>
           </div>
 
           {/* JSON config input */}
           {inputMode === 'json' && (
             <div className="space-y-2">
-              <Label>Outline Manager Config</Label>
+              <Label>{t('servers.dialog.config_label')}</Label>
               <textarea
                 className="w-full h-24 px-3 py-2 text-sm bg-background border rounded-lg resize-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder='{"apiUrl":"https://...","certSha256":"..."}'
@@ -207,14 +209,14 @@ function AddServerDialog({
                 {parseConfigMutation.isPending && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
-                Parse Configuration
+                {t('servers.dialog.parse')}
               </Button>
             </div>
           )}
 
           {/* Server name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Server Name *</Label>
+            <Label htmlFor="name">{t('servers.dialog.name')}</Label>
             <Input
               id="name"
               placeholder="e.g., Singapore VPS"
@@ -225,7 +227,7 @@ function AddServerDialog({
 
           {/* API URL */}
           <div className="space-y-2">
-            <Label htmlFor="apiUrl">API URL *</Label>
+            <Label htmlFor="apiUrl">{t('servers.dialog.api_url')}</Label>
             <Input
               id="apiUrl"
               placeholder="https://your-server:port/secret"
@@ -237,7 +239,7 @@ function AddServerDialog({
 
           {/* Certificate SHA256 */}
           <div className="space-y-2">
-            <Label htmlFor="certSha256">Certificate SHA256 *</Label>
+            <Label htmlFor="certSha256">{t('servers.dialog.cert')}</Label>
             <Input
               id="certSha256"
               placeholder="64-character hex string"
@@ -250,7 +252,7 @@ function AddServerDialog({
           {/* Location and Country */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">{t('servers.dialog.location')}</Label>
               <Input
                 id="location"
                 placeholder="e.g., AWS Singapore"
@@ -259,7 +261,7 @@ function AddServerDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Country</Label>
+              <Label>{t('servers.dialog.country')}</Label>
               <Select value={countryCode} onValueChange={setCountryCode}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select country" />
@@ -281,13 +283,13 @@ function AddServerDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('servers.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              Add Server
+              {t('servers.dialog.submit')}
             </Button>
           </DialogFooter>
         </form>
@@ -333,13 +335,14 @@ function ServerCard({
   onDelete: () => void;
   isSyncing?: boolean;
 }) {
+  const { t } = useLocale();
   const status = server.healthCheck?.lastStatus || 'UNKNOWN';
 
   const statusConfig = {
-    UP: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle2, label: 'Online' },
-    DOWN: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, label: 'Offline' },
-    SLOW: { color: 'text-yellow-500', bg: 'bg-yellow-500', icon: AlertTriangle, label: 'Slow' },
-    UNKNOWN: { color: 'text-gray-500', bg: 'bg-gray-500', icon: Activity, label: 'Unknown' },
+    UP: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle2, labelKey: 'servers.status.online' },
+    DOWN: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, labelKey: 'servers.status.offline' },
+    SLOW: { color: 'text-yellow-500', bg: 'bg-yellow-500', icon: AlertTriangle, labelKey: 'servers.status.slow' },
+    UNKNOWN: { color: 'text-gray-500', bg: 'bg-gray-500', icon: Activity, labelKey: 'servers.status.unknown' },
   };
 
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.UNKNOWN;
@@ -375,7 +378,7 @@ function ServerCard({
             `${config.bg}/20 ${config.color}`
           )}>
             <span className={cn('w-1.5 h-1.5 rounded-full', config.bg)} />
-            {config.label}
+            {t(config.labelKey)}
           </div>
         </div>
 
@@ -383,7 +386,7 @@ function ServerCard({
         <div className="mb-4 p-3 bg-muted/50 rounded-lg">
           <div className="flex items-center gap-2 mb-1">
             <ArrowUpDown className="w-4 h-4 text-primary" />
-            <span className="text-xs text-muted-foreground">Total Bandwidth</span>
+            <span className="text-xs text-muted-foreground">{t('servers.total_bandwidth')}</span>
           </div>
           <p className="text-2xl font-bold">
             {server.metrics?.totalBandwidth
@@ -399,14 +402,14 @@ function ServerCard({
               <Key className="w-3 h-3 text-muted-foreground" />
             </div>
             <p className="text-lg font-semibold">{server.metrics?.totalKeys || 0}</p>
-            <p className="text-xs text-muted-foreground">Total Keys</p>
+            <p className="text-xs text-muted-foreground">{t('servers.total_keys')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
               <Zap className="w-3 h-3 text-green-500" />
             </div>
             <p className="text-lg font-semibold text-green-500">{server.metrics?.activeKeys || 0}</p>
-            <p className="text-xs text-muted-foreground">Active</p>
+            <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
@@ -417,7 +420,7 @@ function ServerCard({
                 ? `${server.healthCheck.lastLatencyMs}ms`
                 : '-'}
             </p>
-            <p className="text-xs text-muted-foreground">Latency</p>
+            <p className="text-xs text-muted-foreground">{t('servers.latency')}</p>
           </div>
         </div>
 
@@ -443,7 +446,7 @@ function ServerCard({
             {server.outlineVersion && `v${server.outlineVersion}`}
             {server.healthCheck?.uptimePercent !== undefined && (
               <span className="ml-2">
-                Uptime: {server.healthCheck.uptimePercent.toFixed(1)}%
+                {t('servers.uptime')}: {server.healthCheck.uptimePercent.toFixed(1)}%
               </span>
             )}
           </div>
@@ -453,12 +456,12 @@ function ServerCard({
               size="sm"
               onClick={onSync}
               disabled={isSyncing}
-              title="Sync data"
+              title={t('servers.actions.sync')}
             >
               <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
             </Button>
             <Link href={`/dashboard/servers/${server.id}`}>
-              <Button variant="ghost" size="sm" title="View details">
+              <Button variant="ghost" size="sm" title={t('servers.actions.view')}>
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </Link>
@@ -467,7 +470,7 @@ function ServerCard({
               size="sm"
               onClick={onDelete}
               className="text-destructive hover:text-destructive"
-              title="Delete server"
+              title={t('servers.actions.delete')}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -486,6 +489,7 @@ function ServerCard({
  */
 export default function ServersPage() {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [syncingServerId, setSyncingServerId] = useState<string | null>(null);
@@ -499,7 +503,7 @@ export default function ServersPage() {
   const syncMutation = trpc.servers.sync.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Server synced',
+        title: t('servers.toast.synced'),
         description: `Found ${result.keysFound} keys. Created ${result.keysCreated}, removed ${result.keysRemoved}.`,
       });
       refetch();
@@ -519,8 +523,8 @@ export default function ServersPage() {
   const deleteMutation = trpc.servers.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server deleted',
-        description: 'The server has been removed from Atomic-UI.',
+        title: t('servers.toast.deleted'),
+        description: t('servers.toast.deleted_desc'),
       });
       refetch();
     },
@@ -534,7 +538,7 @@ export default function ServersPage() {
   });
 
   // Filter servers by search query
-  const filteredServers = servers?.filter((server) => 
+  const filteredServers = servers?.filter((server) =>
     server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     server.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -545,7 +549,7 @@ export default function ServersPage() {
   };
 
   const handleDelete = (serverId: string, serverName: string) => {
-    if (confirm(`Are you sure you want to remove "${serverName}" from Atomic-UI?\n\nNote: This will NOT delete keys from the actual Outline server.`)) {
+    if (confirm(`${t('servers.confirm_delete')} "${serverName}"?\n\n${t('servers.confirm_delete_desc')}`)) {
       deleteMutation.mutate({ id: serverId });
     }
   };
@@ -555,14 +559,14 @@ export default function ServersPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Servers</h1>
+          <h1 className="text-2xl font-bold">{t('servers.title')}</h1>
           <p className="text-muted-foreground">
-            Manage your Outline VPN servers and their access keys.
+            {t('servers.subtitle')}
           </p>
         </div>
         <Button onClick={() => setAddDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Add Server
+          {t('servers.add')}
         </Button>
       </div>
 
@@ -571,7 +575,7 @@ export default function ServersPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search servers..."
+            placeholder={t('servers.search_placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -583,7 +587,7 @@ export default function ServersPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('w-4 h-4 mr-2', isLoading && 'animate-spin')} />
-          Refresh
+          {t('servers.refresh')}
         </Button>
       </div>
 
@@ -610,16 +614,16 @@ export default function ServersPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Globe className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No servers found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('servers.empty.title')}</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
               {searchQuery
-                ? 'No servers match your search criteria.'
-                : 'Get started by adding your first Outline VPN server.'}
+                ? t('servers.empty.no_match')
+                : t('servers.empty.start')}
             </p>
             {!searchQuery && (
               <Button onClick={() => setAddDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Your First Server
+                {t('servers.empty.add_first')}
               </Button>
             )}
           </CardContent>
