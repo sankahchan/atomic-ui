@@ -39,6 +39,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import Link from 'next/link';
+import { SystemStatus } from '../_components/system-status';
 
 /**
  * StatCard Component
@@ -82,7 +83,7 @@ function StatCard({
             <Icon className="w-5 h-5" />
           </div>
         </div>
-        
+
         {trend && trendValue && (
           <div className="mt-4 flex items-center gap-2">
             {trend === 'up' && (
@@ -162,7 +163,7 @@ function ServerStatusCard({
               statusColors[server.status as keyof typeof statusColors] || 'bg-gray-500'
             )} />
           </div>
-          
+
           <div className="grid grid-cols-3 gap-2 text-sm">
             <div>
               <p className="text-muted-foreground text-xs">Status</p>
@@ -182,7 +183,7 @@ function ServerStatusCard({
               <p className="font-medium mt-0.5">{server.keyCount}</p>
             </div>
           </div>
-          
+
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-muted-foreground">Uptime</span>
@@ -315,51 +316,59 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Traffic Chart */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                Traffic Overview
-              </CardTitle>
-              <CardDescription>
-                Bandwidth usage over time
-              </CardDescription>
-            </div>
-            <Select
-              value={trafficDays.toString()}
-              onValueChange={(value) => setTrafficDays(parseInt(value))}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="14">Last 14 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {trafficLoading ? (
-            <div className="h-[300px] bg-muted rounded-lg animate-pulse" />
-          ) : trafficHistory && trafficHistory.length > 0 ? (
-            <TrafficChart data={trafficHistory} type="area" height={300} />
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No traffic data available yet</p>
-                <p className="text-sm">Traffic will appear here after keys are used</p>
+      {/* Traffic & System Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Traffic Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-primary" />
+                  Traffic Overview
+                </CardTitle>
+                <CardDescription>
+                  Bandwidth usage over time
+                </CardDescription>
               </div>
+              <Select
+                value={trafficDays.toString()}
+                onValueChange={(value) => setTrafficDays(parseInt(value))}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            {trafficLoading ? (
+              <div className="h-[300px] bg-muted rounded-lg animate-pulse" />
+            ) : trafficHistory && trafficHistory.length > 0 ? (
+              <TrafficChart data={trafficHistory} type="area" height={300} />
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No traffic data available yet</p>
+                  <p className="text-sm">Traffic will appear here after keys are used</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* System Status */}
+        <div className="lg:col-span-1">
+          <SystemStatus />
+        </div>
+      </div>
 
       {/* Two-column layout for detailed sections */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -433,7 +442,7 @@ export default function DashboardPage() {
                   time="Now"
                 />
               )}
-              
+
               {stats?.expiringIn24h && stats.expiringIn24h > 0 && (
                 <AlertItem
                   type="warning"
@@ -442,7 +451,7 @@ export default function DashboardPage() {
                   time="Soon"
                 />
               )}
-              
+
               {stats?.depletedKeys && stats.depletedKeys > 0 && (
                 <AlertItem
                   type="warning"
@@ -497,7 +506,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Link>
-            
+
             <Link href="/dashboard/keys/new">
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Key className="w-8 h-8 text-primary" />
@@ -507,7 +516,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Link>
-            
+
             <Link href="/dashboard/health">
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Activity className="w-8 h-8 text-primary" />
@@ -517,7 +526,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Link>
-            
+
             <Link href="/dashboard/notifications">
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Activity className="w-8 h-8 text-primary" />
@@ -530,6 +539,6 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </div >
   );
 }

@@ -154,6 +154,7 @@ model AccessKey {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   trafficLogs TrafficLog[]
+  notifications NotificationLog[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -329,6 +330,10 @@ model NotificationLog {
   status    String // SUCCESS, FAILED
   error     String?
   sentAt    DateTime @default(now())
+  
+  // Optional relation to access key
+  accessKeyId String?
+  accessKey   AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: SetNull)
 }
 
 // ============================================

@@ -46,6 +46,8 @@
     "@trpc/next": "^11.0.0-rc.297",
     "@trpc/react-query": "^11.0.0-rc.297",
     "@trpc/server": "^11.0.0-rc.297",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
@@ -69,6 +71,8 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.11.24",
     "@types/node-cron": "^3.0.11",

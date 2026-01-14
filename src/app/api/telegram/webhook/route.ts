@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import QRCode from 'qrcode';
+import { sendTelegramMessage, sendTelegramPhoto } from '@/lib/telegram';
 
 interface TelegramUpdate {
   update_id: number;
@@ -26,46 +27,6 @@ interface TelegramUpdate {
     date: number;
     text?: string;
   };
-}
-
-async function sendTelegramMessage(
-  botToken: string,
-  chatId: number,
-  text: string,
-  parseMode: 'HTML' | 'Markdown' = 'HTML'
-) {
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: parseMode,
-    }),
-  });
-}
-
-async function sendTelegramPhoto(
-  botToken: string,
-  chatId: number,
-  photo: Buffer,
-  caption?: string
-) {
-  const formData = new FormData();
-  formData.append('chat_id', chatId.toString());
-  // Convert Buffer to base64 for sending via Telegram API
-  const base64Photo = photo.toString('base64');
-  const photoBlob = new Blob([Buffer.from(base64Photo, 'base64')], { type: 'image/png' });
-  formData.append('photo', photoBlob, 'qrcode.png');
-  if (caption) {
-    formData.append('caption', caption);
-    formData.append('parse_mode', 'HTML');
-  }
-
-  await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-    method: 'POST',
-    body: formData,
-  });
 }
 
 export async function POST(request: NextRequest) {
