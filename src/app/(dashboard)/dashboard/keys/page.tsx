@@ -63,6 +63,7 @@ import {
   HardDrive,
   ArrowUpDown,
 } from 'lucide-react';
+import { MobileCardView } from '@/components/mobile-card-view';
 
 /**
  * Status badge configuration for visual consistency
@@ -79,30 +80,30 @@ const ENCRYPTION_METHODS = [
 ] as const;
 
 const statusConfig = {
-  ACTIVE: { 
-    color: 'bg-green-500/20 text-green-400 border-green-500/30', 
-    icon: CheckCircle2, 
-    label: 'Active' 
+  ACTIVE: {
+    color: 'bg-green-500/20 text-green-400 border-green-500/30',
+    icon: CheckCircle2,
+    label: 'Active'
   },
-  DISABLED: { 
-    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', 
-    icon: XCircle, 
-    label: 'Disabled' 
+  DISABLED: {
+    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    icon: XCircle,
+    label: 'Disabled'
   },
-  EXPIRED: { 
-    color: 'bg-red-500/20 text-red-400 border-red-500/30', 
-    icon: Clock, 
-    label: 'Expired' 
+  EXPIRED: {
+    color: 'bg-red-500/20 text-red-400 border-red-500/30',
+    icon: Clock,
+    label: 'Expired'
   },
-  DEPLETED: { 
-    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', 
-    icon: AlertTriangle, 
-    label: 'Depleted' 
+  DEPLETED: {
+    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    icon: AlertTriangle,
+    label: 'Depleted'
   },
-  PENDING: { 
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', 
-    icon: Clock, 
-    label: 'Pending' 
+  PENDING: {
+    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    icon: Clock,
+    label: 'Pending'
   },
 };
 
@@ -321,7 +322,7 @@ function CreateKeyDialog({
             <Label>Expiration</Label>
             <Select
               value={formData.expirationType}
-              onValueChange={(value: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') => 
+              onValueChange={(value: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') =>
                 setFormData({ ...formData, expirationType: value })
               }
             >
@@ -337,20 +338,20 @@ function CreateKeyDialog({
           </div>
 
           {/* Duration days (conditional) */}
-          {(formData.expirationType === 'DURATION_FROM_CREATION' || 
+          {(formData.expirationType === 'DURATION_FROM_CREATION' ||
             formData.expirationType === 'START_ON_FIRST_USE') && (
-            <div className="space-y-2">
-              <Label htmlFor="durationDays">Duration (days)</Label>
-              <Input
-                id="durationDays"
-                type="number"
-                placeholder="30"
-                value={formData.durationDays}
-                onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-                min="1"
-              />
-            </div>
-          )}
+              <div className="space-y-2">
+                <Label htmlFor="durationDays">Duration (days)</Label>
+                <Input
+                  id="durationDays"
+                  type="number"
+                  placeholder="30"
+                  value={formData.durationDays}
+                  onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                  min="1"
+                />
+              </div>
+            )}
 
           {/* Notes */}
           <div className="space-y-2">
@@ -402,7 +403,7 @@ function QRCodeDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
-  
+
   // Fetch QR code
   const { data, isLoading } = trpc.keys.generateQRCode.useQuery(
     { id: keyId },
@@ -724,6 +725,93 @@ export default function KeysPage() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   const pageSize = 20;
+
+  // Render function for mobile card view
+  const renderKeyCard = (key: any) => {
+    const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
+    const StatusIcon = config.icon;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <OnlineIndicator isOnline={onlineKeyIds.has(key.id)} />
+            <div>
+              <Link href={`/dashboard/keys/${key.id}`} className="font-medium hover:underline">
+                {key.name}
+              </Link>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                {key.server && (
+                  <>
+                    {key.server.countryCode && <span>{getCountryFlag(key.server.countryCode)}</span>}
+                    <span>{key.server.name}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <Badge className={cn('border', config.color)}>
+            <StatusIcon className="w-3 h-3 mr-1" />
+            {config.label}
+          </Badge>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Usage</span>
+            <span>{formatBytes(key.usedBytes)} / {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : '∞'}</span>
+          </div>
+          {key.dataLimitBytes && (
+            <Progress
+              value={key.usagePercent || 0}
+              className={cn('h-1.5', key.isTrafficWarning && '[&>div]:bg-orange-500')}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="text-xs text-muted-foreground">
+            {key.expiresAt ? (
+              <span className={cn(key.isExpiringSoon && 'text-red-500')}>
+                Expires: {formatRelativeTime(key.expiresAt)}
+              </span>
+            ) : (
+              <span>Never expires</span>
+            )}
+          </div>
+
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setQrDialogKey({ id: key.id, name: key.name })}>
+              <QrCode className="w-4 h-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/keys/${key.id}`}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Details
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
+                  <Power className="w-4 h-4 mr-2" />
+                  {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Fetch keys
   const { data, isLoading, refetch } = trpc.keys.list.useQuery({
@@ -1172,10 +1260,27 @@ export default function KeysPage() {
         </div>
       )}
 
+      {/* Mobile Card View */}
+      {isLoading ? (
+        <div className="md:hidden space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="h-32 bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <MobileCardView
+          data={data?.items || []}
+          renderCard={renderKeyCard}
+          keyExtractor={(item) => item.id}
+          className="md:hidden"
+        />
+      )}
+
       {/* Keys table */}
-      <Card>
+      <Card className="hidden md:block mb-6">
         <div className="overflow-x-auto">
           <table className="w-full">
+
             <thead>
               <tr className="border-b border-border">
                 <th className="px-2 py-3 w-10">

@@ -38,6 +38,7 @@ import {
   Archive,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { LanguageSelector } from '@/components/ui/language-selector';
 
 /**
  * Navigation items configuration
@@ -94,6 +95,8 @@ const navItems = [
   },
 ];
 
+import { useLocale } from '@/hooks/use-locale';
+
 /**
  * Sidebar Component
  * 
@@ -112,6 +115,58 @@ function Sidebar({
   onClose?: () => void;
 }) {
   const pathname = usePathname();
+  const { t } = useLocale();
+
+  const navItems = [
+    {
+      href: '/dashboard',
+      label: t('nav.dashboard'),
+      icon: LayoutDashboard,
+      description: 'Overview and statistics'
+    },
+    {
+      href: '/dashboard/servers',
+      label: t('nav.servers'),
+      icon: Server,
+      description: 'Manage Outline servers'
+    },
+    {
+      href: '/dashboard/keys',
+      label: t('nav.keys'),
+      icon: Key,
+      description: 'Manage VPN access keys'
+    },
+    {
+      href: '/dashboard/dynamic-keys',
+      label: t('nav.dynamic_keys'),
+      icon: KeyRound,
+      description: 'Dynamic access key pools'
+    },
+    {
+      href: '/dashboard/archived',
+      label: t('nav.archived'),
+      icon: Archive,
+      description: 'View expired and deleted keys'
+    },
+    {
+      href: '/dashboard/health',
+      label: t('nav.health'),
+      icon: Activity,
+      description: 'Server health monitoring'
+    },
+    {
+      href: '/dashboard/notifications',
+      label: t('nav.notifications'),
+      icon: Bell,
+      description: 'Alert settings'
+    },
+    {
+      href: '/dashboard/settings',
+      label: t('nav.settings'),
+      icon: Settings,
+      description: 'Application settings'
+    },
+  ];
 
   return (
     <aside
@@ -247,18 +302,21 @@ function Header({
         <div className="flex items-center gap-2">
           {/* Theme toggle */}
           {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
+            <div className="flex items-center gap-1">
+              <LanguageSelector />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
           )}
 
           {/* User info */}

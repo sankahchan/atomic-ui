@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TrafficChart } from '@/components/ui/traffic-chart';
 import { trpc } from '@/lib/trpc';
 import { formatBytes, formatRelativeTime, getCountryFlag, cn } from '@/lib/utils';
+import { useLocale } from '@/hooks/use-locale';
 import {
   Server,
   Key,
@@ -131,6 +132,7 @@ function ServerStatusCard({
     uptimePercent: number;
   };
 }) {
+  const { t } = useLocale();
   const statusColors = {
     UP: 'bg-green-500',
     DOWN: 'bg-red-500',
@@ -186,7 +188,7 @@ function ServerStatusCard({
 
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">Uptime</span>
+              <span className="text-muted-foreground">{t('dashboard.uptime')}</span>
               <span className="font-medium">{server.uptimePercent.toFixed(1)}%</span>
             </div>
             <Progress value={server.uptimePercent} className="h-1.5" />
@@ -249,6 +251,7 @@ function AlertItem({
  */
 export default function DashboardPage() {
   const [trafficDays, setTrafficDays] = useState(30);
+  const { t, mounted } = useLocale();
 
   // Fetch dashboard statistics
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery();
@@ -263,7 +266,7 @@ export default function DashboardPage() {
   const { data: trafficHistory, isLoading: trafficLoading } = trpc.dashboard.trafficHistory.useQuery({ days: trafficDays });
 
   // Loading state
-  if (statsLoading) {
+  if (statsLoading || !mounted) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -279,38 +282,38 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
         <p className="text-muted-foreground">
-          Welcome back! Here&apos;s an overview of your VPN infrastructure.
+          {t('dashboard.welcome')}
         </p>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Servers"
+          title={t('dashboard.total_servers')}
           value={stats?.totalServers || 0}
-          description={`${stats?.activeServers || 0} active, ${stats?.downServers || 0} down`}
+          description={`${stats?.activeServers || 0} ${t('dashboard.active')}, ${stats?.downServers || 0} ${t('dashboard.down')}`}
           icon={Server}
           href="/dashboard/servers"
         />
         <StatCard
-          title="Access Keys"
+          title={t('dashboard.total_keys')}
           value={stats?.totalKeys || 0}
-          description={`${stats?.activeKeys || 0} active, ${stats?.expiredKeys || 0} expired`}
+          description={`${stats?.activeKeys || 0} ${t('dashboard.active')}, ${stats?.expiredKeys || 0} ${t('dashboard.expired')}`}
           icon={Key}
           href="/dashboard/keys"
         />
         <StatCard
-          title="Total Traffic"
+          title={t('dashboard.total_traffic')}
           value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
-          description="All time usage"
+          description={t('dashboard.all_time')}
           icon={TrendingUp}
         />
         <StatCard
-          title="Expiring Soon"
+          title={t('dashboard.expiring_soon')}
           value={stats?.expiringIn24h || 0}
-          description="Keys expiring in 24 hours"
+          description={t('dashboard.expiring_24h')}
           icon={Clock}
           href="/dashboard/keys?status=expiring"
         />
@@ -325,7 +328,7 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-primary" />
-                  Traffic Overview
+                  {t('dashboard.traffic_overview')}
                 </CardTitle>
                 <CardDescription>
                   Bandwidth usage over time
@@ -379,7 +382,7 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="w-5 h-5 text-primary" />
-                  Server Status
+                  {t('dashboard.server_status')}
                 </CardTitle>
                 <CardDescription>
                   Real-time health status of your Outline servers
@@ -387,7 +390,7 @@ export default function DashboardPage() {
               </div>
               <Link href="/dashboard/servers">
                 <Badge variant="outline" className="cursor-pointer hover:bg-muted">
-                  View All
+                  {t('dashboard.view_all')}
                 </Badge>
               </Link>
             </div>
@@ -424,7 +427,7 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Zap className="w-5 h-5 text-primary" />
-                  Alerts & Activity
+                  {t('dashboard.alerts')}
                 </CardTitle>
                 <CardDescription>
                   Recent events and notifications
@@ -501,7 +504,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Server className="w-8 h-8 text-primary" />
                 <div>
-                  <p className="font-medium">Add Server</p>
+                  <p className="font-medium">{t('dashboard.add_server')}</p>
                   <p className="text-xs text-muted-foreground">Connect new Outline server</p>
                 </div>
               </div>
@@ -511,7 +514,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Key className="w-8 h-8 text-primary" />
                 <div>
-                  <p className="font-medium">Create Key</p>
+                  <p className="font-medium">{t('dashboard.create_key')}</p>
                   <p className="text-xs text-muted-foreground">Generate new access key</p>
                 </div>
               </div>
@@ -521,7 +524,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Activity className="w-8 h-8 text-primary" />
                 <div>
-                  <p className="font-medium">Health Check</p>
+                  <p className="font-medium">{t('dashboard.health_check')}</p>
                   <p className="text-xs text-muted-foreground">Monitor server health</p>
                 </div>
               </div>
@@ -531,7 +534,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
                 <Activity className="w-8 h-8 text-primary" />
                 <div>
-                  <p className="font-medium">Notifications</p>
+                  <p className="font-medium">{t('dashboard.configure_alerts')}</p>
                   <p className="text-xs text-muted-foreground">Configure alerts</p>
                 </div>
               </div>

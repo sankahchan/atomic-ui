@@ -1,13 +1,132 @@
-/**
- * Translation Strings
- *
- * Contains all translatable strings for the application.
- * Currently focused on login page, can be extended for other pages.
- */
+import { locales, type Locale } from './config';
 
-import type { Locale } from './config';
+// Navigation Translations
+const navTranslations: Record<Locale, Record<string, string>> = {
+  en: {
+    'nav.dashboard': 'Dashboard',
+    'nav.servers': 'Servers',
+    'nav.keys': 'Access Keys',
+    'nav.dynamic_keys': 'Dynamic Keys',
+    'nav.archived': 'Archived Keys',
+    'nav.health': 'Health',
+    'nav.notifications': 'Notifications',
+    'nav.settings': 'Settings',
+  },
+  zh: {
+    'nav.dashboard': '仪表板',
+    'nav.servers': '服务器',
+    'nav.keys': '访问密钥',
+    'nav.dynamic_keys': '动态密钥',
+    'nav.archived': '归档密钥',
+    'nav.health': '健康状态',
+    'nav.notifications': '通知',
+    'nav.settings': '设置',
+  },
+  my: {
+    'nav.dashboard': 'ဒက်ရှ်ဘုတ်',
+    'nav.servers': 'ဆာဗာများ',
+    'nav.keys': 'အသုံးပြုခွင့် သော့များ',
+    'nav.dynamic_keys': 'ပြောင်းလဲနိုင်သော သော့များ',
+    'nav.archived': 'သိမ်းဆည်းထားသော',
+    'nav.health': 'ကျန်းမာရေး',
+    'nav.notifications': 'အသိပေးချက်များ',
+    'nav.settings': 'ဆက်တင်များ',
+  },
+  ja: {},
+  ko: {},
+  ru: {},
+};
 
-export const translations: Record<Locale, Record<string, string>> = {
+// Dashboard Translations
+const dashboardTranslations: Record<Locale, Record<string, string>> = {
+  en: {
+    'dashboard.title': 'Dashboard',
+    'dashboard.welcome': "Welcome back! Here's an overview of your VPN infrastructure.",
+    'dashboard.total_servers': 'Total Servers',
+    'dashboard.active': 'active',
+    'dashboard.down': 'down',
+    'dashboard.total_keys': 'Access Keys',
+    'dashboard.expired': 'expired',
+    'dashboard.total_traffic': 'Total Traffic',
+    'dashboard.all_time': 'All time usage',
+    'dashboard.expiring_soon': 'Expiring Soon',
+    'dashboard.expiring_24h': 'Keys expiring in 24h',
+    'dashboard.traffic_overview': 'Traffic Overview',
+    'dashboard.system_status': 'System Status',
+    'dashboard.server_status': 'Server Status',
+    'dashboard.view_all': 'View All',
+    'dashboard.alerts': 'Alerts & Activity',
+    'dashboard.quick_actions': 'Quick Actions',
+    'dashboard.add_server': 'Add Server',
+    'dashboard.create_key': 'Create Key',
+    'dashboard.health_check': 'Health Check',
+    'dashboard.configure_alerts': 'Configure Alerts',
+    'dashboard.uptime': 'Uptime',
+    'dashboard.cpu_load': 'CPU Load',
+    'dashboard.memory': 'Memory',
+    'dashboard.disk': 'Disk Storage',
+  },
+  zh: {
+    'dashboard.title': '仪表板',
+    'dashboard.welcome': '欢迎回来！这是您的 VPN 基础设施概览。',
+    'dashboard.total_servers': '服务器总数',
+    'dashboard.active': '活跃',
+    'dashboard.down': '离线',
+    'dashboard.total_keys': '访问密钥',
+    'dashboard.expired': '过期',
+    'dashboard.total_traffic': '总流量',
+    'dashboard.all_time': '历史总用量',
+    'dashboard.expiring_soon': '即将过期',
+    'dashboard.expiring_24h': '24小时内过期',
+    'dashboard.traffic_overview': '流量概览',
+    'dashboard.system_status': '系统状态',
+    'dashboard.server_status': '服务器状态',
+    'dashboard.view_all': '查看全部',
+    'dashboard.alerts': '警报与活动',
+    'dashboard.quick_actions': '快速操作',
+    'dashboard.add_server': '添加服务器',
+    'dashboard.create_key': '创建密钥',
+    'dashboard.health_check': '健康检查',
+    'dashboard.configure_alerts': '配置警报',
+    'dashboard.uptime': '运行时间',
+    'dashboard.cpu_load': 'CPU 负载',
+    'dashboard.memory': '内存',
+    'dashboard.disk': '磁盘存储',
+  },
+  my: {
+    'dashboard.title': 'ဒက်ရှ်ဘုတ်',
+    'dashboard.welcome': 'ပြန်လည်ကြိုဆိုပါသည်။ သင်၏ VPN အခြေအနေအကျဉ်းချုပ်။',
+    'dashboard.total_servers': 'ဆာဗာ စုစုပေါင်း',
+    'dashboard.active': 'အလုပ်လုပ်နေသည်',
+    'dashboard.down': 'အလုပ်မလုပ်ပါ',
+    'dashboard.total_keys': 'အသုံးပြုခွင့် သော့များ',
+    'dashboard.expired': 'သက်တမ်းကုန်',
+    'dashboard.total_traffic': 'အင်တာနက် အသုံးပြုမှု',
+    'dashboard.all_time': 'စုစုပေါင်း အသုံးပြုမှု',
+    'dashboard.expiring_soon': 'သက်တမ်းကုန်တော့မည်',
+    'dashboard.expiring_24h': '၂၄ နာရီအတွင်း သက်တမ်းကုန်မည်',
+    'dashboard.traffic_overview': 'အင်တာနက် အသုံးပြုမှု အကျဉ်းချုပ်',
+    'dashboard.system_status': 'စနစ် အခြေအနေ',
+    'dashboard.server_status': 'ဆာဗာ အခြေအနေ',
+    'dashboard.view_all': 'အားလုံးကြည့်ရန်',
+    'dashboard.alerts': 'သတိပေးချက်များနှင့် လှုပ်ရှားမှုများ',
+    'dashboard.quick_actions': 'အမြန် လုပ်ဆောင်ချက်များ',
+    'dashboard.add_server': 'ဆာဗာထည့်ရန်',
+    'dashboard.create_key': 'သော့တံဖန်တီးရန်',
+    'dashboard.health_check': 'ကျန်းမာရေးစစ်ဆေးရန်',
+    'dashboard.configure_alerts': 'သတိပေးချက်များ ပြင်ဆင်ရန်',
+    'dashboard.uptime': 'ဖွင့်ထားချိန်',
+    'dashboard.cpu_load': 'CPU အသုံးပြုမှု',
+    'dashboard.memory': 'မှတ်ဉာဏ်',
+    'dashboard.disk': 'Disk နေရာလွတ်',
+  },
+  ja: {},
+  ko: {},
+  ru: {},
+};
+
+// Login Translations
+const loginTranslations: Record<Locale, Record<string, string>> = {
   en: {
     'login.title': 'Atomic-UI',
     'login.subtitle': 'Outline VPN Management Panel',
@@ -111,3 +230,22 @@ export const translations: Record<Locale, Record<string, string>> = {
     'login.enter_both': 'Пожалуйста, введите имя пользователя и пароль.',
   },
 };
+
+// Main translations object
+export const translations: Record<Locale, Record<string, string>> = {
+  en: {},
+  zh: {},
+  my: {},
+  ja: {},
+  ko: {},
+  ru: {},
+};
+
+// Merge all translations dynamically
+locales.forEach((locale) => {
+  translations[locale] = {
+    ...(loginTranslations[locale] || {}),
+    ...(navTranslations[locale] || {}),
+    ...(dashboardTranslations[locale] || {}),
+  };
+});
