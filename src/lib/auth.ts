@@ -150,7 +150,9 @@ export async function setSessionCookie(token: string): Promise<void> {
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // Only use secure cookies if we are definitely using HTTPS
+    // This fixes login loops when accessing via HTTP/IP address
+    secure: process.env.NODE_ENV === 'production' && process.env.APP_URL?.startsWith('https'),
     sameSite: 'lax',
     maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // Convert days to seconds
     path: '/',
