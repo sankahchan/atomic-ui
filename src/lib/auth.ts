@@ -6,7 +6,18 @@ import { db } from './db';
 // Constants for authentication
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'atomic-ui-default-secret');
 const SESSION_COOKIE_NAME = 'atomic-session';
-const SESSION_EXPIRY_DAYS = parseInt(process.env.SESSION_EXPIRY_DAYS || '7');
+const rawSessionExpiryDays = process.env.SESSION_EXPIRY_DAYS;
+const parsedSessionExpiryDays = Number.parseInt(rawSessionExpiryDays ?? '7', 10);
+const SESSION_EXPIRY_DAYS =
+  Number.isFinite(parsedSessionExpiryDays) && parsedSessionExpiryDays > 0
+    ? parsedSessionExpiryDays
+    : 7;
+
+if (!Number.isFinite(parsedSessionExpiryDays) || parsedSessionExpiryDays <= 0) {
+  console.warn(
+    `Invalid SESSION_EXPIRY_DAYS value "${rawSessionExpiryDays}". Falling back to 7 days.`
+  );
+}
 
 // Types for authentication
 export interface SessionPayload {
