@@ -68,6 +68,7 @@ export async function checkSubscriptions() {
                             event: 'DATA_USAGE',
                             message: `Sent usage alert to ${key.telegramId} (${percentage.toFixed(1)}%)`,
                             accessKeyId: key.id,
+                            status: 'SUCCESS',
                         },
                     });
                 }
@@ -114,6 +115,7 @@ export async function checkSubscriptions() {
                         event: 'EXPIRING_SOON',
                         message: `Sent expiry alert to ${key.telegramId} (${daysLeft} days left)`,
                         accessKeyId: key.id,
+                        status: 'SUCCESS',
                     },
                 });
             }
