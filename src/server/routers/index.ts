@@ -25,14 +25,16 @@ import { archivedKeysRouter } from './archived-keys';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
-import { 
-  authenticateUser, 
-  createSession, 
-  setSessionCookie, 
-  clearSessionCookie, 
+import {
+  authenticateUser,
+  createSession,
+  setSessionCookie,
+  clearSessionCookie,
   getCurrentUser,
   hashPassword,
   invalidateAllUserSessions,
+  invalidateSession,
+  getSessionToken,
 } from '@/lib/auth';
 
 /**
@@ -83,6 +85,10 @@ const authRouter = router({
    * Clears the session cookie, effectively logging out the user.
    */
   logout: publicProcedure.mutation(async () => {
+    const token = await getSessionToken();
+    if (token) {
+      await invalidateSession(token);
+    }
     await clearSessionCookie();
     return { success: true };
   }),
@@ -467,7 +473,7 @@ const settingsRouter = router({
    */
   getAll: protectedProcedure.query(async () => {
     const settings = await db.settings.findMany();
-    
+
     // Convert to key-value object
     const result: Record<string, unknown> = {};
     for (const setting of settings) {

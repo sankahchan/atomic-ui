@@ -6,7 +6,20 @@ import { db } from './db';
 // Constants for authentication
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'atomic-ui-default-secret');
 const SESSION_COOKIE_NAME = 'atomic-session';
-const SESSION_EXPIRY_DAYS = parseInt(process.env.SESSION_EXPIRY_DAYS || '7');
+// Validate session expiry
+const getSessionExpiryDays = () => {
+  const value = parseInt(process.env.SESSION_EXPIRY_DAYS || '');
+  // Default to 7 if not set, invalid number, or non-positive
+  if (isNaN(value) || value <= 0) {
+    if (process.env.SESSION_EXPIRY_DAYS) {
+      console.warn(`[Auth] Invalid SESSION_EXPIRY_DAYS "${process.env.SESSION_EXPIRY_DAYS}". Using default (7 days).`);
+    }
+    return 7;
+  }
+  return value;
+};
+
+const SESSION_EXPIRY_DAYS = getSessionExpiryDays();
 
 // Types for authentication
 export interface SessionPayload {
@@ -142,6 +155,14 @@ export async function setSessionCookie(token: string): Promise<void> {
     maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // Convert days to seconds
     path: '/',
   });
+}
+
+/**
+ * Get the current session token from the cookie
+ */
+export async function getSessionToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(SESSION_COOKIE_NAME)?.value;
 }
 
 /**
