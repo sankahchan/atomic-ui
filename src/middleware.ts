@@ -28,6 +28,8 @@ import { jwtVerify } from 'jose';
 const publicRoutes = [
   '/login',
   '/sub/',                  // Subscription URLs
+  '/api/sub/',              // Subscription API endpoint
+  '/api/subscription/',     // Subscription API endpoint (alternate format)
   '/api/health',            // Health check endpoint
   '/api/trpc/auth.login',   // Login API endpoint
   '/api/trpc/auth.logout',  // Logout API endpoint
@@ -113,7 +115,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       })();
 
-    response.cookies.delete('session');
+    response.cookies.delete('atomic-session');
     return response;
   }
 }
