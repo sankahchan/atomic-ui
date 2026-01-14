@@ -186,10 +186,33 @@ chmod +x "$INSTALL_DIR/atomic-ui.sh"
 cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
 echo -e "${GREEN}[✓]${NC} Management script installed"
 
-# Firewall - add the random port
+# Firewall - Configure for access
+echo -e "${BLUE}[*]${NC} Configuring firewall..."
+
+# 1. Try UFW
 if command -v ufw &> /dev/null; then
+    # Enable UFW if not active (risky? 3x-ui doesn't force enable, but opens port)
+    # Just open the port
     ufw allow ${PANEL_PORT}/tcp > /dev/null 2>&1
-    echo -e "${GREEN}[✓]${NC} Firewall configured for port ${PANEL_PORT}"
+    ufw allow 22/tcp > /dev/null 2>&1 # Ensure SSH is safe
+    ufw reload > /dev/null 2>&1
+    echo -e "${GREEN}[✓]${NC} UFW configured for port ${PANEL_PORT}"
+fi
+
+# 2. Try iptables (common fallback)
+if command -v iptables &> /dev/null; then
+    # Check if rule exists before adding
+    if ! iptables -C INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT 2>/dev/null; then
+        iptables -I INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT
+        echo -e "${GREEN}[✓]${NC} iptables rule added for port ${PANEL_PORT}"
+        
+        # Save rules if persistent package exists
+        if command -v netfilter-persistent &> /dev/null; then
+            netfilter-persistent save > /dev/null 2>&1
+        elif [ -d /etc/iptables ]; then
+            iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+        fi
+    fi
 fi
 
 # Save port and path to config files for the management script
