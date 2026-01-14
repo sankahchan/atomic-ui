@@ -21,7 +21,8 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/atomic-ui"
 SERVICE_NAME="atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="1.3.0"
+DEFAULT_PORT=2053
 
 # Get current port from saved file or default
 get_current_port() {
@@ -334,11 +335,27 @@ setup_firewall() {
     local PORT=$1
     print_step "Configuring firewall for port ${PORT}..."
 
+    # 1. Try UFW
     if command -v ufw &> /dev/null; then
         ufw allow ${PORT}/tcp > /dev/null 2>&1
-        print_success "Firewall rule added for port ${PORT}"
-    else
-        print_warning "UFW not found, skipping firewall configuration"
+        ufw allow 22/tcp > /dev/null 2>&1
+        ufw reload > /dev/null 2>&1
+        print_success "UFW configured for port ${PORT}"
+    fi
+
+    # 2. Try iptables
+    if command -v iptables &> /dev/null; then
+        if ! iptables -C INPUT -p tcp --dport ${PORT} -j ACCEPT 2>/dev/null; then
+            iptables -I INPUT -p tcp --dport ${PORT} -j ACCEPT
+            print_success "iptables rule added for port ${PORT}"
+            
+            # Save rules
+            if command -v netfilter-persistent &> /dev/null; then
+                netfilter-persistent save > /dev/null 2>&1
+            elif [ -d /etc/iptables ]; then
+                iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+            fi
+        fi
     fi
 }
 
@@ -549,10 +566,8 @@ change_port() {
     systemctl daemon-reload
     
     # Add new firewall rule
-    if command -v ufw &> /dev/null; then
-        ufw allow ${NEW_PORT}/tcp > /dev/null 2>&1
-        print_success "Firewall updated for port ${NEW_PORT}"
-    fi
+    setup_firewall "${NEW_PORT}"
+    print_success "Firewall updated for port ${NEW_PORT}"
     
     # Start service
     systemctl start ${SERVICE_NAME}
@@ -614,6 +629,17 @@ update_service() {
     cp .env.backup .env 2>/dev/null || true
     cp .panel_port.backup .panel_port 2>/dev/null || true
     cp .panel_path.backup .panel_path 2>/dev/null || true
+
+    # Ensure NEXT_PUBLIC_PANEL_PATH is set (fix for updates from old versions)
+    if grep -q "^PANEL_PATH=" .env; then
+        # Check if NEXT_PUBLIC var exists
+        if ! grep -q "^NEXT_PUBLIC_PANEL_PATH=" .env; then
+             # It doesn't exist, so append it using the value from PANEL_PATH
+             CURRENT_PANEL_PATH=$(grep "^PANEL_PATH=" .env | cut -d'=' -f2)
+             echo "NEXT_PUBLIC_PANEL_PATH=${CURRENT_PANEL_PATH}" >> .env
+             print_info "Added missing NEXT_PUBLIC_PANEL_PATH to .env"
+        fi
+    fi
     
     print_step "Installing dependencies..."
     rm -rf node_modules .next package-lock.json
@@ -744,9 +770,9 @@ show_menu() {
 install_full() {
     print_banner
     
-    # Generate random port
-    NEW_PORT=$(generate_random_port)
-    print_info "Generated random port: ${NEW_PORT}"
+    # Use default port 2053
+    NEW_PORT=${DEFAULT_PORT}
+    print_info "Using default port: ${NEW_PORT}"
     
     check_root
     check_system
