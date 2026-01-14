@@ -29,7 +29,12 @@ A modern, feature-rich web application for managing Outline VPN servers. Built w
 ### Monitoring & Alerts
 - **Health Checks**: Automated server availability monitoring
 - **Notifications**: Telegram, email, and webhook notifications
-- **Dashboard Analytics**: Traffic trends, usage statistics, and alerts
+- **Automated Alerts**: Expiry warnings (< 3 days) and usage alerts (> 80%)
+- **Dashboard Analytics**: Traffic trends, system health (CPU/RAM/Disk), and alerts
+
+### System & Maintenance
+- **Backup & Restore**: One-click full system backup and restore capabilities
+- **System Monitoring**: Real-time server resource usage tracking
 
 ### User Experience
 - **Modern UI**: Clean, responsive interface with dark/light themes
@@ -214,7 +219,10 @@ atomic-ui/
 - **Database**: SQLite with Prisma ORM
 - **API**: tRPC for type-safe APIs
 - **Styling**: Tailwind CSS with shadcn/ui
-- **State**: Zustand + React Query
+- **Starte Management**: Zustand + React Query
+- **System Monitoring**: Native Node.js OS modules
+- **Tasks**: node-cron for background jobs
+- **Backup**: adm-zip & archiver
 
 ### Commands
 
