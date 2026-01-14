@@ -317,14 +317,6 @@ Contributions are welcome! Please read the contributing guidelines before submit
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- [Outline VPN](https://getoutline.org/) - The underlying VPN technology
-- [x-ui](https://github.com/alireza0/x-ui) - UI inspiration
-- [OutlineAdmin](https://github.com/AmRo045/OutlineAdmin) - Multi-server management concepts
-- [shadcn/ui](https://ui.shadcn.com/) - UI component library
-- [Tailwind CSS](https://tailwindcss.com/) - Styling framework
-
 ---
 
 Made with ⚛️ by [sankahchan](https://github.com/sankahchan)
