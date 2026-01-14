@@ -35,13 +35,16 @@ export const trpc = createTRPCReact<AppRouter>();
  */
 function getBaseUrl() {
   if (typeof window !== 'undefined') {
-    // Browser: use relative path
-    return '';
+    // Browser: use configured path from environment or relative if not set
+    // Note: client-side env must be prefixed with NEXT_PUBLIC_
+    return process.env.NEXT_PUBLIC_PANEL_PATH || '';
   }
 
   // Server: use localhost with the port from environment
   const port = process.env.PORT ?? 3000;
-  return `http://localhost:${port}`;
+  // Include PANEL_PATH if configured (for server-side calls)
+  const panelPath = process.env.PANEL_PATH || '';
+  return `http://localhost:${port}${panelPath}`;
 }
 
 /**

@@ -81,7 +81,9 @@ export async function middleware(request: NextRequest) {
     }
 
     // For page routes, redirect to login with return URL
-    const loginUrl = new URL('/login', request.url);
+    // For page routes, redirect to login with return URL
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -92,7 +94,7 @@ export async function middleware(request: NextRequest) {
   // validation happens in the tRPC context.
   try {
     await jwtVerify(sessionToken, getJwtSecret());
-    
+
     // Token is valid, allow the request to proceed
     return NextResponse.next();
   } catch (error) {
@@ -102,10 +104,14 @@ export async function middleware(request: NextRequest) {
     // Clear the invalid cookie
     const response = pathname.startsWith('/api/')
       ? NextResponse.json(
-          { error: 'Unauthorized', message: 'Session expired. Please log in again.' },
-          { status: 401 }
-        )
-      : NextResponse.redirect(new URL('/login', request.url));
+        { error: 'Unauthorized', message: 'Session expired. Please log in again.' },
+        { status: 401 }
+      )
+      : (() => {
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        return NextResponse.redirect(url);
+      })();
 
     response.cookies.delete('session');
     return response;

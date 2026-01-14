@@ -125,11 +125,18 @@ else
     sed -i "s|^PORT=.*|PORT=${PANEL_PORT}|g" .env
 fi
 
-# Add PANEL_PATH to .env for the random URL path
+# Add PANEL_PATH and NEXT_PUBLIC_PANEL_PATH to .env
 if ! grep -q "^PANEL_PATH=" .env; then
     echo "PANEL_PATH=/${PANEL_PATH}" >> .env
+    echo "NEXT_PUBLIC_PANEL_PATH=/${PANEL_PATH}" >> .env
 else
     sed -i "s|^PANEL_PATH=.*|PANEL_PATH=/${PANEL_PATH}|g" .env
+    # Update NEXT_PUBLIC var too if exists, or append
+    if grep -q "^NEXT_PUBLIC_PANEL_PATH=" .env; then
+        sed -i "s|^NEXT_PUBLIC_PANEL_PATH=.*|NEXT_PUBLIC_PANEL_PATH=/${PANEL_PATH}|g" .env
+    else
+        echo "NEXT_PUBLIC_PANEL_PATH=/${PANEL_PATH}" >> .env
+    fi
 fi
 
 echo -e "${GREEN}[✓]${NC} Environment configured"
