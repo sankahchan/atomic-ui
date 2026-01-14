@@ -31,8 +31,10 @@ import {
   setSessionCookie, 
   clearSessionCookie, 
   getCurrentUser,
+  getSessionToken,
   hashPassword,
   invalidateAllUserSessions,
+  invalidateSession,
 } from '@/lib/auth';
 
 /**
@@ -83,6 +85,10 @@ const authRouter = router({
    * Clears the session cookie, effectively logging out the user.
    */
   logout: publicProcedure.mutation(async () => {
+    const token = await getSessionToken();
+    if (token) {
+      await invalidateSession(token);
+    }
     await clearSessionCookie();
     return { success: true };
   }),
