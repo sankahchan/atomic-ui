@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import QRCode from 'qrcode';
@@ -49,14 +50,14 @@ import {
  */
 const DAK_TYPES = {
   SELF_MANAGED: {
-    label: 'Self-Managed',
+    labelKey: 'dynamic_keys.type.self_managed',
     description: 'Automatically creates and rotates keys across servers',
     icon: Shuffle,
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
   },
   MANUAL: {
-    label: 'Manual',
+    labelKey: 'dynamic_keys.type.manual',
     description: 'Manually attach and detach keys as needed',
     icon: Settings,
     color: 'text-blue-500',
@@ -70,6 +71,7 @@ const DAK_TYPES = {
 export default function DynamicKeyDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { t } = useLocale();
   const { toast } = useToast();
   const dakId = params.id as string;
 
@@ -85,7 +87,7 @@ export default function DynamicKeyDetailPage() {
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Dynamic key deleted',
+        title: t('dynamic_keys.msg.deleted'),
         description: 'The dynamic key has been deleted successfully.',
       });
       router.push('/dashboard/dynamic-keys');
@@ -103,7 +105,7 @@ export default function DynamicKeyDetailPage() {
   const detachKeyMutation = trpc.dynamicKeys.detachKey.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Key detached',
+        title: t('dynamic_keys.msg.detached'),
         description: 'The access key has been detached from this dynamic key.',
       });
       refetch();
@@ -136,8 +138,8 @@ export default function DynamicKeyDetailPage() {
       const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
       navigator.clipboard.writeText(url);
       toast({
-        title: 'Copied!',
-        description: 'Subscription URL copied to clipboard.',
+        title: t('dynamic_keys.msg.copied'),
+        description: t('dynamic_keys.msg.copy_url'),
       });
     }
   };
@@ -146,20 +148,20 @@ export default function DynamicKeyDetailPage() {
     if (dak?.dynamicUrl) {
       navigator.clipboard.writeText(dak.dynamicUrl);
       toast({
-        title: 'Copied!',
+        title: t('dynamic_keys.msg.copied'),
         description: 'Subscription token copied to clipboard.',
       });
     }
   };
 
   const handleDelete = () => {
-    if (dak && confirm(`Are you sure you want to delete "${dak.name}"?\n\nThis will also detach all associated access keys.`)) {
+    if (dak && confirm(t('dynamic_keys.msg.confirm_delete'))) {
       deleteMutation.mutate({ id: dak.id });
     }
   };
 
   const handleDetachKey = (keyId: string) => {
-    if (dak && confirm('Are you sure you want to detach this key?')) {
+    if (dak && confirm(t('dynamic_keys.msg.confirm_detach'))) {
       detachKeyMutation.mutate({ dakId: dak.id, keyId });
     }
   };
@@ -184,14 +186,14 @@ export default function DynamicKeyDetailPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <KeyRound className="w-16 h-16 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Dynamic key not found</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('dynamic_keys.detail.not_found')}</h3>
           <p className="text-muted-foreground mb-6">
             The requested dynamic access key could not be found.
           </p>
           <Button asChild>
             <Link href="/dashboard/dynamic-keys">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dynamic Keys
+              {t('dynamic_keys.detail.back')}
             </Link>
           </Button>
         </CardContent>
@@ -223,7 +225,7 @@ export default function DynamicKeyDetailPage() {
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              Created {formatRelativeTime(dak.createdAt)}
+              {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}
             </p>
           </div>
         </div>
@@ -231,7 +233,7 @@ export default function DynamicKeyDetailPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {t('dynamic_keys.detail.refresh')}
           </Button>
           <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
             {deleteMutation.isPending ? (
@@ -239,7 +241,7 @@ export default function DynamicKeyDetailPage() {
             ) : (
               <Trash2 className="w-4 h-4 mr-2" />
             )}
-            Delete
+            {t('dynamic_keys.detail.delete')}
           </Button>
         </div>
       </div>
@@ -252,7 +254,7 @@ export default function DynamicKeyDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TypeIcon className={cn('w-5 h-5', typeConfig.color)} />
-                {typeConfig.label} Key
+                {t(typeConfig.labelKey)}
               </CardTitle>
               <CardDescription>{typeConfig.description}</CardDescription>
             </CardHeader>
@@ -261,7 +263,7 @@ export default function DynamicKeyDetailPage() {
               {dak.dynamicUrl && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Subscription URL</Label>
+                    <Label className="text-sm text-muted-foreground">{t('dynamic_keys.detail.subscription_url')}</Label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
                         {window.location.origin}/sub/{dak.dynamicUrl}
@@ -274,7 +276,7 @@ export default function DynamicKeyDetailPage() {
 
                   {/* Subscription token */}
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Subscription Token</Label>
+                    <Label className="text-sm text-muted-foreground">{t('dynamic_keys.detail.subscription_token')}</Label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm">
                         {dak.dynamicUrl}
@@ -294,7 +296,7 @@ export default function DynamicKeyDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
-                Traffic Usage
+                {t('dynamic_keys.detail.traffic_usage')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -333,7 +335,7 @@ export default function DynamicKeyDetailPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Key className="w-5 h-5 text-primary" />
-                  Attached Keys ({dak.accessKeys.length})
+                  {t('dynamic_keys.detail.attached_keys')} ({dak.accessKeys.length})
                 </CardTitle>
               </div>
             </CardHeader>
@@ -384,7 +386,7 @@ export default function DynamicKeyDetailPage() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No keys attached yet</p>
+                  <p>{t('dynamic_keys.detail.no_keys')}</p>
                 </div>
               )}
             </CardContent>
@@ -397,10 +399,10 @@ export default function DynamicKeyDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-primary" />
-                QR Code
+                {t('dynamic_keys.detail.qr_code')}
               </CardTitle>
               <CardDescription>
-                Scan with a compatible VPN client
+                {t('dynamic_keys.detail.scan_qr')}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center">
@@ -431,27 +433,27 @@ export default function DynamicKeyDetailPage() {
           {/* Quick Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t('dynamic_keys.detail.details')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Type</span>
-                <span className="font-medium">{typeConfig.label}</span>
+                <span className="text-muted-foreground">{t('dynamic_keys.table.type')}</span>
+                <span className="font-medium">{t(typeConfig.labelKey)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Attached Keys</span>
+                <span className="text-muted-foreground">{t('dynamic_keys.detail.attached_keys')}</span>
                 <span className="font-medium">{dak.accessKeys.length}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Status</span>
+                <span className="text-muted-foreground">{t('dynamic_keys.table.status')}</span>
                 <span className="font-medium">{dak.status}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Created</span>
+                <span className="text-muted-foreground">{t('dynamic_keys.detail.created')}</span>
                 <span>{formatDateTime(dak.createdAt)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Updated</span>
+                <span className="text-muted-foreground">{t('dynamic_keys.detail.updated')}</span>
                 <span>{formatDateTime(dak.updatedAt)}</span>
               </div>
             </CardContent>

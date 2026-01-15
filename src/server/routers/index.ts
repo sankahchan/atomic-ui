@@ -23,6 +23,7 @@ import { dynamicKeysRouter } from './dynamic-keys';
 import { telegramBotRouter } from './telegram-bot';
 import { archivedKeysRouter } from './archived-keys';
 import { systemRouter } from './system';
+import { backupRouter } from './backup';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
@@ -536,6 +537,7 @@ export const appRouter = router({
   settings: settingsRouter,
   telegramBot: telegramBotRouter,
   system: systemRouter,
+  backup: backupRouter,
 });
 
 /**

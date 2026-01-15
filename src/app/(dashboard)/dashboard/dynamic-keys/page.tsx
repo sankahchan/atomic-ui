@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes } from '@/lib/utils';
 import QRCode from 'qrcode';
@@ -71,14 +72,14 @@ const ENCRYPTION_METHODS = [
  */
 const DAK_TYPES = {
   SELF_MANAGED: {
-    label: 'Self-Managed',
+    labelKey: 'dynamic_keys.type.self_managed',
     description: 'Automatically creates and rotates keys across servers',
     icon: Shuffle,
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
   },
   MANUAL: {
-    label: 'Manual',
+    labelKey: 'dynamic_keys.type.manual',
     description: 'Manually attach and detach keys as needed',
     icon: Settings,
     color: 'text-blue-500',
@@ -93,27 +94,27 @@ const statusConfig = {
   ACTIVE: {
     color: 'bg-green-500/20 text-green-400 border-green-500/30',
     icon: CheckCircle2,
-    label: 'Active',
+    labelKey: 'dynamic_keys.status.active',
   },
   DISABLED: {
     color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     icon: XCircle,
-    label: 'Disabled',
+    labelKey: 'dynamic_keys.status.disabled',
   },
   EXPIRED: {
     color: 'bg-red-500/20 text-red-400 border-red-500/30',
     icon: Clock,
-    label: 'Expired',
+    labelKey: 'dynamic_keys.status.expired',
   },
   DEPLETED: {
     color: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     icon: AlertTriangle,
-    label: 'Depleted',
+    labelKey: 'dynamic_keys.status.depleted',
   },
   PENDING: {
     color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     icon: Clock,
-    label: 'Pending',
+    labelKey: 'dynamic_keys.status.pending',
   },
 };
 
@@ -159,6 +160,7 @@ function CreateDAKDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
+  const { t } = useLocale();
   const { toast } = useToast();
   const [formData, setFormData] = useState<{
     name: string;
@@ -199,7 +201,7 @@ function CreateDAKDialog({
   const createMutation = trpc.dynamicKeys.create.useMutation({
     onSuccess: (data) => {
       toast({
-        title: 'Dynamic key created',
+        title: t('dynamic_keys.msg.created'),
         description: `"${data.name}" has been created successfully.`,
       });
       onSuccess();
@@ -246,20 +248,20 @@ function CreateDAKDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-primary" />
-            Create Dynamic Access Key
+            {t('dynamic_keys.dialog.create_title')}
           </DialogTitle>
           <DialogDescription>
-            Create a dynamic key with a stable subscription URL.
+            {t('dynamic_keys.dialog.create_desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div className="space-y-2">
-            <Label htmlFor="dakName">Name *</Label>
+            <Label htmlFor="dakName">{t('dynamic_keys.dialog.name')} *</Label>
             <Input
               id="dakName"
-              placeholder="e.g., Premium Users Pool"
+              placeholder={t('dynamic_keys.dialog.name_placeholder')}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -267,7 +269,7 @@ function CreateDAKDialog({
 
           {/* Type selection */}
           <div className="space-y-3">
-            <Label>Key Type *</Label>
+            <Label>{t('dynamic_keys.dialog.type')} *</Label>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(DAK_TYPES).map(([key, config]) => (
                 <button
@@ -282,7 +284,7 @@ function CreateDAKDialog({
                   )}
                 >
                   <config.icon className={cn('w-5 h-5 mb-2', config.color)} />
-                  <p className="font-medium text-sm">{config.label}</p>
+                  <p className="font-medium text-sm">{t(config.labelKey)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {config.description}
                   </p>
@@ -293,7 +295,7 @@ function CreateDAKDialog({
 
           {/* Encryption method */}
           <div className="space-y-2">
-            <Label>Encryption Method</Label>
+            <Label>{t('dynamic_keys.dialog.encryption')}</Label>
             <Select
               value={formData.method}
               onValueChange={(value) => setFormData({ ...formData, method: value })}
@@ -317,7 +319,7 @@ function CreateDAKDialog({
           {/* Contact info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="dakEmail">Email</Label>
+              <Label htmlFor="dakEmail">{t('dynamic_keys.dialog.email')}</Label>
               <Input
                 id="dakEmail"
                 type="email"
@@ -327,7 +329,7 @@ function CreateDAKDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dakTelegram">Telegram ID</Label>
+              <Label htmlFor="dakTelegram">{t('dynamic_keys.dialog.telegram')}</Label>
               <Input
                 id="dakTelegram"
                 placeholder="@username or ID"
@@ -339,7 +341,7 @@ function CreateDAKDialog({
 
           {/* Data limit */}
           <div className="space-y-2">
-            <Label htmlFor="dakDataLimit">Data Limit (GB)</Label>
+            <Label htmlFor="dakDataLimit">{t('dynamic_keys.dialog.data_limit')}</Label>
             <Input
               id="dakDataLimit"
               type="number"
@@ -350,13 +352,13 @@ function CreateDAKDialog({
               step="0.5"
             />
             <p className="text-xs text-muted-foreground">
-              Leave empty for unlimited data usage.
+              {t('dynamic_keys.dialog.data_limit_help')}
             </p>
           </div>
 
           {/* Expiration type */}
           <div className="space-y-2">
-            <Label>Expiration</Label>
+            <Label>{t('dynamic_keys.dialog.expiration')}</Label>
             <Select
               value={formData.expirationType}
               onValueChange={(value: 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') =>
@@ -367,7 +369,7 @@ function CreateDAKDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NEVER">Never expires</SelectItem>
+                <SelectItem value="NEVER">{t('dynamic_keys.expires.never')}</SelectItem>
                 <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
                 <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
               </SelectContent>
@@ -377,22 +379,22 @@ function CreateDAKDialog({
           {/* Duration days (conditional) */}
           {(formData.expirationType === 'DURATION_FROM_CREATION' ||
             formData.expirationType === 'START_ON_FIRST_USE') && (
-            <div className="space-y-2">
-              <Label htmlFor="dakDurationDays">Duration (days)</Label>
-              <Input
-                id="dakDurationDays"
-                type="number"
-                placeholder="30"
-                value={formData.durationDays}
-                onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-                min="1"
-              />
-            </div>
-          )}
+              <div className="space-y-2">
+                <Label htmlFor="dakDurationDays">{t('dynamic_keys.dialog.duration')}</Label>
+                <Input
+                  id="dakDurationDays"
+                  type="number"
+                  placeholder="30"
+                  value={formData.durationDays}
+                  onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                  min="1"
+                />
+              </div>
+            )}
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="dakNotes">Notes</Label>
+            <Label htmlFor="dakNotes">{t('dynamic_keys.dialog.notes')}</Label>
             <Input
               id="dakNotes"
               placeholder="Optional notes about this dynamic key"
@@ -407,11 +409,11 @@ function CreateDAKDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('dynamic_keys.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Create Dynamic Key
+              {t('dynamic_keys.dialog.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -432,6 +434,7 @@ function QRCodeDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useLocale();
   const { toast } = useToast();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -463,8 +466,8 @@ function QRCodeDialog({
       const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
       navigator.clipboard.writeText(url);
       toast({
-        title: 'Copied!',
-        description: 'Subscription URL copied to clipboard.',
+        title: t('dynamic_keys.msg.copied'),
+        description: t('dynamic_keys.msg.copy_url'),
       });
     }
   };
@@ -475,9 +478,9 @@ function QRCodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>QR Code: {dak.name}</DialogTitle>
+          <DialogTitle>{t('dynamic_keys.detail.qr_code')}: {dak.name}</DialogTitle>
           <DialogDescription>
-            Scan this code with a compatible VPN client to connect.
+            {t('dynamic_keys.detail.scan_qr')}
           </DialogDescription>
         </DialogHeader>
 
@@ -553,6 +556,7 @@ function DAKRow({
   isTogglingStatus: boolean;
   isOnline: boolean;
 }) {
+  const { t } = useLocale();
   const typeConfig = DAK_TYPES[dak.type];
   const config = statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
@@ -599,7 +603,7 @@ function DAKRow({
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <typeConfig.icon className={cn('w-4 h-4', typeConfig.color)} />
-          <span className="text-sm">{typeConfig.label}</span>
+          <span className="text-sm">{t(typeConfig.labelKey)}</span>
         </div>
       </td>
 
@@ -607,7 +611,7 @@ function DAKRow({
       <td className="px-4 py-3">
         <Badge className={cn('border', config.color)}>
           <StatusIcon className="w-3 h-3 mr-1" />
-          {config.label}
+          {t(config.labelKey)}
         </Badge>
       </td>
 
@@ -646,15 +650,15 @@ function DAKRow({
             dak.daysRemaining != null && dak.daysRemaining <= 3 && 'text-orange-500'
           )}>
             {dak.daysRemaining != null && dak.daysRemaining > 0 ? (
-              <span>{dak.daysRemaining}d remaining</span>
+              <span>{dak.daysRemaining}{t('dynamic_keys.expires.days_left')}</span>
             ) : dak.daysRemaining === 0 ? (
-              <span>Expires today</span>
+              <span>{t('dynamic_keys.expires.today')}</span>
             ) : (
-              <span className="text-red-500">Expired</span>
+              <span className="text-red-500">{t('dynamic_keys.expires.expired')}</span>
             )}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">Never</span>
+          <span className="text-sm text-muted-foreground">{t('dynamic_keys.expires.never')}</span>
         )}
       </td>
 
@@ -666,7 +670,7 @@ function DAKRow({
             size="icon"
             className="h-8 w-8"
             onClick={onShowQR}
-            title="Show QR Code"
+            title={t('dynamic_keys.detail.qr_code')}
           >
             <QrCode className="w-4 h-4" />
           </Button>
@@ -697,12 +701,12 @@ function DAKRow({
               <DropdownMenuItem asChild>
                 <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="cursor-pointer">
                   <Eye className="w-4 h-4 mr-2" />
-                  View Details
+                  {t('dynamic_keys.detail.details')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
-                Show QR Code
+                {t('dynamic_keys.detail.qr_code')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyUrl}>
                 <Copy className="w-4 h-4 mr-2" />
@@ -714,7 +718,7 @@ function DAKRow({
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Key
+                {t('dynamic_keys.detail.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -728,6 +732,7 @@ function DAKRow({
  * DynamicKeysPage Component
  */
 export default function DynamicKeysPage() {
+  const { t } = useLocale();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -820,7 +825,7 @@ export default function DynamicKeysPage() {
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Dynamic key deleted',
+        title: t('dynamic_keys.msg.deleted'),
         description: 'The dynamic key has been deleted successfully.',
       });
       refetch();
@@ -880,8 +885,8 @@ export default function DynamicKeysPage() {
       const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
       navigator.clipboard.writeText(url);
       toast({
-        title: 'URL copied',
-        description: 'Subscription URL copied to clipboard.',
+        title: t('dynamic_keys.msg.copied'),
+        description: t('dynamic_keys.msg.copy_url'),
       });
     }
   };
@@ -891,7 +896,7 @@ export default function DynamicKeysPage() {
   };
 
   const handleDelete = (dak: DAKData) => {
-    if (confirm(`Are you sure you want to delete "${dak.name}"?\n\nThis will also detach all associated access keys.`)) {
+    if (confirm(t('dynamic_keys.msg.confirm_delete'))) {
       deleteMutation.mutate({ id: dak.id });
     }
   };
@@ -973,14 +978,14 @@ export default function DynamicKeysPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dynamic Access Keys</h1>
+          <h1 className="text-2xl font-bold">{t('dynamic_keys.title')}</h1>
           <p className="text-muted-foreground">
-            Manage dynamic key pools with stable subscription URLs.
+            {t('dynamic_keys.desc')}
           </p>
         </div>
         <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Create DAK
+          {t('dynamic_keys.create')}
         </Button>
       </div>
 
@@ -990,14 +995,14 @@ export default function DynamicKeysPage() {
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="text-sm text-muted-foreground">{t('dynamic_keys.total_keys')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.total}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <p className="text-sm text-green-500">Active</p>
+              <p className="text-sm text-green-500">{t('dynamic_keys.active_keys')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.active}</p>
           </Card>
@@ -1007,28 +1012,28 @@ export default function DynamicKeysPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <p className="text-sm text-green-500">Online</p>
+              <p className="text-sm text-green-500">{t('dynamic_keys.online_users')}</p>
             </div>
             <p className="text-2xl font-bold">{onlineData?.onlineCount || 0}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <Shuffle className="w-4 h-4 text-purple-500" />
-              <p className="text-sm text-purple-500">Self-Managed</p>
+              <p className="text-sm text-purple-500">{t('dynamic_keys.type.self_managed')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.selfManaged}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <Settings className="w-4 h-4 text-blue-500" />
-              <p className="text-sm text-blue-500">Manual</p>
+              <p className="text-sm text-blue-500">{t('dynamic_keys.type.manual')}</p>
             </div>
             <p className="text-2xl font-bold">{stats.manual}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-primary" />
-              <p className="text-sm text-muted-foreground">Total Usage</p>
+              <p className="text-sm text-muted-foreground">{t('dynamic_keys.total_usage')}</p>
             </div>
             <p className="text-2xl font-bold">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
           </Card>
@@ -1040,7 +1045,7 @@ export default function DynamicKeysPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or email..."
+            placeholder={t('dynamic_keys.search_placeholder')}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -1058,15 +1063,15 @@ export default function DynamicKeysPage() {
           }}
         >
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder={t('dynamic_keys.filter_status')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="DEPLETED">Depleted</SelectItem>
-            <SelectItem value="EXPIRED">Expired</SelectItem>
-            <SelectItem value="DISABLED">Disabled</SelectItem>
+            <SelectItem value="all">{t('dynamic_keys.filter_status')}</SelectItem>
+            <SelectItem value="ACTIVE">{t('dynamic_keys.status.active')}</SelectItem>
+            <SelectItem value="PENDING">{t('dynamic_keys.status.pending')}</SelectItem>
+            <SelectItem value="DEPLETED">{t('dynamic_keys.status.depleted')}</SelectItem>
+            <SelectItem value="EXPIRED">{t('dynamic_keys.status.expired')}</SelectItem>
+            <SelectItem value="DISABLED">{t('dynamic_keys.status.disabled')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -1078,12 +1083,12 @@ export default function DynamicKeysPage() {
           }}
         >
           <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All Types" />
+            <SelectValue placeholder={t('dynamic_keys.filter_type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="SELF_MANAGED">Self-Managed</SelectItem>
-            <SelectItem value="MANUAL">Manual</SelectItem>
+            <SelectItem value="all">{t('dynamic_keys.filter_type')}</SelectItem>
+            <SelectItem value="SELF_MANAGED">{t('dynamic_keys.type.self_managed')}</SelectItem>
+            <SelectItem value="MANUAL">{t('dynamic_keys.type.manual')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -1150,7 +1155,7 @@ export default function DynamicKeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            Sync
+            {t('dynamic_keys.sync_servers')}
           </Button>
         </div>
       </div>
@@ -1206,13 +1211,13 @@ export default function DynamicKeysPage() {
                     )}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Name</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Type</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Usage</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Keys</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Expires</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Actions</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.name')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.type')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.status')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.usage')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.attached')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.expires')}</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1245,8 +1250,8 @@ export default function DynamicKeysPage() {
                     <KeyRound className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">
                       {hasActiveFilters
-                        ? 'No dynamic keys match your filters.'
-                        : 'No dynamic keys yet.'}
+                        ? t('dynamic_keys.empty_title')
+                        : t('dynamic_keys.empty_title')}
                     </p>
                     {!hasActiveFilters && (
                       <Button
@@ -1254,7 +1259,7 @@ export default function DynamicKeysPage() {
                         onClick={() => setCreateDialogOpen(true)}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Create Your First DAK
+                        {t('dynamic_keys.create_btn')}
                       </Button>
                     )}
                   </td>
@@ -1264,7 +1269,7 @@ export default function DynamicKeysPage() {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Pagination (kept simplified) */}
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
             <p className="text-sm text-muted-foreground">

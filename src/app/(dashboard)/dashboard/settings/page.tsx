@@ -33,8 +33,13 @@ import {
   MessageCircle,
   CheckCircle2,
   XCircle,
+  Upload,
+  Download,
+  Trash2,
+  FileText,
+  AlertTriangle,
+  History,
   Copy,
-  ExternalLink,
 } from 'lucide-react';
 
 /**
@@ -166,6 +171,55 @@ export default function SettingsPage() {
       refetchWebhook();
     },
   });
+
+  // Backup & Restore
+  const { data: backups, refetch: refetchBackups } = trpc.backup.list.useQuery();
+  const createBackupMutation = trpc.backup.create.useMutation({
+    onSuccess: () => {
+      toast({ title: t('settings.backup.create_success') });
+      refetchBackups();
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const restoreBackupMutation = trpc.backup.restore.useMutation({
+    onSuccess: () => {
+      toast({ title: t('settings.backup.restore_success') });
+      window.location.reload();
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteBackupMutation = trpc.backup.delete.useMutation({
+    onSuccess: () => {
+      toast({ title: t('settings.backup.delete_success') });
+      refetchBackups();
+    },
+  });
+
+  const handleCreateBackup = () => {
+    createBackupMutation.mutate();
+  };
+
+  const handleRestoreBackup = (filename: string) => {
+    if (confirm(t('settings.backup.restore_desc'))) {
+      restoreBackupMutation.mutate({ filename });
+    }
+  };
+
+  const handleDeleteBackup = (filename: string) => {
+    if (confirm('Are you sure you want to delete this backup?')) {
+      deleteBackupMutation.mutate({ filename });
+    }
+  };
+
+  const handleDownloadBackup = (filename: string) => {
+    window.open(`/api/backup/download?filename=${filename}`, '_blank');
+  };
 
   // Initialize telegram form when settings load
   useState(() => {
@@ -365,6 +419,83 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   {t('settings.health.traffic_desc')}
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Backup & Restore */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              {t('settings.backup.title')}
+            </CardTitle>
+            <CardDescription>
+              {t('settings.backup.desc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4">
+              <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending}>
+                {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                <Save className="w-4 h-4 mr-2" />
+                {t('settings.backup.create')}
+              </Button>
+            </div>
+
+            <div className="rounded-md border">
+              <div className="grid grid-cols-12 gap-4 p-4 border-b font-medium text-sm text-muted-foreground">
+                <div className="col-span-6">{t('settings.backup.filename')}</div>
+                <div className="col-span-3">{t('settings.backup.size')}</div>
+                <div className="col-span-3 text-right">{t('settings.backup.actions')}</div>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {backups?.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    {t('settings.backup.empty')}
+                  </div>
+                ) : (
+                  backups?.map((backup) => (
+                    <div key={backup.filename} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 items-center hover:bg-muted/50">
+                      <div className="col-span-6 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-mono text-sm">{backup.filename}</span>
+                      </div>
+                      <div className="col-span-3 text-sm text-muted-foreground">
+                        {Math.round(backup.size / 1024)} KB
+                      </div>
+                      <div className="col-span-3 flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownloadBackup(backup.filename)}
+                          title={t('settings.backup.download')}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRestoreBackup(backup.filename)}
+                          title={t('settings.backup.restore')}
+                          disabled={restoreBackupMutation.isPending}
+                        >
+                          <RefreshCw className={`w-4 h-4 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteBackup(backup.filename)}
+                          title={t('settings.backup.delete')}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </CardContent>
