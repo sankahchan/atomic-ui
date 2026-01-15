@@ -132,6 +132,7 @@ function CreateKeyDialog({
     telegramId: string;
     notes: string;
     dataLimitGB: string;
+    dataLimitResetStrategy: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER';
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
     durationDays: string;
     method: string;
@@ -142,6 +143,7 @@ function CreateKeyDialog({
     telegramId: '',
     notes: '',
     dataLimitGB: '',
+    dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
@@ -179,6 +181,7 @@ function CreateKeyDialog({
       telegramId: '',
       notes: '',
       dataLimitGB: '',
+      dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
@@ -204,6 +207,7 @@ function CreateKeyDialog({
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
@@ -318,6 +322,29 @@ function CreateKeyDialog({
               Leave empty for unlimited data usage.
             </p>
           </div>
+
+          {/* Data Limit Reset Strategy */}
+          {formData.dataLimitGB && (
+            <div className="space-y-2">
+              <Label>Reset Strategy</Label>
+              <Select
+                value={formData.dataLimitResetStrategy}
+                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                  setFormData({ ...formData, dataLimitResetStrategy: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEVER">Never Reset</SelectItem>
+                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
+                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Expiration type */}
           <div className="space-y-2">

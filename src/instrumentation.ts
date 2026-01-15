@@ -4,11 +4,15 @@ export async function register() {
         // This prevents it from running in build/edge environments where not supported
         const cron = await import('node-cron');
         const { checkSubscriptions } = await import('@/server/jobs/notification-worker');
+        const { checkPeriodicLimits } = await import('@/server/jobs/limit-reset');
 
         // Run every hour
         cron.schedule('0 * * * *', async () => {
-            console.log('Running subscription check job...');
-            await checkSubscriptions();
+            console.log('Running background jobs...');
+            await Promise.all([
+                checkSubscriptions(),
+                checkPeriodicLimits()
+            ]);
         });
 
         console.log('Background jobs registered');

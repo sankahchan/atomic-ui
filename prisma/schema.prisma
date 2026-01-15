@@ -128,6 +128,12 @@ model AccessKey {
   // Traffic limits (in bytes)
   dataLimitBytes BigInt?
   usedBytes      BigInt  @default(0)
+  
+  // Periodic Data Limits
+  // Strategy: DAILY, WEEKLY, MONTHLY, NEVER
+  dataLimitResetStrategy String    @default("NEVER")
+  lastDataLimitReset     DateTime?
+  usageOffset            BigInt    @default(0) // Total usage at start of period
 
   // Expiration settings
   // Valid expirationType: NEVER, FIXED_DATE, DURATION_FROM_CREATION, START_ON_FIRST_USE
@@ -177,6 +183,12 @@ model DynamicAccessKey {
   // Limits
   dataLimitBytes BigInt?
   usedBytes      BigInt    @default(0)
+  
+  // Periodic Limits
+  dataLimitResetStrategy String    @default("NEVER")
+  lastDataLimitReset     DateTime?
+  usageOffset            BigInt    @default(0)
+
   expiresAt      DateTime?
   durationDays   Int?
   expirationType String    @default("NEVER") // Same values as AccessKey

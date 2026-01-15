@@ -106,6 +106,7 @@ export default function SettingsPage() {
   const [botToken, setBotToken] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [keyNotFoundMessage, setKeyNotFoundMessage] = useState('');
+  const [adminChatIds, setAdminChatIds] = useState('');
   const [isTelegramEnabled, setIsTelegramEnabled] = useState(false);
 
   // Telegram bot queries and mutations
@@ -227,6 +228,7 @@ export default function SettingsPage() {
       setBotToken(telegramSettings.botToken || '');
       setWelcomeMessage(telegramSettings.welcomeMessage || '');
       setKeyNotFoundMessage(telegramSettings.keyNotFoundMessage || '');
+      setAdminChatIds(telegramSettings.adminChatIds?.join(', ') || '');
       setIsTelegramEnabled(telegramSettings.isEnabled || false);
     }
   });
@@ -236,6 +238,7 @@ export default function SettingsPage() {
       botToken: botToken || telegramSettings?.botToken || '',
       welcomeMessage: welcomeMessage || telegramSettings?.welcomeMessage || '',
       keyNotFoundMessage: keyNotFoundMessage || telegramSettings?.keyNotFoundMessage || '',
+      adminChatIds: adminChatIds.split(',').map(id => id.trim()).filter(id => id),
       isEnabled: isTelegramEnabled,
     });
   };
@@ -577,6 +580,20 @@ export default function SettingsPage() {
                 >
                   @BotFather
                 </a>
+              </p>
+            </div>
+
+            {/* Admin Chat IDs */}
+            <div className="space-y-2">
+              <Label htmlFor="adminChatIds">{t('settings.telegram.admin_ids')}</Label>
+              <Input
+                id="adminChatIds"
+                placeholder={t('settings.telegram.admin_ids_placeholder')}
+                defaultValue={telegramSettings?.adminChatIds?.join(', ') || ''}
+                onChange={(e) => setAdminChatIds(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                IDs of users authorized to use admin commands like /sysinfo and /backup
               </p>
             </div>
 

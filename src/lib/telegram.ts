@@ -69,3 +69,39 @@ export async function sendTelegramPhoto(
         console.error(`Error sending Telegram photo to ${chatId}:`, error);
     }
 }
+
+export async function sendTelegramDocument(
+    botToken: string,
+    chatId: number | string,
+    document: Buffer,
+    filename: string,
+    caption?: string
+) {
+    try {
+        const formData = new FormData();
+        formData.append('chat_id', chatId.toString());
+
+        const blob = new Blob([new Uint8Array(document)], { type: 'application/octet-stream' });
+        formData.append('document', blob, filename);
+
+        if (caption) {
+            formData.append('caption', caption);
+            formData.append('parse_mode', 'HTML');
+        }
+
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            console.error(`Failed to send Telegram document to ${chatId}:`, data.description);
+            // Throw error for backup to know it failed
+            throw new Error(data.description || 'Telegram API Error');
+        }
+    } catch (error) {
+        console.error(`Error sending Telegram document to ${chatId}:`, error);
+        throw error;
+    }
+}

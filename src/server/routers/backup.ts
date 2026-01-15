@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { TRPCError } from '@trpc/server';
 import { env } from 'process';
+import { db } from '@/lib/db';
+import { sendTelegramDocument } from '@/lib/telegram';
 
 // Ensure backup directory exists
 const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
@@ -77,6 +79,32 @@ export const backupRouter = router({
 
             // Copy file
             fs.copyFileSync(dbPath, backupPath);
+
+            // Send to Telegram Admins (Fire and forget, or await safely)
+            try {
+                const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
+                if (settings) {
+                    const botSettings = JSON.parse(settings.value);
+                    const { botToken, isEnabled, adminChatIds } = botSettings;
+
+                    if (isEnabled && botToken && adminChatIds && Array.isArray(adminChatIds) && adminChatIds.length > 0) {
+                        const fileBuffer = fs.readFileSync(backupPath);
+
+                        await Promise.all(adminChatIds.map((chatId: string) =>
+                            sendTelegramDocument(
+                                botToken,
+                                chatId,
+                                fileBuffer,
+                                backupFilename,
+                                `Backup created via Dashboard at ${new Date().toLocaleString()}`
+                            ).catch(e => console.error(`Failed to send backup to ${chatId}:`, e))
+                        ));
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to auto-send backup to Telegram:', err);
+                // Don't fail the request, just log
+            }
 
             return { success: true, filename: backupFilename };
         } catch (error: any) {

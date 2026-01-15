@@ -43,6 +43,7 @@ const createKeySchema = z.object({
 
   // Data limit in GB (converted to bytes in the mutation)
   dataLimitGB: z.number().positive().optional().nullable(),
+  dataLimitResetStrategy: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'NEVER']).optional(),
 
   // Expiration settings
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']),
@@ -66,6 +67,7 @@ const updateKeySchema = z.object({
   telegramId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  dataLimitResetStrategy: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'NEVER']).optional(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
   expiresAt: z.date().optional().nullable(),
   durationDays: z.number().int().positive().optional().nullable(),
@@ -136,18 +138,18 @@ export const keysRouter = router({
     .input(listKeysSchema)
     .query(async ({ input }) => {
       const { serverId, status, search, page, pageSize } = input;
-      
+
       // Build the where clause
       const where: Record<string, unknown> = {};
-      
+
       if (serverId) {
         where.serverId = serverId;
       }
-      
+
       if (status) {
         where.status = status;
       }
-      
+
       if (search) {
         where.OR = [
           { name: { contains: search } },
@@ -303,6 +305,7 @@ export const keysRouter = router({
             port: outlineKey.port,
             method: outlineKey.method,
             dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+            dataLimitResetStrategy: input.dataLimitResetStrategy || 'NEVER',
             expirationType: input.expirationType,
             expiresAt,
             durationDays: input.durationDays,
@@ -390,6 +393,13 @@ export const keysRouter = router({
 
         if (data.dataLimitGB !== undefined) {
           updateData.dataLimitBytes = data.dataLimitGB ? gbToBytes(data.dataLimitGB) : null;
+        }
+
+        if (data.dataLimitResetStrategy) {
+          updateData.dataLimitResetStrategy = data.dataLimitResetStrategy;
+          // If setting a strategy, establish the baseline (reset logic will handle the rest)
+          // But we don't change usageOffset here, so "usedBytes" remains "Total Usage" until next sync or reset.
+          // This is safe.
         }
 
         if (data.expirationType) {
@@ -642,7 +652,7 @@ export const keysRouter = router({
 
           if (key) {
             const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
-            
+
             try {
               await client.deleteAccessKey(key.outlineKeyId);
             } catch {

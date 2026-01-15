@@ -61,30 +61,30 @@ import {
  * Provides consistent styling for different key statuses
  */
 const statusConfig = {
-  ACTIVE: { 
-    color: 'bg-green-500/20 text-green-400 border-green-500/30', 
-    icon: CheckCircle2, 
-    label: 'Active' 
+  ACTIVE: {
+    color: 'bg-green-500/20 text-green-400 border-green-500/30',
+    icon: CheckCircle2,
+    label: 'Active'
   },
-  DISABLED: { 
-    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', 
-    icon: XCircle, 
-    label: 'Disabled' 
+  DISABLED: {
+    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    icon: XCircle,
+    label: 'Disabled'
   },
-  EXPIRED: { 
-    color: 'bg-red-500/20 text-red-400 border-red-500/30', 
-    icon: Clock, 
-    label: 'Expired' 
+  EXPIRED: {
+    color: 'bg-red-500/20 text-red-400 border-red-500/30',
+    icon: Clock,
+    label: 'Expired'
   },
-  DEPLETED: { 
-    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', 
-    icon: AlertTriangle, 
-    label: 'Depleted' 
+  DEPLETED: {
+    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    icon: AlertTriangle,
+    label: 'Depleted'
   },
-  PENDING: { 
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', 
-    icon: Clock, 
-    label: 'Pending (Start on First Use)' 
+  PENDING: {
+    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    icon: Clock,
+    label: 'Pending (Start on First Use)'
   },
 };
 
@@ -109,6 +109,7 @@ function EditKeyDialog({
     telegramId: string | null;
     notes: string | null;
     dataLimitBytes: bigint | null;
+    dataLimitResetStrategy: string | null;
   };
   onSuccess: () => void;
 }) {
@@ -118,9 +119,10 @@ function EditKeyDialog({
     email: keyData.email || '',
     telegramId: keyData.telegramId || '',
     notes: keyData.notes || '',
-    dataLimitGB: keyData.dataLimitBytes 
+    dataLimitGB: keyData.dataLimitBytes
       ? (Number(keyData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
+    dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
   });
 
   const updateMutation = trpc.keys.update.useMutation({
@@ -160,6 +162,7 @@ function EditKeyDialog({
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      dataLimitResetStrategy: formData.dataLimitResetStrategy,
     });
   };
 
@@ -214,6 +217,28 @@ function EditKeyDialog({
               step="0.5"
             />
           </div>
+
+          {formData.dataLimitGB && (
+            <div className="space-y-2">
+              <Label>Reset Strategy</Label>
+              <Select
+                value={formData.dataLimitResetStrategy}
+                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                  setFormData({ ...formData, dataLimitResetStrategy: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEVER">Never Reset</SelectItem>
+                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
+                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="editNotes">Notes</Label>
@@ -520,6 +545,16 @@ export default function KeyDetailPage() {
                     )}
                   />
                 )}
+
+                {(key as any).dataLimitResetStrategy && (key as any).dataLimitResetStrategy !== 'NEVER' && (
+                  <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                    <RefreshCw className="w-4 h-4" />
+                    <span>
+                      Resets {(key as any).dataLimitResetStrategy.toLowerCase()}
+                      {(key as any).lastDataLimitReset && ` (Last reset: ${(key as any).lastDataLimitReset ? formatRelativeTime((key as any).lastDataLimitReset) : 'Never'})`}
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -665,6 +700,7 @@ export default function KeyDetailPage() {
             telegramId: key.telegramId,
             notes: key.notes,
             dataLimitBytes: key.dataLimitBytes,
+            dataLimitResetStrategy: (key as any).dataLimitResetStrategy,
           }}
           onSuccess={() => refetch()}
         />

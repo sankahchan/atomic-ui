@@ -74,7 +74,7 @@ export const serversRouter = router({
     .query(async ({ input }) => {
       // Build the where clause based on filters
       const where: Record<string, unknown> = {};
-      
+
       if (!input?.includeInactive) {
         where.isActive = true;
       }
@@ -248,10 +248,10 @@ export const serversRouter = router({
           // Connect tags if provided
           tags: input.tagIds
             ? {
-                create: input.tagIds.map((tagId) => ({
-                  tag: { connect: { id: tagId } },
-                })),
-              }
+              create: input.tagIds.map((tagId) => ({
+                tag: { connect: { id: tagId } },
+              })),
+            }
             : undefined,
         },
         include: {
@@ -322,11 +322,11 @@ export const serversRouter = router({
           // Update tags if provided
           tags: tagIds
             ? {
-                deleteMany: {},
-                create: tagIds.map((tagId) => ({
-                  tag: { connect: { id: tagId } },
-                })),
-              }
+              deleteMany: {},
+              create: tagIds.map((tagId) => ({
+                tag: { connect: { id: tagId } },
+              })),
+            }
             : undefined,
         },
         include: {
@@ -442,14 +442,25 @@ export const serversRouter = router({
           // Get traffic data for this key - try both string and number key formats
           const keyId = outlineKey.id;
           const usedBytes = metrics?.bytesTransferredByUserId?.[keyId] ??
-                           metrics?.bytesTransferredByUserId?.[String(keyId)] ?? 0;
+            metrics?.bytesTransferredByUserId?.[String(keyId)] ?? 0;
 
           if (existingKey) {
-            const previousUsedBytes = Number(existingKey.usedBytes);
-            const currentUsedBytes = usedBytes;
-            const bytesTransferred = currentUsedBytes - previousUsedBytes;
+            // Calculate effective usage (metric - offset)
+            const metricBytes = Number(usedBytes);
+            const offset = Number(existingKey.usageOffset || 0);
 
-            console.log(`🔑 Key ${keyId} (${outlineKey.name}): prev=${previousUsedBytes}, curr=${currentUsedBytes}, delta=${bytesTransferred}`);
+            // If metric < offset, server might have been reset or reinstalled. Adjust offset to 0 conservatively?
+            // Or assume metric is accurate and offset is stale? 
+            // Better to assume offset is valid unless metric < offset, in which case offset = 0.
+
+            const effectiveUsedBytes = (metricBytes < offset)
+              ? metricBytes // Server reset scenario
+              : metricBytes - offset;
+
+            const previousUsedBytes = Number(existingKey.usedBytes);
+            const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
+
+            console.log(`🔑 Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, offset=${offset}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
 
             // Prepare update data
             const updateData: Record<string, unknown> = {
@@ -457,14 +468,32 @@ export const serversRouter = router({
               password: outlineKey.password,
               port: outlineKey.port,
               method: outlineKey.method,
-              dataLimitBytes: outlineKey.dataLimit?.bytes
-                ? BigInt(outlineKey.dataLimit.bytes)
-                : null,
-              usedBytes: BigInt(usedBytes),
+              // Keep local data limit if we are managing it?
+              // If strategy is set, we treat dataLimitBytes as Period Limit and ignore server limit for DB update?
+              // But serversRouter usually trusts Outline.
+              // Logic: If strategy != NEVER, we trust our DB dataLimitBytes more than Server Limit?
+              // The server limit will be set to (Limit + Offset).
+              // So if we sync back from server, we might get (Limit + Offset).
+              // We should probably NOT overwrite dataLimitBytes if strategy != 'NEVER'.
             };
 
+            // Should we update dataLimitBytes from server? 
+            // Only if strategy is NEVER (default behavior).
+            if (!existingKey.dataLimitResetStrategy || existingKey.dataLimitResetStrategy === 'NEVER') {
+              updateData.dataLimitBytes = outlineKey.dataLimit?.bytes
+                ? BigInt(outlineKey.dataLimit.bytes)
+                : null;
+            }
+
+            updateData.usedBytes = BigInt(effectiveUsedBytes);
+
+            // If metric < offset (server reset), update offset to 0
+            if (metricBytes < offset) {
+              updateData.usageOffset = BigInt(0);
+            }
+
             // Check if PENDING key has been used - activate it and start expiration timer
-            if (existingKey.status === 'PENDING' && usedBytes > 0) {
+            if (existingKey.status === 'PENDING' && effectiveUsedBytes > 0) {
               const now = new Date();
               updateData.status = 'ACTIVE';
               updateData.firstUsedAt = now;
@@ -477,6 +506,17 @@ export const serversRouter = router({
               }
             }
 
+            // Check if ACTIVE key has exceeded data limit - mark as depleted
+            const dataLimit = (existingKey.dataLimitBytes) ? Number(existingKey.dataLimitBytes) : null;
+            if (existingKey.status === 'ACTIVE' && dataLimit && effectiveUsedBytes >= dataLimit) {
+              // Double check server status is respected? 
+              // If periodic limit, we rely on server having blocked it OR we block it here.
+              // Outline Server doesn't have "DISABLED" state for depletion, it just drops packets.
+              // But we mark it as DEPLETED in UI.
+              updateData.status = 'DEPLETED';
+              console.log(`📉 Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dataLimit} bytes`);
+            }
+
             // Update existing key
             await db.accessKey.update({
               where: { id: existingKey.id },
@@ -484,9 +524,6 @@ export const serversRouter = router({
             });
 
             // Create TrafficLog entry if there was meaningful traffic since last sync
-            // This is used for tracking online users
-            // Minimum threshold of 500KB to filter out background/keepalive traffic
-            // Only active browsing/streaming generates this much per sync interval
             const MIN_TRAFFIC_THRESHOLD = 500 * 1024; // 500KB
             if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
               console.log(`📊 [sync] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
@@ -509,8 +546,8 @@ export const serversRouter = router({
                 password: outlineKey.password,
                 port: outlineKey.port,
                 method: outlineKey.method,
-                dataLimitBytes: outlineKey.dataLimit?.bytes 
-                  ? BigInt(outlineKey.dataLimit.bytes) 
+                dataLimitBytes: outlineKey.dataLimit?.bytes
+                  ? BigInt(outlineKey.dataLimit.bytes)
                   : null,
                 usedBytes: BigInt(usedBytes),
               },
@@ -610,28 +647,45 @@ export const serversRouter = router({
 
           const keyId = outlineKey.id;
           const usedBytes = metrics?.bytesTransferredByUserId?.[keyId] ??
-                           metrics?.bytesTransferredByUserId?.[String(keyId)] ?? 0;
+            metrics?.bytesTransferredByUserId?.[String(keyId)] ?? 0;
 
           if (existingKey) {
-            const previousUsedBytes = Number(existingKey.usedBytes);
-            const currentUsedBytes = usedBytes;
-            const bytesTransferred = currentUsedBytes - previousUsedBytes;
+            // Calculate effective usage (metric - offset)
+            const metricBytes = Number(usedBytes);
+            const offset = Number(existingKey.usageOffset || 0);
 
-            console.log(`🔑 [syncAll] Key ${keyId} (${outlineKey.name}): prev=${previousUsedBytes}, curr=${currentUsedBytes}, delta=${bytesTransferred}`);
+            const effectiveUsedBytes = (metricBytes < offset)
+              ? metricBytes // Server reset scenario
+              : metricBytes - offset;
+
+            const previousUsedBytes = Number(existingKey.usedBytes);
+            const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
+
+            console.log(`🔑 [syncAll] Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
 
             const updateData: Record<string, unknown> = {
               accessUrl: outlineKey.accessUrl,
               password: outlineKey.password,
               port: outlineKey.port,
               method: outlineKey.method,
-              dataLimitBytes: outlineKey.dataLimit?.bytes
-                ? BigInt(outlineKey.dataLimit.bytes)
-                : null,
-              usedBytes: BigInt(usedBytes),
+              // Do not overwrite dataLimitBytes if strategy is set (prevent clearing periodic settings)
             };
 
+            if (!existingKey.dataLimitResetStrategy || existingKey.dataLimitResetStrategy === 'NEVER') {
+              updateData.dataLimitBytes = outlineKey.dataLimit?.bytes
+                ? BigInt(outlineKey.dataLimit.bytes)
+                : null;
+            }
+
+            updateData.usedBytes = BigInt(effectiveUsedBytes);
+
+            // If metric < offset (server reset), update offset to 0
+            if (metricBytes < offset) {
+              updateData.usageOffset = BigInt(0);
+            }
+
             // Check if PENDING key has been used - activate it
-            if (existingKey.status === 'PENDING' && usedBytes > 0) {
+            if (existingKey.status === 'PENDING' && effectiveUsedBytes > 0) {
               const now = new Date();
               updateData.status = 'ACTIVE';
               updateData.firstUsedAt = now;
@@ -651,9 +705,13 @@ export const serversRouter = router({
 
             // Check if ACTIVE key has exceeded data limit - mark as depleted
             const dataLimit = outlineKey.dataLimit?.bytes || (existingKey.dataLimitBytes ? Number(existingKey.dataLimitBytes) : null);
-            if (existingKey.status === 'ACTIVE' && dataLimit && usedBytes >= dataLimit) {
+            // Note: dataLimit from server includes offset if periodic! 
+            // We should check against our periodic limit in DB.
+            const dbLimit = existingKey.dataLimitBytes ? Number(existingKey.dataLimitBytes) : null;
+
+            if (existingKey.status === 'ACTIVE' && dbLimit && effectiveUsedBytes >= dbLimit) {
               updateData.status = 'DEPLETED';
-              console.log(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${usedBytes} of ${dataLimit} bytes`);
+              console.log(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
             }
 
             await db.accessKey.update({
@@ -661,10 +719,7 @@ export const serversRouter = router({
               data: updateData,
             });
 
-            // Create TrafficLog entry if there was meaningful traffic since last sync
-            // This is used for tracking online users
-            // Minimum threshold of 500KB to filter out background/keepalive traffic
-            // Only active browsing/streaming generates this much per sync interval
+            // Create TrafficLog
             const MIN_TRAFFIC_THRESHOLD = 500 * 1024; // 500KB
             if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
               console.log(`📊 [syncAll] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);

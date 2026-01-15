@@ -19,6 +19,7 @@ const telegramSettingsSchema = z.object({
   welcomeMessage: z.string().optional(),
   keyNotFoundMessage: z.string().optional(),
   isEnabled: z.boolean().default(true),
+  adminChatIds: z.array(z.string()).optional().default([]),
 });
 
 export const telegramBotRouter = router({
@@ -48,6 +49,7 @@ export const telegramBotRouter = router({
         welcomeMessage: parsed.welcomeMessage || 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: parsed.keyNotFoundMessage || 'No key found for your account. Please contact the administrator.',
         isEnabled: parsed.isEnabled ?? false,
+        adminChatIds: parsed.adminChatIds || [],
       };
     } catch {
       return {
