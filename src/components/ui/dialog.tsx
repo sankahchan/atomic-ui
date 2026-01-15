@@ -77,7 +77,7 @@ const DialogContent = React.forwardRef<
         // Centered positioning
         'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
         // Grid layout for consistent structure
-        'grid w-full max-w-lg gap-4',
+        'grid w-full max-w-lg gap-4 max-h-[85dvh] overflow-y-auto',
         // Card-like appearance
         'border bg-background p-6 shadow-lg rounded-lg',
         // Duration for animations

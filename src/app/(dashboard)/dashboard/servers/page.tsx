@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -189,6 +190,56 @@ function AddServerDialog({
             </button>
           </div>
 
+          {/* Installation Instructions */}
+          {inputMode === 'json' && (
+            <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border/50">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">1</span>
+                  <p className="text-sm font-medium">{t('servers.dialog.install_step1') || 'Log into your server, and run this command.'}</p>
+                </div>
+              </div>
+
+              <div className="relative group">
+                <div className="p-3 bg-slate-950 rounded-md font-mono text-xs text-slate-50 break-all pr-12">
+                  sudo bash -c &quot;$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-apps/master/server_manager/install_scripts/install_server.sh)&quot;
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1 text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8"
+                  onClick={() => {
+                    navigator.clipboard.writeText('sudo bash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-apps/master/server_manager/install_scripts/install_server.sh)"');
+                    toast({ description: 'Command copied to clipboard' });
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 rotate-0 scale-100 transition-all dark:rotate-0 dark:scale-100 hidden" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4"
+                  >
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </svg>
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">2</span>
+                <p className="text-sm font-medium">{t('servers.dialog.install_step2') || 'Paste your installation output here.'}</p>
+              </div>
+            </div>
+          )}
+
           {/* JSON config input */}
           {inputMode === 'json' && (
             <div className="space-y-2">
@@ -313,6 +364,7 @@ function ServerCard({
   server: {
     id: string;
     name: string;
+    apiUrl: string;
     location: string | null;
     countryCode: string | null;
     isActive: boolean;
@@ -347,12 +399,16 @@ function ServerCard({
 
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.UNKNOWN;
 
+  // Heuristic to check if server is local (localhost or 127.0.0.1)
+  // In a real multi-server setup, we might need a dedicated flag in the DB
+  const isLocal = server.apiUrl.includes('localhost') || server.apiUrl.includes('127.0.0.1');
+
   return (
     <Card className={cn(
-      'group hover:border-primary/30 transition-all duration-200',
+      'group hover:border-primary/30 transition-all duration-200 flex flex-col',
       !server.isActive && 'opacity-60'
     )}>
-      <CardContent className="p-5">
+      <CardContent className="p-5 flex-1">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -399,16 +455,18 @@ function ServerCard({
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center p-2 bg-muted/30 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Key className="w-3 h-3 text-muted-foreground" />
+              <Zap className="w-3 h-3 text-emerald-500" />
             </div>
-            <p className="text-lg font-semibold">{server.metrics?.totalKeys || 0}</p>
-            <p className="text-xs text-muted-foreground">{t('servers.total_keys')}</p>
+            {/* Live Stats Component */}
+            <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
+            <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Zap className="w-3 h-3 text-green-500" />
+              <Zap className="w-3 h-3 text-emerald-500" />
             </div>
-            <p className="text-lg font-semibold text-green-500">{server.metrics?.activeKeys || 0}</p>
+            {/* Live Stats Component */}
+            <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
             <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">
@@ -423,6 +481,11 @@ function ServerCard({
             <p className="text-xs text-muted-foreground">{t('servers.latency')}</p>
           </div>
         </div>
+
+        {/* System Stats (Local Server Only) */}
+        {isLocal && (
+          <ServerSystemStats />
+        )}
 
         {/* Tags */}
         {server.tags.length > 0 && (
@@ -439,9 +502,11 @@ function ServerCard({
             ))}
           </div>
         )}
+      </CardContent>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+      {/* Footer Actions */}
+      <div className="px-5 py-3 border-t border-border/50 bg-muted/10">
+        <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
             {server.outlineVersion && `v${server.outlineVersion}`}
             {server.healthCheck?.uptimePercent !== undefined && (
@@ -476,8 +541,79 @@ function ServerCard({
             </Button>
           </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
+  );
+}
+
+/**
+ * ServerSystemStats Component
+ * Fetches and displays real-time system stats (CPU, RAM, Disk)
+ */
+function ServerSystemStats() {
+  // Poll every 5 seconds
+  const { data: stats, isLoading } = trpc.system.getStats.useQuery(undefined, {
+    refetchInterval: 5000,
+  });
+
+  if (isLoading || !stats) return null;
+
+  // Helper for color coding usage
+  const getUsageColor = (percent: number) => {
+    if (percent >= 90) return 'bg-red-500';
+    if (percent >= 75) return 'bg-yellow-500';
+    return 'bg-primary';
+  };
+
+  return (
+    <div className="mb-4 space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">CPU ({stats.cpu.cores} cores)</span>
+          <span className="font-medium">{stats.cpu.percent}%</span>
+        </div>
+        <Progress value={stats.cpu.percent} className="h-1.5" indicatorClassName={getUsageColor(stats.cpu.percent)} />
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">RAM ({formatBytes(stats.memory.total)})</span>
+          <span className="font-medium">{stats.memory.percent}%</span>
+        </div>
+        <Progress value={stats.memory.percent} className="h-1.5" indicatorClassName={getUsageColor(stats.memory.percent)} />
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">Disk ({formatBytes(stats.disk.total)})</span>
+          <span className="font-medium">{stats.disk.percent}%</span>
+        </div>
+        <Progress value={stats.disk.percent} className="h-1.5" indicatorClassName={getUsageColor(stats.disk.percent)} />
+      </div>
+
+      <div className="pt-1 flex justify-between items-center text-xs text-muted-foreground border-t border-border/50 mt-2">
+        <span>System Uptime:</span>
+        <span className="font-mono">{new Date(stats.os.uptime * 1000).toISOString().substr(11, 8)}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ServerLiveStats Component
+ * Display live active connections by measuring traffic delta
+ */
+function ServerLiveStats({ serverId, defaultActive }: { serverId: string, defaultActive: number }) {
+  // Poll every 10 seconds to avoid overwhelming the server
+  const { data: stats } = trpc.servers.getLiveStats.useQuery({ id: serverId }, {
+    refetchInterval: 10000,
+    placeholderData: { activeConnections: defaultActive, bandwidthBps: 0 } as any,
+  });
+
+  return (
+    <span className="text-lg font-semibold text-emerald-500 block min-w-[20px]">
+      {stats ? stats.activeConnections : defaultActive}
+    </span>
   );
 }
 

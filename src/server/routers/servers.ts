@@ -590,6 +590,62 @@ export const serversRouter = router({
     }),
 
   /**
+   * Get active connection count and live bandwidth by checking metric deltas.
+   * This estimates "Active Connections" by seeing which keys are transmitting data.
+   */
+  getLiveStats: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const server = await db.server.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!server) return { activeConnections: 0, bandwidthBps: 0 };
+
+      const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
+
+      try {
+        // First snapshot
+        const metrics1 = await client.getMetrics();
+
+        // Wait 1 second to calculate rate
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Second snapshot
+        const metrics2 = await client.getMetrics();
+
+        // Calculate delta
+        let activeConnections = 0;
+        let bandwidthBps = 0;
+        const keyStats: Record<string, number> = {};
+
+        const m1 = metrics1?.bytesTransferredByUserId || {};
+        const m2 = metrics2?.bytesTransferredByUserId || {};
+
+        for (const keyId in m2) {
+          const start = m1[keyId] || 0;
+          const end = m2[keyId] || 0;
+          const delta = end - start;
+
+          if (delta > 0) {
+            activeConnections++;
+            bandwidthBps += delta;
+            keyStats[keyId] = delta;
+          }
+        }
+
+        return {
+          activeConnections,
+          bandwidthBps,
+          keyStats,
+        };
+      } catch (error) {
+        console.error('Failed to get live stats:', error);
+        return { activeConnections: 0, bandwidthBps: 0 };
+      }
+    }),
+
+  /**
    * Sync all active servers at once.
    *
    * This is useful for auto-sync functionality to keep all keys updated.

@@ -17,12 +17,23 @@
  * - Action buttons for common operations
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -265,6 +276,51 @@ function EditKeyDialog({
 }
 
 /**
+ * DeleteKeyDialog Component
+ * 
+ * A confirmation dialog for deleting an access key.
+ */
+function DeleteKeyDialog({
+  open,
+  onOpenChange,
+  keyName,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  keyName: string;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  const { toast } = useToast();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Access Key</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete &quot;{keyName}&quot;?
+            <br />
+            This action cannot be undone. The key will be permanently removed from the server.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * KeyDetailPage Component
  * 
  * The main page component that fetches and displays all information about
@@ -318,9 +374,16 @@ export default function KeyDetailPage() {
     });
   };
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${key?.name}"?\n\nThis will also remove the key from the Outline server.`)) {
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (keyId) {
       deleteMutation.mutate({ id: keyId });
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -556,6 +619,12 @@ export default function KeyDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Real-time Graph */}
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-sm font-medium mb-2">Live Activity</p>
+                <TrafficGraph serverId={key.server.id} outlineKeyId={key.outlineKeyId} />
+              </div>
             </CardContent>
           </Card>
 
@@ -705,6 +774,110 @@ export default function KeyDetailPage() {
           onSuccess={() => refetch()}
         />
       )}
+
+      {key && (
+        <DeleteKeyDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          keyName={key.name}
+          onConfirm={confirmDelete}
+          isPending={deleteMutation.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * TrafficGraph Component
+ * Displays real-time bandwidth usage for a specific key
+ */
+function TrafficGraph({
+  serverId,
+  outlineKeyId
+}: {
+  serverId: string;
+  outlineKeyId: string;
+}) {
+  const [data, setData] = useState<{ time: number; bytes: number }[]>([]);
+
+  // Poll for live stats
+  const { data: stats } = trpc.servers.getLiveStats.useQuery(
+    { id: serverId },
+    {
+      refetchInterval: 2000,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  useEffect(() => {
+    if (stats) {
+      const now = Date.now();
+      const bytes = stats.keyStats?.[outlineKeyId] || 0;
+
+      setData(prev => {
+        // Keep last 60 points (approx 2 minutes at 2s interval)
+        const newData = [...prev, { time: now, bytes }];
+        if (newData.length > 60) newData.shift();
+        return newData;
+      });
+    }
+  }, [stats, outlineKeyId]);
+
+  if (data.length < 2) {
+    return (
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+        Initializing graph...
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[200px] w-full mt-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id="colorBytes" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="time"
+            hide
+            domain={['dataMin', 'dataMax']}
+          />
+          <YAxis
+            hide
+            domain={[0, 'auto']}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'hsl(var(--background))',
+              borderColor: 'hsl(var(--border))',
+              borderRadius: '0.5rem',
+            }}
+            labelFormatter={() => ''}
+            formatter={(value: number) => [formatBytes(value) + '/s', 'Speed']}
+          />
+          <Area
+            type="monotone"
+            dataKey="bytes"
+            stroke="#10b981"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorBytes)"
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+        <span>2 mins ago</span>
+        <span>Reserved Bandwidth: {formatBytes(data[data.length - 1]?.bytes || 0)}/s</span>
+        <span>Live</span>
+      </div>
     </div>
   );
 }

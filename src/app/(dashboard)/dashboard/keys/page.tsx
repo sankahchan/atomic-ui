@@ -502,6 +502,51 @@ function QRCodeDialog({
 }
 
 /**
+ * DeleteKeyDialog Component
+ * 
+ * A confirmation dialog for deleting an access key.
+ */
+function DeleteKeyDialog({
+  open,
+  onOpenChange,
+  keyName,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  keyName: string;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  const { t } = useLocale();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('keys.delete_title') || 'Delete Access Key'}</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete &quot;{keyName}&quot;?
+            <br />
+            {t('keys.confirm_delete_desc') || 'This action cannot be undone. The key will be permanently removed from the server.'}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('keys.cancel')}
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {t('keys.delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Online indicator component with blinking animation
  */
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
@@ -982,9 +1027,18 @@ export default function KeysPage() {
     },
   });
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
+
   const handleDelete = (keyId: string, keyName: string) => {
-    if (confirm(`${t('keys.confirm_delete')} "${keyName}"?`)) {
-      deleteMutation.mutate({ id: keyId });
+    setKeyToDelete({ id: keyId, name: keyName });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (keyToDelete) {
+      deleteMutation.mutate({ id: keyToDelete.id });
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -1429,6 +1483,16 @@ export default function KeysPage() {
           keyName={qrDialogKey.name}
           open={!!qrDialogKey}
           onOpenChange={(open) => !open && setQrDialogKey(null)}
+        />
+      )}
+
+      {keyToDelete && (
+        <DeleteKeyDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          keyName={keyToDelete.name}
+          onConfirm={confirmDelete}
+          isPending={deleteMutation.isPending}
         />
       )}
     </div>

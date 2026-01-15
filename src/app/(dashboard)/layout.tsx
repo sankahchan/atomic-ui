@@ -441,7 +441,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden">
       {/* Mobile sidebar overlay */}
       {mobileMenuOpen && (
         <div
@@ -482,7 +482,7 @@ export default function DashboardLayout({
         />
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8">
           {children}
         </main>
       </div>

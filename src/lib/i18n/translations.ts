@@ -441,6 +441,8 @@ const serversTranslations: Record<Locale, Record<string, string>> = {
     'servers.toast.deleted_desc': 'The server has been removed from Atomic-UI.',
     'servers.confirm_delete': 'Are you sure you want to remove',
     'servers.confirm_delete_desc': 'Note: This will NOT delete keys from the actual Outline server.',
+    'servers.dialog.install_step1': 'Log into your server, and run this command.',
+    'servers.dialog.install_step2': 'Paste your installation output here.',
   },
   zh: {
     'servers.title': '服务器',
@@ -486,6 +488,8 @@ const serversTranslations: Record<Locale, Record<string, string>> = {
     'servers.toast.deleted_desc': '服务器已从 Atomic-UI 中移除。',
     'servers.confirm_delete': '您确定要移除',
     'servers.confirm_delete_desc': '注意：这不会从实际的 Outline 服务器中删除密钥。',
+    'servers.dialog.install_step1': '登录到您的服务器，并运行此命令。',
+    'servers.dialog.install_step2': '在此粘贴安装输出。',
   },
   my: {
     'servers.title': 'ဆာဗာများ',
@@ -531,6 +535,8 @@ const serversTranslations: Record<Locale, Record<string, string>> = {
     'servers.toast.deleted_desc': 'ဆာဗာကို Atomic-UI မှ ဖယ်ရှားလိုက်ပါပြီ။',
     'servers.confirm_delete': 'သင် ဖယ်ရှားရန် သေချာပါသလား',
     'servers.confirm_delete_desc': 'မှတ်ချက်: ၎င်းသည် Outline ဆာဗာမှ သော့များကို ဖျက်မည်မဟုတ်ပါ။',
+    'servers.dialog.install_step1': 'သင်၏ဆာဗာသို့ ဝင်ရောက်ပြီး ဤအမိန့်ကို run ပါ။',
+    'servers.dialog.install_step2': 'တပ်ဆင်မှုရလဒ် output ကို ဤနေရာတွင် ထည့်ပါ။',
   },
   ja: {},
   ko: {},
