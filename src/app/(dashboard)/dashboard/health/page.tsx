@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { cn, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import {
   Activity,
@@ -46,32 +47,32 @@ const healthStatusConfig = {
     color: 'text-green-500',
     bgColor: 'bg-green-500/20',
     borderColor: 'border-green-500/30',
-    label: 'Online',
-    description: 'Server is responding normally',
+    labelKey: 'health.status.UP',
+    descriptionKey: 'health.status_desc.UP',
   },
   DOWN: {
     icon: XCircle,
     color: 'text-red-500',
     bgColor: 'bg-red-500/20',
     borderColor: 'border-red-500/30',
-    label: 'Offline',
-    description: 'Server is not responding',
+    labelKey: 'health.status.DOWN',
+    descriptionKey: 'health.status_desc.DOWN',
   },
   SLOW: {
     icon: AlertTriangle,
     color: 'text-yellow-500',
     bgColor: 'bg-yellow-500/20',
     borderColor: 'border-yellow-500/30',
-    label: 'Slow',
-    description: 'Server responding with high latency',
+    labelKey: 'health.status.SLOW',
+    descriptionKey: 'health.status_desc.SLOW',
   },
   UNKNOWN: {
     icon: Clock,
     color: 'text-gray-500',
     bgColor: 'bg-gray-500/20',
     borderColor: 'border-gray-500/30',
-    label: 'Unknown',
-    description: 'Status not yet determined',
+    labelKey: 'health.status.UNKNOWN',
+    descriptionKey: 'health.status_desc.UNKNOWN',
   },
 };
 
@@ -144,6 +145,7 @@ function ServerHealthCard({
   onManualCheck: () => void;
   isChecking: boolean;
 }) {
+  const { t } = useLocale();
   const health = server.healthCheck;
   const status = (health?.lastStatus || 'UNKNOWN') as keyof typeof healthStatusConfig;
   const config = healthStatusConfig[status] || healthStatusConfig.UNKNOWN;
@@ -182,14 +184,14 @@ function ServerHealthCard({
             config.borderColor
           )}>
             <StatusIcon className="w-3.5 h-3.5" />
-            {config.label}
+            {t(config.labelKey)}
           </div>
         </div>
 
         {/* Health metrics */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Latency</p>
+            <p className="text-xs text-muted-foreground">{t('health.metrics.latency')}</p>
             <p className="text-lg font-semibold">
               {health?.lastLatencyMs !== null && health?.lastLatencyMs !== undefined
                 ? `${health.lastLatencyMs}ms`
@@ -197,11 +199,11 @@ function ServerHealthCard({
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Last Check</p>
+            <p className="text-xs text-muted-foreground">{t('health.metrics.last_check')}</p>
             <p className="text-sm">
               {health?.lastCheckedAt
                 ? formatRelativeTime(health.lastCheckedAt)
-                : 'Never'}
+                : t('health.metrics.never')}
             </p>
           </div>
         </div>
@@ -209,7 +211,7 @@ function ServerHealthCard({
         {/* Uptime progress */}
         <div className="space-y-2 mb-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Uptime</span>
+            <span className="text-muted-foreground">{t('health.metrics.uptime')}</span>
             <span className="font-medium">
               {health?.uptimePercent !== undefined
                 ? `${health.uptimePercent.toFixed(1)}%`
@@ -226,7 +228,7 @@ function ServerHealthCard({
           />
           {health?.totalChecks !== undefined && (
             <p className="text-xs text-muted-foreground">
-              {health.successfulChecks} / {health.totalChecks} checks successful
+              {health.successfulChecks} / {health.totalChecks} {t('health.metrics.checks_success')}
             </p>
           )}
         </div>
@@ -242,12 +244,12 @@ function ServerHealthCard({
           {isChecking ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Checking...
+              {t('health.actions.checking')}
             </>
           ) : (
             <>
               <RefreshCw className="w-4 h-4 mr-2" />
-              Check Now
+              {t('health.actions.check_now')}
             </>
           )}
         </Button>
@@ -264,6 +266,7 @@ function ServerHealthCard({
  */
 export default function HealthPage() {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [checkingServerId, setCheckingServerId] = useState<string | null>(null);
 
   // Fetch server status with health data
@@ -273,9 +276,9 @@ export default function HealthPage() {
   const testConnectionMutation = trpc.servers.testConnection.useMutation({
     onSuccess: (result) => {
       toast({
-        title: result.success ? 'Server is healthy' : 'Server check failed',
+        title: result.success ? t('health.toast.healthy') : t('health.toast.check_failed'),
         description: result.success
-          ? `Latency: ${result.latency}ms`
+          ? `${t('health.metrics.latency')}: ${result.latency}ms`
           : result.error || 'Unable to connect to server',
         variant: result.success ? 'default' : 'destructive',
       });
@@ -284,7 +287,7 @@ export default function HealthPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Check failed',
+        title: t('health.toast.check_error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -303,11 +306,11 @@ export default function HealthPage() {
       : '0.0',
     avgLatency: serverStatus?.filter((s) => s.latencyMs !== null).length
       ? Math.round(
-          serverStatus
-            .filter((s) => s.latencyMs !== null)
-            .reduce((sum, s) => sum + (s.latencyMs || 0), 0) /
-          serverStatus.filter((s) => s.latencyMs !== null).length
-        )
+        serverStatus
+          .filter((s) => s.latencyMs !== null)
+          .reduce((sum, s) => sum + (s.latencyMs || 0), 0) /
+        serverStatus.filter((s) => s.latencyMs !== null).length
+      )
       : null,
   };
 
@@ -321,9 +324,9 @@ export default function HealthPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Health Monitoring</h1>
+          <h1 className="text-2xl font-bold">{t('health.title')}</h1>
           <p className="text-muted-foreground">
-            Monitor server health and uptime across your VPN infrastructure.
+            {t('health.subtitle')}
           </p>
         </div>
         <Button
@@ -332,44 +335,44 @@ export default function HealthPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('w-4 h-4 mr-2', isLoading && 'animate-spin')} />
-          Refresh All
+          {t('health.refresh_all')}
         </Button>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <HealthSummaryCard
-          title="Total Servers"
+          title={t('health.summary.total')}
           value={stats.total}
           icon={Server}
           color="bg-primary/10 text-primary"
         />
         <HealthSummaryCard
-          title="Online"
+          title={t('health.summary.online')}
           value={stats.online}
           icon={Wifi}
           color="bg-green-500/10 text-green-500"
         />
         <HealthSummaryCard
-          title="Offline"
+          title={t('health.summary.offline')}
           value={stats.offline}
           icon={WifiOff}
           color="bg-red-500/10 text-red-500"
         />
         <HealthSummaryCard
-          title="Slow"
+          title={t('health.summary.slow')}
           value={stats.slow}
           icon={AlertTriangle}
           color="bg-yellow-500/10 text-yellow-500"
         />
         <HealthSummaryCard
-          title="Avg Uptime"
+          title={t('health.summary.uptime')}
           value={`${stats.avgUptime}%`}
           icon={TrendingUp}
           color="bg-blue-500/10 text-blue-500"
         />
         <HealthSummaryCard
-          title="Avg Latency"
+          title={t('health.summary.latency')}
           value={stats.avgLatency !== null ? `${stats.avgLatency}ms` : '-'}
           icon={Zap}
           color="bg-purple-500/10 text-purple-500"
@@ -382,14 +385,14 @@ export default function HealthPage() {
           <div className="flex gap-3">
             <Activity className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <p className="text-sm font-medium">Understanding Health Status</p>
+              <p className="text-sm font-medium">{t('health.explanation.title')}</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 {Object.entries(healthStatusConfig).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2">
                     <value.icon className={cn('w-4 h-4', value.color)} />
                     <div>
-                      <span className="font-medium">{value.label}</span>
-                      <p className="text-xs text-muted-foreground">{value.description}</p>
+                      <span className="font-medium">{t(value.labelKey)}</span>
+                      <p className="text-xs text-muted-foreground">{t(value.descriptionKey)}</p>
                     </div>
                   </div>
                 ))}
@@ -429,8 +432,8 @@ export default function HealthPage() {
                 // Would need to fetch apiUrl and certSha256 for the server
                 // For now, we'll just show a placeholder action
                 toast({
-                  title: 'Manual check',
-                  description: 'Navigate to server details to perform a manual health check.',
+                  title: t('health.toast.manual_check'),
+                  description: t('health.toast.manual_check_desc'),
                 });
               }}
               isChecking={checkingServerId === server.id}
@@ -441,14 +444,14 @@ export default function HealthPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Activity className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No servers to monitor</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('health.empty.title')}</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Add servers to start monitoring their health status.
+              {t('health.empty.desc')}
             </p>
             <Button asChild>
               <Link href="/dashboard/servers">
                 <Server className="w-4 h-4 mr-2" />
-                Manage Servers
+                {t('health.empty.btn')}
               </Link>
             </Button>
           </CardContent>

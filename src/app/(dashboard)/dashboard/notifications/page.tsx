@@ -18,6 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes } from '@/lib/utils';
 import {
@@ -49,13 +50,13 @@ type ChannelType = 'TELEGRAM' | 'EMAIL' | 'WEBHOOK';
  * Event types that can trigger notifications
  */
 const EVENT_TYPES = [
-  { id: 'SERVER_DOWN', label: 'Server Down', description: 'Server becomes unreachable' },
-  { id: 'SERVER_UP', label: 'Server Up', description: 'Server comes back online' },
-  { id: 'SERVER_SLOW', label: 'Server Slow', description: 'Server response is slow' },
-  { id: 'KEY_EXPIRING', label: 'Key Expiring', description: 'Access key about to expire' },
-  { id: 'KEY_EXPIRED', label: 'Key Expired', description: 'Access key has expired' },
-  { id: 'TRAFFIC_WARNING', label: 'Traffic Warning', description: 'Key approaching data limit' },
-  { id: 'TRAFFIC_DEPLETED', label: 'Traffic Depleted', description: 'Key has exhausted data limit' },
+  { id: 'SERVER_DOWN', labelKey: 'notifications.event.SERVER_DOWN' },
+  { id: 'SERVER_UP', labelKey: 'notifications.event.SERVER_UP' },
+  { id: 'SERVER_SLOW', labelKey: 'notifications.event.SERVER_SLOW' },
+  { id: 'KEY_EXPIRING', labelKey: 'notifications.event.KEY_EXPIRING' },
+  { id: 'KEY_EXPIRED', labelKey: 'notifications.event.KEY_EXPIRED' },
+  { id: 'TRAFFIC_WARNING', labelKey: 'notifications.event.TRAFFIC_WARNING' },
+  { id: 'TRAFFIC_DEPLETED', labelKey: 'notifications.event.TRAFFIC_DEPLETED' },
 ];
 
 /**
@@ -64,22 +65,22 @@ const EVENT_TYPES = [
 const CHANNEL_TYPES = {
   TELEGRAM: {
     icon: Send,
-    label: 'Telegram',
-    description: 'Receive notifications via Telegram bot',
+    labelKey: 'notifications.type.TELEGRAM',
+    descriptionKey: 'notifications.channel_desc.telegram', // We can simplify or reuse
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
   },
   EMAIL: {
     icon: Mail,
-    label: 'Email',
-    description: 'Receive notifications via email',
+    labelKey: 'notifications.type.EMAIL',
+    descriptionKey: 'notifications.channel_desc.email',
     color: 'text-green-500',
     bgColor: 'bg-green-500/10',
   },
   WEBHOOK: {
     icon: Globe,
-    label: 'Webhook',
-    description: 'HTTP callbacks for custom integrations',
+    labelKey: 'notifications.type.WEBHOOK',
+    descriptionKey: 'notifications.channel_desc.webhook',
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
   },
@@ -110,6 +111,7 @@ function ChannelDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: editChannel?.name || '',
@@ -125,8 +127,8 @@ function ChannelDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a channel name.',
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.name_required'),
         variant: 'destructive',
       });
       return;
@@ -134,8 +136,8 @@ function ChannelDialog({
 
     if (formData.type === 'TELEGRAM' && !formData.telegramChatId) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a Telegram Chat ID.',
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.chat_id_required'),
         variant: 'destructive',
       });
       return;
@@ -143,8 +145,8 @@ function ChannelDialog({
 
     if (formData.type === 'EMAIL' && !formData.email) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter an email address.',
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.email_required'),
         variant: 'destructive',
       });
       return;
@@ -152,8 +154,8 @@ function ChannelDialog({
 
     if (formData.type === 'WEBHOOK' && !formData.webhookUrl) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a webhook URL.',
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.webhook_required'),
         variant: 'destructive',
       });
       return;
@@ -165,8 +167,8 @@ function ChannelDialog({
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     toast({
-      title: editChannel ? 'Channel updated' : 'Channel created',
-      description: `Notification channel "${formData.name}" has been ${editChannel ? 'updated' : 'created'}.`,
+      title: editChannel ? t('notifications.toast.channel_updated') : t('notifications.toast.channel_created'),
+      description: t('notifications.toast.success_desc'),
     });
 
     setIsLoading(false);
@@ -189,20 +191,20 @@ function ChannelDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" />
-            {editChannel ? 'Edit Channel' : 'Add Notification Channel'}
+            {editChannel ? t('notifications.edit_channel') : t('notifications.create_channel')}
           </DialogTitle>
           <DialogDescription>
-            Configure how and when you want to receive notifications.
+            {t('notifications.dialog.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Channel name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Channel Name</Label>
+            <Label htmlFor="name">{t('notifications.dialog.name')}</Label>
             <Input
               id="name"
-              placeholder="e.g., Admin Alerts"
+              placeholder={t('notifications.dialog.name_placeholder')}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -210,7 +212,7 @@ function ChannelDialog({
 
           {/* Channel type */}
           <div className="space-y-2">
-            <Label>Channel Type</Label>
+            <Label>{t('notifications.dialog.type')}</Label>
             <Select
               value={formData.type}
               onValueChange={(value: ChannelType) => setFormData({ ...formData, type: value })}
@@ -224,7 +226,7 @@ function ChannelDialog({
                   <SelectItem key={key} value={key}>
                     <div className="flex items-center gap-2">
                       <config.icon className={cn('w-4 h-4', config.color)} />
-                      {config.label}
+                      {t(config.labelKey)}
                     </div>
                   </SelectItem>
                 ))}
@@ -235,26 +237,26 @@ function ChannelDialog({
           {/* Type-specific configuration */}
           {formData.type === 'TELEGRAM' && (
             <div className="space-y-2">
-              <Label htmlFor="chatId">Telegram Chat ID</Label>
+              <Label htmlFor="chatId">{t('notifications.dialog.chat_id')}</Label>
               <Input
                 id="chatId"
-                placeholder="e.g., 123456789 or -100123456789"
+                placeholder={t('notifications.dialog.chat_id_placeholder')}
                 value={formData.telegramChatId}
                 onChange={(e) => setFormData({ ...formData, telegramChatId: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                Get your Chat ID by messaging @userinfobot on Telegram
+                {t('notifications.dialog.chat_id_help')}
               </p>
             </div>
           )}
 
           {formData.type === 'EMAIL' && (
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t('notifications.dialog.email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder={t('notifications.dialog.email_placeholder')}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
@@ -263,23 +265,23 @@ function ChannelDialog({
 
           {formData.type === 'WEBHOOK' && (
             <div className="space-y-2">
-              <Label htmlFor="webhookUrl">Webhook URL</Label>
+              <Label htmlFor="webhookUrl">{t('notifications.dialog.webhook')}</Label>
               <Input
                 id="webhookUrl"
                 type="url"
-                placeholder="https://your-server.com/webhook"
+                placeholder={t('notifications.dialog.webhook_placeholder')}
                 value={formData.webhookUrl}
                 onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                We&apos;ll send POST requests with JSON payload to this URL
+                {t('notifications.dialog.webhook_help')}
               </p>
             </div>
           )}
 
           {/* Event subscriptions */}
           <div className="space-y-3">
-            <Label>Subscribed Events</Label>
+            <Label>{t('notifications.dialog.events')}</Label>
             <div className="grid grid-cols-1 gap-2">
               {EVENT_TYPES.map((event) => (
                 <button
@@ -294,8 +296,7 @@ function ChannelDialog({
                   )}
                 >
                   <div>
-                    <p className="font-medium text-sm">{event.label}</p>
-                    <p className="text-xs text-muted-foreground">{event.description}</p>
+                    <p className="font-medium text-sm">{t(event.labelKey)}</p>
                   </div>
                   <div className={cn(
                     'w-5 h-5 rounded border flex items-center justify-center',
@@ -318,11 +319,11 @@ function ChannelDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('notifications.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editChannel ? 'Save Changes' : 'Create Channel'}
+              {editChannel ? t('notifications.dialog.save') : t('notifications.dialog.create')}
             </Button>
           </DialogFooter>
         </form>
@@ -345,6 +346,7 @@ function ChannelCard({
   onDelete: () => void;
   onTest: () => void;
 }) {
+  const { t } = useLocale();
   const config = CHANNEL_TYPES[channel.type];
   const Icon = config.icon;
 
@@ -359,29 +361,29 @@ function ChannelCard({
             </div>
             <div>
               <h3 className="font-semibold">{channel.name}</h3>
-              <p className="text-sm text-muted-foreground">{config.label}</p>
+              <p className="text-sm text-muted-foreground">{t(config.labelKey)}</p>
             </div>
           </div>
           <Badge variant={channel.isActive ? 'default' : 'secondary'}>
-            {channel.isActive ? 'Active' : 'Inactive'}
+            {channel.isActive ? t('notifications.channel_active') : t('notifications.channel_inactive')}
           </Badge>
         </div>
 
         {/* Subscribed events */}
         <div className="mb-4">
-          <p className="text-xs text-muted-foreground mb-2">Subscribed to:</p>
+          <p className="text-xs text-muted-foreground mb-2">{t('notifications.events.subscribed')}</p>
           <div className="flex flex-wrap gap-1.5">
             {channel.events.length > 0 ? (
               channel.events.map((eventId) => {
                 const event = EVENT_TYPES.find((e) => e.id === eventId);
                 return (
                   <Badge key={eventId} variant="outline" className="text-xs">
-                    {event?.label || eventId}
+                    {event ? t(event.labelKey) : eventId}
                   </Badge>
                 );
               })
             ) : (
-              <span className="text-sm text-muted-foreground">No events selected</span>
+              <span className="text-sm text-muted-foreground">{t('notifications.events.none')}</span>
             )}
           </div>
         </div>
@@ -395,7 +397,7 @@ function ChannelCard({
             onClick={onTest}
           >
             <TestTube className="w-4 h-4 mr-2" />
-            Test
+            {t('notifications.actions.test')}
           </Button>
           <Button
             variant="ghost"
@@ -427,6 +429,7 @@ function ChannelCard({
  * - Expiring within 7 days
  */
 function KeyAlertsCard() {
+  const { t } = useLocale();
   const { data: alertsData, isLoading, refetch } = trpc.keys.getKeyAlerts.useQuery();
 
   if (isLoading) {
@@ -435,7 +438,7 @@ function KeyAlertsCard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
-            Key Alerts
+            {t('notifications.key_alerts.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -460,23 +463,23 @@ function KeyAlertsCard() {
               'w-5 h-5',
               hasAlerts ? 'text-orange-500' : 'text-muted-foreground'
             )} />
-            Key Alerts
+            {t('notifications.key_alerts.title')}
           </CardTitle>
           <Button variant="ghost" size="icon" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
         <CardDescription>
-          Keys requiring attention (80%+ usage or expiring within 7 days)
+          {t('notifications.key_alerts.desc')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!hasAlerts ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <CheckCircle2 className="w-12 h-12 text-green-500 mb-3" />
-            <p className="font-medium text-green-600">All keys are healthy</p>
+            <p className="font-medium text-green-600">{t('notifications.key_alerts.all_healthy')}</p>
             <p className="text-sm text-muted-foreground">
-              No keys are approaching limits or expiring soon.
+              {t('notifications.key_alerts.no_issues')}
             </p>
           </div>
         ) : (
@@ -494,7 +497,7 @@ function KeyAlertsCard() {
                     'w-4 h-4',
                     alertsData.expiringCount > 0 ? 'text-red-500' : 'text-muted-foreground'
                   )} />
-                  <span className="text-sm font-medium">Expiring Soon</span>
+                  <span className="text-sm font-medium">{t('notifications.key_alerts.expiring')}</span>
                 </div>
                 <p className={cn(
                   'text-2xl font-bold',
@@ -502,7 +505,7 @@ function KeyAlertsCard() {
                 )}>
                   {alertsData.expiringCount} keys
                 </p>
-                <p className="text-xs text-muted-foreground">7 days or less remaining</p>
+                <p className="text-xs text-muted-foreground">{t('notifications.key_alerts.expiring_desc')}</p>
               </div>
 
               <div className={cn(
@@ -516,7 +519,7 @@ function KeyAlertsCard() {
                     'w-4 h-4',
                     alertsData.trafficWarningCount > 0 ? 'text-orange-500' : 'text-muted-foreground'
                   )} />
-                  <span className="text-sm font-medium">High Usage</span>
+                  <span className="text-sm font-medium">{t('notifications.key_alerts.high_usage')}</span>
                 </div>
                 <p className={cn(
                   'text-2xl font-bold',
@@ -524,7 +527,7 @@ function KeyAlertsCard() {
                 )}>
                   {alertsData.trafficWarningCount} keys
                 </p>
-                <p className="text-xs text-muted-foreground">80%+ data limit reached</p>
+                <p className="text-xs text-muted-foreground">{t('notifications.key_alerts.high_usage_desc')}</p>
               </div>
             </div>
 
@@ -533,7 +536,7 @@ function KeyAlertsCard() {
               <div>
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-red-500" />
-                  Keys Expiring Within 7 Days
+                  {t('notifications.key_alerts.expiring_title')}
                 </h4>
                 <div className="space-y-2">
                   {alertsData.expiringKeys.slice(0, 5).map((key) => (
@@ -551,10 +554,10 @@ function KeyAlertsCard() {
                       <div className="flex items-center gap-3">
                         <Badge variant="destructive" className="text-xs">
                           {key.daysRemaining === 0
-                            ? 'Expires today'
+                            ? t('notifications.key_alerts.expires_today')
                             : key.daysRemaining === 1
-                              ? '1 day left'
-                              : `${key.daysRemaining} days left`}
+                              ? t('notifications.key_alerts.day_left')
+                              : `${key.daysRemaining} ${t('notifications.key_alerts.days_left')}`}
                         </Badge>
                         <Link href={`/dashboard/access-keys`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -566,7 +569,7 @@ function KeyAlertsCard() {
                   ))}
                   {alertsData.expiringKeys.length > 5 && (
                     <p className="text-xs text-muted-foreground text-center pt-2">
-                      +{alertsData.expiringKeys.length - 5} more keys expiring soon
+                      +{alertsData.expiringKeys.length - 5} {t('notifications.key_alerts.more')}
                     </p>
                   )}
                 </div>
@@ -578,7 +581,7 @@ function KeyAlertsCard() {
               <div>
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <HardDrive className="w-4 h-4 text-orange-500" />
-                  Keys Reaching Data Limit (80%+)
+                  {t('notifications.key_alerts.usage_title')}
                 </h4>
                 <div className="space-y-2">
                   {alertsData.trafficWarningKeys.slice(0, 5).map((key) => (
@@ -629,7 +632,7 @@ function KeyAlertsCard() {
                   ))}
                   {alertsData.trafficWarningKeys.length > 5 && (
                     <p className="text-xs text-muted-foreground text-center pt-2">
-                      +{alertsData.trafficWarningKeys.length - 5} more keys with high usage
+                      +{alertsData.trafficWarningKeys.length - 5} {t('notifications.key_alerts.more')}
                     </p>
                   )}
                 </div>
@@ -647,6 +650,7 @@ function KeyAlertsCard() {
  */
 export default function NotificationsPage() {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editChannel, setEditChannel] = useState<Channel | null>(null);
@@ -657,19 +661,19 @@ export default function NotificationsPage() {
   };
 
   const handleDelete = (channel: Channel) => {
-    if (confirm(`Are you sure you want to delete "${channel.name}"?`)) {
+    if (confirm(`${t('notifications.confirm_delete')} "${channel.name}"?`)) {
       setChannels(channels.filter((c) => c.id !== channel.id));
       toast({
-        title: 'Channel deleted',
-        description: `"${channel.name}" has been removed.`,
+        title: t('notifications.toast.deleted'),
+        description: t('notifications.toast.deleted_desc'),
       });
     }
   };
 
   const handleTest = async (channel: Channel) => {
     toast({
-      title: 'Test notification sent',
-      description: `A test message has been sent to "${channel.name}".`,
+      title: t('notifications.toast.test_sent'),
+      description: t('notifications.toast.test_desc'),
     });
   };
 
@@ -683,14 +687,14 @@ export default function NotificationsPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Notifications</h1>
+          <h1 className="text-2xl font-bold">{t('notifications.title')}</h1>
           <p className="text-muted-foreground">
-            Configure how you receive alerts about important events.
+            {t('notifications.subtitle')}
           </p>
         </div>
         <Button onClick={handleOpenCreate}>
           <Plus className="w-4 h-4 mr-2" />
-          Add Channel
+          {t('notifications.add_channel')}
         </Button>
       </div>
 
@@ -703,12 +707,9 @@ export default function NotificationsPage() {
           <div className="flex gap-3">
             <Bell className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="text-sm font-medium">Stay informed about your VPN infrastructure</p>
+              <p className="text-sm font-medium">{t('notifications.info.title')}</p>
               <p className="text-sm text-muted-foreground">
-                Configure notification channels to receive alerts when servers go down,
-                access keys are about to expire, or traffic limits are reached. You can
-                set up multiple channels and customize which events trigger notifications
-                on each channel.
+                {t('notifications.info.desc')}
               </p>
             </div>
           </div>
@@ -721,11 +722,10 @@ export default function NotificationsPage() {
           <div className="flex gap-3">
             <MessageSquare className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <p className="text-sm font-medium">Telegram Bot Setup</p>
+              <p className="text-sm font-medium">{t('notifications.telegram.title')}</p>
               <p className="text-sm text-muted-foreground">
-                To use Telegram notifications, you need to configure a bot token in the
-                environment variables. Create a bot with @BotFather and add the token to
-                your <code className="bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</code> setting.
+                {t('notifications.telegram.desc')}{' '}
+                <code className="bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</code> setting.
               </p>
             </div>
           </div>
@@ -749,14 +749,13 @@ export default function NotificationsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Bell className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No notification channels</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('notifications.empty.title')}</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Set up notification channels to receive alerts about server status,
-              expiring keys, and other important events.
+              {t('notifications.empty.desc')}
             </p>
             <Button onClick={handleOpenCreate}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Your First Channel
+              {t('notifications.empty.btn')}
             </Button>
           </CardContent>
         </Card>

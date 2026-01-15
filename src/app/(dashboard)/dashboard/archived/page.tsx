@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { formatBytes } from '@/lib/utils';
 import {
   Archive,
@@ -115,6 +116,7 @@ function getReasonBadgeClass(reason: string): string {
 
 export default function ArchivedKeysPage() {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [page, setPage] = useState(1);
   const [reason, setReason] = useState<ArchiveReason>('ALL');
   const [search, setSearch] = useState('');
@@ -142,7 +144,7 @@ export default function ArchivedKeysPage() {
   // Delete mutations
   const deleteMutation = trpc.archivedKeys.permanentDelete.useMutation({
     onSuccess: () => {
-      toast({ title: 'Key permanently deleted' });
+      toast({ title: t('archived.toast.deleted') });
       utils.archivedKeys.list.invalidate();
       utils.archivedKeys.getStats.invalidate();
       setKeyToDelete(null);
@@ -155,7 +157,7 @@ export default function ArchivedKeysPage() {
 
   const deleteManyMutation = trpc.archivedKeys.permanentDeleteMany.useMutation({
     onSuccess: (result) => {
-      toast({ title: `${result.deleted} keys permanently deleted` });
+      toast({ title: `${result.deleted} ${t('archived.toast.deleted_multiple')}` });
       utils.archivedKeys.list.invalidate();
       utils.archivedKeys.getStats.invalidate();
       setSelectedIds([]);
@@ -209,7 +211,7 @@ export default function ArchivedKeysPage() {
 
     const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     downloadFile(csv, 'archived-keys.csv', 'text/csv');
-    toast({ title: 'Exported to CSV' });
+    toast({ title: t('archived.toast.exported_csv') });
   };
 
   // Handle export to Excel (actually TSV for simplicity, can be opened in Excel)
@@ -256,7 +258,7 @@ export default function ArchivedKeysPage() {
     // Create TSV (Tab Separated Values) which Excel opens correctly
     const tsv = [headers.join('\t'), ...rows.map((row) => row.join('\t'))].join('\n');
     downloadFile(tsv, 'archived-keys.xls', 'application/vnd.ms-excel');
-    toast({ title: 'Exported to Excel' });
+    toast({ title: t('archived.toast.exported_excel') });
   };
 
   // Download file helper
@@ -319,10 +321,10 @@ export default function ArchivedKeysPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Archive className="w-6 h-6 text-primary" />
-            Archived Keys
+            {t('archived.title')}
           </h1>
           <p className="text-muted-foreground">
-            View expired, deleted, and depleted keys. Kept for 3 months.
+            {t('archived.subtitle')}
           </p>
         </div>
 
@@ -330,11 +332,11 @@ export default function ArchivedKeysPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={exportToCSV}>
             <FileText className="w-4 h-4 mr-2" />
-            CSV
+            {t('archived.export_csv')}
           </Button>
           <Button variant="outline" size="sm" onClick={exportToExcel}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Excel
+            {t('archived.export_excel')}
           </Button>
         </div>
       </div>
@@ -342,29 +344,29 @@ export default function ArchivedKeysPage() {
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Total Archived</div>
+          <div className="text-sm text-muted-foreground">{t('archived.stats.total')}</div>
           <div className="text-2xl font-bold">{stats?.total || 0}</div>
         </div>
         <div className="bg-card rounded-lg border p-4">
           <div className="text-sm text-amber-500 flex items-center gap-1">
-            <Clock className="w-4 h-4" /> Expired
+            <Clock className="w-4 h-4" /> {t('archived.stats.expired')}
           </div>
           <div className="text-2xl font-bold">{stats?.expired || 0}</div>
         </div>
         <div className="bg-card rounded-lg border p-4">
           <div className="text-sm text-red-500 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" /> Depleted
+            <AlertCircle className="w-4 h-4" /> {t('archived.stats.depleted')}
           </div>
           <div className="text-2xl font-bold">{stats?.depleted || 0}</div>
         </div>
         <div className="bg-card rounded-lg border p-4">
           <div className="text-sm text-gray-400 flex items-center gap-1">
-            <XCircle className="w-4 h-4" /> Deleted
+            <XCircle className="w-4 h-4" /> {t('archived.stats.deleted')}
           </div>
           <div className="text-2xl font-bold">{stats?.deleted || 0}</div>
         </div>
         <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">Total Usage</div>
+          <div className="text-sm text-muted-foreground">{t('archived.stats.total_usage')}</div>
           <div className="text-2xl font-bold">
             {formatBytes(Number(stats?.totalUsedBytes || 0))}
           </div>
@@ -376,7 +378,7 @@ export default function ArchivedKeysPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, email, server..."
+            placeholder={t('archived.search_placeholder')}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -394,21 +396,21 @@ export default function ArchivedKeysPage() {
           }}
         >
           <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filter by reason" />
+            <SelectValue placeholder={t('archived.filter.reason')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All Reasons</SelectItem>
-            <SelectItem value="EXPIRED">Expired</SelectItem>
-            <SelectItem value="DEPLETED">Depleted</SelectItem>
-            <SelectItem value="DELETED">Deleted</SelectItem>
-            <SelectItem value="DISABLED">Disabled</SelectItem>
+            <SelectItem value="ALL">{t('archived.filter.all')}</SelectItem>
+            <SelectItem value="EXPIRED">{t('archived.filter.expired')}</SelectItem>
+            <SelectItem value="DEPLETED">{t('archived.filter.depleted')}</SelectItem>
+            <SelectItem value="DELETED">{t('archived.filter.deleted')}</SelectItem>
+            <SelectItem value="DISABLED">{t('archived.filter.disabled')}</SelectItem>
           </SelectContent>
         </Select>
 
         {selectedIds.length > 0 && (
           <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
             <Trash2 className="w-4 h-4 mr-2" />
-            Delete ({selectedIds.length})
+            {t('archived.delete_selected')} ({selectedIds.length})
           </Button>
         )}
       </div>
@@ -426,13 +428,13 @@ export default function ArchivedKeysPage() {
                   className="rounded"
                 />
               </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Server</TableHead>
-              <TableHead>Usage</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Archived At</TableHead>
-              <TableHead>Delete After</TableHead>
-              <TableHead className="w-20">Actions</TableHead>
+              <TableHead>{t('archived.table.name')}</TableHead>
+              <TableHead>{t('archived.table.server')}</TableHead>
+              <TableHead>{t('archived.table.usage')}</TableHead>
+              <TableHead>{t('archived.table.reason')}</TableHead>
+              <TableHead>{t('archived.table.archived_at')}</TableHead>
+              <TableHead>{t('archived.table.delete_after')}</TableHead>
+              <TableHead className="w-20">{t('archived.table.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -445,7 +447,7 @@ export default function ArchivedKeysPage() {
             ) : data?.keys.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No archived keys found
+                  {t('archived.empty')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -491,7 +493,7 @@ export default function ArchivedKeysPage() {
                       className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getReasonBadgeClass(key.archiveReason)}`}
                     >
                       {getReasonIcon(key.archiveReason)}
-                      {key.archiveReason}
+                      {t(`archived.filter.${key.archiveReason.toLowerCase()}`)}
                     </span>
                   </TableCell>
                   <TableCell className="text-sm">{formatDateTime(key.archivedAt)}</TableCell>
@@ -546,15 +548,15 @@ export default function ArchivedKeysPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Permanently Delete?</AlertDialogTitle>
+            <AlertDialogTitle>{t('archived.dialog.delete.title')}</AlertDialogTitle>
             <AlertDialogDescription>
               {keyToDelete
-                ? 'This will permanently delete the archived key. This action cannot be undone.'
-                : `This will permanently delete ${selectedIds.length} archived key(s). This action cannot be undone.`}
+                ? t('archived.dialog.delete.single')
+                : t('archived.dialog.delete.multiple').replace('{count}', selectedIds.length.toString())}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('archived.dialog.delete.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -564,7 +566,7 @@ export default function ArchivedKeysPage() {
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
-              Delete Permanently
+              {t('archived.dialog.delete.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

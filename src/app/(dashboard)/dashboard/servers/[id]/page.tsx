@@ -27,7 +27,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
-import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
+import { useLocale } from '@/hooks/use-locale';
+import { cn, formatBytes, formatRelativeTime, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
 import {
   Server,
   Key,
@@ -40,7 +41,6 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Clock,
   Loader2,
   Globe,
   Shield,
@@ -48,7 +48,6 @@ import {
   BarChart3,
   ExternalLink,
   Copy,
-  QrCode,
 } from 'lucide-react';
 
 /**
@@ -75,6 +74,7 @@ function EditServerDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [name, setName] = useState(server.name);
   const [location, setLocation] = useState(server.location || '');
   const [countryCode, setCountryCode] = useState(server.countryCode || '');
@@ -88,15 +88,15 @@ function EditServerDialog({
   const updateMutation = trpc.servers.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server updated',
-        description: 'The server has been updated successfully.',
+        title: t('server_details.toast.updated'),
+        description: t('server_details.toast.updated_desc'),
       });
       onSuccess();
       onOpenChange(false);
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: t('server_details.toast.update_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -119,15 +119,15 @@ function EditServerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit Server</DialogTitle>
+          <DialogTitle>{t('server_details.edit.title')}</DialogTitle>
           <DialogDescription>
-            Update server metadata and organization.
+            {t('server_details.edit.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Server Name</Label>
+            <Label htmlFor="name">{t('server_details.edit.name')}</Label>
             <Input
               id="name"
               value={name}
@@ -137,22 +137,22 @@ function EditServerDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">{t('server_details.edit.location')}</Label>
               <Input
                 id="location"
-                placeholder="e.g., AWS Singapore"
+                placeholder={t('server_details.edit.location_placeholder')}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Country</Label>
+              <Label>{t('server_details.edit.country')}</Label>
               <Select value={countryCode} onValueChange={setCountryCode}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
+                  <SelectValue placeholder={t('server_details.edit.country_select')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="">{t('server_details.edit.none')}</SelectItem>
                   {COUNTRY_OPTIONS.map((country) => (
                     <SelectItem key={country.code} value={country.code}>
                       {getCountryFlag(country.code)} {country.name}
@@ -165,7 +165,7 @@ function EditServerDialog({
 
           {tags && tags.length > 0 && (
             <div className="space-y-2">
-              <Label>Tags</Label>
+              <Label>{t('server_details.edit.tags')}</Label>
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag) => (
                   <button
@@ -202,17 +202,17 @@ function EditServerDialog({
               className="rounded border-gray-300"
             />
             <Label htmlFor="isDefault" className="font-normal">
-              Set as default server for new keys
+              {t('server_details.edit.default')}
             </Label>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('server_details.edit.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              {t('server_details.edit.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -230,6 +230,7 @@ export default function ServerDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { t } = useLocale();
   const serverId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -244,14 +245,14 @@ export default function ServerDetailPage() {
   const syncMutation = trpc.servers.sync.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Server synced',
+        title: t('server_details.toast.synced'),
         description: `Found ${result.keysFound} keys. Created ${result.keysCreated}, removed ${result.keysRemoved}.`,
       });
       refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Sync failed',
+        title: t('server_details.toast.sync_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -262,14 +263,14 @@ export default function ServerDetailPage() {
   const deleteMutation = trpc.servers.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server deleted',
+        title: t('server_details.toast.deleted'),
         description: 'The server has been removed from Atomic-UI.',
       });
       router.push('/dashboard/servers');
     },
     onError: (error) => {
       toast({
-        title: 'Delete failed',
+        title: t('server_details.toast.delete_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -277,7 +278,7 @@ export default function ServerDetailPage() {
   });
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to remove "${server?.name}" from Atomic-UI?\n\nNote: This will NOT delete keys from the actual Outline server.`)) {
+    if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
       deleteMutation.mutate({ id: serverId });
     }
   };
@@ -297,14 +298,14 @@ export default function ServerDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <Server className="w-16 h-16 text-muted-foreground/50 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Server not found</h2>
+        <h2 className="text-xl font-semibold mb-2">{t('server_details.not_found')}</h2>
         <p className="text-muted-foreground mb-6">
-          The requested server could not be found.
+          {t('server_details.not_found_desc')}
         </p>
         <Button asChild>
           <Link href="/dashboard/servers">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Servers
+            {t('server_details.back')}
           </Link>
         </Button>
       </div>
@@ -313,10 +314,10 @@ export default function ServerDetailPage() {
 
   const healthStatus = server.healthCheck?.lastStatus || 'UNKNOWN';
   const statusConfig = {
-    UP: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle2, label: 'Online' },
-    DOWN: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, label: 'Offline' },
-    SLOW: { color: 'text-yellow-500', bg: 'bg-yellow-500', icon: AlertTriangle, label: 'Slow' },
-    UNKNOWN: { color: 'text-gray-500', bg: 'bg-gray-500', icon: Activity, label: 'Unknown' },
+    UP: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle2, labelKey: 'health.status.UP' },
+    DOWN: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, labelKey: 'health.status.DOWN' },
+    SLOW: { color: 'text-yellow-500', bg: 'bg-yellow-500', icon: AlertTriangle, labelKey: 'health.status.SLOW' },
+    UNKNOWN: { color: 'text-gray-500', bg: 'bg-gray-500', icon: Activity, labelKey: 'health.status.UNKNOWN' },
   };
   const status = statusConfig[healthStatus as keyof typeof statusConfig] || statusConfig.UNKNOWN;
   const StatusIcon = status.icon;
@@ -350,11 +351,11 @@ export default function ServerDetailPage() {
             disabled={syncMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncMutation.isPending && 'animate-spin')} />
-            Sync
+            {t('server_details.sync')}
           </Button>
           <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
             <Edit2 className="w-4 h-4 mr-2" />
-            Edit
+            {t('server_details.edit')}
           </Button>
         </div>
       </div>
@@ -382,8 +383,8 @@ export default function ServerDetailPage() {
               <StatusIcon className={cn('w-5 h-5', status.color)} />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <p className="text-lg font-semibold">{status.label}</p>
+              <p className="text-sm text-muted-foreground">{t('health.explanation.title')}</p>
+              <p className="text-lg font-semibold">{t(status.labelKey)}</p>
             </div>
           </div>
         </Card>
@@ -394,7 +395,7 @@ export default function ServerDetailPage() {
               <Key className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Access Keys</p>
+              <p className="text-sm text-muted-foreground">{t('server_details.keys.title')}</p>
               <p className="text-lg font-semibold">{server.accessKeys?.length || 0}</p>
             </div>
           </div>
@@ -406,7 +407,7 @@ export default function ServerDetailPage() {
               <Wifi className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Latency</p>
+              <p className="text-sm text-muted-foreground">{t('health.metrics.latency')}</p>
               <p className="text-lg font-semibold">
                 {server.healthCheck?.lastLatencyMs
                   ? `${server.healthCheck.lastLatencyMs}ms`
@@ -422,7 +423,7 @@ export default function ServerDetailPage() {
               <BarChart3 className="w-5 h-5 text-green-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Uptime</p>
+              <p className="text-sm text-muted-foreground">{t('health.metrics.uptime')}</p>
               <p className="text-lg font-semibold">
                 {server.healthCheck?.uptimePercent
                   ? `${server.healthCheck.uptimePercent.toFixed(1)}%`
@@ -439,31 +440,31 @@ export default function ServerDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
-              Server Information
+              {t('server_details.info.title')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Server ID</p>
+                <p className="text-sm text-muted-foreground">{t('server_details.info.id')}</p>
                 <p className="font-mono text-sm">{server.outlineServerId || '-'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Version</p>
+                <p className="text-sm text-muted-foreground">{t('server_details.info.version')}</p>
                 <p className="font-mono text-sm">{server.outlineVersion || '-'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Port for New Keys</p>
+                <p className="text-sm text-muted-foreground">{t('server_details.info.port')}</p>
                 <p className="font-mono text-sm">{server.portForNewAccessKeys || '-'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Hostname</p>
+                <p className="text-sm text-muted-foreground">{t('server_details.info.hostname')}</p>
                 <p className="font-mono text-sm">{server.hostnameForAccessKeys || '-'}</p>
               </div>
             </div>
 
             <div className="pt-4 border-t border-border">
-              <p className="text-sm text-muted-foreground mb-2">API URL</p>
+              <p className="text-sm text-muted-foreground mb-2">{t('server_details.info.api_url')}</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-muted rounded text-xs font-mono truncate">
                   {server.apiUrl}
@@ -474,7 +475,7 @@ export default function ServerDetailPage() {
                   className="h-8 w-8"
                   onClick={() => {
                     navigator.clipboard.writeText(server.apiUrl);
-                    toast({ title: 'Copied!', description: 'API URL copied to clipboard.' });
+                    toast({ title: t('settings.toast.copied'), description: t('server_details.info.api_url') + ' copied.' });
                   }}
                 >
                   <Copy className="w-4 h-4" />
@@ -483,11 +484,11 @@ export default function ServerDetailPage() {
             </div>
 
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Last Synced</p>
+              <p className="text-sm text-muted-foreground mb-2">{t('server_details.info.last_synced')}</p>
               <p className="text-sm">
                 {server.lastSyncAt
                   ? formatRelativeTime(server.lastSyncAt)
-                  : 'Never'}
+                  : t('health.metrics.never')}
               </p>
             </div>
           </CardContent>
@@ -498,7 +499,7 @@ export default function ServerDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
-              Health Status
+              {t('server_details.health.title')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -512,10 +513,10 @@ export default function ServerDetailPage() {
             </div>
 
             <div className="text-center">
-              <p className={cn('text-xl font-semibold', status.color)}>{status.label}</p>
+              <p className={cn('text-xl font-semibold', status.color)}>{t(status.labelKey)}</p>
               {server.healthCheck?.lastCheckedAt && (
                 <p className="text-sm text-muted-foreground">
-                  Last checked {formatRelativeTime(server.healthCheck.lastCheckedAt)}
+                  {t('server_details.health.last_checked')} {formatRelativeTime(server.healthCheck.lastCheckedAt)}
                 </p>
               )}
             </div>
@@ -524,21 +525,21 @@ export default function ServerDetailPage() {
               <div className="space-y-3 pt-4 border-t border-border">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Uptime</span>
+                    <span className="text-muted-foreground">{t('server_details.health.uptime')}</span>
                     <span>{server.healthCheck.uptimePercent.toFixed(1)}%</span>
                   </div>
                   <Progress value={server.healthCheck.uptimePercent} className="h-2" />
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Total Checks</span>
+                  <span className="text-muted-foreground">{t('server_details.health.total_checks')}</span>
                   <span>{server.healthCheck.totalChecks}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Successful</span>
+                  <span className="text-muted-foreground">{t('server_details.health.successful')}</span>
                   <span className="text-green-500">{server.healthCheck.successfulChecks}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Failed</span>
+                  <span className="text-muted-foreground">{t('server_details.health.failed')}</span>
                   <span className="text-red-500">{server.healthCheck.failedChecks}</span>
                 </div>
               </div>
@@ -554,15 +555,15 @@ export default function ServerDetailPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Key className="w-5 h-5 text-primary" />
-                Access Keys
+                {t('server_details.keys.title')}
               </CardTitle>
               <CardDescription>
-                {server.accessKeys?.length || 0} key(s) on this server
+                {server.accessKeys?.length || 0} {t('server_details.keys.subtitle')}
               </CardDescription>
             </div>
             <Button asChild>
               <Link href={`/dashboard/keys?server=${serverId}`}>
-                View All Keys
+                {t('server_details.keys.view_all')}
                 <ExternalLink className="w-4 h-4 ml-2" />
               </Link>
             </Button>
@@ -584,7 +585,7 @@ export default function ServerDetailPage() {
                       {key.name}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {formatBytes(key.usedBytes)} used
+                      {formatBytes(key.usedBytes)} {t('server_details.keys.used')}
                       {key.dataLimitBytes && ` / ${formatBytes(key.dataLimitBytes)}`}
                     </p>
                   </div>
@@ -599,18 +600,18 @@ export default function ServerDetailPage() {
               ))}
               {server.accessKeys.length > 5 && (
                 <p className="text-center text-sm text-muted-foreground pt-2">
-                  And {server.accessKeys.length - 5} more...
+                  And {server.accessKeys.length - 5} {t('server_details.keys.more')}
                 </p>
               )}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No access keys on this server yet.</p>
+              <p>{t('server_details.keys.empty')}</p>
               <Button className="mt-4" asChild>
                 <Link href={`/dashboard/keys?server=${serverId}`}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Create Key
+                  {t('server_details.keys.create')}
                 </Link>
               </Button>
             </div>
@@ -623,18 +624,18 @@ export default function ServerDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Shield className="w-5 h-5" />
-            Danger Zone
+            {t('server_details.danger.title')}
           </CardTitle>
           <CardDescription>
-            Irreversible actions that affect this server.
+            {t('server_details.danger.desc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
             <div>
-              <p className="font-medium">Remove Server</p>
+              <p className="font-medium">{t('server_details.danger.remove_title')}</p>
               <p className="text-sm text-muted-foreground">
-                Remove this server from Atomic-UI. Keys on the Outline server will not be deleted.
+                {t('server_details.danger.remove_desc')}
               </p>
             </div>
             <Button
@@ -644,7 +645,7 @@ export default function ServerDetailPage() {
             >
               {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               <Trash2 className="w-4 h-4 mr-2" />
-              Remove
+              {t('server_details.danger.remove_btn')}
             </Button>
           </div>
         </CardContent>
