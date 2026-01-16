@@ -36,6 +36,7 @@ import {
   Sun,
   User,
   Archive,
+  Globe,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { LanguageSelector } from '@/components/ui/language-selector';
@@ -86,6 +87,12 @@ const navItems = [
     label: 'Notifications',
     icon: Bell,
     description: 'Alert settings'
+  },
+  {
+    href: '/portal',
+    label: 'User Portal',
+    icon: Globe,
+    description: 'Access user portal'
   },
   {
     href: '/dashboard/settings',
@@ -159,6 +166,12 @@ function Sidebar({
       label: t('nav.notifications'),
       icon: Bell,
       description: 'Alert settings'
+    },
+    {
+      href: '/portal',
+      label: t('nav.portal'),
+      icon: Globe,
+      description: 'Access user portal'
     },
     {
       href: '/dashboard/settings',
