@@ -268,7 +268,7 @@ export default function DeployServerPage() {
                             </div>
                         </div>
                         <p className="text-sm text-muted-foreground italic">
-                            After running the command, copy the "apiUrl" output and add it via the <Link href="/dashboard/servers" className="underline text-primary">Servers Page</Link>.
+                            After running the command, copy the &quot;apiUrl&quot; output and add it via the <Link href="/dashboard/servers" className="underline text-primary">Servers Page</Link>.
                         </p>
                     </CardContent>
                     <CardFooter>
