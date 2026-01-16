@@ -26,29 +26,39 @@ async function main() {
   console.log('🚀 Atomic-UI Setup Script');
   console.log('========================\n');
 
-  // Get credentials from environment or use defaults
-  const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
+  // Get credentials from environment or generate random defaults
+  const generateRandomString = (length: number) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin';
+  // If no password env var is set, generate a random 12-char password
+  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || generateRandomString(12);
 
   // Check if admin user exists
   console.log('📊 Checking database...');
 
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: 'ADMIN' },
   });
 
   if (existingAdmin) {
-    console.log(`✅ Admin user "${adminEmail}" already exists.`);
-    console.log('\n💡 To change the password, run: npm run password:change');
+    console.log(`✅ Admin user "${existingAdmin.email}" already exists.`);
+    console.log('\n💡 To change the password, run: npm run change-password');
   } else {
     // Create admin user
     console.log('👤 Creating admin user...');
 
     const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
-        email: adminEmail,
+        email: adminEmail, // Can be "admin" or email format
         passwordHash,
         role: 'ADMIN',
       },
@@ -57,10 +67,10 @@ async function main() {
     console.log('✅ Admin user created successfully!\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🔐 Login Credentials:');
-    console.log(`   Email:    ${adminEmail}`);
+    console.log(`   Username: ${newUser.email}`);
     console.log(`   Password: ${adminPassword}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.log('⚠️  Please change the password after first login!\n');
+    console.log('⚠️  Please save these credentials! You can change them in the implementation settings or via CLI.\n');
   }
 
   // Create default settings if they don't exist

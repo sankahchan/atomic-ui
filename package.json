@@ -17,8 +17,10 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "setup": "tsx scripts/setup.ts",
-    "password:change": "tsx scripts/change-password.ts"
+    "setup": "npx tsx scripts/setup.ts",
+    "change-password": "npx tsx scripts/change-credentials.ts",
+    "password:change": "tsx scripts/change-password.ts",
+    "postinstall": "prisma generate && npx tsx scripts/fix-null-email.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

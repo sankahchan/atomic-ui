@@ -97,12 +97,51 @@ export default function SettingsPage() {
     },
   });
 
-  // Password change form state
+  // Password/Profile change form state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState('');
 
-  // Telegram bot state
+  // Initialize username
+  useState(() => {
+    if (currentUser?.email) {
+      setUsername(currentUser.email);
+    }
+  });
+
+  // Telegram bot state...
+  // (lines 106-111 are unchanged)
+
+  // ... (lines 112-254 are unchanged)
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newPassword && newPassword !== confirmPassword) {
+      toast({
+        title: t('settings.toast.password_mismatch'),
+        description: t('settings.toast.password_mismatch_desc'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword && newPassword.length < 6) {
+      toast({
+        title: t('settings.toast.password_short'),
+        description: t('settings.toast.password_short_desc'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    passwordMutation.mutate({
+      currentPassword,
+      newPassword: newPassword || undefined,
+      newUsername: username !== currentUser?.email ? username : undefined,
+    });
+  };
   const [botToken, setBotToken] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [keyNotFoundMessage, setKeyNotFoundMessage] = useState('');
@@ -251,32 +290,7 @@ export default function SettingsPage() {
     updateMutation.mutate({ key, value });
   };
 
-  const handlePasswordChange = (e: React.FormEvent) => {
-    e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: t('settings.toast.password_mismatch'),
-        description: t('settings.toast.password_mismatch_desc'),
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({
-        title: t('settings.toast.password_short'),
-        description: t('settings.toast.password_short_desc'),
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    passwordMutation.mutate({
-      currentPassword,
-      newPassword,
-    });
-  };
 
   if (isLoading) {
     return (
@@ -716,6 +730,22 @@ export default function SettingsPage() {
               )}
 
               <form onSubmit={handlePasswordChange} className="space-y-4">
+                {/* Username Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="username">{t('settings.security.username') || 'Username'}</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="admin"
+                  />
+                  <p className="text-xs text-muted-foreground">{t('settings.security.username_desc') || "You can change your login username/email here."}</p>
+                </div>
+
+                <div className="border-t my-4"></div>
+                <p className="text-sm font-medium mb-2">{t('settings.security.change_password') || 'Change Password (Optional)'}</p>
+
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword">{t('settings.security.current')}</Label>
                   <Input
@@ -724,6 +754,7 @@ export default function SettingsPage() {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder={t('settings.security.current_placeholder')}
+                    required
                   />
                 </div>
 
@@ -751,7 +782,7 @@ export default function SettingsPage() {
 
                 <Button
                   type="submit"
-                  disabled={passwordMutation.isPending || !currentPassword || !newPassword || !confirmPassword}
+                  disabled={passwordMutation.isPending || !currentPassword || (!newPassword && username === currentUser?.email)}
                 >
                   {passwordMutation.isPending && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

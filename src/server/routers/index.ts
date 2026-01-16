@@ -108,11 +108,15 @@ const authRouter = router({
   /**
    * Change the current user's password.
    */
+  /**
+   * Change the current user's password and/or username (email).
+   */
   changePassword: protectedProcedure
     .input(
       z.object({
         currentPassword: z.string().min(1),
-        newPassword: z.string().min(6),
+        newPassword: z.string().min(6).optional(),
+        newUsername: z.string().min(1).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -136,15 +140,41 @@ const authRouter = router({
         });
       }
 
-      // Hash and update password
-      const passwordHash = await hashPassword(input.newPassword);
+      const updates: any = {};
+
+      // Handle username/email change
+      if (input.newUsername && input.newUsername !== user.email) {
+        const existing = await db.user.findUnique({
+          where: { email: input.newUsername },
+        });
+
+        if (existing) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Username is already taken',
+          });
+        }
+        updates.email = input.newUsername;
+      }
+
+      // Handle password change
+      if (input.newPassword) {
+        updates.passwordHash = await hashPassword(input.newPassword);
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return { success: true };
+      }
+
       await db.user.update({
         where: { id: ctx.user.id },
-        data: { passwordHash },
+        data: updates,
       });
 
-      // Invalidate all sessions to force re-login
-      await invalidateAllUserSessions(ctx.user.id);
+      // Invalidate sessions if password changed (security best practice)
+      if (input.newPassword) {
+        await invalidateAllUserSessions(ctx.user.id);
+      }
 
       return { success: true };
     }),

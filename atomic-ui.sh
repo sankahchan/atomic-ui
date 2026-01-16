@@ -490,6 +490,14 @@ disable_service() {
     print_success "Atomic-UI will not start automatically on boot"
 }
 
+# Change Credentials
+change_credentials() {
+    print_step "Launching credential manager..."
+    cd "$INSTALL_DIR"
+    npm run change-password
+    print_success "Credential update complete"
+}
+
 # ============================================
 # Port Management
 # ============================================
@@ -742,12 +750,13 @@ show_menu() {
     echo -e "  ${GREEN}9)${NC} Update Atomic-UI"
     echo -e "  ${GREEN}10)${NC} Reinstall Atomic-UI"
     echo ""
-    echo -e "  ${RED}11)${NC} Uninstall Atomic-UI"
+    echo -e "  ${GREEN}11)${NC} Uninstall Atomic-UI"
+    echo -e "  ${GREEN}12)${NC} Change Password/Username"
     echo ""
     echo -e "  ${GREEN}0)${NC} Exit"
     echo ""
     
-    read -p "Please enter your choice [0-11]: " choice
+    read -p "Please enter your choice [0-12]: " choice
     
     case $choice in
         1) start_service ;;
@@ -761,6 +770,7 @@ show_menu() {
         9) update_service ;;
         10) install_full ;;
         11) uninstall_service ;;
+        12) change_credentials ;;
         0) exit 0 ;;
         *) print_error "Invalid option" ;;
     esac
