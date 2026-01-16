@@ -260,7 +260,7 @@ export default function DeployServerPage() {
                             </p>
                             <div className="relative">
                                 <div className="bg-black/80 text-white font-mono text-xs p-3 rounded border border-border/20 pr-10">
-                                    ssh root@{dropletIp} "bash -c \"\$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)\""
+                                    ssh root@{dropletIp} &quot;bash -c \&quot;\$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)\&quot;&quot;
                                 </div>
                                 <Button size="icon" variant="ghost" className="absolute top-0 right-0 h-full text-white hover:text-white/80" onClick={() => handleCopy(`ssh root@${dropletIp} "bash -c \\"\\$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)\\""`)}>
                                     <ArrowRight className="w-4 h-4" />

@@ -805,6 +805,7 @@ install_full() {
 # Main Entry Point
 # ============================================
 
+
 main() {
     case "$1" in
         install)
@@ -856,6 +857,10 @@ main() {
             check_root
             disable_service
             ;;
+        change-password)
+            check_root
+            change_credentials
+            ;;
         "")
             check_root
             show_menu
@@ -864,19 +869,20 @@ main() {
             echo "Usage: atomic-ui [command]"
             echo ""
             echo "Commands:"
-            echo "  install    - Install Atomic-UI"
-            echo "  uninstall  - Uninstall Atomic-UI"
-            echo "  update     - Update to latest version"
-            echo "  start      - Start service"
-            echo "  stop       - Stop service"
-            echo "  restart    - Restart service"
-            echo "  status     - Show status"
-            echo "  info       - Show panel URL, port and path"
-            echo "  logs       - View logs"
-            echo "  port       - Show current port"
-            echo "  port <num> - Change port to <num>"
-            echo "  enable     - Enable auto-start"
-            echo "  disable    - Disable auto-start"
+            echo "  install          - Install Atomic-UI"
+            echo "  uninstall        - Uninstall Atomic-UI"
+            echo "  update           - Update to latest version"
+            echo "  start            - Start service"
+            echo "  stop             - Stop service"
+            echo "  restart          - Restart service"
+            echo "  status           - Show status"
+            echo "  info             - Show panel URL, port and path"
+            echo "  logs             - View logs"
+            echo "  port             - Show current port"
+            echo "  port <num>       - Change port to <num>"
+            echo "  enable           - Enable auto-start"
+            echo "  disable          - Disable auto-start"
+            echo "  change-password  - Change username/password"
             echo ""
             echo "Run without arguments to show interactive menu."
             ;;

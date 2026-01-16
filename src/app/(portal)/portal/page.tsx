@@ -80,7 +80,7 @@ export default function PortalPage() {
                         <WifiOff className="h-12 w-12 text-muted-foreground mb-4" />
                         <h3 className="text-lg font-medium">No Access Keys Found</h3>
                         <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                            You don't have any access keys assigned yet. Please contact the administrator.
+                            You don&apos;t have any access keys assigned yet. Please contact the administrator.
                         </p>
                     </CardContent>
                 </Card>
