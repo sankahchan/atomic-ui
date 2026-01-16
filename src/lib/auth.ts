@@ -24,15 +24,14 @@ const SESSION_EXPIRY_DAYS = getSessionExpiryDays();
 // Types for authentication
 export interface SessionPayload {
   userId: string;
-  username: string;
+  email: string;
   role: string;
   exp: number;
 }
 
 export interface AuthUser {
   id: string;
-  username: string;
-  email: string | null;
+  email: string;
   role: string;
 }
 
@@ -54,16 +53,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 /**
  * Create a new JWT session token
- * The token contains the user's ID, username, and role for authorization
+ * The token contains the user's ID, email, and role for authorization
  */
-export async function createSession(userId: string, username: string, role: string): Promise<string> {
+export async function createSession(userId: string, email: string, role: string): Promise<string> {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
 
   // Create the JWT with user information
   const token = await new SignJWT({
     userId,
-    username,
+    email,
     role,
   })
     .setProtectedHeader({ alg: 'HS256' })
@@ -130,13 +129,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       where: { id: payload.userId },
       select: {
         id: true,
-        username: true,
         email: true,
         role: true,
+        passwordHash: false, // Explicitly exclude hash
       },
     });
 
-    return user;
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
   } catch {
     return null;
   }
@@ -212,18 +217,18 @@ export async function cleanupExpiredSessions(): Promise<number> {
 }
 
 /**
- * Authenticate a user with username and password
+ * Authenticate a user with email and password
  * Returns the user if successful, null otherwise
  */
 export async function authenticateUser(
-  username: string,
+  email: string,
   password: string
 ): Promise<AuthUser | null> {
   const user = await db.user.findUnique({
-    where: { username },
+    where: { email },
   });
 
-  if (!user) {
+  if (!user || !user.passwordHash) {
     return null;
   }
 
@@ -233,17 +238,8 @@ export async function authenticateUser(
     return null;
   }
 
-  // Update last login info
-  await db.user.update({
-    where: { id: user.id },
-    data: {
-      lastLoginAt: new Date(),
-    },
-  });
-
   return {
     id: user.id,
-    username: user.username,
     email: user.email,
     role: user.role,
   };

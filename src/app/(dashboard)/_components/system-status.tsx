@@ -52,63 +52,63 @@ export function SystemStatus() {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg font-medium flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
+        <Card className="h-full">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
                     System Status
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
                 {/* CPU */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                            <Cpu className="h-4 w-4 text-muted-foreground" />
+                            <Cpu className="h-3 w-3 text-muted-foreground" />
                             <span>CPU Load</span>
                         </div>
                         <span className="font-medium">{stats.cpu.percent}%</span>
                     </div>
-                    <Progress value={stats.cpu.percent} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right">
+                    <Progress value={stats.cpu.percent} className="h-1.5" />
+                    <p className="text-[10px] text-muted-foreground text-right">
                         {stats.cpu.cores} Cores
                     </p>
                 </div>
 
                 {/* Memory */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-muted-foreground" />
+                            <Activity className="h-3 w-3 text-muted-foreground" />
                             <span>Memory</span>
                         </div>
                         <span className="font-medium">{stats.memory.percent}%</span>
                     </div>
-                    <Progress value={stats.memory.percent} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right">
+                    <Progress value={stats.memory.percent} className="h-1.5" />
+                    <p className="text-[10px] text-muted-foreground text-right">
                         {formatBytes(stats.memory.used)} / {formatBytes(stats.memory.total)}
                     </p>
                 </div>
 
                 {/* Disk */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                            <HardDrive className="h-4 w-4 text-muted-foreground" />
+                            <HardDrive className="h-3 w-3 text-muted-foreground" />
                             <span>Disk Storage</span>
                         </div>
                         <span className="font-medium">{stats.disk.percent}%</span>
                     </div>
-                    <Progress value={stats.disk.percent} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right">
+                    <Progress value={stats.disk.percent} className="h-1.5" />
+                    <p className="text-[10px] text-muted-foreground text-right">
                         {formatBytes(stats.disk.used)} / {formatBytes(stats.disk.total)}
                     </p>
                 </div>
 
                 {/* Uptime */}
-                <div className="pt-2 border-t flex items-center justify-between text-sm">
+                <div className="pt-2 border-t flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-3 w-3" />
                         <span>Uptime</span>
                     </div>
                     <span className="font-medium font-mono">

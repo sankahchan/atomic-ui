@@ -124,7 +124,7 @@ export default function LoginPage() {
   const { t, mounted } = useLocale();
 
   // Form state management
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -141,7 +141,7 @@ export default function LoginPage() {
     onError: (error) => {
       toast({
         title: mounted ? t('login.failed') : 'Login failed',
-        description: error.message || (mounted ? t('login.invalid') : 'Invalid username or password.'),
+        description: error.message || (mounted ? t('login.invalid') : 'Invalid email or password.'),
         variant: 'destructive',
       });
     },
@@ -153,16 +153,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       toast({
         title: mounted ? t('login.validation_error') : 'Validation error',
-        description: mounted ? t('login.enter_both') : 'Please enter both username and password.',
+        description: mounted ? t('login.enter_both') : 'Please enter both email and password.',
         variant: 'destructive',
       });
       return;
     }
 
-    loginMutation.mutate({ username, password });
+    loginMutation.mutate({ email, password });
   };
 
   return (
@@ -206,22 +206,22 @@ export default function LoginPage() {
 
         <CardContent className="pb-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Username field with icon prefix */}
+            {/* Email field with icon prefix */}
             <div className="space-y-2">
               <Label
-                htmlFor="username"
+                htmlFor="email"
                 className="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                {mounted ? t('login.username') : 'Username'}
+                {mounted ? t('login.username') : 'Username or Email'}
               </Label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500 pointer-events-none" />
                 <Input
-                  id="username"
+                  id="email"
                   type="text"
-                  placeholder={mounted ? t('login.username.placeholder') : 'Enter your username'}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={mounted ? t('login.username.placeholder') : 'Enter your email or username'}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   disabled={loginMutation.isPending}
                   className={cn(
                     'rounded-[30px] pl-12 pr-4 h-12',

@@ -66,6 +66,7 @@ import {
   Download,
   Share2,
 } from 'lucide-react';
+import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 
 /**
  * Status badge configuration
@@ -624,6 +625,11 @@ export default function KeyDetailPage() {
               <div className="pt-4 border-t border-border/50">
                 <p className="text-sm font-medium mb-2">Live Activity</p>
                 <TrafficGraph serverId={key.server.id} outlineKeyId={key.outlineKeyId} />
+              </div>
+
+              {/* Historical Chart */}
+              <div className="pt-4 border-t border-border/50">
+                <TrafficHistoryChart accessKeyId={key.id} />
               </div>
             </CardContent>
           </Card>

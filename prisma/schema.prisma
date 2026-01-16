@@ -27,16 +27,14 @@ datasource db {
 
 model User {
   id           String    @id @default(cuid())
-  username     String    @unique
-  email        String?   @unique
-  passwordHash String
-  role         String    @default("ADMIN") // Valid: ADMIN, STAFF, VIEWER
-  totpSecret   String?
-  totpEnabled  Boolean   @default(false)
-  lastLoginAt  DateTime?
-  lastLoginIp  String?
+  email        String    @unique
+  passwordHash String?   // Nullable for passwordless/magic link flow if we go that route
+  role         String    @default("USER") // Valid: ADMIN, USER
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  // Relations
+  accessKeys   AccessKey[]
   sessions     Session[]
 }
 
@@ -114,6 +112,10 @@ model AccessKey {
   email        String?
   telegramId   String?
   notes        String?
+
+  // User Ownership
+  userId       String?
+  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Server relation
   serverId String
@@ -217,7 +219,10 @@ model TrafficLog {
   accessKeyId String
   accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
 
-  bytesUsed  BigInt
+  // Historical Analytics (Phase 8)
+  bytesUsed   BigInt   // Cumulative at time of log
+  deltaBytes  BigInt   @default(0) // Usage since last log
+  
   recordedAt DateTime @default(now())
 
   @@index([accessKeyId, recordedAt])

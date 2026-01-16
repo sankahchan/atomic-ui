@@ -66,40 +66,40 @@ function StatCard({
   href?: string;
 }) {
   const content = (
-    <Card className="stat-card group cursor-pointer">
-      <CardContent className="p-6">
+    <Card className="stat-card group cursor-pointer hover:border-primary/50 transition-colors">
+      <CardContent className="p-4">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold">{value}</p>
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold">{value}</p>
             {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="text-[10px] text-muted-foreground">{description}</p>
             )}
           </div>
           <div className={cn(
-            'p-3 rounded-xl transition-colors',
+            'p-2 rounded-lg transition-colors',
             'bg-primary/10 text-primary',
             'group-hover:bg-primary group-hover:text-primary-foreground'
           )}>
-            <Icon className="w-5 h-5" />
+            <Icon className="w-4 h-4" />
           </div>
         </div>
 
         {trend && trendValue && (
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2">
             {trend === 'up' && (
-              <span className="flex items-center text-green-500 text-sm">
-                <ArrowUpRight className="w-4 h-4" />
+              <span className="flex items-center text-green-500 text-xs">
+                <ArrowUpRight className="w-3 h-3" />
                 {trendValue}
               </span>
             )}
             {trend === 'down' && (
-              <span className="flex items-center text-red-500 text-sm">
-                <ArrowDownRight className="w-4 h-4" />
+              <span className="flex items-center text-red-500 text-xs">
+                <ArrowDownRight className="w-3 h-3" />
                 {trendValue}
               </span>
             )}
-            <span className="text-xs text-muted-foreground">vs last week</span>
+            <span className="text-[10px] text-muted-foreground">vs last week</span>
           </div>
         )}
       </CardContent>
@@ -151,47 +151,39 @@ function ServerStatusCard({
 
   return (
     <Link href={`/dashboard/servers/${server.id}`}>
-      <Card className="hover:border-primary/30 transition-colors cursor-pointer">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+      <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               {server.countryCode && (
-                <span className="text-lg">{getCountryFlag(server.countryCode)}</span>
+                <span className="text-base">{getCountryFlag(server.countryCode)}</span>
               )}
-              <span className="font-medium">{server.name}</span>
+              <span className="font-medium text-sm truncate max-w-[100px]">{server.name}</span>
             </div>
             <div className={cn(
-              'w-2 h-2 rounded-full',
+              'w-1.5 h-1.5 rounded-full',
               statusColors[server.status as keyof typeof statusColors] || 'bg-gray-500'
             )} />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-sm">
+          <div className="grid grid-cols-3 gap-1 text-xs">
             <div>
-              <p className="text-muted-foreground text-xs">Status</p>
+              <p className="text-muted-foreground text-[10px]">Status</p>
               <div className="flex items-center gap-1 mt-0.5">
-                <StatusIcon className="w-3.5 h-3.5" />
+                <StatusIcon className="w-3 h-3" />
                 <span className="font-medium">{server.status}</span>
               </div>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Latency</p>
+              <p className="text-muted-foreground text-[10px]">Latency</p>
               <p className="font-medium mt-0.5">
                 {server.latencyMs ? `${server.latencyMs}ms` : '-'}
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Keys</p>
+              <p className="text-muted-foreground text-[10px]">Keys</p>
               <p className="font-medium mt-0.5">{server.keyCount}</p>
             </div>
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">{t('dashboard.uptime')}</span>
-              <span className="font-medium">{server.uptimePercent.toFixed(1)}%</span>
-            </div>
-            <Progress value={server.uptimePercent} className="h-1.5" />
           </div>
         </CardContent>
       </Card>
@@ -228,16 +220,16 @@ function AlertItem({
 
   return (
     <div className={cn(
-      'flex items-start gap-3 p-3 rounded-lg border',
+      'flex items-start gap-2 p-2 rounded-md border text-xs',
       style.bg,
       style.border
     )}>
-      <Icon className={cn('w-5 h-5 mt-0.5 flex-shrink-0', style.iconColor)} />
+      <Icon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', style.iconColor)} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+        <p className="font-medium">{title}</p>
+        <p className="text-[10px] text-muted-foreground truncate">{description}</p>
       </div>
-      <span className="text-xs text-muted-foreground whitespace-nowrap">{time}</span>
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{time}</span>
     </div>
   );
 }
@@ -268,10 +260,10 @@ export default function DashboardPage() {
   // Loading state
   if (statsLoading || !mounted) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-4 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-36 bg-muted rounded-xl" />
+            <div key={i} className="h-24 bg-muted rounded-xl" />
           ))}
         </div>
       </div>
@@ -279,28 +271,46 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
-        <p className="text-muted-foreground">
-          {t('dashboard.welcome')}
-        </p>
+    <div className="space-y-4 h-[calc(100vh-theme(spacing.20))] overflow-hidden flex flex-col">
+      {/* Page header - Compact */}
+      <div className="flex items-center justify-between shrink-0">
+        <div>
+          <h1 className="text-xl font-bold">{t('dashboard.title')}</h1>
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            {t('dashboard.welcome')}
+          </p>
+        </div>
+
+        {/* Quick Actions Inline */}
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/servers/new">
+            <Button size="sm" variant="outline" className="h-8 gap-2">
+              <Server className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('dashboard.add_server')}</span>
+            </Button>
+          </Link>
+          <Link href="/dashboard/keys/new">
+            <Button size="sm" variant="outline" className="h-8 gap-2">
+              <Key className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('dashboard.create_key')}</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
         <StatCard
           title={t('dashboard.total_servers')}
           value={stats?.totalServers || 0}
-          description={`${stats?.activeServers || 0} ${t('dashboard.active')}, ${stats?.downServers || 0} ${t('dashboard.down')}`}
+          description={`${stats?.activeServers || 0} active, ${stats?.downServers || 0} down`}
           icon={Server}
           href="/dashboard/servers"
         />
         <StatCard
           title={t('dashboard.total_keys')}
           value={stats?.totalKeys || 0}
-          description={`${stats?.activeKeys || 0} ${t('dashboard.active')}, ${stats?.expiredKeys || 0} ${t('dashboard.expired')}`}
+          description={`${stats?.activeKeys || 0} active`}
           icon={Key}
           href="/dashboard/keys"
         />
@@ -319,229 +329,131 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Traffic & System Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Traffic Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-primary" />
+      {/* Main Content Area - Scrollable if needed, but designed to fit */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0 flex-1">
+        {/* Left Column: Traffic & Servers */}
+        <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
+          {/* Traffic Chart */}
+          <Card className="flex-1 min-h-[200px] flex flex-col overflow-hidden">
+            <CardHeader className="p-4 pb-2 shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
                   {t('dashboard.traffic_overview')}
                 </CardTitle>
-                <CardDescription>
-                  Bandwidth usage over time
-                </CardDescription>
+                <Select
+                  value={trafficDays.toString()}
+                  onValueChange={(value) => setTrafficDays(parseInt(value))}
+                >
+                  <SelectTrigger className="w-[100px] h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select
-                value={trafficDays.toString()}
-                onValueChange={(value) => setTrafficDays(parseInt(value))}
-              >
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="14">Last 14 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {trafficLoading ? (
-              <div className="h-[300px] bg-muted rounded-lg animate-pulse" />
-            ) : trafficHistory && trafficHistory.length > 0 ? (
-              <TrafficChart data={trafficHistory} type="area" height={300} />
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No traffic data available yet</p>
-                  <p className="text-sm">Traffic will appear here after keys are used</p>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 flex-1 min-h-0">
+              {trafficLoading ? (
+                <div className="h-full bg-muted/20 rounded-lg animate-pulse" />
+              ) : trafficHistory && trafficHistory.length > 0 ? (
+                <div className="-ml-4 h-full w-full">
+                  <TrafficChart data={trafficHistory} type="area" height="100%" />
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <p className="text-xs">No traffic data</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* System Status */}
-        <div className="lg:col-span-1">
-          <SystemStatus />
-        </div>
-      </div>
-
-      {/* Two-column layout for detailed sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Server status section - takes 2 columns */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-primary" />
+          {/* Server Status Grid - Compact */}
+          <Card className="flex-1 min-h-[180px] overflow-hidden flex flex-col">
+            <CardHeader className="p-4 pb-2 border-b shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-primary" />
                   {t('dashboard.server_status')}
                 </CardTitle>
-                <CardDescription>
-                  Real-time health status of your Outline servers
-                </CardDescription>
-              </div>
-              <Link href="/dashboard/servers">
-                <Badge variant="outline" className="cursor-pointer hover:bg-muted">
-                  {t('dashboard.view_all')}
-                </Badge>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {serversLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : serverStatus && serverStatus.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {serverStatus.slice(0, 6).map((server) => (
-                  <ServerStatusCard key={server.id} server={server} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Server className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No servers configured yet.</p>
-                <Link href="/dashboard/servers" className="text-primary hover:underline text-sm">
-                  Add your first server
+                <Link href="/dashboard/servers" className="text-xs text-primary hover:underline">
+                  View all
                 </Link>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="p-4 overflow-y-auto">
+              {serversLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="h-24 bg-muted rounded-lg animate-pulse" />
+                  <div className="h-24 bg-muted rounded-lg animate-pulse" />
+                </div>
+              ) : serverStatus && serverStatus.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {serverStatus.slice(0, 4).map((server) => (
+                    <ServerStatusCard key={server.id} server={server} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  No servers online
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Alerts & Activity section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />
-                  {t('dashboard.alerts')}
-                </CardTitle>
-                <CardDescription>
-                  Recent events and notifications
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+        {/* Right Column: System & Alerts */}
+        <div className="flex flex-col gap-4 min-h-0">
+          {/* System Status - Fixed height */}
+          <div className="shrink-0">
+            <SystemStatus />
+          </div>
+
+          {/* Alerts - Fills remaining space */}
+          <Card className="flex-1 min-h-[150px] flex flex-col overflow-hidden">
+            <CardHeader className="p-4 pb-2 shrink-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Zap className="w-4 h-4 text-primary" />
+                {t('dashboard.alerts')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 overflow-y-auto space-y-2">
+              {/* Alerts Logic */}
               {stats?.downServers && stats.downServers > 0 && (
                 <AlertItem
                   type="error"
                   title="Servers Down"
-                  description={`${stats.downServers} server(s) are currently unreachable`}
+                  description={`${stats.downServers} server(s) unreachable`}
                   time="Now"
                 />
               )}
-
               {stats?.expiringIn24h && stats.expiringIn24h > 0 && (
                 <AlertItem
                   type="warning"
                   title="Keys Expiring"
-                  description={`${stats.expiringIn24h} key(s) will expire in 24 hours`}
+                  description={`${stats.expiringIn24h} keys expiring soon`}
                   time="Soon"
                 />
               )}
-
-              {stats?.depletedKeys && stats.depletedKeys > 0 && (
-                <AlertItem
-                  type="warning"
-                  title="Traffic Depleted"
-                  description={`${stats.depletedKeys} key(s) have exhausted their data limit`}
-                  time="Recent"
-                />
-              )}
-
-              {activityLoading ? (
-                <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : activity?.recentKeys && activity.recentKeys.length > 0 ? (
+              {activity?.recentKeys && activity.recentKeys.length > 0 ? (
                 activity.recentKeys.slice(0, 5).map((key) => (
                   <AlertItem
                     key={key.id}
                     type="info"
                     title="Key Created"
-                    description={`${key.name} on ${key.serverName}`}
+                    description={`${key.name}`}
                     time={formatRelativeTime(key.createdAt)}
                   />
                 ))
               ) : (
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  No recent activity
-                </div>
+                <p className="text-center text-xs text-muted-foreground py-4">No recent alerts</p>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* Quick actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common tasks you might want to perform
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link href="/dashboard/servers/new">
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
-                <Server className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium">{t('dashboard.add_server')}</p>
-                  <p className="text-xs text-muted-foreground">Connect new Outline server</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/dashboard/keys/new">
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
-                <Key className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium">{t('dashboard.create_key')}</p>
-                  <p className="text-xs text-muted-foreground">Generate new access key</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/dashboard/health">
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
-                <Activity className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium">{t('dashboard.health_check')}</p>
-                  <p className="text-xs text-muted-foreground">Monitor server health</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/dashboard/notifications">
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
-                <Activity className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium">{t('dashboard.configure_alerts')}</p>
-                  <p className="text-xs text-muted-foreground">Configure alerts</p>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div >
+    </div>
   );
 }

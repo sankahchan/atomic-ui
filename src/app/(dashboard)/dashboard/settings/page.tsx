@@ -707,9 +707,9 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-6">
                   <User className="w-8 h-8 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">{currentUser.username}</p>
+                    <p className="font-medium">{currentUser.email}</p>
                     <p className="text-sm text-muted-foreground">
-                      {currentUser.email || 'No email set'} • {currentUser.role}
+                      {currentUser.role}
                     </p>
                   </div>
                 </div>

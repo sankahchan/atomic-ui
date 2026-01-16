@@ -272,7 +272,7 @@ function Header({
   onLogout,
 }: {
   onMenuClick: () => void;
-  user: { username: string; role: string } | null;
+  user: { email: string; role: string } | null;
   onLogout: () => void;
 }) {
   const { theme, setTheme } = useTheme();
@@ -323,7 +323,7 @@ function Header({
           {user && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
               <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{user.username}</span>
+              <span className="text-sm font-medium">{user.email}</span>
               <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
                 {user.role}
               </span>

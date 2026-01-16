@@ -30,7 +30,7 @@ interface TrafficDataPoint {
 interface TrafficChartProps {
   data: TrafficDataPoint[];
   type?: 'area' | 'bar';
-  height?: number;
+  height?: number | string;
   showGrid?: boolean;
   color?: string;
 }

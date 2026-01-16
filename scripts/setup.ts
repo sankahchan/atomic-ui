@@ -27,28 +27,28 @@ async function main() {
   console.log('========================\n');
 
   // Get credentials from environment or use defaults
-  const adminUsername = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
+  const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com';
   const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
 
   // Check if admin user exists
   console.log('📊 Checking database...');
-  
+
   const existingAdmin = await prisma.user.findUnique({
-    where: { username: adminUsername },
+    where: { email: adminEmail },
   });
 
   if (existingAdmin) {
-    console.log(`✅ Admin user "${adminUsername}" already exists.`);
+    console.log(`✅ Admin user "${adminEmail}" already exists.`);
     console.log('\n💡 To change the password, run: npm run password:change');
   } else {
     // Create admin user
     console.log('👤 Creating admin user...');
-    
+
     const passwordHash = await bcrypt.hash(adminPassword, 12);
-    
+
     await prisma.user.create({
       data: {
-        username: adminUsername,
+        email: adminEmail,
         passwordHash,
         role: 'ADMIN',
       },
@@ -57,7 +57,7 @@ async function main() {
     console.log('✅ Admin user created successfully!\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🔐 Login Credentials:');
-    console.log(`   Username: ${adminUsername}`);
+    console.log(`   Email:    ${adminEmail}`);
     console.log(`   Password: ${adminPassword}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('⚠️  Please change the password after first login!\n');
@@ -65,7 +65,7 @@ async function main() {
 
   // Create default settings if they don't exist
   console.log('⚙️  Checking default settings...');
-  
+
   const defaultSettings = [
     { key: 'siteName', value: '"Atomic-UI"' },
     { key: 'siteDescription', value: '"Outline VPN Management Panel"' },

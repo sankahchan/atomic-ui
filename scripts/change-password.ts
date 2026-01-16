@@ -42,14 +42,14 @@ function prompt(question: string): Promise<string> {
 function promptPassword(question: string): Promise<string> {
   return new Promise((resolve) => {
     process.stdout.write(question);
-    
+
     const stdin = process.stdin;
     stdin.setRawMode(true);
     stdin.resume();
     stdin.setEncoding('utf8');
-    
+
     let password = '';
-    
+
     stdin.on('data', (ch: string) => {
       if (ch === '\r' || ch === '\n') {
         stdin.setRawMode(false);
@@ -80,29 +80,29 @@ async function main() {
   console.log('==================================\n');
 
   try {
-    // Get username
-    const username = await prompt('Enter username: ');
-    
-    if (!username.trim()) {
-      console.log('❌ Username cannot be empty.');
+    // Get email
+    const email = await prompt('Enter email: ');
+
+    if (!email.trim()) {
+      console.log('❌ Email cannot be empty.');
       process.exit(1);
     }
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { username: username.trim() },
+      where: { email: email.trim() },
     });
 
     if (!user) {
-      console.log(`❌ User "${username}" not found.`);
+      console.log(`❌ User "${email}" not found.`);
       process.exit(1);
     }
 
-    console.log(`\n✅ Found user: ${user.username} (${user.role})\n`);
+    console.log(`\n✅ Found user: ${user.email} (${user.role})\n`);
 
     // Get new password
     const newPassword = await promptPassword('Enter new password: ');
-    
+
     if (newPassword.length < 6) {
       console.log('\n❌ Password must be at least 6 characters.');
       process.exit(1);
@@ -110,7 +110,7 @@ async function main() {
 
     // Confirm password
     const confirmPassword = await promptPassword('Confirm new password: ');
-    
+
     if (newPassword !== confirmPassword) {
       console.log('\n❌ Passwords do not match.');
       process.exit(1);
@@ -118,9 +118,9 @@ async function main() {
 
     // Hash and update password
     console.log('\n⏳ Updating password...');
-    
+
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    
+
     await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash },
@@ -132,7 +132,7 @@ async function main() {
     });
 
     console.log('✅ Password updated successfully!');
-    
+
     if (deletedSessions.count > 0) {
       console.log(`📤 ${deletedSessions.count} session(s) invalidated.`);
     }

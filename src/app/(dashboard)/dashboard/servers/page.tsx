@@ -44,6 +44,7 @@ import {
   Globe,
   ArrowUpDown,
   Zap,
+  Cloud,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 
@@ -700,10 +701,18 @@ export default function ServersPage() {
             {t('servers.subtitle')}
           </p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          {t('servers.add')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary">
+            <Link href="/dashboard/servers/deploy">
+              <Cloud className="mr-2 h-4 w-4" />
+              Deploy New
+            </Link>
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            {t('servers.add')}
+          </Button>
+        </div>
       </div>
 
       {/* Search and filters */}

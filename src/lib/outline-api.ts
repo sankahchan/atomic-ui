@@ -205,8 +205,8 @@ export class OutlineClient {
    * Set the default data limit for all access keys
    */
   async setDefaultDataLimit(bytes: number): Promise<void> {
-    await this.request('PUT', '/server/access-key-data-limit', { 
-      limit: { bytes } 
+    await this.request('PUT', '/server/access-key-data-limit', {
+      limit: { bytes }
     });
   }
 
@@ -326,6 +326,17 @@ export class OutlineClient {
     return this.request<OutlineMetrics>('GET', '/metrics/transfer');
   }
 
+  /**
+   * Get data usage for all access keys
+   * Returns a map of Key ID -> Bytes Used
+   */
+  async getDataUsage(): Promise<{ bytesByAccessKey: Record<string, number> }> {
+    const metrics = await this.getMetrics();
+    return {
+      bytesByAccessKey: metrics.bytesTransferredByUserId,
+    };
+  }
+
   // ============================================
   // Health Check
   // ============================================
@@ -336,7 +347,7 @@ export class OutlineClient {
    */
   async healthCheck(): Promise<number> {
     const startTime = Date.now();
-    
+
     try {
       await this.getServerInfo();
       return Date.now() - startTime;
@@ -396,11 +407,11 @@ export function parseOutlineConfig(config: string): { apiUrl: string; certSha256
  */
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
-  
+
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const k = 1024;
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${units[i]}`;
 }
 

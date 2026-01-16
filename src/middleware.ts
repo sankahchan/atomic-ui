@@ -95,7 +95,37 @@ export async function middleware(request: NextRequest) {
   // so we only check that the token is structurally valid. Full session
   // validation happens in the tRPC context.
   try {
-    await jwtVerify(sessionToken, getJwtSecret());
+    const { payload } = await jwtVerify(sessionToken, getJwtSecret());
+    const role = payload.role as string;
+
+    // Role-based Access Control (RBAC)
+    // Redirect USER role trying to access admin dashboard
+    if (role === 'USER' && pathname.startsWith('/dashboard')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/portal';
+      return NextResponse.redirect(url);
+    }
+
+    // Redirect ADMIN role trying to access user portal (optional, but keeps things clean)
+    if (role === 'ADMIN' && pathname.startsWith('/portal')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
+
+    // Redirect USER accessing root to portal
+    if (role === 'USER' && pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/portal';
+      return NextResponse.redirect(url);
+    }
+
+    // Redirect ADMIN accessing root to dashboard
+    if (role === 'ADMIN' && pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
 
     // Token is valid, allow the request to proceed
     return NextResponse.next();

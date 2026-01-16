@@ -133,14 +133,21 @@ export const keysRouter = router({
    * 
    * Supports filtering by server, status, and search term.
    * Returns paginated results with usage statistics.
+   * 
+   * For non-admin users, restricts results to their own keys.
    */
   list: protectedProcedure
     .input(listKeysSchema)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const { serverId, status, search, page, pageSize } = input;
 
       // Build the where clause
       const where: Record<string, unknown> = {};
+
+      // Role-based filtering: Users see only their own keys
+      if (ctx.user.role !== 'ADMIN') {
+        where.userId = ctx.user.id;
+      }
 
       if (serverId) {
         where.serverId = serverId;
@@ -215,7 +222,7 @@ export const keysRouter = router({
    */
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.id },
         include: {
@@ -240,6 +247,14 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found',
+        });
+      }
+
+      // Authorization check: User can only access their own key
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
         });
       }
 

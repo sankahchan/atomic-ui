@@ -24,6 +24,8 @@ import { telegramBotRouter } from './telegram-bot';
 import { archivedKeysRouter } from './archived-keys';
 import { systemRouter } from './system';
 import { backupRouter } from './backup';
+import { analyticsRouter } from './analytics';
+import { provisionRouter } from './provision';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
@@ -47,7 +49,7 @@ import {
  */
 const authRouter = router({
   /**
-   * Login with username and password.
+   * Login with email and password.
    * 
    * On success, creates a session and sets the authentication cookie.
    * Returns the authenticated user's public information.
@@ -55,27 +57,26 @@ const authRouter = router({
   login: publicProcedure
     .input(
       z.object({
-        username: z.string().min(1),
+        email: z.string().min(1),
         password: z.string().min(1),
       })
     )
     .mutation(async ({ input }) => {
-      const user = await authenticateUser(input.username, input.password);
+      const user = await authenticateUser(input.email, input.password);
 
       if (!user) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',
-          message: 'Invalid username or password',
+          message: 'Invalid email or password',
         });
       }
 
       // Create session and set cookie
-      const token = await createSession(user.id, user.username, user.role);
+      const token = await createSession(user.id, user.email, user.role);
       await setSessionCookie(token);
 
       return {
         id: user.id,
-        username: user.username,
         email: user.email,
         role: user.role,
       };
@@ -119,7 +120,7 @@ const authRouter = router({
         where: { id: ctx.user.id },
       });
 
-      if (!user) {
+      if (!user || !user.email) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'User not found',
@@ -127,7 +128,7 @@ const authRouter = router({
       }
 
       // Verify current password
-      const isValid = await authenticateUser(user.username, input.currentPassword);
+      const isValid = await authenticateUser(user.email, input.currentPassword);
       if (!isValid) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -538,6 +539,8 @@ export const appRouter = router({
   telegramBot: telegramBotRouter,
   system: systemRouter,
   backup: backupRouter,
+  analytics: analyticsRouter,
+  provision: provisionRouter,
 });
 
 /**
