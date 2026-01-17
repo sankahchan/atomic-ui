@@ -101,13 +101,7 @@ export function SessionProvider({
                 window.removeEventListener(event, throttledHandler);
             });
         };
-    }, [pathname, timeoutMinutes, lastActivity]); // Removed logout from deps as it's stable (function reference might change but logic doesn't depend on props)
-    // Actually, best to keep logout stable or suppress if it causes loops. here logout is defined inside component so it changes every render.
-    // To solve this properly, wrap logout in useCallback or move outside.
-    // For now, I'll memoize logout or just suppress the lint warning if it persists, but let's try to make it clean.
-
-    // Better Strategy: Move logout inside useEffect or wrap in useCallback.
-    // However, for this fix I will just include it in deps and assume no infinite loop (router/toast are stable-ish).
+    }, [pathname, timeoutMinutes, lastActivity, logout]);
 
     return (
         <SessionContext.Provider value={{ lastActivity }}>

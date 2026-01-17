@@ -283,13 +283,13 @@ export default function DashboardPage() {
 
         {/* Quick Actions Inline */}
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/servers/new">
+          <Link href="/dashboard/servers">
             <Button size="sm" variant="outline" className="h-8 gap-2">
               <Server className="w-4 h-4" />
               <span className="hidden sm:inline">{t('dashboard.add_server')}</span>
             </Button>
           </Link>
-          <Link href="/dashboard/keys/new">
+          <Link href="/dashboard/keys">
             <Button size="sm" variant="outline" className="h-8 gap-2">
               <Key className="w-4 h-4" />
               <span className="hidden sm:inline">{t('dashboard.create_key')}</span>

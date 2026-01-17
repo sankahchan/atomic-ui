@@ -119,7 +119,7 @@ export function CoverImagePicker({
   };
 
   // Handle file upload
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({ title: 'Invalid file type', description: 'Please upload an image', variant: 'destructive' });
       return;
@@ -159,7 +159,7 @@ export function CoverImagePicker({
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [keyId, onCoverChange, onOpenChange, toast]);
 
   // Handle drag and drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -177,7 +177,7 @@ export function CoverImagePicker({
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFileUpload(file);
-  }, [keyId]);
+  }, [handleFileUpload]);
 
   // Handle Unsplash search
   const handleUnsplashSearch = async () => {
