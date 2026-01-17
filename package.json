@@ -20,7 +20,7 @@
     "setup": "npx tsx scripts/setup.ts",
     "change-password": "npx tsx scripts/change-credentials.ts",
     "password:change": "tsx scripts/change-password.ts",
-    "postinstall": "prisma generate && npx tsx scripts/fix-null-email.ts"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

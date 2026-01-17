@@ -19,7 +19,7 @@
 # for building. The node_modules are cached in this layer for faster rebuilds.
 
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # Copy package files
@@ -47,7 +47,7 @@ RUN npx prisma generate
 
 # Build the application
 # Disable telemetry during build
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ==============================================================================
@@ -57,11 +57,12 @@ RUN npm run build
 # to run the application, resulting in a smaller and more secure image.
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 # Set production environment
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
@@ -92,7 +93,7 @@ USER nextjs
 EXPOSE 3000
 
 # Set the port environment variable
-ENV PORT 3000
+ENV PORT=3000
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
