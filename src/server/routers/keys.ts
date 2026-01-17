@@ -771,7 +771,8 @@ export const keysRouter = router({
       // The subscription URL format - clients can fetch this to get the access URL
       // This will be handled by a public API endpoint
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const subscriptionUrl = `${baseUrl}/api/subscription/${token}`;
+      const basePath = process.env.PANEL_PATH || '';
+      const subscriptionUrl = `${baseUrl}${basePath}/api/subscription/${token}`;
 
       return {
         subscriptionUrl,

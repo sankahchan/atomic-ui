@@ -9,6 +9,11 @@ const nextConfig = {
   // Leave empty for root access, or set PANEL_PATH=/yourpath
   basePath: panelPath,
 
+  // Expose the base path to the client for generating correct subscription URLs
+  env: {
+    NEXT_PUBLIC_BASE_PATH: panelPath,
+  },
+
   // External packages for server components (required for Prisma)
   experimental: {
     instrumentationHook: true,

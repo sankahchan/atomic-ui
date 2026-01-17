@@ -535,7 +535,7 @@ export default function KeyDetailPage() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
                     {typeof window !== 'undefined'
-                      ? `${window.location.origin}/api/subscription/${key.subscriptionToken}`
+                      ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/subscription/${key.subscriptionToken}`
                       : `/api/subscription/${key.subscriptionToken}`}
                   </div>
                   <Button
@@ -544,7 +544,7 @@ export default function KeyDetailPage() {
                     onClick={() =>
                       copyToClipboard(
                         typeof window !== 'undefined'
-                          ? `${window.location.origin}/api/subscription/${key.subscriptionToken}`
+                          ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/subscription/${key.subscriptionToken}`
                           : `/api/subscription/${key.subscriptionToken}`,
                         'Subscription URL'
                       )
