@@ -2,8 +2,9 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BackupSettings } from "./_components/backup-settings";
+import { SubscriptionSettings } from "./_components/subscription-settings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Shield, User } from "lucide-react";
+import { Settings, Shield, User, Palette } from "lucide-react";
 
 export default function SettingsPage() {
     return (
@@ -15,8 +16,16 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            <Tabs defaultValue="backup" className="space-y-4">
+            <Tabs defaultValue="subscription" className="space-y-4">
                 <TabsList>
+                    <TabsTrigger value="subscription">
+                        <Palette className="w-4 h-4 mr-2" />
+                        Subscription Page
+                    </TabsTrigger>
+                    <TabsTrigger value="backup">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Backup & Restore
+                    </TabsTrigger>
                     <TabsTrigger value="general" disabled>
                         <Settings className="w-4 h-4 mr-2" />
                         General
@@ -25,11 +34,11 @@ export default function SettingsPage() {
                         <User className="w-4 h-4 mr-2" />
                         Account
                     </TabsTrigger>
-                    <TabsTrigger value="backup">
-                        <Shield className="w-4 h-4 mr-2" />
-                        Backup & Restore
-                    </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="subscription">
+                    <SubscriptionSettings />
+                </TabsContent>
 
                 <TabsContent value="general">
                     <Card>

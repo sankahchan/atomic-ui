@@ -65,7 +65,11 @@ import {
   Link2,
   Download,
   Share2,
+  Eye,
+  Palette,
+  ExternalLink,
 } from 'lucide-react';
+import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 
 /**
@@ -322,8 +326,182 @@ function DeleteKeyDialog({
 }
 
 /**
+ * SubscriptionShareCard Component
+ *
+ * Card for sharing the subscription page with theme selection and preview.
+ */
+function SubscriptionShareCard({
+  keyId,
+  subscriptionToken,
+  currentTheme,
+  onThemeChange,
+}: {
+  keyId: string;
+  subscriptionToken: string | null;
+  currentTheme: string | null;
+  onThemeChange: () => void;
+}) {
+  const { toast } = useToast();
+  const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const updateThemeMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Theme updated',
+        description: 'The subscription page theme has been updated.',
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleThemeChange = (themeId: string) => {
+    setSelectedTheme(themeId);
+    updateThemeMutation.mutate({
+      id: keyId,
+      subscriptionTheme: themeId,
+    } as any);
+  };
+
+  const getSubscriptionPageUrl = () => {
+    if (typeof window === 'undefined' || !subscriptionToken) return '';
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    return `${window.location.origin}${basePath}/sub/${subscriptionToken}`;
+  };
+
+  const copySubscriptionPageUrl = async () => {
+    const url = getSubscriptionPageUrl();
+    await navigator.clipboard.writeText(url);
+    toast({
+      title: 'Copied!',
+      description: 'Subscription page URL copied to clipboard.',
+    });
+  };
+
+  const theme = getTheme(selectedTheme);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Share2 className="w-5 h-5 text-primary" />
+          Share Page
+        </CardTitle>
+        <CardDescription>
+          Share a beautiful subscription page with your user
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Theme Selector */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            Page Theme
+          </Label>
+          <Select value={selectedTheme} onValueChange={handleThemeChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              {themeList.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: t.bgPrimary, borderColor: t.accent }}
+                    />
+                    {t.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Theme Preview */}
+        <div
+          className="rounded-lg p-4 border transition-colors"
+          style={{
+            backgroundColor: theme.bgPrimary,
+            borderColor: theme.border,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+              style={{ backgroundColor: theme.bgCard }}
+            >
+              📊
+            </div>
+            <div>
+              <div className="text-sm font-medium" style={{ color: theme.textPrimary }}>
+                Preview
+              </div>
+              <div className="text-xs" style={{ color: theme.textMuted }}>
+                {theme.name} Theme
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <div
+              className="flex-1 h-2 rounded-full"
+              style={{ backgroundColor: theme.progressBg }}
+            >
+              <div
+                className="h-full rounded-full w-2/3"
+                style={{ backgroundColor: theme.progressFill }}
+              />
+            </div>
+          </div>
+          <div
+            className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
+            style={{
+              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+              color: '#fff',
+            }}
+          >
+            Add to Outline
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              const url = getSubscriptionPageUrl();
+              if (url) window.open(url, '_blank');
+            }}
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Preview
+          </Button>
+          <Button className="flex-1" onClick={copySubscriptionPageUrl}>
+            <Copy className="w-4 h-4 mr-2" />
+            Copy Link
+          </Button>
+        </div>
+
+        {/* URL Display */}
+        <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
+          {getSubscriptionPageUrl() || 'No subscription token'}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * KeyDetailPage Component
- * 
+ *
  * The main page component that fetches and displays all information about
  * a specific access key. It provides a comprehensive overview with action
  * buttons for common management tasks.
@@ -760,6 +938,14 @@ export default function KeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Subscription Page Share */}
+          <SubscriptionShareCard
+            keyId={key.id}
+            subscriptionToken={key.subscriptionToken}
+            currentTheme={(key as any).subscriptionTheme}
+            onThemeChange={() => refetch()}
+          />
         </div>
       </div>
 

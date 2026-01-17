@@ -159,6 +159,10 @@ model AccessKey {
   // Subscription
   subscriptionToken String? @unique
 
+  // Subscription page theme (overrides global default)
+  // Valid themes: dark, light, purple, blue, green, orange, pink, red
+  subscriptionTheme String?
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   trafficLogs TrafficLog[]

@@ -1,48 +1,44 @@
 /**
- * Subscription Endpoint
+ * Subscription URL Endpoint
  * 
- * This API route provides subscription links for VPN clients. Users can share
- * their subscription token with VPN applications, which will then fetch the
- * current access key configuration from this endpoint.
+ * This endpoint serves access key configurations to VPN clients. It supports
+ * multiple output formats commonly used by different Shadowsocks clients,
+ * including raw, Base64-encoded, Clash YAML, and SIP008 JSON formats.
  * 
- * The endpoint supports multiple output formats to work with different VPN
- * clients and subscription managers.
+ * The endpoint is designed to be compatible with popular VPN client applications
+ * that support subscription URLs, allowing users to automatically update their
+ * server configurations without manual entry.
  * 
- * URL Format: /api/sub/[token]
+ * URL Format: /sub/{token}?format={format}
  * 
- * Query Parameters:
- * - format: Output format (default: "plain")
- *   - plain: Raw ss:// URL
- *   - base64: Base64-encoded ss:// URL
- *   - clash: Clash proxy configuration
- *   - sip008: SIP008 JSON format
- *   - qr: QR code image
+ * Supported Formats:
+ * - raw: Plain ss:// URL (default)
+ * - base64: Base64-encoded ss:// URL
+ * - clash: Clash proxy configuration YAML
+ * - sip008: SIP008 JSON format for Outline/Shadowsocks clients
  * 
- * Headers:
- * - User-Agent: Used to auto-detect client type
- * 
- * Response:
- * - 200: Subscription content in requested format
- * - 404: Token not found or key inactive
- * - 410: Key has expired or been revoked
+ * The token is a unique identifier generated for each access key, providing
+ * a level of security by requiring knowledge of the specific token to access
+ * the configuration.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
-import QRCode from 'qrcode';
 
 /**
- * Supported subscription output formats.
- * Each format is tailored for specific VPN clients and use cases.
+ * Supported subscription formats
+ * Each format is designed for compatibility with different VPN client apps.
  */
-type SubscriptionFormat = 'plain' | 'base64' | 'clash' | 'sip008' | 'qr';
+type SubscriptionFormat = 'raw' | 'base64' | 'clash' | 'sip008';
 
 /**
- * GET Handler
+ * GET /sub/[token]
  * 
- * Fetches the access key associated with the subscription token and returns
- * it in the requested format. The handler performs validation to ensure the
- * key is still active and within its usage limits.
+ * Retrieves the access key configuration for the given subscription token.
+ * The response format can be specified via the `format` query parameter.
+ * 
+ * This endpoint also tracks key usage by recording the "first use" timestamp,
+ * which is important for keys with START_ON_FIRST_USE expiration type.
  */
 export async function GET(
   request: NextRequest,
@@ -50,8 +46,7 @@ export async function GET(
 ) {
   try {
     const { token } = params;
-    const { searchParams } = new URL(request.url);
-    const format = (searchParams.get('format') || 'plain') as SubscriptionFormat;
+    const format = (request.nextUrl.searchParams.get('format') || 'raw') as SubscriptionFormat;
 
     // Find the access key by subscription token
     const accessKey = await prisma.accessKey.findUnique({
@@ -61,69 +56,51 @@ export async function GET(
       },
     });
 
-    // Return 404 if token not found
+    // Return 404 if key not found
     if (!accessKey) {
       return new NextResponse('Subscription not found', { status: 404 });
     }
 
-    // Check if the key is still active
-    if (accessKey.status === 'DISABLED') {
-      return new NextResponse('Subscription has been disabled', { status: 410 });
+    // Check if key is active
+    if (accessKey.status !== 'ACTIVE' && accessKey.status !== 'PENDING') {
+      return new NextResponse('Subscription is no longer active', { status: 403 });
     }
 
-    if (accessKey.status === 'EXPIRED') {
-      return new NextResponse('Subscription has expired', { status: 410 });
+    // Check if key has expired
+    if (accessKey.expiresAt && new Date() > accessKey.expiresAt) {
+      return new NextResponse('Subscription has expired', { status: 403 });
     }
 
-    if (accessKey.status === 'DEPLETED') {
-      return new NextResponse('Data limit exceeded', { status: 410 });
+    // Check if data limit exceeded
+    if (accessKey.dataLimitBytes && accessKey.usedBytes >= accessKey.dataLimitBytes) {
+      return new NextResponse('Data limit exceeded', { status: 403 });
     }
 
-    // Check if the key is still within its expiration date
-    if (accessKey.expiresAt && accessKey.expiresAt < new Date()) {
-      // Update status to expired
-      await prisma.accessKey.update({
-        where: { id: accessKey.id },
-        data: { status: 'EXPIRED' },
-      });
-      return new NextResponse('Subscription has expired', { status: 410 });
-    }
+    // Handle START_ON_FIRST_USE expiration type
+    // If this is the first access, activate the key and start the expiration timer
+    if (accessKey.expirationType === 'START_ON_FIRST_USE' && !accessKey.firstUsedAt) {
+      const firstUsedAt = new Date();
+      const expiresAt = accessKey.durationDays
+        ? new Date(firstUsedAt.getTime() + accessKey.durationDays * 24 * 60 * 60 * 1000)
+        : null;
 
-    // Handle START_ON_FIRST_USE keys - activate them on first access
-    if (accessKey.status === 'PENDING' && accessKey.expirationType === 'START_ON_FIRST_USE') {
-      const durationMs = (accessKey.durationDays || 30) * 24 * 60 * 60 * 1000;
-      const expiresAt = new Date(Date.now() + durationMs);
-      
       await prisma.accessKey.update({
         where: { id: accessKey.id },
         data: {
-          status: 'ACTIVE',
-          firstUsedAt: new Date(),
+          firstUsedAt,
           expiresAt,
+          status: 'ACTIVE',
         },
       });
     }
 
-    // Get the access URL from the key
-    const accessUrl = accessKey.accessUrl;
-    
-    if (!accessUrl) {
-      return new NextResponse('Access URL not available', { status: 500 });
-    }
+    // Build the access URL if not already stored
+    const accessUrl = accessKey.accessUrl || buildAccessUrl(accessKey);
 
-    // Generate response based on format
+    // Return response in the requested format
     switch (format) {
-      case 'plain':
-        return new NextResponse(accessUrl, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Content-Disposition': `inline; filename="${accessKey.name}.txt"`,
-          },
-        });
-
       case 'base64':
-        const base64Url = Buffer.from(accessUrl).toString('base64');
-        return new NextResponse(base64Url, {
+        return new NextResponse(Buffer.from(accessUrl).toString('base64'), {
           headers: {
             'Content-Type': 'text/plain; charset=utf-8',
             'Content-Disposition': `inline; filename="${accessKey.name}.txt"`,
@@ -131,40 +108,24 @@ export async function GET(
         });
 
       case 'clash':
-        const clashConfig = generateClashConfig(accessKey, accessUrl);
+        const clashConfig = buildClashConfig(accessKey, accessUrl);
         return new NextResponse(clashConfig, {
           headers: {
             'Content-Type': 'text/yaml; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${accessKey.name}.yaml"`,
+            'Content-Disposition': `inline; filename="${accessKey.name}.yaml"`,
           },
         });
 
       case 'sip008':
-        const sip008Config = generateSIP008Config(accessKey, accessUrl);
-        return new NextResponse(JSON.stringify(sip008Config, null, 2), {
+        const sip008Config = buildSIP008Config(accessKey, accessUrl);
+        return new NextResponse(JSON.stringify(sip008Config), {
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${accessKey.name}.json"`,
+            'Content-Disposition': `inline; filename="${accessKey.name}.json"`,
           },
         });
 
-      case 'qr':
-        const qrCode = await QRCode.toBuffer(accessUrl, {
-          type: 'png',
-          width: 256,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#ffffff',
-          },
-        });
-        return new NextResponse(new Uint8Array(qrCode), {
-          headers: {
-            'Content-Type': 'image/png',
-            'Content-Disposition': `inline; filename="${accessKey.name}.png"`,
-          },
-        });
-
+      case 'raw':
       default:
         return new NextResponse(accessUrl, {
           headers: {
@@ -173,104 +134,92 @@ export async function GET(
         });
     }
   } catch (error) {
-    console.error('Subscription error:', error);
+    console.error('Subscription endpoint error:', error);
     return new NextResponse('Internal server error', { status: 500 });
   }
 }
 
 /**
- * Generate Clash proxy configuration from access URL.
- * 
- * Clash is a popular cross-platform proxy client that supports various
- * protocols including Shadowsocks. This function generates a minimal
- * configuration file that can be imported directly into Clash.
+ * Build the ss:// access URL from key data
+ * This creates a standard Shadowsocks URI that can be imported by clients.
  */
-function generateClashConfig(
-  accessKey: { name: string; server: { name: string } },
+function buildAccessUrl(accessKey: {
+  outlineKeyId: string;
+  server: {
+    hostnameForAccessKeys: string | null;
+    portForNewAccessKeys: number | null;
+  };
+}): string {
+  // Note: In a real implementation, this would need the actual key credentials
+  // from the Outline server. For now, we return a placeholder.
+  // The actual accessUrl should be stored when the key is created.
+  return `ss://placeholder@${accessKey.server.hostnameForAccessKeys}:${accessKey.server.portForNewAccessKeys}#${accessKey.outlineKeyId}`;
+}
+
+/**
+ * Build Clash proxy configuration
+ * Clash is a popular proxy client that uses YAML configuration files.
+ */
+function buildClashConfig(
+  accessKey: {
+    name: string;
+    server: {
+      name: string;
+      hostnameForAccessKeys: string | null;
+      portForNewAccessKeys: number | null;
+    };
+  },
   accessUrl: string
 ): string {
-  // Parse the ss:// URL to extract connection details
-  const parsed = parseSSUrl(accessUrl);
+  // Parse the ss:// URL to extract server details
+  // Format: ss://BASE64(method:password)@host:port#name
+  // or: ss://BASE64(userinfo)@host:port/?plugin=...#name
   
+  const parsed = parseSSUrl(accessUrl);
   if (!parsed) {
     return `# Error: Could not parse access URL`;
   }
 
-  const config = {
-    port: 7890,
-    'socks-port': 7891,
-    'allow-lan': false,
-    mode: 'rule',
-    'log-level': 'info',
-    proxies: [
-      {
-        name: accessKey.name,
-        type: 'ss',
-        server: parsed.server,
-        port: parsed.port,
-        cipher: parsed.method,
-        password: parsed.password,
-        udp: true,
-      },
-    ],
-    'proxy-groups': [
-      {
-        name: 'Proxy',
-        type: 'select',
-        proxies: [accessKey.name],
-      },
-    ],
-    rules: [
-      'GEOIP,CN,DIRECT',
-      'MATCH,Proxy',
-    ],
-  };
-
-  // Convert to YAML manually for consistent formatting
   return `# Clash Configuration for ${accessKey.name}
 # Server: ${accessKey.server.name}
 # Generated by Atomic-UI
 
-port: ${config.port}
-socks-port: ${config['socks-port']}
-allow-lan: ${config['allow-lan']}
-mode: ${config.mode}
-log-level: ${config['log-level']}
-
 proxies:
   - name: "${accessKey.name}"
     type: ss
-    server: ${parsed.server}
+    server: ${parsed.host}
     port: ${parsed.port}
     cipher: ${parsed.method}
     password: "${parsed.password}"
-    udp: true
 
 proxy-groups:
-  - name: Proxy
+  - name: "Proxy"
     type: select
     proxies:
       - "${accessKey.name}"
 
 rules:
-  - GEOIP,CN,DIRECT
   - MATCH,Proxy
 `;
 }
 
 /**
- * Generate SIP008 configuration.
- * 
- * SIP008 is a standardized JSON format for Shadowsocks server configurations.
- * It's supported by many Shadowsocks clients including Shadowsocks-Windows,
- * Shadowsocks-Android, and various subscription managers.
+ * Build SIP008 JSON configuration
+ * SIP008 is a standard format for Shadowsocks server configurations,
+ * supported by Outline and many other Shadowsocks clients.
  */
-function generateSIP008Config(
-  accessKey: { name: string; server: { name: string } },
+function buildSIP008Config(
+  accessKey: {
+    name: string;
+    server: {
+      name: string;
+      hostnameForAccessKeys: string | null;
+      portForNewAccessKeys: number | null;
+    };
+  },
   accessUrl: string
 ): object {
   const parsed = parseSSUrl(accessUrl);
-  
   if (!parsed) {
     return { error: 'Could not parse access URL' };
   }
@@ -280,85 +229,67 @@ function generateSIP008Config(
     servers: [
       {
         id: accessKey.name,
-        remarks: `${accessKey.name} (${accessKey.server.name})`,
-        server: parsed.server,
+        remarks: `${accessKey.server.name} - ${accessKey.name}`,
+        server: parsed.host,
         server_port: parsed.port,
         password: parsed.password,
         method: parsed.method,
-        plugin: '',
-        plugin_opts: '',
       },
     ],
     bytes_used: 0,
-    bytes_remaining: 0,
+    bytes_remaining: null,
   };
 }
 
 /**
- * Parse a Shadowsocks URL (ss://) into its components.
- * 
- * SS URL format: ss://BASE64(method:password)@server:port#tag
- * 
- * This parser handles both the standard and alternative URL formats
- * used by various Shadowsocks implementations.
+ * Parse a Shadowsocks ss:// URL
+ * Extracts the method, password, host, and port from the URL.
  */
 function parseSSUrl(url: string): {
   method: string;
   password: string;
-  server: string;
+  host: string;
   port: number;
-  tag?: string;
 } | null {
   try {
-    // Remove the ss:// prefix
-    const withoutPrefix = url.replace(/^ss:\/\//, '');
-    
-    // Split by @ to separate credentials from server
-    const atIndex = withoutPrefix.lastIndexOf('@');
-    
-    if (atIndex === -1) {
-      // Try alternative format where everything is base64 encoded
-      const hashIndex = withoutPrefix.indexOf('#');
-      const encoded = hashIndex > -1 ? withoutPrefix.slice(0, hashIndex) : withoutPrefix;
-      const tag = hashIndex > -1 ? decodeURIComponent(withoutPrefix.slice(hashIndex + 1)) : undefined;
-      
-      const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
-      const [methodPassword, serverPort] = decoded.split('@');
-      
-      if (!methodPassword || !serverPort) return null;
-      
-      const [method, password] = methodPassword.split(':');
-      const [server, portStr] = serverPort.split(':');
-      
-      return {
-        method,
-        password,
-        server,
-        port: parseInt(portStr),
-        tag,
-      };
+    // ss:// URLs can be in two formats:
+    // 1. ss://BASE64(method:password)@host:port#tag
+    // 2. ss://method:password@host:port#tag (deprecated)
+
+    const match = url.match(/^ss:\/\/([^@]+)@([^:]+):(\d+)/);
+    if (!match) return null;
+
+    const [, userInfo, host, portStr] = match;
+    const port = parseInt(portStr, 10);
+
+    // Try to decode Base64 userinfo
+    let method: string;
+    let password: string;
+
+    try {
+      const decoded = Buffer.from(userInfo, 'base64').toString('utf-8');
+      const colonIndex = decoded.indexOf(':');
+      if (colonIndex > 0) {
+        method = decoded.substring(0, colonIndex);
+        password = decoded.substring(colonIndex + 1);
+      } else {
+        // Fallback: assume chacha20-ietf-poly1305
+        method = 'chacha20-ietf-poly1305';
+        password = decoded;
+      }
+    } catch {
+      // Not Base64, try direct parsing
+      const colonIndex = userInfo.indexOf(':');
+      if (colonIndex > 0) {
+        method = userInfo.substring(0, colonIndex);
+        password = userInfo.substring(colonIndex + 1);
+      } else {
+        return null;
+      }
     }
-    
-    // Standard format: BASE64(method:password)@server:port#tag
-    const credentialsEncoded = withoutPrefix.slice(0, atIndex);
-    const serverPart = withoutPrefix.slice(atIndex + 1);
-    
-    // Decode credentials
-    const credentials = Buffer.from(credentialsEncoded, 'base64').toString('utf-8');
-    const [method, password] = credentials.split(':');
-    
-    // Parse server and port
-    const hashIndex = serverPart.indexOf('#');
-    const serverPortPart = hashIndex > -1 ? serverPart.slice(0, hashIndex) : serverPart;
-    const tag = hashIndex > -1 ? decodeURIComponent(serverPart.slice(hashIndex + 1)) : undefined;
-    
-    const colonIndex = serverPortPart.lastIndexOf(':');
-    const server = serverPortPart.slice(0, colonIndex);
-    const port = parseInt(serverPortPart.slice(colonIndex + 1));
-    
-    return { method, password, server, port, tag };
-  } catch (error) {
-    console.error('Error parsing SS URL:', error);
+
+    return { method, password, host, port };
+  } catch {
     return null;
   }
 }

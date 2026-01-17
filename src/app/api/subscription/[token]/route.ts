@@ -33,10 +33,14 @@ export async function GET(
         expiresAt: true,
         dataLimitBytes: true,
         usedBytes: true,
+        method: true,
+        port: true,
+        subscriptionTheme: true,
         server: {
           select: {
             name: true,
             countryCode: true,
+            location: true,
           },
         },
       },
@@ -79,11 +83,21 @@ export async function GET(
     // If client wants JSON (default for browsers/programmatic access)
     if (acceptHeader.includes('application/json')) {
       return NextResponse.json({
+        id: key.id,
         name: key.name,
-        server: key.server.name,
-        countryCode: key.server.countryCode,
         accessUrl: key.accessUrl,
         status: key.status,
+        server: {
+          name: key.server.name,
+          countryCode: key.server.countryCode,
+          location: key.server.location || null,
+        },
+        usedBytes: key.usedBytes.toString(),
+        dataLimitBytes: key.dataLimitBytes?.toString() || null,
+        expiresAt: key.expiresAt?.toISOString() || null,
+        subscriptionTheme: key.subscriptionTheme || null,
+        method: key.method || null,
+        port: key.port || null,
       });
     }
 

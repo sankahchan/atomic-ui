@@ -75,6 +75,7 @@ const updateKeySchema = z.object({
   durationDays: z.number().int().positive().optional().nullable(),
   status: z.enum(['ACTIVE', 'DISABLED', 'EXPIRED', 'DEPLETED', 'PENDING']).optional(),
   prefix: z.string().max(16).optional().nullable(),
+  subscriptionTheme: z.enum(['dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red']).optional().nullable(),
 });
 
 /**
@@ -441,6 +442,10 @@ export const keysRouter = router({
 
         if (data.durationDays !== undefined) {
           updateData.durationDays = data.durationDays;
+        }
+
+        if (data.subscriptionTheme !== undefined) {
+          updateData.subscriptionTheme = data.subscriptionTheme;
         }
 
         // Update the database record

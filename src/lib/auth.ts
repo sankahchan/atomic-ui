@@ -139,7 +139,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     return {
       id: user.id,
-      email: user.email,
+      email: user.email || '',
       role: user.role,
     };
   } catch {
@@ -157,7 +157,7 @@ export async function setSessionCookie(token: string): Promise<void> {
     httpOnly: true,
     // Only use secure cookies if we are definitely using HTTPS
     // This fixes login loops when accessing via HTTP/IP address
-    secure: process.env.NODE_ENV === 'production' && process.env.APP_URL?.startsWith('https'),
+    secure: process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL?.startsWith('https'),
     sameSite: 'lax',
     maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // Convert days to seconds
     path: '/',
@@ -240,7 +240,7 @@ export async function authenticateUser(
 
   return {
     id: user.id,
-    email: user.email,
+    email: user.email || '',
     role: user.role,
   };
 }

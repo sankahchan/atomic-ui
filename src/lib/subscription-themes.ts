@@ -1,0 +1,324 @@
+/**
+ * Subscription Page Themes
+ *
+ * Beautiful color themes for the user-facing subscription page.
+ * Each theme includes colors for backgrounds, text, accents, and buttons.
+ */
+
+export interface SubscriptionTheme {
+  id: string;
+  name: string;
+  // Background
+  bgPrimary: string;
+  bgSecondary: string;
+  bgCard: string;
+  bgCardHover: string;
+  // Text
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  // Accent colors
+  accent: string;
+  accentHover: string;
+  accentText: string;
+  // Status colors
+  success: string;
+  warning: string;
+  danger: string;
+  // Button gradient
+  buttonGradientFrom: string;
+  buttonGradientTo: string;
+  // Progress bar
+  progressBg: string;
+  progressFill: string;
+  // Border
+  border: string;
+  borderHover: string;
+  // Tab colors
+  tabActive: string;
+  tabInactive: string;
+  tabActiveText: string;
+  tabInactiveText: string;
+}
+
+export const subscriptionThemes: Record<string, SubscriptionTheme> = {
+  dark: {
+    id: 'dark',
+    name: 'Dark',
+    bgPrimary: '#0f172a',
+    bgSecondary: '#1e293b',
+    bgCard: '#1e293b',
+    bgCardHover: '#334155',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#94a3b8',
+    accent: '#06b6d4',
+    accentHover: '#22d3ee',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#8b5cf6',
+    buttonGradientTo: '#a855f7',
+    progressBg: '#334155',
+    progressFill: '#06b6d4',
+    border: '#334155',
+    borderHover: '#475569',
+    tabActive: '#ffffff',
+    tabInactive: '#334155',
+    tabActiveText: '#0f172a',
+    tabInactiveText: '#94a3b8',
+  },
+  light: {
+    id: 'light',
+    name: 'Light',
+    bgPrimary: '#f8fafc',
+    bgSecondary: '#f1f5f9',
+    bgCard: '#ffffff',
+    bgCardHover: '#f1f5f9',
+    textPrimary: '#0f172a',
+    textSecondary: '#1e293b',
+    textMuted: '#64748b',
+    accent: '#0891b2',
+    accentHover: '#06b6d4',
+    accentText: '#ffffff',
+    success: '#16a34a',
+    warning: '#d97706',
+    danger: '#dc2626',
+    buttonGradientFrom: '#7c3aed',
+    buttonGradientTo: '#9333ea',
+    progressBg: '#e2e8f0',
+    progressFill: '#0891b2',
+    border: '#e2e8f0',
+    borderHover: '#cbd5e1',
+    tabActive: '#0f172a',
+    tabInactive: '#f1f5f9',
+    tabActiveText: '#ffffff',
+    tabInactiveText: '#64748b',
+  },
+  purple: {
+    id: 'purple',
+    name: 'Purple',
+    bgPrimary: '#1a1025',
+    bgSecondary: '#2d1f42',
+    bgCard: '#2d1f42',
+    bgCardHover: '#3d2a5c',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#a78bfa',
+    accent: '#a855f7',
+    accentHover: '#c084fc',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#a855f7',
+    buttonGradientTo: '#d946ef',
+    progressBg: '#3d2a5c',
+    progressFill: '#a855f7',
+    border: '#3d2a5c',
+    borderHover: '#5b4178',
+    tabActive: '#ffffff',
+    tabInactive: '#3d2a5c',
+    tabActiveText: '#1a1025',
+    tabInactiveText: '#a78bfa',
+  },
+  blue: {
+    id: 'blue',
+    name: 'Ocean Blue',
+    bgPrimary: '#0c1929',
+    bgSecondary: '#132f4c',
+    bgCard: '#132f4c',
+    bgCardHover: '#1a3d5c',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#7dd3fc',
+    accent: '#0ea5e9',
+    accentHover: '#38bdf8',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#0ea5e9',
+    buttonGradientTo: '#06b6d4',
+    progressBg: '#1a3d5c',
+    progressFill: '#0ea5e9',
+    border: '#1a3d5c',
+    borderHover: '#2563eb',
+    tabActive: '#ffffff',
+    tabInactive: '#1a3d5c',
+    tabActiveText: '#0c1929',
+    tabInactiveText: '#7dd3fc',
+  },
+  green: {
+    id: 'green',
+    name: 'Emerald',
+    bgPrimary: '#052e16',
+    bgSecondary: '#14532d',
+    bgCard: '#14532d',
+    bgCardHover: '#166534',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#86efac',
+    accent: '#22c55e',
+    accentHover: '#4ade80',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#22c55e',
+    buttonGradientTo: '#10b981',
+    progressBg: '#166534',
+    progressFill: '#22c55e',
+    border: '#166534',
+    borderHover: '#22c55e',
+    tabActive: '#ffffff',
+    tabInactive: '#166534',
+    tabActiveText: '#052e16',
+    tabInactiveText: '#86efac',
+  },
+  orange: {
+    id: 'orange',
+    name: 'Sunset',
+    bgPrimary: '#1c1210',
+    bgSecondary: '#3b1f1a',
+    bgCard: '#3b1f1a',
+    bgCardHover: '#4a2920',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#fdba74',
+    accent: '#f97316',
+    accentHover: '#fb923c',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#f97316',
+    buttonGradientTo: '#ef4444',
+    progressBg: '#4a2920',
+    progressFill: '#f97316',
+    border: '#4a2920',
+    borderHover: '#7c2d12',
+    tabActive: '#ffffff',
+    tabInactive: '#4a2920',
+    tabActiveText: '#1c1210',
+    tabInactiveText: '#fdba74',
+  },
+  pink: {
+    id: 'pink',
+    name: 'Rose',
+    bgPrimary: '#1f0a14',
+    bgSecondary: '#3d1526',
+    bgCard: '#3d1526',
+    bgCardHover: '#4c1d3b',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#f9a8d4',
+    accent: '#ec4899',
+    accentHover: '#f472b6',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#ec4899',
+    buttonGradientTo: '#f43f5e',
+    progressBg: '#4c1d3b',
+    progressFill: '#ec4899',
+    border: '#4c1d3b',
+    borderHover: '#9d174d',
+    tabActive: '#ffffff',
+    tabInactive: '#4c1d3b',
+    tabActiveText: '#1f0a14',
+    tabInactiveText: '#f9a8d4',
+  },
+  red: {
+    id: 'red',
+    name: 'Crimson',
+    bgPrimary: '#1a0a0a',
+    bgSecondary: '#2d1515',
+    bgCard: '#2d1515',
+    bgCardHover: '#451a1a',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#fca5a5',
+    accent: '#ef4444',
+    accentHover: '#f87171',
+    accentText: '#ffffff',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    buttonGradientFrom: '#ef4444',
+    buttonGradientTo: '#dc2626',
+    progressBg: '#451a1a',
+    progressFill: '#ef4444',
+    border: '#451a1a',
+    borderHover: '#7f1d1d',
+    tabActive: '#ffffff',
+    tabInactive: '#451a1a',
+    tabActiveText: '#1a0a0a',
+    tabInactiveText: '#fca5a5',
+  },
+};
+
+export const themeList = Object.values(subscriptionThemes);
+
+export function getTheme(themeId: string | null | undefined): SubscriptionTheme {
+  return subscriptionThemes[themeId || 'dark'] || subscriptionThemes.dark;
+}
+
+/**
+ * Client app configurations for different platforms
+ */
+export interface ClientApp {
+  id: string;
+  name: string;
+  platforms: ('android' | 'ios' | 'windows' | 'macos' | 'linux')[];
+  icon: string; // Emoji or icon name
+  urlScheme: (accessUrl: string) => string;
+  storeUrl?: {
+    android?: string;
+    ios?: string;
+    windows?: string;
+    macos?: string;
+  };
+}
+
+export const clientApps: ClientApp[] = [
+  {
+    id: 'outline',
+    name: 'Outline',
+    platforms: ['android', 'ios', 'windows', 'macos', 'linux'],
+    icon: '🔑',
+    urlScheme: (accessUrl: string) => accessUrl,
+    storeUrl: {
+      android: 'https://play.google.com/store/apps/details?id=org.outline.android.client',
+      ios: 'https://apps.apple.com/app/outline-app/id1356177741',
+      windows: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe',
+    },
+  },
+  {
+    id: 'hiddify',
+    name: 'Hiddify',
+    platforms: ['android', 'ios', 'windows', 'macos', 'linux'],
+    icon: '🛡️',
+    urlScheme: (accessUrl: string) => `hiddify://import/${encodeURIComponent(accessUrl)}`,
+    storeUrl: {
+      android: 'https://play.google.com/store/apps/details?id=app.hiddify.com',
+      ios: 'https://apps.apple.com/app/hiddify-proxy-vpn/id6596777532',
+    },
+  },
+  {
+    id: 'v2box',
+    name: 'V2Box',
+    platforms: ['ios', 'macos'],
+    icon: '📦',
+    urlScheme: (accessUrl: string) => `v2box://install-sub?url=${encodeURIComponent(accessUrl)}`,
+    storeUrl: {
+      ios: 'https://apps.apple.com/app/v2box-v2ray-client/id6446814690',
+    },
+  },
+];
+
+export function getAppsForPlatform(platform: 'android' | 'ios' | 'windows'): ClientApp[] {
+  return clientApps.filter((app) => app.platforms.includes(platform));
+}
