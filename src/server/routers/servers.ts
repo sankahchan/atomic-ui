@@ -517,14 +517,101 @@ export const serversRouter = router({
               console.log(`📉 Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dataLimit} bytes`);
             }
 
+            // Update lastUsedAt if there's any traffic increase (for online detection)
+            // Threshold of 1KB to filter out noise/handshakes
+            const hasTraffic = bytesTransferred > 1024;
+            if (hasTraffic) {
+              updateData.lastUsedAt = new Date();
+            }
+
             // Update existing key
             await db.accessKey.update({
               where: { id: existingKey.id },
               data: updateData,
             });
 
+            // Session tracking for device estimation
+            const now = new Date();
+            const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = session ended
+
+            if (hasTraffic) {
+              // Check for active session
+              const activeSession = await db.connectionSession.findFirst({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+                orderBy: { startedAt: 'desc' },
+              });
+
+              if (activeSession) {
+                // Update existing session
+                await db.connectionSession.update({
+                  where: { id: activeSession.id },
+                  data: {
+                    lastActiveAt: now,
+                    bytesUsed: { increment: BigInt(bytesTransferred) },
+                  },
+                });
+              } else {
+                // Create new session
+                await db.connectionSession.create({
+                  data: {
+                    accessKeyId: existingKey.id,
+                    bytesUsed: BigInt(bytesTransferred),
+                  },
+                });
+              }
+
+              // Update device count
+              const activeSessionCount = await db.connectionSession.count({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+              });
+
+              await db.accessKey.update({
+                where: { id: existingKey.id },
+                data: {
+                  estimatedDevices: activeSessionCount,
+                  peakDevices: Math.max(existingKey.peakDevices || 0, activeSessionCount),
+                },
+              });
+            } else {
+              // No traffic - close stale sessions
+              await db.connectionSession.updateMany({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                  lastActiveAt: {
+                    lt: new Date(now.getTime() - SESSION_TIMEOUT_MS),
+                  },
+                },
+                data: {
+                  isActive: false,
+                  endedAt: now,
+                },
+              });
+
+              // Update device count after closing sessions
+              const activeSessionCount = await db.connectionSession.count({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+              });
+
+              if (activeSessionCount !== existingKey.estimatedDevices) {
+                await db.accessKey.update({
+                  where: { id: existingKey.id },
+                  data: { estimatedDevices: activeSessionCount },
+                });
+              }
+            }
+
             // Create TrafficLog entry if there was meaningful traffic since last sync
-            const MIN_TRAFFIC_THRESHOLD = 500 * 1024; // 500KB
+            const MIN_TRAFFIC_THRESHOLD = 100 * 1024; // 100KB threshold for logging
             if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
               console.log(`📊 [sync] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
               await db.trafficLog.create({
@@ -770,13 +857,100 @@ export const serversRouter = router({
               console.log(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
             }
 
+            // Update lastUsedAt if there's any traffic increase (for online detection)
+            // Threshold of 1KB to filter out noise/handshakes
+            const hasTraffic = bytesTransferred > 1024;
+            if (hasTraffic) {
+              updateData.lastUsedAt = new Date();
+            }
+
             await db.accessKey.update({
               where: { id: existingKey.id },
               data: updateData,
             });
 
-            // Create TrafficLog
-            const MIN_TRAFFIC_THRESHOLD = 500 * 1024; // 500KB
+            // Session tracking for device estimation
+            const now = new Date();
+            const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = session ended
+
+            if (hasTraffic) {
+              // Check for active session
+              const activeSession = await db.connectionSession.findFirst({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+                orderBy: { startedAt: 'desc' },
+              });
+
+              if (activeSession) {
+                // Update existing session
+                await db.connectionSession.update({
+                  where: { id: activeSession.id },
+                  data: {
+                    lastActiveAt: now,
+                    bytesUsed: { increment: BigInt(bytesTransferred) },
+                  },
+                });
+              } else {
+                // Create new session
+                await db.connectionSession.create({
+                  data: {
+                    accessKeyId: existingKey.id,
+                    bytesUsed: BigInt(bytesTransferred),
+                  },
+                });
+              }
+
+              // Update device count
+              const activeSessionCount = await db.connectionSession.count({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+              });
+
+              await db.accessKey.update({
+                where: { id: existingKey.id },
+                data: {
+                  estimatedDevices: activeSessionCount,
+                  peakDevices: Math.max(existingKey.peakDevices || 0, activeSessionCount),
+                },
+              });
+            } else {
+              // No traffic - close stale sessions
+              await db.connectionSession.updateMany({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                  lastActiveAt: {
+                    lt: new Date(now.getTime() - SESSION_TIMEOUT_MS),
+                  },
+                },
+                data: {
+                  isActive: false,
+                  endedAt: now,
+                },
+              });
+
+              // Update device count after closing sessions
+              const activeSessionCount = await db.connectionSession.count({
+                where: {
+                  accessKeyId: existingKey.id,
+                  isActive: true,
+                },
+              });
+
+              if (activeSessionCount !== existingKey.estimatedDevices) {
+                await db.accessKey.update({
+                  where: { id: existingKey.id },
+                  data: { estimatedDevices: activeSessionCount },
+                });
+              }
+            }
+
+            // Create TrafficLog for significant traffic (for historical analytics)
+            const MIN_TRAFFIC_THRESHOLD = 100 * 1024; // 100KB threshold for logging
             if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
               console.log(`📊 [syncAll] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
               await db.trafficLog.create({

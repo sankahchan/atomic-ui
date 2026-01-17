@@ -163,10 +163,15 @@ model AccessKey {
   // Valid themes: dark, light, purple, blue, green, orange, pink, red
   subscriptionTheme String?
 
+  // Connection/device tracking
+  estimatedDevices Int @default(0)
+  peakDevices      Int @default(0)
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   trafficLogs TrafficLog[]
   notifications NotificationLog[]
+  sessions    ConnectionSession[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -226,10 +231,34 @@ model TrafficLog {
   // Historical Analytics (Phase 8)
   bytesUsed   BigInt   // Cumulative at time of log
   deltaBytes  BigInt   @default(0) // Usage since last log
-  
+
   recordedAt DateTime @default(now())
 
   @@index([accessKeyId, recordedAt])
+}
+
+// ============================================
+// Connection Sessions (for device tracking)
+// ============================================
+
+model ConnectionSession {
+  id          String    @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+
+  // Session timing
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  lastActiveAt DateTime @default(now())
+
+  // Traffic during this session
+  bytesUsed   BigInt    @default(0)
+
+  // Is this session currently active?
+  isActive    Boolean   @default(true)
+
+  @@index([accessKeyId, isActive])
+  @@index([accessKeyId, startedAt])
 }
 
 // ============================================

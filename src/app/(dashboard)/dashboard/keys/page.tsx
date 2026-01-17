@@ -63,6 +63,7 @@ import {
   Wifi,
   HardDrive,
   ArrowUpDown,
+  Smartphone,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 
@@ -614,6 +615,7 @@ function KeyRow({
     daysRemaining?: number | null;
     isExpiringSoon?: boolean;
     isTrafficWarning?: boolean;
+    estimatedDevices?: number;
     server?: {
       id: string;
       name: string;
@@ -710,6 +712,16 @@ function KeyRow({
               )}
             />
           )}
+        </div>
+      </td>
+
+      {/* Devices */}
+      <td className="px-4 py-3 text-center">
+        <div className="flex items-center justify-center gap-1">
+          <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-sm font-medium">
+            {accessKey.estimatedDevices || 0}
+          </span>
         </div>
       </td>
 
@@ -871,6 +883,14 @@ export default function KeysPage() {
               className={cn('h-1.5', key.isTrafficWarning && '[&>div]:bg-orange-500')}
             />
           )}
+        </div>
+
+        <div className="flex items-center justify-between text-xs pt-1">
+          <span className="text-muted-foreground">Devices</span>
+          <span className="flex items-center gap-1">
+            <Smartphone className="w-3 h-3" />
+            {key.estimatedDevices || 0}
+          </span>
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-border/50">
@@ -1413,6 +1433,7 @@ export default function KeysPage() {
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.server')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.status')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.usage')}</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Devices</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.expires')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.actions')}</th>
               </tr>
@@ -1421,7 +1442,7 @@ export default function KeysPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={6} className="px-4 py-3">
+                    <td colSpan={8} className="px-4 py-3">
                       <div className="h-12 bg-muted rounded animate-pulse" />
                     </td>
                   </tr>

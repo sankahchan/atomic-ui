@@ -68,6 +68,9 @@ import {
   Eye,
   Palette,
   ExternalLink,
+  Smartphone,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -939,6 +942,9 @@ export default function KeyDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Connection Sessions */}
+          <ConnectionSessionsCard keyId={key.id} />
+
           {/* Subscription Page Share */}
           <SubscriptionShareCard
             keyId={key.id}
@@ -1071,5 +1077,119 @@ function TrafficGraph({
         <span>Live</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * ConnectionSessionsCard Component
+ * Displays estimated device count and recent connection sessions
+ */
+function ConnectionSessionsCard({ keyId }: { keyId: string }) {
+  const { data, isLoading } = trpc.keys.getConnectionSessions.useQuery(
+    { keyId, limit: 10 },
+    { refetchInterval: 30000 } // Refresh every 30 seconds
+  );
+
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours < 24) return `${hours}h ${mins}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-primary" />
+            Connections
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-24 bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-primary" />
+          Connections
+        </CardTitle>
+        <CardDescription>
+          Estimated device usage based on traffic patterns
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              {(data?.activeCount || 0) > 0 ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span className="text-2xl font-bold">{data?.estimatedDevices || 0}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Active Devices</p>
+          </div>
+          <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
+            <p className="text-xs text-muted-foreground">Peak Devices</p>
+          </div>
+        </div>
+
+        {/* Recent Sessions */}
+        {data?.sessions && data.sessions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Recent Sessions</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {data.sessions.slice(0, 5).map((session) => (
+                <div
+                  key={session.id}
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded-lg text-sm",
+                    session.isActive ? "bg-green-500/10" : "bg-muted/50"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        session.isActive ? "bg-green-500 animate-pulse" : "bg-muted-foreground"
+                      )}
+                    />
+                    <span className="text-muted-foreground">
+                      {formatRelativeTime(session.startedAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-muted-foreground">
+                      {formatDuration(session.durationMinutes)}
+                    </span>
+                    <span className="font-mono">
+                      {formatBytes(BigInt(session.bytesUsed))}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(!data?.sessions || data.sessions.length === 0) && (
+          <div className="text-center py-4 text-muted-foreground text-sm">
+            No connection sessions recorded yet
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

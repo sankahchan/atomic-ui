@@ -248,6 +248,10 @@ export const keysRouter = router({
             take: 30,
             orderBy: { recordedAt: 'desc' },
           },
+          sessions: {
+            take: 10,
+            orderBy: { startedAt: 'desc' },
+          },
         },
       });
 
@@ -919,30 +923,26 @@ export const keysRouter = router({
   /**
    * Get online/active users (keys with recent traffic activity).
    *
-   * This checks for keys that have had traffic changes in the MOST RECENT sync.
-   * A key is considered "online" only if it had traffic during the latest sync,
-   * similar to how X-UI handles online status detection.
+   * Similar to 3x-ui, a key is considered "online" if it had traffic during
+   * the most recent sync. We use the `lastUsedAt` timestamp which is updated
+   * when any traffic delta is detected.
    *
    * The logic:
-   * 1. Find the timestamp of the most recent traffic log (indicates last sync time)
-   * 2. Get all traffic logs from that sync (within a small tolerance window)
+   * 1. Find when the most recent sync happened (server.lastSyncAt)
+   * 2. Get keys with lastUsedAt within a window around that sync time
    * 3. Only those keys are considered "online"
    *
-   * This ensures users show as offline once they stop using VPN, rather than
-   * staying green until the 5-minute window expires.
+   * This ensures users show as offline once they stop using VPN.
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    // First, find the most recent traffic log timestamp to determine when last sync happened
-    const latestLog = await db.trafficLog.findFirst({
-      orderBy: {
-        recordedAt: 'desc',
-      },
-      select: {
-        recordedAt: true,
-      },
+    // Find the most recent sync time from any server
+    const latestServer = await db.server.findFirst({
+      where: { isActive: true },
+      orderBy: { lastSyncAt: 'desc' },
+      select: { lastSyncAt: true },
     });
 
-    if (!latestLog) {
+    if (!latestServer?.lastSyncAt) {
       return {
         onlineCount: 0,
         onlineKeyIds: [],
@@ -950,44 +950,43 @@ export const keysRouter = router({
       };
     }
 
-    // Allow a 30-second tolerance window for logs created in the same sync batch
-    // (sync might take a few seconds to process all keys)
-    const syncWindow = new Date(latestLog.recordedAt.getTime() - 30 * 1000);
+    const lastSyncAt = latestServer.lastSyncAt;
 
     // Only consider the sync valid if it happened within the last 2 minutes
     // (if no sync in 2 minutes, consider all users offline)
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-    if (latestLog.recordedAt < twoMinutesAgo) {
+    if (lastSyncAt < twoMinutesAgo) {
       return {
         onlineCount: 0,
         onlineKeyIds: [],
-        lastSyncAt: latestLog.recordedAt,
+        lastSyncAt,
       };
     }
 
-    // Get traffic logs from the most recent sync batch
-    const recentLogs = await db.trafficLog.findMany({
+    // Keys are considered "online" if lastUsedAt is within 30 seconds of the last sync
+    // This accounts for sync processing time across multiple servers
+    const syncWindow = new Date(lastSyncAt.getTime() - 30 * 1000);
+
+    // Find keys with recent activity
+    const onlineKeys = await db.accessKey.findMany({
       where: {
-        recordedAt: {
+        status: 'ACTIVE',
+        lastUsedAt: {
           gte: syncWindow,
-        },
-        bytesUsed: {
-          gt: 0,
         },
       },
       select: {
-        accessKeyId: true,
+        id: true,
       },
-      distinct: ['accessKeyId'],
     });
 
-    const activeKeyIds = recentLogs.map(log => log.accessKeyId);
+    const activeKeyIds = onlineKeys.map(key => key.id);
 
     return {
       onlineCount: activeKeyIds.length,
       onlineKeyIds: activeKeyIds,
-      lastSyncAt: latestLog.recordedAt,
+      lastSyncAt,
     };
   }),
 
@@ -1092,6 +1091,97 @@ export const keysRouter = router({
       totalAlerts: trafficWarningKeys.length + expiringKeys.length,
       trafficWarningCount: trafficWarningKeys.length,
       expiringCount: expiringKeys.length,
+    };
+  }),
+
+  /**
+   * Get connection sessions for a key.
+   * Returns both active and historical sessions.
+   */
+  getConnectionSessions: protectedProcedure
+    .input(
+      z.object({
+        keyId: z.string(),
+        includeInactive: z.boolean().default(true),
+        limit: z.number().int().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.keyId },
+        select: { id: true, userId: true, estimatedDevices: true, peakDevices: true },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      // Authorization check
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      const sessions = await db.connectionSession.findMany({
+        where: {
+          accessKeyId: input.keyId,
+          ...(input.includeInactive ? {} : { isActive: true }),
+        },
+        orderBy: { startedAt: 'desc' },
+        take: input.limit,
+      });
+
+      // Calculate session durations
+      const sessionsWithDuration = sessions.map((session) => {
+        const endTime = session.endedAt || new Date();
+        const durationMs = endTime.getTime() - session.startedAt.getTime();
+        const durationMinutes = Math.round(durationMs / 60000);
+
+        return {
+          ...session,
+          bytesUsed: session.bytesUsed.toString(),
+          durationMinutes,
+        };
+      });
+
+      return {
+        sessions: sessionsWithDuration,
+        activeCount: sessions.filter((s) => s.isActive).length,
+        estimatedDevices: key.estimatedDevices,
+        peakDevices: key.peakDevices,
+      };
+    }),
+
+  /**
+   * Get active connections count for all keys.
+   * Used for dashboard overview.
+   */
+  getActiveConnectionsOverview: protectedProcedure.query(async () => {
+    const activeSessions = await db.connectionSession.groupBy({
+      by: ['accessKeyId'],
+      where: { isActive: true },
+      _count: { id: true },
+    });
+
+    const totalActiveSessions = activeSessions.reduce(
+      (sum, item) => sum + item._count.id,
+      0
+    );
+
+    const keysWithActiveSessions = activeSessions.length;
+
+    return {
+      totalActiveSessions,
+      keysWithActiveSessions,
+      sessionsByKey: activeSessions.map((item) => ({
+        keyId: item.accessKeyId,
+        count: item._count.id,
+      })),
     };
   }),
 });
