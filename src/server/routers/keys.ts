@@ -40,6 +40,7 @@ const createKeySchema = z.object({
   email: z.string().email().optional().nullable(),
   telegramId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  userId: z.string().optional().nullable(),
 
   // Data limit in GB (converted to bytes in the mutation)
   dataLimitGB: z.number().positive().optional().nullable(),
@@ -66,6 +67,7 @@ const updateKeySchema = z.object({
   email: z.string().email().optional().nullable(),
   telegramId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  userId: z.string().optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   dataLimitResetStrategy: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'NEVER']).optional(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
@@ -163,6 +165,11 @@ export const keysRouter = router({
           { email: { contains: search } },
           { telegramId: { contains: search } },
         ];
+      }
+
+      // Admin can filter by specific userId
+      if (ctx.user.role === 'ADMIN' && (input as any).userId) {
+        where.userId = (input as any).userId;
       }
 
       // Get total count for pagination
@@ -314,6 +321,7 @@ export const keysRouter = router({
             email: input.email,
             telegramId: input.telegramId,
             notes: input.notes,
+            userId: input.userId, // Assign to user if provided
             serverId: input.serverId,
             accessUrl: outlineKey.accessUrl,
             password: outlineKey.password,
@@ -403,6 +411,7 @@ export const keysRouter = router({
         if (data.email !== undefined) updateData.email = data.email;
         if (data.telegramId !== undefined) updateData.telegramId = data.telegramId;
         if (data.notes !== undefined) updateData.notes = data.notes;
+        if (data.userId !== undefined) updateData.userId = data.userId;
         if (data.prefix !== undefined) updateData.prefix = data.prefix;
         if (data.status) updateData.status = data.status;
 

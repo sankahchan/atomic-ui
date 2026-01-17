@@ -26,6 +26,7 @@ import { systemRouter } from './system';
 import { backupRouter } from './backup';
 import { analyticsRouter } from './analytics';
 import { provisionRouter } from './provision';
+import { usersRouter } from './users';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
@@ -571,6 +572,7 @@ export const appRouter = router({
   backup: backupRouter,
   analytics: analyticsRouter,
   provision: provisionRouter,
+  users: usersRouter,
 });
 
 /**

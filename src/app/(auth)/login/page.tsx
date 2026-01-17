@@ -130,12 +130,17 @@ export default function LoginPage() {
 
   // Login mutation using tRPC
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: mounted ? t('login.welcome') : 'Welcome back!',
         description: mounted ? t('login.success') : 'You have been successfully logged in.',
       });
-      router.push('/dashboard');
+
+      if (data.role === 'ADMIN') {
+        router.push('/dashboard');
+      } else {
+        router.push('/portal');
+      }
       router.refresh();
     },
     onError: (error) => {

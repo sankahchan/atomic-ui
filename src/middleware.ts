@@ -99,8 +99,8 @@ export async function middleware(request: NextRequest) {
     const role = payload.role as string;
 
     // Role-based Access Control (RBAC)
-    // Redirect USER role trying to access admin dashboard
-    if (role === 'USER' && pathname.startsWith('/dashboard')) {
+    // Redirect USER/CLIENT role trying to access admin dashboard
+    if ((role === 'USER' || role === 'CLIENT') && pathname.startsWith('/dashboard')) {
       const url = request.nextUrl.clone();
       url.pathname = '/portal';
       return NextResponse.redirect(url);
@@ -113,8 +113,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Redirect USER accessing root to portal
-    if (role === 'USER' && pathname === '/') {
+    // Redirect USER/CLIENT accessing root to portal
+    if ((role === 'USER' || role === 'CLIENT') && pathname === '/') {
       const url = request.nextUrl.clone();
       url.pathname = '/portal';
       return NextResponse.redirect(url);

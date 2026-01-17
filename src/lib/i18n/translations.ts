@@ -11,6 +11,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.health': 'Health',
     'nav.notifications': 'Notifications',
     'nav.settings': 'Settings',
+    'nav.users': 'User Management',
     'nav.portal': 'User Portal',
   },
   zh: {
@@ -21,7 +22,9 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.archived': '归档密钥',
     'nav.health': '健康状态',
     'nav.notifications': '通知',
+    'nav.buttons': 'Buttons', // Kept for reference but not in menu
     'nav.settings': '设置',
+    'nav.users': '用户管理',
     'nav.portal': '用户门户',
   },
   my: {
@@ -33,6 +36,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.health': 'ကျန်းမာရေး',
     'nav.notifications': 'အသိပေးချက်များ',
     'nav.settings': 'ဆက်တင်များ',
+    'nav.users': 'အသုံးပြုသူများ',
     'nav.portal': 'အသုံးပြုသူ ပေါ်တယ်',
   },
   ja: {},

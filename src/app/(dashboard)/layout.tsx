@@ -89,10 +89,10 @@ const navItems = [
     description: 'Alert settings'
   },
   {
-    href: '/portal',
-    label: 'User Portal',
-    icon: Globe,
-    description: 'Access user portal'
+    href: '/dashboard/users',
+    label: 'User Management',
+    icon: User,
+    description: 'Manage users'
   },
   {
     href: '/dashboard/settings',
@@ -168,10 +168,10 @@ function Sidebar({
       description: 'Alert settings'
     },
     {
-      href: '/portal',
-      label: t('nav.portal'),
-      icon: Globe,
-      description: 'Access user portal'
+      href: '/dashboard/users',
+      label: t('nav.users'),
+      icon: User,
+      description: 'Manage users'
     },
     {
       href: '/dashboard/settings',

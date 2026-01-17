@@ -136,6 +136,7 @@ function CreateKeyDialog({
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
     durationDays: string;
     method: string;
+    userId: string;
   }>({
     serverId: '',
     name: '',
@@ -147,10 +148,13 @@ function CreateKeyDialog({
     expirationType: 'NEVER',
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
+    userId: 'unassigned', // Use 'unassigned' to represent null/undefined in Select
   });
 
   // Fetch servers for selection
   const { data: servers } = trpc.servers.list.useQuery();
+  // Fetch users for assignment
+  const { data: users } = trpc.users.list.useQuery();
   const { t } = useLocale();
 
   // Create key mutation
@@ -185,6 +189,7 @@ function CreateKeyDialog({
       expirationType: 'NEVER',
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
+      userId: 'unassigned',
     });
   };
 
@@ -211,6 +216,7 @@ function CreateKeyDialog({
       expirationType: formData.expirationType,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
+      userId: formData.userId !== 'unassigned' ? formData.userId : undefined,
     });
   };
 
@@ -258,6 +264,27 @@ function CreateKeyDialog({
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
+          </div>
+
+          {/* User Assignment */}
+          <div className="space-y-2">
+            <Label>Assign to User (Optional)</Label>
+            <Select
+              value={formData.userId}
+              onValueChange={(value) => setFormData({ ...formData, userId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned (Admin only)</SelectItem>
+                {users?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.email} (Keys: {(user as any)._count?.accessKeys || 0})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Encryption method */}
