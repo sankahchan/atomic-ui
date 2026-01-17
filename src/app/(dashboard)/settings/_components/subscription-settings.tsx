@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Palette, MessageSquare, ExternalLink } from "lucide-react";
+import { Loader2, Save, Palette, MessageSquare, ExternalLink, Camera, Eye, EyeOff } from "lucide-react";
 import { themeList, getTheme } from "@/lib/subscription-themes";
 
 export function SubscriptionSettings() {
@@ -17,6 +17,8 @@ export function SubscriptionSettings() {
 
     const [supportLink, setSupportLink] = useState("");
     const [defaultTheme, setDefaultTheme] = useState("dark");
+    const [unsplashApiKey, setUnsplashApiKey] = useState("");
+    const [showApiKey, setShowApiKey] = useState(false);
 
     // Fetch current settings
     useEffect(() => {
@@ -28,6 +30,7 @@ export function SubscriptionSettings() {
                     const data = await response.json();
                     setSupportLink(data.supportLink || "");
                     setDefaultTheme(data.defaultSubscriptionTheme || "dark");
+                    setUnsplashApiKey(data.unsplashApiKey || "");
                 }
             } catch (error) {
                 console.error("Failed to fetch settings:", error);
@@ -48,6 +51,7 @@ export function SubscriptionSettings() {
                 body: JSON.stringify({
                     supportLink,
                     defaultSubscriptionTheme: defaultTheme,
+                    unsplashApiKey,
                 }),
             });
 
@@ -207,6 +211,66 @@ export function SubscriptionSettings() {
                             </div>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Unsplash API Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Camera className="w-5 h-5" />
+                        Unsplash Integration
+                    </CardTitle>
+                    <CardDescription>
+                        Enable cover images from Unsplash for subscription pages.
+                        Get a free API key at{" "}
+                        <a
+                            href="https://unsplash.com/developers"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                        >
+                            unsplash.com/developers
+                        </a>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="unsplashApiKey">Access Key</Label>
+                        <div className="relative">
+                            <Input
+                                id="unsplashApiKey"
+                                type={showApiKey ? "text" : "password"}
+                                placeholder="Enter your Unsplash Access Key"
+                                value={unsplashApiKey}
+                                onChange={(e) => setUnsplashApiKey(e.target.value)}
+                                className="pr-10"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                            >
+                                {showApiKey ? (
+                                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                    <Eye className="w-4 h-4 text-muted-foreground" />
+                                )}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Required for searching and selecting photos from Unsplash.
+                            Leave empty to use only gradients and custom uploads.
+                        </p>
+                    </div>
+                    {unsplashApiKey && (
+                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                            Unsplash integration enabled
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

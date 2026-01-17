@@ -71,9 +71,11 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
+  ImagePlus,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
+import { CoverImagePicker } from '@/components/cover-image-picker';
 
 /**
  * Status badge configuration
@@ -337,16 +339,23 @@ function SubscriptionShareCard({
   keyId,
   subscriptionToken,
   currentTheme,
+  currentCoverImage,
+  currentCoverImageType,
   onThemeChange,
 }: {
   keyId: string;
   subscriptionToken: string | null;
   currentTheme: string | null;
+  currentCoverImage: string | null;
+  currentCoverImageType: string | null;
   onThemeChange: () => void;
 }) {
   const { toast } = useToast();
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverImage, setCoverImage] = useState(currentCoverImage);
+  const [coverImageType, setCoverImageType] = useState(currentCoverImageType);
 
   const updateThemeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
@@ -402,6 +411,41 @@ function SubscriptionShareCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Cover Image */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <ImagePlus className="w-4 h-4" />
+            Cover Image
+          </Label>
+          <button
+            onClick={() => setCoverPickerOpen(true)}
+            className="w-full h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors overflow-hidden relative group"
+          >
+            {coverImage ? (
+              <>
+                {coverImageType === 'gradient' ? (
+                  <div className="absolute inset-0" style={{ background: coverImage }} />
+                ) : (
+                  <Image
+                    src={coverImage}
+                    alt="Cover"
+                    fill
+                    className="object-cover"
+                  />
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">Change Cover</span>
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                <ImagePlus className="w-6 h-6 mb-1" />
+                <span className="text-xs">Add cover image</span>
+              </div>
+            )}
+          </button>
+        </div>
+
         {/* Theme Selector */}
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
@@ -498,6 +542,20 @@ function SubscriptionShareCard({
           {getSubscriptionPageUrl() || 'No subscription token'}
         </div>
       </CardContent>
+
+      {/* Cover Image Picker Dialog */}
+      <CoverImagePicker
+        keyId={keyId}
+        currentCover={coverImage}
+        currentCoverType={coverImageType}
+        open={coverPickerOpen}
+        onOpenChange={setCoverPickerOpen}
+        onCoverChange={(newCover, newType) => {
+          setCoverImage(newCover);
+          setCoverImageType(newType);
+          onThemeChange(); // Trigger refetch
+        }}
+      />
     </Card>
   );
 }
@@ -950,6 +1008,8 @@ export default function KeyDetailPage() {
             keyId={key.id}
             subscriptionToken={key.subscriptionToken}
             currentTheme={(key as any).subscriptionTheme}
+            currentCoverImage={(key as any).coverImage}
+            currentCoverImageType={(key as any).coverImageType}
             onThemeChange={() => refetch()}
           />
         </div>

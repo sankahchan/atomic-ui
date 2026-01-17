@@ -33,6 +33,8 @@ interface KeyData {
   dataLimitBytes: string | null;
   expiresAt: string | null;
   subscriptionTheme: string | null;
+  coverImage: string | null;
+  coverImageType: string | null;
   method: string | null;
   port: number | null;
 }
@@ -222,10 +224,34 @@ export default function SubscriptionPage() {
 
   return (
     <div
-      className="min-h-screen py-8 px-4"
+      className="min-h-screen"
       style={{ backgroundColor: theme.bgPrimary }}
     >
-      <div className="max-w-md mx-auto space-y-6">
+      {/* Cover Image */}
+      {keyData.coverImage && (
+        <div className="relative w-full h-48 overflow-hidden">
+          {keyData.coverImageType === 'gradient' ? (
+            <div className="absolute inset-0" style={{ background: keyData.coverImage }} />
+          ) : (
+            <img
+              src={keyData.coverImage}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          )}
+          {/* Gradient overlay for smooth transition to content */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-16"
+            style={{
+              background: `linear-gradient(to top, ${theme.bgPrimary}, transparent)`,
+            }}
+          />
+        </div>
+      )}
+
+      <div className={`max-w-md mx-auto space-y-6 px-4 ${keyData.coverImage ? '-mt-8 relative z-10' : 'py-8'}`}>
+        {!keyData.coverImage && <div className="h-8" />}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-4">
           {/* Data Usage Card */}

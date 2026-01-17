@@ -36,6 +36,8 @@ export async function GET(
         method: true,
         port: true,
         subscriptionTheme: true,
+        coverImage: true,
+        coverImageType: true,
         server: {
           select: {
             name: true,
@@ -96,6 +98,8 @@ export async function GET(
         dataLimitBytes: key.dataLimitBytes?.toString() || null,
         expiresAt: key.expiresAt?.toISOString() || null,
         subscriptionTheme: key.subscriptionTheme || null,
+        coverImage: key.coverImage || null,
+        coverImageType: key.coverImageType || null,
         method: key.method || null,
         port: key.port || null,
       });

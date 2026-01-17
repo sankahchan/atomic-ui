@@ -163,6 +163,11 @@ model AccessKey {
   // Valid themes: dark, light, purple, blue, green, orange, pink, red
   subscriptionTheme String?
 
+  // Subscription page cover image
+  // coverImageType: upload, unsplash, gradient
+  coverImageType String?
+  coverImage     String? // Path for upload, URL for unsplash, gradient name for gradient
+
   // Connection/device tracking
   estimatedDevices Int @default(0)
   peakDevices      Int @default(0)
