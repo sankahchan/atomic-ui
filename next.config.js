@@ -5,6 +5,10 @@
 const panelPath = process.env.PANEL_PATH || '';
 
 const nextConfig = {
+  // Enable standalone output for Docker deployment
+  // This creates a minimal .next/standalone folder with all dependencies
+  output: 'standalone',
+
   // Base path for the panel (used for security - random URL path)
   // Leave empty for root access, or set PANEL_PATH=/yourpath
   basePath: panelPath,
