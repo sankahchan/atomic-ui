@@ -4,9 +4,9 @@
  * CoverImagePicker Component
  *
  * A Notion-like cover image picker with tabs for:
- * - Gallery: Pre-defined gradients
+ * - Gallery: Pre-defined gradients and solid colors
  * - Upload: Drag & drop file upload
- * - Unsplash: Search and select photos
+ * - Link: Paste any image URL from the web
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -19,16 +19,15 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   Upload,
-  Search,
+  Link as LinkIcon,
   Loader2,
-  X,
   ImageIcon,
   Palette,
-  Camera,
   Check,
+  ExternalLink,
 } from 'lucide-react';
 
-// Pre-defined gradients (matching Notion style)
+// Pre-defined gradients
 const GRADIENTS = [
   { id: 'gradient-coral', name: 'Coral', value: 'linear-gradient(135deg, #f97171 0%, #f4a58a 100%)' },
   { id: 'gradient-amber', name: 'Amber', value: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' },
@@ -42,24 +41,35 @@ const GRADIENTS = [
   { id: 'gradient-sky', name: 'Sky', value: 'linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%)' },
   { id: 'gradient-mint', name: 'Mint', value: 'linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%)' },
   { id: 'gradient-rose', name: 'Rose', value: 'linear-gradient(135deg, #fda4af 0%, #fb7185 100%)' },
+  { id: 'gradient-emerald', name: 'Emerald', value: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+  { id: 'gradient-indigo', name: 'Indigo', value: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' },
+  { id: 'gradient-slate', name: 'Slate', value: 'linear-gradient(135deg, #64748b 0%, #475569 100%)' },
+  { id: 'gradient-warm', name: 'Warm', value: 'linear-gradient(135deg, #fcd34d 0%, #f97316 100%)' },
 ];
 
-interface UnsplashPhoto {
-  id: string;
-  description: string | null;
-  urls: {
-    thumb: string;
-    small: string;
-    regular: string;
-    full: string;
-  };
-  user: {
-    name: string;
-    username: string;
-    link: string;
-  };
-  color: string;
-}
+// Solid colors
+const SOLID_COLORS = [
+  { id: 'solid-red', name: 'Red', value: '#ef4444' },
+  { id: 'solid-orange', name: 'Orange', value: '#f97316' },
+  { id: 'solid-amber', name: 'Amber', value: '#f59e0b' },
+  { id: 'solid-yellow', name: 'Yellow', value: '#eab308' },
+  { id: 'solid-lime', name: 'Lime', value: '#84cc16' },
+  { id: 'solid-green', name: 'Green', value: '#22c55e' },
+  { id: 'solid-emerald', name: 'Emerald', value: '#10b981' },
+  { id: 'solid-teal', name: 'Teal', value: '#14b8a6' },
+  { id: 'solid-cyan', name: 'Cyan', value: '#06b6d4' },
+  { id: 'solid-sky', name: 'Sky', value: '#0ea5e9' },
+  { id: 'solid-blue', name: 'Blue', value: '#3b82f6' },
+  { id: 'solid-indigo', name: 'Indigo', value: '#6366f1' },
+  { id: 'solid-violet', name: 'Violet', value: '#8b5cf6' },
+  { id: 'solid-purple', name: 'Purple', value: '#a855f7' },
+  { id: 'solid-fuchsia', name: 'Fuchsia', value: '#d946ef' },
+  { id: 'solid-pink', name: 'Pink', value: '#ec4899' },
+  { id: 'solid-rose', name: 'Rose', value: '#f43f5e' },
+  { id: 'solid-slate', name: 'Slate', value: '#64748b' },
+  { id: 'solid-gray', name: 'Gray', value: '#6b7280' },
+  { id: 'solid-zinc', name: 'Zinc', value: '#71717a' },
+];
 
 interface CoverImagePickerProps {
   keyId: string;
@@ -82,52 +92,57 @@ export function CoverImagePicker({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('gallery');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Unsplash state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [unsplashPhotos, setUnsplashPhotos] = useState<UnsplashPhoto[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
+  // Link tab state
+  const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isValidatingUrl, setIsValidatingUrl] = useState(false);
 
   // Selection state
   const [selectedGradient, setSelectedGradient] = useState<string | null>(
     currentCoverType === 'gradient' ? (currentCover ?? null) : null
   );
 
-  // Handle gradient selection
-  const handleGradientSelect = async (gradient: typeof GRADIENTS[0]) => {
+  // Save cover to server
+  const saveCover = async (coverImage: string, coverImageType: string) => {
+    setIsSaving(true);
     try {
       const response = await fetch(`/api/keys/${keyId}/cover`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          coverImageType: 'gradient',
-          coverImage: gradient.value,
-        }),
+        body: JSON.stringify({ coverImageType, coverImage }),
       });
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        console.error('Non-JSON response:', await response.text());
-        throw new Error('Server returned an unexpected response');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save cover');
       }
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to save gradient');
-
-      setSelectedGradient(gradient.value);
-      onCoverChange(gradient.value, 'gradient');
-      toast({ title: 'Cover updated', description: `Set to ${gradient.name} gradient` });
-      onOpenChange(false);
+      return true;
     } catch (error) {
-      console.error('Gradient save error:', error);
+      console.error('Save cover error:', error);
       toast({
         title: 'Failed to save cover',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive'
+        description: error instanceof Error ? error.message : 'Please try again',
+        variant: 'destructive',
       });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle gradient/color selection
+  const handleGradientSelect = async (value: string, name: string) => {
+    const success = await saveCover(value, 'gradient');
+    if (success) {
+      setSelectedGradient(value);
+      onCoverChange(value, 'gradient');
+      toast({ title: 'Cover updated', description: `Set to ${name}` });
+      onOpenChange(false);
     }
   };
 
@@ -155,18 +170,12 @@ export function CoverImagePicker({
         body: formData,
       });
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response from upload API:', text);
-        throw new Error('Server returned an unexpected response');
-      }
-
-      const data = await response.json();
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Upload failed');
       }
 
+      const data = await response.json();
       onCoverChange(data.coverImage, 'upload');
       toast({ title: 'Cover uploaded successfully' });
       onOpenChange(false);
@@ -174,7 +183,7 @@ export function CoverImagePicker({
       console.error('Upload error:', error);
       toast({
         title: 'Upload failed',
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: error instanceof Error ? error.message : 'Please try again',
         variant: 'destructive',
       });
     } finally {
@@ -200,71 +209,46 @@ export function CoverImagePicker({
     if (file) handleFileUpload(file);
   }, [handleFileUpload]);
 
-  // Handle Unsplash search
-  const handleUnsplashSearch = async () => {
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    setHasSearched(true);
-    try {
-      const response = await fetch(
-        `/api/unsplash/search?query=${encodeURIComponent(searchQuery)}&per_page=20`,
-        { credentials: 'include' }
-      );
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response from Unsplash API:', text);
-        throw new Error('Server returned an unexpected response');
-      }
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Search failed');
-      }
-
-      setUnsplashPhotos(data.photos || []);
-    } catch (error) {
-      console.error('Unsplash search error:', error);
-      toast({
-        title: 'Search failed',
-        description: error instanceof Error ? error.message : 'Could not search Unsplash',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSearching(false);
+  // Validate and preview image URL
+  const validateImageUrl = useCallback(async (url: string) => {
+    if (!url.trim()) {
+      setImagePreview(null);
+      return;
     }
-  };
 
-  // Handle Unsplash photo selection
-  const handleUnsplashSelect = async (photo: UnsplashPhoto) => {
+    // Basic URL validation
     try {
-      const response = await fetch(`/api/keys/${keyId}/cover`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          coverImageType: 'unsplash',
-          coverImage: photo.urls.regular,
-        }),
-      });
+      new URL(url);
+    } catch {
+      toast({ title: 'Invalid URL', description: 'Please enter a valid URL', variant: 'destructive' });
+      return;
+    }
 
-      if (!response.ok) throw new Error('Failed to save cover');
+    setIsValidatingUrl(true);
+    setImagePreview(url);
+    setIsValidatingUrl(false);
+  }, [toast]);
 
-      onCoverChange(photo.urls.regular, 'unsplash');
-      toast({
-        title: 'Cover updated',
-        description: `Photo by ${photo.user.name}`,
-      });
+  // Handle URL submission
+  const handleUrlSubmit = async () => {
+    if (!imageUrl.trim()) {
+      toast({ title: 'Please enter an image URL', variant: 'destructive' });
+      return;
+    }
+
+    const success = await saveCover(imageUrl, 'url');
+    if (success) {
+      onCoverChange(imageUrl, 'url');
+      toast({ title: 'Cover updated' });
+      setImageUrl('');
+      setImagePreview(null);
       onOpenChange(false);
-    } catch (error) {
-      toast({ title: 'Failed to save cover', variant: 'destructive' });
     }
   };
 
   // Handle remove cover
   const handleRemoveCover = async () => {
+    setIsSaving(true);
     try {
       const response = await fetch(`/api/keys/${keyId}/cover`, {
         method: 'DELETE',
@@ -279,6 +263,8 @@ export function CoverImagePicker({
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Failed to remove cover', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -289,7 +275,7 @@ export function CoverImagePicker({
           <DialogTitle className="flex items-center justify-between">
             <span>Change cover</span>
             {(currentCover || currentCoverType) && (
-              <Button variant="ghost" size="sm" onClick={handleRemoveCover}>
+              <Button variant="ghost" size="sm" onClick={handleRemoveCover} disabled={isSaving}>
                 Remove
               </Button>
             )}
@@ -306,34 +292,64 @@ export function CoverImagePicker({
               <Upload className="w-4 h-4" />
               Upload
             </TabsTrigger>
-            <TabsTrigger value="unsplash" className="flex items-center gap-2">
-              <Camera className="w-4 h-4" />
-              Unsplash
+            <TabsTrigger value="link" className="flex items-center gap-2">
+              <LinkIcon className="w-4 h-4" />
+              Link
             </TabsTrigger>
           </TabsList>
 
-          {/* Gallery Tab - Gradients */}
-          <TabsContent value="gallery" className="flex-1 overflow-auto mt-4">
-            <p className="text-sm text-muted-foreground mb-4">Color & Gradient</p>
-            <div className="grid grid-cols-4 gap-3">
-              {GRADIENTS.map((gradient) => (
-                <button
-                  key={gradient.id}
-                  onClick={() => handleGradientSelect(gradient)}
-                  className={cn(
-                    'relative aspect-[16/10] rounded-lg overflow-hidden transition-all hover:ring-2 hover:ring-primary',
-                    selectedGradient === gradient.value && 'ring-2 ring-primary'
-                  )}
-                  style={{ background: gradient.value }}
-                  title={gradient.name}
-                >
-                  {selectedGradient === gradient.value && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <Check className="w-6 h-6 text-white" />
-                    </div>
-                  )}
-                </button>
-              ))}
+          {/* Gallery Tab - Gradients & Colors */}
+          <TabsContent value="gallery" className="flex-1 overflow-auto mt-4 space-y-6">
+            {/* Gradients */}
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">Gradients</p>
+              <div className="grid grid-cols-4 gap-3">
+                {GRADIENTS.map((gradient) => (
+                  <button
+                    key={gradient.id}
+                    onClick={() => handleGradientSelect(gradient.value, gradient.name)}
+                    disabled={isSaving}
+                    className={cn(
+                      'relative aspect-[16/10] rounded-lg overflow-hidden transition-all hover:ring-2 hover:ring-primary disabled:opacity-50',
+                      selectedGradient === gradient.value && 'ring-2 ring-primary'
+                    )}
+                    style={{ background: gradient.value }}
+                    title={gradient.name}
+                  >
+                    {selectedGradient === gradient.value && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <Check className="w-6 h-6 text-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Solid Colors */}
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">Solid Colors</p>
+              <div className="grid grid-cols-5 gap-3">
+                {SOLID_COLORS.map((color) => (
+                  <button
+                    key={color.id}
+                    onClick={() => handleGradientSelect(color.value, color.name)}
+                    disabled={isSaving}
+                    className={cn(
+                      'relative aspect-square rounded-lg overflow-hidden transition-all hover:ring-2 hover:ring-primary disabled:opacity-50',
+                      selectedGradient === color.value && 'ring-2 ring-primary'
+                    )}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  >
+                    {selectedGradient === color.value && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <Check className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </TabsContent>
 
@@ -379,68 +395,96 @@ export function CoverImagePicker({
             </div>
           </TabsContent>
 
-          {/* Unsplash Tab */}
-          <TabsContent value="unsplash" className="flex-1 overflow-hidden flex flex-col mt-4">
-            <div className="flex gap-2 flex-shrink-0">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {/* Link Tab - Paste any image URL */}
+          <TabsContent value="link" className="flex-1 overflow-auto mt-4 space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Paste an image URL from any website (Pexels, Pixabay, your own hosting, etc.)
+              </p>
+              <div className="flex gap-2">
                 <Input
-                  placeholder="Search photos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUnsplashSearch()}
-                  className="pl-9"
+                  placeholder="https://example.com/image.jpg"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  onBlur={() => validateImageUrl(imageUrl)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                 />
+                <Button onClick={handleUrlSubmit} disabled={isSaving || !imageUrl.trim()}>
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                </Button>
               </div>
-              <Button onClick={handleUnsplashSearch} disabled={isSearching}>
-                {isSearching ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Search'
-                )}
-              </Button>
             </div>
 
-            <div className="flex-1 overflow-auto mt-4">
-              {isSearching ? (
-                <div className="flex items-center justify-center h-48">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Preview:</p>
+                <div className="relative aspect-[16/9] rounded-lg overflow-hidden bg-muted">
+                  {isValidatingUrl ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      fill
+                      className="object-cover"
+                      onError={() => {
+                        setImagePreview(null);
+                        toast({
+                          title: 'Failed to load image',
+                          description: 'Please check the URL and try again',
+                          variant: 'destructive',
+                        });
+                      }}
+                    />
+                  )}
                 </div>
-              ) : unsplashPhotos.length > 0 ? (
-                <div className="grid grid-cols-3 gap-3">
-                  {unsplashPhotos.map((photo) => (
-                    <button
-                      key={photo.id}
-                      onClick={() => handleUnsplashSelect(photo)}
-                      className="relative aspect-[16/10] rounded-lg overflow-hidden group"
-                    >
-                      <Image
-                        src={photo.urls.small}
-                        alt={photo.description || 'Unsplash photo'}
-                        fill
-                        className="object-cover transition-transform group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end">
-                        <p className="text-xs text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity truncate w-full">
-                          by {photo.user.name}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : hasSearched ? (
-                <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                  <ImageIcon className="w-10 h-10 mb-2" />
-                  <p>No photos found</p>
-                  <p className="text-sm">Try a different search term</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                  <Camera className="w-10 h-10 mb-2" />
-                  <p>Search for beautiful photos</p>
-                  <p className="text-sm">Powered by Unsplash</p>
-                </div>
-              )}
+              </div>
+            )}
+
+            {/* Free image sources */}
+            <div className="pt-4 border-t">
+              <p className="text-sm font-medium mb-2">Free image sources:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <a
+                  href="https://www.pexels.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Pexels
+                </a>
+                <a
+                  href="https://pixabay.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Pixabay
+                </a>
+                <a
+                  href="https://unsplash.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Unsplash
+                </a>
+                <a
+                  href="https://www.freepik.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Freepik
+                </a>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

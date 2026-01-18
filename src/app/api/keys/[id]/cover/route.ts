@@ -1,7 +1,7 @@
 /**
  * Cover Image API for Access Keys
  *
- * PUT: Set cover image (Unsplash URL or gradient)
+ * PUT: Set cover image (URL, gradient, or uploaded file reference)
  * DELETE: Remove cover image
  */
 
@@ -33,7 +33,7 @@ export async function PUT(
       );
     }
 
-    if (!['upload', 'unsplash', 'gradient'].includes(coverImageType)) {
+    if (!['upload', 'unsplash', 'gradient', 'url'].includes(coverImageType)) {
       return NextResponse.json(
         { error: 'Invalid coverImageType' },
         { status: 400 }
