@@ -431,7 +431,7 @@ function SubscriptionShareCard({
               <SelectItem value="TRIGGER_COVER_PICKER" className="font-medium text-primary">
                 <div className="flex items-center gap-2">
                   <ImagePlus className="w-4 h-4" />
-                  Custom Cover...
+                  Custom Theme...
                 </div>
               </SelectItem>
               {themeList.map((t) => (

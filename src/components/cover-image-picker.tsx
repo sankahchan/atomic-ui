@@ -101,6 +101,7 @@ export function CoverImagePicker({
       const response = await fetch(`/api/keys/${keyId}/cover`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           coverImageType: 'gradient',
           coverImage: gradient.value,
@@ -138,6 +139,7 @@ export function CoverImagePicker({
 
       const response = await fetch('/api/upload/cover', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
 
@@ -187,7 +189,8 @@ export function CoverImagePicker({
     setHasSearched(true);
     try {
       const response = await fetch(
-        `/api/unsplash/search?query=${encodeURIComponent(searchQuery)}&per_page=20`
+        `/api/unsplash/search?query=${encodeURIComponent(searchQuery)}&per_page=20`,
+        { credentials: 'include' }
       );
 
       if (!response.ok) {
@@ -214,6 +217,7 @@ export function CoverImagePicker({
       const response = await fetch(`/api/keys/${keyId}/cover`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           coverImageType: 'unsplash',
           coverImage: photo.urls.regular,
@@ -238,6 +242,7 @@ export function CoverImagePicker({
     try {
       const response = await fetch(`/api/keys/${keyId}/cover`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (!response.ok) throw new Error('Failed to remove cover');
