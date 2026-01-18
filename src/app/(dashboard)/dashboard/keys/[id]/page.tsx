@@ -71,11 +71,9 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
-  ImagePlus,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
-import { CoverImagePicker } from '@/components/cover-image-picker';
 
 /**
  * Status badge configuration
@@ -339,23 +337,15 @@ function SubscriptionShareCard({
   keyId,
   subscriptionToken,
   currentTheme,
-  currentCoverImage,
-  currentCoverImageType,
   onThemeChange,
 }: {
   keyId: string;
   subscriptionToken: string | null;
   currentTheme: string | null;
-  currentCoverImage: string | null;
-  currentCoverImageType: string | null;
   onThemeChange: () => void;
 }) {
   const { toast } = useToast();
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
-  const [coverImage, setCoverImage] = useState(currentCoverImage);
-  const [coverImageType, setCoverImageType] = useState(currentCoverImageType);
 
   const updateThemeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
@@ -375,10 +365,6 @@ function SubscriptionShareCard({
   });
 
   const handleThemeChange = (value: string) => {
-    if (value === 'TRIGGER_COVER_PICKER') {
-      setCoverPickerOpen(true);
-      return;
-    }
     setSelectedTheme(value);
     updateThemeMutation.mutate({
       id: keyId,
@@ -415,8 +401,6 @@ function SubscriptionShareCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-
-
         {/* Theme Selector */}
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
@@ -428,12 +412,6 @@ function SubscriptionShareCard({
               <SelectValue placeholder="Select theme" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="TRIGGER_COVER_PICKER" className="font-medium text-primary">
-                <div className="flex items-center gap-2">
-                  <ImagePlus className="w-4 h-4" />
-                  Custom Theme...
-                </div>
-              </SelectItem>
               {themeList.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   <div className="flex items-center gap-2">
@@ -519,20 +497,6 @@ function SubscriptionShareCard({
           {getSubscriptionPageUrl() || 'No subscription token'}
         </div>
       </CardContent>
-
-      {/* Cover Image Picker Dialog */}
-      <CoverImagePicker
-        keyId={keyId}
-        currentCover={coverImage}
-        currentCoverType={coverImageType}
-        open={coverPickerOpen}
-        onOpenChange={setCoverPickerOpen}
-        onCoverChange={(newCover, newType) => {
-          setCoverImage(newCover);
-          setCoverImageType(newType);
-          onThemeChange(); // Trigger refetch
-        }}
-      />
     </Card>
   );
 }
@@ -985,8 +949,6 @@ export default function KeyDetailPage() {
             keyId={key.id}
             subscriptionToken={key.subscriptionToken}
             currentTheme={(key as any).subscriptionTheme}
-            currentCoverImage={(key as any).coverImage}
-            currentCoverImageType={(key as any).coverImageType}
             onThemeChange={() => refetch()}
           />
         </div>
