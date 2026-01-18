@@ -19,11 +19,18 @@ export async function PUT(
   try {
     const user = await getCurrentUser();
     if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized - Please log in again' }, { status: 401 });
     }
 
     const { id: keyId } = await params;
-    const body = await request.json();
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     const { coverImageType, coverImage } = body;
 
     if (!coverImageType || !coverImage) {
@@ -46,7 +53,7 @@ export async function PUT(
     });
 
     if (!key) {
-      return NextResponse.json({ error: 'Access key not found' }, { status: 404 });
+      return NextResponse.json({ error: `Access key not found: ${keyId}` }, { status: 404 });
     }
 
     // Delete old uploaded file if switching from upload to another type
@@ -76,7 +83,8 @@ export async function PUT(
     });
   } catch (error) {
     console.error('Update cover failed:', error);
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Update failed: ${message}` }, { status: 500 });
   }
 }
 

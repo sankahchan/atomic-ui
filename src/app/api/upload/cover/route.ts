@@ -21,10 +21,16 @@ export async function POST(request: NextRequest) {
     // Verify admin session
     const user = await getCurrentUser();
     if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized - Please log in again' }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+    }
+
     const file = formData.get('file') as File | null;
     const keyId = formData.get('keyId') as string | null;
 
@@ -39,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF' },
+        { error: `Invalid file type: ${file.type}. Allowed: JPEG, PNG, WebP, GIF` },
         { status: 400 }
       );
     }
@@ -47,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size: 5MB' },
+        { error: `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum: 5MB` },
         { status: 400 }
       );
     }
@@ -59,13 +65,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (!key) {
-      return NextResponse.json({ error: 'Access key not found' }, { status: 404 });
+      return NextResponse.json({ error: `Access key not found: ${keyId}` }, { status: 404 });
     }
 
     // Create upload directory if it doesn't exist
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'covers');
     if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+      try {
+        await mkdir(uploadDir, { recursive: true });
+      } catch (e) {
+        console.error('Failed to create upload directory:', e);
+        return NextResponse.json({ error: 'Failed to create upload directory' }, { status: 500 });
+      }
     }
 
     // Delete old uploaded cover if exists
@@ -87,9 +98,14 @@ export async function POST(request: NextRequest) {
     const publicPath = `/uploads/covers/${filename}`;
 
     // Write file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filepath, buffer);
+    } catch (e) {
+      console.error('Failed to write file:', e);
+      return NextResponse.json({ error: 'Failed to save file to disk' }, { status: 500 });
+    }
 
     // Update database
     await db.accessKey.update({
@@ -107,7 +123,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Upload failed:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Upload failed: ${message}` }, { status: 500 });
   }
 }
 
