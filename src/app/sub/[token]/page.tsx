@@ -319,7 +319,14 @@ export default function SubscriptionPage() {
               Data Usage
             </div>
             <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
-              {formatBytes(keyData.usedBytes)}
+              {keyData.dataLimitBytes ? (
+                <>
+                  <span>{formatBytes(keyData.usedBytes)}</span>
+                  <span className="text-sm font-normal" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.6)' : theme.textMuted }}> / {formatBytes(keyData.dataLimitBytes)}</span>
+                </>
+              ) : (
+                formatBytes(keyData.usedBytes)
+              )}
             </div>
             {keyData.dataLimitBytes && (
               <div className="mt-2">

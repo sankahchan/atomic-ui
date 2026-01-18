@@ -952,9 +952,10 @@ export default function KeysPage() {
   // Fetch key stats
   const { data: stats } = trpc.keys.stats.useQuery();
 
-  // Fetch online users
+  // Fetch online users - always poll every 3 seconds when auto-refresh is enabled
+  // This ensures responsive online status updates independent of the sync interval
   const { data: onlineData, refetch: refetchOnline } = trpc.keys.getOnlineUsers.useQuery(undefined, {
-    refetchInterval: autoRefreshInterval > 0 ? autoRefreshInterval * 1000 : false,
+    refetchInterval: autoRefreshInterval > 0 ? 3000 : false,
   });
 
   // Set of online key IDs for quick lookup

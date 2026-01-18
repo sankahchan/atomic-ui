@@ -518,8 +518,8 @@ export const serversRouter = router({
             }
 
             // Update lastUsedAt if there's any traffic increase (for online detection)
-            // Threshold of 1KB to filter out noise/handshakes
-            const hasTraffic = bytesTransferred > 1024;
+            // Use very low threshold (100 bytes) for responsive online status
+            const hasTraffic = bytesTransferred > 100;
             if (hasTraffic) {
               updateData.lastUsedAt = new Date();
             }
@@ -858,8 +858,8 @@ export const serversRouter = router({
             }
 
             // Update lastUsedAt if there's any traffic increase (for online detection)
-            // Threshold of 1KB to filter out noise/handshakes
-            const hasTraffic = bytesTransferred > 1024;
+            // Use very low threshold (100 bytes) for responsive online status
+            const hasTraffic = bytesTransferred > 100;
             if (hasTraffic) {
               updateData.lastUsedAt = new Date();
             }
