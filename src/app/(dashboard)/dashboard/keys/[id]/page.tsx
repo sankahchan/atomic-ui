@@ -374,11 +374,15 @@ function SubscriptionShareCard({
     },
   });
 
-  const handleThemeChange = (themeId: string) => {
-    setSelectedTheme(themeId);
+  const handleThemeChange = (value: string) => {
+    if (value === 'TRIGGER_COVER_PICKER') {
+      setCoverPickerOpen(true);
+      return;
+    }
+    setSelectedTheme(value);
     updateThemeMutation.mutate({
       id: keyId,
-      subscriptionTheme: themeId,
+      subscriptionTheme: value,
     } as any);
   };
 
@@ -411,40 +415,7 @@ function SubscriptionShareCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Cover Image */}
-        <div className="space-y-2">
-          <Label className="text-sm text-muted-foreground flex items-center gap-2">
-            <ImagePlus className="w-4 h-4" />
-            Cover Image
-          </Label>
-          <button
-            onClick={() => setCoverPickerOpen(true)}
-            className="w-full h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors overflow-hidden relative group"
-          >
-            {coverImage ? (
-              <>
-                {coverImageType === 'gradient' ? (
-                  <div className="absolute inset-0" style={{ background: coverImage }} />
-                ) : (
-                  <Image
-                    src={coverImage}
-                    alt="Cover"
-                    fill
-                    className="object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">Change Cover</span>
-                </div>
-              </>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                <ImagePlus className="w-6 h-6 mb-1" />
-                <span className="text-xs">Add cover image</span>
-              </div>
-            )}
-          </button>
-        </div>
+
 
         {/* Theme Selector */}
         <div className="space-y-2">
@@ -457,6 +428,12 @@ function SubscriptionShareCard({
               <SelectValue placeholder="Select theme" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="TRIGGER_COVER_PICKER" className="font-medium text-primary">
+                <div className="flex items-center gap-2">
+                  <ImagePlus className="w-4 h-4" />
+                  Custom Cover...
+                </div>
+              </SelectItem>
               {themeList.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   <div className="flex items-center gap-2">
