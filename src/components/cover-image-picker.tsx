@@ -108,14 +108,26 @@ export function CoverImagePicker({
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to save gradient');
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        console.error('Non-JSON response:', await response.text());
+        throw new Error('Server returned an unexpected response');
+      }
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save gradient');
 
       setSelectedGradient(gradient.value);
       onCoverChange(gradient.value, 'gradient');
       toast({ title: 'Cover updated', description: `Set to ${gradient.name} gradient` });
       onOpenChange(false);
     } catch (error) {
-      toast({ title: 'Failed to save cover', variant: 'destructive' });
+      console.error('Gradient save error:', error);
+      toast({
+        title: 'Failed to save cover',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -143,16 +155,23 @@ export function CoverImagePicker({
         body: formData,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response from upload API:', text);
+        throw new Error('Server returned an unexpected response');
       }
 
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
       onCoverChange(data.coverImage, 'upload');
       toast({ title: 'Cover uploaded successfully' });
       onOpenChange(false);
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         title: 'Upload failed',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -193,14 +212,21 @@ export function CoverImagePicker({
         { credentials: 'include' }
       );
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Search failed');
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response from Unsplash API:', text);
+        throw new Error('Server returned an unexpected response');
       }
 
       const data = await response.json();
-      setUnsplashPhotos(data.photos);
+      if (!response.ok) {
+        throw new Error(data.error || 'Search failed');
+      }
+
+      setUnsplashPhotos(data.photos || []);
     } catch (error) {
+      console.error('Unsplash search error:', error);
       toast({
         title: 'Search failed',
         description: error instanceof Error ? error.message : 'Could not search Unsplash',
