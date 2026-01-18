@@ -105,6 +105,7 @@ const listKeysSchema = z.object({
   search: z.string().optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
+  unattachedOnly: z.boolean().optional(), // Filter for keys not attached to any dynamic key
 });
 
 // Helper function to convert GB to bytes
@@ -148,7 +149,7 @@ export const keysRouter = router({
   list: protectedProcedure
     .input(listKeysSchema)
     .query(async ({ ctx, input }) => {
-      const { serverId, status, search, page, pageSize } = input;
+      const { serverId, status, search, page, pageSize, unattachedOnly } = input;
 
       // Build the where clause
       const where: Record<string, unknown> = {};
@@ -172,6 +173,11 @@ export const keysRouter = router({
           { email: { contains: search } },
           { telegramId: { contains: search } },
         ];
+      }
+
+      // Filter for keys not attached to any dynamic key
+      if (unattachedOnly) {
+        where.dynamicKeyId = null;
       }
 
       // Admin can filter by specific userId

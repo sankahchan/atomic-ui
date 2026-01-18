@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
@@ -76,6 +77,8 @@ export default function DynamicKeyDetailPage() {
   const dakId = params.id as string;
 
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [selectedKeyId, setSelectedKeyId] = useState<string>('');
 
   // Fetch DAK data from API
   const { data: dak, isLoading, refetch } = trpc.dynamicKeys.getById.useQuery(
@@ -109,6 +112,7 @@ export default function DynamicKeyDetailPage() {
         description: 'The access key has been detached from this dynamic key.',
       });
       refetch();
+      refetchAvailableKeys();
     },
     onError: (error) => {
       toast({
@@ -117,6 +121,34 @@ export default function DynamicKeyDetailPage() {
         variant: 'destructive',
       });
     },
+  });
+
+  // Attach key mutation
+  const attachKeyMutation = trpc.dynamicKeys.attachKey.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Key attached',
+        description: 'The access key has been attached to this dynamic key.',
+      });
+      setAttachDialogOpen(false);
+      setSelectedKeyId('');
+      refetch();
+      refetchAvailableKeys();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error attaching key',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Fetch available keys (not attached to any DAK)
+  const { data: availableKeys, refetch: refetchAvailableKeys } = trpc.keys.list.useQuery({
+    status: 'ACTIVE',
+    unattachedOnly: true,
+    pageSize: 100,
   });
 
   // Generate QR code when data loads
@@ -163,6 +195,12 @@ export default function DynamicKeyDetailPage() {
   const handleDetachKey = (keyId: string) => {
     if (dak && confirm(t('dynamic_keys.msg.confirm_detach'))) {
       detachKeyMutation.mutate({ dakId: dak.id, keyId });
+    }
+  };
+
+  const handleAttachKey = () => {
+    if (dak && selectedKeyId) {
+      attachKeyMutation.mutate({ dakId: dak.id, keyId: selectedKeyId });
     }
   };
 
@@ -337,6 +375,13 @@ export default function DynamicKeyDetailPage() {
                   <Key className="w-5 h-5 text-primary" />
                   {t('dynamic_keys.detail.attached_keys')} ({dak.accessKeys.length})
                 </CardTitle>
+                <Button
+                  size="sm"
+                  onClick={() => setAttachDialogOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Attach Key
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -460,6 +505,80 @@ export default function DynamicKeyDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Attach Key Dialog */}
+      <Dialog open={attachDialogOpen} onOpenChange={setAttachDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Attach Access Key
+            </DialogTitle>
+            <DialogDescription>
+              Select an access key to attach to this dynamic key. Only active keys that are not already attached to another dynamic key are shown.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select Access Key</Label>
+              <Select
+                value={selectedKeyId}
+                onValueChange={setSelectedKeyId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a key to attach..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableKeys?.items && availableKeys.items.length > 0 ? (
+                    availableKeys.items.map((key) => (
+                      <SelectItem key={key.id} value={key.id}>
+                        <div className="flex items-center gap-2">
+                          <Key className="w-4 h-4" />
+                          <span>{key.name}</span>
+                          <span className="text-muted-foreground text-xs">
+                            ({key.server?.name || 'Unknown Server'})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No available keys
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {(!availableKeys?.items || availableKeys.items.length === 0) && (
+                <p className="text-sm text-muted-foreground">
+                  No unattached access keys available. Create a new key first or detach one from another dynamic key.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAttachDialogOpen(false);
+                setSelectedKeyId('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAttachKey}
+              disabled={!selectedKeyId || attachKeyMutation.isPending}
+            >
+              {attachKeyMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Attach Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
