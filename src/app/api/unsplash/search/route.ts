@@ -24,14 +24,29 @@ export async function GET(request: NextRequest) {
       where: { key: 'unsplashApiKey' },
     });
 
-    if (!apiKeySetting?.value) {
+    let apiKey = apiKeySetting?.value;
+
+    // Fallback to environment variable
+    if (!apiKey && process.env.UNSPLASH_ACCESS_KEY) {
+      apiKey = process.env.UNSPLASH_ACCESS_KEY;
+    }
+
+    if (!apiKey) {
       return NextResponse.json(
-        { error: 'Unsplash API key not configured. Please add it in Settings.' },
+        { error: 'Unsplash API key not configured. Please add it in Settings or .env file.' },
         { status: 400 }
       );
     }
 
-    const apiKey = JSON.parse(apiKeySetting.value);
+    try {
+      // Try to parse if it's JSON encoded (from DB settings)
+      if (apiKey.startsWith('"') || apiKey.startsWith('{')) {
+        apiKey = JSON.parse(apiKey);
+      }
+    } catch (e) {
+      // Use raw value if parse fails (likely env var or plain string in DB)
+      console.warn('Failed to parse Unsplash API key as JSON, using raw value');
+    }
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query');
@@ -111,14 +126,27 @@ export async function POST(request: NextRequest) {
       where: { key: 'unsplashApiKey' },
     });
 
-    if (!apiKeySetting?.value) {
+    let apiKey = apiKeySetting?.value;
+
+    // Fallback to environment variable
+    if (!apiKey && process.env.UNSPLASH_ACCESS_KEY) {
+      apiKey = process.env.UNSPLASH_ACCESS_KEY;
+    }
+
+    if (!apiKey) {
       return NextResponse.json(
         { error: 'Unsplash API key not configured' },
         { status: 400 }
       );
     }
 
-    const apiKey = JSON.parse(apiKeySetting.value);
+    try {
+      if (apiKey.startsWith('"') || apiKey.startsWith('{')) {
+        apiKey = JSON.parse(apiKey);
+      }
+    } catch (e) {
+      console.warn('Failed to parse Unsplash API key as JSON, using raw value');
+    }
 
     const body = await request.json();
     const { collection } = body;
