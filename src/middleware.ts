@@ -33,8 +33,10 @@ const publicRoutes = [
   '/api/health',            // Health check endpoint
   '/api/trpc/auth.login',   // Login API endpoint
   '/api/trpc/auth.logout',  // Logout API endpoint
+  '/api/tasks/',            // Background tasks (cron jobs)
   '/_next',                 // Next.js static files
   '/favicon.ico',           // Favicon
+  '/uploads/',              // Uploaded files (covers, etc.)
 ];
 
 /**
