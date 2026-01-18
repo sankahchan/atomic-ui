@@ -164,9 +164,14 @@ model AccessKey {
   subscriptionTheme String?
 
   // Subscription page cover image
-  // coverImageType: upload, unsplash, gradient
+  // coverImageType: upload, unsplash, gradient, url
   coverImageType String?
-  coverImage     String? // Path for upload, URL for unsplash, gradient name for gradient
+  coverImage     String? // Path for upload, URL for unsplash/url, gradient name for gradient
+
+  // Contact links for subscription page (JSON array of up to 3 contacts)
+  // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
+  // Valid types: telegram, discord, whatsapp, phone, email, website, facebook
+  contactLinks   String?
 
   // Connection/device tracking
   estimatedDevices Int @default(0)

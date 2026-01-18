@@ -38,6 +38,7 @@ export async function GET(
         subscriptionTheme: true,
         coverImage: true,
         coverImageType: true,
+        contactLinks: true,
         server: {
           select: {
             name: true,
@@ -102,6 +103,7 @@ export async function GET(
         coverImageType: key.coverImageType || null,
         method: key.method || null,
         port: key.port || null,
+        contactLinks: key.contactLinks ? JSON.parse(key.contactLinks) : null,
       });
     }
 

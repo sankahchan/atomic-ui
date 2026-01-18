@@ -75,7 +75,13 @@ const updateKeySchema = z.object({
   durationDays: z.number().int().positive().optional().nullable(),
   status: z.enum(['ACTIVE', 'DISABLED', 'EXPIRED', 'DEPLETED', 'PENDING']).optional(),
   prefix: z.string().max(16).optional().nullable(),
-  subscriptionTheme: z.enum(['dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red']).optional().nullable(),
+  subscriptionTheme: z.enum([
+    'dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red',
+    'glassPurple', 'glassBlue', 'glassCyan', 'glassGreen', 'glassPink', 'glassOrange', 'glassNeutral'
+  ]).optional().nullable(),
+  coverImage: z.string().url().optional().nullable(),
+  coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
+  contactLinks: z.string().optional().nullable(), // JSON string of contact links
 });
 
 /**
@@ -450,6 +456,18 @@ export const keysRouter = router({
 
         if (data.subscriptionTheme !== undefined) {
           updateData.subscriptionTheme = data.subscriptionTheme;
+        }
+
+        if (data.coverImage !== undefined) {
+          updateData.coverImage = data.coverImage;
+        }
+
+        if (data.coverImageType !== undefined) {
+          updateData.coverImageType = data.coverImageType;
+        }
+
+        if (data.contactLinks !== undefined) {
+          updateData.contactLinks = data.contactLinks;
         }
 
         // Update the database record

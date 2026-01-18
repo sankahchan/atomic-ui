@@ -71,6 +71,11 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
+  Plus,
+  X,
+  Image as ImageIcon,
+  Phone,
+  Globe,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -328,24 +333,52 @@ function DeleteKeyDialog({
   );
 }
 
+// Contact type options for subscription page
+const CONTACT_TYPES = [
+  { value: 'telegram', label: 'Telegram', icon: '📱' },
+  { value: 'discord', label: 'Discord', icon: '🎮' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
+  { value: 'phone', label: 'Phone', icon: '📞' },
+  { value: 'email', label: 'Email', icon: '📧' },
+  { value: 'website', label: 'Website', icon: '🌐' },
+  { value: 'facebook', label: 'Facebook', icon: '👤' },
+] as const;
+
+interface ContactLink {
+  type: typeof CONTACT_TYPES[number]['value'];
+  value: string;
+}
+
 /**
  * SubscriptionShareCard Component
  *
- * Card for sharing the subscription page with theme selection and preview.
+ * Card for sharing the subscription page with theme selection, cover image, and contact links.
  */
 function SubscriptionShareCard({
   keyId,
   subscriptionToken,
   currentTheme,
+  currentCoverImage,
+  currentCoverImageType,
+  currentContactLinks,
   onThemeChange,
 }: {
   keyId: string;
   subscriptionToken: string | null;
   currentTheme: string | null;
+  currentCoverImage: string | null;
+  currentCoverImageType: string | null;
+  currentContactLinks: ContactLink[] | null;
   onThemeChange: () => void;
 }) {
   const { toast } = useToast();
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    currentCoverImageType === 'url' ? currentCoverImage || '' : ''
+  );
+  const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
+  const [newContactType, setNewContactType] = useState<string>('telegram');
+  const [newContactValue, setNewContactValue] = useState('');
 
   const updateThemeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
@@ -364,11 +397,97 @@ function SubscriptionShareCard({
     },
   });
 
+  const updateCoverMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Cover image updated',
+        description: 'The cover image has been updated.',
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateContactsMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Contacts updated',
+        description: 'Contact links have been updated.',
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleThemeChange = (value: string) => {
     setSelectedTheme(value);
     updateThemeMutation.mutate({
       id: keyId,
       subscriptionTheme: value,
+    } as any);
+  };
+
+  const handleCoverImageSave = () => {
+    if (coverImageUrl.trim()) {
+      updateCoverMutation.mutate({
+        id: keyId,
+        coverImage: coverImageUrl.trim(),
+        coverImageType: 'url',
+      } as any);
+    } else {
+      // Clear cover image
+      updateCoverMutation.mutate({
+        id: keyId,
+        coverImage: null,
+        coverImageType: null,
+      } as any);
+    }
+  };
+
+  const handleAddContact = () => {
+    if (!newContactValue.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a contact value.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (contacts.length >= 3) {
+      toast({
+        title: 'Limit reached',
+        description: 'Maximum 3 contacts allowed.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const newContacts = [...contacts, { type: newContactType as ContactLink['type'], value: newContactValue.trim() }];
+    setContacts(newContacts);
+    setNewContactValue('');
+    updateContactsMutation.mutate({
+      id: keyId,
+      contactLinks: JSON.stringify(newContacts),
+    } as any);
+  };
+
+  const handleRemoveContact = (index: number) => {
+    const newContacts = contacts.filter((_, i) => i !== index);
+    setContacts(newContacts);
+    updateContactsMutation.mutate({
+      id: keyId,
+      contactLinks: newContacts.length > 0 ? JSON.stringify(newContacts) : null,
     } as any);
   };
 
@@ -425,6 +544,107 @@ function SubscriptionShareCard({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Cover Image URL */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <ImageIcon className="w-4 h-4" />
+            Cover Image URL
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://example.com/image.jpg"
+              value={coverImageUrl}
+              onChange={(e) => setCoverImageUrl(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCoverImageSave}
+              disabled={updateCoverMutation.isPending}
+            >
+              {updateCoverMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Paste any image URL from Pexels, Unsplash, or your own hosting
+          </p>
+        </div>
+
+        {/* Contact Links */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Contact Links ({contacts.length}/3)
+          </Label>
+
+          {/* Existing contacts */}
+          {contacts.length > 0 && (
+            <div className="space-y-2">
+              {contacts.map((contact, index) => {
+                const contactType = CONTACT_TYPES.find(t => t.value === contact.type);
+                return (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                    <span>{contactType?.icon}</span>
+                    <span className="text-sm font-medium">{contactType?.label}</span>
+                    <span className="text-sm text-muted-foreground truncate flex-1">{contact.value}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleRemoveContact(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add new contact */}
+          {contacts.length < 3 && (
+            <div className="flex gap-2">
+              <Select value={newContactType} onValueChange={setNewContactType}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{type.icon}</span>
+                        {type.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Enter link or ID"
+                value={newContactValue}
+                onChange={(e) => setNewContactValue(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleAddContact}
+                disabled={updateContactsMutation.isPending}
+              >
+                {updateContactsMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Theme Preview */}
@@ -949,6 +1169,9 @@ export default function KeyDetailPage() {
             keyId={key.id}
             subscriptionToken={key.subscriptionToken}
             currentTheme={(key as any).subscriptionTheme}
+            currentCoverImage={(key as any).coverImage}
+            currentCoverImageType={(key as any).coverImageType}
+            currentContactLinks={(key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null}
             onThemeChange={() => refetch()}
           />
         </div>
