@@ -1,245 +1,26 @@
 /**
- * Subscription URL Endpoint
- * 
- * This endpoint serves access key configurations to VPN clients. It supports
- * multiple output formats commonly used by different Shadowsocks clients,
- * including raw, Base64-encoded, Clash YAML, and SIP008 JSON formats.
- * 
- * The endpoint is designed to be compatible with popular VPN client applications
- * that support subscription URLs, allowing users to automatically update their
- * server configurations without manual entry.
- * 
- * URL Format: /sub/{token}?format={format}
- * 
- * Supported Formats:
- * - raw: Plain ss:// URL (default)
- * - base64: Base64-encoded ss:// URL
- * - clash: Clash proxy configuration YAML
- * - sip008: SIP008 JSON format for Outline/Shadowsocks clients
- * 
- * The token is a unique identifier generated for each access key, providing
- * a level of security by requiring knowledge of the specific token to access
- * the configuration.
+ * Dynamic Subscription URL Endpoint
+ *
+ * This endpoint serves access key configurations to VPN clients.
+ * It supports both Dynamic Access Keys and regular Access Keys.
+ *
+ * For Outline clients, this returns a JSON object in the format:
+ * {
+ *   "server": "hostname",
+ *   "server_port": 8388,
+ *   "password": "secret",
+ *   "method": "chacha20-ietf-poly1305"
+ * }
+ *
+ * URL Format: /sub/{token}
+ *
+ * The token can be either:
+ * - A Dynamic Access Key's dynamicUrl token
+ * - A regular Access Key's subscriptionToken
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db as prisma } from '@/lib/db';
-
-/**
- * Supported subscription formats
- * Each format is designed for compatibility with different VPN client apps.
- */
-type SubscriptionFormat = 'raw' | 'base64' | 'clash' | 'sip008';
-
-/**
- * GET /sub/[token]
- * 
- * Retrieves the access key configuration for the given subscription token.
- * The response format can be specified via the `format` query parameter.
- * 
- * This endpoint also tracks key usage by recording the "first use" timestamp,
- * which is important for keys with START_ON_FIRST_USE expiration type.
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
-  try {
-    const { token } = params;
-    const format = (request.nextUrl.searchParams.get('format') || 'raw') as SubscriptionFormat;
-
-    // Find the access key by subscription token
-    const accessKey = await prisma.accessKey.findUnique({
-      where: { subscriptionToken: token },
-      include: {
-        server: true,
-      },
-    });
-
-    // Return 404 if key not found
-    if (!accessKey) {
-      return new NextResponse('Subscription not found', { status: 404 });
-    }
-
-    // Check if key is active
-    if (accessKey.status !== 'ACTIVE' && accessKey.status !== 'PENDING') {
-      return new NextResponse('Subscription is no longer active', { status: 403 });
-    }
-
-    // Check if key has expired
-    if (accessKey.expiresAt && new Date() > accessKey.expiresAt) {
-      return new NextResponse('Subscription has expired', { status: 403 });
-    }
-
-    // Check if data limit exceeded
-    if (accessKey.dataLimitBytes && accessKey.usedBytes >= accessKey.dataLimitBytes) {
-      return new NextResponse('Data limit exceeded', { status: 403 });
-    }
-
-    // Handle START_ON_FIRST_USE expiration type
-    // If this is the first access, activate the key and start the expiration timer
-    if (accessKey.expirationType === 'START_ON_FIRST_USE' && !accessKey.firstUsedAt) {
-      const firstUsedAt = new Date();
-      const expiresAt = accessKey.durationDays
-        ? new Date(firstUsedAt.getTime() + accessKey.durationDays * 24 * 60 * 60 * 1000)
-        : null;
-
-      await prisma.accessKey.update({
-        where: { id: accessKey.id },
-        data: {
-          firstUsedAt,
-          expiresAt,
-          status: 'ACTIVE',
-        },
-      });
-    }
-
-    // Build the access URL if not already stored
-    const accessUrl = accessKey.accessUrl || buildAccessUrl(accessKey);
-
-    // Return response in the requested format
-    switch (format) {
-      case 'base64':
-        return new NextResponse(Buffer.from(accessUrl).toString('base64'), {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Content-Disposition': `inline; filename="${accessKey.name}.txt"`,
-          },
-        });
-
-      case 'clash':
-        const clashConfig = buildClashConfig(accessKey, accessUrl);
-        return new NextResponse(clashConfig, {
-          headers: {
-            'Content-Type': 'text/yaml; charset=utf-8',
-            'Content-Disposition': `inline; filename="${accessKey.name}.yaml"`,
-          },
-        });
-
-      case 'sip008':
-        const sip008Config = buildSIP008Config(accessKey, accessUrl);
-        return new NextResponse(JSON.stringify(sip008Config), {
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Content-Disposition': `inline; filename="${accessKey.name}.json"`,
-          },
-        });
-
-      case 'raw':
-      default:
-        return new NextResponse(accessUrl, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-          },
-        });
-    }
-  } catch (error) {
-    console.error('Subscription endpoint error:', error);
-    return new NextResponse('Internal server error', { status: 500 });
-  }
-}
-
-/**
- * Build the ss:// access URL from key data
- * This creates a standard Shadowsocks URI that can be imported by clients.
- */
-function buildAccessUrl(accessKey: {
-  outlineKeyId: string;
-  server: {
-    hostnameForAccessKeys: string | null;
-    portForNewAccessKeys: number | null;
-  };
-}): string {
-  // Note: In a real implementation, this would need the actual key credentials
-  // from the Outline server. For now, we return a placeholder.
-  // The actual accessUrl should be stored when the key is created.
-  return `ss://placeholder@${accessKey.server.hostnameForAccessKeys}:${accessKey.server.portForNewAccessKeys}#${accessKey.outlineKeyId}`;
-}
-
-/**
- * Build Clash proxy configuration
- * Clash is a popular proxy client that uses YAML configuration files.
- */
-function buildClashConfig(
-  accessKey: {
-    name: string;
-    server: {
-      name: string;
-      hostnameForAccessKeys: string | null;
-      portForNewAccessKeys: number | null;
-    };
-  },
-  accessUrl: string
-): string {
-  // Parse the ss:// URL to extract server details
-  // Format: ss://BASE64(method:password)@host:port#name
-  // or: ss://BASE64(userinfo)@host:port/?plugin=...#name
-  
-  const parsed = parseSSUrl(accessUrl);
-  if (!parsed) {
-    return `# Error: Could not parse access URL`;
-  }
-
-  return `# Clash Configuration for ${accessKey.name}
-# Server: ${accessKey.server.name}
-# Generated by Atomic-UI
-
-proxies:
-  - name: "${accessKey.name}"
-    type: ss
-    server: ${parsed.host}
-    port: ${parsed.port}
-    cipher: ${parsed.method}
-    password: "${parsed.password}"
-
-proxy-groups:
-  - name: "Proxy"
-    type: select
-    proxies:
-      - "${accessKey.name}"
-
-rules:
-  - MATCH,Proxy
-`;
-}
-
-/**
- * Build SIP008 JSON configuration
- * SIP008 is a standard format for Shadowsocks server configurations,
- * supported by Outline and many other Shadowsocks clients.
- */
-function buildSIP008Config(
-  accessKey: {
-    name: string;
-    server: {
-      name: string;
-      hostnameForAccessKeys: string | null;
-      portForNewAccessKeys: number | null;
-    };
-  },
-  accessUrl: string
-): object {
-  const parsed = parseSSUrl(accessUrl);
-  if (!parsed) {
-    return { error: 'Could not parse access URL' };
-  }
-
-  return {
-    version: 1,
-    servers: [
-      {
-        id: accessKey.name,
-        remarks: `${accessKey.server.name} - ${accessKey.name}`,
-        server: parsed.host,
-        server_port: parsed.port,
-        password: parsed.password,
-        method: parsed.method,
-      },
-    ],
-    bytes_used: 0,
-    bytes_remaining: null,
-  };
-}
+import { db } from '@/lib/db';
 
 /**
  * Parse a Shadowsocks ss:// URL
@@ -291,5 +72,196 @@ function parseSSUrl(url: string): {
     return { method, password, host, port };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Build Outline-compatible JSON response from parsed SS URL
+ */
+function buildOutlineJson(parsed: {
+  method: string;
+  password: string;
+  host: string;
+  port: number;
+}): object {
+  return {
+    server: parsed.host,
+    server_port: parsed.port,
+    password: parsed.password,
+    method: parsed.method,
+  };
+}
+
+/**
+ * GET /sub/[token]
+ *
+ * Retrieves the access key configuration for the given token.
+ * Returns JSON format compatible with Outline clients.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  try {
+    const { token } = await params;
+
+    if (!token) {
+      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+    }
+
+    // First, try to find a Dynamic Access Key by dynamicUrl
+    const dynamicKey = await db.dynamicAccessKey.findUnique({
+      where: { dynamicUrl: token },
+      include: {
+        accessKeys: {
+          where: {
+            status: 'ACTIVE',
+          },
+          include: {
+            server: true,
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (dynamicKey) {
+      // Found a dynamic key - validate it
+      if (dynamicKey.status !== 'ACTIVE' && dynamicKey.status !== 'PENDING') {
+        return NextResponse.json(
+          { error: `Key is ${dynamicKey.status.toLowerCase()}` },
+          { status: 403 }
+        );
+      }
+
+      // Check if expired
+      if (dynamicKey.expiresAt && new Date() > dynamicKey.expiresAt) {
+        return NextResponse.json({ error: 'Key has expired' }, { status: 403 });
+      }
+
+      // Check data limit
+      if (dynamicKey.dataLimitBytes && dynamicKey.usedBytes >= dynamicKey.dataLimitBytes) {
+        return NextResponse.json({ error: 'Data limit exceeded' }, { status: 403 });
+      }
+
+      // Handle START_ON_FIRST_USE expiration type
+      if (dynamicKey.expirationType === 'START_ON_FIRST_USE' && !dynamicKey.firstUsedAt) {
+        const firstUsedAt = new Date();
+        const expiresAt = dynamicKey.durationDays
+          ? new Date(firstUsedAt.getTime() + dynamicKey.durationDays * 24 * 60 * 60 * 1000)
+          : null;
+
+        await db.dynamicAccessKey.update({
+          where: { id: dynamicKey.id },
+          data: {
+            firstUsedAt,
+            expiresAt,
+            status: 'ACTIVE',
+          },
+        });
+      }
+
+      // Get the attached access key
+      const attachedKey = dynamicKey.accessKeys[0];
+
+      if (!attachedKey || !attachedKey.accessUrl) {
+        return NextResponse.json(
+          { error: 'No active access key attached to this dynamic key' },
+          { status: 404 }
+        );
+      }
+
+      // Parse the access URL and return Outline-compatible JSON
+      const parsed = parseSSUrl(attachedKey.accessUrl);
+
+      if (!parsed) {
+        // Return the raw ss:// URL if parsing fails
+        return new NextResponse(attachedKey.accessUrl, {
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+          },
+        });
+      }
+
+      // Return Outline-compatible JSON
+      return NextResponse.json(buildOutlineJson(parsed), {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      });
+    }
+
+    // Fall back to regular access key lookup by subscriptionToken
+    const accessKey = await db.accessKey.findUnique({
+      where: { subscriptionToken: token },
+      include: {
+        server: true,
+      },
+    });
+
+    if (!accessKey) {
+      return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+    }
+
+    // Check if key is active
+    if (accessKey.status !== 'ACTIVE' && accessKey.status !== 'PENDING') {
+      return NextResponse.json(
+        { error: `Key is ${accessKey.status.toLowerCase()}` },
+        { status: 403 }
+      );
+    }
+
+    // Check if key has expired
+    if (accessKey.expiresAt && new Date() > accessKey.expiresAt) {
+      return NextResponse.json({ error: 'Key has expired' }, { status: 403 });
+    }
+
+    // Check if data limit exceeded
+    if (accessKey.dataLimitBytes && accessKey.usedBytes >= accessKey.dataLimitBytes) {
+      return NextResponse.json({ error: 'Data limit exceeded' }, { status: 403 });
+    }
+
+    // Handle START_ON_FIRST_USE expiration type
+    if (accessKey.expirationType === 'START_ON_FIRST_USE' && !accessKey.firstUsedAt) {
+      const firstUsedAt = new Date();
+      const expiresAt = accessKey.durationDays
+        ? new Date(firstUsedAt.getTime() + accessKey.durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      await db.accessKey.update({
+        where: { id: accessKey.id },
+        data: {
+          firstUsedAt,
+          expiresAt,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
+    if (!accessKey.accessUrl) {
+      return NextResponse.json({ error: 'No access URL available' }, { status: 404 });
+    }
+
+    // Parse the access URL and return Outline-compatible JSON
+    const parsed = parseSSUrl(accessKey.accessUrl);
+
+    if (!parsed) {
+      // Return the raw ss:// URL if parsing fails
+      return new NextResponse(accessKey.accessUrl, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+        },
+      });
+    }
+
+    // Return Outline-compatible JSON
+    return NextResponse.json(buildOutlineJson(parsed), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+    });
+  } catch (error) {
+    console.error('Subscription endpoint error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -263,41 +263,46 @@ export default function SubscriptionPage() {
 
   const apps = getAppsForPlatform(platform);
 
+  // Check if using image as background theme
+  const hasImageBackground = keyData.coverImage && keyData.coverImageType === 'url';
+
+  // Card style for image background mode - glass effect
+  const getCardStyle = () => {
+    if (hasImageBackground) {
+      return {
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      };
+    }
+    return { backgroundColor: theme.bgCard };
+  };
+
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen relative"
       style={{ backgroundColor: theme.bgPrimary }}
     >
-      {/* Cover Image */}
-      {keyData.coverImage && (
-        <div className="relative w-full h-48 overflow-hidden">
-          {keyData.coverImageType === 'gradient' ? (
-            <div className="absolute inset-0" style={{ background: keyData.coverImage }} />
-          ) : (
-            <img
-              src={keyData.coverImage}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          )}
-          {/* Gradient overlay for smooth transition to content */}
+      {/* Full-page background image (when using image as theme) */}
+      {hasImageBackground && (
+        <>
           <div
-            className="absolute bottom-0 left-0 right-0 h-16"
-            style={{
-              background: `linear-gradient(to top, ${theme.bgPrimary}, transparent)`,
-            }}
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${keyData.coverImage})` }}
           />
-        </div>
+          {/* Dark overlay for readability */}
+          <div className="fixed inset-0 bg-black/60" />
+        </>
       )}
 
-      <div className={`max-w-md mx-auto space-y-4 px-4 pb-8 ${keyData.coverImage ? '-mt-8 relative z-10' : 'pt-8'}`}>
+      <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8">
 
         {/* Stats Cards - Updated icons like screenshot 2 */}
         <div className="grid grid-cols-2 gap-3">
           {/* Data Usage Card */}
           <div
             className="p-4 rounded-2xl"
-            style={{ backgroundColor: theme.bgCard }}
+            style={getCardStyle()}
           >
             <div className="flex items-center gap-2 mb-2">
               {/* Circular progress icon */}
@@ -310,10 +315,10 @@ export default function SubscriptionPage() {
                 </svg>
               </div>
             </div>
-            <div className="text-xs mb-1" style={{ color: theme.textMuted }}>
+            <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
               Data Usage
             </div>
-            <div className="text-xl font-bold" style={{ color: theme.textPrimary }}>
+            <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
               {formatBytes(keyData.usedBytes)}
             </div>
             {keyData.dataLimitBytes && (
@@ -337,7 +342,7 @@ export default function SubscriptionPage() {
           {/* Time Remaining Card */}
           <div
             className="p-4 rounded-2xl"
-            style={{ backgroundColor: theme.bgCard }}
+            style={getCardStyle()}
           >
             <div className="flex items-center gap-2 mb-2">
               {/* Hourglass icon */}
@@ -350,10 +355,10 @@ export default function SubscriptionPage() {
                 </svg>
               </div>
             </div>
-            <div className="text-xs mb-1" style={{ color: theme.textMuted }}>
+            <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
               Time Left
             </div>
-            <div className="text-xl font-bold" style={{ color: theme.textPrimary }}>
+            <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
               {getTimeRemaining(keyData.expiresAt)}
             </div>
           </div>
@@ -362,7 +367,7 @@ export default function SubscriptionPage() {
         {/* Server Info Card */}
         <div
           className="p-4 rounded-2xl"
-          style={{ backgroundColor: theme.bgCard }}
+          style={getCardStyle()}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -370,11 +375,11 @@ export default function SubscriptionPage() {
                 {getCountryFlag(keyData.server.countryCode)}
               </span>
               <div>
-                <div className="font-semibold" style={{ color: theme.textPrimary }}>
+                <div className="font-semibold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
                   {keyData.server.name}
                 </div>
                 {keyData.server.location && (
-                  <div className="text-sm" style={{ color: theme.textMuted }}>
+                  <div className="text-sm" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
                     {keyData.server.location}
                   </div>
                 )}
@@ -395,7 +400,7 @@ export default function SubscriptionPage() {
         {/* Platform Tabs - Pill style like screenshot 2 */}
         <div
           className="p-1 rounded-full flex"
-          style={{ backgroundColor: theme.bgCard }}
+          style={getCardStyle()}
         >
           {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
             <button
@@ -420,9 +425,9 @@ export default function SubscriptionPage() {
               onClick={() => handleAddToApp(app.id)}
               className="py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
               style={{
-                backgroundColor: theme.bgCard,
-                color: theme.textPrimary,
-                border: `1px solid ${theme.border}`,
+                ...getCardStyle(),
+                color: hasImageBackground ? '#ffffff' : theme.textPrimary,
+                border: hasImageBackground ? '1px solid rgba(255,255,255,0.2)' : `1px solid ${theme.border}`,
               }}
             >
               <span className="text-lg">▶</span>
@@ -450,15 +455,15 @@ export default function SubscriptionPage() {
         {qrCode && (
           <div
             className="p-5 rounded-2xl text-center"
-            style={{ backgroundColor: theme.bgCard }}
+            style={getCardStyle()}
           >
-            <h3 className="font-semibold mb-3 text-sm" style={{ color: theme.textPrimary }}>
+            <h3 className="font-semibold mb-3 text-sm" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
               Scan QR Code
             </h3>
             <div className="inline-block p-2 bg-white rounded-xl">
               <img src={qrCode} alt="QR Code" className="w-40 h-40" />
             </div>
-            <p className="mt-2 text-xs" style={{ color: theme.textMuted }}>
+            <p className="mt-2 text-xs" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
               Scan with your VPN app to connect
             </p>
           </div>
@@ -475,9 +480,12 @@ export default function SubscriptionPage() {
                   key={index}
                   onClick={() => handleContactClick(contact)}
                   className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110"
-                  style={{ backgroundColor: config.color + '20' }}
+                  style={{
+                    backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.15)' : config.color + '20',
+                    backdropFilter: hasImageBackground ? 'blur(8px)' : undefined,
+                  }}
                 >
-                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={config.color}>
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={hasImageBackground ? '#ffffff' : config.color}>
                     <path d={config.icon} />
                   </svg>
                 </button>
@@ -487,7 +495,7 @@ export default function SubscriptionPage() {
         )}
 
         {/* Footer */}
-        <div className="text-center text-xs pt-4" style={{ color: theme.textMuted }}>
+        <div className="text-center text-xs pt-4" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.5)' : theme.textMuted }}>
           <p>Powered by Atomic-UI</p>
         </div>
       </div>

@@ -546,11 +546,11 @@ function SubscriptionShareCard({
           </Select>
         </div>
 
-        {/* Cover Image URL */}
+        {/* Background Image URL */}
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <ImageIcon className="w-4 h-4" />
-            Cover Image URL
+            Background Image (Optional)
           </Label>
           <div className="flex gap-2">
             <Input
@@ -572,7 +572,7 @@ function SubscriptionShareCard({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Paste any image URL from Pexels, Unsplash, or your own hosting
+            Use image as full-page background theme. Overrides color theme when set.
           </p>
         </div>
 
@@ -649,47 +649,62 @@ function SubscriptionShareCard({
 
         {/* Theme Preview */}
         <div
-          className="rounded-lg p-4 border transition-colors"
+          className="rounded-lg p-4 border transition-colors relative overflow-hidden"
           style={{
-            backgroundColor: theme.bgPrimary,
+            backgroundColor: coverImageUrl ? 'transparent' : theme.bgPrimary,
             borderColor: theme.border,
           }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-              style={{ backgroundColor: theme.bgCard }}
-            >
-              📊
-            </div>
-            <div>
-              <div className="text-sm font-medium" style={{ color: theme.textPrimary }}>
-                Preview
-              </div>
-              <div className="text-xs" style={{ color: theme.textMuted }}>
-                {theme.name} Theme
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <div
-              className="flex-1 h-2 rounded-full"
-              style={{ backgroundColor: theme.progressBg }}
-            >
+          {/* Background image preview */}
+          {coverImageUrl && (
+            <>
               <div
-                className="h-full rounded-full w-2/3"
-                style={{ backgroundColor: theme.progressFill }}
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${coverImageUrl})` }}
               />
+              <div className="absolute inset-0 bg-black/60" />
+            </>
+          )}
+          <div className="relative z-10">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                style={{
+                  backgroundColor: coverImageUrl ? 'rgba(0,0,0,0.4)' : theme.bgCard,
+                  backdropFilter: coverImageUrl ? 'blur(8px)' : undefined,
+                }}
+              >
+                📊
+              </div>
+              <div>
+                <div className="text-sm font-medium" style={{ color: coverImageUrl ? '#ffffff' : theme.textPrimary }}>
+                  Preview
+                </div>
+                <div className="text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                  {coverImageUrl ? 'Image Background' : theme.name + ' Theme'}
+                </div>
+              </div>
             </div>
-          </div>
-          <div
-            className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
-            style={{
-              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-              color: '#fff',
-            }}
-          >
-            Add to Outline
+            <div className="mt-3 flex gap-2">
+              <div
+                className="flex-1 h-2 rounded-full"
+                style={{ backgroundColor: coverImageUrl ? 'rgba(255,255,255,0.3)' : theme.progressBg }}
+              >
+                <div
+                  className="h-full rounded-full w-2/3"
+                  style={{ backgroundColor: coverImageUrl ? '#ffffff' : theme.progressFill }}
+                />
+              </div>
+            </div>
+            <div
+              className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
+              style={{
+                background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                color: '#fff',
+              }}
+            >
+              Add to Outline
+            </div>
           </div>
         </div>
 
