@@ -45,6 +45,9 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Ensure public directory exists (required for standalone output)
+RUN mkdir -p public
+
 # Build the application
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
