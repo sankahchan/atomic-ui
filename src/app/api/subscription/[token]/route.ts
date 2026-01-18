@@ -25,20 +25,7 @@ export async function GET(
     // Find the key by subscription token
     const key = await db.accessKey.findUnique({
       where: { subscriptionToken: token },
-      select: {
-        id: true,
-        name: true,
-        accessUrl: true,
-        status: true,
-        expiresAt: true,
-        dataLimitBytes: true,
-        usedBytes: true,
-        method: true,
-        port: true,
-        subscriptionTheme: true,
-        coverImage: true,
-        coverImageType: true,
-        contactLinks: true,
+      include: {
         server: {
           select: {
             name: true,
@@ -103,7 +90,7 @@ export async function GET(
         coverImageType: key.coverImageType || null,
         method: key.method || null,
         port: key.port || null,
-        contactLinks: key.contactLinks ? JSON.parse(key.contactLinks) : null,
+        contactLinks: (key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null,
       });
     }
 
