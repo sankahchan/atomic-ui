@@ -151,11 +151,22 @@ export default function DynamicKeyDetailPage() {
     pageSize: 100,
   });
 
+  // Generate ssconf:// URL for Outline client
+  const getSsconfUrl = () => {
+    if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
+    // ssconf:// protocol tells Outline to fetch config from this URL
+    // We need to encode the https URL and use ssconf:// prefix
+    const httpsUrl = `${window.location.origin}/api/sub/${dak.dynamicUrl}`;
+    return `ssconf://${httpsUrl.replace('https://', '').replace('http://', '')}`;
+  };
+
   // Generate QR code when data loads
   useEffect(() => {
-    if (dak?.dynamicUrl) {
-      const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
-      QRCode.toDataURL(url, {
+    if (dak?.dynamicUrl && typeof window !== 'undefined') {
+      // Use ssconf:// URL for QR code (Outline client compatible)
+      const httpsUrl = `${window.location.origin}/api/sub/${dak.dynamicUrl}`;
+      const ssconfUrl = `ssconf://${httpsUrl.replace('https://', '').replace('http://', '')}`;
+      QRCode.toDataURL(ssconfUrl, {
         width: 256,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
@@ -167,11 +178,12 @@ export default function DynamicKeyDetailPage() {
 
   const handleCopyUrl = () => {
     if (dak?.dynamicUrl) {
-      const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
-      navigator.clipboard.writeText(url);
+      // Copy ssconf:// URL for Outline client
+      const ssconfUrl = getSsconfUrl();
+      navigator.clipboard.writeText(ssconfUrl);
       toast({
         title: t('dynamic_keys.msg.copied'),
-        description: t('dynamic_keys.msg.copy_url'),
+        description: 'Dynamic access key URL copied. Paste in Outline client.',
       });
     }
   };
@@ -297,27 +309,32 @@ export default function DynamicKeyDetailPage() {
               <CardDescription>{typeConfig.description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Subscription URL */}
+              {/* Subscription URL for Outline Client */}
               {dak.dynamicUrl && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">{t('dynamic_keys.detail.subscription_url')}</Label>
+                    <Label className="text-sm text-muted-foreground">
+                      Outline Client URL (ssconf://)
+                    </Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                        {window.location.origin}/sub/{dak.dynamicUrl}
+                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-xs break-all">
+                        {getSsconfUrl()}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyUrl}>
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Copy this URL and paste it in Outline client to connect. The client will automatically fetch the latest server configuration.
+                    </p>
                   </div>
 
-                  {/* Subscription token */}
+                  {/* API Endpoint */}
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">{t('dynamic_keys.detail.subscription_token')}</Label>
+                    <Label className="text-sm text-muted-foreground">API Endpoint</Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm">
-                        {dak.dynamicUrl}
+                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-xs break-all">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/api/sub/${dak.dynamicUrl}` : ''}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyToken}>
                         <Copy className="w-4 h-4" />
