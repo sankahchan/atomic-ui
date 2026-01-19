@@ -458,16 +458,18 @@ function ServerCard({
             <div className="flex items-center justify-center gap-1 mb-1">
               <Zap className="w-3 h-3 text-emerald-500" />
             </div>
-            {/* Live Stats Component */}
+            {/* Live Stats Component - Online connections */}
             <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
             <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Zap className="w-3 h-3 text-emerald-500" />
+              <Key className="w-3 h-3 text-primary" />
             </div>
-            {/* Live Stats Component */}
-            <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
+            {/* Total active keys count from DB */}
+            <p className="text-lg font-semibold text-primary">
+              {server.metrics?.activeKeys || 0}
+            </p>
             <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
           </div>
           <div className="text-center p-2 bg-muted/30 rounded-lg">

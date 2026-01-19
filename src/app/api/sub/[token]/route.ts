@@ -9,7 +9,8 @@
  *   "server": "hostname",
  *   "server_port": 8388,
  *   "password": "secret",
- *   "method": "chacha20-ietf-poly1305"
+ *   "method": "chacha20-ietf-poly1305",
+ *   "prefix": "POST " (optional, for restricted networks)
  * }
  *
  * URL Format: /sub/{token}
@@ -17,10 +18,53 @@
  * The token can be either:
  * - A Dynamic Access Key's dynamicUrl token
  * - A regular Access Key's subscriptionToken
+ *
+ * Load Balancing Algorithms (for Dynamic Access Keys):
+ * - IP_HASH: Uses CRC32 of client IP for consistent server selection
+ * - RANDOM: Randomly selects from available access keys
+ * - ROUND_ROBIN: Cycles through access keys sequentially
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+
+/**
+ * Simple CRC32 implementation for IP-based hashing
+ * Used to consistently route the same client IP to the same server
+ */
+function crc32(str: string): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i);
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * Get client IP address from request headers
+ * Checks multiple headers for proxied requests
+ */
+function getClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+
+  const clientIp = request.headers.get('x-client-ip');
+  if (clientIp) {
+    return clientIp;
+  }
+
+  return '127.0.0.1';
+}
 
 /**
  * Parse a Shadowsocks ss:// URL
@@ -76,20 +120,102 @@ function parseSSUrl(url: string): {
 }
 
 /**
+ * Access key with server info for load balancing
+ */
+interface AccessKeyWithServer {
+  id: string;
+  accessUrl: string | null;
+  password: string | null;
+  port: number | null;
+  method: string | null;
+  status: string;
+  server: {
+    id: string;
+    hostnameForAccessKeys: string | null;
+    name: string;
+  };
+}
+
+/**
+ * Select an access key based on the load balancing algorithm
+ */
+async function selectAccessKey(
+  dakId: string,
+  accessKeys: AccessKeyWithServer[],
+  algorithm: string,
+  clientIp: string,
+  lastSelectedKeyIndex: number
+): Promise<{ key: AccessKeyWithServer; newIndex: number } | null> {
+  if (accessKeys.length === 0) {
+    return null;
+  }
+
+  if (accessKeys.length === 1) {
+    return { key: accessKeys[0], newIndex: 0 };
+  }
+
+  let selectedIndex: number;
+
+  switch (algorithm) {
+    case 'IP_HASH': {
+      // Use CRC32 hash of client IP for consistent routing
+      const hash = crc32(clientIp);
+      selectedIndex = hash % accessKeys.length;
+      break;
+    }
+
+    case 'RANDOM': {
+      // Random selection
+      selectedIndex = Math.floor(Math.random() * accessKeys.length);
+      break;
+    }
+
+    case 'ROUND_ROBIN': {
+      // Cycle through keys sequentially
+      selectedIndex = (lastSelectedKeyIndex + 1) % accessKeys.length;
+
+      // Update the index in the database for next request
+      await db.dynamicAccessKey.update({
+        where: { id: dakId },
+        data: { lastSelectedKeyIndex: selectedIndex },
+      });
+      break;
+    }
+
+    default:
+      // Default to IP_HASH
+      const defaultHash = crc32(clientIp);
+      selectedIndex = defaultHash % accessKeys.length;
+  }
+
+  return { key: accessKeys[selectedIndex], newIndex: selectedIndex };
+}
+
+/**
  * Build Outline-compatible JSON response from parsed SS URL
  */
-function buildOutlineJson(parsed: {
-  method: string;
-  password: string;
-  host: string;
-  port: number;
-}): object {
-  return {
+function buildOutlineJson(
+  parsed: {
+    method: string;
+    password: string;
+    host: string;
+    port: number;
+  },
+  prefix?: string | null
+): object {
+  const result: Record<string, unknown> = {
     server: parsed.host,
     server_port: parsed.port,
     password: parsed.password,
     method: parsed.method,
   };
+
+  // Add prefix if specified (for restricted networks)
+  if (prefix) {
+    result.prefix = prefix;
+  }
+
+  return result;
 }
 
 /**
@@ -109,6 +235,9 @@ export async function GET(
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
 
+    // Get client IP for load balancing
+    const clientIp = getClientIp(request);
+
     // First, try to find a Dynamic Access Key by dynamicUrl
     const dynamicKey = await db.dynamicAccessKey.findUnique({
       where: { dynamicUrl: token },
@@ -118,9 +247,19 @@ export async function GET(
             status: 'ACTIVE',
           },
           include: {
-            server: true,
+            server: {
+              select: {
+                id: true,
+                name: true,
+                hostnameForAccessKeys: true,
+                tags: {
+                  include: {
+                    tag: true,
+                  },
+                },
+              },
+            },
           },
-          take: 1,
         },
       },
     });
@@ -161,30 +300,51 @@ export async function GET(
         });
       }
 
-      // Get the attached access key
-      const attachedKey = dynamicKey.accessKeys[0];
+      // Filter access keys by server tags if specified
+      let availableKeys = dynamicKey.accessKeys;
+      const serverTagIds: string[] = JSON.parse(dynamicKey.serverTagsJson || '[]');
 
-      if (!attachedKey || !attachedKey.accessUrl) {
+      if (serverTagIds.length > 0) {
+        // Filter keys to only those from servers with matching tags
+        availableKeys = dynamicKey.accessKeys.filter((key) => {
+          const serverTags = key.server.tags?.map((st) => st.tag.id) || [];
+          return serverTagIds.some((tagId) => serverTags.includes(tagId));
+        });
+      }
+
+      // Select an access key using the load balancing algorithm
+      const selection = await selectAccessKey(
+        dynamicKey.id,
+        availableKeys as AccessKeyWithServer[],
+        dynamicKey.loadBalancerAlgorithm,
+        clientIp,
+        dynamicKey.lastSelectedKeyIndex
+      );
+
+      if (!selection || !selection.key.accessUrl) {
         return NextResponse.json(
-          { error: 'No active access key attached to this dynamic key' },
+          { error: 'No active access key available for this dynamic key' },
           { status: 404 }
         );
       }
 
+      const attachedKey = selection.key;
+      const accessUrl = attachedKey.accessUrl as string; // Already checked above, so this is non-null
+
       // Parse the access URL and return Outline-compatible JSON
-      const parsed = parseSSUrl(attachedKey.accessUrl);
+      const parsed = parseSSUrl(accessUrl);
 
       if (!parsed) {
         // Return the raw ss:// URL if parsing fails
-        return new NextResponse(attachedKey.accessUrl, {
+        return new NextResponse(accessUrl, {
           headers: {
             'Content-Type': 'text/plain; charset=utf-8',
           },
         });
       }
 
-      // Return Outline-compatible JSON
-      return NextResponse.json(buildOutlineJson(parsed), {
+      // Return Outline-compatible JSON with optional prefix
+      return NextResponse.json(buildOutlineJson(parsed, dynamicKey.prefix), {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
         },
@@ -254,8 +414,8 @@ export async function GET(
       });
     }
 
-    // Return Outline-compatible JSON
-    return NextResponse.json(buildOutlineJson(parsed), {
+    // Return Outline-compatible JSON with optional prefix
+    return NextResponse.json(buildOutlineJson(parsed, accessKey.prefix), {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
       },

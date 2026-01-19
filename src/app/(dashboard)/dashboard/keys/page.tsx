@@ -64,6 +64,9 @@ import {
   HardDrive,
   ArrowUpDown,
   Smartphone,
+  LayoutGrid,
+  LayoutList,
+  Share2,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 
@@ -836,6 +839,7 @@ export default function KeysPage() {
   const [countdown, setCountdown] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const { t } = useLocale();
@@ -1326,6 +1330,26 @@ export default function KeysPage() {
         </DropdownMenu>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="hidden md:flex items-center border rounded-lg p-0.5 bg-muted/50">
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setViewMode('list')}
+            >
+              <LayoutList className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+          </div>
+
           {/* Auto-sync selector */}
           <div className="flex items-center gap-1">
             <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
@@ -1410,8 +1434,134 @@ export default function KeysPage() {
         />
       )}
 
-      {/* Keys table */}
-      <Card className="hidden md:block mb-6">
+      {/* Desktop Grid View */}
+      {viewMode === 'grid' && (
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          {isLoading ? (
+            [...Array(8)].map((_, i) => (
+              <Card key={i} className="h-48 bg-muted animate-pulse" />
+            ))
+          ) : data?.items && data.items.length > 0 ? (
+            data.items.map((key) => {
+              const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
+              const StatusIcon = config.icon;
+              const isOnline = onlineKeyIds.has(key.id);
+
+              return (
+                <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="relative">
+                          {isOnline && (
+                            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                            </span>
+                          )}
+                          <Key className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <Link href={`/dashboard/keys/${key.id}`} className="font-medium hover:underline truncate block">
+                            {key.name}
+                          </Link>
+                          {key.server && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              {key.server.countryCode && <span>{getCountryFlag(key.server.countryCode)}</span>}
+                              <span className="truncate">{key.server.name}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Badge className={cn('border shrink-0', config.color)}>
+                        <StatusIcon className="w-3 h-3 mr-1" />
+                        {t(config.labelKey)}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{t('keys.table.usage')}</span>
+                        <span className="font-medium">{formatBytes(key.usedBytes)}</span>
+                      </div>
+                      {key.dataLimitBytes && (
+                        <Progress
+                          value={key.usagePercent || 0}
+                          className={cn('h-1.5', key.isTrafficWarning && '[&>div]:bg-orange-500')}
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Smartphone className="w-3 h-3" />
+                        {key.estimatedDevices || 0} devices
+                      </span>
+                      <span className={cn('text-muted-foreground', key.isExpiringSoon && 'text-red-500')}>
+                        {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setQrDialogKey({ id: key.id, name: key.name })}>
+                          <QrCode className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
+                            navigator.clipboard.writeText(url);
+                            toast({ title: t('keys.toast.copied'), description: t('keys.toast.copied_desc') });
+                          }}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/keys/${key.id}`}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
+                            <Power className="w-4 h-4 mr-2" />
+                            {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-12 text-center">
+              <Key className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">
+                {hasActiveFilters ? t('keys.empty.no_match') : t('keys.empty.no_keys')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Keys table (List View) */}
+      <Card className={cn('hidden mb-6', viewMode === 'list' && 'md:block')}>
         <div className="overflow-x-auto">
           <table className="w-full">
 

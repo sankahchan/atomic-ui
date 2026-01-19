@@ -140,11 +140,17 @@ const config: Config = {
         'atomic-grid':
           'linear-gradient(to right, rgba(6, 182, 212, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(6, 182, 212, 0.1) 1px, transparent 1px)',
         'atomic-glow': 'radial-gradient(circle at center, rgba(6, 182, 212, 0.15) 0%, transparent 70%)',
+        // Diagonal stripe pattern for light theme (like image 4)
+        'diagonal-stripes':
+          'repeating-linear-gradient(135deg, transparent, transparent 10px, rgba(0, 0, 0, 0.02) 10px, rgba(0, 0, 0, 0.02) 20px)',
+        'diagonal-stripes-light':
+          'repeating-linear-gradient(135deg, transparent, transparent 8px, rgba(148, 163, 184, 0.08) 8px, rgba(148, 163, 184, 0.08) 16px)',
       },
       backgroundSize: {
         'grid-sm': '20px 20px',
         'grid-md': '40px 40px',
         'grid-lg': '80px 80px',
+        'stripes': '28px 28px',
       },
     },
   },

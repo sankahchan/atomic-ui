@@ -204,7 +204,7 @@ model DynamicAccessKey {
   // Limits
   dataLimitBytes BigInt?
   usedBytes      BigInt    @default(0)
-  
+
   // Periodic Limits
   dataLimitResetStrategy String    @default("NEVER")
   lastDataLimitReset     DateTime?
@@ -226,6 +226,13 @@ model DynamicAccessKey {
 
   // Encryption method for Shadowsocks
   method String @default("chacha20-ietf-poly1305")
+
+  // Load balancer algorithm for selecting access keys
+  // Valid: IP_HASH, RANDOM, ROUND_ROBIN
+  loadBalancerAlgorithm String @default("IP_HASH")
+
+  // Track which server was last selected (for round-robin)
+  lastSelectedKeyIndex Int @default(0)
 
   accessKeys AccessKey[]
 

@@ -55,7 +55,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Share2,
 } from 'lucide-react';
+import { MobileCardView } from '@/components/mobile-card-view';
 
 /**
  * Supported encryption methods for Shadowsocks
@@ -502,15 +504,41 @@ function QRCodeDialog({
             </div>
           )}
 
-          <div className="flex gap-2 mt-4 w-full">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleCopyUrl}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy URL
-            </Button>
+          <div className="flex flex-col gap-2 mt-4 w-full">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleCopyUrl}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy URL
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  if (dak?.dynamicUrl) {
+                    const ssconfUrl = `ssconf://${window.location.host}/sub/${dak.dynamicUrl}#${encodeURIComponent(dak.name)}`;
+                    navigator.clipboard.writeText(ssconfUrl);
+                    toast({
+                      title: t('dynamic_keys.msg.copied'),
+                      description: 'ssconf URL copied for Outline app',
+                    });
+                  }
+                }}
+              >
+                <Link2 className="w-4 h-4 mr-2" />
+                ssconf://
+              </Button>
+            </div>
+
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Subscription URL:</p>
+              <code className="text-xs break-all select-all">
+                {dak?.dynamicUrl ? `${window.location.origin}/sub/${dak.dynamicUrl}` : ''}
+              </code>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -1193,8 +1221,127 @@ export default function DynamicKeysPage() {
         </div>
       )}
 
-      {/* Keys table */}
-      <Card>
+      {/* Mobile Card View */}
+      {isLoading ? (
+        <div className="md:hidden space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="h-32 bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <MobileCardView
+          data={dynamicKeys}
+          renderCard={(dak) => {
+            const typeConfig = DAK_TYPES[dak.type];
+            const config = statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
+            const StatusIcon = config.icon;
+            const isOnline = onlineDakIds.has(dak.id);
+            const usagePercent = dak.dataLimitBytes
+              ? Number((dak.usedBytes * BigInt(100)) / dak.dataLimitBytes)
+              : 0;
+
+            return (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    {isOnline && (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                    )}
+                    <div>
+                      <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="font-medium hover:underline">
+                        {dak.name}
+                      </Link>
+                      {dak.email && (
+                        <p className="text-xs text-muted-foreground">{dak.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge className={cn('border', config.color)}>
+                    <StatusIcon className="w-3 h-3 mr-1" />
+                    {t(config.labelKey)}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <typeConfig.icon className={cn('w-4 h-4', typeConfig.color)} />
+                  <span className="text-sm">{t(typeConfig.labelKey)}</span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{t('dynamic_keys.table.usage')}</span>
+                    <span>{formatBytes(dak.usedBytes)} / {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : '∞'}</span>
+                  </div>
+                  {dak.dataLimitBytes && (
+                    <Progress
+                      value={usagePercent}
+                      className={cn(
+                        'h-1.5',
+                        usagePercent >= 90 && '[&>div]:bg-red-500',
+                        usagePercent >= 70 && usagePercent < 90 && '[&>div]:bg-orange-500'
+                      )}
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{dak.attachedKeysCount} keys attached</span>
+                  <span className={cn('text-muted-foreground', dak.daysRemaining !== null && dak.daysRemaining <= 7 && 'text-red-500')}>
+                    {dak.expiresAt
+                      ? dak.daysRemaining !== null && dak.daysRemaining >= 0
+                        ? `${dak.daysRemaining}d left`
+                        : 'Expired'
+                      : 'Never'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShowQR(dak)}>
+                      <QrCode className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyUrl(dak)}>
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          {t('dynamic_keys.detail.details')}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleStatus(dak)}>
+                        <Power className="w-4 h-4 mr-2" />
+                        {dak.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDelete(dak)} className="text-destructive">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {t('dynamic_keys.detail.delete')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            );
+          }}
+          keyExtractor={(item) => item.id}
+          className="md:hidden"
+        />
+      )}
+
+      {/* Keys table - Desktop only */}
+      <Card className="hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

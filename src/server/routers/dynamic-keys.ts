@@ -34,6 +34,8 @@ const createDAKSchema = z.object({
   prefix: z.string().max(16).optional().nullable(),
   // Encryption method
   method: z.enum(['chacha20-ietf-poly1305', 'aes-128-gcm', 'aes-192-gcm', 'aes-256-gcm']).optional().nullable(),
+  // Load balancer algorithm
+  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN']).default('IP_HASH'),
 });
 
 /**
@@ -54,6 +56,8 @@ const updateDAKSchema = z.object({
   serverTagIds: z.array(z.string()).optional(),
   // Protocol obfuscation prefix
   prefix: z.string().max(16).optional().nullable(),
+  // Load balancer algorithm
+  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN']).optional(),
 });
 
 /**
@@ -166,6 +170,7 @@ export const dynamicKeysRouter = router({
           daysRemaining,
           prefix: dak.prefix,
           method: dak.method,
+          loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
           serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
           attachedKeysCount: dak._count.accessKeys,
           createdAt: dak.createdAt,
@@ -229,6 +234,7 @@ export const dynamicKeysRouter = router({
         durationDays: dak.durationDays,
         firstUsedAt: dak.firstUsedAt,
         prefix: dak.prefix,
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         accessKeys: dak.accessKeys,
         createdAt: dak.createdAt,
@@ -269,6 +275,7 @@ export const dynamicKeysRouter = router({
           serverTagsJson: JSON.stringify(input.serverTagIds || []),
           prefix: input.prefix,
           method: input.method || 'chacha20-ietf-poly1305',
+          loadBalancerAlgorithm: input.loadBalancerAlgorithm,
         },
         include: {
           _count: {
@@ -286,6 +293,7 @@ export const dynamicKeysRouter = router({
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
@@ -298,7 +306,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, email, telegramId, notes, prefix, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, email, telegramId, notes, prefix, loadBalancerAlgorithm, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -339,6 +347,10 @@ export const dynamicKeysRouter = router({
         updateData.prefix = prefix;
       }
 
+      if (loadBalancerAlgorithm !== undefined) {
+        updateData.loadBalancerAlgorithm = loadBalancerAlgorithm;
+      }
+
       // Recalculate expiration if type changed
       if (data.expirationType) {
         const { expiresAt, status } = calculateExpiration(
@@ -371,6 +383,7 @@ export const dynamicKeysRouter = router({
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,

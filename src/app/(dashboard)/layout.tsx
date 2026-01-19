@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { LanguageSelector } from '@/components/ui/language-selector';
+import { ScrollToTop } from '@/components/ui/scroll-to-top';
 
 /**
  * Navigation items configuration
@@ -454,7 +455,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden">
+    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden bg-diagonal-stripes-light dark:bg-none">
       {/* Mobile sidebar overlay */}
       {mobileMenuOpen && (
         <div
@@ -499,6 +500,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Scroll to top button for mobile */}
+      <ScrollToTop />
     </div>
   );
 }
