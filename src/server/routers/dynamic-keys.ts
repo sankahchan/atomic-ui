@@ -395,6 +395,17 @@ export const dynamicKeysRouter = router({
         if (!data.status) {
           updateData.status = status;
         }
+      } else if (data.expiresAt !== undefined) {
+        // Allow updating expiresAt directly without changing expirationType
+        updateData.expiresAt = data.expiresAt;
+        updateData.expirationType = 'FIXED_DATE';
+      } else if (data.durationDays !== undefined && data.durationDays !== null) {
+        // Recalculate expiresAt from durationDays
+        const newExpiry = new Date();
+        newExpiry.setDate(newExpiry.getDate() + data.durationDays);
+        updateData.expiresAt = newExpiry;
+        updateData.durationDays = data.durationDays;
+        updateData.expirationType = 'DURATION_FROM_CREATION';
       }
 
       const dak = await db.dynamicAccessKey.update({

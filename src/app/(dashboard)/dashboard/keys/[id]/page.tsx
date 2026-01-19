@@ -134,6 +134,9 @@ function EditKeyDialog({
     notes: string | null;
     dataLimitBytes: bigint | null;
     dataLimitResetStrategy: string | null;
+    durationDays: number | null;
+    expiresAt: Date | null;
+    expirationType: string | null;
   };
   onSuccess: () => void;
 }) {
@@ -147,6 +150,8 @@ function EditKeyDialog({
       ? (Number(keyData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
     dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
+    durationDays: keyData.durationDays?.toString() || '',
+    expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
   });
 
   const updateMutation = trpc.keys.update.useMutation({
@@ -187,7 +192,9 @@ function EditKeyDialog({
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
-    });
+      durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
+      expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+    } as any);
   };
 
   return (
@@ -263,6 +270,34 @@ function EditKeyDialog({
               </Select>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="editDuration">Duration (Days)</Label>
+            <Input
+              id="editDuration"
+              type="number"
+              placeholder="e.g., 30, 45, 60"
+              value={formData.durationDays}
+              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+              min="1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Set the validity period in days. This will recalculate the expiration date.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editExpiration">Expiration Date</Label>
+            <Input
+              id="editExpiration"
+              type="date"
+              value={formData.expiresAt}
+              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Or set a specific expiration date directly.
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="editNotes">Notes</Label>
@@ -949,21 +984,15 @@ export default function KeyDetailPage() {
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                    {typeof window !== 'undefined'
-                      ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/subscription/${key.subscriptionToken}`
-                      : `/api/subscription/${key.subscriptionToken}`}
+                    {`${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`}
                   </div>
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() =>
-                      copyToClipboard(
-                        typeof window !== 'undefined'
-                          ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/subscription/${key.subscriptionToken}`
-                          : `/api/subscription/${key.subscriptionToken}`,
-                        'Subscription URL'
-                      )
-                    }
+                    onClick={() => {
+                      const url = `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`;
+                      copyToClipboard(url, 'Subscription URL');
+                    }}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -1205,6 +1234,9 @@ export default function KeyDetailPage() {
             notes: key.notes,
             dataLimitBytes: key.dataLimitBytes,
             dataLimitResetStrategy: (key as any).dataLimitResetStrategy,
+            durationDays: (key as any).durationDays,
+            expiresAt: key.expiresAt,
+            expirationType: (key as any).expirationType,
           }}
           onSuccess={() => refetch()}
         />

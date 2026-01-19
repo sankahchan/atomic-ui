@@ -454,6 +454,16 @@ export const keysRouter = router({
           if (data.status === undefined) {
             updateData.status = status;
           }
+        } else if (data.expiresAt !== undefined) {
+          // Allow updating expiresAt directly without changing expirationType
+          updateData.expiresAt = data.expiresAt;
+          updateData.expirationType = 'FIXED_DATE';
+        } else if (data.durationDays !== undefined && data.durationDays !== null) {
+          // Recalculate expiresAt from durationDays
+          const newExpiry = new Date();
+          newExpiry.setDate(newExpiry.getDate() + data.durationDays);
+          updateData.expiresAt = newExpiry;
+          updateData.expirationType = 'DURATION_FROM_CREATION';
         }
 
         if (data.durationDays !== undefined) {
