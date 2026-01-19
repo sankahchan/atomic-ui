@@ -427,6 +427,18 @@ function CreateDAKDialog({
 /**
  * QRCodeDialog Component
  */
+// Helper to get the full subscription URL including base path
+function getSubscriptionUrl(dynamicUrl: string): string {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `${window.location.origin}${basePath}/api/sub/${dynamicUrl}`;
+}
+
+// Helper to get ssconf:// URL for Outline app
+function getSsconfUrl(dynamicUrl: string, name: string): string {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `ssconf://${window.location.host}${basePath}/api/sub/${dynamicUrl}#${encodeURIComponent(name)}`;
+}
+
 function QRCodeDialog({
   dak,
   open,
@@ -444,7 +456,7 @@ function QRCodeDialog({
   useEffect(() => {
     if (open && dak?.dynamicUrl) {
       setIsLoading(true);
-      const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
+      const url = getSubscriptionUrl(dak.dynamicUrl);
       QRCode.toDataURL(url, {
         width: 256,
         margin: 2,
@@ -465,7 +477,7 @@ function QRCodeDialog({
 
   const handleCopyUrl = () => {
     if (dak?.dynamicUrl) {
-      const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
+      const url = getSubscriptionUrl(dak.dynamicUrl);
       navigator.clipboard.writeText(url);
       toast({
         title: t('dynamic_keys.msg.copied'),
@@ -519,7 +531,7 @@ function QRCodeDialog({
                 className="flex-1"
                 onClick={() => {
                   if (dak?.dynamicUrl) {
-                    const ssconfUrl = `ssconf://${window.location.host}/sub/${dak.dynamicUrl}#${encodeURIComponent(dak.name)}`;
+                    const ssconfUrl = getSsconfUrl(dak.dynamicUrl, dak.name);
                     navigator.clipboard.writeText(ssconfUrl);
                     toast({
                       title: t('dynamic_keys.msg.copied'),
@@ -536,7 +548,7 @@ function QRCodeDialog({
             <div className="p-2 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">Subscription URL:</p>
               <code className="text-xs break-all select-all">
-                {dak?.dynamicUrl ? `${window.location.origin}/sub/${dak.dynamicUrl}` : ''}
+                {dak?.dynamicUrl ? getSubscriptionUrl(dak.dynamicUrl) : ''}
               </code>
             </div>
           </div>
@@ -911,7 +923,7 @@ export default function DynamicKeysPage() {
 
   const handleCopyUrl = (dak: DAKData) => {
     if (dak.dynamicUrl) {
-      const url = `${window.location.origin}/sub/${dak.dynamicUrl}`;
+      const url = getSubscriptionUrl(dak.dynamicUrl);
       navigator.clipboard.writeText(url);
       toast({
         title: t('dynamic_keys.msg.copied'),

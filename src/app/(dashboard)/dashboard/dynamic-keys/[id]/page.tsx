@@ -44,7 +44,29 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Share2,
+  Palette,
+  Image as ImageIcon,
+  Phone,
+  X,
 } from 'lucide-react';
+import { themeList, getTheme } from '@/lib/subscription-themes';
+
+// Contact type options for subscription page
+const CONTACT_TYPES = [
+  { value: 'telegram', label: 'Telegram', icon: '📱' },
+  { value: 'discord', label: 'Discord', icon: '🎮' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
+  { value: 'phone', label: 'Phone', icon: '📞' },
+  { value: 'email', label: 'Email', icon: '📧' },
+  { value: 'website', label: 'Website', icon: '🌐' },
+  { value: 'facebook', label: 'Facebook', icon: '👤' },
+] as const;
+
+interface ContactLink {
+  type: typeof CONTACT_TYPES[number]['value'];
+  value: string;
+}
 
 /**
  * DAK Type configuration
@@ -65,6 +87,344 @@ const DAK_TYPES = {
     bgColor: 'bg-blue-500/10',
   },
 };
+
+/**
+ * SubscriptionShareCard Component
+ *
+ * Card for sharing the subscription page with theme selection, cover image, and contact links.
+ */
+function SubscriptionShareCard({
+  dakId,
+  dynamicUrl,
+  currentTheme,
+  currentCoverImage,
+  currentCoverImageType,
+  currentContactLinks,
+  onUpdate,
+}: {
+  dakId: string;
+  dynamicUrl: string | null;
+  currentTheme: string | null;
+  currentCoverImage: string | null;
+  currentCoverImageType: string | null;
+  currentContactLinks: ContactLink[] | null;
+  onUpdate: () => void;
+}) {
+  const { toast } = useToast();
+  const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'glassPurple');
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    currentCoverImageType === 'url' ? currentCoverImage || '' : ''
+  );
+  const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
+  const [newContactType, setNewContactType] = useState<string>('telegram');
+  const [newContactValue, setNewContactValue] = useState('');
+
+  const updateMutation = trpc.dynamicKeys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Updated',
+        description: 'Share page settings have been updated.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleThemeChange = (value: string) => {
+    setSelectedTheme(value);
+    updateMutation.mutate({
+      id: dakId,
+      subscriptionTheme: value,
+    } as any);
+  };
+
+  const handleCoverImageSave = () => {
+    if (coverImageUrl.trim()) {
+      updateMutation.mutate({
+        id: dakId,
+        coverImage: coverImageUrl.trim(),
+        coverImageType: 'url',
+      } as any);
+    } else {
+      updateMutation.mutate({
+        id: dakId,
+        coverImage: null,
+        coverImageType: null,
+      } as any);
+    }
+  };
+
+  const handleAddContact = () => {
+    if (!newContactValue.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a contact value.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (contacts.length >= 3) {
+      toast({
+        title: 'Limit reached',
+        description: 'Maximum 3 contacts allowed.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const newContacts = [...contacts, { type: newContactType as ContactLink['type'], value: newContactValue.trim() }];
+    setContacts(newContacts);
+    setNewContactValue('');
+    updateMutation.mutate({
+      id: dakId,
+      contactLinks: JSON.stringify(newContacts),
+    } as any);
+  };
+
+  const handleRemoveContact = (index: number) => {
+    const newContacts = contacts.filter((_, i) => i !== index);
+    setContacts(newContacts);
+    updateMutation.mutate({
+      id: dakId,
+      contactLinks: newContacts.length > 0 ? JSON.stringify(newContacts) : null,
+    } as any);
+  };
+
+  const getSubscriptionPageUrl = () => {
+    if (typeof window === 'undefined' || !dynamicUrl) return '';
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    return `${window.location.origin}${basePath}/sub/${dynamicUrl}`;
+  };
+
+  const copySubscriptionPageUrl = async () => {
+    const url = getSubscriptionPageUrl();
+    await navigator.clipboard.writeText(url);
+    toast({
+      title: 'Copied!',
+      description: 'Subscription page URL copied to clipboard.',
+    });
+  };
+
+  const theme = getTheme(selectedTheme);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Share2 className="w-5 h-5 text-primary" />
+          Share Page
+        </CardTitle>
+        <CardDescription>
+          Share a beautiful subscription page with your user
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Theme Selector */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            Page Theme
+          </Label>
+          <Select value={selectedTheme} onValueChange={handleThemeChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              {themeList.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: t.bgPrimary, borderColor: t.accent }}
+                    />
+                    {t.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Background Image URL */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <ImageIcon className="w-4 h-4" />
+            Background Image (Optional)
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://example.com/image.jpg"
+              value={coverImageUrl}
+              onChange={(e) => setCoverImageUrl(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCoverImageSave}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Use image as full-page background theme. Overrides color theme when set.
+          </p>
+        </div>
+
+        {/* Contact Links */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Contact Links ({contacts.length}/3)
+          </Label>
+
+          {/* Existing contacts */}
+          {contacts.length > 0 && (
+            <div className="space-y-2">
+              {contacts.map((contact, index) => {
+                const contactType = CONTACT_TYPES.find(t => t.value === contact.type);
+                return (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                    <span>{contactType?.icon}</span>
+                    <span className="text-sm font-medium">{contactType?.label}</span>
+                    <span className="text-sm text-muted-foreground truncate flex-1">{contact.value}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleRemoveContact(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add new contact */}
+          {contacts.length < 3 && (
+            <div className="flex gap-2">
+              <Select value={newContactType} onValueChange={setNewContactType}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{type.icon}</span>
+                        {type.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Enter link or ID"
+                value={newContactValue}
+                onChange={(e) => setNewContactValue(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleAddContact}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Theme Preview */}
+        <div
+          className="rounded-lg p-4 border transition-colors relative overflow-hidden"
+          style={{
+            backgroundColor: coverImageUrl ? 'transparent' : theme.bgPrimary,
+            borderColor: theme.border,
+          }}
+        >
+          {/* Background image preview */}
+          {coverImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${coverImageUrl})` }}
+              />
+              <div className="absolute inset-0 bg-black/60" />
+            </>
+          )}
+          <div className="relative z-10">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                style={{
+                  backgroundColor: coverImageUrl ? 'rgba(0,0,0,0.4)' : theme.bgCard,
+                  backdropFilter: coverImageUrl ? 'blur(8px)' : undefined,
+                }}
+              >
+                📊
+              </div>
+              <div>
+                <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Preview</p>
+                <p className="text-xs" style={{ color: theme.textMuted }}>Image Background</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview & Copy Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              const url = getSubscriptionPageUrl();
+              if (url) window.open(url, '_blank');
+            }}
+            disabled={!dynamicUrl}
+          >
+            <Share2 className="w-4 h-4 mr-2" />
+            Preview
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={copySubscriptionPageUrl}
+            disabled={!dynamicUrl}
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            Copy Link
+          </Button>
+        </div>
+
+        {/* URL Display */}
+        {dynamicUrl && (
+          <div className="p-2 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Subscription Page URL:</p>
+            <code className="text-xs break-all select-all">
+              {getSubscriptionPageUrl()}
+            </code>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 /**
  * DynamicKeyDetailPage Component
@@ -520,6 +880,17 @@ export default function DynamicKeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Share Page Settings */}
+          <SubscriptionShareCard
+            dakId={dak.id}
+            dynamicUrl={dak.dynamicUrl}
+            currentTheme={dak.subscriptionTheme}
+            currentCoverImage={dak.coverImage}
+            currentCoverImageType={dak.coverImageType}
+            currentContactLinks={dak.contactLinks}
+            onUpdate={() => refetch()}
+          />
         </div>
       </div>
 

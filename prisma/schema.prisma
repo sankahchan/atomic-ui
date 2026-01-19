@@ -234,6 +234,19 @@ model DynamicAccessKey {
   // Track which server was last selected (for round-robin)
   lastSelectedKeyIndex Int @default(0)
 
+  // Subscription page theme (overrides global default)
+  // Valid themes: dark, light, purple, blue, green, orange, pink, red, glass*
+  subscriptionTheme String?
+
+  // Subscription page cover image
+  // coverImageType: upload, url, gradient
+  coverImageType String?
+  coverImage     String?
+
+  // Contact links for subscription page (JSON array of up to 3 contacts)
+  // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
+  contactLinks   String?
+
   accessKeys AccessKey[]
 
   createdAt DateTime @default(now())

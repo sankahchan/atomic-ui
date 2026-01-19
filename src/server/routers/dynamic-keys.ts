@@ -41,6 +41,12 @@ const createDAKSchema = z.object({
 /**
  * Schema for updating a Dynamic Access Key
  */
+// Valid themes for subscription pages
+const SUBSCRIPTION_THEMES = [
+  'dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red',
+  'glassPurple', 'glassBlue', 'glassCyan', 'glassGreen', 'glassPink', 'glassOrange', 'glassNeutral'
+] as const;
+
 const updateDAKSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(100).optional(),
@@ -58,6 +64,11 @@ const updateDAKSchema = z.object({
   prefix: z.string().max(16).optional().nullable(),
   // Load balancer algorithm
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN']).optional(),
+  // Subscription page customization
+  subscriptionTheme: z.enum(SUBSCRIPTION_THEMES).optional().nullable(),
+  coverImage: z.string().url().optional().nullable(),
+  coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
+  contactLinks: z.string().optional().nullable(), // JSON string of contact links
 });
 
 /**
@@ -237,6 +248,11 @@ export const dynamicKeysRouter = router({
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         accessKeys: dak.accessKeys,
+        // Subscription page customization
+        subscriptionTheme: dak.subscriptionTheme,
+        coverImage: dak.coverImage,
+        coverImageType: dak.coverImageType,
+        contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
@@ -306,7 +322,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, email, telegramId, notes, prefix, loadBalancerAlgorithm, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, email, telegramId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -349,6 +365,23 @@ export const dynamicKeysRouter = router({
 
       if (loadBalancerAlgorithm !== undefined) {
         updateData.loadBalancerAlgorithm = loadBalancerAlgorithm;
+      }
+
+      // Subscription page customization
+      if (subscriptionTheme !== undefined) {
+        updateData.subscriptionTheme = subscriptionTheme;
+      }
+
+      if (coverImage !== undefined) {
+        updateData.coverImage = coverImage;
+      }
+
+      if (coverImageType !== undefined) {
+        updateData.coverImageType = coverImageType;
+      }
+
+      if (contactLinks !== undefined) {
+        updateData.contactLinks = contactLinks;
       }
 
       // Recalculate expiration if type changed

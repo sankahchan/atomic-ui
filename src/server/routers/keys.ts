@@ -945,18 +945,15 @@ export const keysRouter = router({
   }),
 
   /**
-   * Get online/active users (keys with recent traffic activity).
+   * Get online/active users (keys with active connection sessions).
    *
-   * Similar to 3x-ui, a key is considered "online" if it had traffic during
-   * the most recent sync. We use the `lastUsedAt` timestamp which is updated
-   * when any traffic delta is detected.
+   * A key is considered "online" if it has an active ConnectionSession.
+   * Sessions are created when traffic is detected and closed after 5 minutes
+   * of inactivity (handled in the sync logic).
    *
-   * The logic:
-   * 1. Find when the most recent sync happened (server.lastSyncAt)
-   * 2. Get keys with lastUsedAt within a window around that sync time
-   * 3. Only those keys are considered "online"
-   *
-   * This ensures users show as offline once they stop using VPN.
+   * This is more accurate than using lastUsedAt because:
+   * - Sessions are explicitly closed when no traffic is detected
+   * - Sessions track actual ongoing connections, not just recent activity
    */
   getOnlineUsers: protectedProcedure.query(async () => {
     // Find the most recent sync time from any server
@@ -988,24 +985,23 @@ export const keysRouter = router({
       };
     }
 
-    // Keys are considered "online" if lastUsedAt is within 30 seconds of the last sync
-    // This accounts for sync processing time across multiple servers
-    const syncWindow = new Date(lastSyncAt.getTime() - 30 * 1000);
-
-    // Find keys with recent activity
-    const onlineKeys = await db.accessKey.findMany({
+    // Find keys with active connection sessions
+    // This is more accurate than lastUsedAt because sessions are
+    // explicitly closed when no traffic is detected for 5 minutes
+    const activeSessions = await db.connectionSession.findMany({
       where: {
-        status: 'ACTIVE',
-        lastUsedAt: {
-          gte: syncWindow,
+        isActive: true,
+        accessKey: {
+          status: 'ACTIVE',
         },
       },
       select: {
-        id: true,
+        accessKeyId: true,
       },
+      distinct: ['accessKeyId'],
     });
 
-    const activeKeyIds = onlineKeys.map(key => key.id);
+    const activeKeyIds = activeSessions.map(session => session.accessKeyId);
 
     return {
       onlineCount: activeKeyIds.length,
