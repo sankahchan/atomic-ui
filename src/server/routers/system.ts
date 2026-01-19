@@ -93,4 +93,9 @@ export const systemRouter = router({
             },
         };
     }),
+    getMyIp: protectedProcedure.query(({ ctx }) => {
+        return {
+            ip: ctx.clientIp,
+        };
+    }),
 });

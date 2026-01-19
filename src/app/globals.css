@@ -7,6 +7,8 @@
  * 
  * The design system supports both light and dark modes, with dark mode
  * being the default for this VPN management interface.
+ *
+ * (Styles verified 2026-01-19)
  */
 
 @tailwind base;

@@ -67,6 +67,7 @@ import {
   LayoutGrid,
   LayoutList,
   Share2,
+  Calendar,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 
@@ -141,6 +142,7 @@ function CreateKeyDialog({
     durationDays: string;
     method: string;
     userId: string;
+    templateId: string;
   }>({
     serverId: '',
     name: '',
@@ -153,7 +155,11 @@ function CreateKeyDialog({
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
     userId: 'unassigned', // Use 'unassigned' to represent null/undefined in Select
+    templateId: 'none',
   });
+
+  // Fetch templates
+  const { data: templates } = trpc.templates.list.useQuery();
 
   // Fetch servers for selection
   const { data: servers } = trpc.servers.list.useQuery();
@@ -181,6 +187,12 @@ function CreateKeyDialog({
     },
   });
 
+  const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
+
+  // Helper to handle prefix when submitting if template used? 
+  // For now the applyTemplate updates the state directly so handleSubmit works as is.
+
+
   const resetForm = () => {
     setFormData({
       serverId: '',
@@ -194,7 +206,54 @@ function CreateKeyDialog({
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
       userId: 'unassigned',
+      templateId: 'none',
     });
+  };
+
+  // Handle URL params for template pre-selection
+  useEffect(() => {
+    if (open) {
+      const params = new URLSearchParams(window.location.search);
+      const templateId = params.get('template');
+      if (templateId && templates) {
+        setFormData(prev => ({ ...prev, templateId }));
+        // Apply template immediately if found
+        const template = templates.find(temp => temp.id === templateId);
+        if (template) applyTemplate(template);
+      }
+    }
+  }, [open, templates]);
+
+  const applyTemplate = (template: any) => {
+    setFormData(prev => ({
+      ...prev,
+      namePrefix: template.namePrefix || prev.name, // We'll handle prefix logic in render or submission if needed, but for now just storing it might be tricky. Actually, if it's a prefix, we might want to auto-generate a name.
+      // Let's just update the fields that map directly
+      dataLimitGB: template.dataLimitGB ? (Number(template.dataLimitBytes) / (1024 * 1024 * 1024)).toString() : '',
+      dataLimitResetStrategy: template.dataLimitResetStrategy as any,
+      expirationType: template.expirationType as any,
+      durationDays: template.durationDays?.toString() || '',
+      method: template.method,
+      notes: template.notes || '',
+      serverId: template.serverId || prev.serverId,
+    }));
+
+    // Auto-generate name if prefix exists
+    if (template.namePrefix) {
+      // Simple random suffix for now, user can edit
+      const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      setFormData(prev => ({ ...prev, name: `${template.namePrefix}${randomSuffix}` }));
+    }
+  };
+
+  const handleTemplateChange = (templateId: string) => {
+    setFormData(prev => ({ ...prev, templateId }));
+    if (templateId !== 'none' && templates) {
+      const template = templates.find(temp => temp.id === templateId);
+      if (template) {
+        applyTemplate(template);
+      }
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -238,6 +297,27 @@ function CreateKeyDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Template Selection */}
+          <div className="space-y-2">
+            <Label>Apply Template</Label>
+            <Select
+              value={formData.templateId}
+              onValueChange={handleTemplateChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a template" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {templates?.map((tpl) => (
+                  <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="border-t border-border pt-4"></div>
+
           {/* Server selection */}
           <div className="space-y-2">
             <Label>{t('keys.form.server')} *</Label>
@@ -570,6 +650,64 @@ function DeleteKeyDialog({
           <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {t('keys.delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+/**
+ * BulkExtendDialog Component
+ * 
+ * A dialog for extending the expiration of multiple keys.
+ */
+function BulkExtendDialog({
+  open,
+  onOpenChange,
+  count,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  count: number;
+  onConfirm: (days: number) => void;
+  isPending: boolean;
+}) {
+  const [days, setDays] = useState('30');
+  const { t } = useLocale();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Extend Expiration</DialogTitle>
+          <DialogDescription>
+            Extend {count} selected keys. This will add days to their current expiration date and reactivate them if expired.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4">
+          <Label htmlFor="days">Extension (Days)</Label>
+          <Input
+            id="days"
+            type="number"
+            min="1"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            className="mt-2"
+          />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('keys.cancel')}
+          </Button>
+          <Button onClick={() => onConfirm(parseInt(days) || 30)} disabled={isPending}>
+            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Extend
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -978,6 +1116,14 @@ export default function KeysPage() {
   const syncAllRef = useRef(syncAllMutation);
   syncAllRef.current = syncAllMutation;
 
+  // Auto-open create dialog if query param present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'create') {
+      setCreateDialogOpen(true);
+    }
+  }, []);
+
   // Auto-sync effect - syncs with Outline servers and refreshes data
   useEffect(() => {
     // Clear existing intervals
@@ -1080,7 +1226,37 @@ export default function KeysPage() {
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkExtendDialogOpen, setBulkExtendDialogOpen] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Bulk extend mutation
+  const bulkExtendMutation = trpc.keys.bulkExtend.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Extension complete',
+        description: `Extended ${result.success} keys.`,
+      });
+      setBulkExtendDialogOpen(false);
+      setSelectedKeys(new Set());
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Extension failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleBulkExtend = (days: number) => {
+    if (selectedKeys.size === 0) return;
+    bulkExtendMutation.mutate({
+      ids: Array.from(selectedKeys),
+      days,
+    });
+  };
+
 
   const handleDelete = (keyId: string, keyName: string) => {
     setKeyToDelete({ id: keyId, name: keyName });
@@ -1394,6 +1570,14 @@ export default function KeysPage() {
           </span>
           <div className="flex items-center gap-2">
             <Button
+              variant="default"
+              size="sm"
+              onClick={() => setBulkExtendDialogOpen(true)}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Extend Expiry
+            </Button>
+            <Button
               variant="destructive"
               size="sm"
               onClick={handleBulkDelete}
@@ -1694,6 +1878,14 @@ export default function KeysPage() {
           isPending={deleteMutation.isPending}
         />
       )}
+
+      <BulkExtendDialog
+        open={bulkExtendDialogOpen}
+        onOpenChange={setBulkExtendDialogOpen}
+        count={selectedKeys.size}
+        onConfirm={handleBulkExtend}
+        isPending={bulkExtendMutation.isPending}
+      />
     </div>
   );
 }

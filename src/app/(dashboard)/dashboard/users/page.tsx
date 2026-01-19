@@ -26,6 +26,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, User, Key, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocale } from '@/hooks/use-locale';
+import { MobileCardView } from '@/components/mobile-card-view';
+
 
 export default function UsersPage() {
     const { t } = useLocale();
@@ -148,7 +150,8 @@ export default function UsersPage() {
                 </Dialog>
             </div>
 
-            <div className="rounded-md border bg-card">
+            {/* Desktop View */}
+            <div className="hidden md:block rounded-md border bg-card">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -213,6 +216,52 @@ export default function UsersPage() {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Mobile View */}
+            <MobileCardView
+                data={users || []}
+                keyExtractor={(user) => user.id}
+                renderCard={(user) => (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <div className="flex items-center gap-2 font-medium">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    {user.email}
+                                </div>
+                                <div className="mt-1">
+                                    <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
+                                        {user.role}
+                                    </Badge>
+                                </div>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-2 -mr-2"
+                                onClick={() => handleDelete(user.id, user.email || 'Unknown')}
+                                disabled={user.role === 'ADMIN'}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wider mb-1">Created</p>
+                                <p className="text-foreground">{new Date(user.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wider mb-1">Keys</p>
+                                <div className="flex items-center gap-1 text-foreground">
+                                    <Key className="h-3 w-3" />
+                                    {(user as any)._count?.accessKeys || 0}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            />
         </div>
     );
 }

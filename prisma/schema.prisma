@@ -26,16 +26,18 @@ datasource db {
 // ============================================
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String?   // Nullable for passwordless/magic link flow if we go that route
-  role         String    @default("USER") // Valid: ADMIN, USER
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String?   // Nullable for passwordless/magic link flow if we go that route
+  role           String    @default("USER") // Valid: ADMIN, USER
+  telegramChatId String?   // Telegram chat ID for bot notifications
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
-  accessKeys   AccessKey[]
-  sessions     Session[]
+  accessKeys      AccessKey[]
+  dynamicAccessKeys DynamicAccessKey[]
+  sessions        Session[]
 }
 
 model Session {
@@ -72,6 +74,7 @@ model Server {
   accessKeys  AccessKey[]
   healthCheck HealthCheck?
   metrics     ServerMetric[]
+  keyTemplates KeyTemplate[]
 
   // Cached server info from Outline API
   outlineServerId       String?
@@ -197,6 +200,11 @@ model DynamicAccessKey {
   email      String?
   telegramId String?
   notes      String?
+
+  // User Ownership
+  userId     String?
+  user       User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
 
   // For tag-based server selection (stored as JSON string)
   serverTagsJson String @default("[]")
@@ -451,3 +459,57 @@ model AuditLog {
 // DakType values: SELF_MANAGED, MANUAL
 // HealthStatus values: UP, DOWN, SLOW, UNKNOWN
 // NotificationType values: TELEGRAM, EMAIL, WEBHOOK
+
+// ============================================
+// Access Key Templates
+// ============================================
+
+model KeyTemplate {
+  id          String   @id @default(cuid())
+  name        String   // Template name (e.g., "Standard 30 Day")
+  description String?
+
+  // Key Configuration
+  namePrefix             String? // Prefix for generated keys
+  dataLimitBytes         BigInt?
+  dataLimitResetStrategy String  @default("NEVER")
+  expirationType         String  @default("NEVER")
+  durationDays           Int?    // For DURATION_FROM_CREATION or START_ON_FIRST_USE
+  method                 String  @default("chacha20-ietf-poly1305")
+  
+  // Customization
+  notes                  String? // Default notes
+  
+  // Default server (optional)
+  serverId               String?
+  server                 Server? @relation(fields: [serverId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Security & Access Control
+// ============================================
+
+model SecurityRule {
+  id          String   @id @default(cuid())
+  
+  // Rule Type: ALLOW (Whitelist) or BLOCK (Blacklist)
+  type        String   @default("BLOCK") 
+  
+  // Target: IP, CIDR, COUNTRY
+  // Valid: IP, CIDR, COUNTRY
+  targetType  String   
+  
+  // Value: 192.168.1.1, 10.0.0.0/24, US, CN
+  targetValue String   
+  
+  description String?
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, targetType])
+}

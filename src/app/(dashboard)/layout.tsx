@@ -37,7 +37,11 @@ import {
   User,
   Archive,
   Globe,
+  BarChart3,
+  FileText,
+  ShieldCheck,
 } from 'lucide-react';
+
 import { useTheme } from 'next-themes';
 import { LanguageSelector } from '@/components/ui/language-selector';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
@@ -139,6 +143,12 @@ function Sidebar({
       description: 'Manage Outline servers'
     },
     {
+      href: '/dashboard/analytics',
+      label: t('nav.analytics') || 'Analytics',
+      icon: BarChart3,
+      description: 'Traffic analysis'
+    },
+    {
       href: '/dashboard/keys',
       label: t('nav.keys'),
       icon: Key,
@@ -149,6 +159,18 @@ function Sidebar({
       label: t('nav.dynamic_keys'),
       icon: KeyRound,
       description: 'Dynamic access key pools'
+    },
+    {
+      href: '/dashboard/templates',
+      label: 'Templates',
+      icon: FileText,
+      description: 'Key configuration templates'
+    },
+    {
+      href: '/dashboard/security',
+      label: 'Security',
+      icon: ShieldCheck,
+      description: 'Firewall and access rules'
     },
     {
       href: '/dashboard/archived',
@@ -423,6 +445,15 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-4">
           <Atom className="h-12 w-12 text-primary animate-spin" />
           <p className="text-muted-foreground">Loading...</p>
+          {/* Fallback logout if stuck in loading */}
+          <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              document.cookie = 'atomic-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+              window.location.href = '/login';
+            }}>
+              Taking too long? Sign out
+            </Button>
+          </div>
         </div>
       </div>
     );

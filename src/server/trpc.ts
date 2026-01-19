@@ -14,17 +14,21 @@ import superjson from 'superjson';
 import { ZodError } from 'zod';
 import { getCurrentUser, type AuthUser } from '@/lib/auth';
 
+import { type FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
+
 /**
  * Context available to all tRPC procedures.
  * 
  * The context is created fresh for each request and contains:
  * - user: The authenticated user (if any)
+ * - clientIp: The IP address of the client
  * 
  * This allows procedures to access the current user without
  * having to manually handle authentication in each procedure.
  */
 export interface Context {
   user: AuthUser | null;
+  clientIp: string | null;
 }
 
 /**
@@ -34,9 +38,47 @@ export interface Context {
  * It fetches the current user from the session cookie and includes
  * them in the context. If no valid session exists, user will be null.
  */
-export async function createContext(): Promise<Context> {
+export async function createContext(opts?: FetchCreateContextFnOptions): Promise<Context> {
   const user = await getCurrentUser();
-  return { user };
+
+  let clientIp: string | null = null;
+
+  if (opts?.req) {
+    const forwardedFor = opts.req.headers.get('x-forwarded-for');
+    if (forwardedFor) {
+      clientIp = forwardedFor.split(',')[0].trim();
+    } else {
+      clientIp = opts.req.headers.get('x-real-ip');
+    }
+
+    if (clientIp) {
+      // We need to dynamically import to avoid circular dependencies if any,
+      // but standard import should work.
+      // However, checkIpAllowed uses DB.
+
+      try {
+        const { checkIpAllowed } = await import('@/lib/security');
+        const { allowed, reason } = await checkIpAllowed(clientIp);
+
+        if (!allowed) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: reason || 'Access denied by security policy',
+          });
+        }
+      } catch (error) {
+        // If it's already a TRPCError, rethrow
+        if (error instanceof TRPCError) throw error;
+
+        // Log other errors but don't block access if DB fails? 
+        // Best to fail closed for security.
+        console.error('Security check failed:', error);
+        // Optional: throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Security check failed' });
+      }
+    }
+  }
+
+  return { user, clientIp };
 }
 
 /**

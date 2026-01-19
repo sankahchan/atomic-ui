@@ -24,6 +24,7 @@ const createDAKSchema = z.object({
   type: z.enum(['SELF_MANAGED', 'MANUAL']).default('SELF_MANAGED'),
   email: z.string().email().optional().nullable(),
   telegramId: z.string().optional().nullable(),
+  userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
@@ -53,6 +54,7 @@ const updateDAKSchema = z.object({
   type: z.enum(['SELF_MANAGED', 'MANUAL']).optional(),
   email: z.string().email().optional().nullable(),
   telegramId: z.string().optional().nullable(),
+  userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
@@ -117,7 +119,7 @@ export const dynamicKeysRouter = router({
    */
   list: protectedProcedure
     .input(listDAKSchema)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const { search, type, status, page, pageSize } = input;
 
       // Build the where clause
@@ -137,6 +139,16 @@ export const dynamicKeysRouter = router({
           { email: { contains: search } },
           { telegramId: { contains: search } },
         ];
+      }
+
+      // Role-based filtering: Users see only their own keys
+      if (ctx.user.role !== 'ADMIN') {
+        where.userId = ctx.user.id;
+      }
+
+      // Admin can filter by specific userId
+      if (ctx.user.role === 'ADMIN' && (input as any).userId) {
+        where.userId = (input as any).userId;
       }
 
       // Get total count for pagination
@@ -176,8 +188,6 @@ export const dynamicKeysRouter = router({
           dataLimitBytes: dak.dataLimitBytes,
           usedBytes: dak.usedBytes,
           expiresAt: dak.expiresAt,
-          expirationType: dak.expirationType,
-          durationDays: dak.durationDays,
           daysRemaining,
           prefix: dak.prefix,
           method: dak.method,
@@ -186,6 +196,7 @@ export const dynamicKeysRouter = router({
           attachedKeysCount: dak._count.accessKeys,
           createdAt: dak.createdAt,
           updatedAt: dak.updatedAt,
+          userId: dak.userId,
         };
       });
 
@@ -204,7 +215,7 @@ export const dynamicKeysRouter = router({
    */
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const dak = await db.dynamicAccessKey.findUnique({
         where: { id: input.id },
         include: {
@@ -225,7 +236,15 @@ export const dynamicKeysRouter = router({
       if (!dak) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      // Authorization check: User can only access their own key
+      if (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id) {
+        // Allow if user owns an attached key? Maybe strict ownership for DAK is better.
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
         });
       }
 
@@ -236,6 +255,7 @@ export const dynamicKeysRouter = router({
         status: dak.status as 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DEPLETED',
         email: dak.email,
         telegramId: dak.telegramId,
+        userId: dak.userId,
         notes: dak.notes,
         dynamicUrl: dak.dynamicUrl,
         dataLimitBytes: dak.dataLimitBytes,
@@ -278,9 +298,9 @@ export const dynamicKeysRouter = router({
       const dak = await db.dynamicAccessKey.create({
         data: {
           name: input.name,
-          type: input.type,
           email: input.email,
           telegramId: input.telegramId,
+          userId: input.userId, // Assign to user if provided
           notes: input.notes,
           dynamicUrl,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
@@ -322,7 +342,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, email, telegramId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -345,6 +365,10 @@ export const dynamicKeysRouter = router({
 
       if (telegramId !== undefined) {
         updateData.telegramId = telegramId;
+      }
+
+      if (userId !== undefined) {
+        updateData.userId = userId;
       }
 
       if (notes !== undefined) {

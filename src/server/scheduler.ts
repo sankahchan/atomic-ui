@@ -6,6 +6,7 @@
  * Tasks include:
  * - Traffic usage snapshots (Hourly)
  * - Expiration checks (Every 5 mins)
+ * - Health checks (Every 2 mins)
  * - Data limit resets (Daily)
  * - Notification checks (Every 5 mins)
  */
@@ -13,8 +14,7 @@
 import cron from 'node-cron';
 import { snapshotTraffic } from '@/lib/services/analytics';
 import { checkExpirations } from '@/lib/services/expiration';
-// import { checkNotifications } from '@/lib/services/notifications'; // Future
-// import { resetDataLimits } from '@/lib/services/limits'; // Future
+import { runHealthChecks, ensureHealthChecks } from '@/lib/services/health-check';
 
 let isSchedulerRunning = false;
 
@@ -47,7 +47,18 @@ export function initScheduler() {
         }
     });
 
-    // Run expiration check immediately on startup
+    // 3. Health Check (Every 2 minutes)
+    cron.schedule('*/2 * * * *', async () => {
+        console.log('🏥 Running health checks...');
+        try {
+            const result = await runHealthChecks();
+            console.log(`✅ Health check complete: ${result.up} up, ${result.down} down, ${result.slow} slow`);
+        } catch (error) {
+            console.error('❌ Health check failed:', error);
+        }
+    });
+
+    // Run initial checks on startup
     setTimeout(async () => {
         console.log('⏰ Running initial expiration check on startup...');
         try {
@@ -56,10 +67,22 @@ export function initScheduler() {
         } catch (error) {
             console.error('❌ Initial expiration check failed:', error);
         }
-    }, 5000); // Wait 5 seconds for DB to be ready
 
-    // Future tasks can be added here...
-    // cron.schedule('*/5 * * * *', checkNotifications);
+        // Ensure health check records exist for all servers
+        console.log('🏥 Ensuring health check records exist...');
+        try {
+            const created = await ensureHealthChecks();
+            if (created > 0) {
+                console.log(`✅ Created ${created} health check records`);
+            }
+
+            // Run initial health check
+            const result = await runHealthChecks();
+            console.log(`✅ Initial health check: ${result.up} up, ${result.down} down, ${result.slow} slow`);
+        } catch (error) {
+            console.error('❌ Initial health check failed:', error);
+        }
+    }, 5000); // Wait 5 seconds for DB to be ready
 
     isSchedulerRunning = true;
     console.log('✅ Scheduler started successfully');

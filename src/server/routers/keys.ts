@@ -738,6 +738,58 @@ export const keysRouter = router({
     }),
 
   /**
+   * Bulk extend expiration for multiple keys.
+   * 
+   * Adds the specified number of days to the current expiration date.
+   * If a key has no expiration, it sets it to now + days.
+   * Also reactivates expired keys.
+   */
+  bulkExtend: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      days: z.number().int().positive(),
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({ where: { id } });
+
+          if (key) {
+            let newExpiresAt: Date;
+
+            if (key.expiresAt) {
+              // Add days to existing expiration
+              newExpiresAt = new Date(key.expiresAt);
+              newExpiresAt.setDate(newExpiresAt.getDate() + input.days);
+            } else {
+              // Set from now if no previous expiration
+              newExpiresAt = new Date();
+              newExpiresAt.setDate(newExpiresAt.getDate() + input.days);
+            }
+
+            // Update key
+            await db.accessKey.update({
+              where: { id },
+              data: {
+                expiresAt: newExpiresAt,
+                expirationType: 'FIXED_DATE', // Switch to fixed date to be safe
+                status: 'ACTIVE', // Reactivate if it was expired
+              },
+            });
+
+            results.success++;
+          }
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
    * Toggle key enabled/disabled status.
    *
    * Quickly enable or disable a key without deleting it.
