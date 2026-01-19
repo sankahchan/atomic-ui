@@ -23,10 +23,16 @@
  * - IP_HASH: Uses CRC32 of client IP for consistent server selection
  * - RANDOM: Randomly selects from available access keys
  * - ROUND_ROBIN: Cycles through access keys sequentially
+ * 
+ * SELF_MANAGED Mode:
+ * - Automatically creates access keys on available servers
+ * - Keys are named: self-managed-dak-{dakId}
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { createOutlineClient } from '@/lib/outline-api';
+import { generateRandomString } from '@/lib/utils';
 
 /**
  * Simple CRC32 implementation for IP-based hashing
@@ -192,6 +198,106 @@ async function selectAccessKey(
 }
 
 /**
+ * Create or get existing self-managed access key for a Dynamic Access Key.
+ * This implements OutlineAdmin-style SELF_MANAGED behavior.
+ */
+async function createSelfManagedKey(
+  dakId: string,
+  serverTagsJson: string | null,
+  method: string | null,
+  prefix: string | null
+): Promise<{ accessUrl: string; server: { hostnameForAccessKeys: string | null } } | null> {
+  const keyName = `self-managed-dak-${dakId}`;
+
+  // Check if a key already exists for this DAK
+  const existingKey = await db.accessKey.findFirst({
+    where: {
+      dynamicKeyId: dakId,
+      name: { startsWith: 'self-managed-dak-' },
+      status: 'ACTIVE',
+    },
+    include: {
+      server: true,
+    },
+  });
+
+  if (existingKey && existingKey.accessUrl) {
+    return {
+      accessUrl: existingKey.accessUrl,
+      server: { hostnameForAccessKeys: existingKey.server.hostnameForAccessKeys },
+    };
+  }
+
+  // Get available servers based on tags
+  const serverTagIds: string[] = JSON.parse(serverTagsJson || '[]');
+
+  let servers;
+  if (serverTagIds.length > 0) {
+    // Filter by tags
+    servers = await db.server.findMany({
+      where: {
+        isActive: true,
+        tags: {
+          some: {
+            tagId: { in: serverTagIds },
+          },
+        },
+      },
+    });
+  } else {
+    // Get all active servers
+    servers = await db.server.findMany({
+      where: { isActive: true },
+    });
+  }
+
+  if (servers.length === 0) {
+    return null;
+  }
+
+  // Select a random server
+  const selectedServer = servers[Math.floor(Math.random() * servers.length)];
+
+  try {
+    // Create key on Outline server
+    const client = createOutlineClient(selectedServer.apiUrl, selectedServer.apiCertSha256);
+    const outlineKey = await client.createAccessKey({
+      name: keyName,
+      method: method || 'chacha20-ietf-poly1305',
+    });
+
+    // Save to database and attach to Dynamic Key
+    const subscriptionToken = generateRandomString(32);
+    const newKey = await db.accessKey.create({
+      data: {
+        outlineKeyId: outlineKey.id,
+        name: keyName,
+        accessUrl: outlineKey.accessUrl,
+        password: outlineKey.password,
+        port: outlineKey.port,
+        method: outlineKey.method,
+        serverId: selectedServer.id,
+        dynamicKeyId: dakId,
+        status: 'ACTIVE',
+        subscriptionToken,
+        prefix: prefix,
+      },
+      include: {
+        server: true,
+      },
+    });
+
+    return {
+      accessUrl: newKey.accessUrl!,
+      server: { hostnameForAccessKeys: newKey.server.hostnameForAccessKeys },
+    };
+  } catch (error) {
+    console.error('Failed to create self-managed key:', error);
+    return null;
+  }
+}
+
+/**
  * Build Outline-compatible JSON response from parsed SS URL
  */
 function buildOutlineJson(
@@ -300,6 +406,37 @@ export async function GET(
         });
       }
 
+      // Handle SELF_MANAGED vs MANUAL mode differently
+      if (dynamicKey.type === 'SELF_MANAGED') {
+        // SELF_MANAGED: Auto-create keys on demand
+        const selfManagedResult = await createSelfManagedKey(
+          dynamicKey.id,
+          dynamicKey.serverTagsJson,
+          dynamicKey.method,
+          dynamicKey.prefix
+        );
+
+        if (!selfManagedResult) {
+          return NextResponse.json(
+            { error: 'No servers available. Please configure servers first.' },
+            { status: 503 }
+          );
+        }
+
+        // Parse and return
+        const parsed = parseSSUrl(selfManagedResult.accessUrl);
+        if (!parsed) {
+          return new NextResponse(selfManagedResult.accessUrl, {
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        }
+
+        return NextResponse.json(buildOutlineJson(parsed, dynamicKey.prefix), {
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+
+      // MANUAL mode: Use attached keys with load balancing
       // Filter access keys by server tags if specified
       let availableKeys = dynamicKey.accessKeys;
       const serverTagIds: string[] = JSON.parse(dynamicKey.serverTagsJson || '[]');
@@ -323,13 +460,13 @@ export async function GET(
 
       if (!selection || !selection.key.accessUrl) {
         return NextResponse.json(
-          { error: 'No active access key available for this dynamic key' },
+          { error: 'No active access key available. Please attach keys to this dynamic key.' },
           { status: 404 }
         );
       }
 
       const attachedKey = selection.key;
-      const accessUrl = attachedKey.accessUrl as string; // Already checked above, so this is non-null
+      const accessUrl = attachedKey.accessUrl as string;
 
       // Parse the access URL and return Outline-compatible JSON
       const parsed = parseSSUrl(accessUrl);
