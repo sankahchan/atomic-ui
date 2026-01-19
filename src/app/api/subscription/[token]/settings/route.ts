@@ -24,7 +24,17 @@ export async function GET(
       select: { id: true },
     });
 
-    if (!key) {
+    let isValid = !!key;
+
+    if (!isValid) {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { dynamicUrl: token },
+        select: { id: true },
+      });
+      isValid = !!dak;
+    }
+
+    if (!isValid) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
     }
 

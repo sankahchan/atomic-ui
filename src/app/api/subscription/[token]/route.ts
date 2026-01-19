@@ -36,11 +36,109 @@ export async function GET(
       },
     });
 
+    // If not found in AccessKey, check DynamicAccessKey
     if (!key) {
-      return NextResponse.json(
-        { error: 'Invalid subscription token' },
-        { status: 404 }
-      );
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { dynamicUrl: token },
+        include: {
+          accessKeys: {
+            where: { status: 'ACTIVE' },
+            include: {
+              server: {
+                select: {
+                  name: true,
+                  countryCode: true,
+                  location: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        return NextResponse.json(
+          { error: 'Invalid subscription token' },
+          { status: 404 }
+        );
+      }
+
+      // Check DAK status
+      if (dak.status !== 'ACTIVE') {
+        return NextResponse.json(
+          { error: `Key is ${dak.status.toLowerCase()}` },
+          { status: 403 }
+        );
+      }
+
+      // Check DAK expiration
+      if (dak.expiresAt && new Date() > dak.expiresAt) {
+        return NextResponse.json(
+          { error: 'Key has expired' },
+          { status: 403 }
+        );
+      }
+
+      // Check DAK data limit
+      if (dak.dataLimitBytes && dak.usedBytes >= dak.dataLimitBytes) {
+        return NextResponse.json(
+          { error: 'Data limit exceeded' },
+          { status: 403 }
+        );
+      }
+
+      // Check Accept header
+      const acceptHeader = request.headers.get('accept') || '';
+      const host = request.headers.get('host') || 'localhost:3000';
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+
+      // Construct a subscription URL (SSCONF or similar) for the JSON response
+      // This allows the QR code to point to a subscription update
+      const subscriptionUrl = `${protocol}://${host}/api/subscription/${token}`;
+      const ssConfUrl = `ssconf://${host}/api/subscription/${token}#${encodeURIComponent(dak.name)}`;
+
+      if (acceptHeader.includes('application/json')) {
+        return NextResponse.json({
+          id: dak.id,
+          name: dak.name,
+          // Use ssconf:// for the "accessUrl" in the UI so clients treat it as a subscription
+          accessUrl: ssConfUrl,
+          status: dak.status,
+          server: {
+            name: "Dynamic Backend",
+            countryCode: null, // Could maybe aggregate flags?
+            location: "Auto-Selected",
+          },
+          usedBytes: dak.usedBytes.toString(),
+          dataLimitBytes: dak.dataLimitBytes?.toString() || null,
+          expiresAt: dak.expiresAt?.toISOString() || null,
+          subscriptionTheme: dak.subscriptionTheme || null,
+          coverImage: dak.coverImage || null,
+          coverImageType: dak.coverImageType || null,
+          method: dak.method || null,
+          port: null,
+          contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
+          isDynamic: true,
+        });
+      }
+
+      // Return SIP002/SIP008 style list for plain text (the subscription content)
+      // We return a list of ss:// links separated by newlines, or base64 encoded.
+      // Many clients support base64 encoded list.
+
+      const validKeys = dak.accessKeys.filter(k => k.accessUrl);
+      const links = validKeys.map(k => k.accessUrl).join('\n');
+
+      // Base64 encode the list for better compatibility with some clients
+      const b64Links = Buffer.from(links).toString('base64');
+
+      return new NextResponse(b64Links, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `inline; filename="${dak.name}.txt"`,
+        },
+      });
     }
 
     // Check if key is active
