@@ -298,6 +298,7 @@ export const dynamicKeysRouter = router({
       const dak = await db.dynamicAccessKey.create({
         data: {
           name: input.name,
+          type: input.type, // SELF_MANAGED or MANUAL - determines key creation behavior
           email: input.email,
           telegramId: input.telegramId,
           userId: input.userId, // Assign to user if provided
