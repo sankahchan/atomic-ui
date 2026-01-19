@@ -4,7 +4,7 @@
 
 A modern, feature-rich web application for managing Outline VPN servers. Built with Next.js 14, TypeScript, and a beautiful atomic-inspired dark theme.
 
-![Atomic-UI Dashboard]
+
 ![New Note](https://github.com/user-attachments/assets/e3a543e6-165f-472b-a46b-462a15c96ed0)
 
 ## ✨ Features
