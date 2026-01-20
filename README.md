@@ -45,8 +45,20 @@ A modern, feature-rich web application for managing Outline VPN servers. Built w
 
 ## 🚀 Quick Start
 
-### 1. Installation
-The recommended way to deploy is using Docker.
+### One-Command Installation (Recommended for VPS)
+
+Deploy instantly on Ubuntu/Debian with a single command:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
+```
+
+After installation:
+- Access panel at `http://YOUR_IP:2053/YOUR_PATH/`
+- Default login: `admin` / `admin123`
+- Run `atomic-ui` for management menu
+
+### Docker Installation
 
 ```bash
 git clone https://github.com/sankahchan/atomic-ui.git
