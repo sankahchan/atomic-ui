@@ -1450,7 +1450,7 @@ export default function DynamicKeysPage() {
 
               <div className="flex items-center gap-2 mt-2">
                 <div className={cn('text-xs flex items-center gap-1', (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).color)}>
-                  {DAK_TYPES[dak.type]?.icon && <Settings className="w-3 h-3" />}
+                  {(() => { const Icon = (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).icon; return <Icon className="w-3 h-3" />; })()}
                   {t((DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).labelKey)}
                 </div>
                 <span className="text-xs text-muted-foreground">• {formatBytes(dak.usedBytes)}</span>
