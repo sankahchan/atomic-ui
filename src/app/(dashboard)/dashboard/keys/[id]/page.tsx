@@ -42,6 +42,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
+import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -534,11 +536,7 @@ function SubscriptionShareCard({
 
   const copySubscriptionPageUrl = async () => {
     const url = getSubscriptionPageUrl();
-    await navigator.clipboard.writeText(url);
-    toast({
-      title: 'Copied!',
-      description: 'Subscription page URL copied to clipboard.',
-    });
+    await copyToClipboard(url, 'Copied!', 'Subscription page URL copied to clipboard.');
   };
 
   const theme = getTheme(selectedTheme);
@@ -1167,13 +1165,10 @@ export default function KeyDetailPage() {
               {qrLoading ? (
                 <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
               ) : qrData?.qrCode ? (
-                <Image
-                  src={qrData.qrCode}
-                  alt="QR Code"
-                  width={200}
-                  height={200}
-                  className="rounded-lg bg-white p-2"
-                  unoptimized
+                <QRCodeWithLogo
+                  dataUrl={qrData.qrCode}
+                  size={200}
+                  className="bg-white p-2 rounded-lg"
                 />
               ) : (
                 <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">

@@ -59,8 +59,12 @@ import {
   LayoutGrid,
   LayoutList,
   Archive,
+  ListTree,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
+import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
+import { copyToClipboard } from '@/lib/clipboard';
+import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 
 /**
  * Supported encryption methods for Shadowsocks
@@ -505,14 +509,10 @@ function QRCodeDialog({
     }
   }, [open, dak]);
 
-  const handleCopyUrl = () => {
+  const handleCopyUrl = async () => {
     if (dak?.dynamicUrl) {
       const url = getSubscriptionUrl(dak.dynamicUrl);
-      navigator.clipboard.writeText(url);
-      toast({
-        title: t('dynamic_keys.msg.copied'),
-        description: t('dynamic_keys.msg.copy_url'),
-      });
+      await copyToClipboard(url);
     }
   };
 
@@ -532,13 +532,9 @@ function QRCodeDialog({
           {isLoading ? (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
           ) : qrCode ? (
-            <Image
-              src={qrCode}
-              alt="QR Code"
-              width={200}
-              height={200}
-              className="rounded-lg"
-              unoptimized
+            <QRCodeWithLogo
+              dataUrl={qrCode}
+              size={200}
             />
           ) : (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
@@ -816,7 +812,7 @@ export default function DynamicKeysPage() {
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
 
   const pageSize = 20;
 
@@ -955,11 +951,7 @@ export default function DynamicKeysPage() {
   const handleCopyUrl = (dak: DAKData) => {
     if (dak.dynamicUrl) {
       const url = getSubscriptionUrl(dak.dynamicUrl);
-      navigator.clipboard.writeText(url);
-      toast({
-        title: t('dynamic_keys.msg.copied'),
-        description: t('dynamic_keys.msg.copy_url'),
-      });
+      copyToClipboard(url);
     }
   };
 
@@ -1057,12 +1049,12 @@ export default function DynamicKeysPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/archived">
-            <Button variant="outline">
+            <Button variant="outline" size="sm" className="h-8">
               <Archive className="w-4 h-4 mr-2" />
               {t('nav.archived') || 'Archived'}
             </Button>
           </Link>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-8">
             <Plus className="w-4 h-4 mr-2" />
             {t('dynamic_keys.create')}
           </Button>
@@ -1256,6 +1248,14 @@ export default function DynamicKeysPage() {
             >
               <LayoutGrid className="w-4 h-4" />
             </Button>
+            <Button
+              variant={viewMode === 'group' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setViewMode('group')}
+            >
+              <ListTree className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </div>
@@ -1414,8 +1414,62 @@ export default function DynamicKeysPage() {
         )
       )}
 
-      {/* Keys table - show on desktop always when list mode, and on mobile when list mode */}
-      <Card className={cn('mb-6', viewMode === 'list' ? 'block' : 'hidden')}>
+      {/* Group View */}
+      {viewMode === 'group' && (
+        <DynamicGroupList
+          keys={dynamicKeys}
+          onToggleStatus={(key) => handleToggleStatus(key)}
+          onDelete={(key) => handleDelete(key)}
+          onCopyUrl={(key) => handleCopyUrl(key)}
+          onShowQR={(key) => handleShowQR(key)}
+          isProcessingId={togglingKeyId}
+        />
+      )}
+
+      {/* Mobile Card View for List Mode */}
+      {viewMode === 'list' && (
+        <MobileCardView
+          className="md:hidden mb-6"
+          data={dynamicKeys}
+          renderCard={(dak) => (
+            <div className="space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  {onlineDakIds.has(dak.id) && <OnlineIndicator isOnline={true} />}
+                  <div>
+                    <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="font-medium hover:underline">
+                      {dak.name}
+                    </Link>
+                    {dak.email && <p className="text-xs text-muted-foreground">{dak.email}</p>}
+                  </div>
+                </div>
+                <Badge className={cn('border', (statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE).color)}>
+                  {dak.status}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <div className={cn('text-xs flex items-center gap-1', (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).color)}>
+                  {DAK_TYPES[dak.type]?.icon && <Settings className="w-3 h-3" />}
+                  {t((DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).labelKey)}
+                </div>
+                <span className="text-xs text-muted-foreground">• {formatBytes(dak.usedBytes)}</span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+                <Button variant="ghost" size="sm" onClick={() => handleCopyUrl(dak)}><Copy className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => handleShowQR(dak)}><QrCode className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(dak)}><Power className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(dak)} className="text-destructive"><Trash2 className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          )}
+          keyExtractor={(item) => item.id}
+        />
+      )}
+
+
+      <Card className={cn('mb-6', viewMode === 'list' ? 'hidden md:block' : 'hidden')}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -1536,6 +1590,6 @@ export default function DynamicKeysPage() {
         open={!!qrDialogDak}
         onOpenChange={(open) => !open && setQrDialogDak(null)}
       />
-    </div>
+    </div >
   );
 }

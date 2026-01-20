@@ -75,6 +75,8 @@ import {
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { ServerGroupList } from '@/components/keys/server-group-list';
+import { copyToClipboard } from '@/lib/clipboard';
+import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 
 /**
  * Status badge configuration for visual consistency
@@ -564,11 +566,7 @@ function QRCodeDialog({
 
   const handleCopyUrl = async () => {
     if (keyData?.accessUrl) {
-      await navigator.clipboard.writeText(keyData.accessUrl);
-      toast({
-        title: t('keys.toast.copied'),
-        description: t('keys.toast.copied_desc'),
-      });
+      await copyToClipboard(keyData.accessUrl);
     }
   };
 
@@ -586,13 +584,9 @@ function QRCodeDialog({
           {isLoading ? (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
           ) : data?.qrCode ? (
-            <Image
-              src={data.qrCode}
-              alt="QR Code"
-              width={200}
-              height={200}
-              className="rounded-lg"
-              unoptimized
+            <QRCodeWithLogo
+              dataUrl={data.qrCode}
+              size={200}
             />
           ) : (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
@@ -1362,18 +1356,18 @@ export default function KeysPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/templates">
-            <Button variant="outline">
+            <Button variant="outline" size="sm" className="h-8">
               <FileText className="w-4 h-4 mr-2" />
               {t('nav.templates') || 'Templates'}
             </Button>
           </Link>
           <Link href="/dashboard/archived">
-            <Button variant="outline">
+            <Button variant="outline" size="sm" className="h-8">
               <Archive className="w-4 h-4 mr-2" />
               {t('nav.archived') || 'Archived'}
             </Button>
           </Link>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-8">
             <Plus className="w-4 h-4 mr-2" />
             {t('keys.create')}
           </Button>
@@ -1646,8 +1640,7 @@ export default function KeysPage() {
           onDelete={(key) => handleDelete(key.id, key.name)}
           onCopy={(key) => {
             if (key.accessUrl) {
-              navigator.clipboard.writeText(key.accessUrl);
-              toast({ title: t('keys.toast.copied'), description: t('keys.toast.copied_desc') });
+              copyToClipboard(key.accessUrl);
             } else {
               toast({ title: 'Error', description: 'No access URL available', variant: 'destructive' });
             }
@@ -1743,8 +1736,7 @@ export default function KeysPage() {
                           className="h-8 w-8"
                           onClick={() => {
                             const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
-                            navigator.clipboard.writeText(url);
-                            toast({ title: t('keys.toast.copied'), description: t('keys.toast.copied_desc') });
+                            copyToClipboard(url);
                           }}
                         >
                           <Share2 className="w-4 h-4" />

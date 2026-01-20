@@ -271,7 +271,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-4 h-[calc(100vh-theme(spacing.20))] overflow-hidden flex flex-col">
+    <div className="space-y-4 h-full md:h-[calc(100vh-theme(spacing.20))] overflow-auto md:overflow-hidden flex flex-col">
       {/* Page header - Compact */}
       <div className="flex items-center justify-between shrink-0">
         <div>
