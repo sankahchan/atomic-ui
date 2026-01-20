@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,8 +69,12 @@ import {
   LayoutList,
   Share2,
   Calendar,
+  FileText,
+  Archive,
+  List as ListIcon,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
+import { ServerGroupList } from '@/components/keys/server-group-list';
 
 /**
  * Status badge configuration for visual consistency
@@ -977,10 +982,11 @@ export default function KeysPage() {
   const [countdown, setCountdown] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const { t } = useLocale();
+  const router = useRouter();
 
   const pageSize = 20;
 
@@ -1354,10 +1360,24 @@ export default function KeysPage() {
             {t('keys.subtitle')}
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          {t('keys.create')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/templates">
+            <Button variant="outline">
+              <FileText className="w-4 h-4 mr-2" />
+              {t('nav.templates') || 'Templates'}
+            </Button>
+          </Link>
+          <Link href="/dashboard/archived">
+            <Button variant="outline">
+              <Archive className="w-4 h-4 mr-2" />
+              {t('nav.archived') || 'Archived'}
+            </Button>
+          </Link>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            {t('keys.create')}
+          </Button>
+        </div>
       </div>
 
       {/* Stats cards */}
@@ -1506,8 +1526,8 @@ export default function KeysPage() {
         </DropdownMenu>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="hidden md:flex items-center border rounded-lg p-0.5 bg-muted/50">
+          {/* View mode toggle - visible on all screens */}
+          <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
@@ -1523,6 +1543,15 @@ export default function KeysPage() {
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'group' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setViewMode('group')}
+              title="Group by Server"
+            >
+              <ListIcon className="w-4 h-4" />
             </Button>
           </div>
 
@@ -1602,21 +1631,38 @@ export default function KeysPage() {
         </div>
       )}
 
-      {/* Mobile Card View */}
+      {/* Mobile Card View - only show when viewMode is 'grid' */}
       {isLoading ? (
         <div className="md:hidden space-y-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="h-32 bg-muted animate-pulse" />
           ))}
         </div>
-      ) : (
+      ) : viewMode === 'group' ? (
+        <ServerGroupList
+          keys={data?.items || []}
+          onToggleStatus={(key, checked) => handleToggleStatus(key.id)}
+          onEdit={(key) => router.push(`/dashboard/keys/${key.id}`)}
+          onDelete={(key) => handleDelete(key.id, key.name)}
+          onCopy={(key) => {
+            if (key.accessUrl) {
+              navigator.clipboard.writeText(key.accessUrl);
+              toast({ title: t('keys.toast.copied'), description: t('keys.toast.copied_desc') });
+            } else {
+              toast({ title: 'Error', description: 'No access URL available', variant: 'destructive' });
+            }
+          }}
+          onQr={(key) => setQrDialogKey({ id: key.id, name: key.name })}
+          isProcessingId={togglingKeyId}
+        />
+      ) : (viewMode === 'grid' || viewMode === 'list') ? (
         <MobileCardView
           data={data?.items || []}
           renderCard={renderKeyCard}
           keyExtractor={(item) => item.id}
           className="md:hidden"
         />
-      )}
+      ) : null}
 
       {/* Desktop Grid View */}
       {viewMode === 'grid' && (
@@ -1744,8 +1790,8 @@ export default function KeysPage() {
         </div>
       )}
 
-      {/* Keys table (List View) */}
-      <Card className={cn('hidden mb-6', viewMode === 'list' && 'md:block')}>
+      {/* Keys table (List View) - show on desktop always when list mode, and on mobile when list mode */}
+      <Card className={cn('mb-6', viewMode === 'list' ? 'hidden md:block' : 'hidden')}>
         <div className="overflow-x-auto">
           <table className="w-full">
 

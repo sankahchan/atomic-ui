@@ -311,7 +311,7 @@ export default function SubscriptionPage() {
                 style={{ backgroundColor: theme.accent + '20' }}
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill={theme.accent}>
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2v-2zm0-2h2V7h-2v7z"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2v-2zm0-2h2V7h-2v7z" />
                 </svg>
               </div>
             </div>
@@ -358,7 +358,7 @@ export default function SubscriptionPage() {
                 style={{ backgroundColor: '#ec4899' + '20' }}
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#ec4899">
-                  <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z"/>
+                  <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z" />
                 </svg>
               </div>
             </div>
@@ -468,6 +468,7 @@ export default function SubscriptionPage() {
               Scan QR Code
             </h3>
             <div className="inline-block p-2 bg-white rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrCode} alt="QR Code" className="w-40 h-40" />
             </div>
             <p className="mt-2 text-xs" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>

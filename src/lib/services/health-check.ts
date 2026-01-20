@@ -7,6 +7,7 @@
 
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
+import { sendAdminAlert } from '@/lib/services/telegram-bot';
 
 export interface HealthCheckResult {
     serverId: string;
@@ -112,9 +113,13 @@ export async function runHealthChecks(): Promise<{
                 },
             });
 
-            // TODO: Send notification if status changed (wasDown !== isNowDown)
             if (wasDown !== isNowDown) {
-                console.log(`🔔 Server ${server.name} status changed: ${wasDown ? 'DOWN' : 'UP'} -> ${isNowDown ? 'DOWN' : 'UP'}`);
+                const statusEmoji = isNowDown ? '🔴' : '🟢';
+                const statusText = isNowDown ? 'DOWN' : 'UP';
+                const statusMsg = `${statusEmoji} <b>Server Alert:</b> ${server.name} is now <b>${statusText}</b>`;
+
+                console.log(`🔔 ${statusMsg.replace(/<[^>]*>/g, '')}`);
+                await sendAdminAlert(statusMsg);
             }
         }
     }

@@ -75,7 +75,7 @@ async function runExpirationChecks(): Promise<{
   trafficSynced: number;
 }> {
   const now = new Date();
-  
+
   // Step 1: Expire keys that have passed their expiration date
   const expiredResult = await prisma.accessKey.updateMany({
     where: {
@@ -121,7 +121,7 @@ async function runExpirationChecks(): Promise<{
   // Step 4: Find keys expiring soon and potentially send notifications
   const warningDays = await getWarningDays();
   const warningDate = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
-  
+
   const expiringKeys = await prisma.accessKey.count({
     where: {
       status: 'ACTIVE',
@@ -171,10 +171,10 @@ async function syncTrafficUsage(): Promise<number> {
     try {
       // Create Outline client
       const client = new OutlineClient(server.apiUrl, server.apiCertSha256);
-      
+
       // Fetch metrics from Outline
       const metrics = await client.getMetrics();
-      
+
       if (!metrics || !metrics.bytesTransferredByUserId) {
         continue;
       }
@@ -252,6 +252,7 @@ async function sendExpirationWarnings(warningDays: number): Promise<void> {
   // Get keys expiring soon with their contact info
   const now = new Date();
   const warningDate = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const expiringKeys = await prisma.accessKey.findMany({
     where: {
@@ -261,6 +262,10 @@ async function sendExpirationWarnings(warningDays: number): Promise<void> {
         gte: now,
         lte: warningDate,
       },
+      OR: [
+        { lastWarningSentAt: null },
+        { lastWarningSentAt: { lt: twentyFourHoursAgo } }
+      ]
     },
     include: {
       server: {
@@ -298,16 +303,19 @@ Expires at: ${key.expiresAt!.toISOString()}
 
 Please renew this key to maintain VPN access.`;
 
+    let sent = false;
+
     // Send to appropriate channels based on key contact info
     for (const channel of channels) {
       try {
         // Check if this channel type matches the key's contact info
         const config = channel.config as unknown as Record<string, string>;
-        
+
         if (channel.type === 'TELEGRAM' && key.telegramId) {
           await sendTelegramMessage(config.botToken || process.env.TELEGRAM_BOT_TOKEN!, key.telegramId, message);
+          sent = true;
         }
-        
+
         // Admin notification channel (always notify)
         if (config.notifyAdmin === 'true') {
           await sendTelegramMessage(
@@ -315,13 +323,20 @@ Please renew this key to maintain VPN access.`;
             config.adminChatId || config.chatId,
             message
           );
+          sent = true;
         }
       } catch (error) {
         console.error(`Failed to send expiration warning via ${channel.type}:`, error);
       }
     }
-    // Note: To prevent duplicate notifications, consider adding a lastNotifiedAt 
-    // field to the AccessKey model in the Prisma schema
+
+    // Update lastWarningSentAt if notification was attempted
+    if (sent) {
+      await prisma.accessKey.update({
+        where: { id: key.id },
+        data: { lastWarningSentAt: new Date() }
+      });
+    }
   }
 }
 

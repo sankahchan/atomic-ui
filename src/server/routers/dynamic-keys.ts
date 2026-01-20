@@ -27,6 +27,7 @@ const createDAKSchema = z.object({
   userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
   expiresAt: z.date().optional().nullable(),
   durationDays: z.number().int().positive().optional().nullable(),
@@ -57,6 +58,7 @@ const updateDAKSchema = z.object({
   userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).optional(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
   expiresAt: z.date().optional().nullable(),
   durationDays: z.number().int().positive().optional().nullable(),
@@ -305,6 +307,7 @@ export const dynamicKeysRouter = router({
           notes: input.notes,
           dynamicUrl,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           expiresAt,
           durationDays: input.durationDays,
@@ -343,7 +346,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -378,6 +381,10 @@ export const dynamicKeysRouter = router({
 
       if (dataLimitGB !== undefined) {
         updateData.dataLimitBytes = dataLimitGB ? gbToBytes(dataLimitGB) : null;
+      }
+
+      if (dataLimitResetStrategy !== undefined) {
+        updateData.dataLimitResetStrategy = dataLimitResetStrategy;
       }
 
       if (serverTagIds !== undefined) {

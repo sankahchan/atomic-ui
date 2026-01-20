@@ -282,6 +282,17 @@ export const keysRouter = router({
         });
       }
 
+      // Auto-generate subscriptionToken if missing (for older keys)
+      if (!key.subscriptionToken) {
+        const newToken = generateRandomString(32);
+        await db.accessKey.update({
+          where: { id: input.id },
+          data: { subscriptionToken: newToken },
+        });
+        // Return updated key with the new token
+        return { ...key, subscriptionToken: newToken };
+      }
+
       return key;
     }),
 

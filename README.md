@@ -17,10 +17,12 @@ A modern, feature-rich web application for managing Outline VPN servers. Built w
 
 ### Access Key Management
 - **Advanced CRUD**: Create, read, update, and delete access keys with ease
+- **Smart Grouping**: Organize keys by server with collapsible groups for better management
 - **Key Templates**: Define standard configurations (e.g. "30 Day Plan") for quick key creation
 - **Bulk Operations**: Create, extend, or delete multiple keys at once
 - **Traffic Limits**: Set data usage limits (GB) with auto-reset strategies (Daily/Weekly/Monthly)
 - **Flexible Expiration**: Never, fixed date, duration from creation, or start-on-first-use
+- **Mobile Optimized**: Responsive card views and touch-friendly controls for on-the-go management
 - **Sharing**: Auto-generated QR codes and subscription URLs (Dynamic Keys)
 
 ### User Portal & Self-Service

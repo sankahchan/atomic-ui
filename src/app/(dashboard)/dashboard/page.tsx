@@ -329,6 +329,28 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Quick Analytics Link Card */}
+      <Link href="/dashboard/analytics">
+        <Card className="hover:border-primary/50 transition-colors cursor-pointer shrink-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <BarChart3 className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">{t('nav.analytics') || 'Analytics'}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {t('dashboard.total_traffic')}: {formatBytes(stats?.totalTrafficBytes || BigInt(0))} • View peak hours &amp; top users
+                  </p>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
       {/* Main Content Area - Scrollable if needed, but designed to fit */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0 flex-1">
         {/* Left Column: Traffic & Servers */}

@@ -748,6 +748,7 @@ function SubscriptionShareCard({
           <Button
             variant="outline"
             className="flex-1"
+            disabled={!subscriptionToken}
             onClick={() => {
               const url = getSubscriptionPageUrl();
               if (url) window.open(url, '_blank');
@@ -756,7 +757,11 @@ function SubscriptionShareCard({
             <Eye className="w-4 h-4 mr-2" />
             Preview
           </Button>
-          <Button className="flex-1" onClick={copySubscriptionPageUrl}>
+          <Button
+            className="flex-1"
+            onClick={copySubscriptionPageUrl}
+            disabled={!subscriptionToken}
+          >
             <Copy className="w-4 h-4 mr-2" />
             Copy Link
           </Button>
@@ -764,7 +769,7 @@ function SubscriptionShareCard({
 
         {/* URL Display */}
         <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
-          {getSubscriptionPageUrl() || 'No subscription token'}
+          {subscriptionToken ? getSubscriptionPageUrl() : 'Generating subscription token...'}
         </div>
       </CardContent>
     </Card>
@@ -984,15 +989,20 @@ export default function KeyDetailPage() {
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                    {`${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`}
+                    {key.subscriptionToken
+                      ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`
+                      : 'Loading subscription token...'}
                   </div>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      const url = `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`;
-                      copyToClipboard(url, 'Subscription URL');
+                      if (key.subscriptionToken) {
+                        const url = `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`;
+                        copyToClipboard(url, 'Subscription URL');
+                      }
                     }}
+                    disabled={!key.subscriptionToken}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>

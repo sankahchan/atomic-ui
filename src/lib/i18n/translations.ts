@@ -4,9 +4,12 @@ import { locales, type Locale } from './config';
 const navTranslations: Record<Locale, Record<string, string>> = {
   en: {
     'nav.dashboard': 'Dashboard',
-    'nav.servers': 'Servers',
+    'nav.servers': 'Health & Servers',
+    'nav.analytics': 'Analytics',
     'nav.keys': 'Access Keys',
     'nav.dynamic_keys': 'Dynamic Keys',
+    'nav.templates': 'Templates',
+    'nav.security': 'Security',
     'nav.archived': 'Archived Keys',
     'nav.health': 'Health',
     'nav.notifications': 'Notifications',
@@ -16,22 +19,27 @@ const navTranslations: Record<Locale, Record<string, string>> = {
   },
   zh: {
     'nav.dashboard': '仪表板',
-    'nav.servers': '服务器',
+    'nav.servers': '健康与服务器',
+    'nav.analytics': '分析',
     'nav.keys': '访问密钥',
     'nav.dynamic_keys': '动态密钥',
+    'nav.templates': '模板',
+    'nav.security': '安全',
     'nav.archived': '归档密钥',
     'nav.health': '健康状态',
     'nav.notifications': '通知',
-    'nav.buttons': 'Buttons', // Kept for reference but not in menu
     'nav.settings': '设置',
     'nav.users': '用户管理',
     'nav.portal': '用户门户',
   },
   my: {
     'nav.dashboard': 'ဒက်ရှ်ဘုတ်',
-    'nav.servers': 'ဆာဗာများ',
+    'nav.servers': 'Health & Servers',
+    'nav.analytics': 'ခွဲခြမ်းစိတ်ဖြာမှု',
     'nav.keys': 'အသုံးပြုခွင့် သော့များ',
     'nav.dynamic_keys': 'ပြောင်းလဲနိုင်သော သော့များ',
+    'nav.templates': 'ပုံစံပြားများ',
+    'nav.security': 'လုံခြုံရေး',
     'nav.archived': 'သိမ်းဆည်းထားသော',
     'nav.health': 'ကျန်းမာရေး',
     'nav.notifications': 'အသိပေးချက်များ',
@@ -39,9 +47,51 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.users': 'အသုံးပြုသူများ',
     'nav.portal': 'အသုံးပြုသူ ပေါ်တယ်',
   },
-  ja: {},
-  ko: {},
-  ru: {},
+  ja: {
+    'nav.dashboard': 'ダッシュボード',
+    'nav.servers': 'ヘルス & サーバー',
+    'nav.analytics': '分析',
+    'nav.keys': 'アクセスキー',
+    'nav.dynamic_keys': 'ダイナミックキー',
+    'nav.templates': 'テンプレート',
+    'nav.security': 'セキュリティ',
+    'nav.archived': 'アーカイブ',
+    'nav.health': 'ヘルス',
+    'nav.notifications': '通知',
+    'nav.settings': '設定',
+    'nav.users': 'ユーザー管理',
+    'nav.portal': 'ユーザーポータル',
+  },
+  ko: {
+    'nav.dashboard': '대시보드',
+    'nav.servers': '상태 및 서버',
+    'nav.analytics': '분석',
+    'nav.keys': '액세스 키',
+    'nav.dynamic_keys': '동적 키',
+    'nav.templates': '템플릿',
+    'nav.security': '보안',
+    'nav.archived': '보관함',
+    'nav.health': '상태',
+    'nav.notifications': '알림',
+    'nav.settings': '설정',
+    'nav.users': '사용자 관리',
+    'nav.portal': '사용자 포털',
+  },
+  ru: {
+    'nav.dashboard': 'Панель',
+    'nav.servers': 'Состояние и Серверы',
+    'nav.analytics': 'Аналитика',
+    'nav.keys': 'Ключи доступа',
+    'nav.dynamic_keys': 'Динамические ключи',
+    'nav.templates': 'Шаблоны',
+    'nav.security': 'Безопасность',
+    'nav.archived': 'Архив',
+    'nav.health': 'Состояние',
+    'nav.notifications': 'Уведомления',
+    'nav.settings': 'Настройки',
+    'nav.users': 'Управление',
+    'nav.portal': 'Портал',
+  },
 };
 
 // Dashboard Translations
@@ -1648,6 +1698,64 @@ const dynamicKeysTranslations: Record<Locale, Record<string, string>> = {
   ru: {},
 };
 
+// Days of Week Translations
+const daysTranslations: Record<Locale, Record<string, string>> = {
+  en: {
+    'days.sunday': 'Sun',
+    'days.monday': 'Mon',
+    'days.tuesday': 'Tue',
+    'days.wednesday': 'Wed',
+    'days.thursday': 'Thu',
+    'days.friday': 'Fri',
+    'days.saturday': 'Sat',
+  },
+  zh: {
+    'days.sunday': '周日',
+    'days.monday': '周一',
+    'days.tuesday': '周二',
+    'days.wednesday': '周三',
+    'days.thursday': '周四',
+    'days.friday': '周五',
+    'days.saturday': '周六',
+  },
+  my: {
+    'days.sunday': 'တနင်္ဂနွေ',
+    'days.monday': 'တနင်္လာ',
+    'days.tuesday': 'အင်္ဂါ',
+    'days.wednesday': 'ဗုဒ္ဓဟူး',
+    'days.thursday': 'ကြာသပတေး',
+    'days.friday': 'သောကြာ',
+    'days.saturday': 'စနေ',
+  },
+  ja: {
+    'days.sunday': '日',
+    'days.monday': '月',
+    'days.tuesday': '火',
+    'days.wednesday': '水',
+    'days.thursday': '木',
+    'days.friday': '金',
+    'days.saturday': '土',
+  },
+  ko: {
+    'days.sunday': '일',
+    'days.monday': '월',
+    'days.tuesday': '화',
+    'days.wednesday': '수',
+    'days.thursday': '목',
+    'days.friday': '금',
+    'days.saturday': '토',
+  },
+  ru: {
+    'days.sunday': 'Вс',
+    'days.monday': 'Пн',
+    'days.tuesday': 'Вт',
+    'days.wednesday': 'Ср',
+    'days.thursday': 'Чт',
+    'days.friday': 'Пт',
+    'days.saturday': 'Сб',
+  },
+};
+
 // Main translations object
 export const translations = {
   en: {
@@ -1662,6 +1770,7 @@ export const translations = {
     ...(serverDetailsTranslations.en || {}),
     ...(archivedTranslations.en || {}),
     ...(dynamicKeysTranslations.en || {}),
+    ...(daysTranslations.en || {}),
   },
   zh: {
     ...(loginTranslations.zh || {}),
@@ -1675,6 +1784,7 @@ export const translations = {
     ...(serverDetailsTranslations.zh || {}),
     ...(archivedTranslations.zh || {}),
     ...(dynamicKeysTranslations.zh || {}),
+    ...(daysTranslations.zh || {}),
   },
   my: {
     ...(loginTranslations.my || {}),
@@ -1688,6 +1798,7 @@ export const translations = {
     ...(serverDetailsTranslations.my || {}),
     ...(archivedTranslations.my || {}),
     ...(dynamicKeysTranslations.my || {}),
+    ...(daysTranslations.my || {}),
   },
   ja: {
     ...(loginTranslations.ja || {}),
@@ -1701,6 +1812,7 @@ export const translations = {
     ...(serverDetailsTranslations.ja || {}),
     ...(archivedTranslations.ja || {}),
     ...(dynamicKeysTranslations.ja || {}),
+    ...(daysTranslations.ja || {}),
   },
   ko: {
     ...(loginTranslations.ko || {}),
@@ -1714,6 +1826,7 @@ export const translations = {
     ...(serverDetailsTranslations.ko || {}),
     ...(archivedTranslations.ko || {}),
     ...(dynamicKeysTranslations.ko || {}),
+    ...(daysTranslations.ko || {}),
   },
   ru: {
     ...(loginTranslations.ru || {}),
@@ -1727,5 +1840,6 @@ export const translations = {
     ...(serverDetailsTranslations.ru || {}),
     ...(archivedTranslations.ru || {}),
     ...(dynamicKeysTranslations.ru || {}),
+    ...(daysTranslations.ru || {}),
   },
 };

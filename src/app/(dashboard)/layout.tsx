@@ -45,6 +45,7 @@ import {
 import { useTheme } from 'next-themes';
 import { LanguageSelector } from '@/components/ui/language-selector';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
+import { NotificationBell } from '@/components/notification-bell';
 
 /**
  * Navigation items configuration
@@ -143,12 +144,6 @@ function Sidebar({
       description: 'Manage Outline servers'
     },
     {
-      href: '/dashboard/analytics',
-      label: t('nav.analytics') || 'Analytics',
-      icon: BarChart3,
-      description: 'Traffic analysis'
-    },
-    {
       href: '/dashboard/keys',
       label: t('nav.keys'),
       icon: Key,
@@ -161,35 +156,13 @@ function Sidebar({
       description: 'Dynamic access key pools'
     },
     {
-      href: '/dashboard/templates',
-      label: 'Templates',
-      icon: FileText,
-      description: 'Key configuration templates'
-    },
-    {
       href: '/dashboard/security',
-      label: 'Security',
+      label: t('nav.security'),
       icon: ShieldCheck,
       description: 'Firewall and access rules'
     },
-    {
-      href: '/dashboard/archived',
-      label: t('nav.archived'),
-      icon: Archive,
-      description: 'View expired and deleted keys'
-    },
-    {
-      href: '/dashboard/health',
-      label: t('nav.health'),
-      icon: Activity,
-      description: 'Server health monitoring'
-    },
-    {
-      href: '/dashboard/notifications',
-      label: t('nav.notifications'),
-      icon: Bell,
-      description: 'Alert settings'
-    },
+
+
     {
       href: '/dashboard/users',
       label: t('nav.users'),
@@ -340,6 +313,7 @@ function Header({
           {mounted && (
             <div className="flex items-center gap-1">
               <LanguageSelector />
+              <NotificationBell />
               <Button
                 variant="ghost"
                 size="icon"
