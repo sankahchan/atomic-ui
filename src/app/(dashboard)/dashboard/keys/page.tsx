@@ -1177,6 +1177,7 @@ export default function KeysPage() {
         description: 'The access key has been deleted.',
       });
       refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
@@ -1195,6 +1196,7 @@ export default function KeysPage() {
         description: `${result.name} is now ${result.status.toLowerCase()}.`,
       });
       refetch();
+      refetchStats();
       setTogglingKeyId(null);
     },
     onError: (error) => {
@@ -1216,6 +1218,7 @@ export default function KeysPage() {
       });
       setSelectedKeys(new Set());
       refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({

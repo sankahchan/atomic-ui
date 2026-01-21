@@ -898,6 +898,7 @@ export default function DynamicKeysPage() {
         description: 'The dynamic key has been deleted successfully.',
       });
       refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
@@ -916,6 +917,7 @@ export default function DynamicKeysPage() {
         description: `${result.name} is now ${result.status.toLowerCase()}.`,
       });
       refetch();
+      refetchStats();
       setTogglingKeyId(null);
     },
     onError: (error) => {
@@ -937,6 +939,7 @@ export default function DynamicKeysPage() {
       });
       setSelectedKeys(new Set());
       refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
