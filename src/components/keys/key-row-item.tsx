@@ -45,6 +45,7 @@ export function KeyRowItem({
     onQr,
     isProcessing = false
 }: KeyItemProps) {
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const used = Number(usedBytes);
     const limit = dataLimitBytes ? Number(dataLimitBytes) : null;
@@ -53,83 +54,156 @@ export function KeyRowItem({
     const isExpired = expiresAt && new Date(expiresAt) < new Date();
     const isActive = status === 'ACTIVE' && !isExpired;
 
+    // Format expiration text
+    const getExpirationText = () => {
+        if (!expiresAt) return 'Never expires.';
+        const date = new Date(expiresAt);
+        const now = new Date();
+        const diffTime = date.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) return 'Expired';
+        if (diffDays === 0) return 'Expires today';
+        return `${diffDays}d left`;
+    };
+
     return (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center p-4 border-b last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors gap-4">
-            {/* 1. ID/Name/Status */}
-            <div className="flex items-center gap-3 w-full sm:w-[250px] shrink-0">
+        <div className="border-b last:border-0">
+            {/* Compact Row */}
+            <div
+                className="flex items-center p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors gap-3 cursor-pointer"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                {/* Info button */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(!isExpanded);
+                    }}
+                >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                </Button>
+
+                {/* Name and truncated ID */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <span className="font-medium truncate text-sm" title={name}>{name}</span>
-                        {!isActive && (
-                            <Badge variant="outline" className="text-[10px] px-1 h-5 text-red-500 border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900">
-                                {isExpired ? 'EXPIRED' : 'DISABLED'}
-                            </Badge>
-                        )}
+                        <span className="font-medium text-sm truncate">{name}</span>
                     </div>
                     <div className="text-xs text-muted-foreground font-mono truncate">
-                        ID: {id.substring(0, 8)}...
+                        {id.substring(0, 16)}...
                     </div>
                 </div>
 
-                <Switch
-                    checked={status === 'ACTIVE'}
-                    onCheckedChange={onToggleStatus}
-                    disabled={isProcessing}
-                    className="data-[state=checked]:bg-green-500"
-                />
-            </div>
+                {/* Status badge */}
+                <Badge
+                    variant="outline"
+                    className={`shrink-0 text-[10px] px-2 h-5 ${isActive
+                            ? 'text-green-500 border-green-500/30 bg-green-500/10'
+                            : 'text-red-500 border-red-500/30 bg-red-500/10'
+                        }`}
+                >
+                    {isActive ? 'Active' : isExpired ? 'Expired' : 'Disabled'}
+                </Badge>
 
-            {/* 2. Usage Bar */}
-            <div className="flex-1 w-full sm:w-auto min-w-[200px]">
-                <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                        <HardDrive className="h-3 w-3" /> Usage
+                {/* Compact info */}
+                <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1">
+                        <HardDrive className="w-3 h-3" />
+                        {formatBytes(used)} / {limit ? formatBytes(limit) : '∞'}
                     </span>
-                    <span className="font-mono">
-                        {formatBytes(used)}
-                        {limit && <span className="text-muted-foreground"> / {formatBytes(limit)}</span>}
-                    </span>
+                    <span>, Devices 0</span>
+                    <span>, {getExpirationText()}</span>
                 </div>
-                <div className="relative h-2.5 w-full bg-secondary rounded-full overflow-hidden">
-                    <div
-                        className={`h-full transition-all duration-500 ${percentage > 90 ? 'bg-red-500' :
-                            percentage > 75 ? 'bg-orange-500' :
-                                'bg-blue-500'
-                            }`}
-                        style={{ width: limit ? `${percentage}%` : '5%' }}
-                    />
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onQr();
+                        }}
+                    >
+                        <QrCode className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            // More options dropdown
+                        }}
+                    >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="5" r="1" />
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="12" cy="19" r="1" />
+                        </svg>
+                    </Button>
+
+                    {/* Expand chevron */}
+                    <svg
+                        className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                    >
+                        <path d="M6 9l6 6 6-6" />
+                    </svg>
                 </div>
             </div>
 
-            {/* 3. Expiration */}
-            <div className="w-full sm:w-[150px] shrink-0 text-right sm:text-left">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                    <Calendar className="h-3 w-3" /> Expiration
+            {/* Expanded details */}
+            {isExpanded && (
+                <div className="px-3 pb-3 pt-1 bg-muted/30 border-t border-dashed">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-1">Usage</p>
+                            <div className="flex items-center gap-2">
+                                <Progress value={percentage} className="h-2 flex-1" />
+                                <span className="text-xs font-mono">{percentage}%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-1">Data Used</p>
+                            <p className="font-medium">{formatBytes(used)}{limit && ` / ${formatBytes(limit)}`}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-1">Expiration</p>
+                            <p className="font-medium flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {expiresAt ? new Date(expiresAt).toLocaleDateString() : 'Never'}
+                            </p>
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <Switch
+                                checked={status === 'ACTIVE'}
+                                onCheckedChange={onToggleStatus}
+                                disabled={isProcessing}
+                                className="data-[state=checked]:bg-green-500"
+                            />
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCopy}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={onDelete}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                {expiresAt ? (
-                    <Badge variant="secondary" className="font-mono text-xs font-normal">
-                        {new Date(expiresAt).toLocaleDateString()}
-                    </Badge>
-                ) : (
-                    <span className="text-xs text-muted-foreground">Unlimited</span>
-                )}
-            </div>
-
-            {/* 4. Actions */}
-            <div className="flex items-center gap-1 w-full sm:w-auto justify-end">
-                <Button variant="ghost" size="icon" onClick={onQr} title="Show QR">
-                    <QrCode className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={onCopy} title="Copy Key">
-                    <Copy className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={onEdit} title="Edit">
-                    <Pencil className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={onDelete} title="Delete" className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </div>
+            )}
         </div>
     );
 }

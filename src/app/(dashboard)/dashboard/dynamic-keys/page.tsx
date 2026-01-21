@@ -1047,11 +1047,11 @@ export default function DynamicKeysPage() {
             {t('dynamic_keys.desc')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <Link href="/dashboard/archived">
             <Button variant="outline" size="sm" className="h-8">
-              <Archive className="w-4 h-4 mr-2" />
-              {t('nav.archived') || 'Archived'}
+              <Archive className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
             </Button>
           </Link>
           <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-8">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -54,6 +54,29 @@ export function AddServerDialog({
     const [location, setLocation] = useState('');
     const [countryCode, setCountryCode] = useState('');
     const [inputMode, setInputMode] = useState<'json' | 'manual'>('json');
+    const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'success' | 'error'>('idle');
+    const [connectionTime, setConnectionTime] = useState(0);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Track connection time while loading
+    useEffect(() => {
+        if (connectionStatus === 'connecting') {
+            setConnectionTime(0);
+            timerRef.current = setInterval(() => {
+                setConnectionTime(prev => prev + 1);
+            }, 1000);
+        } else {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        }
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, [connectionStatus]);
 
     // Parse config mutation for extracting API URL and cert from JSON
     const parseConfigMutation = trpc.servers.parseConfig.useMutation({
@@ -77,6 +100,7 @@ export function AddServerDialog({
     // Create server mutation
     const createMutation = trpc.servers.create.useMutation({
         onSuccess: () => {
+            setConnectionStatus('success');
             toast({
                 title: t('servers.toast.added'),
                 description: t('servers.toast.added_desc'),
@@ -86,9 +110,18 @@ export function AddServerDialog({
             resetForm();
         },
         onError: (error) => {
+            setConnectionStatus('error');
+            let errorMessage = error.message;
+            if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+                errorMessage = 'Connection timed out. Please check that the server is reachable and the API URL is correct.';
+            } else if (error.message.includes('ECONNREFUSED')) {
+                errorMessage = 'Connection refused. The server may be down or the port is blocked.';
+            } else if (error.message.includes('certificate') || error.message.includes('cert')) {
+                errorMessage = 'Certificate verification failed. Please check the Certificate SHA256 value.';
+            }
             toast({
                 title: 'Failed to add server',
-                description: error.message,
+                description: errorMessage,
                 variant: 'destructive',
             });
         },
@@ -101,6 +134,15 @@ export function AddServerDialog({
         setConfigJson('');
         setLocation('');
         setCountryCode('');
+        setConnectionStatus('idle');
+        setConnectionTime(0);
+    };
+
+    const handleCancel = () => {
+        // Note: tRPC mutations can't be cancelled, but we can close the dialog
+        setConnectionStatus('idle');
+        onOpenChange(false);
+        resetForm();
     };
 
     const handleParseConfig = () => {
@@ -121,6 +163,7 @@ export function AddServerDialog({
             return;
         }
 
+        setConnectionStatus('connecting');
         createMutation.mutate({
             name,
             apiUrl,
@@ -310,20 +353,52 @@ export function AddServerDialog({
                         </div>
                     </div>
 
+                    {/* Connection status indicator */}
+                    {connectionStatus === 'connecting' && (
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-blue-500">Connecting to server...</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {connectionTime < 10
+                                            ? 'Validating connection and importing server info...'
+                                            : connectionTime < 20
+                                                ? 'Still connecting... This may take a moment.'
+                                                : 'Taking longer than expected. Please check if the server is reachable.'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">Time elapsed: {connectionTime}s</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            {t('servers.dialog.cancel')}
-                        </Button>
-                        <Button type="submit" disabled={createMutation.isPending}>
-                            {createMutation.isPending && (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            )}
-                            {t('servers.dialog.submit')}
-                        </Button>
+                        {connectionStatus === 'connecting' ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCancel}
+                            >
+                                Cancel
+                            </Button>
+                        ) : (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    {t('servers.dialog.cancel')}
+                                </Button>
+                                <Button type="submit" disabled={createMutation.isPending}>
+                                    {createMutation.isPending && (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    )}
+                                    {t('servers.dialog.submit')}
+                                </Button>
+                            </>
+                        )}
                     </DialogFooter>
                 </form>
             </DialogContent>
