@@ -53,6 +53,9 @@ RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
+# Ensure .next/static exists (may be empty but directory must exist for COPY)
+RUN mkdir -p .next/static
+
 # ==============================================================================
 # Stage 3: Runner (Production)
 # ==============================================================================
@@ -82,7 +85,10 @@ RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 # The standalone output includes the minimal server and dependencies
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+
+# Create .next/static directory and copy contents (directory must exist first)
+RUN mkdir -p .next/static
+COPY --from=builder /app/.next/static/ ./.next/static/
 
 # Copy Prisma schema and scripts for database management
 COPY --from=builder /app/prisma ./prisma
