@@ -826,7 +826,7 @@ export default function DynamicKeysPage() {
   });
 
   // Fetch stats
-  const { data: stats } = trpc.dynamicKeys.stats.useQuery();
+  const { data: stats, refetch: refetchStats } = trpc.dynamicKeys.stats.useQuery();
 
   // Fetch online users - always poll every 3 seconds when auto-refresh is enabled
   // This ensures responsive online status updates independent of the sync interval
@@ -841,6 +841,7 @@ export default function DynamicKeysPage() {
   const syncAllMutation = trpc.servers.syncAll.useMutation({
     onSuccess: () => {
       refetch();
+      refetchStats();
       refetchOnline();
     },
   });

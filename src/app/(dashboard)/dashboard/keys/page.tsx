@@ -1092,7 +1092,7 @@ export default function KeysPage() {
   const { data: servers } = trpc.servers.list.useQuery();
 
   // Fetch key stats
-  const { data: stats } = trpc.keys.stats.useQuery();
+  const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery();
 
   // Fetch online users - always poll every 3 seconds when auto-refresh is enabled
   // This ensures responsive online status updates independent of the sync interval
@@ -1106,8 +1106,9 @@ export default function KeysPage() {
   // Sync all servers mutation
   const syncAllMutation = trpc.servers.syncAll.useMutation({
     onSuccess: () => {
-      // Refresh keys list and online users after sync
+      // Refresh keys list, stats, and online users after sync
       refetch();
+      refetchStats();
       refetchOnline();
     },
   });
