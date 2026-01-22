@@ -16,7 +16,7 @@
  * - Detailed key information with copy functionality
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes, formatRelativeTime, formatDateTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
 import {
@@ -972,13 +973,10 @@ export default function KeysPage() {
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [qrDialogKey, setQrDialogKey] = useState<{ id: string; name: string } | null>(null);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
-  const [countdown, setCountdown] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const { t } = useLocale();
   const router = useRouter();
 
@@ -1079,6 +1077,15 @@ export default function KeysPage() {
     );
   };
 
+  // Auto-refresh hook with localStorage persistence and tab visibility handling
+  const autoRefresh = useAutoRefresh({
+    onRefresh: useCallback(() => {
+      if (syncAllRef.current && !syncAllRef.current.isPending) {
+        syncAllRef.current.mutate();
+      }
+    }, []),
+  });
+
   // Fetch keys
   const { data, isLoading, refetch } = trpc.keys.list.useQuery({
     serverId: serverFilter || undefined,
@@ -1091,13 +1098,14 @@ export default function KeysPage() {
   // Fetch servers for filter
   const { data: servers } = trpc.servers.list.useQuery();
 
-  // Fetch key stats
-  const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery();
+  // Fetch key stats with polling when auto-refresh is active
+  const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery(undefined, {
+    refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
+  });
 
-  // Fetch online users - always poll every 3 seconds when auto-refresh is enabled
-  // This ensures responsive online status updates independent of the sync interval
+  // Fetch online users - poll every 3 seconds when auto-refresh is enabled
   const { data: onlineData, refetch: refetchOnline } = trpc.keys.getOnlineUsers.useQuery(undefined, {
-    refetchInterval: autoRefreshInterval > 0 ? 3000 : false,
+    refetchInterval: autoRefresh.isActive ? 3000 : false,
   });
 
   // Set of online key IDs for quick lookup
@@ -1113,8 +1121,7 @@ export default function KeysPage() {
     },
   });
 
-  // Store mutation in ref to avoid infinite effect loop
-  const syncAllRef = useRef(syncAllMutation);
+  // Store mutation in ref for auto-refresh callback
   syncAllRef.current = syncAllMutation;
 
   // Auto-open create dialog if query param present
@@ -1125,49 +1132,7 @@ export default function KeysPage() {
     }
   }, []);
 
-  // Auto-sync effect - syncs with Outline servers and refreshes data
-  useEffect(() => {
-    // Clear existing intervals
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-
-    if (autoRefreshInterval > 0) {
-      // Set countdown to interval
-      setCountdown(autoRefreshInterval);
-
-      // Countdown timer (updates every second)
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            return autoRefreshInterval;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      // Sync timer - syncs with Outline servers then refreshes
-      intervalRef.current = setInterval(() => {
-        syncAllRef.current.mutate();
-      }, autoRefreshInterval * 1000);
-    } else {
-      setCountdown(0);
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
-    };
-  }, [autoRefreshInterval]);
+  // Note: Auto-sync is now handled by the useAutoRefresh hook above
 
   // Delete mutation
   const deleteMutation = trpc.keys.delete.useMutation({
@@ -1557,8 +1522,8 @@ export default function KeysPage() {
           <div className="flex items-center gap-1">
             <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
             <Select
-              value={autoRefreshInterval.toString()}
-              onValueChange={(value) => setAutoRefreshInterval(parseInt(value))}
+              value={autoRefresh.interval.toString()}
+              onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
             >
               <SelectTrigger className="w-[80px] h-9">
                 <SelectValue />
@@ -1571,9 +1536,9 @@ export default function KeysPage() {
                 ))}
               </SelectContent>
             </Select>
-            {autoRefreshInterval > 0 && (
+            {autoRefresh.isActive && (
               <span className="text-xs text-muted-foreground min-w-[24px]">
-                {countdown}s
+                {autoRefresh.countdown}s
               </span>
             )}
           </div>

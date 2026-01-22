@@ -9,7 +9,7 @@
  * layer of abstraction that enables several advanced use cases.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes } from '@/lib/utils';
 import QRCode from 'qrcode';
 import {
@@ -806,15 +807,21 @@ export default function DynamicKeysPage() {
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [qrDialogDak, setQrDialogDak] = useState<DAKData | null>(null);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
-  const [countdown, setCountdown] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
 
   const pageSize = 20;
+
+  // Auto-refresh hook with localStorage persistence and tab visibility handling
+  const autoRefresh = useAutoRefresh({
+    onRefresh: useCallback(() => {
+      if (syncAllRef.current && !syncAllRef.current.isPending) {
+        syncAllRef.current.mutate();
+      }
+    }, []),
+  });
 
   // Fetch dynamic keys from API
   const { data, isLoading, refetch } = trpc.dynamicKeys.list.useQuery({
@@ -825,13 +832,14 @@ export default function DynamicKeysPage() {
     pageSize,
   });
 
-  // Fetch stats
-  const { data: stats, refetch: refetchStats } = trpc.dynamicKeys.stats.useQuery();
+  // Fetch stats with polling when auto-refresh is active
+  const { data: stats, refetch: refetchStats } = trpc.dynamicKeys.stats.useQuery(undefined, {
+    refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
+  });
 
-  // Fetch online users - always poll every 3 seconds when auto-refresh is enabled
-  // This ensures responsive online status updates independent of the sync interval
+  // Fetch online users - poll every 3 seconds when auto-refresh is enabled
   const { data: onlineData, refetch: refetchOnline } = trpc.dynamicKeys.getOnlineUsers.useQuery(undefined, {
-    refetchInterval: autoRefreshInterval > 0 ? 3000 : false,
+    refetchInterval: autoRefresh.isActive ? 3000 : false,
   });
 
   // Set of online DAK IDs for quick lookup
@@ -846,49 +854,10 @@ export default function DynamicKeysPage() {
     },
   });
 
-  // Store mutation in ref to avoid infinite effect loop
-  const syncAllRef = useRef(syncAllMutation);
+  // Store mutation in ref for auto-refresh callback
   syncAllRef.current = syncAllMutation;
 
-  // Auto-sync effect
-  useEffect(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-
-    if (autoRefreshInterval > 0) {
-      setCountdown(autoRefreshInterval);
-
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            return autoRefreshInterval;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      intervalRef.current = setInterval(() => {
-        syncAllRef.current.mutate();
-      }, autoRefreshInterval * 1000);
-    } else {
-      setCountdown(0);
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
-    };
-  }, [autoRefreshInterval]);
+  // Note: Auto-sync is now handled by the useAutoRefresh hook above
 
   // Delete mutation
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({
@@ -1204,8 +1173,8 @@ export default function DynamicKeysPage() {
           <div className="flex items-center gap-1">
             <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
             <Select
-              value={autoRefreshInterval.toString()}
-              onValueChange={(value) => setAutoRefreshInterval(parseInt(value))}
+              value={autoRefresh.interval.toString()}
+              onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
             >
               <SelectTrigger className="w-[80px] h-9">
                 <SelectValue />
@@ -1218,9 +1187,9 @@ export default function DynamicKeysPage() {
                 ))}
               </SelectContent>
             </Select>
-            {autoRefreshInterval > 0 && (
+            {autoRefresh.isActive && (
               <span className="text-xs text-muted-foreground min-w-[24px]">
-                {countdown}s
+                {autoRefresh.countdown}s
               </span>
             )}
           </div>
