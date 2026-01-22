@@ -71,17 +71,40 @@ export const dashboardRouter = router({
      * Get overview statistics for the dashboard.
      */
     stats: protectedProcedure.query(async () => {
-        // Get server counts
-        const [totalServers, activeServers] = await Promise.all([
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const [
+            totalServers,
+            activeServers,
+            keyCounts,
+            healthCounts,
+            expiringIn24h,
+            trafficResult,
+        ] = await Promise.all([
             db.server.count(),
             db.server.count({ where: { isActive: true } }),
+            db.accessKey.groupBy({
+                by: ['status'],
+                _count: { status: true },
+            }),
+            db.healthCheck.groupBy({
+                by: ['lastStatus'],
+                _count: { lastStatus: true },
+            }),
+            db.accessKey.count({
+                where: {
+                    status: 'ACTIVE',
+                    expiresAt: {
+                        lte: tomorrow,
+                        gte: new Date(),
+                    },
+                },
+            }),
+            db.accessKey.aggregate({
+                _sum: { usedBytes: true },
+            }),
         ]);
-
-        // Get key counts by status
-        const keyCounts = await db.accessKey.groupBy({
-            by: ['status'],
-            _count: { status: true },
-        });
 
         const keyStats = {
             total: 0,
@@ -113,36 +136,12 @@ export const dashboardRouter = router({
             }
         }
 
-        // Get health check status
-        const healthCounts = await db.healthCheck.groupBy({
-            by: ['lastStatus'],
-            _count: { lastStatus: true },
-        });
-
         let downServers = 0;
         for (const item of healthCounts) {
             if (item.lastStatus === 'DOWN') {
                 downServers = item._count.lastStatus;
             }
         }
-
-        // Get keys expiring in 24 hours
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const expiringIn24h = await db.accessKey.count({
-            where: {
-                status: 'ACTIVE',
-                expiresAt: {
-                    lte: tomorrow,
-                    gte: new Date(),
-                },
-            },
-        });
-
-        // Calculate total traffic (sum of usedBytes)
-        const trafficResult = await db.accessKey.aggregate({
-            _sum: { usedBytes: true },
-        });
 
         return {
             totalServers,

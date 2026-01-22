@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { env } from 'process';
 import { db } from '@/lib/db';
 import { sendTelegramDocument } from '@/lib/telegram';
+import { logger } from '@/lib/logger';
 
 // Ensure backup directory exists
 const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
@@ -51,7 +52,7 @@ export const backupRouter = router({
 
             return backups;
         } catch (error: any) {
-            console.error('Failed to list backups:', error);
+            logger.error('Failed to list backups:', error);
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
                 message: 'Failed to list backups',
@@ -97,18 +98,18 @@ export const backupRouter = router({
                                 fileBuffer,
                                 backupFilename,
                                 `Backup created via Dashboard at ${new Date().toLocaleString()}`
-                            ).catch(e => console.error(`Failed to send backup to ${chatId}:`, e))
+                            ).catch(e => logger.error(`Failed to send backup to ${chatId}:`, e))
                         ));
                     }
                 }
             } catch (err) {
-                console.error('Failed to auto-send backup to Telegram:', err);
+                logger.error('Failed to auto-send backup to Telegram:', err);
                 // Don't fail the request, just log
             }
 
             return { success: true, filename: backupFilename };
         } catch (error: any) {
-            console.error('Failed to create backup:', error);
+            logger.error('Failed to create backup:', error);
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
                 message: error.message || 'Failed to create backup',
@@ -145,7 +146,7 @@ export const backupRouter = router({
 
                 return { success: true };
             } catch (error: any) {
-                console.error('Failed to restore backup:', error);
+                logger.error('Failed to restore backup:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
                     message: error.message || 'Failed to restore backup',
@@ -168,7 +169,7 @@ export const backupRouter = router({
 
                 return { success: true };
             } catch (error: any) {
-                console.error('Failed to delete backup:', error);
+                logger.error('Failed to delete backup:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
                     message: 'Failed to delete backup',

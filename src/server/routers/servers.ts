@@ -15,6 +15,8 @@ import { router, protectedProcedure, adminProcedure, publicProcedure } from '../
 import { db } from '@/lib/db';
 import { createOutlineClient, parseOutlineConfig } from '@/lib/outline-api';
 import { TRPCError } from '@trpc/server';
+import { logger } from '@/lib/logger';
+import { acquireSyncLock, releaseSyncLock, getSyncLockStatus } from '@/lib/sync-lock';
 
 /**
  * Input validation schema for creating a new server.
@@ -97,13 +99,6 @@ export const serversRouter = router({
             },
           },
           healthCheck: true,
-          accessKeys: {
-            select: {
-              id: true,
-              status: true,
-              usedBytes: true,
-            },
-          },
           _count: {
             select: {
               accessKeys: true,
@@ -116,23 +111,43 @@ export const serversRouter = router({
         ],
       });
 
+      // Get total bandwidth per server using aggregate query
+      const bandwidthByServer = await db.accessKey.groupBy({
+        by: ['serverId'],
+        _sum: {
+          usedBytes: true,
+        },
+        where: {
+          serverId: { in: servers.map((s) => s.id) },
+        },
+      });
+
+      const bandwidthMap = new Map(
+        bandwidthByServer.map((b) => [b.serverId, b._sum.usedBytes ?? BigInt(0)])
+      );
+
+      // Get active key counts per server
+      const activeKeysByServer = await db.accessKey.groupBy({
+        by: ['serverId'],
+        _count: true,
+        where: {
+          serverId: { in: servers.map((s) => s.id) },
+          status: 'ACTIVE',
+        },
+      });
+
+      const activeKeysMap = new Map(
+        activeKeysByServer.map((a) => [a.serverId, a._count])
+      );
+
       // Transform the data to flatten the tags structure and calculate metrics
       return servers.map((server) => {
-        // Calculate bandwidth metrics
-        const totalBandwidth = server.accessKeys.reduce(
-          (sum, key) => sum + key.usedBytes,
-          BigInt(0)
-        );
-        const activeKeys = server.accessKeys.filter(
-          (key) => key.status === 'ACTIVE'
-        ).length;
-
         return {
           ...server,
           tags: server.tags.map((st) => st.tag),
           metrics: {
-            totalBandwidth,
-            activeKeys,
+            totalBandwidth: bandwidthMap.get(server.id) ?? BigInt(0),
+            activeKeys: activeKeysMap.get(server.id) ?? 0,
             totalKeys: server._count.accessKeys,
           },
         };
@@ -733,17 +748,37 @@ export const serversRouter = router({
     }),
 
   /**
+   * Get current sync lock status
+   */
+  getSyncStatus: protectedProcedure.query(() => {
+    return getSyncLockStatus();
+  }),
+
+  /**
    * Sync all active servers at once.
    *
    * This is useful for auto-sync functionality to keep all keys updated.
+   * Uses a lock to prevent concurrent sync operations.
    */
   syncAll: protectedProcedure.mutation(async () => {
-    // Get all active servers
-    const servers = await db.server.findMany({
-      where: { isActive: true },
-    });
+    // Try to acquire sync lock
+    const operationId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const lockResult = acquireSyncLock(operationId);
+    
+    if (!lockResult.acquired) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: `Sync already in progress${lockResult.lockedFor ? ` (running for ${Math.round(lockResult.lockedFor / 1000)}s)` : ''}. Please wait for it to complete.`,
+      });
+    }
 
-    const results: { serverId: string; serverName: string; success: boolean; error?: string }[] = [];
+    try {
+      // Get all active servers
+      const servers = await db.server.findMany({
+        where: { isActive: true },
+      });
+
+      const results: { serverId: string; serverName: string; success: boolean; error?: string }[] = [];
 
     for (const server of servers) {
       const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
@@ -763,129 +798,162 @@ export const serversRouter = router({
           // Metrics might not be enabled
         }
 
-        // Update server info
-        await db.server.update({
-          where: { id: server.id },
-          data: {
-            outlineServerId: serverInfo.serverId,
-            outlineName: serverInfo.name,
-            outlineVersion: serverInfo.version,
-            hostnameForAccessKeys: serverInfo.hostnameForAccessKeys,
-            portForNewAccessKeys: serverInfo.portForNewAccessKeys,
-            metricsEnabled: serverInfo.metricsEnabled,
-            lastSyncAt: new Date(),
+        // Fetch existing keys for this server in one query
+        // Exclude DISABLED keys since they're deleted from Outline
+        const existingKeys = await db.accessKey.findMany({
+          where: { 
+            serverId: server.id,
+            status: { not: 'DISABLED' },
           },
         });
+        const existingKeyMap = new Map(
+          existingKeys.map(k => [`${k.serverId}_${k.outlineKeyId}`, k])
+        );
 
-        // Sync access keys
+        // Collect all database operations to batch in a transaction
+        type DbOperation = 
+          | { type: 'updateAccessKey'; id: string; data: Record<string, unknown> }
+          | { type: 'updateSession'; id: string; data: { lastActiveAt: Date; bytesUsed: { increment: bigint } } }
+          | { type: 'createSession'; data: { accessKeyId: string; bytesUsed: bigint } }
+          | { type: 'closeStaleSession'; accessKeyId: string; before: Date }
+          | { type: 'createTrafficLog'; data: { accessKeyId: string; bytesUsed: bigint; recordedAt: Date } };
+
+        const dbOperations: DbOperation[] = [];
+        const sessionUpdates: { keyId: string; hasTraffic: boolean; bytesTransferred: number; existingKey: typeof existingKeys[0] }[] = [];
+
+        const now = new Date();
+        const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+
+        // Process each outline key and collect updates
         for (const outlineKey of outlineKeys) {
-          const existingKey = await db.accessKey.findUnique({
-            where: {
-              serverId_outlineKeyId: {
-                serverId: server.id,
-                outlineKeyId: outlineKey.id,
-              },
-            },
-          });
+          const existingKey = existingKeyMap.get(`${server.id}_${outlineKey.id}`);
+          if (!existingKey) continue;
 
           const keyId = outlineKey.id;
           const usedBytes = metrics?.bytesTransferredByUserId?.[keyId] ??
             metrics?.bytesTransferredByUserId?.[String(keyId)] ?? 0;
 
-          if (existingKey) {
-            // Calculate effective usage (metric - offset)
-            const metricBytes = Number(usedBytes);
-            const offset = Number(existingKey.usageOffset || 0);
+          // Calculate effective usage (metric - offset)
+          const metricBytes = Number(usedBytes);
+          const offset = Number(existingKey.usageOffset || 0);
 
-            const effectiveUsedBytes = (metricBytes < offset)
-              ? metricBytes // Server reset scenario
-              : metricBytes - offset;
+          const effectiveUsedBytes = (metricBytes < offset)
+            ? metricBytes // Server reset scenario
+            : metricBytes - offset;
 
-            const previousUsedBytes = Number(existingKey.usedBytes);
-            const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
+          const previousUsedBytes = Number(existingKey.usedBytes);
+          const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
 
-            console.log(`🔑 [syncAll] Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
+          console.log(`🔑 [syncAll] Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
 
-            const updateData: Record<string, unknown> = {
-              accessUrl: outlineKey.accessUrl,
-              password: outlineKey.password,
-              port: outlineKey.port,
-              method: outlineKey.method,
-              // Do not overwrite dataLimitBytes if strategy is set (prevent clearing periodic settings)
-            };
+          const updateData: Record<string, unknown> = {
+            accessUrl: outlineKey.accessUrl,
+            password: outlineKey.password,
+            port: outlineKey.port,
+            method: outlineKey.method,
+          };
 
-            if (!existingKey.dataLimitResetStrategy || existingKey.dataLimitResetStrategy === 'NEVER') {
-              updateData.dataLimitBytes = outlineKey.dataLimit?.bytes
-                ? BigInt(outlineKey.dataLimit.bytes)
-                : null;
+          if (!existingKey.dataLimitResetStrategy || existingKey.dataLimitResetStrategy === 'NEVER') {
+            updateData.dataLimitBytes = outlineKey.dataLimit?.bytes
+              ? BigInt(outlineKey.dataLimit.bytes)
+              : null;
+          }
+
+          updateData.usedBytes = BigInt(effectiveUsedBytes);
+
+          if (metricBytes < offset) {
+            updateData.usageOffset = BigInt(0);
+          }
+
+          // Check if PENDING key has been used - activate it
+          if (existingKey.status === 'PENDING' && effectiveUsedBytes > 0) {
+            updateData.status = 'ACTIVE';
+            updateData.firstUsedAt = now;
+
+            if (existingKey.durationDays) {
+              const expiresAt = new Date(now);
+              expiresAt.setDate(expiresAt.getDate() + existingKey.durationDays);
+              updateData.expiresAt = expiresAt;
             }
+          }
 
-            updateData.usedBytes = BigInt(effectiveUsedBytes);
+          // Check if ACTIVE key is expired
+          if (existingKey.status === 'ACTIVE' && existingKey.expiresAt && existingKey.expiresAt <= now) {
+            updateData.status = 'EXPIRED';
+            console.log(`⏰ [syncAll] Key ${keyId} (${outlineKey.name}) expired`);
+          }
 
-            // If metric < offset (server reset), update offset to 0
-            if (metricBytes < offset) {
-              updateData.usageOffset = BigInt(0);
-            }
+          // Check if ACTIVE key has exceeded data limit - mark as depleted
+          const dbLimit = existingKey.dataLimitBytes ? Number(existingKey.dataLimitBytes) : null;
 
-            // Check if PENDING key has been used - activate it
-            if (existingKey.status === 'PENDING' && effectiveUsedBytes > 0) {
-              const now = new Date();
-              updateData.status = 'ACTIVE';
-              updateData.firstUsedAt = now;
+          if (existingKey.status === 'ACTIVE' && dbLimit && effectiveUsedBytes >= dbLimit) {
+            updateData.status = 'DEPLETED';
+            logger.debug(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
+          }
 
-              if (existingKey.durationDays) {
-                const expiresAt = new Date(now);
-                expiresAt.setDate(expiresAt.getDate() + existingKey.durationDays);
-                updateData.expiresAt = expiresAt;
-              }
-            }
+          const hasTraffic = bytesTransferred > 100;
+          if (hasTraffic) {
+            updateData.lastUsedAt = now;
+          }
 
-            // Check if ACTIVE key is expired
-            if (existingKey.status === 'ACTIVE' && existingKey.expiresAt && existingKey.expiresAt <= new Date()) {
-              updateData.status = 'EXPIRED';
-              console.log(`⏰ [syncAll] Key ${keyId} (${outlineKey.name}) expired`);
-            }
+          dbOperations.push({ type: 'updateAccessKey', id: existingKey.id, data: updateData });
 
-            // Check if ACTIVE key has exceeded data limit - mark as depleted
-            const dataLimit = outlineKey.dataLimit?.bytes || (existingKey.dataLimitBytes ? Number(existingKey.dataLimitBytes) : null);
-            // Note: dataLimit from server includes offset if periodic! 
-            // We should check against our periodic limit in DB.
-            const dbLimit = existingKey.dataLimitBytes ? Number(existingKey.dataLimitBytes) : null;
+          // Track session updates for later processing
+          sessionUpdates.push({ keyId: existingKey.id, hasTraffic, bytesTransferred, existingKey });
 
-            if (existingKey.status === 'ACTIVE' && dbLimit && effectiveUsedBytes >= dbLimit) {
-              updateData.status = 'DEPLETED';
-              console.log(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
-            }
-
-            // Update lastUsedAt if there's any traffic increase (for online detection)
-            // Use very low threshold (100 bytes) for responsive online status
-            const hasTraffic = bytesTransferred > 100;
-            if (hasTraffic) {
-              updateData.lastUsedAt = new Date();
-            }
-
-            await db.accessKey.update({
-              where: { id: existingKey.id },
-              data: updateData,
+          // Create TrafficLog for significant traffic
+          const MIN_TRAFFIC_THRESHOLD = 100 * 1024;
+          if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
+            logger.debug(`📊 [syncAll] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
+            dbOperations.push({
+              type: 'createTrafficLog',
+              data: {
+                accessKeyId: existingKey.id,
+                bytesUsed: BigInt(bytesTransferred),
+                recordedAt: now,
+              },
             });
+          }
+        }
 
-            // Session tracking for device estimation
-            const now = new Date();
-            const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = session ended
+        // Execute all key updates and traffic logs in a single transaction
+        await db.$transaction(async (tx) => {
+          // Update server info
+          await tx.server.update({
+            where: { id: server.id },
+            data: {
+              outlineServerId: serverInfo.serverId,
+              outlineName: serverInfo.name,
+              outlineVersion: serverInfo.version,
+              hostnameForAccessKeys: serverInfo.hostnameForAccessKeys,
+              portForNewAccessKeys: serverInfo.portForNewAccessKeys,
+              metricsEnabled: serverInfo.metricsEnabled,
+              lastSyncAt: now,
+            },
+          });
 
+          // Process all collected operations
+          for (const op of dbOperations) {
+            if (op.type === 'updateAccessKey') {
+              await tx.accessKey.update({
+                where: { id: op.id },
+                data: op.data,
+              });
+            } else if (op.type === 'createTrafficLog') {
+              await tx.trafficLog.create({ data: op.data });
+            }
+          }
+
+          // Process session tracking within the same transaction
+          for (const { keyId, hasTraffic, bytesTransferred, existingKey } of sessionUpdates) {
             if (hasTraffic) {
-              // Check for active session
-              const activeSession = await db.connectionSession.findFirst({
-                where: {
-                  accessKeyId: existingKey.id,
-                  isActive: true,
-                },
+              const activeSession = await tx.connectionSession.findFirst({
+                where: { accessKeyId: keyId, isActive: true },
                 orderBy: { startedAt: 'desc' },
               });
 
               if (activeSession) {
-                // Update existing session
-                await db.connectionSession.update({
+                await tx.connectionSession.update({
                   where: { id: activeSession.id },
                   data: {
                     lastActiveAt: now,
@@ -893,139 +961,103 @@ export const serversRouter = router({
                   },
                 });
               } else {
-                // Create new session
-                await db.connectionSession.create({
-                  data: {
-                    accessKeyId: existingKey.id,
-                    bytesUsed: BigInt(bytesTransferred),
-                  },
+                await tx.connectionSession.create({
+                  data: { accessKeyId: keyId, bytesUsed: BigInt(bytesTransferred) },
                 });
               }
 
-              // Update device count
-              const activeSessionCount = await db.connectionSession.count({
-                where: {
-                  accessKeyId: existingKey.id,
-                  isActive: true,
-                },
+              const activeSessionCount = await tx.connectionSession.count({
+                where: { accessKeyId: keyId, isActive: true },
               });
 
-              await db.accessKey.update({
-                where: { id: existingKey.id },
+              await tx.accessKey.update({
+                where: { id: keyId },
                 data: {
                   estimatedDevices: activeSessionCount,
                   peakDevices: Math.max(existingKey.peakDevices || 0, activeSessionCount),
                 },
               });
             } else {
-              // No traffic - close stale sessions
-              await db.connectionSession.updateMany({
+              await tx.connectionSession.updateMany({
                 where: {
-                  accessKeyId: existingKey.id,
+                  accessKeyId: keyId,
                   isActive: true,
-                  lastActiveAt: {
-                    lt: new Date(now.getTime() - SESSION_TIMEOUT_MS),
-                  },
+                  lastActiveAt: { lt: new Date(now.getTime() - SESSION_TIMEOUT_MS) },
                 },
-                data: {
-                  isActive: false,
-                  endedAt: now,
-                },
+                data: { isActive: false, endedAt: now },
               });
 
-              // Update device count after closing sessions
-              const activeSessionCount = await db.connectionSession.count({
-                where: {
-                  accessKeyId: existingKey.id,
-                  isActive: true,
-                },
+              const activeSessionCount = await tx.connectionSession.count({
+                where: { accessKeyId: keyId, isActive: true },
               });
 
               if (activeSessionCount !== existingKey.estimatedDevices) {
-                await db.accessKey.update({
-                  where: { id: existingKey.id },
+                await tx.accessKey.update({
+                  where: { id: keyId },
                   data: { estimatedDevices: activeSessionCount },
                 });
               }
             }
-
-            // Create TrafficLog for significant traffic (for historical analytics)
-            const MIN_TRAFFIC_THRESHOLD = 100 * 1024; // 100KB threshold for logging
-            if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
-              console.log(`📊 [syncAll] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
-              await db.trafficLog.create({
-                data: {
-                  accessKeyId: existingKey.id,
-                  bytesUsed: BigInt(bytesTransferred),
-                  recordedAt: new Date(),
-                },
-              });
-            }
           }
-        }
+        });
 
         // Auto-archive expired and depleted keys (store for 3 months)
         const keysToArchive = await db.accessKey.findMany({
           where: {
             serverId: server.id,
-            OR: [
-              { status: 'EXPIRED' },
-              { status: 'DEPLETED' },
-            ],
+            OR: [{ status: 'EXPIRED' }, { status: 'DEPLETED' }],
           },
           include: {
-            server: {
-              select: {
-                name: true,
-                location: true,
-              },
-            },
+            server: { select: { name: true, location: true } },
           },
         });
 
+        // Delete from Outline server first (outside transaction as it's external)
         for (const keyToArchive of keysToArchive) {
           try {
-            // Delete from Outline server
             await client.deleteAccessKey(keyToArchive.outlineKeyId);
-            console.log(`🗑️ [syncAll] Deleted ${keyToArchive.status} key from Outline: ${keyToArchive.name} (${keyToArchive.outlineKeyId})`);
+            logger.debug(`🗑️ [syncAll] Deleted ${keyToArchive.status} key from Outline: ${keyToArchive.name} (${keyToArchive.outlineKeyId})`);
           } catch (deleteError) {
-            console.error(`Failed to delete key ${keyToArchive.outlineKeyId} from Outline: ${(deleteError as Error).message}`);
+            logger.error(`Failed to delete key ${keyToArchive.outlineKeyId} from Outline: ${(deleteError as Error).message}`);
           }
+        }
 
-          // Archive the key (keep for 3 months)
+        // Archive all keys in a single transaction
+        if (keysToArchive.length > 0) {
           const deleteAfter = new Date();
           deleteAfter.setMonth(deleteAfter.getMonth() + 3);
 
-          await db.archivedKey.create({
-            data: {
-              originalKeyId: keyToArchive.id,
-              outlineKeyId: keyToArchive.outlineKeyId,
-              name: keyToArchive.name,
-              email: keyToArchive.email,
-              telegramId: keyToArchive.telegramId,
-              notes: keyToArchive.notes,
-              serverName: keyToArchive.server.name,
-              serverLocation: keyToArchive.server.location,
-              accessUrl: keyToArchive.accessUrl,
-              dataLimitBytes: keyToArchive.dataLimitBytes,
-              usedBytes: keyToArchive.usedBytes,
-              expirationType: keyToArchive.expirationType,
-              expiresAt: keyToArchive.expiresAt,
-              durationDays: keyToArchive.durationDays,
-              archiveReason: keyToArchive.status, // EXPIRED or DEPLETED
-              originalStatus: keyToArchive.status,
-              firstUsedAt: keyToArchive.firstUsedAt,
-              lastUsedAt: keyToArchive.lastUsedAt,
-              createdAt: keyToArchive.createdAt,
-              deleteAfter,
-            },
-          });
+          await db.$transaction(async (tx) => {
+            for (const keyToArchive of keysToArchive) {
+              await tx.archivedKey.create({
+                data: {
+                  originalKeyId: keyToArchive.id,
+                  outlineKeyId: keyToArchive.outlineKeyId,
+                  name: keyToArchive.name,
+                  email: keyToArchive.email,
+                  telegramId: keyToArchive.telegramId,
+                  notes: keyToArchive.notes,
+                  serverName: keyToArchive.server.name,
+                  serverLocation: keyToArchive.server.location,
+                  accessUrl: keyToArchive.accessUrl,
+                  dataLimitBytes: keyToArchive.dataLimitBytes,
+                  usedBytes: keyToArchive.usedBytes,
+                  expirationType: keyToArchive.expirationType,
+                  expiresAt: keyToArchive.expiresAt,
+                  durationDays: keyToArchive.durationDays,
+                  archiveReason: keyToArchive.status,
+                  originalStatus: keyToArchive.status,
+                  firstUsedAt: keyToArchive.firstUsedAt,
+                  lastUsedAt: keyToArchive.lastUsedAt,
+                  createdAt: keyToArchive.createdAt,
+                  deleteAfter,
+                },
+              });
 
-          // Delete from database
-          await db.accessKey.delete({
-            where: { id: keyToArchive.id },
+              await tx.accessKey.delete({ where: { id: keyToArchive.id } });
+              logger.debug(`📦 [syncAll] Archived ${keyToArchive.status} key: ${keyToArchive.name}`);
+            }
           });
-          console.log(`📦 [syncAll] Archived ${keyToArchive.status} key: ${keyToArchive.name}`);
         }
 
         results.push({ serverId: server.id, serverName: server.name, success: true });
@@ -1039,7 +1071,11 @@ export const serversRouter = router({
       }
     }
 
-    return { results, syncedAt: new Date() };
+      return { results, syncedAt: new Date() };
+    } finally {
+      // Always release the lock when done
+      releaseSyncLock(operationId);
+    }
   }),
 
   /**

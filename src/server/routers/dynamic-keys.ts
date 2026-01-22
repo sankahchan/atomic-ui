@@ -15,6 +15,8 @@ import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { generateRandomString } from '@/lib/utils';
+import { createOutlineClient } from '@/lib/outline-api';
+import { logger } from '@/lib/logger';
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -501,12 +503,22 @@ export const dynamicKeysRouter = router({
 
   /**
    * Toggle the status of a Dynamic Access Key between ACTIVE and DISABLED
+   *
+   * When disabling a DAK, all its attached access keys are also disabled
+   * (deleted from Outline servers). When enabling, they are recreated.
    */
   toggleStatus: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       const dak = await db.dynamicAccessKey.findUnique({
         where: { id: input.id },
+        include: {
+          accessKeys: {
+            include: {
+              server: true,
+            },
+          },
+        },
       });
 
       if (!dak) {
@@ -516,9 +528,69 @@ export const dynamicKeysRouter = router({
         });
       }
 
-      // Toggle between ACTIVE and DISABLED
-      const newStatus = dak.status === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
+      const isCurrentlyDisabled = dak.status === 'DISABLED';
+      const newStatus = isCurrentlyDisabled ? 'ACTIVE' : 'DISABLED';
 
+      // Disable/Enable all attached access keys on Outline servers
+      for (const key of dak.accessKeys) {
+        const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+
+        if (isCurrentlyDisabled) {
+          // ENABLE: Recreate keys on Outline
+          try {
+            const newOutlineKey = await client.createAccessKey({
+              name: key.name,
+              method: key.method || undefined,
+            });
+
+            if (key.dataLimitBytes) {
+              const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+              await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
+            }
+
+            await db.accessKey.update({
+              where: { id: key.id },
+              data: {
+                status: 'ACTIVE',
+                outlineKeyId: newOutlineKey.id,
+                accessUrl: newOutlineKey.accessUrl,
+                password: newOutlineKey.password,
+                port: newOutlineKey.port,
+                method: newOutlineKey.method,
+                disabledAt: null,
+                disabledOutlineKeyId: null,
+              },
+            });
+          } catch (error) {
+            logger.error(`Failed to re-enable key ${key.id}`, error);
+          }
+        } else {
+          // DISABLE: Delete keys from Outline
+          try {
+            await client.deleteAccessKey(key.outlineKeyId);
+          } catch (error) {
+            logger.error(`Failed to delete key ${key.outlineKeyId}`, error);
+          }
+
+          await db.accessKey.update({
+            where: { id: key.id },
+            data: {
+              status: 'DISABLED',
+              disabledAt: new Date(),
+              disabledOutlineKeyId: key.outlineKeyId,
+              estimatedDevices: 0,
+            },
+          });
+
+          // Close active sessions
+          await db.connectionSession.updateMany({
+            where: { accessKeyId: key.id, isActive: true },
+            data: { isActive: false, endedAt: new Date() },
+          });
+        }
+      }
+
+      // Update the DAK status
       const updated = await db.dynamicAccessKey.update({
         where: { id: input.id },
         data: { status: newStatus },

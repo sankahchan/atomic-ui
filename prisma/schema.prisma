@@ -49,6 +49,8 @@ model Session {
   userAgent String?
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ============================================
@@ -152,6 +154,11 @@ model AccessKey {
   firstUsedAt DateTime?
   lastUsedAt  DateTime?
   lastWarningSentAt DateTime?
+  
+  // Disable tracking - when DISABLED, key is deleted from Outline server
+  // but kept in DB for potential re-enabling
+  disabledAt          DateTime?
+  disabledOutlineKeyId String?   // Original Outline key ID when disabled (for reference)
 
   // Dynamic key association
   dynamicKeyId String?
@@ -190,6 +197,8 @@ model AccessKey {
   @@unique([serverId, outlineKeyId])
   @@index([status])
   @@index([expiresAt])
+  @@index([userId])
+  @@index([serverId])
 }
 
 model DynamicAccessKey {
@@ -235,6 +244,8 @@ model DynamicAccessKey {
 
   // Encryption method for Shadowsocks
   method String @default("chacha20-ietf-poly1305")
+
+  @@index([userId])
 
   // Load balancer algorithm for selecting access keys
   // Valid: IP_HASH, RANDOM, ROUND_ROBIN

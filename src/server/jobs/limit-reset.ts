@@ -1,9 +1,10 @@
 
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
+import { logger } from '@/lib/logger';
 
 export async function checkPeriodicLimits() {
-    console.log('🔄 Checking periodic data limits...');
+    logger.debug('🔄 Checking periodic data limits...');
 
     // Get all Active servers
     const servers = await db.server.findMany({
@@ -49,7 +50,7 @@ export async function checkPeriodicLimits() {
                 }
 
                 if (shouldReset) {
-                    console.log(`♻️ Resetting limit for key ${key.name} (${key.dataLimitResetStrategy})`);
+                    logger.debug(`♻️ Resetting limit for key ${key.name} (${key.dataLimitResetStrategy})`);
 
                     // Get current Total Usage from server
                     // If key not found in metrics, assume 0 or keep current?
@@ -79,15 +80,15 @@ export async function checkPeriodicLimits() {
 
                         try {
                             await client.setAccessKeyDataLimit(key.outlineKeyId, Number(newServerLimit));
-                            console.log(`   ✅ Limit updated on server: ${newServerLimit} (Offset: ${currentTotal} + Limit: ${limitBytes})`);
+                            logger.debug(`   ✅ Limit updated on server: ${newServerLimit} (Offset: ${currentTotal} + Limit: ${limitBytes})`);
                         } catch (err) {
-                            console.error(`   ❌ Failed to update limit on server for key ${key.id}:`, err);
+                            logger.error(`   ❌ Failed to update limit on server for key ${key.id}:`, err);
                         }
                     }
                 }
             }
         } catch (error) {
-            console.error(`Error checking limits for server ${server.name}:`, error);
+            logger.error(`Error checking limits for server ${server.name}:`, error);
         }
     }
 }

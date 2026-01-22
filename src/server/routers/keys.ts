@@ -15,7 +15,9 @@ import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { TRPCError } from '@trpc/server';
 import { generateRandomString } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
+import { Prisma } from '@prisma/client';
 
 /**
  * Validation schema for creating a new access key.
@@ -105,7 +107,8 @@ const listKeysSchema = z.object({
   search: z.string().optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
-  unattachedOnly: z.boolean().optional(), // Filter for keys not attached to any dynamic key
+  unattachedOnly: z.boolean().optional(),
+  userId: z.string().optional(),
 });
 
 // Helper function to convert GB to bytes
@@ -152,11 +155,13 @@ export const keysRouter = router({
       const { serverId, status, search, page, pageSize, unattachedOnly } = input;
 
       // Build the where clause
-      const where: Record<string, unknown> = {};
+      const where: Prisma.AccessKeyWhereInput = {};
 
-      // Role-based filtering: Users see only their own keys
+      // Role-based filtering: Users see only their own keys, admins can filter by userId
       if (ctx.user.role !== 'ADMIN') {
         where.userId = ctx.user.id;
+      } else if (input.userId) {
+        where.userId = input.userId;
       }
 
       if (serverId) {
@@ -175,14 +180,8 @@ export const keysRouter = router({
         ];
       }
 
-      // Filter for keys not attached to any dynamic key
       if (unattachedOnly) {
         where.dynamicKeyId = null;
-      }
-
-      // Admin can filter by specific userId
-      if (ctx.user.role === 'ADMIN' && (input as any).userId) {
-        where.userId = (input as any).userId;
       }
 
       // Get total count for pagination
@@ -803,13 +802,21 @@ export const keysRouter = router({
   /**
    * Toggle key enabled/disabled status.
    *
-   * Quickly enable or disable a key without deleting it.
+   * DISABLE: Deletes the key from the Outline server (stops traffic immediately)
+   *          but keeps the key in Atomic-UI DB for potential re-enabling.
+   * ENABLE:  Recreates the key on the Outline server with the same settings.
+   *
+   * This ensures disabled keys truly cannot be used - Outline has no native
+   * "disable" endpoint, so we must delete/recreate.
    */
   toggleStatus: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.id },
+        include: {
+          server: true,
+        },
       });
 
       if (!key) {
@@ -819,24 +826,102 @@ export const keysRouter = router({
         });
       }
 
-      // Toggle between ACTIVE and DISABLED
-      const newStatus = key.status === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
+      const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+      const isCurrentlyDisabled = key.status === 'DISABLED';
 
-      const updatedKey = await db.accessKey.update({
-        where: { id: input.id },
-        data: { status: newStatus },
-        include: {
-          server: {
-            select: {
-              id: true,
-              name: true,
-              countryCode: true,
+      if (isCurrentlyDisabled) {
+        // === ENABLE: Recreate the key on Outline server ===
+        try {
+          // Try to recreate with the original key ID if possible
+          const newOutlineKey = await client.createAccessKey({
+            name: key.name,
+            method: key.method || undefined,
+            // Note: Outline may not preserve the same ID, so we create new
+          });
+
+          // Set data limit if the key had one
+          if (key.dataLimitBytes) {
+            // Calculate the server-side limit (offset + remaining limit)
+            const remainingLimit = key.dataLimitBytes - (key.usedBytes - key.usageOffset);
+            const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+            await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
+          }
+
+          // Update DB with new Outline key details
+          const updatedKey = await db.accessKey.update({
+            where: { id: input.id },
+            data: {
+              status: 'ACTIVE',
+              outlineKeyId: newOutlineKey.id,
+              accessUrl: newOutlineKey.accessUrl,
+              password: newOutlineKey.password,
+              port: newOutlineKey.port,
+              method: newOutlineKey.method,
+              disabledAt: null,
+              disabledOutlineKeyId: null,
+            },
+            include: {
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          });
+
+          return updatedKey;
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Failed to re-enable key on Outline server: ${(error as Error).message}`,
+          });
+        }
+      } else {
+        // === DISABLE: Delete the key from Outline server ===
+        try {
+          await client.deleteAccessKey(key.outlineKeyId);
+        } catch (error) {
+          // Log but don't fail - key might already be deleted
+          logger.error(`Failed to delete key ${key.outlineKeyId} from Outline`, error);
+        }
+
+        // Update DB to mark as disabled (keep all settings for re-enabling)
+        const updatedKey = await db.accessKey.update({
+          where: { id: input.id },
+          data: {
+            status: 'DISABLED',
+            disabledAt: new Date(),
+            disabledOutlineKeyId: key.outlineKeyId,
+            // Clear online tracking since key is disabled
+            estimatedDevices: 0,
+          },
+          include: {
+            server: {
+              select: {
+                id: true,
+                name: true,
+                countryCode: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      return updatedKey;
+        // Close any active sessions for this key
+        await db.connectionSession.updateMany({
+          where: {
+            accessKeyId: key.id,
+            isActive: true,
+          },
+          data: {
+            isActive: false,
+            endedAt: new Date(),
+          },
+        });
+
+        return updatedKey;
+      }
     }),
 
   /**
@@ -1020,16 +1105,14 @@ export const keysRouter = router({
   /**
    * Get online/active users (keys with active connection sessions).
    *
-   * A key is considered "online" if it has an active ConnectionSession.
-   * Sessions are created when traffic is detected and closed after 5 minutes
-   * of inactivity (handled in the sync logic).
+   * A key is considered "online" if:
+   * - It has status ACTIVE (not DISABLED, EXPIRED, etc.)
+   * - AND it has recent traffic (lastUsedAt within ONLINE_WINDOW)
    *
-   * This is more accurate than using lastUsedAt because:
-   * - Sessions are explicitly closed when no traffic is detected
-   * - Sessions track actual ongoing connections, not just recent activity
+   * DISABLED keys are always offline since they're deleted from Outline.
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    // List raw usage for all active keys so client can compute "online" status via deltas
+    // Only fetch ACTIVE keys - disabled keys are always offline
     const activeKeys = await db.accessKey.findMany({
       where: {
         status: 'ACTIVE',
@@ -1037,12 +1120,23 @@ export const keysRouter = router({
       select: {
         id: true,
         usedBytes: true,
+        lastUsedAt: true,
+        estimatedDevices: true,
       },
     });
+
+    // Online = lastUsedAt within 90 seconds (or has active sessions)
+    const ONLINE_WINDOW_MS = 90 * 1000;
+    const now = Date.now();
 
     return activeKeys.map(key => ({
       id: key.id,
       usedBytes: key.usedBytes.toString(),
+      lastUsedAt: key.lastUsedAt?.toISOString() || null,
+      isOnline: key.lastUsedAt 
+        ? (now - key.lastUsedAt.getTime()) <= ONLINE_WINDOW_MS
+        : false,
+      estimatedDevices: key.estimatedDevices,
     }));
   }),
 
