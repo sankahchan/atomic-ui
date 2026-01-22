@@ -706,77 +706,20 @@ export const dynamicKeysRouter = router({
    * how X-UI handles online status detection.
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    // First, find the most recent traffic log timestamp to determine when last sync happened
-    const latestLog = await db.trafficLog.findFirst({
-      orderBy: {
-        recordedAt: 'desc',
+    // List raw usage for all active dynamic keys for client-side delta tracking
+    const activeDaks = await db.dynamicAccessKey.findMany({
+      where: {
+        status: 'ACTIVE',
       },
       select: {
-        recordedAt: true,
+        id: true,
+        usedBytes: true,
       },
     });
 
-    if (!latestLog) {
-      return {
-        onlineCount: 0,
-        onlineDakIds: [],
-        lastSyncAt: null,
-      };
-    }
-
-    // Allow a 30-second tolerance window for logs created in the same sync batch
-    const syncWindow = new Date(latestLog.recordedAt.getTime() - 30 * 1000);
-
-    // Only consider the sync valid if it happened within the last 2 minutes
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-
-    if (latestLog.recordedAt < twoMinutesAgo) {
-      return {
-        onlineCount: 0,
-        onlineDakIds: [],
-        lastSyncAt: latestLog.recordedAt,
-      };
-    }
-
-    // Get access keys with traffic from the most recent sync that are attached to dynamic keys
-    const recentLogs = await db.trafficLog.findMany({
-      where: {
-        recordedAt: {
-          gte: syncWindow,
-        },
-        bytesUsed: {
-          gt: 0,
-        },
-        accessKey: {
-          dynamicKeyId: {
-            not: null,
-          },
-        },
-      },
-      include: {
-        accessKey: {
-          select: {
-            dynamicKeyId: true,
-          },
-        },
-      },
-      distinct: ['accessKeyId'],
-    });
-
-    // Get unique dynamic key IDs that have active traffic
-    const onlineDakIdsArray = recentLogs
-      .map(log => log.accessKey.dynamicKeyId)
-      .filter((id): id is string => id !== null);
-
-    // Remove duplicates using filter
-    const onlineDakIds = onlineDakIdsArray.filter(
-      (id, index) => onlineDakIdsArray.indexOf(id) === index
-    );
-
-    return {
-      onlineCount: onlineDakIds.length,
-      onlineDakIds,
-      lastSyncAt: latestLog.recordedAt,
-    };
+    return activeDaks.map(dak => ({
+      id: dak.id,
+      usedBytes: dak.usedBytes.toString(),
+    }));
   }),
 });

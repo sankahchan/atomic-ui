@@ -58,10 +58,13 @@ import {
   ChevronRight,
   Share2,
   LayoutGrid,
+  HelpCircle,
   LayoutList,
   Archive,
   ListTree,
 } from 'lucide-react';
+import { useKeyActivity } from '@/hooks/use-key-activity';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -842,8 +845,11 @@ export default function DynamicKeysPage() {
     refetchInterval: autoRefresh.isActive ? 3000 : false,
   });
 
-  // Set of online DAK IDs for quick lookup
-  const onlineDakIds = new Set(onlineData?.onlineDakIds || []);
+  // Track online status via activity hook (delta-based)
+  const { onlineCount, isOnline } = useKeyActivity(onlineData);
+
+  // Helper to check if a DAK is online
+  const checkIsOnline = (dakId: string) => isOnline(dakId);
 
   // Sync all servers mutation
   const syncAllMutation = trpc.servers.syncAll.useMutation({
@@ -1057,9 +1063,21 @@ export default function DynamicKeysPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <p className="text-sm text-green-500">{t('dynamic_keys.online_users')}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-green-500">{t('dynamic_keys.online_users')}</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-3 h-3 text-green-500/50" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Users active within the last 90 seconds</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
-            <p className="text-2xl font-bold">{onlineData?.onlineCount || 0}</p>
+            <p className="text-2xl font-bold">{onlineCount}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
@@ -1279,7 +1297,7 @@ export default function DynamicKeysPage() {
               const typeConfig = DAK_TYPES[dak.type];
               const config = statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
               const StatusIcon = config.icon;
-              const isOnline = onlineDakIds.has(dak.id);
+              const isOnline = checkIsOnline(dak.id);
               const usagePercent = dak.dataLimitBytes
                 ? Number((dak.usedBytes * BigInt(100)) / dak.dataLimitBytes)
                 : 0;
@@ -1408,7 +1426,7 @@ export default function DynamicKeysPage() {
             <div className="space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
-                  {onlineDakIds.has(dak.id) && <OnlineIndicator isOnline={true} />}
+                  {checkIsOnline(dak.id) && <OnlineIndicator isOnline={true} />}
                   <div>
                     <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="font-medium hover:underline">
                       {dak.name}
@@ -1490,7 +1508,7 @@ export default function DynamicKeysPage() {
                     isSelected={selectedKeys.has(dak.id)}
                     onSelect={() => handleSelectKey(dak.id)}
                     isTogglingStatus={togglingKeyId === dak.id}
-                    isOnline={onlineDakIds.has(dak.id)}
+                    isOnline={checkIsOnline(dak.id)}
                   />
                 ))
               ) : (

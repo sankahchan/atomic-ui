@@ -1029,58 +1029,21 @@ export const keysRouter = router({
    * - Sessions track actual ongoing connections, not just recent activity
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    // Find the most recent sync time from any server
-    const latestServer = await db.server.findFirst({
-      where: { isActive: true },
-      orderBy: { lastSyncAt: 'desc' },
-      select: { lastSyncAt: true },
-    });
-
-    if (!latestServer?.lastSyncAt) {
-      return {
-        onlineCount: 0,
-        onlineKeyIds: [],
-        lastSyncAt: null,
-      };
-    }
-
-    const lastSyncAt = latestServer.lastSyncAt;
-
-    // Only consider the sync valid if it happened within the last 2 minutes
-    // (if no sync in 2 minutes, consider all users offline)
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-
-    if (lastSyncAt < twoMinutesAgo) {
-      return {
-        onlineCount: 0,
-        onlineKeyIds: [],
-        lastSyncAt,
-      };
-    }
-
-    // Find keys with active connection sessions
-    // This is more accurate than lastUsedAt because sessions are
-    // explicitly closed when no traffic is detected for 5 minutes
-    const activeSessions = await db.connectionSession.findMany({
+    // List raw usage for all active keys so client can compute "online" status via deltas
+    const activeKeys = await db.accessKey.findMany({
       where: {
-        isActive: true,
-        accessKey: {
-          status: 'ACTIVE',
-        },
+        status: 'ACTIVE',
       },
       select: {
-        accessKeyId: true,
+        id: true,
+        usedBytes: true,
       },
-      distinct: ['accessKeyId'],
     });
 
-    const activeKeyIds = activeSessions.map(session => session.accessKeyId);
-
-    return {
-      onlineCount: activeKeyIds.length,
-      onlineKeyIds: activeKeyIds,
-      lastSyncAt,
-    };
+    return activeKeys.map(key => ({
+      id: key.id,
+      usedBytes: key.usedBytes.toString(),
+    }));
   }),
 
   /**

@@ -34,8 +34,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes, formatRelativeTime, formatDateTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
+import { useKeyActivity } from '@/hooks/use-key-activity';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Plus,
+  HelpCircle,
   Key,
   Search,
   RefreshCw,
@@ -991,7 +994,7 @@ export default function KeysPage() {
       <div className="space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <OnlineIndicator isOnline={onlineKeyIds.has(key.id)} />
+            <OnlineIndicator isOnline={checkIsOnline(key.id)} />
             <div>
               <Link href={`/dashboard/keys/${key.id}`} className="font-medium hover:underline">
                 {key.name}
@@ -1108,8 +1111,11 @@ export default function KeysPage() {
     refetchInterval: autoRefresh.isActive ? 3000 : false,
   });
 
-  // Set of online key IDs for quick lookup
-  const onlineKeyIds = new Set(onlineData?.onlineKeyIds || []);
+  // Track online status via activity hook (delta-based)
+  const { onlineCount, isOnline } = useKeyActivity(onlineData);
+
+  // Helper to check if a key is online
+  const checkIsOnline = (keyId: string) => isOnline(keyId);
 
   // Sync all servers mutation
   const syncAllMutation = trpc.servers.syncAll.useMutation({
@@ -1366,9 +1372,21 @@ export default function KeysPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <p className="text-sm text-green-500">{t('keys.online')}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-green-500">{t('keys.online')}</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-3 h-3 text-green-500/50" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Users active within the last 90 seconds</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
-            <p className="text-2xl font-bold">{onlineData?.onlineCount || 0}</p>
+            <p className="text-2xl font-bold">{onlineCount}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2">
@@ -1637,7 +1655,7 @@ export default function KeysPage() {
             data.items.map((key) => {
               const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
               const StatusIcon = config.icon;
-              const isOnline = onlineKeyIds.has(key.id);
+              const isOnline = checkIsOnline(key.id);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -1800,7 +1818,7 @@ export default function KeysPage() {
                     isSelected={selectedKeys.has(key.id)}
                     onSelect={() => handleSelectKey(key.id)}
                     isTogglingStatus={togglingKeyId === key.id}
-                    isOnline={onlineKeyIds.has(key.id)}
+                    isOnline={checkIsOnline(key.id)}
                   />
                 ))
               ) : (
