@@ -4,7 +4,7 @@
  * Dashboard Overview Page
  *
  * Premium analytics dashboard with modern UI, improved typography,
- * and refined visual hierarchy. Provides comprehensive VPN management overview.
+ * and refined visual hierarchy. Supports both light and dark modes.
  */
 
 import { useState } from 'react';
@@ -42,7 +42,7 @@ import { SystemStatus } from '../_components/system-status';
  * Premium KPI Card Component
  *
  * Modern stat card with gradient accents, improved spacing,
- * and subtle animations on hover.
+ * and subtle animations on hover. Works in both light and dark modes.
  */
 function KPICard({
   title,
@@ -65,34 +65,39 @@ function KPICard({
 }) {
   const accentStyles = {
     cyan: {
-      gradient: 'from-cyan-500/20 to-cyan-500/5',
-      icon: 'text-cyan-400',
-      iconBg: 'bg-cyan-500/10',
-      border: 'group-hover:border-cyan-500/30',
+      gradient: 'from-cyan-500/10 to-cyan-500/5 dark:from-cyan-500/20 dark:to-cyan-500/5',
+      icon: 'text-cyan-600 dark:text-cyan-400',
+      iconBg: 'bg-cyan-100 dark:bg-cyan-500/10',
+      border: 'group-hover:border-cyan-300 dark:group-hover:border-cyan-500/30',
+      shadow: 'group-hover:shadow-cyan-500/10',
     },
     emerald: {
-      gradient: 'from-emerald-500/20 to-emerald-500/5',
-      icon: 'text-emerald-400',
-      iconBg: 'bg-emerald-500/10',
-      border: 'group-hover:border-emerald-500/30',
+      gradient: 'from-emerald-500/10 to-emerald-500/5 dark:from-emerald-500/20 dark:to-emerald-500/5',
+      icon: 'text-emerald-600 dark:text-emerald-400',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-500/10',
+      border: 'group-hover:border-emerald-300 dark:group-hover:border-emerald-500/30',
+      shadow: 'group-hover:shadow-emerald-500/10',
     },
     violet: {
-      gradient: 'from-violet-500/20 to-violet-500/5',
-      icon: 'text-violet-400',
-      iconBg: 'bg-violet-500/10',
-      border: 'group-hover:border-violet-500/30',
+      gradient: 'from-violet-500/10 to-violet-500/5 dark:from-violet-500/20 dark:to-violet-500/5',
+      icon: 'text-violet-600 dark:text-violet-400',
+      iconBg: 'bg-violet-100 dark:bg-violet-500/10',
+      border: 'group-hover:border-violet-300 dark:group-hover:border-violet-500/30',
+      shadow: 'group-hover:shadow-violet-500/10',
     },
     amber: {
-      gradient: 'from-amber-500/20 to-amber-500/5',
-      icon: 'text-amber-400',
-      iconBg: 'bg-amber-500/10',
-      border: 'group-hover:border-amber-500/30',
+      gradient: 'from-amber-500/10 to-amber-500/5 dark:from-amber-500/20 dark:to-amber-500/5',
+      icon: 'text-amber-600 dark:text-amber-400',
+      iconBg: 'bg-amber-100 dark:bg-amber-500/10',
+      border: 'group-hover:border-amber-300 dark:group-hover:border-amber-500/30',
+      shadow: 'group-hover:shadow-amber-500/10',
     },
     rose: {
-      gradient: 'from-rose-500/20 to-rose-500/5',
-      icon: 'text-rose-400',
-      iconBg: 'bg-rose-500/10',
-      border: 'group-hover:border-rose-500/30',
+      gradient: 'from-rose-500/10 to-rose-500/5 dark:from-rose-500/20 dark:to-rose-500/5',
+      icon: 'text-rose-600 dark:text-rose-400',
+      iconBg: 'bg-rose-100 dark:bg-rose-500/10',
+      border: 'group-hover:border-rose-300 dark:group-hover:border-rose-500/30',
+      shadow: 'group-hover:shadow-rose-500/10',
     },
   };
 
@@ -101,9 +106,11 @@ function KPICard({
   const content = (
     <Card className={cn(
       'group relative overflow-hidden transition-all duration-300',
-      'border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm',
-      'hover:bg-zinc-900/80 hover:shadow-lg hover:shadow-black/20',
-      accent.border
+      'bg-white dark:bg-zinc-900/50',
+      'border-gray-200 dark:border-zinc-800/50',
+      'hover:shadow-lg dark:hover:shadow-black/20',
+      accent.border,
+      accent.shadow
     )}>
       {/* Gradient overlay */}
       <div className={cn(
@@ -114,15 +121,15 @@ function KPICard({
       <CardContent className="relative p-5">
         <div className="flex items-start justify-between">
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-zinc-500">
               {title}
             </p>
             <div className="space-y-1">
-              <p className="text-3xl font-bold tracking-tight text-zinc-100">
+              <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-zinc-100">
                 {value}
               </p>
               {subtitle && (
-                <p className="text-xs text-zinc-500">{subtitle}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{subtitle}</p>
               )}
             </div>
           </div>
@@ -136,20 +143,20 @@ function KPICard({
         </div>
 
         {trend && trendValue && (
-          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-zinc-800/50">
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-zinc-800/50">
             {trend === 'up' && (
-              <span className="flex items-center gap-1 text-emerald-400 text-xs font-medium">
+              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 {trendValue}
               </span>
             )}
             {trend === 'down' && (
-              <span className="flex items-center gap-1 text-rose-400 text-xs font-medium">
+              <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 text-xs font-medium">
                 <ArrowDownRight className="w-3.5 h-3.5" />
                 {trendValue}
               </span>
             )}
-            <span className="text-xs text-zinc-600">vs last period</span>
+            <span className="text-xs text-gray-400 dark:text-zinc-600">vs last period</span>
           </div>
         )}
       </CardContent>
@@ -182,17 +189,17 @@ function ServerStatusRow({
   };
 }) {
   const statusConfig = {
-    UP: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' },
-    DOWN: { color: 'bg-rose-500', text: 'text-rose-400', label: 'Offline' },
-    SLOW: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Slow' },
-    UNKNOWN: { color: 'bg-zinc-500', text: 'text-zinc-400', label: 'Unknown' },
+    UP: { color: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Online' },
+    DOWN: { color: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', label: 'Offline' },
+    SLOW: { color: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Slow' },
+    UNKNOWN: { color: 'bg-gray-400 dark:bg-zinc-500', text: 'text-gray-600 dark:text-zinc-400', label: 'Unknown' },
   };
 
   const config = statusConfig[server.status as keyof typeof statusConfig] || statusConfig.UNKNOWN;
 
   return (
     <Link href={`/dashboard/servers/${server.id}`}>
-      <div className="group flex items-center justify-between p-3 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-all duration-200 cursor-pointer">
+      <div className="group flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/30 hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-all duration-200 cursor-pointer">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className={cn(
@@ -211,24 +218,24 @@ function ServerStatusRow({
             {server.countryCode && (
               <span className="text-base">{getCountryFlag(server.countryCode)}</span>
             )}
-            <span className="font-medium text-sm text-zinc-200">{server.name}</span>
+            <span className="font-medium text-sm text-gray-900 dark:text-zinc-200">{server.name}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-xs text-zinc-500">Latency</p>
-            <p className="text-sm font-medium text-zinc-300 tabular-nums">
+            <p className="text-xs text-gray-500 dark:text-zinc-500">Latency</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 tabular-nums">
               {server.latencyMs ? `${server.latencyMs}ms` : '-'}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-zinc-500">Keys</p>
-            <p className="text-sm font-medium text-zinc-300 tabular-nums">
+            <p className="text-xs text-gray-500 dark:text-zinc-500">Keys</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 tabular-nums">
               {server.keyCount}
             </p>
           </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+          <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-600 group-hover:text-gray-600 dark:group-hover:text-zinc-400 transition-colors" />
         </div>
       </div>
     </Link>
@@ -254,23 +261,23 @@ function ActivityItem({
   const styles = {
     warning: {
       dot: 'bg-amber-500',
-      text: 'text-amber-400',
-      bg: 'bg-amber-500/5',
+      text: 'text-amber-700 dark:text-amber-400',
+      bg: 'bg-amber-50 dark:bg-amber-500/5',
     },
     error: {
       dot: 'bg-rose-500',
-      text: 'text-rose-400',
-      bg: 'bg-rose-500/5',
+      text: 'text-rose-700 dark:text-rose-400',
+      bg: 'bg-rose-50 dark:bg-rose-500/5',
     },
     info: {
       dot: 'bg-blue-500',
-      text: 'text-blue-400',
-      bg: 'bg-blue-500/5',
+      text: 'text-blue-700 dark:text-blue-400',
+      bg: 'bg-blue-50 dark:bg-blue-500/5',
     },
     success: {
       dot: 'bg-emerald-500',
-      text: 'text-emerald-400',
-      bg: 'bg-emerald-500/5',
+      text: 'text-emerald-700 dark:text-emerald-400',
+      bg: 'bg-emerald-50 dark:bg-emerald-500/5',
     },
   };
 
@@ -280,14 +287,14 @@ function ActivityItem({
     <div className={cn(
       'flex items-start gap-3 p-3 rounded-lg transition-colors',
       style.bg,
-      'hover:bg-zinc-800/30'
+      'hover:bg-gray-50 dark:hover:bg-zinc-800/30'
     )}>
       <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', style.dot)} />
       <div className="flex-1 min-w-0">
         <p className={cn('text-sm font-medium', style.text)}>{title}</p>
-        <p className="text-xs text-zinc-500 truncate mt-0.5">{description}</p>
+        <p className="text-xs text-gray-500 dark:text-zinc-500 truncate mt-0.5">{description}</p>
       </div>
-      <span className="text-xs text-zinc-600 whitespace-nowrap">{time}</span>
+      <span className="text-xs text-gray-400 dark:text-zinc-600 whitespace-nowrap">{time}</span>
     </div>
   );
 }
@@ -319,10 +326,10 @@ export default function DashboardPage() {
       <div className="space-y-6 animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-zinc-800/50 rounded-xl" />
+            <div key={i} className="h-32 bg-gray-100 dark:bg-zinc-800/50 rounded-xl" />
           ))}
         </div>
-        <div className="h-80 bg-zinc-800/50 rounded-xl" />
+        <div className="h-80 bg-gray-100 dark:bg-zinc-800/50 rounded-xl" />
       </div>
     );
   }
@@ -332,8 +339,8 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">{t('dashboard.title')}</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">{t('dashboard.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-zinc-500 mt-1">
             {t('dashboard.welcome')}
           </p>
         </div>
@@ -343,7 +350,7 @@ export default function DashboardPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-9 gap-2 border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-600"
+              className="h-9 gap-2 border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Server</span>
@@ -352,7 +359,7 @@ export default function DashboardPage() {
           <Link href="/dashboard/keys">
             <Button
               size="sm"
-              className="h-9 gap-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border-0"
+              className="h-9 gap-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white border-0 shadow-lg shadow-cyan-500/25"
             >
               <Key className="w-4 h-4" />
               <span className="hidden sm:inline">Create Key</span>
@@ -401,18 +408,18 @@ export default function DashboardPage() {
         {/* Left Column - Charts */}
         <div className="lg:col-span-2 space-y-6">
           {/* Traffic Chart Card */}
-          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="border-b border-zinc-800/50 pb-4">
+          <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800/50 overflow-hidden">
+            <CardHeader className="border-b border-gray-100 dark:border-zinc-800/50 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-cyan-500/10">
-                    <BarChart3 className="w-4 h-4 text-cyan-400" />
+                  <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-500/10">
+                    <BarChart3 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-semibold text-zinc-100">
+                    <CardTitle className="text-base font-semibold text-gray-900 dark:text-zinc-100">
                       Traffic Overview
                     </CardTitle>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
                       Bandwidth usage over time
                     </p>
                   </div>
@@ -421,7 +428,7 @@ export default function DashboardPage() {
                   value={trafficDays.toString()}
                   onValueChange={(value) => setTrafficDays(parseInt(value))}
                 >
-                  <SelectTrigger className="w-[100px] h-8 text-xs border-zinc-700 bg-zinc-800/50">
+                  <SelectTrigger className="w-[100px] h-8 text-xs border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -433,13 +440,13 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="p-4">
               {trafficLoading ? (
-                <div className="h-[280px] bg-zinc-800/30 rounded-lg animate-pulse" />
+                <div className="h-[280px] bg-gray-50 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
               ) : trafficHistory && trafficHistory.length > 0 ? (
                 <div className="h-[280px] -ml-4">
                   <TrafficChart data={trafficHistory} type="area" height="100%" />
                 </div>
               ) : (
-                <div className="h-[280px] flex items-center justify-center text-zinc-500">
+                <div className="h-[280px] flex items-center justify-center text-gray-400 dark:text-zinc-500">
                   <div className="text-center">
                     <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">No traffic data available</p>
@@ -450,18 +457,18 @@ export default function DashboardPage() {
           </Card>
 
           {/* Server Status Card */}
-          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="border-b border-zinc-800/50 pb-4">
+          <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800/50 overflow-hidden">
+            <CardHeader className="border-b border-gray-100 dark:border-zinc-800/50 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-emerald-500/10">
-                    <Globe className="w-4 h-4 text-emerald-400" />
+                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-500/10">
+                    <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-semibold text-zinc-100">
+                    <CardTitle className="text-base font-semibold text-gray-900 dark:text-zinc-100">
                       Server Status
                     </CardTitle>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
                       Real-time server health monitoring
                     </p>
                   </div>
@@ -470,7 +477,7 @@ export default function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs text-zinc-400 hover:text-zinc-200"
+                    className="h-8 text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
                   >
                     View all
                     <ChevronRight className="w-3.5 h-3.5 ml-1" />
@@ -482,7 +489,7 @@ export default function DashboardPage() {
               {serversLoading ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-16 bg-zinc-800/30 rounded-lg animate-pulse" />
+                    <div key={i} className="h-16 bg-gray-50 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
                   ))}
                 </div>
               ) : serverStatus && serverStatus.length > 0 ? (
@@ -492,11 +499,11 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="py-8 text-center text-zinc-500">
+                <div className="py-8 text-center text-gray-400 dark:text-zinc-500">
                   <Server className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No servers configured</p>
                   <Link href="/dashboard/servers">
-                    <Button variant="link" size="sm" className="mt-2 text-cyan-400">
+                    <Button variant="link" size="sm" className="mt-2 text-cyan-600 dark:text-cyan-400">
                       Add your first server
                     </Button>
                   </Link>
@@ -513,36 +520,36 @@ export default function DashboardPage() {
 
           {/* Quick Analytics Link */}
           <Link href="/dashboard/analytics">
-            <Card className="border-zinc-800/50 bg-gradient-to-br from-violet-500/10 to-cyan-500/10 backdrop-blur-sm overflow-hidden hover:from-violet-500/15 hover:to-cyan-500/15 transition-all duration-300 group cursor-pointer">
+            <Card className="bg-gradient-to-br from-violet-50 to-cyan-50 dark:from-violet-500/10 dark:to-cyan-500/10 border-violet-200/50 dark:border-zinc-800/50 overflow-hidden hover:from-violet-100 hover:to-cyan-100 dark:hover:from-violet-500/15 dark:hover:to-cyan-500/15 transition-all duration-300 group cursor-pointer">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-violet-500/20">
-                    <BarChart3 className="w-5 h-5 text-violet-400" />
+                  <div className="p-2 rounded-lg bg-violet-200/50 dark:bg-violet-500/20">
+                    <BarChart3 className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-sm text-zinc-100">Analytics</h3>
-                    <p className="text-xs text-zinc-500">
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-zinc-100">Analytics</h3>
+                    <p className="text-xs text-gray-500 dark:text-zinc-500">
                       View detailed usage statistics
                     </p>
                   </div>
-                  <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                  <ArrowUpRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-600 dark:group-hover:text-zinc-300 transition-colors" />
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           {/* Activity Feed */}
-          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="border-b border-zinc-800/50 pb-4">
+          <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800/50 overflow-hidden">
+            <CardHeader className="border-b border-gray-100 dark:border-zinc-800/50 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/10">
-                  <Zap className="w-4 h-4 text-amber-400" />
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-500/10">
+                  <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-semibold text-zinc-100">
+                  <CardTitle className="text-base font-semibold text-gray-900 dark:text-zinc-100">
                     Recent Activity
                   </CardTitle>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
                     Alerts and notifications
                   </p>
                 </div>
@@ -580,7 +587,7 @@ export default function DashboardPage() {
                 ))
               ) : (
                 !stats?.downServers && !stats?.expiringIn24h && (
-                  <div className="py-6 text-center text-zinc-500">
+                  <div className="py-6 text-center text-gray-400 dark:text-zinc-500">
                     <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">All systems running smoothly</p>
                   </div>

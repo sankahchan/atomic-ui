@@ -27,6 +27,8 @@ interface SegmentedUsageBarProps {
  * - 50-79%: Orange/Yellow gradient (warning zone)
  * - 80-99%: Yellow/Amber gradient (caution zone)
  * - 100%: Green (full/complete)
+ *
+ * Supports both light and dark modes.
  */
 export function SegmentedUsageBar({
   valueBytes,
@@ -49,7 +51,7 @@ export function SegmentedUsageBar({
 
   // Get color based on percentage threshold
   const getSegmentColor = (segmentIndex: number, isFilled: boolean) => {
-    if (!isFilled) return 'bg-zinc-800/50';
+    if (!isFilled) return 'bg-gray-200 dark:bg-zinc-800/50';
 
     if (isOverLimit) {
       return 'bg-gradient-to-r from-red-500 to-red-400';
@@ -107,7 +109,7 @@ export function SegmentedUsageBar({
     return (
       <div className={cn('flex items-center gap-2', className)}>
         <div className={cn(
-          'flex items-center rounded-full bg-zinc-800/30 overflow-hidden',
+          'flex items-center rounded-full bg-gray-100 dark:bg-zinc-800/30 overflow-hidden',
           config.height,
           config.gap,
           config.padding,
@@ -119,13 +121,13 @@ export function SegmentedUsageBar({
               className={cn(
                 'flex-1 rounded-full transition-all duration-300',
                 config.height,
-                'bg-zinc-700/30'
+                'bg-gray-200 dark:bg-zinc-700/30'
               )}
             />
           ))}
         </div>
         {showPercent && (
-          <span className={cn(config.text, 'text-zinc-400 whitespace-nowrap')}>
+          <span className={cn(config.text, 'text-gray-500 dark:text-zinc-400 whitespace-nowrap')}>
             {formatBytes(valueBytes)} / ∞
           </span>
         )}
@@ -137,7 +139,7 @@ export function SegmentedUsageBar({
     <div className={cn('flex items-center gap-2', className)}>
       <div
         className={cn(
-          'flex items-center rounded-full bg-zinc-800/30 overflow-hidden',
+          'flex items-center rounded-full bg-gray-100 dark:bg-zinc-800/30 overflow-hidden',
           config.height,
           config.gap,
           config.padding,
@@ -177,11 +179,11 @@ export function SegmentedUsageBar({
         <span className={cn(
           config.text,
           'whitespace-nowrap font-medium tabular-nums',
-          percentage < 50 && 'text-red-400',
-          percentage >= 50 && percentage < 80 && 'text-orange-400',
-          percentage >= 80 && percentage < 100 && 'text-amber-400',
-          percentage >= 100 && !isOverLimit && 'text-emerald-400',
-          isOverLimit && 'text-red-400',
+          percentage < 50 && 'text-red-600 dark:text-red-400',
+          percentage >= 50 && percentage < 80 && 'text-orange-600 dark:text-orange-400',
+          percentage >= 80 && percentage < 100 && 'text-amber-600 dark:text-amber-400',
+          percentage >= 100 && !isOverLimit && 'text-emerald-600 dark:text-emerald-400',
+          isOverLimit && 'text-red-600 dark:text-red-400',
         )}>
           {percentage.toFixed(0)}%
         </span>
@@ -244,8 +246,8 @@ export function SegmentedUsageBarLarge({
     <div className={cn('space-y-2', className)}>
       {label && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-400">{label}</span>
-          <span className="text-sm font-medium text-zinc-200">
+          <span className="text-sm text-gray-500 dark:text-zinc-400">{label}</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-zinc-200">
             {formatBytes(valueBytes)} / {limitBytes ? formatBytes(limitBytes) : '∞'}
           </span>
         </div>
@@ -261,10 +263,10 @@ export function SegmentedUsageBarLarge({
         <div className="text-right">
           <span className={cn(
             'text-lg font-semibold tabular-nums',
-            percentage < 50 && 'text-red-400',
-            percentage >= 50 && percentage < 80 && 'text-orange-400',
-            percentage >= 80 && percentage < 100 && 'text-amber-400',
-            percentage >= 100 && 'text-emerald-400',
+            percentage < 50 && 'text-red-600 dark:text-red-400',
+            percentage >= 50 && percentage < 80 && 'text-orange-600 dark:text-orange-400',
+            percentage >= 80 && percentage < 100 && 'text-amber-600 dark:text-amber-400',
+            percentage >= 100 && 'text-emerald-600 dark:text-emerald-400',
           )}>
             {percentage.toFixed(0)}%
           </span>
