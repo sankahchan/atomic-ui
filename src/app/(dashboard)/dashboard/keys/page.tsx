@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { SegmentedUsageBarCompact } from '@/components/ui/segmented-usage-bar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -76,11 +77,15 @@ import {
   FileText,
   Archive,
   List as ListIcon,
+  Tag,
+  User,
+  LinkIcon as LinkCopy,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { ServerGroupList } from '@/components/keys/server-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
+import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 
 /**
  * Status badge configuration for visual consistency
@@ -663,7 +668,7 @@ function DeleteKeyDialog({
 
 /**
  * BulkExtendDialog Component
- * 
+ *
  * A dialog for extending the expiration of multiple keys.
  */
 function BulkExtendDialog({
@@ -680,37 +685,222 @@ function BulkExtendDialog({
   isPending: boolean;
 }) {
   const [days, setDays] = useState('30');
+  const [customDays, setCustomDays] = useState('');
+  const [useCustom, setUseCustom] = useState(false);
   const { t } = useLocale();
+
+  const quickOptions = [7, 14, 30, 60, 90];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Extend Expiration</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            Extend Expiration
+          </DialogTitle>
           <DialogDescription>
-            Extend {count} selected keys. This will add days to their current expiration date and reactivate them if expired.
+            Extend {count} selected key{count > 1 ? 's' : ''}. This will add days to their current expiration date and reactivate them if expired.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
-          <Label htmlFor="days">Extension (Days)</Label>
-          <Input
-            id="days"
-            type="number"
-            min="1"
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-            className="mt-2"
-          />
+        <div className="py-4 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {quickOptions.map((d) => (
+              <Button
+                key={d}
+                variant={!useCustom && days === d.toString() ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setDays(d.toString());
+                  setUseCustom(false);
+                }}
+              >
+                +{d}d
+              </Button>
+            ))}
+            <Button
+              variant={useCustom ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setUseCustom(true)}
+            >
+              Custom
+            </Button>
+          </div>
+
+          {useCustom && (
+            <div className="space-y-2">
+              <Label htmlFor="customDays">Custom Days</Label>
+              <Input
+                id="customDays"
+                type="number"
+                min="1"
+                placeholder="Enter number of days"
+                value={customDays}
+                onChange={(e) => setCustomDays(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('keys.cancel')}
           </Button>
-          <Button onClick={() => onConfirm(parseInt(days) || 30)} disabled={isPending}>
+          <Button
+            onClick={() => onConfirm(parseInt(useCustom ? customDays : days) || 30)}
+            disabled={isPending || (useCustom && !customDays)}
+          >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Extend
+            Extend +{useCustom ? (customDays || '0') : days} days
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * BulkTagsDialog Component
+ *
+ * A dialog for adding or removing tags from multiple keys.
+ */
+function BulkTagsDialog({
+  open,
+  onOpenChange,
+  count,
+  mode,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  count: number;
+  mode: 'add' | 'remove';
+  onConfirm: (tags: string) => void;
+  isPending: boolean;
+}) {
+  const [tags, setTags] = useState('');
+  const { t } = useLocale();
+
+  const handleSubmit = () => {
+    if (tags.trim()) {
+      onConfirm(tags.trim());
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag className="w-5 h-5 text-primary" />
+            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === 'add'
+              ? `Add tags to ${count} selected key${count > 1 ? 's' : ''}.`
+              : `Remove tags from ${count} selected key${count > 1 ? 's' : ''}.`
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Input
+              id="tags"
+              placeholder="e.g., premium, vip, trial"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter tags separated by commas. Tags are case-insensitive.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('keys.cancel')}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isPending || !tags.trim()}
+            variant={mode === 'remove' ? 'destructive' : 'default'}
+          >
+            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * BulkProgressDialog Component
+ *
+ * Shows progress and results of bulk operations.
+ */
+function BulkProgressDialog({
+  open,
+  onOpenChange,
+  title,
+  results,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  results: { success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null;
+  isPending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="py-4">
+          {isPending ? (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Processing...</p>
+            </div>
+          ) : results ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <p className="text-2xl font-bold text-green-500">{results.success}</p>
+                  <p className="text-sm text-green-500">Successful</p>
+                </div>
+                <div className="flex-1 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-2xl font-bold text-red-500">{results.failed}</p>
+                  <p className="text-sm text-red-500">Failed</p>
+                </div>
+              </div>
+
+              {results.errors && results.errors.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Errors:</p>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {results.errors.map((err, i) => (
+                      <div key={i} className="text-xs p-2 rounded bg-red-500/10 text-red-400">
+                        <span className="font-medium">{err.name || err.id}:</span> {err.error}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} disabled={isPending}>
+            {isPending ? 'Processing...' : 'Close'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -746,6 +936,8 @@ function KeyRow({
   onSelect,
   isTogglingStatus,
   isOnline,
+  onCopyAccessUrl,
+  onCopySubscriptionUrl,
 }: {
   accessKey: {
     id: string;
@@ -760,6 +952,8 @@ function KeyRow({
     isExpiringSoon?: boolean;
     isTrafficWarning?: boolean;
     estimatedDevices?: number;
+    lastUsedAt?: Date | null;
+    tags?: string | null;
     server?: {
       id: string;
       name: string;
@@ -774,6 +968,8 @@ function KeyRow({
   onSelect: () => void;
   isTogglingStatus: boolean;
   isOnline: boolean;
+  onCopyAccessUrl: () => void;
+  onCopySubscriptionUrl: () => void;
 }) {
   const { t } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
@@ -799,7 +995,7 @@ function KeyRow({
       <td className="px-4 py-3">
         <div className="flex items-center">
           <OnlineIndicator isOnline={isOnline} />
-          <div>
+          <div className="min-w-0">
             <Link
               href={`/dashboard/keys/${accessKey.id}`}
               className="font-medium hover:text-primary transition-colors"
@@ -808,6 +1004,18 @@ function KeyRow({
             </Link>
             {accessKey.email && (
               <p className="text-xs text-muted-foreground">{accessKey.email}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Last seen: {accessKey.lastUsedAt ? formatRelativeTime(accessKey.lastUsedAt) : 'Never'}
+            </p>
+            {accessKey.tags && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {accessKey.tags.split(',').filter(Boolean).map((tag) => (
+                  <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
+                    {tag.trim()}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -838,25 +1046,11 @@ function KeyRow({
 
       {/* Usage */}
       <td className="px-4 py-3">
-        <div className="space-y-1 min-w-[120px]">
-          <div className="flex items-center justify-between text-xs">
-            <span>{formatBytes(accessKey.usedBytes)}</span>
-            <span className="text-muted-foreground">
-              {accessKey.dataLimitBytes
-                ? formatBytes(accessKey.dataLimitBytes)
-                : '∞'}
-            </span>
-          </div>
-          {accessKey.dataLimitBytes && (
-            <Progress
-              value={accessKey.usagePercent || 0}
-              className={cn(
-                'h-1.5',
-                accessKey.isTrafficWarning && '[&>div]:bg-orange-500'
-              )}
-            />
-          )}
-        </div>
+        <SegmentedUsageBarCompact
+          valueBytes={Number(accessKey.usedBytes)}
+          limitBytes={accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : undefined}
+          className="min-w-[140px]"
+        />
       </td>
 
       {/* Devices */}
@@ -936,6 +1130,15 @@ function KeyRow({
                 Show QR Code
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onCopyAccessUrl}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Access URL
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onCopySubscriptionUrl}>
+                <Share2 className="w-4 h-4 mr-2" />
+                Copy Subscription URL
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={onDelete}
                 className="text-destructive focus:text-destructive"
@@ -983,6 +1186,8 @@ export default function KeysPage() {
   const { t } = useLocale();
   const router = useRouter();
 
+  const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('access-keys');
+
   const pageSize = 20;
 
   // Render function for mobile card view
@@ -994,7 +1199,7 @@ export default function KeysPage() {
       <div className="space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <OnlineIndicator isOnline={checkIsOnline(key.id)} />
+            <OnlineIndicator isOnline={checkIsOnline(key.id, key.status)} />
             <div>
               <Link href={`/dashboard/keys/${key.id}`} className="font-medium hover:underline">
                 {key.name}
@@ -1016,16 +1221,13 @@ export default function KeysPage() {
         </div>
 
         <div className="space-y-1">
-          <div className="flex justify-between text-xs">
+          <div className="flex justify-between text-xs mb-1">
             <span className="text-muted-foreground">{t('keys.table.usage')}</span>
-            <span>{formatBytes(key.usedBytes)} / {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : '∞'}</span>
           </div>
-          {key.dataLimitBytes && (
-            <Progress
-              value={key.usagePercent || 0}
-              className={cn('h-1.5', key.isTrafficWarning && '[&>div]:bg-orange-500')}
-            />
-          )}
+          <SegmentedUsageBarCompact
+            valueBytes={Number(key.usedBytes)}
+            limitBytes={key.dataLimitBytes ? Number(key.dataLimitBytes) : undefined}
+          />
         </div>
 
         <div className="flex items-center justify-between text-xs pt-1">
@@ -1096,6 +1298,12 @@ export default function KeysPage() {
     search: searchQuery || undefined,
     page,
     pageSize,
+    online: filters.quickFilters.online || undefined,
+    expiring7d: filters.quickFilters.expiring7d || undefined,
+    overQuota: filters.quickFilters.overQuota || undefined,
+    inactive30d: filters.quickFilters.inactive30d || undefined,
+    tag: filters.tagFilter || undefined,
+    owner: filters.ownerFilter || undefined,
   });
 
   // Fetch servers for filter
@@ -1114,8 +1322,11 @@ export default function KeysPage() {
   // Track online status via activity hook (delta-based)
   const { onlineCount, isOnline } = useKeyActivity(onlineData);
 
-  // Helper to check if a key is online
-  const checkIsOnline = (keyId: string) => isOnline(keyId);
+  // Helper to check if a key is online (disabled keys are never online)
+  const checkIsOnline = (keyId: string, status?: string) => {
+    if (status === 'DISABLED') return false;
+    return isOnline(keyId);
+  };
 
   // Sync all servers mutation
   const syncAllMutation = trpc.servers.syncAll.useMutation({
@@ -1202,6 +1413,11 @@ export default function KeysPage() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkExtendDialogOpen, setBulkExtendDialogOpen] = useState(false);
+  const [bulkTagsDialogOpen, setBulkTagsDialogOpen] = useState(false);
+  const [bulkTagsMode, setBulkTagsMode] = useState<'add' | 'remove'>('add');
+  const [bulkProgressDialogOpen, setBulkProgressDialogOpen] = useState(false);
+  const [bulkProgressTitle, setBulkProgressTitle] = useState('');
+  const [bulkProgressResults, setBulkProgressResults] = useState<{ success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null>(null);
   const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Bulk extend mutation
@@ -1214,6 +1430,7 @@ export default function KeysPage() {
       setBulkExtendDialogOpen(false);
       setSelectedKeys(new Set());
       refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
@@ -1224,12 +1441,126 @@ export default function KeysPage() {
     },
   });
 
+  // Bulk toggle status mutation
+  const bulkToggleStatusMutation = trpc.keys.bulkToggleStatus.useMutation({
+    onSuccess: (result) => {
+      setBulkProgressResults(result);
+      setSelectedKeys(new Set());
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Bulk status change failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  // Bulk add tags mutation
+  const bulkAddTagsMutation = trpc.keys.bulkAddTags.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Tags added',
+        description: `Added tags to ${result.success} keys.`,
+      });
+      setBulkTagsDialogOpen(false);
+      setSelectedKeys(new Set());
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to add tags',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Bulk remove tags mutation
+  const bulkRemoveTagsMutation = trpc.keys.bulkRemoveTags.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Tags removed',
+        description: `Removed tags from ${result.success} keys.`,
+      });
+      setBulkTagsDialogOpen(false);
+      setSelectedKeys(new Set());
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to remove tags',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Bulk archive mutation
+  const bulkArchiveMutation = trpc.keys.bulkArchive.useMutation({
+    onSuccess: (result) => {
+      setBulkProgressResults(result);
+      setSelectedKeys(new Set());
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Archive failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
   const handleBulkExtend = (days: number) => {
     if (selectedKeys.size === 0) return;
     bulkExtendMutation.mutate({
       ids: Array.from(selectedKeys),
       days,
     });
+  };
+
+  const handleBulkToggleStatus = (enable: boolean) => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(enable ? 'Enabling Keys' : 'Disabling Keys');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkToggleStatusMutation.mutate({
+      ids: Array.from(selectedKeys),
+      enable,
+    });
+  };
+
+  const handleBulkTags = (tags: string) => {
+    if (selectedKeys.size === 0) return;
+    if (bulkTagsMode === 'add') {
+      bulkAddTagsMutation.mutate({
+        ids: Array.from(selectedKeys),
+        tags,
+      });
+    } else {
+      bulkRemoveTagsMutation.mutate({
+        ids: Array.from(selectedKeys),
+        tags,
+      });
+    }
+  };
+
+  const handleBulkArchive = () => {
+    if (selectedKeys.size === 0) return;
+    if (confirm(`Are you sure you want to archive ${selectedKeys.size} key(s)?\n\nArchived keys will be removed from the server but kept in records for 3 months.`)) {
+      setBulkProgressTitle('Archiving Keys');
+      setBulkProgressResults(null);
+      setBulkProgressDialogOpen(true);
+      bulkArchiveMutation.mutate({
+        ids: Array.from(selectedKeys),
+      });
+    }
   };
 
 
@@ -1419,6 +1750,81 @@ export default function KeysPage() {
         </div>
       )}
 
+      {/* Quick Filter Pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground mr-1">Quick filters:</span>
+        <Button
+          variant={filters.quickFilters.online ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-7 text-xs', filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
+          onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
+        >
+          <Wifi className="w-3 h-3 mr-1" />
+          Online
+        </Button>
+        <Button
+          variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-7 text-xs', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+          onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          Expiring &lt; 7d
+        </Button>
+        <Button
+          variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-7 text-xs', filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
+          onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
+        >
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Over 80% Quota
+        </Button>
+        <Button
+          variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-7 text-xs', filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
+          onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
+        >
+          <EyeOff className="w-3 h-3 mr-1" />
+          Inactive 30d
+        </Button>
+        
+        {/* Tag filter */}
+        <div className="flex items-center gap-1 ml-2">
+          <Tag className="w-3 h-3 text-muted-foreground" />
+          <Input
+            placeholder="Filter by tag"
+            value={filters.tagFilter || ''}
+            onChange={(e) => setTagFilter(e.target.value || undefined)}
+            className="h-7 w-28 text-xs"
+          />
+        </div>
+        
+        {/* Owner filter */}
+        <div className="flex items-center gap-1">
+          <User className="w-3 h-3 text-muted-foreground" />
+          <Input
+            placeholder="Filter by owner"
+            value={filters.ownerFilter || ''}
+            onChange={(e) => setOwnerFilter(e.target.value || undefined)}
+            className="h-7 w-28 text-xs"
+          />
+        </div>
+
+        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.tagFilter || filters.ownerFilter) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={clearPersistedFilters}
+          >
+            <X className="w-3 h-3 mr-1" />
+            Clear
+          </Button>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -1574,19 +1980,87 @@ export default function KeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex-wrap">
           <span className="text-sm font-medium">
             {selectedKeys.size} {t('keys.selected_count')}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Enable/Disable dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkToggleStatusMutation.isPending}
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  Enable/Disable
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleBulkToggleStatus(true)}>
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
+                  Enable All
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkToggleStatus(false)}>
+                  <XCircle className="w-4 h-4 mr-2 text-orange-500" />
+                  Disable All
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Extend Expiry */}
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               onClick={() => setBulkExtendDialogOpen(true)}
             >
               <Clock className="w-4 h-4 mr-2" />
               Extend Expiry
             </Button>
+
+            {/* Tags dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
+                >
+                  <Tag className="w-4 h-4 mr-2" />
+                  Tags
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => {
+                  setBulkTagsMode('add');
+                  setBulkTagsDialogOpen(true);
+                }}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Tags
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setBulkTagsMode('remove');
+                  setBulkTagsDialogOpen(true);
+                }}>
+                  <X className="w-4 h-4 mr-2" />
+                  Remove Tags
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Archive */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkArchive}
+              disabled={bulkArchiveMutation.isPending}
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Archive
+            </Button>
+
+            {/* Delete */}
             <Button
               variant="destructive"
               size="sm"
@@ -1655,7 +2129,7 @@ export default function KeysPage() {
             data.items.map((key) => {
               const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
               const StatusIcon = config.icon;
-              const isOnline = checkIsOnline(key.id);
+              const isOnline = checkIsOnline(key.id, key.status);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -1690,16 +2164,13 @@ export default function KeysPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
+                      <div className="flex justify-between text-xs mb-1">
                         <span className="text-muted-foreground">{t('keys.table.usage')}</span>
-                        <span className="font-medium">{formatBytes(key.usedBytes)}</span>
                       </div>
-                      {key.dataLimitBytes && (
-                        <Progress
-                          value={key.usagePercent || 0}
-                          className={cn('h-1.5', key.isTrafficWarning && '[&>div]:bg-orange-500')}
-                        />
-                      )}
+                      <SegmentedUsageBarCompact
+                        valueBytes={Number(key.usedBytes)}
+                        limitBytes={key.dataLimitBytes ? Number(key.dataLimitBytes) : undefined}
+                      />
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
@@ -1818,7 +2289,22 @@ export default function KeysPage() {
                     isSelected={selectedKeys.has(key.id)}
                     onSelect={() => handleSelectKey(key.id)}
                     isTogglingStatus={togglingKeyId === key.id}
-                    isOnline={checkIsOnline(key.id)}
+                    isOnline={checkIsOnline(key.id, key.status)}
+                    onCopyAccessUrl={() => {
+                      if (key.accessUrl) {
+                        copyToClipboard(key.accessUrl, 'Copied', 'Access URL copied to clipboard');
+                      } else {
+                        toast({ title: 'Error', description: 'No access URL available', variant: 'destructive' });
+                      }
+                    }}
+                    onCopySubscriptionUrl={() => {
+                      if (key.subscriptionToken) {
+                        const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
+                        copyToClipboard(url, 'Copied', 'Subscription URL copied to clipboard');
+                      } else {
+                        toast({ title: 'Error', description: 'No subscription URL available', variant: 'destructive' });
+                      }
+                    }}
                   />
                 ))
               ) : (
@@ -1910,6 +2396,23 @@ export default function KeysPage() {
         count={selectedKeys.size}
         onConfirm={handleBulkExtend}
         isPending={bulkExtendMutation.isPending}
+      />
+
+      <BulkTagsDialog
+        open={bulkTagsDialogOpen}
+        onOpenChange={setBulkTagsDialogOpen}
+        count={selectedKeys.size}
+        mode={bulkTagsMode}
+        onConfirm={handleBulkTags}
+        isPending={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
+      />
+
+      <BulkProgressDialog
+        open={bulkProgressDialogOpen}
+        onOpenChange={setBulkProgressDialogOpen}
+        title={bulkProgressTitle}
+        results={bulkProgressResults}
+        isPending={bulkToggleStatusMutation.isPending || bulkArchiveMutation.isPending}
       />
     </div>
   );

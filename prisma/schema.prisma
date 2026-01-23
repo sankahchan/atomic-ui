@@ -188,6 +188,10 @@ model AccessKey {
   estimatedDevices Int @default(0)
   peakDevices      Int @default(0)
 
+  // Ownership and tagging
+  owner String?              // Owner/email for this key
+  tags  String @default("")  // Comma-separated tags
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   trafficLogs TrafficLog[]
@@ -244,6 +248,10 @@ model DynamicAccessKey {
 
   // Encryption method for Shadowsocks
   method String @default("chacha20-ietf-poly1305")
+
+  // Ownership and tagging
+  owner String?              // Owner/email for this key
+  tags  String @default("")  // Comma-separated tags
 
   @@index([userId])
 
@@ -506,22 +514,215 @@ model KeyTemplate {
 
 model SecurityRule {
   id          String   @id @default(cuid())
-  
+
   // Rule Type: ALLOW (Whitelist) or BLOCK (Blacklist)
-  type        String   @default("BLOCK") 
-  
+  type        String   @default("BLOCK")
+
   // Target: IP, CIDR, COUNTRY
   // Valid: IP, CIDR, COUNTRY
-  targetType  String   
-  
+  targetType  String
+
   // Value: 192.168.1.1, 10.0.0.0/24, US, CN
-  targetValue String   
-  
+  targetValue String
+
   description String?
   isActive    Boolean  @default(true)
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([type, targetType])
+}
+
+// ============================================
+// Analytics & Usage Tracking
+// ============================================
+
+model UsageSnapshot {
+  id        String   @id @default(cuid())
+
+  // Optional server reference (for server-level aggregates)
+  serverId  String?
+
+  // Optional key reference (for per-key snapshots)
+  keyId     String?
+
+  // Key type: ACCESS_KEY or DYNAMIC_KEY
+  keyType   String?
+
+  // Cumulative usage in bytes at this point in time
+  usedBytes BigInt
+
+  // Delta since last snapshot (calculated by worker)
+  deltaBytes BigInt   @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([keyId, createdAt])
+  @@index([serverId, createdAt])
+  @@index([createdAt])
+}
+
+// ============================================
+// Background Worker Coordination
+// ============================================
+
+model WorkerLock {
+  id          String   @id @default("usage-snapshot-worker")
+
+  // Worker that holds the lock
+  workerId    String
+
+  // Lock acquisition time
+  lockedAt    DateTime @default(now())
+
+  // Lock expiration (auto-release if worker crashes)
+  expiresAt   DateTime
+
+  // Last heartbeat from the worker
+  heartbeatAt DateTime @default(now())
+}
+
+// ============================================
+// Two-Factor Authentication (2FA)
+// ============================================
+
+model TotpSecret {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  // Encrypted TOTP secret (base32 encoded, then encrypted)
+  encryptedSecret String
+
+  // Whether 2FA has been verified/enabled
+  verified        Boolean  @default(false)
+
+  // Track verification attempts (for rate limiting)
+  lastAttemptAt   DateTime?
+  attemptCount    Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+
+  // Hashed recovery code (bcrypt)
+  codeHash  String
+
+  // When was this code used (null = not used)
+  usedAt    DateTime?
+
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ============================================
+// WebAuthn Passkeys
+// ============================================
+
+model WebAuthnCredential {
+  id              String   @id @default(cuid())
+  userId          String
+
+  // WebAuthn credential data
+  credentialId    String   @unique // Base64 encoded
+  publicKey       String   // Base64 encoded COSE public key
+  counter         Int      @default(0)
+
+  // Credential metadata
+  deviceType      String?  // platform, cross-platform
+  transports      String?  // JSON array: ["usb", "nfc", "ble", "internal"]
+
+  // User-friendly name for the credential
+  name            String   @default("Security Key")
+
+  // Track last use
+  lastUsedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================
+// Security Probes (TLS/Certificate Monitoring)
+// ============================================
+
+model SecurityProbe {
+  id            String   @id @default(cuid())
+  serverId      String   @unique
+
+  // TLS/Connection details
+  scheme        String?  // http, https
+  tlsVersion    String?  // TLSv1.2, TLSv1.3
+  cipherSuite   String?
+
+  // Certificate details
+  certSubject   String?
+  certIssuer    String?
+  certExpiry    DateTime?
+  certDaysLeft  Int?
+
+  // Security headers
+  hasHsts       Boolean  @default(false)
+  hstsMaxAge    Int?
+
+  // Probe result
+  // Valid: OK, CERT_EXPIRING, CERT_EXPIRED, TLS_ERROR, CONNECTION_ERROR
+  result        String   @default("UNKNOWN")
+  errorMessage  String?
+
+  // Timestamps
+  lastCheckedAt DateTime?
+  nextCheckAt   DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============================================
+// Dashboard Security Settings
+// ============================================
+
+model DashboardSecurityProbe {
+  id            String   @id @default("dashboard-security")
+
+  // Current dashboard URL being probed
+  dashboardUrl  String?
+
+  // TLS/Connection details
+  scheme        String?  // http, https
+  tlsVersion    String?
+
+  // Security headers
+  hasHsts       Boolean  @default(false)
+  hstsMaxAge    Int?
+  hasSecureCookies Boolean @default(false)
+  hasHttpOnlyCookies Boolean @default(false)
+  hasSameSiteCookies Boolean @default(false)
+
+  // Content Security Policy
+  hasCsp        Boolean  @default(false)
+  cspDirectives String?  // JSON
+
+  // Other headers
+  hasXFrameOptions Boolean @default(false)
+  hasXContentTypeOptions Boolean @default(false)
+
+  // Probe result
+  result        String   @default("UNKNOWN")
+  errorMessage  String?
+
+  // Overall security score (0-100)
+  securityScore Int      @default(0)
+
+  lastCheckedAt DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

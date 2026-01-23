@@ -18,6 +18,7 @@ import { generateRandomString } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
+import { formatTagsForStorage } from '@/lib/tags';
 
 /**
  * Validation schema for creating a new access key.
@@ -84,6 +85,9 @@ const updateKeySchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
+  // New fields for tags and owner
+  owner: z.string().max(100).optional().nullable(),
+  tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
 });
 
 /**
@@ -109,6 +113,14 @@ const listKeysSchema = z.object({
   pageSize: z.number().int().min(1).max(100).default(20),
   unattachedOnly: z.boolean().optional(),
   userId: z.string().optional(),
+  // New filters for quick segments
+  online: z.boolean().optional(),
+  expiring7d: z.boolean().optional(),
+  overQuota: z.boolean().optional(),
+  inactive30d: z.boolean().optional(),
+  // Tag/owner filters
+  tag: z.string().optional(),
+  owner: z.string().optional(),
 });
 
 // Helper function to convert GB to bytes
@@ -152,7 +164,7 @@ export const keysRouter = router({
   list: protectedProcedure
     .input(listKeysSchema)
     .query(async ({ ctx, input }) => {
-      const { serverId, status, search, page, pageSize, unattachedOnly } = input;
+      const { serverId, status, search, page, pageSize, unattachedOnly, online, expiring7d, overQuota, inactive30d, tag, owner } = input;
 
       // Build the where clause
       const where: Prisma.AccessKeyWhereInput = {};
@@ -184,6 +196,43 @@ export const keysRouter = router({
         where.dynamicKeyId = null;
       }
 
+      // Quick filter: Online (lastUsedAt within 90s AND not disabled)
+      if (online) {
+        const onlineThreshold = new Date(Date.now() - 90 * 1000);
+        where.lastUsedAt = { gte: onlineThreshold };
+        where.status = { not: 'DISABLED' };
+      }
+
+      // Quick filter: Expiring within 7 days
+      if (expiring7d) {
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        where.expiresAt = {
+          gte: now,
+          lte: sevenDaysFromNow,
+        };
+      }
+
+      // Quick filter: Inactive for 30 days (lastUsedAt older than 30 days OR null)
+      if (inactive30d) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        where.OR = [
+          { lastUsedAt: null },
+          { lastUsedAt: { lt: thirtyDaysAgo } },
+        ];
+      }
+
+      // Tag filter (using contains with delimiters for safer matching)
+      if (tag) {
+        const normalizedTag = tag.trim().toLowerCase();
+        where.tags = { contains: `,${normalizedTag},` };
+      }
+
+      // Owner filter
+      if (owner) {
+        where.owner = { contains: owner };
+      }
+
       // Get total count for pagination
       const total = await db.accessKey.count({ where });
 
@@ -205,7 +254,7 @@ export const keysRouter = router({
       });
 
       // Calculate usage percentages and remaining time
-      const keysWithStats = keys.map((key) => {
+      let keysWithStats = keys.map((key) => {
         const usagePercent = key.dataLimitBytes
           ? Math.round((Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100)
           : 0;
@@ -225,6 +274,13 @@ export const keysRouter = router({
           isTrafficWarning: usagePercent >= 80 && usagePercent < 100,
         };
       });
+
+      // Quick filter: Over 80% quota (post-fetch filter since it compares two fields)
+      if (overQuota) {
+        keysWithStats = keysWithStats.filter(
+          (key) => key.dataLimitBytes && key.usagePercent >= 80
+        );
+      }
 
       return {
         items: keysWithStats,
@@ -496,6 +552,16 @@ export const keysRouter = router({
           updateData.contactLinks = data.contactLinks;
         }
 
+        // Handle owner field
+        if (data.owner !== undefined) {
+          updateData.owner = data.owner;
+        }
+
+        // Handle tags field (normalize for storage)
+        if (data.tags !== undefined) {
+          updateData.tags = data.tags ? formatTagsForStorage(data.tags) : '';
+        }
+
         // Update the database record
         const accessKey = await db.accessKey.update({
           where: { id },
@@ -741,6 +807,301 @@ export const keysRouter = router({
           }
         } catch {
           results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk enable/disable multiple keys.
+   *
+   * When disabling: Deletes keys from Outline servers (stops traffic immediately).
+   * When enabling: Recreates keys on Outline servers.
+   */
+  bulkToggleStatus: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      enable: z.boolean(), // true = enable, false = disable
+    }))
+    .mutation(async ({ input }) => {
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = { success: 0, failed: 0, errors: [] };
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({
+            where: { id },
+            include: { server: true },
+          });
+
+          if (!key) {
+            results.failed++;
+            results.errors.push({ id, name: 'Unknown', error: 'Key not found' });
+            continue;
+          }
+
+          const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+          const isCurrentlyDisabled = key.status === 'DISABLED';
+
+          // Skip if already in desired state
+          if (input.enable && !isCurrentlyDisabled) {
+            results.success++;
+            continue;
+          }
+          if (!input.enable && isCurrentlyDisabled) {
+            results.success++;
+            continue;
+          }
+
+          if (input.enable) {
+            // ENABLE: Recreate the key on Outline server
+            const newOutlineKey = await client.createAccessKey({
+              name: key.name,
+              method: key.method || undefined,
+            });
+
+            if (key.dataLimitBytes) {
+              const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+              await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
+            }
+
+            await db.accessKey.update({
+              where: { id },
+              data: {
+                status: 'ACTIVE',
+                outlineKeyId: newOutlineKey.id,
+                accessUrl: newOutlineKey.accessUrl,
+                password: newOutlineKey.password,
+                port: newOutlineKey.port,
+                method: newOutlineKey.method,
+                disabledAt: null,
+                disabledOutlineKeyId: null,
+              },
+            });
+          } else {
+            // DISABLE: Delete the key from Outline server
+            try {
+              await client.deleteAccessKey(key.outlineKeyId);
+            } catch (error) {
+              logger.error(`Failed to delete key ${key.outlineKeyId} from Outline`, error);
+            }
+
+            await db.accessKey.update({
+              where: { id },
+              data: {
+                status: 'DISABLED',
+                disabledAt: new Date(),
+                disabledOutlineKeyId: key.outlineKeyId,
+                estimatedDevices: 0,
+              },
+            });
+
+            // Close any active sessions
+            await db.connectionSession.updateMany({
+              where: { accessKeyId: key.id, isActive: true },
+              data: { isActive: false, endedAt: new Date() },
+            });
+          }
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: (error as Error).message
+          });
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk add tags to multiple keys.
+   */
+  bulkAddTags: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      tags: z.string(), // Comma-separated tags to add
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+      const newTags = input.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+      if (newTags.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No valid tags provided',
+        });
+      }
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({
+            where: { id },
+            select: { tags: true },
+          });
+
+          if (!key) {
+            results.failed++;
+            continue;
+          }
+
+          // Parse existing tags (stored as ,tag1,tag2, format)
+          const existingTags = (key.tags || '')
+            .split(',')
+            .filter(Boolean)
+            .map(t => t.trim().toLowerCase());
+
+          // Merge with new tags (no duplicates)
+          const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
+          const formattedTags = mergedTags.length > 0 ? `,${mergedTags.join(',')},` : '';
+
+          await db.accessKey.update({
+            where: { id },
+            data: { tags: formattedTags },
+          });
+
+          results.success++;
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk remove tags from multiple keys.
+   */
+  bulkRemoveTags: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      tags: z.string(), // Comma-separated tags to remove
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+      const tagsToRemove = input.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+      if (tagsToRemove.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No valid tags provided',
+        });
+      }
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({
+            where: { id },
+            select: { tags: true },
+          });
+
+          if (!key) {
+            results.failed++;
+            continue;
+          }
+
+          // Parse existing tags
+          const existingTags = (key.tags || '')
+            .split(',')
+            .filter(Boolean)
+            .map(t => t.trim().toLowerCase());
+
+          // Remove specified tags
+          const remainingTags = existingTags.filter(t => !tagsToRemove.includes(t));
+          const formattedTags = remainingTags.length > 0 ? `,${remainingTags.join(',')},` : '';
+
+          await db.accessKey.update({
+            where: { id },
+            data: { tags: formattedTags },
+          });
+
+          results.success++;
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk archive multiple keys.
+   *
+   * Archives keys to the ArchivedKey table and deletes them from Outline and the main table.
+   */
+  bulkArchive: adminProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ input }) => {
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = { success: 0, failed: 0, errors: [] };
+
+      const deleteAfter = new Date();
+      deleteAfter.setMonth(deleteAfter.getMonth() + 3);
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({
+            where: { id },
+            include: { server: true },
+          });
+
+          if (!key) {
+            results.failed++;
+            results.errors.push({ id, name: 'Unknown', error: 'Key not found' });
+            continue;
+          }
+
+          // Delete from Outline server (ignore errors)
+          try {
+            const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+            await client.deleteAccessKey(key.outlineKeyId);
+          } catch (error) {
+            logger.error(`Failed to delete key from Outline during archive: ${(error as Error).message}`);
+          }
+
+          // Create archived key record
+          await db.archivedKey.create({
+            data: {
+              originalKeyId: key.id,
+              outlineKeyId: key.outlineKeyId,
+              name: key.name,
+              email: key.email,
+              telegramId: key.telegramId,
+              notes: key.notes,
+              serverName: key.server.name,
+              serverLocation: key.server.location,
+              accessUrl: key.accessUrl,
+              dataLimitBytes: key.dataLimitBytes,
+              usedBytes: key.usedBytes,
+              expirationType: key.expirationType,
+              expiresAt: key.expiresAt,
+              durationDays: key.durationDays,
+              archiveReason: 'ARCHIVED',
+              originalStatus: key.status,
+              firstUsedAt: key.firstUsedAt,
+              lastUsedAt: key.lastUsedAt,
+              createdAt: key.createdAt,
+              deleteAfter,
+            },
+          });
+
+          // Delete from database
+          await db.accessKey.delete({ where: { id } });
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ id, name: 'Unknown', error: (error as Error).message });
         }
       }
 

@@ -17,6 +17,7 @@ import { TRPCError } from '@trpc/server';
 import { generateRandomString } from '@/lib/utils';
 import { createOutlineClient } from '@/lib/outline-api';
 import { logger } from '@/lib/logger';
+import { formatTagsForStorage } from '@/lib/tags';
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -75,6 +76,9 @@ const updateDAKSchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
+  // New fields for tags and owner
+  owner: z.string().max(100).optional().nullable(),
+  tags: z.string().max(500).optional().nullable(),
 });
 
 /**
@@ -86,6 +90,14 @@ const listDAKSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED', 'EXPIRED', 'DEPLETED', 'PENDING']).optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
+  // New filters for quick segments
+  online: z.boolean().optional(),
+  expiring7d: z.boolean().optional(),
+  overQuota: z.boolean().optional(),
+  inactive30d: z.boolean().optional(),
+  // Tag/owner filters
+  tag: z.string().optional(),
+  owner: z.string().optional(),
 });
 
 // Helper function to convert GB to bytes
@@ -124,7 +136,7 @@ export const dynamicKeysRouter = router({
   list: protectedProcedure
     .input(listDAKSchema)
     .query(async ({ ctx, input }) => {
-      const { search, type, status, page, pageSize } = input;
+      const { search, type, status, page, pageSize, online, expiring7d, overQuota, inactive30d, tag, owner } = input;
 
       // Build the where clause
       const where: Record<string, unknown> = {};
@@ -151,8 +163,45 @@ export const dynamicKeysRouter = router({
       }
 
       // Admin can filter by specific userId
-      if (ctx.user.role === 'ADMIN' && (input as any).userId) {
-        where.userId = (input as any).userId;
+      if (ctx.user.role === 'ADMIN' && (input as Record<string, unknown>).userId) {
+        where.userId = (input as Record<string, unknown>).userId;
+      }
+
+      // Quick filter: Online (firstUsedAt within 90s AND not disabled)
+      if (online) {
+        const onlineThreshold = new Date(Date.now() - 90 * 1000);
+        where.firstUsedAt = { gte: onlineThreshold };
+        where.status = { not: 'DISABLED' };
+      }
+
+      // Quick filter: Expiring within 7 days
+      if (expiring7d) {
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        where.expiresAt = {
+          gte: now,
+          lte: sevenDaysFromNow,
+        };
+      }
+
+      // Quick filter: Inactive for 30 days
+      if (inactive30d) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        where.OR = [
+          { firstUsedAt: null },
+          { firstUsedAt: { lt: thirtyDaysAgo } },
+        ];
+      }
+
+      // Tag filter
+      if (tag) {
+        const normalizedTag = tag.trim().toLowerCase();
+        where.tags = { contains: `,${normalizedTag},` };
+      }
+
+      // Owner filter
+      if (owner) {
+        where.owner = { contains: owner };
       }
 
       // Get total count for pagination
@@ -173,12 +222,16 @@ export const dynamicKeysRouter = router({
 
       // Transform the data and calculate days remaining
       const now = new Date();
-      const items = daks.map((dak) => {
+      let items = daks.map((dak) => {
         let daysRemaining: number | null = null;
         if (dak.expiresAt) {
           const diffMs = dak.expiresAt.getTime() - now.getTime();
           daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         }
+
+        const usagePercent = dak.dataLimitBytes
+          ? Math.round((Number(dak.usedBytes) / Number(dak.dataLimitBytes)) * 100)
+          : 0;
 
         return {
           id: dak.id,
@@ -191,6 +244,7 @@ export const dynamicKeysRouter = router({
           dynamicUrl: dak.dynamicUrl,
           dataLimitBytes: dak.dataLimitBytes,
           usedBytes: dak.usedBytes,
+          usagePercent,
           expiresAt: dak.expiresAt,
           daysRemaining,
           prefix: dak.prefix,
@@ -201,8 +255,18 @@ export const dynamicKeysRouter = router({
           createdAt: dak.createdAt,
           updatedAt: dak.updatedAt,
           userId: dak.userId,
+          owner: dak.owner,
+          tags: dak.tags,
+          firstUsedAt: dak.firstUsedAt,
         };
       });
+
+      // Quick filter: Over 80% quota (post-fetch filter since it compares two fields)
+      if (overQuota) {
+        items = items.filter(
+          (item) => item.dataLimitBytes && item.usagePercent >= 80
+        );
+      }
 
       return {
         items,
@@ -348,7 +412,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, owner, tags, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -416,6 +480,16 @@ export const dynamicKeysRouter = router({
 
       if (contactLinks !== undefined) {
         updateData.contactLinks = contactLinks;
+      }
+
+      // Handle owner field
+      if (owner !== undefined) {
+        updateData.owner = owner;
+      }
+
+      // Handle tags field (normalize for storage)
+      if (tags !== undefined) {
+        updateData.tags = tags ? formatTagsForStorage(tags) : '';
       }
 
       // Recalculate expiration if type changed
@@ -635,6 +709,291 @@ export const dynamicKeysRouter = router({
         success: successCount,
         failed: failedCount,
       };
+    }),
+
+  /**
+   * Bulk enable/disable multiple Dynamic Access Keys.
+   *
+   * When disabling: Disables all attached access keys (deletes from Outline).
+   * When enabling: Re-enables all attached access keys (recreates on Outline).
+   */
+  bulkToggleStatus: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      enable: z.boolean(), // true = enable, false = disable
+    }))
+    .mutation(async ({ input }) => {
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = { success: 0, failed: 0, errors: [] };
+
+      for (const dakId of input.ids) {
+        try {
+          const dak = await db.dynamicAccessKey.findUnique({
+            where: { id: dakId },
+            include: {
+              accessKeys: {
+                include: { server: true },
+              },
+            },
+          });
+
+          if (!dak) {
+            results.failed++;
+            results.errors.push({ id: dakId, name: 'Unknown', error: 'Dynamic key not found' });
+            continue;
+          }
+
+          const isCurrentlyDisabled = dak.status === 'DISABLED';
+
+          // Skip if already in desired state
+          if (input.enable && !isCurrentlyDisabled) {
+            results.success++;
+            continue;
+          }
+          if (!input.enable && isCurrentlyDisabled) {
+            results.success++;
+            continue;
+          }
+
+          // Process all attached access keys
+          for (const key of dak.accessKeys) {
+            const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+
+            if (input.enable) {
+              // ENABLE: Recreate keys on Outline
+              try {
+                const newOutlineKey = await client.createAccessKey({
+                  name: key.name,
+                  method: key.method || undefined,
+                });
+
+                if (key.dataLimitBytes) {
+                  const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+                  await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
+                }
+
+                await db.accessKey.update({
+                  where: { id: key.id },
+                  data: {
+                    status: 'ACTIVE',
+                    outlineKeyId: newOutlineKey.id,
+                    accessUrl: newOutlineKey.accessUrl,
+                    password: newOutlineKey.password,
+                    port: newOutlineKey.port,
+                    method: newOutlineKey.method,
+                    disabledAt: null,
+                    disabledOutlineKeyId: null,
+                  },
+                });
+              } catch (error) {
+                logger.error(`Failed to re-enable key ${key.id}`, error);
+              }
+            } else {
+              // DISABLE: Delete keys from Outline
+              try {
+                await client.deleteAccessKey(key.outlineKeyId);
+              } catch (error) {
+                logger.error(`Failed to delete key ${key.outlineKeyId}`, error);
+              }
+
+              await db.accessKey.update({
+                where: { id: key.id },
+                data: {
+                  status: 'DISABLED',
+                  disabledAt: new Date(),
+                  disabledOutlineKeyId: key.outlineKeyId,
+                  estimatedDevices: 0,
+                },
+              });
+
+              // Close active sessions
+              await db.connectionSession.updateMany({
+                where: { accessKeyId: key.id, isActive: true },
+                data: { isActive: false, endedAt: new Date() },
+              });
+            }
+          }
+
+          // Update the DAK status
+          const newStatus = input.enable ? 'ACTIVE' : 'DISABLED';
+          await db.dynamicAccessKey.update({
+            where: { id: dakId },
+            data: { status: newStatus },
+          });
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ id: dakId, name: 'Unknown', error: (error as Error).message });
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk extend expiration for multiple Dynamic Access Keys.
+   *
+   * Adds the specified number of days to the current expiration date.
+   * If a key has no expiration, it sets it to now + days.
+   * Also reactivates expired keys.
+   */
+  bulkExtend: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      days: z.number().int().positive(),
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+
+      for (const id of input.ids) {
+        try {
+          const dak = await db.dynamicAccessKey.findUnique({ where: { id } });
+
+          if (dak) {
+            let newExpiresAt: Date;
+
+            if (dak.expiresAt) {
+              // Add days to existing expiration
+              newExpiresAt = new Date(dak.expiresAt);
+              newExpiresAt.setDate(newExpiresAt.getDate() + input.days);
+            } else {
+              // Set from now if no previous expiration
+              newExpiresAt = new Date();
+              newExpiresAt.setDate(newExpiresAt.getDate() + input.days);
+            }
+
+            // Update key
+            await db.dynamicAccessKey.update({
+              where: { id },
+              data: {
+                expiresAt: newExpiresAt,
+                expirationType: 'FIXED_DATE',
+                status: 'ACTIVE', // Reactivate if it was expired
+              },
+            });
+
+            results.success++;
+          }
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk add tags to multiple Dynamic Access Keys.
+   */
+  bulkAddTags: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      tags: z.string(), // Comma-separated tags to add
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+      const newTags = input.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+      if (newTags.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No valid tags provided',
+        });
+      }
+
+      for (const id of input.ids) {
+        try {
+          const dak = await db.dynamicAccessKey.findUnique({
+            where: { id },
+            select: { tags: true },
+          });
+
+          if (!dak) {
+            results.failed++;
+            continue;
+          }
+
+          // Parse existing tags (stored as ,tag1,tag2, format)
+          const existingTags = (dak.tags || '')
+            .split(',')
+            .filter(Boolean)
+            .map(t => t.trim().toLowerCase());
+
+          // Merge with new tags (no duplicates)
+          const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
+          const formattedTags = mergedTags.length > 0 ? `,${mergedTags.join(',')},` : '';
+
+          await db.dynamicAccessKey.update({
+            where: { id },
+            data: { tags: formattedTags },
+          });
+
+          results.success++;
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk remove tags from multiple Dynamic Access Keys.
+   */
+  bulkRemoveTags: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      tags: z.string(), // Comma-separated tags to remove
+    }))
+    .mutation(async ({ input }) => {
+      const results = { success: 0, failed: 0 };
+      const tagsToRemove = input.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+      if (tagsToRemove.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No valid tags provided',
+        });
+      }
+
+      for (const id of input.ids) {
+        try {
+          const dak = await db.dynamicAccessKey.findUnique({
+            where: { id },
+            select: { tags: true },
+          });
+
+          if (!dak) {
+            results.failed++;
+            continue;
+          }
+
+          // Parse existing tags
+          const existingTags = (dak.tags || '')
+            .split(',')
+            .filter(Boolean)
+            .map(t => t.trim().toLowerCase());
+
+          // Remove specified tags
+          const remainingTags = existingTags.filter(t => !tagsToRemove.includes(t));
+          const formattedTags = remainingTags.length > 0 ? `,${remainingTags.join(',')},` : '';
+
+          await db.dynamicAccessKey.update({
+            where: { id },
+            data: { tags: formattedTags },
+          });
+
+          results.success++;
+        } catch {
+          results.failed++;
+        }
+      }
+
+      return results;
     }),
 
   /**

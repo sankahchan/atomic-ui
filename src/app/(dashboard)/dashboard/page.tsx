@@ -2,21 +2,13 @@
 
 /**
  * Dashboard Overview Page
- * 
- * This is the main landing page after login, providing a comprehensive overview
- * of the VPN management system. It displays key metrics, server status, recent
- * activity, and alerts in a visually organized layout.
- * 
- * The page is designed to give administrators an at-a-glance view of:
- * - Total servers, keys, and their statuses
- * - Traffic usage and trends
- * - Server health status
- * - Recent activity and alerts
+ *
+ * Premium analytics dashboard with modern UI, improved typography,
+ * and refined visual hierarchy. Provides comprehensive VPN management overview.
  */
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,68 +30,126 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   BarChart3,
+  Shield,
+  Wifi,
+  ChevronRight,
+  Plus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { SystemStatus } from '../_components/system-status';
 
 /**
- * StatCard Component
- * 
- * Displays a single statistic with an icon, value, label, and optional
- * trend indicator. Used for the main metrics row at the top of the dashboard.
+ * Premium KPI Card Component
+ *
+ * Modern stat card with gradient accents, improved spacing,
+ * and subtle animations on hover.
  */
-function StatCard({
+function KPICard({
   title,
   value,
-  description,
+  subtitle,
   icon: Icon,
   trend,
   trendValue,
   href,
+  accentColor = 'cyan',
 }: {
   title: string;
   value: string | number;
-  description?: string;
+  subtitle?: string;
   icon: React.ElementType;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   href?: string;
+  accentColor?: 'cyan' | 'emerald' | 'violet' | 'amber' | 'rose';
 }) {
+  const accentStyles = {
+    cyan: {
+      gradient: 'from-cyan-500/20 to-cyan-500/5',
+      icon: 'text-cyan-400',
+      iconBg: 'bg-cyan-500/10',
+      border: 'group-hover:border-cyan-500/30',
+    },
+    emerald: {
+      gradient: 'from-emerald-500/20 to-emerald-500/5',
+      icon: 'text-emerald-400',
+      iconBg: 'bg-emerald-500/10',
+      border: 'group-hover:border-emerald-500/30',
+    },
+    violet: {
+      gradient: 'from-violet-500/20 to-violet-500/5',
+      icon: 'text-violet-400',
+      iconBg: 'bg-violet-500/10',
+      border: 'group-hover:border-violet-500/30',
+    },
+    amber: {
+      gradient: 'from-amber-500/20 to-amber-500/5',
+      icon: 'text-amber-400',
+      iconBg: 'bg-amber-500/10',
+      border: 'group-hover:border-amber-500/30',
+    },
+    rose: {
+      gradient: 'from-rose-500/20 to-rose-500/5',
+      icon: 'text-rose-400',
+      iconBg: 'bg-rose-500/10',
+      border: 'group-hover:border-rose-500/30',
+    },
+  };
+
+  const accent = accentStyles[accentColor];
+
   const content = (
-    <Card className="stat-card group cursor-pointer hover:border-primary/50 transition-colors">
-      <CardContent className="p-4">
+    <Card className={cn(
+      'group relative overflow-hidden transition-all duration-300',
+      'border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm',
+      'hover:bg-zinc-900/80 hover:shadow-lg hover:shadow-black/20',
+      accent.border
+    )}>
+      {/* Gradient overlay */}
+      <div className={cn(
+        'absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300',
+        accent.gradient
+      )} />
+
+      <CardContent className="relative p-5">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
-            {description && (
-              <p className="text-[10px] text-muted-foreground">{description}</p>
-            )}
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+              {title}
+            </p>
+            <div className="space-y-1">
+              <p className="text-3xl font-bold tracking-tight text-zinc-100">
+                {value}
+              </p>
+              {subtitle && (
+                <p className="text-xs text-zinc-500">{subtitle}</p>
+              )}
+            </div>
           </div>
           <div className={cn(
-            'p-2 rounded-lg transition-colors',
-            'bg-primary/10 text-primary',
-            'group-hover:bg-primary group-hover:text-primary-foreground'
+            'p-3 rounded-xl transition-all duration-300',
+            accent.iconBg,
+            'group-hover:scale-110'
           )}>
-            <Icon className="w-4 h-4" />
+            <Icon className={cn('w-5 h-5', accent.icon)} />
           </div>
         </div>
 
         {trend && trendValue && (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-zinc-800/50">
             {trend === 'up' && (
-              <span className="flex items-center text-green-500 text-xs">
-                <ArrowUpRight className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-emerald-400 text-xs font-medium">
+                <ArrowUpRight className="w-3.5 h-3.5" />
                 {trendValue}
               </span>
             )}
             {trend === 'down' && (
-              <span className="flex items-center text-red-500 text-xs">
-                <ArrowDownRight className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-rose-400 text-xs font-medium">
+                <ArrowDownRight className="w-3.5 h-3.5" />
                 {trendValue}
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground">vs last week</span>
+            <span className="text-xs text-zinc-600">vs last period</span>
           </div>
         )}
       </CardContent>
@@ -107,19 +157,18 @@ function StatCard({
   );
 
   if (href) {
-    return <Link href={href}>{content}</Link>;
+    return <Link href={href} className="block">{content}</Link>;
   }
 
   return content;
 }
 
 /**
- * ServerStatusCard Component
- * 
- * Displays the status of a single server with health indicators,
- * latency, and key count. Clicking navigates to the server detail page.
+ * Server Status Row Component
+ *
+ * Compact horizontal server status display for the server list.
  */
-function ServerStatusCard({
+function ServerStatusRow({
   server,
 }: {
   server: {
@@ -132,72 +181,66 @@ function ServerStatusCard({
     uptimePercent: number;
   };
 }) {
-  const { t } = useLocale();
-  const statusColors = {
-    UP: 'bg-green-500',
-    DOWN: 'bg-red-500',
-    SLOW: 'bg-yellow-500',
-    UNKNOWN: 'bg-gray-500',
+  const statusConfig = {
+    UP: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' },
+    DOWN: { color: 'bg-rose-500', text: 'text-rose-400', label: 'Offline' },
+    SLOW: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Slow' },
+    UNKNOWN: { color: 'bg-zinc-500', text: 'text-zinc-400', label: 'Unknown' },
   };
 
-  const statusIcons = {
-    UP: CheckCircle2,
-    DOWN: XCircle,
-    SLOW: AlertTriangle,
-    UNKNOWN: Clock,
-  };
-
-  const StatusIcon = statusIcons[server.status as keyof typeof statusIcons] || Clock;
+  const config = statusConfig[server.status as keyof typeof statusConfig] || statusConfig.UNKNOWN;
 
   return (
     <Link href={`/dashboard/servers/${server.id}`}>
-      <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {server.countryCode && (
-                <span className="text-base">{getCountryFlag(server.countryCode)}</span>
-              )}
-              <span className="font-medium text-sm truncate max-w-[100px]">{server.name}</span>
-            </div>
+      <div className="group flex items-center justify-between p-3 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-all duration-200 cursor-pointer">
+        <div className="flex items-center gap-3">
+          <div className="relative">
             <div className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              statusColors[server.status as keyof typeof statusColors] || 'bg-gray-500'
+              'w-2 h-2 rounded-full',
+              config.color
             )} />
+            {server.status === 'UP' && (
+              <div className={cn(
+                'absolute inset-0 w-2 h-2 rounded-full animate-ping',
+                config.color,
+                'opacity-75'
+              )} />
+            )}
           </div>
+          <div className="flex items-center gap-2">
+            {server.countryCode && (
+              <span className="text-base">{getCountryFlag(server.countryCode)}</span>
+            )}
+            <span className="font-medium text-sm text-zinc-200">{server.name}</span>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-1 text-xs">
-            <div>
-              <p className="text-muted-foreground text-[10px]">Status</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <StatusIcon className="w-3 h-3" />
-                <span className="font-medium">{server.status}</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-[10px]">Latency</p>
-              <p className="font-medium mt-0.5">
-                {server.latencyMs ? `${server.latencyMs}ms` : '-'}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-[10px]">Keys</p>
-              <p className="font-medium mt-0.5">{server.keyCount}</p>
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-xs text-zinc-500">Latency</p>
+            <p className="text-sm font-medium text-zinc-300 tabular-nums">
+              {server.latencyMs ? `${server.latencyMs}ms` : '-'}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="text-right">
+            <p className="text-xs text-zinc-500">Keys</p>
+            <p className="text-sm font-medium text-zinc-300 tabular-nums">
+              {server.keyCount}
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+        </div>
+      </div>
     </Link>
   );
 }
 
 /**
- * AlertItem Component
- * 
- * Displays a single alert or notification item with appropriate styling
- * based on the alert severity.
+ * Activity Item Component
+ *
+ * Compact activity/alert item with status indicator.
  */
-function AlertItem({
+function ActivityItem({
   type,
   title,
   description,
@@ -209,37 +252,50 @@ function AlertItem({
   time: string;
 }) {
   const styles = {
-    warning: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', icon: AlertTriangle, iconColor: 'text-yellow-500' },
-    error: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: XCircle, iconColor: 'text-red-500' },
-    info: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', icon: Activity, iconColor: 'text-blue-500' },
-    success: { bg: 'bg-green-500/10', border: 'border-green-500/30', icon: CheckCircle2, iconColor: 'text-green-500' },
+    warning: {
+      dot: 'bg-amber-500',
+      text: 'text-amber-400',
+      bg: 'bg-amber-500/5',
+    },
+    error: {
+      dot: 'bg-rose-500',
+      text: 'text-rose-400',
+      bg: 'bg-rose-500/5',
+    },
+    info: {
+      dot: 'bg-blue-500',
+      text: 'text-blue-400',
+      bg: 'bg-blue-500/5',
+    },
+    success: {
+      dot: 'bg-emerald-500',
+      text: 'text-emerald-400',
+      bg: 'bg-emerald-500/5',
+    },
   };
 
   const style = styles[type];
-  const Icon = style.icon;
 
   return (
     <div className={cn(
-      'flex items-start gap-2 p-2 rounded-md border text-xs',
+      'flex items-start gap-3 p-3 rounded-lg transition-colors',
       style.bg,
-      style.border
+      'hover:bg-zinc-800/30'
     )}>
-      <Icon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', style.iconColor)} />
+      <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', style.dot)} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium">{title}</p>
-        <p className="text-[10px] text-muted-foreground truncate">{description}</p>
+        <p className={cn('text-sm font-medium', style.text)}>{title}</p>
+        <p className="text-xs text-zinc-500 truncate mt-0.5">{description}</p>
       </div>
-      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{time}</span>
+      <span className="text-xs text-zinc-600 whitespace-nowrap">{time}</span>
     </div>
   );
 }
 
 /**
  * DashboardPage Component
- * 
- * The main dashboard page that assembles all the overview components.
- * It fetches data from multiple endpoints and displays them in an
- * organized, responsive layout.
+ *
+ * Premium analytics dashboard with modern UI design.
  */
 export default function DashboardPage() {
   const [trafficDays, setTrafficDays] = useState(30);
@@ -260,217 +316,275 @@ export default function DashboardPage() {
   // Loading state
   if (statsLoading || !mounted) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="space-y-6 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-muted rounded-xl" />
+            <div key={i} className="h-32 bg-zinc-800/50 rounded-xl" />
           ))}
         </div>
+        <div className="h-80 bg-zinc-800/50 rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 h-full md:h-[calc(100vh-theme(spacing.20))] overflow-auto md:overflow-hidden flex flex-col">
-      {/* Page header - Compact */}
-      <div className="flex items-center justify-between shrink-0">
+    <div className="space-y-6 min-h-screen pb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">{t('dashboard.title')}</h1>
-          <p className="text-xs text-muted-foreground hidden sm:block">
+          <h1 className="text-2xl font-bold text-zinc-100">{t('dashboard.title')}</h1>
+          <p className="text-sm text-zinc-500 mt-1">
             {t('dashboard.welcome')}
           </p>
         </div>
 
-        {/* Quick Actions Inline */}
         <div className="flex items-center gap-2">
           <Link href="/dashboard/servers">
-            <Button size="sm" variant="outline" className="h-8 gap-2">
-              <Server className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('dashboard.add_server')}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 gap-2 border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-600"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Server</span>
             </Button>
           </Link>
           <Link href="/dashboard/keys">
-            <Button size="sm" variant="outline" className="h-8 gap-2">
+            <Button
+              size="sm"
+              className="h-9 gap-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border-0"
+            >
               <Key className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('dashboard.create_key')}</span>
+              <span className="hidden sm:inline">Create Key</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
-        <StatCard
-          title={t('dashboard.total_servers')}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Total Servers"
           value={stats?.totalServers || 0}
-          description={`${stats?.activeServers || 0} active, ${stats?.downServers || 0} down`}
+          subtitle={`${stats?.activeServers || 0} online, ${stats?.downServers || 0} offline`}
           icon={Server}
+          accentColor="cyan"
           href="/dashboard/servers"
         />
-        <StatCard
-          title={t('dashboard.total_keys')}
+        <KPICard
+          title="Access Keys"
           value={stats?.totalKeys || 0}
-          description={`${stats?.activeKeys || 0} active`}
+          subtitle={`${stats?.activeKeys || 0} active keys`}
           icon={Key}
+          accentColor="violet"
           href="/dashboard/keys"
         />
-        <StatCard
-          title={t('dashboard.total_traffic')}
+        <KPICard
+          title="Total Traffic"
           value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
-          description={t('dashboard.all_time')}
+          subtitle="All time usage"
           icon={TrendingUp}
+          accentColor="emerald"
         />
-        <StatCard
-          title={t('dashboard.expiring_soon')}
+        <KPICard
+          title="Expiring Soon"
           value={stats?.expiringIn24h || 0}
-          description={t('dashboard.expiring_24h')}
+          subtitle="Keys expiring in 24h"
           icon={Clock}
+          accentColor={stats?.expiringIn24h && stats.expiringIn24h > 0 ? 'amber' : 'cyan'}
           href="/dashboard/keys?status=expiring"
         />
       </div>
 
-      {/* Quick Analytics Link Card */}
-      <Link href="/dashboard/analytics">
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer shrink-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm">{t('nav.analytics') || 'Analytics'}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {t('dashboard.total_traffic')}: {formatBytes(stats?.totalTrafficBytes || BigInt(0))} • View peak hours &amp; top users
-                  </p>
-                </div>
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-
-      {/* Main Content Area - Scrollable if needed, but designed to fit */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0 flex-1">
-        {/* Left Column: Traffic & Servers */}
-        <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
-          {/* Traffic Chart */}
-          <Card className="flex-1 min-h-[200px] flex flex-col overflow-hidden">
-            <CardHeader className="p-4 pb-2 shrink-0">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Charts */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Traffic Chart Card */}
+          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="border-b border-zinc-800/50 pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  {t('dashboard.traffic_overview')}
-                </CardTitle>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10">
+                    <BarChart3 className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-zinc-100">
+                      Traffic Overview
+                    </CardTitle>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Bandwidth usage over time
+                    </p>
+                  </div>
+                </div>
                 <Select
                   value={trafficDays.toString()}
                   onValueChange={(value) => setTrafficDays(parseInt(value))}
                 >
-                  <SelectTrigger className="w-[100px] h-7 text-xs">
+                  <SelectTrigger className="w-[100px] h-8 text-xs border-zinc-700 bg-zinc-800/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">7 days</SelectItem>
-                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </CardHeader>
-            <CardContent className="p-4 pt-0 flex-1 min-h-0">
+            <CardContent className="p-4">
               {trafficLoading ? (
-                <div className="h-full bg-muted/20 rounded-lg animate-pulse" />
+                <div className="h-[280px] bg-zinc-800/30 rounded-lg animate-pulse" />
               ) : trafficHistory && trafficHistory.length > 0 ? (
-                <div className="-ml-4 h-full w-full">
+                <div className="h-[280px] -ml-4">
                   <TrafficChart data={trafficHistory} type="area" height="100%" />
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <p className="text-xs">No traffic data</p>
+                <div className="h-[280px] flex items-center justify-center text-zinc-500">
+                  <div className="text-center">
+                    <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No traffic data available</p>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Server Status Grid - Compact */}
-          <Card className="flex-1 min-h-[180px] overflow-hidden flex flex-col">
-            <CardHeader className="p-4 pb-2 border-b shrink-0">
+          {/* Server Status Card */}
+          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="border-b border-zinc-800/50 pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-primary" />
-                  {t('dashboard.server_status')}
-                </CardTitle>
-                <Link href="/dashboard/servers" className="text-xs text-primary hover:underline">
-                  View all
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/10">
+                    <Globe className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-zinc-100">
+                      Server Status
+                    </CardTitle>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Real-time server health monitoring
+                    </p>
+                  </div>
+                </div>
+                <Link href="/dashboard/servers">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-zinc-400 hover:text-zinc-200"
+                  >
+                    View all
+                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
                 </Link>
               </div>
             </CardHeader>
-            <CardContent className="p-4 overflow-y-auto">
+            <CardContent className="p-4">
               {serversLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="h-24 bg-muted rounded-lg animate-pulse" />
-                  <div className="h-24 bg-muted rounded-lg animate-pulse" />
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-16 bg-zinc-800/30 rounded-lg animate-pulse" />
+                  ))}
                 </div>
               ) : serverStatus && serverStatus.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {serverStatus.slice(0, 4).map((server) => (
-                    <ServerStatusCard key={server.id} server={server} />
+                <div className="space-y-2">
+                  {serverStatus.slice(0, 5).map((server) => (
+                    <ServerStatusRow key={server.id} server={server} />
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  No servers online
+                <div className="py-8 text-center text-zinc-500">
+                  <Server className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No servers configured</p>
+                  <Link href="/dashboard/servers">
+                    <Button variant="link" size="sm" className="mt-2 text-cyan-400">
+                      Add your first server
+                    </Button>
+                  </Link>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column: System & Alerts */}
-        <div className="flex flex-col gap-4 min-h-0">
-          {/* System Status - Fixed height */}
-          <div className="shrink-0">
-            <SystemStatus />
-          </div>
+        {/* Right Column - Activity & Status */}
+        <div className="space-y-6">
+          {/* System Status */}
+          <SystemStatus />
 
-          {/* Alerts - Fills remaining space */}
-          <Card className="flex-1 min-h-[150px] flex flex-col overflow-hidden">
-            <CardHeader className="p-4 pb-2 shrink-0">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Zap className="w-4 h-4 text-primary" />
-                {t('dashboard.alerts')}
-              </CardTitle>
+          {/* Quick Analytics Link */}
+          <Link href="/dashboard/analytics">
+            <Card className="border-zinc-800/50 bg-gradient-to-br from-violet-500/10 to-cyan-500/10 backdrop-blur-sm overflow-hidden hover:from-violet-500/15 hover:to-cyan-500/15 transition-all duration-300 group cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-violet-500/20">
+                    <BarChart3 className="w-5 h-5 text-violet-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-sm text-zinc-100">Analytics</h3>
+                    <p className="text-xs text-zinc-500">
+                      View detailed usage statistics
+                    </p>
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Activity Feed */}
+          <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="border-b border-zinc-800/50 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-semibold text-zinc-100">
+                    Recent Activity
+                  </CardTitle>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Alerts and notifications
+                  </p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="p-4 overflow-y-auto space-y-2">
-              {/* Alerts Logic */}
+            <CardContent className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
+              {/* System Alerts */}
               {stats?.downServers && stats.downServers > 0 && (
-                <AlertItem
+                <ActivityItem
                   type="error"
-                  title="Servers Down"
-                  description={`${stats.downServers} server(s) unreachable`}
+                  title="Servers Offline"
+                  description={`${stats.downServers} server(s) are currently unreachable`}
                   time="Now"
                 />
               )}
               {stats?.expiringIn24h && stats.expiringIn24h > 0 && (
-                <AlertItem
+                <ActivityItem
                   type="warning"
-                  title="Keys Expiring"
-                  description={`${stats.expiringIn24h} keys expiring soon`}
+                  title="Keys Expiring Soon"
+                  description={`${stats.expiringIn24h} access key(s) will expire within 24 hours`}
                   time="Soon"
                 />
               )}
+
+              {/* Recent Key Activity */}
               {activity?.recentKeys && activity.recentKeys.length > 0 ? (
                 activity.recentKeys.slice(0, 5).map((key) => (
-                  <AlertItem
+                  <ActivityItem
                     key={key.id}
                     type="info"
                     title="Key Created"
-                    description={`${key.name}`}
+                    description={key.name}
                     time={formatRelativeTime(key.createdAt)}
                   />
                 ))
               ) : (
-                <p className="text-center text-xs text-muted-foreground py-4">No recent alerts</p>
+                !stats?.downServers && !stats?.expiringIn24h && (
+                  <div className="py-6 text-center text-zinc-500">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">All systems running smoothly</p>
+                  </div>
+                )
               )}
             </CardContent>
           </Card>

@@ -29,6 +29,7 @@ import { dashboardRouter } from './dashboard';
 import { provisionRouter } from './provision';
 import { usersRouter } from './users';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import {
@@ -45,16 +46,18 @@ import {
 
 /**
  * Auth Router
- * 
+ *
  * Handles user authentication including login, logout, and session management.
  * Login creates a JWT token stored in an HTTP-only cookie for security.
+ * Supports two-factor authentication (TOTP and WebAuthn).
  */
 const authRouter = router({
   /**
    * Login with email and password.
-   * 
-   * On success, creates a session and sets the authentication cookie.
-   * Returns the authenticated user's public information.
+   *
+   * On success, checks if 2FA is required. If so, returns requires2FA: true
+   * and the client should redirect to the 2FA verification page.
+   * Otherwise, creates a session and sets the authentication cookie.
    */
   login: publicProcedure
     .input(
@@ -73,14 +76,169 @@ const authRouter = router({
         });
       }
 
-      // Create session and set cookie
+      // Check if user has 2FA enabled
+      const totpSecret = await db.totpSecret.findUnique({
+        where: { userId: user.id },
+        select: { verified: true },
+      });
+
+      const webAuthnCredentials = await db.webAuthnCredential.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+
+      const has2FA = (totpSecret?.verified || false) || webAuthnCredentials.length > 0;
+
+      if (has2FA) {
+        // Create a temporary pre-2FA session token
+        // This is stored in Settings temporarily and deleted after 2FA verification
+        const tempToken = crypto.randomUUID();
+        await db.settings.upsert({
+          where: { key: `temp_auth_${tempToken}` },
+          update: { value: JSON.stringify({ userId: user.id, email: user.email, role: user.role, timestamp: Date.now() }) },
+          create: { key: `temp_auth_${tempToken}`, value: JSON.stringify({ userId: user.id, email: user.email, role: user.role, timestamp: Date.now() }) },
+        });
+
+        return {
+          requires2FA: true,
+          tempToken,
+          totpEnabled: totpSecret?.verified || false,
+          webAuthnEnabled: webAuthnCredentials.length > 0,
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        };
+      }
+
+      // No 2FA - create session and set cookie
       const token = await createSession(user.id, user.email, user.role);
       await setSessionCookie(token);
 
       return {
+        requires2FA: false,
         id: user.id,
         email: user.email,
         role: user.role,
+      };
+    }),
+
+  /**
+   * Verify TOTP code after initial login (2FA step 2)
+   */
+  verify2FA: publicProcedure
+    .input(
+      z.object({
+        tempToken: z.string(),
+        totpCode: z.string().length(6).regex(/^\d+$/).optional(),
+        recoveryCode: z.string().min(8).max(10).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      // Get temp auth data
+      const tempAuth = await db.settings.findUnique({
+        where: { key: `temp_auth_${input.tempToken}` },
+      });
+
+      if (!tempAuth) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Invalid or expired session. Please login again.',
+        });
+      }
+
+      const authData = JSON.parse(tempAuth.value);
+
+      // Check if temp token is expired (5 minutes)
+      if (Date.now() - authData.timestamp > 5 * 60 * 1000) {
+        await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } });
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Session expired. Please login again.',
+        });
+      }
+
+      const { userId, email, role } = authData;
+
+      // Try TOTP verification
+      if (input.totpCode) {
+        const otplib = await import('otplib');
+        const cryptoModule = await import('crypto');
+
+        const totpRecord = await db.totpSecret.findUnique({
+          where: { userId },
+        });
+
+        if (!totpRecord || !totpRecord.verified) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'TOTP is not enabled for this account.',
+          });
+        }
+
+        // Decrypt secret
+        const ENCRYPTION_KEY = process.env.TOTP_ENCRYPTION_KEY || cryptoModule.randomBytes(32).toString('hex');
+        const [ivHex, encrypted] = totpRecord.encryptedSecret.split(':');
+        const iv = Buffer.from(ivHex, 'hex');
+        const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
+        const decipher = cryptoModule.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        const isValid = otplib.verify({ token: input.totpCode, secret: decrypted });
+
+        if (!isValid) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid verification code.',
+          });
+        }
+      }
+      // Try recovery code verification
+      else if (input.recoveryCode) {
+        const bcrypt = await import('bcryptjs');
+        const normalizedCode = input.recoveryCode.replace('-', '');
+
+        const recoveryCodes = await db.recoveryCode.findMany({
+          where: { userId, usedAt: null },
+        });
+
+        let found = false;
+        for (const rc of recoveryCodes) {
+          const isMatch = await bcrypt.compare(normalizedCode, rc.codeHash);
+          if (isMatch) {
+            await db.recoveryCode.update({
+              where: { id: rc.id },
+              data: { usedAt: new Date() },
+            });
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid recovery code.',
+          });
+        }
+      }
+      else {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Please provide a TOTP code or recovery code.',
+        });
+      }
+
+      // 2FA verified - clean up temp token and create real session
+      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } });
+
+      const token = await createSession(userId, email, role);
+      await setSessionCookie(token);
+
+      return {
+        id: userId,
+        email,
+        role,
       };
     }),
 

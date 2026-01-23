@@ -131,6 +131,18 @@ export default function LoginPage() {
   // Login mutation using tRPC
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
+      // Check if 2FA is required
+      if (data.requires2FA && data.tempToken) {
+        // Redirect to 2FA verification page
+        const params = new URLSearchParams({
+          token: data.tempToken,
+          totp: data.totpEnabled ? 'true' : 'false',
+          webauthn: data.webAuthnEnabled ? 'true' : 'false',
+        });
+        router.push(`/verify-2fa?${params.toString()}`);
+        return;
+      }
+
       toast({
         title: mounted ? t('login.welcome') : 'Welcome back!',
         description: mounted ? t('login.success') : 'You have been successfully logged in.',
