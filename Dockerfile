@@ -42,6 +42,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Create data directory for Prisma during build
+RUN mkdir -p data
+
 # Generate Prisma client
 RUN npx prisma generate
 
@@ -51,7 +54,17 @@ RUN mkdir -p public
 # Build the application
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Provide dummy environment variables for build
+# These are only used during build, not at runtime
+ENV DATABASE_URL="file:./data/build.db"
+ENV JWT_SECRET="build-time-secret-not-used-at-runtime"
+
+# Build Next.js with standalone output
 RUN npm run build
+
+# Verify standalone output was created (fail fast if not)
+RUN test -d .next/standalone || (echo "ERROR: .next/standalone not found - build failed" && exit 1)
 
 # Ensure .next/static exists (may be empty but directory must exist for COPY)
 RUN mkdir -p .next/static
