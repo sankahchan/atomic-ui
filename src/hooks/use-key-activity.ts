@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // Window in milliseconds to consider a key "online" after activity
-// Reduced to 30 seconds for more responsive online detection
-const ONLINE_WINDOW_MS = 30000; // 30 seconds
+// Set to 60 seconds to account for bursty traffic patterns
+const ONLINE_WINDOW_MS = 60000; // 60 seconds
 
 interface KeyUsage {
     id: string;
@@ -45,10 +45,11 @@ export function useKeyActivity(keys: KeyUsage[] | undefined): UseKeyActivityRetu
                 const existing = newMap[key.id];
 
                 if (!existing) {
-                    // First time seeing this key - set baseline, don't mark active yet
+                    // First time seeing this key - if it has traffic, mark as online immediately
+                    // This handles keys that were already in use when the page loaded
                     newMap[key.id] = {
                         lastUsedBytes: currentBytes,
-                        lastActiveAt: 0, // 0 implies offline
+                        lastActiveAt: currentBytes > BigInt(0) ? currentTime : 0,
                     };
                     hasChanges = true;
                 } else {

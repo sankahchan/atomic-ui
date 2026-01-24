@@ -10,6 +10,27 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
+
+// Atomic logo as SVG data URL (simple atom symbol)
+const ATOMIC_LOGO_SVG = `data:image/svg+xml,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="white"/>
+  <circle cx="50" cy="50" r="40" fill="url(#grad)" opacity="0.1"/>
+  <g fill="none" stroke="url(#grad)" stroke-width="2.5">
+    <ellipse cx="50" cy="50" rx="35" ry="12" transform="rotate(0 50 50)"/>
+    <ellipse cx="50" cy="50" rx="35" ry="12" transform="rotate(60 50 50)"/>
+    <ellipse cx="50" cy="50" rx="35" ry="12" transform="rotate(120 50 50)"/>
+  </g>
+  <circle cx="50" cy="50" r="8" fill="url(#grad)"/>
+  <circle cx="50" cy="50" r="4" fill="white"/>
+</svg>
+`)}`;
 import {
   getTheme,
   getAppsForPlatform,
@@ -109,14 +130,47 @@ export default function SubscriptionPage() {
         const themeId = data.subscriptionTheme || settings.defaultSubscriptionTheme || 'dark';
         setTheme(getTheme(themeId));
 
-        // Generate QR code
+        // Generate QR code with Atomic logo overlay
         if (data.accessUrl) {
-          const qr = await QRCode.toDataURL(data.accessUrl, {
-            width: 200,
+          const qrCanvas = document.createElement('canvas');
+          const qrSize = 200;
+          qrCanvas.width = qrSize;
+          qrCanvas.height = qrSize;
+
+          // Generate base QR code on canvas
+          await QRCode.toCanvas(qrCanvas, data.accessUrl, {
+            width: qrSize,
             margin: 2,
             color: { dark: '#000000', light: '#ffffff' },
+            errorCorrectionLevel: 'H', // High error correction for logo overlay
           });
-          setQrCode(qr);
+
+          // Add logo overlay in center
+          const ctx = qrCanvas.getContext('2d');
+          if (ctx) {
+            const logoImg = new Image();
+            logoImg.onload = () => {
+              const logoSize = qrSize * 0.25; // Logo is 25% of QR size
+              const logoX = (qrSize - logoSize) / 2;
+              const logoY = (qrSize - logoSize) / 2;
+
+              // Draw white background circle for logo
+              ctx.beginPath();
+              ctx.arc(qrSize / 2, qrSize / 2, logoSize / 2 + 4, 0, Math.PI * 2);
+              ctx.fillStyle = '#ffffff';
+              ctx.fill();
+
+              // Draw logo
+              ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+
+              // Convert to data URL
+              setQrCode(qrCanvas.toDataURL('image/png'));
+            };
+            logoImg.src = ATOMIC_LOGO_SVG;
+          } else {
+            // Fallback without logo
+            setQrCode(qrCanvas.toDataURL('image/png'));
+          }
         }
 
         setLoading(false);
@@ -150,9 +204,45 @@ export default function SubscriptionPage() {
   }, []);
 
   const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!text) return;
+
+    try {
+      // Try Modern API first (requires HTTPS or localhost)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+    } catch (err) {
+      console.warn("Clipboard API failed, trying fallback...", err);
+    }
+
+    // Fallback for HTTP / Older Browsers
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      if (successful) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+    } catch (err) {
+      console.error("Fallback clipboard failed", err);
+    }
+
+    // If all methods fail, show alert with manual copy option
+    alert(`Copy failed. Please copy manually:\n\n${text}`);
   };
 
   const formatBytes = (bytes: string | number): string => {
@@ -266,7 +356,10 @@ export default function SubscriptionPage() {
   // Check if using image as background theme
   const hasImageBackground = keyData.coverImage && keyData.coverImageType === 'url';
 
-  // Card style for image background mode - glass effect
+  // Check if using a glass theme (transparent backgrounds need dark backdrop)
+  const isGlassTheme = theme.id.startsWith('glass');
+
+  // Card style for image background mode or glass theme - glass effect
   const getCardStyle = () => {
     if (hasImageBackground) {
       return {
@@ -275,13 +368,28 @@ export default function SubscriptionPage() {
         WebkitBackdropFilter: 'blur(12px)',
       };
     }
+    // For glass themes, add a dark backdrop to ensure text readability
+    if (isGlassTheme) {
+      return {
+        backgroundColor: 'rgba(15, 23, 42, 0.85)', // Dark slate with opacity
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      };
+    }
     return { backgroundColor: theme.bgCard };
   };
 
+  // For glass themes, use a dark solid background to ensure visibility
+  const pageBackgroundColor = isGlassTheme ? '#0f172a' : theme.bgPrimary;
+
   return (
     <div
-      className="min-h-screen relative"
-      style={{ backgroundColor: theme.bgPrimary }}
+      className="min-h-screen relative overflow-x-hidden"
+      style={{
+        backgroundColor: pageBackgroundColor,
+        // Enable smooth scrolling on iOS
+        WebkitOverflowScrolling: 'touch',
+      }}
     >
       {/* Full-page background image (when using image as theme) */}
       {hasImageBackground && (
@@ -295,7 +403,7 @@ export default function SubscriptionPage() {
         </>
       )}
 
-      <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8">
+      <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8 pb-safe">
 
         {/* Stats Cards - Updated icons like screenshot 2 */}
         <div className="grid grid-cols-2 gap-3">

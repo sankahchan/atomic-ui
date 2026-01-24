@@ -1311,10 +1311,11 @@ export default function KeysPage() {
     refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
   });
 
-  // Fetch live metrics directly from Outline servers - poll every 3 seconds when auto-refresh is enabled
-  // This provides real-time online detection without waiting for a full sync
+  // Fetch live metrics directly from Outline servers - always poll every 3 seconds
+  // This provides real-time online detection independent of auto-sync setting
   const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
-    refetchInterval: autoRefresh.isActive ? 3000 : false,
+    refetchInterval: 3000, // Always poll for responsive online detection
+    refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
   });
 
   // Track online status via activity hook (delta-based)

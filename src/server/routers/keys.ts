@@ -864,8 +864,11 @@ export const keysRouter = router({
               method: key.method || undefined,
             });
 
+            // Preserve existing usage by setting a negative offset
+            const preservedUsageOffset = -Number(key.usedBytes);
+
             if (key.dataLimitBytes) {
-              const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+              const serverLimit = Number(key.dataLimitBytes);
               await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
             }
 
@@ -880,6 +883,8 @@ export const keysRouter = router({
                 method: newOutlineKey.method,
                 disabledAt: null,
                 disabledOutlineKeyId: null,
+                // Set negative offset to preserve the existing usedBytes during sync
+                usageOffset: BigInt(preservedUsageOffset),
               },
             });
           } else {
@@ -1200,15 +1205,22 @@ export const keysRouter = router({
             // Note: Outline may not preserve the same ID, so we create new
           });
 
+          // Preserve existing usage by setting a negative offset
+          // New Outline key starts at 0, but we want to preserve the old usedBytes
+          // So we set usageOffset = -usedBytes, meaning effectiveUsage = 0 - (-usedBytes) = usedBytes
+          const preservedUsageOffset = -Number(key.usedBytes);
+
           // Set data limit if the key had one
           if (key.dataLimitBytes) {
-            // Calculate the server-side limit (offset + remaining limit)
-            const remainingLimit = key.dataLimitBytes - (key.usedBytes - key.usageOffset);
-            const serverLimit = Math.max(0, Number(key.usageOffset) + Number(key.dataLimitBytes));
+            // The server limit should be: preservedUsage + remainingAllowance
+            // remainingAllowance = dataLimitBytes - usedBytes
+            // serverLimit = usedBytes + (dataLimitBytes - usedBytes) = dataLimitBytes
+            // But since new key starts at 0, we need to account for the preserved usage
+            const serverLimit = Number(key.dataLimitBytes);
             await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
           }
 
-          // Update DB with new Outline key details
+          // Update DB with new Outline key details, preserving usage data
           const updatedKey = await db.accessKey.update({
             where: { id: input.id },
             data: {
@@ -1220,6 +1232,8 @@ export const keysRouter = router({
               method: newOutlineKey.method,
               disabledAt: null,
               disabledOutlineKeyId: null,
+              // Set negative offset to preserve the existing usedBytes during sync
+              usageOffset: BigInt(preservedUsageOffset),
             },
             include: {
               server: {
@@ -1698,8 +1712,8 @@ export const keysRouter = router({
 
   /**
    * Get live metrics directly from Outline servers.
-   * This fetches real-time traffic data without updating the database,
-   * enabling responsive online status detection.
+   * This fetches real-time traffic data and updates lastUsedAt for keys with new traffic,
+   * enabling responsive online status detection without requiring full sync.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
     const servers = await db.server.findMany({
@@ -1714,12 +1728,22 @@ export const keysRouter = router({
             id: true,
             outlineKeyId: true,
             usageOffset: true,
+            usedBytes: true, // Need current bytes for comparison
           },
         },
       },
     });
 
     const results: Array<{ id: string; usedBytes: string }> = [];
+    const keysWithNewTraffic: string[] = [];
+
+    // Build a map of key id -> current stored bytes for comparison
+    const keyBytesMap = new Map<string, bigint>();
+    for (const server of servers) {
+      for (const key of server.accessKeys) {
+        keyBytesMap.set(key.id, key.usedBytes);
+      }
+    }
 
     await Promise.all(
       servers.map(async (server) => {
@@ -1732,7 +1756,7 @@ export const keysRouter = router({
               const keyId = key.outlineKeyId;
               const rawBytes = metrics.bytesTransferredByUserId[keyId] ??
                 metrics.bytesTransferredByUserId[String(keyId)] ?? 0;
-              
+
               const offset = Number(key.usageOffset || 0);
               const effectiveBytes = rawBytes < offset ? rawBytes : rawBytes - offset;
 
@@ -1740,6 +1764,12 @@ export const keysRouter = router({
                 id: key.id,
                 usedBytes: effectiveBytes.toString(),
               });
+
+              // Check if traffic increased - mark for lastUsedAt update
+              const storedBytes = keyBytesMap.get(key.id) || BigInt(0);
+              if (BigInt(effectiveBytes) > storedBytes) {
+                keysWithNewTraffic.push(key.id);
+              }
             }
           }
         } catch {
@@ -1747,6 +1777,16 @@ export const keysRouter = router({
         }
       })
     );
+
+    // Batch update lastUsedAt for keys with new traffic (non-blocking)
+    if (keysWithNewTraffic.length > 0) {
+      db.accessKey.updateMany({
+        where: { id: { in: keysWithNewTraffic } },
+        data: { lastUsedAt: new Date() },
+      }).catch(() => {
+        // Silently ignore update errors - this is a best-effort optimization
+      });
+    }
 
     return results;
   }),

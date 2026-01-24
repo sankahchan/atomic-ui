@@ -1156,14 +1156,15 @@ export const dynamicKeysRouter = router({
 
   /**
    * Get live metrics for dynamic keys by fetching from Outline servers directly.
-   * Aggregates traffic from all attached access keys.
+   * Aggregates traffic from all attached access keys and updates firstUsedAt for keys with new traffic.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    // Get all active dynamic keys with their attached access keys
+    // Get all active dynamic keys with their attached access keys and current usage
     const activeDaks = await db.dynamicAccessKey.findMany({
       where: { status: 'ACTIVE' },
       select: {
         id: true,
+        usedBytes: true, // Need current bytes for comparison
         accessKeys: {
           select: {
             id: true,
@@ -1182,6 +1183,12 @@ export const dynamicKeysRouter = router({
       },
     });
 
+    // Build a map of DAK id -> current stored bytes for comparison
+    const dakStoredBytesMap = new Map<string, bigint>();
+    for (const dak of activeDaks) {
+      dakStoredBytesMap.set(dak.id, dak.usedBytes);
+    }
+
     // Collect unique servers and their keys
     const serverKeysMap = new Map<string, {
       apiUrl: string;
@@ -1192,7 +1199,7 @@ export const dynamicKeysRouter = router({
     for (const dak of activeDaks) {
       for (const key of dak.accessKeys) {
         if (!key.server.isActive) continue;
-        
+
         if (!serverKeysMap.has(key.server.id)) {
           serverKeysMap.set(key.server.id, {
             apiUrl: key.server.apiUrl,
@@ -1222,7 +1229,7 @@ export const dynamicKeysRouter = router({
             for (const key of serverData.keys) {
               const rawBytes = metrics.bytesTransferredByUserId[key.outlineKeyId] ??
                 metrics.bytesTransferredByUserId[String(key.outlineKeyId)] ?? 0;
-              
+
               const offset = Number(key.usageOffset || 0);
               const effectiveBytes = BigInt(rawBytes < offset ? rawBytes : rawBytes - offset);
 
@@ -1235,6 +1242,24 @@ export const dynamicKeysRouter = router({
         }
       })
     );
+
+    // Find DAKs with new traffic and update firstUsedAt (non-blocking)
+    const daksWithNewTraffic: string[] = [];
+    Array.from(dakUsageMap.entries()).forEach(([dakId, newUsedBytes]) => {
+      const storedBytes = dakStoredBytesMap.get(dakId) || BigInt(0);
+      if (newUsedBytes > storedBytes) {
+        daksWithNewTraffic.push(dakId);
+      }
+    });
+
+    if (daksWithNewTraffic.length > 0) {
+      db.dynamicAccessKey.updateMany({
+        where: { id: { in: daksWithNewTraffic } },
+        data: { firstUsedAt: new Date() },
+      }).catch(() => {
+        // Silently ignore update errors - this is a best-effort optimization
+      });
+    }
 
     return Array.from(dakUsageMap.entries()).map(([id, usedBytes]) => ({
       id,
