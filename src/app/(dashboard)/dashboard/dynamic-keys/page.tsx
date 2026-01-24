@@ -1464,7 +1464,7 @@ export default function DynamicKeysPage() {
                       <HelpCircle className="w-3 h-3 text-green-500/50" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Users active within the last 90 seconds</p>
+                      <p>Users active within the last 30 seconds</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

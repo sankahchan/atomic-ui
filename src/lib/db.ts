@@ -21,12 +21,10 @@ async function initializeDatabase() {
   if (globalForPrisma.prismaInitialized) return;
   
   try {
-    // Enable WAL mode for better concurrency
-    await db.$executeRawUnsafe('PRAGMA journal_mode = WAL;');
-    // Set busy timeout to 5 seconds to wait for locks instead of failing immediately
-    await db.$executeRawUnsafe('PRAGMA busy_timeout = 5000;');
-    // Enable foreign key constraints
-    await db.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
+    // Use $queryRawUnsafe for PRAGMA commands since they return results
+    await db.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
+    await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000;');
+    await db.$queryRawUnsafe('PRAGMA foreign_keys = ON;');
     
     globalForPrisma.prismaInitialized = true;
   } catch (error) {
