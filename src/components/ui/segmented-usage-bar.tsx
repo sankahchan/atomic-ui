@@ -193,26 +193,90 @@ export function SegmentedUsageBar({
 }
 
 /**
- * Compact version for table cells
+ * Compact version for table cells - shows usage data like x-ui style
+ * Format: "224.82 MB / 100.00 GB" with bar and percentage
  */
 export function SegmentedUsageBarCompact({
   valueBytes,
   limitBytes,
   className,
+  showDataLabel = true,
 }: {
   valueBytes: number;
   limitBytes?: number;
   className?: string;
+  /** Show usage data label (e.g., "224 MB / 100 GB") */
+  showDataLabel?: boolean;
 }) {
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
+  const percentage = limitBytes && limitBytes > 0
+    ? Math.min((valueBytes / limitBytes) * 100, 100)
+    : 0;
+
+  const isUnlimited = !limitBytes || limitBytes === 0;
+
   return (
-    <SegmentedUsageBar
-      valueBytes={valueBytes}
-      limitBytes={limitBytes}
-      size="sm"
-      segments={8}
-      showPercent={true}
-      className={className}
-    />
+    <div className={cn('flex flex-col gap-1', className)}>
+      {showDataLabel && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground">
+            {formatBytes(valueBytes)}
+          </span>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="text-muted-foreground">
+            {isUnlimited ? '∞' : formatBytes(limitBytes)}
+          </span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center rounded-full bg-gray-100 dark:bg-zinc-800/30 overflow-hidden h-2 gap-0.5 px-1 min-w-[80px] flex-1">
+          {Array.from({ length: 8 }).map((_, i) => {
+            const filledSegments = Math.ceil((percentage / 100) * 8);
+            const isFilled = i < filledSegments;
+
+            const getColor = () => {
+              if (!isFilled) return 'bg-gray-200 dark:bg-zinc-700/30';
+              if (percentage >= 100) return 'bg-gradient-to-r from-emerald-500 to-emerald-400';
+              if (percentage >= 80) return 'bg-gradient-to-r from-amber-500 to-yellow-400';
+              if (percentage >= 50) return 'bg-gradient-to-r from-orange-500 to-amber-400';
+              return 'bg-gradient-to-r from-red-500 to-orange-400';
+            };
+
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'flex-1 rounded-full transition-all duration-300 h-2',
+                  getColor(),
+                  isFilled && 'shadow-sm'
+                )}
+                style={{
+                  transform: isFilled ? 'scaleY(1)' : 'scaleY(0.7)',
+                  opacity: isFilled ? 1 : 0.3,
+                }}
+              />
+            );
+          })}
+        </div>
+        <span className={cn(
+          'text-xs whitespace-nowrap font-medium tabular-nums min-w-[32px] text-right',
+          percentage < 50 && 'text-red-600 dark:text-red-400',
+          percentage >= 50 && percentage < 80 && 'text-orange-600 dark:text-orange-400',
+          percentage >= 80 && percentage < 100 && 'text-amber-600 dark:text-amber-400',
+          percentage >= 100 && 'text-emerald-600 dark:text-emerald-400',
+          isUnlimited && 'text-gray-500 dark:text-zinc-400',
+        )}>
+          {isUnlimited ? '—' : `${percentage.toFixed(percentage < 1 && percentage > 0 ? 1 : 0)}%`}
+        </span>
+      </div>
+    </div>
   );
 }
 

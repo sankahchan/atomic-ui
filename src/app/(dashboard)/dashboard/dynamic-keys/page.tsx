@@ -17,7 +17,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -25,7 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
-import { cn, formatBytes } from '@/lib/utils';
+import { cn, formatBytes, formatRelativeTime } from '@/lib/utils';
+import { SegmentedUsageBarCompact } from '@/components/ui/segmented-usage-bar';
 import QRCode from 'qrcode';
 import {
   Plus,
@@ -70,7 +70,7 @@ import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
-import { Wifi, EyeOff, Tag, User } from 'lucide-react';
+import { Wifi, EyeOff, Tag, User, Smartphone } from 'lucide-react';
 
 /**
  * Supported encryption methods for Shadowsocks
@@ -161,6 +161,12 @@ type DAKData = {
   expiresAt?: Date | null;
   daysRemaining?: number | null;
   createdAt: Date;
+  firstUsedAt?: Date | null;
+  tags?: string | null;
+  owner?: string | null;
+  isExpiringSoon?: boolean;
+  isTrafficWarning?: boolean;
+  usagePercent?: number;
 };
 
 /**
@@ -899,7 +905,7 @@ function DAKRow({
       <td className="px-4 py-3">
         <div className="flex items-center">
           <OnlineIndicator isOnline={isOnline} />
-          <div>
+          <div className="min-w-0">
             <Link
               href={`/dashboard/dynamic-keys/${dak.id}`}
               className="font-medium hover:text-primary transition-colors"
@@ -908,6 +914,18 @@ function DAKRow({
             </Link>
             {dak.email && (
               <p className="text-xs text-muted-foreground">{dak.email}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+            </p>
+            {dak.tags && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {dak.tags.split(',').filter(Boolean).map((tag) => (
+                  <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
+                    {tag.trim()}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -931,23 +949,20 @@ function DAKRow({
 
       {/* Usage */}
       <td className="px-4 py-3">
-        <div className="space-y-1 min-w-[120px]">
-          <div className="flex items-center justify-between text-xs">
-            <span>{formatBytes(dak.usedBytes)}</span>
-            <span className="text-muted-foreground">
-              {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : '∞'}
-            </span>
-          </div>
-          {dak.dataLimitBytes && (
-            <Progress
-              value={usagePercent}
-              className={cn(
-                'h-1.5',
-                usagePercent >= 90 && '[&>div]:bg-red-500',
-                usagePercent >= 70 && usagePercent < 90 && '[&>div]:bg-orange-500'
-              )}
-            />
-          )}
+        <SegmentedUsageBarCompact
+          valueBytes={Number(dak.usedBytes)}
+          limitBytes={dak.dataLimitBytes ? Number(dak.dataLimitBytes) : undefined}
+          className="min-w-[140px]"
+        />
+      </td>
+
+      {/* Devices */}
+      <td className="px-4 py-3 text-center">
+        <div className="flex items-center justify-center gap-1">
+          <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-sm font-medium">
+            {0 || 0}
+          </span>
         </div>
       </td>
 
@@ -1837,6 +1852,18 @@ export default function DynamicKeysPage() {
                             {dak.email && (
                               <p className="text-xs text-muted-foreground">{dak.email}</p>
                             )}
+                            <p className="text-xs text-muted-foreground">
+                              Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+                            </p>
+                            {dak.tags && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {dak.tags.split(',').filter(Boolean).map((tag) => (
+                                  <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
+                                    {tag.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <Badge className={cn('border', config.color)}>
@@ -1845,26 +1872,22 @@ export default function DynamicKeysPage() {
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <typeConfig.icon className={cn('w-4 h-4', typeConfig.color)} />
-                        <span className="text-sm">{t(typeConfig.labelKey)}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <typeConfig.icon className={cn('w-4 h-4', typeConfig.color)} />
+                          <span className="text-sm">{t(typeConfig.labelKey)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>{0 || 0} devices</span>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">{t('dynamic_keys.table.usage')}</span>
-                          <span>{formatBytes(dak.usedBytes)} / {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : '∞'}</span>
-                        </div>
-                        {dak.dataLimitBytes && (
-                          <Progress
-                            value={usagePercent}
-                            className={cn(
-                              'h-1.5',
-                              usagePercent >= 90 && '[&>div]:bg-red-500',
-                              usagePercent >= 70 && usagePercent < 90 && '[&>div]:bg-orange-500'
-                            )}
-                          />
-                        )}
+                        <SegmentedUsageBarCompact
+                          valueBytes={Number(dak.usedBytes)}
+                          limitBytes={dak.dataLimitBytes ? Number(dak.dataLimitBytes) : undefined}
+                        />
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
@@ -1948,6 +1971,18 @@ export default function DynamicKeysPage() {
                       {dak.name}
                     </Link>
                     {dak.email && <p className="text-xs text-muted-foreground">{dak.email}</p>}
+                    <p className="text-xs text-muted-foreground">
+                      Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+                    </p>
+                    {dak.tags && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {dak.tags.split(',').filter(Boolean).map((tag) => (
+                          <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
+                            {tag.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Badge className={cn('border', (statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE).color)}>
@@ -1955,12 +1990,24 @@ export default function DynamicKeysPage() {
                 </Badge>
               </div>
 
-              <div className="flex items-center gap-2 mt-2">
-                <div className={cn('text-xs flex items-center gap-1', (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).color)}>
-                  {(() => { const Icon = (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).icon; return <Icon className="w-3 h-3" />; })()}
-                  {t((DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).labelKey)}
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <div className={cn('text-xs flex items-center gap-1', (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).color)}>
+                    {(() => { const Icon = (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).icon; return <Icon className="w-3 h-3" />; })()}
+                    {t((DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).labelKey)}
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground">• {formatBytes(dak.usedBytes)}</span>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Smartphone className="w-3 h-3" />
+                  <span>{0 || 0}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <SegmentedUsageBarCompact
+                  valueBytes={Number(dak.usedBytes)}
+                  limitBytes={dak.dataLimitBytes ? Number(dak.dataLimitBytes) : undefined}
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
@@ -1998,6 +2045,12 @@ export default function DynamicKeysPage() {
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.type')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.status')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.usage')}</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
+                  <div className="flex items-center justify-center gap-1">
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Devices
+                  </div>
+                </th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.attached')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.expires')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.actions')}</th>
@@ -2007,7 +2060,7 @@ export default function DynamicKeysPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="h-12 bg-muted rounded animate-pulse" />
                     </td>
                   </tr>
@@ -2029,7 +2082,7 @@ export default function DynamicKeysPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                  <td colSpan={9} className="px-4 py-12 text-center">
                     <KeyRound className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">
                       {hasActiveFilters

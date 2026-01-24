@@ -1221,9 +1221,6 @@ export default function KeysPage() {
         </div>
 
         <div className="space-y-1">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">{t('keys.table.usage')}</span>
-          </div>
           <SegmentedUsageBarCompact
             valueBytes={Number(key.usedBytes)}
             limitBytes={key.dataLimitBytes ? Number(key.dataLimitBytes) : undefined}
