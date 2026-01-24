@@ -1311,13 +1311,14 @@ export default function KeysPage() {
     refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
   });
 
-  // Fetch online users - poll every 3 seconds when auto-refresh is enabled
-  const { data: onlineData, refetch: refetchOnline } = trpc.keys.getOnlineUsers.useQuery(undefined, {
+  // Fetch live metrics directly from Outline servers - poll every 3 seconds when auto-refresh is enabled
+  // This provides real-time online detection without waiting for a full sync
+  const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
     refetchInterval: autoRefresh.isActive ? 3000 : false,
   });
 
   // Track online status via activity hook (delta-based)
-  const { onlineCount, isOnline } = useKeyActivity(onlineData);
+  const { onlineCount, isOnline } = useKeyActivity(liveMetrics);
 
   // Helper to check if a key is online (disabled keys are never online)
   const checkIsOnline = (keyId: string, status?: string) => {

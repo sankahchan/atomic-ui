@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const STORAGE_KEY = 'atomic-ui-auto-refresh-interval';
-const DEFAULT_INTERVAL = 0; // Off by default
+const DEFAULT_INTERVAL = 5; // 5 seconds by default for real-time online status
 
 export interface UseAutoRefreshOptions {
     onRefresh: () => void;

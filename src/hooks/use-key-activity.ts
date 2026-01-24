@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // Window in milliseconds to consider a key "online" after activity
-const ONLINE_WINDOW_MS = 90000; // 90 seconds
+// Reduced to 30 seconds for more responsive online detection
+const ONLINE_WINDOW_MS = 30000; // 30 seconds
 
 interface KeyUsage {
     id: string;

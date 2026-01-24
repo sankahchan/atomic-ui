@@ -1153,4 +1153,92 @@ export const dynamicKeysRouter = router({
       usedBytes: dak.usedBytes.toString(),
     }));
   }),
+
+  /**
+   * Get live metrics for dynamic keys by fetching from Outline servers directly.
+   * Aggregates traffic from all attached access keys.
+   */
+  getLiveMetrics: protectedProcedure.query(async () => {
+    // Get all active dynamic keys with their attached access keys
+    const activeDaks = await db.dynamicAccessKey.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        accessKeys: {
+          select: {
+            id: true,
+            outlineKeyId: true,
+            usageOffset: true,
+            server: {
+              select: {
+                id: true,
+                apiUrl: true,
+                apiCertSha256: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Collect unique servers and their keys
+    const serverKeysMap = new Map<string, {
+      apiUrl: string;
+      apiCertSha256: string;
+      keys: Array<{ id: string; outlineKeyId: string; usageOffset: bigint | null; dakId: string }>;
+    }>();
+
+    for (const dak of activeDaks) {
+      for (const key of dak.accessKeys) {
+        if (!key.server.isActive) continue;
+        
+        if (!serverKeysMap.has(key.server.id)) {
+          serverKeysMap.set(key.server.id, {
+            apiUrl: key.server.apiUrl,
+            apiCertSha256: key.server.apiCertSha256,
+            keys: [],
+          });
+        }
+        serverKeysMap.get(key.server.id)!.keys.push({
+          id: key.id,
+          outlineKeyId: key.outlineKeyId,
+          usageOffset: key.usageOffset,
+          dakId: dak.id,
+        });
+      }
+    }
+
+    // Fetch metrics from each server
+    const dakUsageMap = new Map<string, bigint>();
+
+    await Promise.all(
+      Array.from(serverKeysMap.entries()).map(async ([, serverData]) => {
+        try {
+          const client = createOutlineClient(serverData.apiUrl, serverData.apiCertSha256);
+          const metrics = await client.getMetrics();
+
+          if (metrics?.bytesTransferredByUserId) {
+            for (const key of serverData.keys) {
+              const rawBytes = metrics.bytesTransferredByUserId[key.outlineKeyId] ??
+                metrics.bytesTransferredByUserId[String(key.outlineKeyId)] ?? 0;
+              
+              const offset = Number(key.usageOffset || 0);
+              const effectiveBytes = BigInt(rawBytes < offset ? rawBytes : rawBytes - offset);
+
+              const currentTotal = dakUsageMap.get(key.dakId) || BigInt(0);
+              dakUsageMap.set(key.dakId, currentTotal + effectiveBytes);
+            }
+          }
+        } catch {
+          // Server unreachable - skip silently for live metrics
+        }
+      })
+    );
+
+    return Array.from(dakUsageMap.entries()).map(([id, usedBytes]) => ({
+      id,
+      usedBytes: usedBytes.toString(),
+    }));
+  }),
 });

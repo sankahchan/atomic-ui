@@ -1486,8 +1486,8 @@ export const keysRouter = router({
       },
     });
 
-    // Online = lastUsedAt within 90 seconds (or has active sessions)
-    const ONLINE_WINDOW_MS = 90 * 1000;
+    // Online = lastUsedAt within 30 seconds for more responsive detection
+    const ONLINE_WINDOW_MS = 30 * 1000;
     const now = Date.now();
 
     return activeKeys.map(key => ({
@@ -1694,5 +1694,60 @@ export const keysRouter = router({
         count: item._count.id,
       })),
     };
+  }),
+
+  /**
+   * Get live metrics directly from Outline servers.
+   * This fetches real-time traffic data without updating the database,
+   * enabling responsive online status detection.
+   */
+  getLiveMetrics: protectedProcedure.query(async () => {
+    const servers = await db.server.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        apiUrl: true,
+        apiCertSha256: true,
+        accessKeys: {
+          where: { status: 'ACTIVE' },
+          select: {
+            id: true,
+            outlineKeyId: true,
+            usageOffset: true,
+          },
+        },
+      },
+    });
+
+    const results: Array<{ id: string; usedBytes: string }> = [];
+
+    await Promise.all(
+      servers.map(async (server) => {
+        try {
+          const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
+          const metrics = await client.getMetrics();
+
+          if (metrics?.bytesTransferredByUserId) {
+            for (const key of server.accessKeys) {
+              const keyId = key.outlineKeyId;
+              const rawBytes = metrics.bytesTransferredByUserId[keyId] ??
+                metrics.bytesTransferredByUserId[String(keyId)] ?? 0;
+              
+              const offset = Number(key.usageOffset || 0);
+              const effectiveBytes = rawBytes < offset ? rawBytes : rawBytes - offset;
+
+              results.push({
+                id: key.id,
+                usedBytes: effectiveBytes.toString(),
+              });
+            }
+          }
+        } catch {
+          // Server unreachable - skip silently for live metrics
+        }
+      })
+    );
+
+    return results;
   }),
 });
