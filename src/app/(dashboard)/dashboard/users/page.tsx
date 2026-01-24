@@ -27,6 +27,7 @@ import { Plus, Trash2, User, Key, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocale } from '@/hooks/use-locale';
 import { MobileCardView } from '@/components/mobile-card-view';
+import { BackButton } from '@/components/ui/back-button';
 
 
 export default function UsersPage() {
@@ -95,6 +96,7 @@ export default function UsersPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
+                    <BackButton href="/dashboard" label={t('nav.dashboard')} />
                     <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
                     <p className="text-muted-foreground">
                         Manage admin and client accounts.

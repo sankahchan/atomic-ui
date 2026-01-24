@@ -1,17 +1,13 @@
 'use client';
 
 /**
- * Settings Page
- * 
- * This page provides configuration options for the Atomic-UI application.
- * It allows administrators to customize various aspects of the system
- * including general settings, notification preferences, and user management.
- * 
- * The settings are organized into logical sections with clear descriptions
- * to help administrators understand the impact of each option.
+ * Settings Page - Redesigned with Collapsible Sections
+ *
+ * All settings sections are visible on one screen as tappable cards.
+ * Tap a section to expand and see its details.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,8 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { BackButton } from '@/components/ui/back-button';
+import { cn } from '@/lib/utils';
 import {
-  Settings,
   Bell,
   Shield,
   Globe,
@@ -30,32 +27,80 @@ import {
   RefreshCw,
   User,
   Key,
-  MessageCircle,
-  CheckCircle2,
-  XCircle,
-  Upload,
   Download,
   Trash2,
   FileText,
-  AlertTriangle,
   History,
-  Copy,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 
+// Section type for the collapsible cards
+type SectionId = 'general' | 'health' | 'backup' | 'notifications' | 'security' | 'about' | null;
+
 /**
- * SettingsPage Component
- * 
- * The main settings page with multiple configuration sections.
- * Each section is contained in its own card for visual organization.
+ * Collapsible Section Card
  */
+function SectionCard({
+  id,
+  icon: Icon,
+  title,
+  description,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  id: SectionId;
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  isOpen: boolean;
+  onToggle: (id: SectionId) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={cn('transition-all duration-200', isOpen && 'ring-1 ring-primary/20')}>
+      <CardHeader
+        className="cursor-pointer select-none py-4"
+        onClick={() => onToggle(isOpen ? null : id)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'p-2 rounded-lg',
+              isOpen ? 'bg-primary/10' : 'bg-muted'
+            )}>
+              <Icon className={cn('w-5 h-5', isOpen ? 'text-primary' : 'text-muted-foreground')} />
+            </div>
+            <div>
+              <CardTitle className="text-base">{title}</CardTitle>
+              <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
+            </div>
+          </div>
+          <ChevronRight className={cn(
+            'w-5 h-5 text-muted-foreground transition-transform duration-200',
+            isOpen && 'rotate-90'
+          )} />
+        </div>
+      </CardHeader>
+      {isOpen && (
+        <CardContent className="pt-0 pb-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="border-t pt-4">
+            {children}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const { t } = useLocale();
+  const [openSection, setOpenSection] = useState<SectionId>(null);
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
-
-  // Get current user
   const { data: currentUser } = trpc.auth.me.useQuery();
 
   // Update setting mutation
@@ -83,7 +128,6 @@ export default function SettingsPage() {
         title: t('settings.toast.password_changed'),
         description: t('settings.toast.password_changed_desc'),
       });
-      // Clear form
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -103,17 +147,11 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
 
-  // Initialize username
-  useState(() => {
+  useEffect(() => {
     if (currentUser?.email) {
       setUsername(currentUser.email);
     }
-  });
-
-  // Telegram bot state...
-  // (lines 106-111 are unchanged)
-
-  // ... (lines 112-254 are unchanged)
+  }, [currentUser?.email]);
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,75 +180,6 @@ export default function SettingsPage() {
       newUsername: username !== currentUser?.email ? username : undefined,
     });
   };
-  const [botToken, setBotToken] = useState('');
-  const [welcomeMessage, setWelcomeMessage] = useState('');
-  const [keyNotFoundMessage, setKeyNotFoundMessage] = useState('');
-  const [adminChatIds, setAdminChatIds] = useState('');
-  const [isTelegramEnabled, setIsTelegramEnabled] = useState(false);
-
-  // Telegram bot queries and mutations
-  const { data: telegramSettings, refetch: refetchTelegram } = trpc.telegramBot.getSettings.useQuery();
-  const { data: webhookInfo, refetch: refetchWebhook } = trpc.telegramBot.getWebhookInfo.useQuery();
-
-  const testConnectionMutation = trpc.telegramBot.testConnection.useMutation({
-    onSuccess: (data) => {
-      toast({
-        title: t('settings.toast.connection_success'),
-        description: `Connected to @${data.botUsername}`,
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: t('settings.toast.connection_failed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const updateTelegramMutation = trpc.telegramBot.updateSettings.useMutation({
-    onSuccess: () => {
-      toast({
-        title: t('settings.toast.telegram_saved'),
-        description: t('settings.toast.telegram_saved_desc'),
-      });
-      refetchTelegram();
-    },
-    onError: (error) => {
-      toast({
-        title: t('settings.toast.failed_save'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const setWebhookMutation = trpc.telegramBot.setWebhook.useMutation({
-    onSuccess: () => {
-      toast({
-        title: t('settings.toast.webhook_set'),
-        description: t('settings.toast.webhook_set_desc'),
-      });
-      refetchWebhook();
-    },
-    onError: (error) => {
-      toast({
-        title: t('settings.toast.failed_save'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const deleteWebhookMutation = trpc.telegramBot.deleteWebhook.useMutation({
-    onSuccess: () => {
-      toast({
-        title: t('settings.toast.webhook_deleted'),
-        description: t('settings.toast.webhook_deleted_desc'),
-      });
-      refetchWebhook();
-    },
-  });
 
   // Backup & Restore
   const { data: backups, refetch: refetchBackups } = trpc.backup.list.useQuery();
@@ -261,70 +230,47 @@ export default function SettingsPage() {
     window.open(`/api/backup/download?filename=${filename}`, '_blank');
   };
 
-  // Initialize telegram form when settings load
-  useState(() => {
-    if (telegramSettings) {
-      setBotToken(telegramSettings.botToken || '');
-      setWelcomeMessage(telegramSettings.welcomeMessage || '');
-      setKeyNotFoundMessage(telegramSettings.keyNotFoundMessage || '');
-      setAdminChatIds(telegramSettings.adminChatIds?.join(', ') || '');
-      setIsTelegramEnabled(telegramSettings.isEnabled || false);
-    }
-  });
-
-  const handleSaveTelegram = () => {
-    updateTelegramMutation.mutate({
-      botToken: botToken || telegramSettings?.botToken || '',
-      welcomeMessage: welcomeMessage || telegramSettings?.welcomeMessage || '',
-      keyNotFoundMessage: keyNotFoundMessage || telegramSettings?.keyNotFoundMessage || '',
-      adminChatIds: adminChatIds.split(',').map(id => id.trim()).filter(id => id),
-      isEnabled: isTelegramEnabled,
-    });
-  };
-
-  const webhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/telegram/webhook`
-    : '';
-
   const handleSaveSetting = (key: string, value: unknown) => {
     updateMutation.mutate({ key, value });
   };
 
-
-
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-4 animate-pulse">
         <div className="h-8 bg-muted rounded w-48" />
-        <div className="h-64 bg-muted rounded" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-20 bg-muted rounded-lg" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
+    <div className="space-y-4">
+      {/* Header with back button */}
+      <div className="space-y-1">
+        <BackButton href="/dashboard" label={t('nav.dashboard')} />
         <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t('settings.subtitle')}
         </p>
       </div>
 
-      <div className="grid gap-6">
+      {/* Collapsible Sections */}
+      <div className="space-y-2">
         {/* General Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-primary" />
-              {t('settings.general.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.general.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+        <SectionCard
+          id="general"
+          icon={Globe}
+          title={t('settings.general.title')}
+          description={t('settings.general.desc')}
+          isOpen={openSection === 'general'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="siteName">{t('settings.general.site_name')}</Label>
                 <Input
@@ -358,39 +304,35 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="defaultLanguage">{t('settings.general.language')}</Label>
-                <Select
-                  defaultValue={settings?.defaultLanguage as string || 'en'}
-                  onValueChange={(value) => handleSaveSetting('defaultLanguage', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="my">မြန်မာ (Burmese)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="defaultLanguage">{t('settings.general.language')}</Label>
+              <Select
+                defaultValue={settings?.defaultLanguage as string || 'en'}
+                onValueChange={(value) => handleSaveSetting('defaultLanguage', value)}
+              >
+                <SelectTrigger className="sm:w-1/2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="my">မြန်မာ (Burmese)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
 
-        {/* Health Check Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              {t('settings.health.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.health.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+        {/* Health Monitoring */}
+        <SectionCard
+          id="health"
+          icon={Shield}
+          title={t('settings.health.title')}
+          description={t('settings.health.desc')}
+          isOpen={openSection === 'health'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="healthCheckInterval">{t('settings.health.interval')}</Label>
                 <Input
@@ -422,92 +364,86 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="trafficWarning">{t('settings.health.traffic')}</Label>
-                <Input
-                  id="trafficWarning"
-                  type="number"
-                  min="50"
-                  max="99"
-                  defaultValue={settings?.trafficWarningPercent as number || 80}
-                  onBlur={(e) => handleSaveSetting('trafficWarningPercent', parseInt(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.health.traffic_desc')}
-                </p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="trafficWarning">{t('settings.health.traffic')}</Label>
+              <Input
+                id="trafficWarning"
+                type="number"
+                min="50"
+                max="99"
+                className="sm:w-1/2"
+                defaultValue={settings?.trafficWarningPercent as number || 80}
+                onBlur={(e) => handleSaveSetting('trafficWarningPercent', parseInt(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('settings.health.traffic_desc')}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
 
         {/* Backup & Restore */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="w-5 h-5 text-primary" />
-              {t('settings.backup.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.backup.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending}>
-                {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                <Save className="w-4 h-4 mr-2" />
-                {t('settings.backup.create')}
-              </Button>
-            </div>
+        <SectionCard
+          id="backup"
+          icon={History}
+          title={t('settings.backup.title')}
+          description={t('settings.backup.desc')}
+          isOpen={openSection === 'backup'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending} size="sm">
+              {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Save className="w-4 h-4 mr-2" />
+              {t('settings.backup.create')}
+            </Button>
 
-            <div className="rounded-md border">
-              <div className="grid grid-cols-12 gap-4 p-4 border-b font-medium text-sm text-muted-foreground">
+            <div className="rounded-lg border overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
                 <div className="col-span-6">{t('settings.backup.filename')}</div>
                 <div className="col-span-3">{t('settings.backup.size')}</div>
                 <div className="col-span-3 text-right">{t('settings.backup.actions')}</div>
               </div>
-              <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[200px] overflow-y-auto">
                 {backups?.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
+                  <div className="p-6 text-center text-muted-foreground text-sm">
                     {t('settings.backup.empty')}
                   </div>
                 ) : (
                   backups?.map((backup) => (
-                    <div key={backup.filename} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 items-center hover:bg-muted/50">
-                      <div className="col-span-6 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-mono text-sm">{backup.filename}</span>
+                    <div key={backup.filename} className="grid grid-cols-12 gap-2 p-3 border-t items-center hover:bg-muted/30 text-sm">
+                      <div className="col-span-6 flex items-center gap-2 truncate">
+                        <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-mono text-xs truncate">{backup.filename}</span>
                       </div>
-                      <div className="col-span-3 text-sm text-muted-foreground">
+                      <div className="col-span-3 text-xs text-muted-foreground">
                         {Math.round(backup.size / 1024)} KB
                       </div>
-                      <div className="col-span-3 flex items-center justify-end gap-2">
+                      <div className="col-span-3 flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7"
                           onClick={() => handleDownloadBackup(backup.filename)}
-                          title={t('settings.backup.download')}
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7"
                           onClick={() => handleRestoreBackup(backup.filename)}
-                          title={t('settings.backup.restore')}
                           disabled={restoreBackupMutation.isPending}
                         >
-                          <RefreshCw className={`w-4 h-4 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`w-3.5 h-3.5 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
                           onClick={() => handleDeleteBackup(backup.filename)}
-                          title={t('settings.backup.delete')}
-                          className="text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     </div>
@@ -515,328 +451,159 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
 
-        {/* Notification Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              {t('settings.notifications.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.notifications.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              {t('settings.notifications.info')}{' '}
-              <a href="/dashboard/notifications" className="text-primary hover:underline">
-                {t('settings.notifications.link')}
-              </a>{' '}
-              {t('settings.notifications.section')}
+        {/* Notifications */}
+        <SectionCard
+          id="notifications"
+          icon={Bell}
+          title={t('settings.notifications.title')}
+          description={t('settings.notifications.desc')}
+          isOpen={openSection === 'notifications'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t('settings.notifications.info')}
             </p>
-
-            <div className="flex items-center gap-4">
-              <Button variant="outline" asChild>
-                <a href="/dashboard/notifications">
-                  <Bell className="w-4 h-4 mr-2" />
-                  {t('settings.notifications.btn')}
-                </a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Telegram Bot Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-primary" />
-              {t('settings.telegram.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.telegram.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Bot Token */}
-            <div className="space-y-2">
-              <Label htmlFor="botToken">{t('settings.telegram.token')}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="botToken"
-                  type="password"
-                  placeholder={t('settings.telegram.token_placeholder')}
-                  defaultValue={telegramSettings?.botToken || ''}
-                  onChange={(e) => setBotToken(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => testConnectionMutation.mutate({ botToken: botToken || telegramSettings?.botToken || '' })}
-                  disabled={testConnectionMutation.isPending || (!botToken && !telegramSettings?.botToken)}
-                >
-                  {testConnectionMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    t('settings.telegram.test')
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('settings.telegram.help')}{' '}
-                <a
-                  href="https://t.me/BotFather"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  @BotFather
-                </a>
-              </p>
-            </div>
-
-            {/* Admin Chat IDs */}
-            <div className="space-y-2">
-              <Label htmlFor="adminChatIds">{t('settings.telegram.admin_ids')}</Label>
-              <Input
-                id="adminChatIds"
-                placeholder={t('settings.telegram.admin_ids_placeholder')}
-                defaultValue={telegramSettings?.adminChatIds?.join(', ') || ''}
-                onChange={(e) => setAdminChatIds(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                IDs of users authorized to use admin commands like /sysinfo and /backup
-              </p>
-            </div>
-
-            {/* Webhook Status */}
-            <div className="space-y-2">
-              <Label>{t('settings.telegram.webhook_status')}</Label>
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                {webhookInfo?.webhookSet ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">{t('settings.telegram.webhook_active')}</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="w-4 h-4 text-red-500" />
-                    <span className="text-sm">{t('settings.telegram.webhook_inactive')}</span>
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={webhookUrl}
-                  readOnly
-                  className="font-mono text-xs"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    navigator.clipboard.writeText(webhookUrl);
-                    toast({ title: t('settings.toast.copied'), description: t('settings.toast.copied_desc') });
-                  }}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setWebhookMutation.mutate({ webhookUrl })}
-                  disabled={setWebhookMutation.isPending || !telegramSettings?.botToken}
-                >
-                  {setWebhookMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  {t('settings.telegram.set_webhook')}
-                </Button>
-                {webhookInfo?.webhookSet && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteWebhookMutation.mutate()}
-                    disabled={deleteWebhookMutation.isPending}
-                  >
-                    {t('settings.telegram.remove_webhook')}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Welcome Message */}
-            <div className="space-y-2">
-              <Label htmlFor="welcomeMessage">{t('settings.telegram.welcome')}</Label>
-              <Input
-                id="welcomeMessage"
-                placeholder={t('settings.telegram.welcome_placeholder')}
-                defaultValue={telegramSettings?.welcomeMessage || ''}
-                onChange={(e) => setWelcomeMessage(e.target.value)}
-              />
-            </div>
-
-            {/* Key Not Found Message */}
-            <div className="space-y-2">
-              <Label htmlFor="keyNotFoundMessage">{t('settings.telegram.not_found')}</Label>
-              <Input
-                id="keyNotFoundMessage"
-                placeholder={t('settings.telegram.not_found_placeholder')}
-                defaultValue={telegramSettings?.keyNotFoundMessage || ''}
-                onChange={(e) => setKeyNotFoundMessage(e.target.value)}
-              />
-            </div>
-
-            {/* Save Button */}
-            <Button
-              onClick={handleSaveTelegram}
-              disabled={updateTelegramMutation.isPending}
-            >
-              {updateTelegramMutation.isPending && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              {t('settings.telegram.save')}
+            <Button variant="outline" size="sm" asChild>
+              <a href="/dashboard/notifications">
+                <Bell className="w-4 h-4 mr-2" />
+                {t('settings.notifications.btn')}
+              </a>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
 
         {/* Account Security */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5 text-primary" />
-              {t('settings.security.title')}
-            </CardTitle>
-            <CardDescription>
-              {t('settings.security.desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 max-w-md">
-              {currentUser && (
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-6">
-                  <User className="w-8 h-8 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{currentUser.email}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {currentUser.role}
-                    </p>
+        <SectionCard
+          id="security"
+          icon={Key}
+          title={t('settings.security.title')}
+          description={t('settings.security.desc')}
+          isOpen={openSection === 'security'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            {currentUser && (
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                <User className="w-6 h-6 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-sm">{currentUser.email}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser.role}</p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">{t('settings.security.username') || 'Username'}</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                />
+              </div>
+
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-3">{t('settings.security.change_password') || 'Change Password'}</p>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">{t('settings.security.current')}</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder={t('settings.security.current_placeholder')}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">{t('settings.security.new')}</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder={t('settings.security.new_placeholder')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">{t('settings.security.confirm')}</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder={t('settings.security.confirm_placeholder')}
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              <form onSubmit={handlePasswordChange} className="space-y-4">
-                {/* Username Field */}
-                <div className="space-y-2">
-                  <Label htmlFor="username">{t('settings.security.username') || 'Username'}</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin"
-                  />
-                  <p className="text-xs text-muted-foreground">{t('settings.security.username_desc') || "You can change your login username/email here."}</p>
-                </div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={passwordMutation.isPending || !currentPassword || (!newPassword && username === currentUser?.email)}
+              >
+                {passwordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {t('settings.security.change_btn')}
+              </Button>
+            </form>
+          </div>
+        </SectionCard>
 
-                <div className="border-t my-4"></div>
-                <p className="text-sm font-medium mb-2">{t('settings.security.change_password') || 'Change Password (Optional)'}</p>
-
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">{t('settings.security.current')}</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder={t('settings.security.current_placeholder')}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">{t('settings.security.new')}</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={t('settings.security.new_placeholder')}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">{t('settings.security.confirm')}</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t('settings.security.confirm_placeholder')}
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={passwordMutation.isPending || !currentPassword || (!newPassword && username === currentUser?.email)}
-                >
-                  {passwordMutation.isPending && (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  )}
-                  {t('settings.security.change_btn')}
-                </Button>
-              </form>
+        {/* About */}
+        <SectionCard
+          id="about"
+          icon={Info}
+          title={t('settings.about.title')}
+          description="Version and credits"
+          isOpen={openSection === 'about'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t('settings.about.version')}</span>
+              <span className="font-mono">1.0.0</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* About Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-primary" />
-              {t('settings.about.title')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">{t('settings.about.version')}</span>
-                <span className="font-mono">1.0.0</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">{t('settings.about.author')}</span>
-                <a
-                  href="https://github.com/sankahchan"
-                  className="text-primary hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  sankahchan
-                </a>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">{t('settings.about.repo')}</span>
-                <a
-                  href="https://github.com/sankahchan/atomic-ui"
-                  className="text-primary hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  GitHub
-                </a>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-muted-foreground">{t('settings.about.license')}</span>
-                <span>MIT</span>
-              </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t('settings.about.author')}</span>
+              <a
+                href="https://github.com/sankahchan"
+                className="text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                sankahchan
+              </a>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t('settings.about.repo')}</span>
+              <a
+                href="https://github.com/sankahchan/atomic-ui"
+                className="text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GitHub
+              </a>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">{t('settings.about.license')}</span>
+              <span>MIT</span>
+            </div>
+          </div>
+        </SectionCard>
       </div>
     </div>
   );

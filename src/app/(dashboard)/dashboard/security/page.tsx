@@ -19,6 +19,7 @@ import {
     RefreshCw, Shield, Clock, ExternalLink
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { BackButton } from '@/components/ui/back-button';
 
 function CreateRuleDialog({
     open,
@@ -515,6 +516,7 @@ export default function SecurityPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
+                    <BackButton href="/dashboard" label="Dashboard" />
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <ShieldCheck className="w-8 h-8 text-primary" />
                         Security & Access Control

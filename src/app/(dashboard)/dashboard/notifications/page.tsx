@@ -40,6 +40,7 @@ import {
   ExternalLink,
   RefreshCw,
 } from 'lucide-react';
+import { BackButton } from '@/components/ui/back-button';
 
 /**
  * Notification channel type definitions
@@ -687,6 +688,7 @@ export default function NotificationsPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          <BackButton href="/dashboard" label={t('nav.dashboard')} />
           <h1 className="text-2xl font-bold">{t('notifications.title')}</h1>
           <p className="text-muted-foreground">
             {t('notifications.subtitle')}
