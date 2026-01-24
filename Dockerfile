@@ -61,10 +61,19 @@ ENV DATABASE_URL="file:./data/build.db"
 ENV JWT_SECRET="build-time-secret-not-used-at-runtime"
 
 # Build Next.js with standalone output
-RUN npm run build
-
-# Verify standalone output was created (fail fast if not)
-RUN test -d .next/standalone || (echo "ERROR: .next/standalone not found - build failed" && exit 1)
+# Increase Node.js memory for ARM64 builds which use QEMU emulation
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+RUN npm run build 2>&1 | tee /tmp/build.log; \
+    BUILD_EXIT=$?; \
+    echo "Build exit code: $BUILD_EXIT"; \
+    echo "Checking for standalone output..."; \
+    ls -la .next/ || true; \
+    if [ ! -d ".next/standalone" ]; then \
+        echo "ERROR: .next/standalone not found"; \
+        echo "Last 50 lines of build log:"; \
+        tail -50 /tmp/build.log; \
+        exit 1; \
+    fi
 
 # Ensure .next/static exists (may be empty but directory must exist for COPY)
 RUN mkdir -p .next/static

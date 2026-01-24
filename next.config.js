@@ -18,10 +18,10 @@ const nextConfig = {
     NEXT_PUBLIC_BASE_PATH: panelPath,
   },
 
-  // External packages for server components (required for Prisma)
+  // External packages for server components (required for Prisma and native modules)
+  serverExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
   experimental: {
     instrumentationHook: true,
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
   images: {
     remotePatterns: [
