@@ -50,26 +50,27 @@ export function SegmentedUsageBar({
   const filledSegments = Math.ceil((percentage / 100) * segments);
 
   // Get color based on percentage threshold
+  // Color logic: green (low usage) -> orange -> red (high usage/near limit)
   const getSegmentColor = (segmentIndex: number, isFilled: boolean) => {
     if (!isFilled) return 'bg-gray-200 dark:bg-zinc-800/50';
 
     if (isOverLimit) {
-      return 'bg-gradient-to-r from-red-500 to-red-400';
+      return 'bg-gradient-to-r from-red-600 to-red-500';
     }
 
-    if (percentage >= 100) {
-      return 'bg-gradient-to-r from-emerald-500 to-emerald-400';
+    if (percentage >= 90) {
+      return 'bg-gradient-to-r from-red-600 to-red-500';
     }
 
-    if (percentage >= 80) {
-      return 'bg-gradient-to-r from-amber-500 to-yellow-400';
+    if (percentage >= 75) {
+      return 'bg-gradient-to-r from-orange-500 to-red-500';
     }
 
     if (percentage >= 50) {
-      return 'bg-gradient-to-r from-orange-500 to-amber-400';
+      return 'bg-gradient-to-r from-amber-500 to-orange-500';
     }
 
-    return 'bg-gradient-to-r from-red-500 to-orange-400';
+    return 'bg-gradient-to-r from-emerald-500 to-emerald-400';
   };
 
   // Size configurations
@@ -243,10 +244,11 @@ export function SegmentedUsageBarCompact({
 
             const getColor = () => {
               if (!isFilled) return 'bg-gray-200 dark:bg-zinc-700/30';
-              if (percentage >= 100) return 'bg-gradient-to-r from-emerald-500 to-emerald-400';
-              if (percentage >= 80) return 'bg-gradient-to-r from-amber-500 to-yellow-400';
-              if (percentage >= 50) return 'bg-gradient-to-r from-orange-500 to-amber-400';
-              return 'bg-gradient-to-r from-red-500 to-orange-400';
+              // Color based on usage: green (low usage) -> orange -> red (high usage/near limit)
+              if (percentage >= 90) return 'bg-gradient-to-r from-red-600 to-red-500';
+              if (percentage >= 75) return 'bg-gradient-to-r from-orange-500 to-red-500';
+              if (percentage >= 50) return 'bg-gradient-to-r from-amber-500 to-orange-500';
+              return 'bg-gradient-to-r from-emerald-500 to-emerald-400';
             };
 
             return (
@@ -267,10 +269,11 @@ export function SegmentedUsageBarCompact({
         </div>
         <span className={cn(
           'text-xs whitespace-nowrap font-medium tabular-nums min-w-[32px] text-right',
-          percentage < 50 && 'text-red-600 dark:text-red-400',
-          percentage >= 50 && percentage < 80 && 'text-orange-600 dark:text-orange-400',
-          percentage >= 80 && percentage < 100 && 'text-amber-600 dark:text-amber-400',
-          percentage >= 100 && 'text-emerald-600 dark:text-emerald-400',
+          // Color based on usage: green (low usage) -> orange -> red (high usage/near limit)
+          percentage < 50 && 'text-emerald-600 dark:text-emerald-400',
+          percentage >= 50 && percentage < 75 && 'text-amber-600 dark:text-amber-400',
+          percentage >= 75 && percentage < 90 && 'text-orange-600 dark:text-orange-400',
+          percentage >= 90 && 'text-red-600 dark:text-red-400',
           isUnlimited && 'text-gray-500 dark:text-zinc-400',
         )}>
           {isUnlimited ? '—' : `${percentage.toFixed(percentage < 1 && percentage > 0 ? 1 : 0)}%`}
@@ -327,10 +330,11 @@ export function SegmentedUsageBarLarge({
         <div className="text-right">
           <span className={cn(
             'text-lg font-semibold tabular-nums',
-            percentage < 50 && 'text-red-600 dark:text-red-400',
-            percentage >= 50 && percentage < 80 && 'text-orange-600 dark:text-orange-400',
-            percentage >= 80 && percentage < 100 && 'text-amber-600 dark:text-amber-400',
-            percentage >= 100 && 'text-emerald-600 dark:text-emerald-400',
+            // Color based on usage: green (low usage) -> orange -> red (high usage/near limit)
+            percentage < 50 && 'text-emerald-600 dark:text-emerald-400',
+            percentage >= 50 && percentage < 75 && 'text-amber-600 dark:text-amber-400',
+            percentage >= 75 && percentage < 90 && 'text-orange-600 dark:text-orange-400',
+            percentage >= 90 && 'text-red-600 dark:text-red-400',
           )}>
             {percentage.toFixed(0)}%
           </span>
