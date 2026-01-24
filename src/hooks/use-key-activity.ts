@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // Window in milliseconds to consider a key "online" after activity
-// Set to 60 seconds to account for bursty traffic patterns
-const ONLINE_WINDOW_MS = 60000; // 60 seconds
+// 30 seconds provides responsive status while avoiding flicker
+const ONLINE_WINDOW_MS = 30000; // 30 seconds
 
 interface KeyUsage {
     id: string;
@@ -45,11 +45,11 @@ export function useKeyActivity(keys: KeyUsage[] | undefined): UseKeyActivityRetu
                 const existing = newMap[key.id];
 
                 if (!existing) {
-                    // First time seeing this key - if it has traffic, mark as online immediately
-                    // This handles keys that were already in use when the page loaded
+                    // First time seeing this key - set baseline, don't mark active yet
+                    // We need at least 2 polls to detect traffic increase (delta-based)
                     newMap[key.id] = {
                         lastUsedBytes: currentBytes,
-                        lastActiveAt: currentBytes > BigInt(0) ? currentTime : 0,
+                        lastActiveAt: 0, // Start as offline, will go online on next poll if traffic increases
                     };
                     hasChanges = true;
                 } else {
@@ -61,13 +61,11 @@ export function useKeyActivity(keys: KeyUsage[] | undefined): UseKeyActivityRetu
                         };
                         hasChanges = true;
                     } else if (currentBytes < existing.lastUsedBytes) {
-                        // Counter reset (e.g. server restart) -> Update baseline, keeping old active status or resetting it?
-                        // "treat as baseline reset (don't mark online from it)"
-                        // implies we just sync the bytes. We keep the lastActiveAt as is 
-                        // (so if it was active just before reset, it stays active for the window).
+                        // Counter reset (e.g. server restart) -> Update baseline
+                        // Reset to offline state since we can't trust the old values
                         newMap[key.id] = {
                             lastUsedBytes: currentBytes,
-                            lastActiveAt: existing.lastActiveAt,
+                            lastActiveAt: 0,
                         };
                         hasChanges = true;
                     }
