@@ -99,6 +99,39 @@ print_info() {
     echo -e "${PURPLE}[i]${NC} $1"
 }
 
+# Cleanup failed installation
+cleanup_failed_install() {
+    print_warning "Cleaning up failed installation..."
+    systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+    systemctl disable ${SERVICE_NAME} 2>/dev/null || true
+    rm -f /etc/systemd/system/${SERVICE_NAME}.service
+    rm -f /usr/local/bin/atomic-ui
+    rm -rf "$INSTALL_DIR"
+    systemctl daemon-reload 2>/dev/null || true
+    print_info "Cleanup complete"
+}
+
+# Verify service startup with retry
+verify_service_startup() {
+    print_step "Verifying service startup..."
+    local MAX_RETRIES=5
+    local RETRY_DELAY=3
+    
+    for i in $(seq 1 $MAX_RETRIES); do
+        sleep $RETRY_DELAY
+        if systemctl is-active --quiet ${SERVICE_NAME}; then
+            print_success "Service is running"
+            return 0
+        fi
+        print_warning "Waiting for service to start (attempt $i/$MAX_RETRIES)..."
+    done
+    
+    print_error "Service failed to start after $MAX_RETRIES attempts"
+    print_info "Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
+    systemctl status ${SERVICE_NAME} --no-pager 2>/dev/null || true
+    return 1
+}
+
 # Check if running as root
 check_root() {
     if [ "$EUID" -ne 0 ]; then
@@ -186,23 +219,41 @@ install_nodejs() {
         NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
         if [ "$NODE_VERSION" -ge 18 ]; then
             print_success "Node.js $(node -v) already installed"
-            return
+            return 0
         fi
     fi
 
     print_step "Installing Node.js 20.x..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
+    if ! curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; then
+        print_error "Failed to setup Node.js repository"
+        return 1
+    fi
+    
+    if ! apt-get install -y nodejs; then
+        print_error "Failed to install Node.js"
+        return 1
+    fi
 
     print_success "Node.js $(node -v) installed"
+    return 0
 }
 
 # Install system dependencies
 install_dependencies() {
     print_step "Installing system dependencies..."
-    apt-get update
-    apt-get install -y git curl wget unzip openssl lsof
+    
+    if ! apt-get update; then
+        print_error "Failed to update package lists"
+        return 1
+    fi
+    
+    if ! apt-get install -y git curl wget unzip openssl lsof; then
+        print_error "Failed to install dependencies"
+        return 1
+    fi
+    
     print_success "Dependencies installed"
+    return 0
 }
 
 # Clone or update repository
@@ -218,21 +269,49 @@ setup_repository() {
             print_success "Old installation removed"
         else
             print_warning "Keeping existing installation"
-            return
+            return 0
         fi
     fi
 
-    git clone "https://github.com/${GITHUB_REPO}.git" "$INSTALL_DIR"
+    print_step "Cloning repository from GitHub..."
+    if ! git clone "https://github.com/${GITHUB_REPO}.git" "$INSTALL_DIR" 2>&1; then
+        print_error "Failed to clone repository from GitHub"
+        print_info "Please check your internet connection and try again"
+        return 1
+    fi
+
+    if [ ! -d "$INSTALL_DIR" ] || [ ! -f "$INSTALL_DIR/package.json" ]; then
+        print_error "Repository clone failed - package.json not found"
+        return 1
+    fi
+
     print_success "Repository cloned to $INSTALL_DIR"
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || return 1
 }
 
 # Install npm dependencies
 install_npm_deps() {
     print_step "Installing npm dependencies (clean install)..."
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || return 1
     rm -rf node_modules .next package-lock.json
-    npm install --production=false
+
+    print_step "Running npm install (this may take a few minutes)..."
+    if ! npm install --production=false 2>&1; then
+        print_error "npm install failed"
+        print_info "Trying with --legacy-peer-deps..."
+        if ! npm install --production=false --legacy-peer-deps 2>&1; then
+            print_error "npm install failed even with --legacy-peer-deps"
+            print_info "Please check your Node.js version and try again"
+            return 1
+        fi
+    fi
+
+    # Verify node_modules was created
+    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
+        print_error "node_modules directory not found after npm install"
+        return 1
+    fi
+
     print_success "npm dependencies installed"
 }
 
@@ -241,9 +320,14 @@ setup_environment() {
     local NEW_PORT=$1
     print_step "Setting up environment..."
 
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || return 1
 
     if [ ! -f .env ]; then
+        # Check .env.example exists before copy
+        if [ ! -f .env.example ]; then
+            print_error ".env.example file not found"
+            return 1
+        fi
         cp .env.example .env
         JWT_SECRET=$(openssl rand -base64 32)
         sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
@@ -271,20 +355,56 @@ setup_environment() {
 # Setup database
 setup_database() {
     print_step "Setting up database..."
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || return 1
     mkdir -p prisma/data
-    npx prisma generate
-    npx prisma db push
-    npm run setup
+
+    print_step "Generating Prisma client..."
+    if ! npx prisma generate 2>&1; then
+        print_error "Prisma generate failed"
+        return 1
+    fi
+
+    print_step "Pushing database schema..."
+    if ! npx prisma db push 2>&1; then
+        print_error "Prisma db push failed"
+        return 1
+    fi
+
+    print_step "Running initial setup..."
+    if ! npm run setup 2>&1; then
+        print_error "npm run setup failed"
+        print_info "This might be okay for fresh installs - continuing..."
+    fi
+
+    # Verify database file was created
+    if [ ! -f "$INSTALL_DIR/prisma/data/atomic-ui.db" ]; then
+        print_warning "Database file not found at expected location"
+        print_info "Checking alternative locations..."
+        if [ -f "$INSTALL_DIR/prisma/atomic-ui.db" ]; then
+            print_info "Found database at prisma/atomic-ui.db"
+        fi
+    fi
+
     print_success "Database setup complete"
 }
 
 # Build application
 build_app() {
     print_step "Building application..."
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || return 1
     rm -rf .next
-    npm run build
+    
+    if ! npm run build 2>&1; then
+        print_error "Build failed"
+        print_info "Please check the build output above for errors"
+        return 1
+    fi
+    
+    if [ ! -d "$INSTALL_DIR/.next" ]; then
+        print_error "Build output not found (.next directory missing)"
+        return 1
+    fi
+    
     print_success "Application built successfully"
 }
 
@@ -315,9 +435,20 @@ Environment=PORT=${PORT}
 WantedBy=multi-user.target
 EOF
 
-    systemctl daemon-reload
-    systemctl enable ${SERVICE_NAME}
-    systemctl start ${SERVICE_NAME}
+    if ! systemctl daemon-reload; then
+        print_error "Failed to reload systemd daemon"
+        return 1
+    fi
+    
+    if ! systemctl enable ${SERVICE_NAME} 2>&1; then
+        print_error "Failed to enable service"
+        return 1
+    fi
+    
+    if ! systemctl start ${SERVICE_NAME}; then
+        print_error "Failed to start service"
+        return 1
+    fi
 
     print_success "Service created and started on port ${PORT}"
 }
@@ -1390,15 +1521,67 @@ install_full() {
     
     check_root
     check_system
-    check_port_conflict "$NEW_PORT"
-    install_dependencies
-    install_nodejs
-    setup_repository
-    install_npm_deps
-    setup_environment "$NEW_PORT"
-    setup_database
-    build_app
-    create_service "$NEW_PORT"
+    
+    if ! check_port_conflict "$NEW_PORT"; then
+        print_error "Port conflict detected, cannot continue installation"
+        return 1
+    fi
+    
+    if ! install_dependencies; then
+        print_error "Failed to install system dependencies"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! install_nodejs; then
+        print_error "Failed to install Node.js"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! setup_repository; then
+        print_error "Failed to setup repository"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! install_npm_deps; then
+        print_error "Failed to install npm dependencies"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! setup_environment "$NEW_PORT"; then
+        print_error "Failed to setup environment"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! setup_database; then
+        print_error "Failed to setup database"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! build_app; then
+        print_error "Failed to build application"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    if ! create_service "$NEW_PORT"; then
+        print_error "Failed to create service"
+        cleanup_failed_install
+        return 1
+    fi
+    
+    # Verify service started successfully
+    if ! verify_service_startup; then
+        print_error "Service failed to start"
+        cleanup_failed_install
+        return 1
+    fi
+    
     install_management_script
     setup_firewall "$NEW_PORT"
 
