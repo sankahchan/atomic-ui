@@ -61,14 +61,9 @@ ENV DATABASE_URL="file:./data/build.db"
 ENV JWT_SECRET="build-time-secret-not-used-at-runtime"
 
 # Build Next.js with standalone output
-# Increase Node.js memory for ARM64 builds which use QEMU emulation
-# Use 6GB heap + disable JIT compilation for more stable QEMU builds
-ENV NODE_OPTIONS="--max-old-space-size=6144 --no-compilation-cache"
-RUN npm run build || { \
-        echo "Build failed, retrying with reduced parallelism..."; \
-        rm -rf .next; \
-        NODE_OPTIONS="--max-old-space-size=6144 --single-threaded" npm run build; \
-    }
+# Increase Node.js memory for builds
+ENV NODE_OPTIONS="--max-old-space-size=6144"
+RUN npm run build
 
 # Verify standalone output was created
 RUN if [ ! -d ".next/standalone" ]; then \
