@@ -41,6 +41,71 @@ export interface SubscriptionTheme {
   tabInactiveText: string;
 }
 
+/**
+ * Subscription Branding Settings
+ * Global customization options for subscription pages
+ */
+export interface SubscriptionBranding {
+  // Logo & Branding
+  logoUrl?: string;           // Custom logo URL (replaces Atomic logo)
+  logoSize?: number;          // Logo size in QR code (default: 25%)
+  brandName?: string;         // Brand name shown in footer
+
+  // Footer
+  footerText?: string;        // Custom footer text (default: "Powered by Atomic-UI")
+  showPoweredBy?: boolean;    // Show/hide "Powered by" text
+
+  // Welcome Message
+  welcomeMessage?: string;    // Custom welcome/greeting message
+  showWelcome?: boolean;      // Show/hide welcome message
+
+  // Custom CSS
+  customCss?: string;         // Inject custom CSS
+
+  // Fonts
+  fontFamily?: string;        // Google Font name
+  fontUrl?: string;           // Google Font URL
+
+  // Layout
+  layout?: 'default' | 'compact' | 'detailed' | 'minimal';
+  cardStyle?: 'rounded' | 'sharp' | 'pill';
+
+  // Animations
+  enableAnimations?: boolean;
+  animatedBackground?: 'none' | 'gradient' | 'particles' | 'waves';
+
+  // Usage Alerts
+  showUsageAlerts?: boolean;
+  usageAlertThresholds?: number[]; // e.g., [80, 90, 95]
+
+  // App Buttons
+  enabledApps?: string[];     // List of enabled app IDs
+  customApps?: CustomApp[];   // User-defined apps
+}
+
+export interface CustomApp {
+  id: string;
+  name: string;
+  icon: string;
+  platforms: ('android' | 'ios' | 'windows' | 'macos' | 'linux')[];
+  urlScheme: string;          // Use {url} placeholder for access URL
+  storeUrl?: string;
+}
+
+export const defaultBranding: SubscriptionBranding = {
+  brandName: 'Atomic-UI',
+  footerText: 'Powered by Atomic-UI',
+  showPoweredBy: true,
+  showWelcome: false,
+  layout: 'default',
+  cardStyle: 'rounded',
+  enableAnimations: true,
+  animatedBackground: 'none',
+  showUsageAlerts: true,
+  usageAlertThresholds: [80, 90, 95],
+  enabledApps: ['outline', 'hiddify', 'v2box', 'v2rayng', 'v2rayn'],
+};
+
 export const subscriptionThemes: Record<string, SubscriptionTheme> = {
   dark: {
     id: 'dark',

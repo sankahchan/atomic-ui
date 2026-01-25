@@ -21,7 +21,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/atomic-ui"
 SERVICE_NAME="atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
-SCRIPT_VERSION="1.3.0"
+SCRIPT_VERSION="1.4.0"
 DEFAULT_PORT=2053
 
 # Get current port from saved file or default
@@ -499,6 +499,389 @@ change_credentials() {
 }
 
 # ============================================
+# Custom Domain / SSL Setup
+# ============================================
+
+# Setup custom domain with Nginx and SSL
+setup_custom_domain() {
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║              Custom Domain Setup (SSL/HTTPS)                 ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    CURRENT_PORT=$(get_current_port)
+
+    echo -e "${YELLOW}This will configure:${NC}"
+    echo -e "  • Nginx as reverse proxy"
+    echo -e "  • Let's Encrypt SSL certificate (auto-renewal)"
+    echo -e "  • HTTPS access on port 443"
+    echo ""
+    echo -e "${YELLOW}Requirements:${NC}"
+    echo -e "  • A domain name pointing to this server's IP"
+    echo -e "  • Ports 80 and 443 must be available"
+    echo ""
+
+    read -p "Do you want to continue? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Setup cancelled"
+        return
+    fi
+
+    # Get domain name
+    echo ""
+    read -p "Enter your domain name (e.g., panel.example.com): " DOMAIN_NAME
+
+    if [ -z "$DOMAIN_NAME" ]; then
+        print_error "Domain name is required"
+        return 1
+    fi
+
+    # Validate domain format (basic check)
+    if ! echo "$DOMAIN_NAME" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$'; then
+        print_warning "Domain format looks unusual. Make sure it's correct."
+        read -p "Continue anyway? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            return 1
+        fi
+    fi
+
+    # Get email for Let's Encrypt
+    echo ""
+    read -p "Enter your email for SSL certificate notifications: " EMAIL
+
+    if [ -z "$EMAIL" ]; then
+        print_warning "No email provided. Using --register-unsafely-without-email"
+        EMAIL_OPTION="--register-unsafely-without-email"
+    else
+        EMAIL_OPTION="-m $EMAIL --no-eff-email"
+    fi
+
+    # Check if ports 80/443 are available
+    print_step "Checking port availability..."
+
+    for PORT in 80 443; do
+        if lsof -i :${PORT} > /dev/null 2>&1; then
+            PROCESS=$(lsof -i :${PORT} | tail -1 | awk '{print $1}')
+            if [ "$PROCESS" != "nginx" ]; then
+                print_error "Port ${PORT} is in use by: ${PROCESS}"
+                print_info "Please free up ports 80 and 443 before continuing"
+                return 1
+            fi
+        fi
+    done
+    print_success "Ports 80 and 443 are available"
+
+    # Install Nginx
+    print_step "Installing Nginx..."
+    apt-get update
+    apt-get install -y nginx
+    print_success "Nginx installed"
+
+    # Install Certbot
+    print_step "Installing Certbot..."
+    apt-get install -y certbot python3-certbot-nginx
+    print_success "Certbot installed"
+
+    # Stop Nginx temporarily for certificate generation
+    systemctl stop nginx 2>/dev/null || true
+
+    # Create initial Nginx config (HTTP only, for certbot)
+    print_step "Creating Nginx configuration..."
+
+    cat > /etc/nginx/sites-available/atomic-ui << EOF
+# Atomic-UI Nginx Configuration
+# Domain: ${DOMAIN_NAME}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN_NAME};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://\$server_name\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${DOMAIN_NAME};
+
+    # SSL certificates (will be configured by certbot)
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_NAME}/privkey.pem;
+
+    # SSL settings
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Proxy settings
+    location / {
+        proxy_pass http://127.0.0.1:${CURRENT_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+EOF
+
+    # Create temporary HTTP-only config for certbot
+    cat > /etc/nginx/sites-available/atomic-ui-temp << EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN_NAME};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:${CURRENT_PORT};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+}
+EOF
+
+    # Enable temporary config
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/atomic-ui
+    ln -sf /etc/nginx/sites-available/atomic-ui-temp /etc/nginx/sites-enabled/atomic-ui
+
+    # Create webroot directory
+    mkdir -p /var/www/html
+
+    # Start Nginx with temporary config
+    systemctl start nginx
+
+    # Obtain SSL certificate
+    print_step "Obtaining SSL certificate from Let's Encrypt..."
+    echo ""
+
+    certbot certonly --webroot -w /var/www/html \
+        -d ${DOMAIN_NAME} \
+        ${EMAIL_OPTION} \
+        --agree-tos \
+        --non-interactive
+
+    if [ $? -ne 0 ]; then
+        print_error "Failed to obtain SSL certificate"
+        print_info "Make sure:"
+        print_info "  1. Domain ${DOMAIN_NAME} points to this server"
+        print_info "  2. Port 80 is accessible from the internet"
+        print_info "  3. DNS has propagated (try: dig ${DOMAIN_NAME})"
+
+        # Restore default config
+        rm -f /etc/nginx/sites-enabled/atomic-ui
+        systemctl restart nginx
+        return 1
+    fi
+
+    print_success "SSL certificate obtained!"
+
+    # Switch to full HTTPS config
+    print_step "Enabling HTTPS configuration..."
+    rm -f /etc/nginx/sites-enabled/atomic-ui
+    rm -f /etc/nginx/sites-available/atomic-ui-temp
+    ln -sf /etc/nginx/sites-available/atomic-ui /etc/nginx/sites-enabled/atomic-ui
+
+    # Test nginx config
+    nginx -t
+    if [ $? -ne 0 ]; then
+        print_error "Nginx configuration test failed"
+        return 1
+    fi
+
+    # Reload nginx
+    systemctl reload nginx
+
+    # Setup firewall for 80/443
+    print_step "Configuring firewall..."
+
+    if command -v ufw &> /dev/null; then
+        ufw allow 80/tcp > /dev/null 2>&1
+        ufw allow 443/tcp > /dev/null 2>&1
+        ufw reload > /dev/null 2>&1
+        print_success "UFW configured for ports 80 and 443"
+    fi
+
+    if command -v iptables &> /dev/null; then
+        iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+        iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+
+        if command -v netfilter-persistent &> /dev/null; then
+            netfilter-persistent save > /dev/null 2>&1
+        fi
+    fi
+
+    # Save domain config
+    echo "${DOMAIN_NAME}" > "$INSTALL_DIR/.panel_domain"
+
+    # Setup auto-renewal cron job
+    print_step "Setting up SSL auto-renewal..."
+    (crontab -l 2>/dev/null | grep -v certbot; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
+    print_success "SSL auto-renewal configured (daily at 3 AM)"
+
+    # Print completion message
+    echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║           Custom Domain Setup Complete!                      ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Your panel is now accessible at:${NC}"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${GREEN}https://${DOMAIN_NAME}${NC}"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}SSL Certificate:${NC}"
+    echo -e "${CYAN}│${NC}  Issuer: Let's Encrypt"
+    echo -e "${CYAN}│${NC}  Auto-renewal: Enabled (daily check)"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Important:${NC}"
+    echo -e "${CYAN}│${NC}  • Update APP_URL in .env to https://${DOMAIN_NAME}"
+    echo -e "${CYAN}│${NC}  • Subscription links will use the new domain"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+
+    # Offer to update APP_URL
+    read -p "Update APP_URL in .env to https://${DOMAIN_NAME}? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        cd "$INSTALL_DIR"
+        sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN_NAME}|g" .env
+        print_success "APP_URL updated"
+
+        print_step "Rebuilding application with new URL..."
+        npm run build
+        systemctl restart ${SERVICE_NAME}
+        print_success "Application restarted with new domain"
+    fi
+}
+
+# Remove custom domain configuration
+remove_custom_domain() {
+    echo ""
+    echo -e "${YELLOW}This will remove:${NC}"
+    echo -e "  • Nginx configuration for Atomic-UI"
+    echo -e "  • SSL certificate (optional)"
+    echo ""
+
+    if [ ! -f "$INSTALL_DIR/.panel_domain" ]; then
+        print_warning "No custom domain configuration found"
+        return
+    fi
+
+    DOMAIN_NAME=$(cat "$INSTALL_DIR/.panel_domain")
+    echo -e "Current domain: ${CYAN}${DOMAIN_NAME}${NC}"
+    echo ""
+
+    read -p "Are you sure you want to remove custom domain? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Cancelled"
+        return
+    fi
+
+    print_step "Removing Nginx configuration..."
+    rm -f /etc/nginx/sites-enabled/atomic-ui
+    rm -f /etc/nginx/sites-available/atomic-ui
+    rm -f /etc/nginx/sites-available/atomic-ui-temp
+
+    # Restore default nginx
+    if [ -f /etc/nginx/sites-available/default ]; then
+        ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    fi
+
+    systemctl reload nginx 2>/dev/null || true
+
+    read -p "Also remove SSL certificate? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        certbot delete --cert-name ${DOMAIN_NAME} --non-interactive 2>/dev/null || true
+        print_success "SSL certificate removed"
+    fi
+
+    rm -f "$INSTALL_DIR/.panel_domain"
+
+    CURRENT_PORT=$(get_current_port)
+    SERVER_IP=$(curl -s ifconfig.me || echo "YOUR_SERVER_IP")
+
+    print_success "Custom domain removed"
+    echo ""
+    echo -e "Panel is now accessible at: ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+}
+
+# Show custom domain status
+show_domain_status() {
+    echo ""
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${YELLOW}Custom Domain Status${NC}"
+    echo -e "${CYAN}├──────────────────────────────────────────────────────────────┤${NC}"
+
+    if [ -f "$INSTALL_DIR/.panel_domain" ]; then
+        DOMAIN_NAME=$(cat "$INSTALL_DIR/.panel_domain")
+        echo -e "${CYAN}│${NC}  Domain: ${GREEN}${DOMAIN_NAME}${NC}"
+        echo -e "${CYAN}│${NC}  URL:    ${GREEN}https://${DOMAIN_NAME}${NC}"
+
+        # Check certificate expiry
+        if [ -f "/etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem" ]; then
+            EXPIRY=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem" | cut -d= -f2)
+            echo -e "${CYAN}│${NC}  SSL:    ${GREEN}Valid${NC} (expires: ${EXPIRY})"
+        else
+            echo -e "${CYAN}│${NC}  SSL:    ${RED}Certificate not found${NC}"
+        fi
+
+        # Check nginx status
+        if systemctl is-active --quiet nginx; then
+            echo -e "${CYAN}│${NC}  Nginx:  ${GREEN}● Running${NC}"
+        else
+            echo -e "${CYAN}│${NC}  Nginx:  ${RED}○ Stopped${NC}"
+        fi
+    else
+        echo -e "${CYAN}│${NC}  Status: ${YELLOW}Not configured${NC}"
+        echo -e "${CYAN}│${NC}"
+        echo -e "${CYAN}│${NC}  Run 'atomic-ui domain' to set up custom domain"
+    fi
+
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+}
+
+# ============================================
 # Port Management
 # ============================================
 
@@ -752,12 +1135,13 @@ show_menu() {
     echo ""
     echo -e "  ${GREEN}11)${NC} Uninstall Atomic-UI"
     echo -e "  ${GREEN}12)${NC} Change Password/Username"
+    echo -e "  ${GREEN}13)${NC} Setup Custom Domain (SSL)"
     echo ""
     echo -e "  ${GREEN}0)${NC} Exit"
     echo ""
-    
-    read -p "Please enter your choice [0-12]: " choice
-    
+
+    read -p "Please enter your choice [0-13]: " choice
+
     case $choice in
         1) start_service ;;
         2) stop_service ;;
@@ -771,6 +1155,7 @@ show_menu() {
         10) install_full ;;
         11) uninstall_service ;;
         12) change_credentials ;;
+        13) setup_custom_domain ;;
         0) exit 0 ;;
         *) print_error "Invalid option" ;;
     esac
@@ -799,6 +1184,19 @@ install_full() {
     setup_firewall "$NEW_PORT"
 
     print_completion "$NEW_PORT"
+
+    # Offer custom domain setup
+    echo ""
+    echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
+    read -p "Would you like to setup a custom domain with SSL? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        setup_custom_domain
+    else
+        echo ""
+        print_info "You can setup a custom domain later by running: atomic-ui domain"
+        echo ""
+    fi
 }
 
 # ============================================
@@ -861,6 +1259,16 @@ main() {
             check_root
             change_credentials
             ;;
+        domain)
+            check_root
+            if [ "$2" == "remove" ]; then
+                remove_custom_domain
+            elif [ "$2" == "status" ]; then
+                show_domain_status
+            else
+                setup_custom_domain
+            fi
+            ;;
         "")
             check_root
             show_menu
@@ -883,6 +1291,9 @@ main() {
             echo "  enable           - Enable auto-start"
             echo "  disable          - Disable auto-start"
             echo "  change-password  - Change username/password"
+            echo "  domain           - Setup custom domain with SSL"
+            echo "  domain status    - Show custom domain status"
+            echo "  domain remove    - Remove custom domain config"
             echo ""
             echo "Run without arguments to show interactive menu."
             ;;

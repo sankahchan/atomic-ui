@@ -3,11 +3,11 @@
 /**
  * Subscription Page
  *
- * Beautiful themed subscription page for VPN users.
+ * Beautiful themed subscription page for VPN users with full customization support.
  * Displays key information, usage stats, and quick-connect buttons.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 
@@ -31,11 +31,14 @@ const ATOMIC_LOGO_SVG = `data:image/svg+xml,${encodeURIComponent(`
   <circle cx="50" cy="50" r="4" fill="white"/>
 </svg>
 `)}`;
+
 import {
   getTheme,
-  getAppsForPlatform,
   clientApps,
+  defaultBranding,
   type SubscriptionTheme,
+  type SubscriptionBranding,
+  type CustomApp,
 } from '@/lib/subscription-themes';
 
 type Platform = 'android' | 'ios' | 'windows';
@@ -69,6 +72,7 @@ interface KeyData {
 interface SettingsData {
   supportLink?: string;
   defaultSubscriptionTheme?: string;
+  branding?: SubscriptionBranding;
 }
 
 // Contact type icons and colors
@@ -82,6 +86,85 @@ const contactConfig: Record<string, { icon: string; color: string; label: string
   facebook: { icon: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z', color: '#1877F2', label: 'Facebook' },
 };
 
+// Animated background components
+function GradientBackground({ theme }: { theme: SubscriptionTheme }) {
+  return (
+    <div className="fixed inset-0 overflow-hidden">
+      <div
+        className="absolute inset-0 animate-gradient-shift"
+        style={{
+          background: `linear-gradient(-45deg, ${theme.bgPrimary}, ${theme.accent}30, ${theme.buttonGradientFrom}30, ${theme.bgSecondary})`,
+          backgroundSize: '400% 400%',
+        }}
+      />
+    </div>
+  );
+}
+
+function ParticlesBackground({ theme }: { theme: SubscriptionTheme }) {
+  const particles = useMemo(() =>
+    Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 2,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      duration: Math.random() * 20 + 10,
+      delay: Math.random() * 5,
+    })),
+    []
+  );
+
+  return (
+    <div className="fixed inset-0 overflow-hidden" style={{ backgroundColor: theme.bgPrimary }}>
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full animate-float"
+          style={{
+            width: p.size,
+            height: p.size,
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            backgroundColor: theme.accent,
+            opacity: 0.3,
+            animationDuration: `${p.duration}s`,
+            animationDelay: `${p.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
+  return (
+    <div className="fixed inset-0 overflow-hidden" style={{ backgroundColor: theme.bgPrimary }}>
+      <svg
+        className="absolute bottom-0 w-full h-64 animate-wave"
+        viewBox="0 0 1440 320"
+        preserveAspectRatio="none"
+      >
+        <path
+          fill={theme.accent}
+          fillOpacity="0.2"
+          d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+        />
+      </svg>
+      <svg
+        className="absolute bottom-0 w-full h-48 animate-wave-slow"
+        viewBox="0 0 1440 320"
+        preserveAspectRatio="none"
+      >
+        <path
+          fill={theme.buttonGradientFrom}
+          fillOpacity="0.15"
+          d="M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,90.7C672,85,768,107,864,144C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export default function SubscriptionPage() {
   const params = useParams();
   const token = params.token as string;
@@ -89,12 +172,54 @@ export default function SubscriptionPage() {
   const [keyData, setKeyData] = useState<KeyData | null>(null);
   const [settings, setSettings] = useState<SettingsData>({});
   const [theme, setTheme] = useState<SubscriptionTheme>(getTheme('dark'));
+  const [branding, setBranding] = useState<SubscriptionBranding>(defaultBranding);
   const [platform, setPlatform] = useState<Platform>('android');
   const [qrCode, setQrCode] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState<ContactLink | null>(null);
+  const [usageAlert, setUsageAlert] = useState<number | null>(null);
+
+  // Generate QR code with logo overlay
+  async function generateQRCode(accessUrl: string, logoUrl: string, logoSizePercent: number) {
+    const qrCanvas = document.createElement('canvas');
+    const qrSize = 200;
+    qrCanvas.width = qrSize;
+    qrCanvas.height = qrSize;
+
+    await QRCode.toCanvas(qrCanvas, accessUrl, {
+      width: qrSize,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H',
+    });
+
+    const ctx = qrCanvas.getContext('2d');
+    if (ctx) {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        const logoSize = qrSize * (logoSizePercent / 100);
+        const logoX = (qrSize - logoSize) / 2;
+        const logoY = (qrSize - logoSize) / 2;
+
+        ctx.beginPath();
+        ctx.arc(qrSize / 2, qrSize / 2, logoSize / 2 + 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+        setQrCode(qrCanvas.toDataURL('image/png'));
+      };
+      logoImg.onerror = () => {
+        setQrCode(qrCanvas.toDataURL('image/png'));
+      };
+      logoImg.src = logoUrl;
+    } else {
+      setQrCode(qrCanvas.toDataURL('image/png'));
+    }
+  }
 
   // Fetch key data
   useEffect(() => {
@@ -115,62 +240,30 @@ export default function SubscriptionPage() {
         const data = await response.json();
         setKeyData(data);
 
-        // Fetch settings for support link and default theme
+        // Fetch settings for support link, default theme, and branding
+        let settingsData: SettingsData = {};
         try {
           const settingsRes = await fetch(`${basePath}/api/subscription/${token}/settings`);
           if (settingsRes.ok) {
-            const settingsData = await settingsRes.json();
+            settingsData = await settingsRes.json();
             setSettings(settingsData);
+            if (settingsData.branding) {
+              setBranding({ ...defaultBranding, ...settingsData.branding });
+            }
           }
         } catch {
           // Settings fetch failed, use defaults
         }
 
         // Set theme
-        const themeId = data.subscriptionTheme || settings.defaultSubscriptionTheme || 'dark';
+        const themeId = data.subscriptionTheme || settingsData.defaultSubscriptionTheme || 'dark';
         setTheme(getTheme(themeId));
 
-        // Generate QR code with Atomic logo overlay
+        // Generate QR code
         if (data.accessUrl) {
-          const qrCanvas = document.createElement('canvas');
-          const qrSize = 200;
-          qrCanvas.width = qrSize;
-          qrCanvas.height = qrSize;
-
-          // Generate base QR code on canvas
-          await QRCode.toCanvas(qrCanvas, data.accessUrl, {
-            width: qrSize,
-            margin: 2,
-            color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'H', // High error correction for logo overlay
-          });
-
-          // Add logo overlay in center
-          const ctx = qrCanvas.getContext('2d');
-          if (ctx) {
-            const logoImg = new Image();
-            logoImg.onload = () => {
-              const logoSize = qrSize * 0.25; // Logo is 25% of QR size
-              const logoX = (qrSize - logoSize) / 2;
-              const logoY = (qrSize - logoSize) / 2;
-
-              // Draw white background circle for logo
-              ctx.beginPath();
-              ctx.arc(qrSize / 2, qrSize / 2, logoSize / 2 + 4, 0, Math.PI * 2);
-              ctx.fillStyle = '#ffffff';
-              ctx.fill();
-
-              // Draw logo
-              ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-
-              // Convert to data URL
-              setQrCode(qrCanvas.toDataURL('image/png'));
-            };
-            logoImg.src = ATOMIC_LOGO_SVG;
-          } else {
-            // Fallback without logo
-            setQrCode(qrCanvas.toDataURL('image/png'));
-          }
+          const logoUrl = settingsData.branding?.logoUrl || ATOMIC_LOGO_SVG;
+          const logoSize = settingsData.branding?.logoSize || 25;
+          await generateQRCode(data.accessUrl, logoUrl, logoSize);
         }
 
         setLoading(false);
@@ -181,7 +274,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [token, settings.defaultSubscriptionTheme]);
+  }, [token]);
 
   // Update theme when keyData changes
   useEffect(() => {
@@ -190,6 +283,20 @@ export default function SubscriptionPage() {
       setTheme(getTheme(themeId));
     }
   }, [keyData, settings.defaultSubscriptionTheme]);
+
+  // Check usage alerts
+  useEffect(() => {
+    if (keyData && branding.showUsageAlerts && branding.usageAlertThresholds) {
+      const percent = getUsagePercent();
+      const thresholds = [...branding.usageAlertThresholds].sort((a, b) => b - a);
+      for (const threshold of thresholds) {
+        if (percent >= threshold) {
+          setUsageAlert(threshold);
+          break;
+        }
+      }
+    }
+  }, [keyData, branding.showUsageAlerts, branding.usageAlertThresholds]);
 
   // Detect platform on mount
   useEffect(() => {
@@ -207,7 +314,6 @@ export default function SubscriptionPage() {
     if (!text) return;
 
     try {
-      // Try Modern API first (requires HTTPS or localhost)
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -218,7 +324,6 @@ export default function SubscriptionPage() {
       console.warn("Clipboard API failed, trying fallback...", err);
     }
 
-    // Fallback for HTTP / Older Browsers
     try {
       const textArea = document.createElement("textarea");
       textArea.value = text;
@@ -241,7 +346,6 @@ export default function SubscriptionPage() {
       console.error("Fallback clipboard failed", err);
     }
 
-    // If all methods fail, show alert with manual copy option
     alert(`Copy failed. Please copy manually:\n\n${text}`);
   };
 
@@ -274,7 +378,7 @@ export default function SubscriptionPage() {
   };
 
   const getCountryFlag = (countryCode: string | null): string => {
-    if (!countryCode) return '🌐';
+    if (!countryCode) return '';
     const codePoints = countryCode
       .toUpperCase()
       .split('')
@@ -282,11 +386,36 @@ export default function SubscriptionPage() {
     return String.fromCodePoint(...codePoints);
   };
 
+  // Get enabled apps (built-in + custom)
+  const getEnabledApps = () => {
+    const enabledIds = branding.enabledApps || defaultBranding.enabledApps!;
+    const builtInApps = clientApps.filter(
+      (app) => enabledIds.includes(app.id) && app.platforms.includes(platform)
+    );
+
+    const customApps = (branding.customApps || [])
+      .filter((app) => app.platforms.includes(platform))
+      .map((app) => ({
+        ...app,
+        urlScheme: (accessUrl: string) => app.urlScheme.replace('{url}', encodeURIComponent(accessUrl)),
+      }));
+
+    return [...builtInApps, ...customApps];
+  };
+
   const handleAddToApp = (appId: string) => {
-    const app = clientApps.find((a) => a.id === appId);
+    const allApps = [...clientApps, ...(branding.customApps || [])];
+    const app = allApps.find((a) => a.id === appId);
     if (!app || !keyData?.accessUrl) return;
 
-    const url = app.urlScheme(keyData.accessUrl);
+    let url: string;
+    if ('urlScheme' in app && typeof app.urlScheme === 'function') {
+      url = app.urlScheme(keyData.accessUrl);
+    } else if ('urlScheme' in app && typeof app.urlScheme === 'string') {
+      url = (app as CustomApp).urlScheme.replace('{url}', encodeURIComponent(keyData.accessUrl));
+    } else {
+      url = keyData.accessUrl;
+    }
     window.location.href = url;
   };
 
@@ -314,13 +443,26 @@ export default function SubscriptionPage() {
     }
   };
 
+  // Get card border radius based on cardStyle
+  const getCardRadius = () => {
+    switch (branding.cardStyle) {
+      case 'sharp':
+        return 'rounded-lg';
+      case 'pill':
+        return 'rounded-3xl';
+      default:
+        return 'rounded-2xl';
+    }
+  };
+
   if (loading) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
         style={{ backgroundColor: theme.bgPrimary }}
       >
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent"
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent"
           style={{ borderColor: theme.accent, borderTopColor: 'transparent' }}
         />
       </div>
@@ -334,10 +476,10 @@ export default function SubscriptionPage() {
         style={{ backgroundColor: theme.bgPrimary }}
       >
         <div
-          className="text-center p-8 rounded-2xl max-w-md"
+          className={`text-center p-8 ${getCardRadius()} max-w-md`}
           style={{ backgroundColor: theme.bgCard }}
         >
-          <div className="text-6xl mb-4">❌</div>
+          <div className="text-6xl mb-4">X</div>
           <h1 className="text-xl font-bold mb-2" style={{ color: theme.textPrimary }}>
             {error}
           </h1>
@@ -351,15 +493,10 @@ export default function SubscriptionPage() {
 
   if (!keyData) return null;
 
-  const apps = getAppsForPlatform(platform);
-
-  // Check if using image as background theme
+  const apps = getEnabledApps();
   const hasImageBackground = keyData.coverImage && keyData.coverImageType === 'url';
-
-  // Check if using a glass theme (transparent backgrounds need dark backdrop)
   const isGlassTheme = theme.id.startsWith('glass');
 
-  // Card style for image background mode or glass theme - glass effect
   const getCardStyle = () => {
     if (hasImageBackground) {
       return {
@@ -368,10 +505,9 @@ export default function SubscriptionPage() {
         WebkitBackdropFilter: 'blur(12px)',
       };
     }
-    // For glass themes, add a dark backdrop to ensure text readability
     if (isGlassTheme) {
       return {
-        backgroundColor: 'rgba(15, 23, 42, 0.85)', // Dark slate with opacity
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
       };
@@ -379,301 +515,376 @@ export default function SubscriptionPage() {
     return { backgroundColor: theme.bgCard };
   };
 
-  // For glass themes, use a dark solid background to ensure visibility
   const pageBackgroundColor = isGlassTheme ? '#0f172a' : theme.bgPrimary;
 
+  // Render animated background
+  const renderAnimatedBackground = () => {
+    if (hasImageBackground) return null;
+    if (!branding.enableAnimations) return null;
+
+    switch (branding.animatedBackground) {
+      case 'gradient':
+        return <GradientBackground theme={theme} />;
+      case 'particles':
+        return <ParticlesBackground theme={theme} />;
+      case 'waves':
+        return <WavesBackground theme={theme} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div
-      className="min-h-screen relative overflow-x-hidden"
-      style={{
-        backgroundColor: pageBackgroundColor,
-        // Enable smooth scrolling on iOS
-        WebkitOverflowScrolling: 'touch',
-      }}
-    >
-      {/* Full-page background image (when using image as theme) */}
-      {hasImageBackground && (
-        <>
-          <div
-            className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: `url(${keyData.coverImage})` }}
-          />
-          {/* Dark overlay for readability */}
-          <div className="fixed inset-0 bg-black/60" />
-        </>
+    <>
+      {/* Custom Google Font */}
+      {branding.fontUrl && (
+        <link href={branding.fontUrl} rel="stylesheet" />
       )}
 
-      <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8 pb-safe">
+      {/* Custom CSS injection */}
+      {branding.customCss && (
+        <style dangerouslySetInnerHTML={{ __html: branding.customCss }} />
+      )}
 
-        {/* Stats Cards - Updated icons like screenshot 2 */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Data Usage Card */}
-          <div
-            className="p-4 rounded-2xl"
-            style={getCardStyle()}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              {/* Circular progress icon */}
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: theme.accent + '20' }}
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill={theme.accent}>
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2v-2zm0-2h2V7h-2v7z" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
-              Data Usage
-            </div>
-            <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
-              {keyData.dataLimitBytes ? (
-                <>
-                  <span>{formatBytes(keyData.usedBytes)}</span>
-                  <span className="text-sm font-normal" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.6)' : theme.textMuted }}> / {formatBytes(keyData.dataLimitBytes)}</span>
-                </>
-              ) : (
-                formatBytes(keyData.usedBytes)
-              )}
-            </div>
-            {keyData.dataLimitBytes && (
-              <div className="mt-2">
-                <div
-                  className="h-1.5 rounded-full overflow-hidden"
-                  style={{ backgroundColor: theme.progressBg }}
-                >
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${getUsagePercent()}%`,
-                      backgroundColor: theme.progressFill,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+      {/* Animation styles */}
+      <style>{`
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gradient-shift {
+          animation: gradient-shift 15s ease infinite;
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0) translateX(0); }
+          25% { transform: translateY(-20px) translateX(10px); }
+          50% { transform: translateY(0) translateX(20px); }
+          75% { transform: translateY(20px) translateX(10px); }
+        }
+        .animate-float {
+          animation: float 20s ease-in-out infinite;
+        }
+        @keyframes wave {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-wave {
+          animation: wave 10s linear infinite;
+        }
+        .animate-wave-slow {
+          animation: wave 15s linear infinite reverse;
+        }
+      `}</style>
 
-          {/* Time Remaining Card */}
-          <div
-            className="p-4 rounded-2xl"
-            style={getCardStyle()}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              {/* Hourglass icon */}
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: '#ec4899' + '20' }}
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#ec4899">
-                  <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
-              Time Left
-            </div>
-            <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
-              {getTimeRemaining(keyData.expiresAt)}
-            </div>
-          </div>
-        </div>
+      <div
+        className="min-h-screen relative overflow-x-hidden"
+        style={{
+          backgroundColor: pageBackgroundColor,
+          fontFamily: branding.fontFamily || 'inherit',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {/* Animated backgrounds */}
+        {renderAnimatedBackground()}
 
-        {/* Server Info Card */}
-        <div
-          className="p-4 rounded-2xl"
-          style={getCardStyle()}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">
-                {getCountryFlag(keyData.server.countryCode)}
+        {/* Full-page background image */}
+        {hasImageBackground && (
+          <>
+            <div
+              className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${keyData.coverImage})` }}
+            />
+            <div className="fixed inset-0 bg-black/60" />
+          </>
+        )}
+
+        <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8 pb-safe">
+
+          {/* Welcome Message */}
+          {branding.showWelcome && branding.welcomeMessage && (
+            <div
+              className={`p-4 ${getCardRadius()} text-center`}
+              style={getCardStyle()}
+            >
+              <p style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                {branding.welcomeMessage}
+              </p>
+            </div>
+          )}
+
+          {/* Usage Alert */}
+          {usageAlert && branding.showUsageAlerts && (
+            <div
+              className={`p-3 ${getCardRadius()} flex items-center gap-3`}
+              style={{
+                backgroundColor: usageAlert >= 95 ? theme.danger + '20' : theme.warning + '20',
+                borderLeft: `4px solid ${usageAlert >= 95 ? theme.danger : theme.warning}`,
+              }}
+            >
+              <span className="text-xl">!</span>
+              <span style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                {usageAlert >= 95
+                  ? 'Data almost depleted! Consider upgrading.'
+                  : `${usageAlert}% of your data has been used.`}
               </span>
-              <div>
-                <div className="font-semibold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
-                  {keyData.server.name}
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Data Usage Card */}
+            <div className={`p-4 ${getCardRadius()}`} style={getCardStyle()}>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: theme.accent + '20' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill={theme.accent}>
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2v-2zm0-2h2V7h-2v7z" />
+                  </svg>
                 </div>
-                {keyData.server.location && (
-                  <div className="text-sm" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
-                    {keyData.server.location}
-                  </div>
+              </div>
+              <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                Data Usage
+              </div>
+              <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                {keyData.dataLimitBytes ? (
+                  <>
+                    <span>{formatBytes(keyData.usedBytes)}</span>
+                    <span className="text-sm font-normal" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.6)' : theme.textMuted }}> / {formatBytes(keyData.dataLimitBytes)}</span>
+                  </>
+                ) : (
+                  formatBytes(keyData.usedBytes)
                 )}
               </div>
+              {keyData.dataLimitBytes && (
+                <div className="mt-2">
+                  <div
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ backgroundColor: theme.progressBg }}
+                  >
+                    <div
+                      className={`h-full rounded-full ${branding.enableAnimations ? 'transition-all duration-500' : ''}`}
+                      style={{
+                        width: `${getUsagePercent()}%`,
+                        backgroundColor: theme.progressFill,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div
-              className="px-3 py-1 rounded-full text-sm font-medium"
-              style={{
-                backgroundColor: keyData.status === 'ACTIVE' ? theme.success + '20' : theme.warning + '20',
-                color: keyData.status === 'ACTIVE' ? theme.success : theme.warning,
-              }}
-            >
-              {keyData.status === 'ACTIVE' ? 'ACTIVE' : keyData.status}
+
+            {/* Time Remaining Card */}
+            <div className={`p-4 ${getCardRadius()}`} style={getCardStyle()}>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: '#ec4899' + '20' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#ec4899">
+                    <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-xs mb-1" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                Time Left
+              </div>
+              <div className="text-xl font-bold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                {getTimeRemaining(keyData.expiresAt)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Platform Tabs - Pill style like screenshot 2 */}
-        <div
-          className="p-1 rounded-full flex"
-          style={getCardStyle()}
-        >
-          {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPlatform(p)}
-              className="flex-1 py-2.5 rounded-full font-medium transition-all text-sm"
-              style={{
-                backgroundColor: platform === p ? theme.tabActive : 'transparent',
-                color: platform === p ? theme.tabActiveText : theme.tabInactiveText,
-              }}
-            >
-              {p === 'android' ? 'Android' : p === 'ios' ? 'iOS' : 'Windows'}
-            </button>
-          ))}
-        </div>
-
-        {/* App Buttons - Side by side grid like screenshot 2 */}
-        <div className="grid grid-cols-2 gap-2">
-          {apps.map((app) => (
-            <button
-              key={app.id}
-              onClick={() => handleAddToApp(app.id)}
-              className="py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm"
-              style={{
-                ...getCardStyle(),
-                color: hasImageBackground ? '#ffffff' : theme.textPrimary,
-                border: hasImageBackground ? '1px solid rgba(255,255,255,0.2)' : `1px solid ${theme.border}`,
-              }}
-            >
-              <span className="text-lg">▶</span>
-              {app.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="space-y-2">
-          {/* Copy URL Button */}
-          <button
-            onClick={() => copyToClipboard(keyData.accessUrl)}
-            className="w-full py-3.5 rounded-xl font-semibold transition-all text-sm"
-            style={{
-              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-              color: '#ffffff',
-            }}
-          >
-            {copied ? '✓ Copied!' : '📋 Copy Connection URL'}
-          </button>
-        </div>
-
-        {/* QR Code Section */}
-        {qrCode && (
-          <div
-            className="p-5 rounded-2xl text-center"
-            style={getCardStyle()}
-          >
-            <h3 className="font-semibold mb-3 text-sm" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
-              Scan QR Code
-            </h3>
-            <div className="inline-block p-2 bg-white rounded-xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrCode} alt="QR Code" className="w-40 h-40" />
+          {/* Server Info Card */}
+          <div className={`p-4 ${getCardRadius()}`} style={getCardStyle()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">
+                  {getCountryFlag(keyData.server.countryCode)}
+                </span>
+                <div>
+                  <div className="font-semibold" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                    {keyData.server.name}
+                  </div>
+                  {keyData.server.location && (
+                    <div className="text-sm" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                      {keyData.server.location}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div
+                className="px-3 py-1 rounded-full text-sm font-medium"
+                style={{
+                  backgroundColor: keyData.status === 'ACTIVE' ? theme.success + '20' : theme.warning + '20',
+                  color: keyData.status === 'ACTIVE' ? theme.success : theme.warning,
+                }}
+              >
+                {keyData.status === 'ACTIVE' ? 'ACTIVE' : keyData.status}
+              </div>
             </div>
-            <p className="mt-2 text-xs" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
-              Scan with your VPN app to connect
-            </p>
           </div>
-        )}
 
-        {/* Contact Icons */}
-        {keyData.contactLinks && keyData.contactLinks.length > 0 && (
-          <div className="flex justify-center gap-4 py-2">
-            {keyData.contactLinks.map((contact, index) => {
-              const config = contactConfig[contact.type];
-              if (!config) return null;
-              return (
+          {/* Platform Tabs */}
+          <div className="p-1 rounded-full flex" style={getCardStyle()}>
+            {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPlatform(p)}
+                className={`flex-1 py-2.5 rounded-full font-medium text-sm ${branding.enableAnimations ? 'transition-all' : ''}`}
+                style={{
+                  backgroundColor: platform === p ? theme.tabActive : 'transparent',
+                  color: platform === p ? theme.tabActiveText : theme.tabInactiveText,
+                }}
+              >
+                {p === 'android' ? 'Android' : p === 'ios' ? 'iOS' : 'Windows'}
+              </button>
+            ))}
+          </div>
+
+          {/* App Buttons */}
+          {apps.length > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              {apps.map((app) => (
                 <button
-                  key={index}
-                  onClick={() => handleContactClick(contact)}
-                  className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110"
+                  key={app.id}
+                  onClick={() => handleAddToApp(app.id)}
+                  className={`py-3 px-4 ${getCardRadius()} font-medium flex items-center justify-center gap-2 text-sm ${branding.enableAnimations ? 'transition-all hover:scale-[1.02]' : ''}`}
                   style={{
-                    backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.15)' : config.color + '20',
-                    backdropFilter: hasImageBackground ? 'blur(8px)' : undefined,
+                    ...getCardStyle(),
+                    color: hasImageBackground ? '#ffffff' : theme.textPrimary,
+                    border: hasImageBackground ? '1px solid rgba(255,255,255,0.2)' : `1px solid ${theme.border}`,
                   }}
                 >
-                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={hasImageBackground ? '#ffffff' : config.color}>
-                    <path d={config.icon} />
-                  </svg>
+                  <span className="text-lg">{app.icon}</span>
+                  {app.name}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          )}
+
+          {/* Quick Actions */}
+          <div className="space-y-2">
+            <button
+              onClick={() => copyToClipboard(keyData.accessUrl)}
+              className={`w-full py-3.5 ${getCardRadius()} font-semibold text-sm ${branding.enableAnimations ? 'transition-all hover:scale-[1.01]' : ''}`}
+              style={{
+                background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                color: '#ffffff',
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy Connection URL'}
+            </button>
+          </div>
+
+          {/* QR Code Section */}
+          {qrCode && (
+            <div className={`p-5 ${getCardRadius()} text-center`} style={getCardStyle()}>
+              <h3 className="font-semibold mb-3 text-sm" style={{ color: hasImageBackground ? '#ffffff' : theme.textPrimary }}>
+                Scan QR Code
+              </h3>
+              <div className={`inline-block p-2 bg-white ${getCardRadius()}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrCode} alt="QR Code" className="w-40 h-40" />
+              </div>
+              <p className="mt-2 text-xs" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                Scan with your VPN app to connect
+              </p>
+            </div>
+          )}
+
+          {/* Contact Icons */}
+          {keyData.contactLinks && keyData.contactLinks.length > 0 && (
+            <div className="flex justify-center gap-4 py-2">
+              {keyData.contactLinks.map((contact, index) => {
+                const config = contactConfig[contact.type];
+                if (!config) return null;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleContactClick(contact)}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center ${branding.enableAnimations ? 'transition-transform hover:scale-110' : ''}`}
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.15)' : config.color + '20',
+                      backdropFilter: hasImageBackground ? 'blur(8px)' : undefined,
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill={hasImageBackground ? '#ffffff' : config.color}>
+                      <path d={config.icon} />
+                    </svg>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="text-center text-xs pt-4" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.5)' : theme.textMuted }}>
+            {branding.showPoweredBy !== false && (
+              <p>{branding.footerText || `Powered by ${branding.brandName || 'Atomic-UI'}`}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Contact Popup */}
+        {showContactPopup && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowContactPopup(null)}
+          >
+            <div
+              className={`p-6 ${getCardRadius()} max-w-sm w-full`}
+              style={{ backgroundColor: theme.bgCard }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: contactConfig[showContactPopup.type]?.color + '20' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill={contactConfig[showContactPopup.type]?.color}>
+                    <path d={contactConfig[showContactPopup.type]?.icon} />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold" style={{ color: theme.textPrimary }}>
+                    {contactConfig[showContactPopup.type]?.label}
+                  </h3>
+                  <p className="text-sm" style={{ color: theme.textMuted }}>
+                    {showContactPopup.value}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => copyToClipboard(showContactPopup.value)}
+                  className={`flex-1 py-3 ${getCardRadius()} font-medium text-sm`}
+                  style={{
+                    backgroundColor: theme.bgSecondary,
+                    color: theme.textPrimary,
+                  }}
+                >
+                  Copy
+                </button>
+                <a
+                  href={getContactUrl(showContactPopup)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex-1 py-3 ${getCardRadius()} font-medium text-sm text-center`}
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                    color: '#ffffff',
+                  }}
+                >
+                  Open
+                </a>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* Footer */}
-        <div className="text-center text-xs pt-4" style={{ color: hasImageBackground ? 'rgba(255,255,255,0.5)' : theme.textMuted }}>
-          <p>Powered by Atomic-UI</p>
-        </div>
       </div>
-
-      {/* Contact Popup */}
-      {showContactPopup && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowContactPopup(null)}
-        >
-          <div
-            className="p-6 rounded-2xl max-w-sm w-full"
-            style={{ backgroundColor: theme.bgCard }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: contactConfig[showContactPopup.type]?.color + '20' }}
-              >
-                <svg viewBox="0 0 24 24" className="w-6 h-6" fill={contactConfig[showContactPopup.type]?.color}>
-                  <path d={contactConfig[showContactPopup.type]?.icon} />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold" style={{ color: theme.textPrimary }}>
-                  {contactConfig[showContactPopup.type]?.label}
-                </h3>
-                <p className="text-sm" style={{ color: theme.textMuted }}>
-                  {showContactPopup.value}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  copyToClipboard(showContactPopup.value);
-                }}
-                className="flex-1 py-3 rounded-xl font-medium text-sm"
-                style={{
-                  backgroundColor: theme.bgSecondary,
-                  color: theme.textPrimary,
-                }}
-              >
-                Copy
-              </button>
-              <a
-                href={getContactUrl(showContactPopup)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-3 rounded-xl font-medium text-sm text-center"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                  color: '#ffffff',
-                }}
-              >
-                Open
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
