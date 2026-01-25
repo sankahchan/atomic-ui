@@ -21,7 +21,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/atomic-ui"
 SERVICE_NAME="atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
-SCRIPT_VERSION="1.4.0"
+SCRIPT_VERSION="1.4.1"
 DEFAULT_PORT=2053
 
 # Get current port from saved file or default
@@ -559,6 +559,196 @@ setup_custom_domain() {
         EMAIL_OPTION="-m $EMAIL --no-eff-email"
     fi
 
+    # ============================================
+    # DNS Verification - Critical Step
+    # ============================================
+    echo ""
+    print_step "Verifying DNS configuration for ${DOMAIN_NAME}..."
+    echo ""
+
+    # Get server's public IP
+    SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null)
+
+    if [ -z "$SERVER_IP" ]; then
+        print_warning "Could not determine server's public IP"
+        SERVER_IP="UNKNOWN"
+    else
+        print_info "This server's IP: ${GREEN}${SERVER_IP}${NC}"
+    fi
+
+    # Check DNS resolution
+    DOMAIN_IP=""
+
+    # Try dig first
+    if command -v dig &> /dev/null; then
+        DOMAIN_IP=$(dig +short ${DOMAIN_NAME} A 2>/dev/null | head -1)
+    fi
+
+    # Fallback to nslookup
+    if [ -z "$DOMAIN_IP" ] && command -v nslookup &> /dev/null; then
+        DOMAIN_IP=$(nslookup ${DOMAIN_NAME} 2>/dev/null | grep -A1 "Name:" | grep "Address" | awk '{print $2}' | head -1)
+    fi
+
+    # Fallback to host
+    if [ -z "$DOMAIN_IP" ] && command -v host &> /dev/null; then
+        DOMAIN_IP=$(host ${DOMAIN_NAME} 2>/dev/null | grep "has address" | awk '{print $4}' | head -1)
+    fi
+
+    # Fallback to getent
+    if [ -z "$DOMAIN_IP" ] && command -v getent &> /dev/null; then
+        DOMAIN_IP=$(getent hosts ${DOMAIN_NAME} 2>/dev/null | awk '{print $1}' | head -1)
+    fi
+
+    echo ""
+
+    if [ -z "$DOMAIN_IP" ]; then
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║                    DNS Resolution Failed                     ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}The domain ${CYAN}${DOMAIN_NAME}${YELLOW} could not be resolved.${NC}"
+        echo ""
+        echo -e "${WHITE}This usually means:${NC}"
+        echo -e "  ${RED}1.${NC} DNS records have not been configured yet"
+        echo -e "  ${RED}2.${NC} Domain is using parking nameservers"
+        echo -e "  ${RED}3.${NC} DNS changes are still propagating"
+        echo ""
+        echo -e "${YELLOW}To fix this:${NC}"
+        echo ""
+        echo -e "  ${CYAN}Step 1:${NC} Go to your domain registrar (Hostinger, Namecheap, etc.)"
+        echo -e "  ${CYAN}Step 2:${NC} Navigate to DNS settings"
+        echo -e "  ${CYAN}Step 3:${NC} Add an A record:"
+        echo ""
+        echo -e "         ${GREEN}Type:${NC}  A"
+        echo -e "         ${GREEN}Name:${NC}  @ (or leave blank for root domain)"
+        echo -e "         ${GREEN}Value:${NC} ${SERVER_IP}"
+        echo -e "         ${GREEN}TTL:${NC}   3600 (or default)"
+        echo ""
+        echo -e "  ${CYAN}Step 4:${NC} Wait 5-30 minutes for DNS to propagate"
+        echo -e "  ${CYAN}Step 5:${NC} Run this setup again: ${GREEN}atomic-ui domain${NC}"
+        echo ""
+        echo -e "${YELLOW}Verify DNS is working:${NC}"
+        echo -e "  ${CYAN}dig ${DOMAIN_NAME} +short${NC}"
+        echo -e "  Should return: ${GREEN}${SERVER_IP}${NC}"
+        echo ""
+        return 1
+    fi
+
+    print_info "Domain ${DOMAIN_NAME} resolves to: ${GREEN}${DOMAIN_IP}${NC}"
+
+    # Check if domain points to this server
+    if [ "$SERVER_IP" != "UNKNOWN" ] && [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║                    DNS Mismatch Detected                     ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}The domain points to a different IP address:${NC}"
+        echo ""
+        echo -e "  ${CYAN}Your server IP:${NC}  ${GREEN}${SERVER_IP}${NC}"
+        echo -e "  ${CYAN}Domain points to:${NC} ${RED}${DOMAIN_IP}${NC}"
+        echo ""
+        echo -e "${WHITE}This might indicate:${NC}"
+        echo -e "  ${RED}•${NC} Domain is pointing to old/wrong server"
+        echo -e "  ${RED}•${NC} CDN/Proxy is configured (Cloudflare, etc.)"
+        echo -e "  ${RED}•${NC} DNS records need to be updated"
+        echo ""
+
+        # Check if it's a common CDN/Proxy IP
+        if echo "$DOMAIN_IP" | grep -qE '^(104\.|172\.|198\.|103\.)'; then
+            echo -e "${YELLOW}Note:${NC} The IP ${DOMAIN_IP} looks like a CDN/Proxy IP."
+            echo -e "If using Cloudflare, ${YELLOW}disable proxy (orange cloud)${NC} temporarily"
+            echo -e "to allow Let's Encrypt certificate generation."
+            echo ""
+        fi
+
+        echo -e "${YELLOW}To fix this:${NC}"
+        echo ""
+        echo -e "  ${CYAN}Step 1:${NC} Update DNS A record to point to: ${GREEN}${SERVER_IP}${NC}"
+        echo -e "  ${CYAN}Step 2:${NC} Wait for DNS propagation (5-30 minutes)"
+        echo -e "  ${CYAN}Step 3:${NC} Run setup again: ${GREEN}atomic-ui domain${NC}"
+        echo ""
+
+        read -p "Continue anyway? (Not recommended) (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Setup cancelled. Please fix DNS and try again."
+            return 1
+        fi
+        print_warning "Continuing despite DNS mismatch - SSL may fail!"
+    else
+        print_success "DNS is correctly configured! Domain points to this server."
+    fi
+
+    # Test HTTP connectivity to the domain
+    echo ""
+    print_step "Testing HTTP connectivity..."
+
+    # Start a temporary web server to test connectivity
+    mkdir -p /var/www/html/.well-known/acme-challenge
+    echo "atomic-ui-test-$(date +%s)" > /var/www/html/.well-known/acme-challenge/test.txt
+
+    # Quick nginx setup for test
+    if ! systemctl is-active --quiet nginx; then
+        apt-get update -qq
+        apt-get install -y nginx -qq
+        cat > /etc/nginx/sites-available/test-domain << EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+    root /var/www/html;
+    location / { try_files \$uri \$uri/ =404; }
+}
+EOF
+        ln -sf /etc/nginx/sites-available/test-domain /etc/nginx/sites-enabled/
+        rm -f /etc/nginx/sites-enabled/default
+        systemctl start nginx
+    fi
+
+    sleep 2
+
+    # Test if we can reach the server via domain
+    HTTP_TEST=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 "http://${DOMAIN_NAME}/.well-known/acme-challenge/test.txt" 2>/dev/null || echo "000")
+
+    rm -f /var/www/html/.well-known/acme-challenge/test.txt
+    rm -f /etc/nginx/sites-available/test-domain
+    rm -f /etc/nginx/sites-enabled/test-domain
+
+    if [ "$HTTP_TEST" = "000" ] || [ "$HTTP_TEST" = "000" ]; then
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║              HTTP Connectivity Test Failed                   ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}Could not reach this server via http://${DOMAIN_NAME}${NC}"
+        echo ""
+        echo -e "${WHITE}Possible causes:${NC}"
+        echo -e "  ${RED}1.${NC} Firewall blocking port 80"
+        echo -e "  ${RED}2.${NC} DNS not propagated yet"
+        echo -e "  ${RED}3.${NC} Network/ISP issues"
+        echo ""
+        echo -e "${YELLOW}Check firewall:${NC}"
+        echo -e "  ${CYAN}ufw allow 80/tcp${NC}"
+        echo -e "  ${CYAN}ufw allow 443/tcp${NC}"
+        echo ""
+        echo -e "${YELLOW}Check if port 80 is open:${NC}"
+        echo -e "  ${CYAN}curl -I http://${SERVER_IP}${NC}"
+        echo ""
+
+        read -p "Continue anyway? (Not recommended) (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Setup cancelled. Please fix connectivity and try again."
+            return 1
+        fi
+        print_warning "Continuing despite connectivity issues - SSL may fail!"
+    else
+        print_success "HTTP connectivity verified (HTTP ${HTTP_TEST})"
+    fi
+
+    echo ""
+
     # Check if ports 80/443 are available
     print_step "Checking port availability..."
 
@@ -699,15 +889,44 @@ EOF
         --non-interactive
 
     if [ $? -ne 0 ]; then
-        print_error "Failed to obtain SSL certificate"
-        print_info "Make sure:"
-        print_info "  1. Domain ${DOMAIN_NAME} points to this server"
-        print_info "  2. Port 80 is accessible from the internet"
-        print_info "  3. DNS has propagated (try: dig ${DOMAIN_NAME})"
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║              SSL Certificate Generation Failed               ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}Let's Encrypt could not verify domain ownership.${NC}"
+        echo ""
+        echo -e "${WHITE}Common causes:${NC}"
+        echo ""
+        echo -e "  ${RED}1. DNS not pointing to this server${NC}"
+        echo -e "     Check: ${CYAN}dig ${DOMAIN_NAME} +short${NC}"
+        echo -e "     Should return: ${GREEN}${SERVER_IP}${NC}"
+        echo ""
+        echo -e "  ${RED}2. Port 80 blocked by firewall${NC}"
+        echo -e "     Fix: ${CYAN}ufw allow 80/tcp && ufw allow 443/tcp${NC}"
+        echo ""
+        echo -e "  ${RED}3. DNS using parking/default nameservers${NC}"
+        echo -e "     Fix: Add A record pointing to ${GREEN}${SERVER_IP}${NC}"
+        echo ""
+        echo -e "  ${RED}4. Cloudflare proxy enabled${NC}"
+        echo -e "     Fix: Disable proxy (gray cloud) temporarily"
+        echo ""
+        echo -e "  ${RED}5. DNS propagation not complete${NC}"
+        echo -e "     Wait 5-30 minutes and try again"
+        echo ""
+        echo -e "${YELLOW}Diagnostic commands:${NC}"
+        echo -e "  ${CYAN}dig ${DOMAIN_NAME} +short${NC}              # Check DNS"
+        echo -e "  ${CYAN}curl -I http://${DOMAIN_NAME}${NC}          # Test HTTP"
+        echo -e "  ${CYAN}cat /var/log/letsencrypt/letsencrypt.log${NC}  # View error log"
+        echo ""
+        echo -e "${YELLOW}After fixing, run:${NC}"
+        echo -e "  ${GREEN}atomic-ui domain${NC}"
+        echo ""
 
         # Restore default config
         rm -f /etc/nginx/sites-enabled/atomic-ui
-        systemctl restart nginx
+        rm -f /etc/nginx/sites-available/atomic-ui-temp
+        systemctl restart nginx 2>/dev/null || true
         return 1
     fi
 
