@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 // 30 seconds provides responsive status while avoiding flicker
 const ONLINE_WINDOW_MS = 30000; // 30 seconds
 
+// Minimum bytes increase to consider as real activity (not probe/heartbeat traffic)
+// 1KB threshold filters out small probe packets while detecting real usage
+const MIN_ACTIVITY_BYTES = BigInt(1024); // 1 KB
+
 interface KeyUsage {
     id: string;
     usedBytes: string;
@@ -12,6 +16,9 @@ interface KeyUsage {
 interface ActivityState {
     lastUsedBytes: bigint;
     lastActiveAt: number;
+    // Track baseline for detecting meaningful activity bursts
+    baselineBytes: bigint;
+    baselineTime: number;
 }
 
 interface UseKeyActivityReturn {
@@ -49,25 +56,45 @@ export function useKeyActivity(keys: KeyUsage[] | undefined): UseKeyActivityRetu
                     // We need at least 2 polls to detect traffic increase (delta-based)
                     newMap[key.id] = {
                         lastUsedBytes: currentBytes,
-                        lastActiveAt: 0, // Start as offline, will go online on next poll if traffic increases
+                        lastActiveAt: 0, // Start as offline
+                        baselineBytes: currentBytes,
+                        baselineTime: currentTime,
                     };
                     hasChanges = true;
                 } else {
-                    if (currentBytes > existing.lastUsedBytes) {
-                        // Usage increased -> Mark active
-                        newMap[key.id] = {
-                            lastUsedBytes: currentBytes,
-                            lastActiveAt: currentTime,
-                        };
-                        hasChanges = true;
-                    } else if (currentBytes < existing.lastUsedBytes) {
+                    if (currentBytes < existing.lastUsedBytes) {
                         // Counter reset (e.g. server restart) -> Update baseline
                         // Reset to offline state since we can't trust the old values
                         newMap[key.id] = {
                             lastUsedBytes: currentBytes,
                             lastActiveAt: 0,
+                            baselineBytes: currentBytes,
+                            baselineTime: currentTime,
                         };
                         hasChanges = true;
+                    } else if (currentBytes > existing.lastUsedBytes) {
+                        // Usage increased - check if it's meaningful activity
+                        const bytesSinceBaseline = currentBytes - existing.baselineBytes;
+
+                        // Only mark as active if we've seen significant traffic
+                        // This filters out small probe/heartbeat packets
+                        if (bytesSinceBaseline >= MIN_ACTIVITY_BYTES) {
+                            newMap[key.id] = {
+                                lastUsedBytes: currentBytes,
+                                lastActiveAt: currentTime,
+                                baselineBytes: currentBytes, // Reset baseline after activity
+                                baselineTime: currentTime,
+                            };
+                            hasChanges = true;
+                        } else {
+                            // Small increase - update bytes but don't mark active
+                            // Keep accumulating until threshold is reached
+                            newMap[key.id] = {
+                                ...existing,
+                                lastUsedBytes: currentBytes,
+                            };
+                            hasChanges = true;
+                        }
                     }
                     // If bytes equal, do nothing (keep existing state)
                 }
