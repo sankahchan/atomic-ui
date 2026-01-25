@@ -23,8 +23,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
-import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
+import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import QRCode from 'qrcode';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import {
   ArrowLeft,
   KeyRound,
@@ -49,8 +58,12 @@ import {
   Image as ImageIcon,
   Phone,
   X,
+  Smartphone,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
+import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 
 // Contact type options for subscription page
 const CONTACT_TYPES = [
@@ -931,6 +944,19 @@ export default function DynamicKeyDetailPage() {
                   />
                 )}
               </div>
+
+              {/* Real-time Graph */}
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-sm font-medium mb-2">Live Activity</p>
+                <AggregatedTrafficGraph accessKeys={dak.accessKeys} />
+              </div>
+
+              {/* Historical Chart - show for first attached key if available */}
+              {dak.accessKeys.length > 0 && (
+                <div className="pt-4 border-t border-border/50">
+                  <TrafficHistoryChart accessKeyId={dak.accessKeys[0].id} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1071,6 +1097,9 @@ export default function DynamicKeyDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Connection Sessions */}
+          <DAKConnectionSessionsCard dakId={dak.id} />
+
           {/* Share Page Settings */}
           <SubscriptionShareCard
             dakId={dak.id}
@@ -1177,5 +1206,234 @@ export default function DynamicKeyDetailPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * AggregatedTrafficGraph Component
+ * Displays real-time bandwidth usage aggregated from all attached access keys
+ */
+function AggregatedTrafficGraph({
+  accessKeys,
+}: {
+  accessKeys: Array<{ server: { id: string } | null; outlineKeyId: string }>;
+}) {
+  const [data, setData] = useState<{ time: number; bytes: number }[]>([]);
+  const [currentServer, setCurrentServer] = useState<string | null>(null);
+
+  // Get unique server IDs
+  const serverIds = Array.from(
+    new Set(accessKeys.map((k) => k.server?.id).filter(Boolean))
+  ) as string[];
+
+  // Set initial server if not set
+  useEffect(() => {
+    if (serverIds.length > 0 && !currentServer) {
+      setCurrentServer(serverIds[0]);
+    }
+  }, [serverIds, currentServer]);
+
+  // Poll for live stats from the first active server (for simplicity)
+  const { data: stats } = trpc.servers.getLiveStats.useQuery(
+    { id: currentServer! },
+    {
+      enabled: !!currentServer,
+      refetchInterval: 2000,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  useEffect(() => {
+    if (stats && currentServer) {
+      const now = Date.now();
+      // Aggregate bytes from all keys on this server
+      const keysOnServer = accessKeys.filter((k) => k.server?.id === currentServer);
+      const totalBytes = keysOnServer.reduce((sum, key) => {
+        return sum + (stats.keyStats?.[key.outlineKeyId] || 0);
+      }, 0);
+
+      setData((prev) => {
+        const newData = [...prev, { time: now, bytes: totalBytes }];
+        if (newData.length > 60) newData.shift();
+        return newData;
+      });
+    }
+  }, [stats, currentServer, accessKeys]);
+
+  if (accessKeys.length === 0) {
+    return (
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+        <p className="text-sm">No attached keys to monitor</p>
+      </div>
+    );
+  }
+
+  if (data.length < 2) {
+    return (
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+        Initializing graph...
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[200px] w-full mt-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id="colorBytesDAK" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <XAxis dataKey="time" hide domain={['dataMin', 'dataMax']} />
+          <YAxis hide domain={[0, 'auto']} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'hsl(var(--background))',
+              borderColor: 'hsl(var(--border))',
+              borderRadius: '0.5rem',
+            }}
+            labelFormatter={() => ''}
+            formatter={(value: number) => [formatBytes(value) + '/s', 'Aggregated Speed']}
+          />
+          <Area
+            type="monotone"
+            dataKey="bytes"
+            stroke="#8b5cf6"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorBytesDAK)"
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+        <span>2 mins ago</span>
+        <span>Aggregated Bandwidth: {formatBytes(data[data.length - 1]?.bytes || 0)}/s</span>
+        <span>Live</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * DAKConnectionSessionsCard Component
+ * Displays aggregated device count and recent connection sessions from all attached keys
+ */
+function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
+  const { t } = useLocale();
+  const { data, isLoading } = trpc.dynamicKeys.getConnectionSessions.useQuery(
+    { dakId, limit: 10 },
+    { refetchInterval: 30000 } // Refresh every 30 seconds
+  );
+
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours < 24) return `${hours}h ${mins}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-primary" />
+            Connections
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-24 bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-primary" />
+          Connections
+        </CardTitle>
+        <CardDescription>
+          Aggregated device usage across all attached keys
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              {(data?.activeCount || 0) > 0 ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span className="text-2xl font-bold">{data?.estimatedDevices || 0}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Active Devices</p>
+          </div>
+          <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
+            <p className="text-xs text-muted-foreground">Peak Devices</p>
+          </div>
+        </div>
+
+        {/* Recent Sessions */}
+        {data?.sessions && data.sessions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Recent Sessions</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {data.sessions.slice(0, 5).map((session) => (
+                <div
+                  key={session.id}
+                  className={cn(
+                    'flex items-center justify-between p-2 rounded-lg text-sm',
+                    session.isActive ? 'bg-green-500/10' : 'bg-muted/50'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        'w-2 h-2 rounded-full',
+                        session.isActive ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium">{session.keyName}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        {session.serverCountry && (
+                          <span>{getCountryFlag(session.serverCountry)}</span>
+                        )}
+                        {session.serverName}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-muted-foreground">
+                      {formatDuration(session.durationMinutes)}
+                    </span>
+                    <span className="font-mono">{formatBytes(BigInt(session.bytesUsed))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(!data?.sessions || data.sessions.length === 0) && (
+          <div className="text-center py-4 text-muted-foreground text-sm">
+            No connection sessions recorded yet
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

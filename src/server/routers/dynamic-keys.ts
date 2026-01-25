@@ -1155,6 +1155,122 @@ export const dynamicKeysRouter = router({
   }),
 
   /**
+   * Get aggregated connection sessions for a Dynamic Access Key.
+   * Combines sessions from all attached access keys.
+   */
+  getConnectionSessions: protectedProcedure
+    .input(
+      z.object({
+        dakId: z.string(),
+        includeInactive: z.boolean().default(true),
+        limit: z.number().int().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.dakId },
+        select: {
+          id: true,
+          userId: true,
+          accessKeys: {
+            select: {
+              id: true,
+              estimatedDevices: true,
+              peakDevices: true,
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      // Authorization check
+      if (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      // Get all access key IDs attached to this DAK
+      const accessKeyIds = dak.accessKeys.map((k) => k.id);
+
+      if (accessKeyIds.length === 0) {
+        return {
+          estimatedDevices: 0,
+          peakDevices: 0,
+          activeCount: 0,
+          sessions: [],
+        };
+      }
+
+      // Fetch sessions from all attached access keys
+      const sessions = await db.connectionSession.findMany({
+        where: {
+          accessKeyId: { in: accessKeyIds },
+          ...(input.includeInactive ? {} : { isActive: true }),
+        },
+        orderBy: { startedAt: 'desc' },
+        take: input.limit,
+        include: {
+          accessKey: {
+            select: {
+              name: true,
+              server: {
+                select: {
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Calculate aggregated stats
+      const totalEstimatedDevices = dak.accessKeys.reduce(
+        (sum, k) => sum + (k.estimatedDevices || 0),
+        0
+      );
+      const maxPeakDevices = dak.accessKeys.reduce(
+        (max, k) => Math.max(max, k.peakDevices || 0),
+        0
+      );
+      const activeCount = sessions.filter((s) => s.isActive).length;
+
+      // Calculate session durations
+      const sessionsWithDuration = sessions.map((session) => {
+        const endTime = session.endedAt || new Date();
+        const durationMs = endTime.getTime() - session.startedAt.getTime();
+        const durationMinutes = Math.round(durationMs / 60000);
+
+        return {
+          id: session.id,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt,
+          isActive: session.isActive,
+          bytesUsed: session.bytesUsed.toString(),
+          durationMinutes,
+          keyName: session.accessKey?.name || 'Unknown',
+          serverName: session.accessKey?.server?.name || 'Unknown',
+          serverCountry: session.accessKey?.server?.countryCode,
+        };
+      });
+
+      return {
+        estimatedDevices: totalEstimatedDevices,
+        peakDevices: maxPeakDevices,
+        activeCount,
+        sessions: sessionsWithDuration,
+      };
+    }),
+
+  /**
    * Get live metrics for dynamic keys by fetching from Outline servers directly.
    * Aggregates traffic from all attached access keys and updates firstUsedAt for keys with new traffic.
    */
