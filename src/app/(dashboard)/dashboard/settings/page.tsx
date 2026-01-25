@@ -33,10 +33,12 @@ import {
   History,
   ChevronRight,
   Info,
+  Palette,
 } from 'lucide-react';
+import Link from 'next/link';
 
 // Section type for the collapsible cards
-type SectionId = 'general' | 'health' | 'backup' | 'notifications' | 'security' | 'about' | null;
+type SectionId = 'general' | 'health' | 'backup' | 'notifications' | 'security' | 'about' | 'subscription' | null;
 
 /**
  * Collapsible Section Card
@@ -319,6 +321,28 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </SectionCard>
+
+        {/* Subscription Page Customization */}
+        <SectionCard
+          id="subscription"
+          icon={Palette}
+          title="Subscription Page"
+          description="Customize the user subscription page appearance"
+          isOpen={openSection === 'subscription'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Customize how your users see their subscription pages - including themes, branding, logos, and more.
+            </p>
+            <Link href="/settings">
+              <Button variant="outline" size="sm">
+                <Palette className="w-4 h-4 mr-2" />
+                Open Subscription Settings
+              </Button>
+            </Link>
           </div>
         </SectionCard>
 
