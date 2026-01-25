@@ -819,15 +819,6 @@ export default function KeyDetailPage() {
     },
   });
 
-  // Copy to clipboard helper
-  const copyToClipboard = async (text: string, label: string) => {
-    await navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied!',
-      description: `${label} copied to clipboard.`,
-    });
-  };
-
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleDelete = () => {
@@ -972,7 +963,7 @@ export default function KeyDetailPage() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => copyToClipboard(key.accessUrl || '', 'Access URL')}
+                    onClick={() => copyToClipboard(key.accessUrl || '', 'Copied!', 'Access URL copied to clipboard.')}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -997,7 +988,7 @@ export default function KeyDetailPage() {
                     onClick={() => {
                       if (key.subscriptionToken) {
                         const url = `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`;
-                        copyToClipboard(url, 'Subscription URL');
+                        copyToClipboard(url, 'Copied!', 'Subscription URL copied to clipboard.');
                       }
                     }}
                     disabled={!key.subscriptionToken}
@@ -1180,7 +1171,7 @@ export default function KeyDetailPage() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => copyToClipboard(key.accessUrl || '', 'Access URL')}
+                  onClick={() => copyToClipboard(key.accessUrl || '', 'Copied!', 'Access URL copied to clipboard.')}
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL
