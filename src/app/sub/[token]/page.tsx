@@ -287,7 +287,13 @@ export default function SubscriptionPage() {
   // Check usage alerts
   useEffect(() => {
     if (keyData && branding.showUsageAlerts && branding.usageAlertThresholds) {
-      const percent = getUsagePercent();
+      // Calculate usage percent inline to avoid dependency issues
+      let percent = 0;
+      if (keyData.dataLimitBytes) {
+        const used = parseFloat(keyData.usedBytes);
+        const limit = parseFloat(keyData.dataLimitBytes);
+        percent = Math.min(Math.round((used / limit) * 100), 100);
+      }
       const thresholds = [...branding.usageAlertThresholds].sort((a, b) => b - a);
       for (const threshold of thresholds) {
         if (percent >= threshold) {
