@@ -62,18 +62,20 @@ ENV JWT_SECRET="build-time-secret-not-used-at-runtime"
 
 # Build Next.js with standalone output
 # Increase Node.js memory for ARM64 builds which use QEMU emulation
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm run build 2>&1 | tee /tmp/build.log; \
-    BUILD_EXIT=$?; \
-    echo "Build exit code: $BUILD_EXIT"; \
-    echo "Checking for standalone output..."; \
-    ls -la .next/ || true; \
-    if [ ! -d ".next/standalone" ]; then \
-        echo "ERROR: .next/standalone not found"; \
-        echo "Last 50 lines of build log:"; \
-        tail -50 /tmp/build.log; \
+# Use 6GB heap + disable JIT compilation for more stable QEMU builds
+ENV NODE_OPTIONS="--max-old-space-size=6144 --no-compilation-cache"
+RUN npm run build || { \
+        echo "Build failed, retrying with reduced parallelism..."; \
+        rm -rf .next; \
+        NODE_OPTIONS="--max-old-space-size=6144 --single-threaded" npm run build; \
+    }
+
+# Verify standalone output was created
+RUN if [ ! -d ".next/standalone" ]; then \
+        echo "ERROR: .next/standalone not found after build"; \
+        ls -la .next/ || true; \
         exit 1; \
-    fi
+    fi && echo "Standalone build verified successfully"
 
 # Ensure .next/static exists (may be empty but directory must exist for COPY)
 RUN mkdir -p .next/static
