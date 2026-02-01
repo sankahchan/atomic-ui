@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { usePathname } from "next/navigation";
+import { trpc } from "@/lib/trpc";
 
 export function NotificationBell() {
-    const pathname = usePathname();
-    const unreadCount = 0; // TODO: Fetch real unread count
+    const { data: alertsData } = trpc.keys.getKeyAlerts.useQuery(undefined, {
+        refetchInterval: 60000, // Refresh every minute
+    });
+    const unreadCount = alertsData?.totalAlerts ?? 0;
 
     return (
         <Button

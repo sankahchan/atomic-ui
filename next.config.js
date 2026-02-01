@@ -19,9 +19,9 @@ const nextConfig = {
   },
 
   // External packages for server components (required for Prisma and native modules)
-  serverExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
   experimental: {
     instrumentationHook: true,
+    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
   },
   images: {
     remotePatterns: [
