@@ -231,7 +231,13 @@ if [ ! -d "$INSTALL_DIR/.next" ]; then
 fi
 echo -e "${GREEN}[✓]${NC} Build complete"
 
-# Create service with random port
+# Copy standalone files for production
+echo -e "${BLUE}[*]${NC} Setting up standalone production build..."
+cp -r .next/standalone/* ./
+cp -r .next/static .next/static 2>/dev/null || true
+cp -r public ./public 2>/dev/null || true
+
+# Create service with random port (using standalone for low memory)
 echo -e "${BLUE}[*]${NC} Creating systemd service..."
 cat > /etc/systemd/system/atomic-ui.service << EOF
 [Unit]
@@ -242,12 +248,13 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=${PANEL_PORT}
 Environment=PANEL_PATH=/${PANEL_PATH}
+Environment=NODE_OPTIONS=--max-old-space-size=384
 
 [Install]
 WantedBy=multi-user.target

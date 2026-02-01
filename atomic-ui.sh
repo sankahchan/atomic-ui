@@ -422,7 +422,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
 StandardOutput=syslog
@@ -430,6 +430,7 @@ StandardError=syslog
 SyslogIdentifier=${SERVICE_NAME}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
+Environment=NODE_OPTIONS=--max-old-space-size=384
 
 [Install]
 WantedBy=multi-user.target
