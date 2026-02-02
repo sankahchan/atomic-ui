@@ -80,6 +80,7 @@ import {
   Tag,
   User,
   LinkIcon as LinkCopy,
+  Pencil,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { ServerGroupList } from '@/components/keys/server-group-list';
@@ -1123,6 +1124,12 @@ function KeyRow({
                 <Link href={`/dashboard/keys/${accessKey.id}`} className="cursor-pointer">
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/keys/${accessKey.id}`} className="cursor-pointer">
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
@@ -2210,6 +2217,12 @@ export default function KeysPage() {
                             <Link href={`/dashboard/keys/${key.id}`}>
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/keys/${key.id}`}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>

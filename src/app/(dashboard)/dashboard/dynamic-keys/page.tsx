@@ -62,6 +62,7 @@ import {
   LayoutList,
   Archive,
   ListTree,
+  Pencil,
 } from 'lucide-react';
 import { useKeyActivity } from '@/hooks/use-key-activity';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -1031,6 +1032,12 @@ function DAKRow({
                 <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="cursor-pointer">
                   <Eye className="w-4 h-4 mr-2" />
                   {t('dynamic_keys.detail.details')}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="cursor-pointer">
+                  <Pencil className="w-4 h-4 mr-2" />
+                  {t('common.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
