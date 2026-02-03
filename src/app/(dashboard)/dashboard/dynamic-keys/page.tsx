@@ -1237,7 +1237,7 @@ function DAKRow({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="w-4 h-4 mr-2" />
-                {t('common.edit')}
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
@@ -2138,8 +2138,21 @@ export default function DynamicKeysPage() {
                             <DropdownMenuItem asChild>
                               <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
                                 <Eye className="w-4 h-4 mr-2" />
-                                {t('dynamic_keys.detail.details')}
+                                Details
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditingDAK({
+                              id: dak.id,
+                              name: dak.name,
+                              email: dak.email ?? null,
+                              telegramId: dak.telegramId ?? null,
+                              notes: dak.notes ?? null,
+                              dataLimitBytes: dak.dataLimitBytes,
+                              durationDays: (dak as DAKData).durationDays ?? null,
+                              expiresAt: dak.expiresAt ?? null,
+                            })}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleStatus(dak)}>
                               <Power className="w-4 h-4 mr-2" />
@@ -2148,7 +2161,7 @@ export default function DynamicKeysPage() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleDelete(dak)} className="text-destructive">
                               <Trash2 className="w-4 h-4 mr-2" />
-                              {t('dynamic_keys.detail.delete')}
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -2170,6 +2183,16 @@ export default function DynamicKeysPage() {
           onDelete={(key) => handleDelete(key)}
           onCopyUrl={(key) => handleCopyUrl(key)}
           onShowQR={(key) => handleShowQR(key)}
+          onEdit={(key) => setEditingDAK({
+            id: key.id,
+            name: key.name,
+            email: key.email ?? null,
+            telegramId: key.telegramId ?? null,
+            notes: key.notes ?? null,
+            dataLimitBytes: key.dataLimitBytes,
+            durationDays: key.durationDays ?? null,
+            expiresAt: key.expiresAt ?? null,
+          })}
           isProcessingId={togglingKeyId}
         />
       )}

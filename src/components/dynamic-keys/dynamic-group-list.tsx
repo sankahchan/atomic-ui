@@ -12,7 +12,8 @@ import {
     Share2,
     Settings,
     Shuffle,
-    Link2
+    Link2,
+    Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,7 @@ interface DynamicGroupListProps {
     onDelete: (key: any) => void;
     onCopyUrl: (key: any) => void;
     onShowQR: (key: any) => void;
+    onEdit: (key: any) => void;
     isProcessingId: string | null;
 }
 
@@ -63,6 +65,7 @@ export function DynamicGroupList({
     onDelete,
     onCopyUrl,
     onShowQR,
+    onEdit,
     isProcessingId
 }: DynamicGroupListProps) {
     const { t } = useLocale();
@@ -92,6 +95,7 @@ export function DynamicGroupList({
                         onDelete={onDelete}
                         onCopyUrl={onCopyUrl}
                         onShowQR={onShowQR}
+                        onEdit={onEdit}
                         isProcessingId={isProcessingId}
                     />
                 );
@@ -109,6 +113,7 @@ function GroupSection({
     onDelete,
     onCopyUrl,
     onShowQR,
+    onEdit,
     isProcessingId
 }: any) {
     const [isOpen, setIsOpen] = useState(true);
@@ -142,6 +147,7 @@ function GroupSection({
                                 onDelete={() => onDelete(key)}
                                 onCopyUrl={() => onCopyUrl(key)}
                                 onShowQR={() => onShowQR(key)}
+                                onEdit={() => onEdit(key)}
                                 isProcessing={isProcessingId === key.id}
                             />
                         ))}
@@ -159,6 +165,7 @@ function DynamicKeyRow({
     onDelete,
     onCopyUrl,
     onShowQR,
+    onEdit,
     isProcessing
 }: any) {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -260,6 +267,10 @@ function DynamicKeyRow({
                             <DropdownMenuItem onClick={onShowQR}>
                                 <QrCode className="w-4 h-4 mr-2" />
                                 Show QR
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onEdit}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={onToggleStatus}>
