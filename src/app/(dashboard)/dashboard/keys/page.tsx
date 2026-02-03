@@ -910,6 +910,232 @@ function BulkProgressDialog({
 }
 
 /**
+ * EditKeyDialog Component
+ *
+ * A dialog for editing access key properties.
+ */
+function EditKeyDialog({
+  open,
+  onOpenChange,
+  keyData,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  keyData: {
+    id: string;
+    name: string;
+    email: string | null;
+    telegramId: string | null;
+    notes: string | null;
+    dataLimitBytes: bigint | null;
+    dataLimitResetStrategy: string | null;
+    durationDays: number | null;
+    expiresAt: Date | null;
+    expirationType: string | null;
+  };
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    name: keyData.name,
+    email: keyData.email || '',
+    telegramId: keyData.telegramId || '',
+    notes: keyData.notes || '',
+    dataLimitGB: keyData.dataLimitBytes
+      ? (Number(keyData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
+      : '',
+    dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
+    durationDays: keyData.durationDays?.toString() || '',
+    expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
+  });
+
+  // Reset form data when keyData changes
+  useEffect(() => {
+    setFormData({
+      name: keyData.name,
+      email: keyData.email || '',
+      telegramId: keyData.telegramId || '',
+      notes: keyData.notes || '',
+      dataLimitGB: keyData.dataLimitBytes
+        ? (Number(keyData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
+        : '',
+      dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
+      durationDays: keyData.durationDays?.toString() || '',
+      expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
+    });
+  }, [keyData]);
+
+  const updateMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Key updated',
+        description: 'The access key has been updated successfully.',
+      });
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast({
+        title: 'Validation error',
+        description: 'Please enter a key name.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateMutation.mutate({
+      id: keyData.id,
+      name: formData.name.trim(),
+      email: formData.email || undefined,
+      telegramId: formData.telegramId || undefined,
+      notes: formData.notes || undefined,
+      dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      dataLimitResetStrategy: formData.dataLimitResetStrategy,
+      durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
+      expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+    } as any);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Access Key</DialogTitle>
+          <DialogDescription>
+            Update the key configuration. Name changes will sync to Outline.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="editName">Name</Label>
+            <Input
+              id="editName"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editEmail">Email</Label>
+            <Input
+              id="editEmail"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editTelegram">Telegram ID</Label>
+            <Input
+              id="editTelegram"
+              value={formData.telegramId}
+              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
+            <Input
+              id="editDataLimit"
+              type="number"
+              placeholder="Leave empty for unlimited"
+              value={formData.dataLimitGB}
+              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+              min="0"
+              step="0.5"
+            />
+          </div>
+
+          {formData.dataLimitGB && (
+            <div className="space-y-2">
+              <Label>Reset Strategy</Label>
+              <Select
+                value={formData.dataLimitResetStrategy}
+                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                  setFormData({ ...formData, dataLimitResetStrategy: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEVER">Never Reset</SelectItem>
+                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
+                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="editDuration">Duration (Days)</Label>
+            <Input
+              id="editDuration"
+              type="number"
+              placeholder="e.g., 30, 45, 60"
+              value={formData.durationDays}
+              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+              min="1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Set the validity period in days. This will recalculate the expiration date.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editExpiration">Expiration Date</Label>
+            <Input
+              id="editExpiration"
+              type="date"
+              value={formData.expiresAt}
+              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Or set a specific expiration date directly.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editNotes">Notes</Label>
+            <Input
+              id="editNotes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Online indicator component with blinking animation
  */
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
@@ -939,6 +1165,7 @@ function KeyRow({
   isOnline,
   onCopyAccessUrl,
   onCopySubscriptionUrl,
+  onEdit,
 }: {
   accessKey: {
     id: string;
@@ -971,6 +1198,7 @@ function KeyRow({
   isOnline: boolean;
   onCopyAccessUrl: () => void;
   onCopySubscriptionUrl: () => void;
+  onEdit: () => void;
 }) {
   const { t } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
@@ -1126,11 +1354,9 @@ function KeyRow({
                   View Details
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/keys/${accessKey.id}`} className="cursor-pointer">
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit
-                </Link>
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
@@ -1189,6 +1415,18 @@ export default function KeysPage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
+  const [editingKey, setEditingKey] = useState<{
+    id: string;
+    name: string;
+    email: string | null;
+    telegramId: string | null;
+    notes: string | null;
+    dataLimitBytes: bigint | null;
+    dataLimitResetStrategy: string | null;
+    durationDays: number | null;
+    expiresAt: Date | null;
+    expirationType: string | null;
+  } | null>(null);
   const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const { t } = useLocale();
   const router = useRouter();
@@ -2103,7 +2341,7 @@ export default function KeysPage() {
         <ServerGroupList
           keys={data?.items || []}
           onToggleStatus={(key, checked) => handleToggleStatus(key.id)}
-          onEdit={(key) => router.push(`/dashboard/keys/${key.id}`)}
+          onEdit={(key) => setEditingKey(key)}
           onDelete={(key) => handleDelete(key.id, key.name)}
           onCopy={(key) => {
             if (key.accessUrl) {
@@ -2219,11 +2457,9 @@ export default function KeysPage() {
                               View Details
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/keys/${key.id}`}>
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Edit
-                            </Link>
+                          <DropdownMenuItem onClick={() => setEditingKey(key)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                             <Power className="w-4 h-4 mr-2" />
@@ -2317,6 +2553,7 @@ export default function KeysPage() {
                         toast({ title: 'Error', description: 'No subscription URL available', variant: 'destructive' });
                       }
                     }}
+                    onEdit={() => setEditingKey(key)}
                   />
                 ))
               ) : (
@@ -2426,6 +2663,18 @@ export default function KeysPage() {
         results={bulkProgressResults}
         isPending={bulkToggleStatusMutation.isPending || bulkArchiveMutation.isPending}
       />
+
+      {editingKey && (
+        <EditKeyDialog
+          open={!!editingKey}
+          onOpenChange={(open) => !open && setEditingKey(null)}
+          keyData={editingKey}
+          onSuccess={() => {
+            refetch();
+            setEditingKey(null);
+          }}
+        />
+      )}
     </div>
   );
 }

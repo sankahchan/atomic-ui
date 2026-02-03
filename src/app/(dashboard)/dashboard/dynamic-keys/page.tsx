@@ -150,6 +150,8 @@ type DAKData = {
   id: string;
   name: string;
   email?: string | null;
+  telegramId?: string | null;
+  notes?: string | null;
   type: 'SELF_MANAGED' | 'MANUAL';
   status: 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DEPLETED' | 'PENDING';
   dynamicUrl: string | null;
@@ -160,6 +162,7 @@ type DAKData = {
   prefix: string | null;
   method: string | null;
   expiresAt?: Date | null;
+  durationDays?: number | null;
   daysRemaining?: number | null;
   createdAt: Date;
   firstUsedAt?: Date | null;
@@ -854,6 +857,202 @@ function BulkProgressDialog({
 }
 
 /**
+ * EditDAKDialog Component - Inline edit dialog for dynamic keys
+ */
+function EditDAKDialog({
+  open,
+  onOpenChange,
+  dakData,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  dakData: {
+    id: string;
+    name: string;
+    email: string | null;
+    telegramId: string | null;
+    notes: string | null;
+    dataLimitBytes: bigint | null;
+    durationDays: number | null;
+    expiresAt: Date | null;
+  };
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    name: dakData.name,
+    email: dakData.email || '',
+    telegramId: dakData.telegramId || '',
+    notes: dakData.notes || '',
+    dataLimitGB: dakData.dataLimitBytes
+      ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
+      : '',
+    durationDays: dakData.durationDays?.toString() || '',
+    expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+  });
+
+  useEffect(() => {
+    setFormData({
+      name: dakData.name,
+      email: dakData.email || '',
+      telegramId: dakData.telegramId || '',
+      notes: dakData.notes || '',
+      dataLimitGB: dakData.dataLimitBytes
+        ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
+        : '',
+      durationDays: dakData.durationDays?.toString() || '',
+      expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+    });
+  }, [dakData]);
+
+  const updateMutation = trpc.dynamicKeys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Dynamic Key updated',
+        description: 'The dynamic access key has been updated successfully.',
+      });
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast({
+        title: 'Validation error',
+        description: 'Please enter a name.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateMutation.mutate({
+      id: dakData.id,
+      name: formData.name.trim(),
+      email: formData.email || undefined,
+      telegramId: formData.telegramId || undefined,
+      notes: formData.notes || undefined,
+      dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
+      expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+    } as any);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Dynamic Key</DialogTitle>
+          <DialogDescription>
+            Update the dynamic key configuration.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="editName">Name</Label>
+            <Input
+              id="editName"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editEmail">Email</Label>
+            <Input
+              id="editEmail"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editTelegram">Telegram ID</Label>
+            <Input
+              id="editTelegram"
+              value={formData.telegramId}
+              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
+            <Input
+              id="editDataLimit"
+              type="number"
+              placeholder="Leave empty for unlimited"
+              value={formData.dataLimitGB}
+              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+              min="0"
+              step="0.5"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editDuration">Duration (Days)</Label>
+            <Input
+              id="editDuration"
+              type="number"
+              placeholder="e.g., 30, 45, 60"
+              value={formData.durationDays}
+              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+              min="1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Set the validity period in days. This will recalculate the expiration date.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editExpiration">Expiration Date</Label>
+            <Input
+              id="editExpiration"
+              type="date"
+              value={formData.expiresAt}
+              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Or set a specific expiration date directly.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editNotes">Notes</Label>
+            <Input
+              id="editNotes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * DAKRow Component - Table row for a dynamic key
  */
 function DAKRow({
@@ -862,6 +1061,7 @@ function DAKRow({
   onShowQR,
   onDelete,
   onToggleStatus,
+  onEdit,
   isSelected,
   onSelect,
   isTogglingStatus,
@@ -872,6 +1072,7 @@ function DAKRow({
   onShowQR: () => void;
   onDelete: () => void;
   onToggleStatus: () => void;
+  onEdit: () => void;
   isSelected: boolean;
   onSelect: () => void;
   isTogglingStatus: boolean;
@@ -1034,11 +1235,9 @@ function DAKRow({
                   {t('dynamic_keys.detail.details')}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="cursor-pointer">
-                  <Pencil className="w-4 h-4 mr-2" />
-                  {t('common.edit')}
-                </Link>
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="w-4 h-4 mr-2" />
+                {t('common.edit')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
@@ -1078,6 +1277,16 @@ export default function DynamicKeysPage() {
   const [qrDialogDak, setQrDialogDak] = useState<DAKData | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
+  const [editingDAK, setEditingDAK] = useState<{
+    id: string;
+    name: string;
+    email: string | null;
+    telegramId: string | null;
+    notes: string | null;
+    dataLimitBytes: bigint | null;
+    durationDays: number | null;
+    expiresAt: Date | null;
+  } | null>(null);
   const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
 
@@ -2083,6 +2292,16 @@ export default function DynamicKeysPage() {
                     onShowQR={() => handleShowQR(dak)}
                     onDelete={() => handleDelete(dak)}
                     onToggleStatus={() => handleToggleStatus(dak)}
+                    onEdit={() => setEditingDAK({
+                      id: dak.id,
+                      name: dak.name,
+                      email: dak.email ?? null,
+                      telegramId: dak.telegramId ?? null,
+                      notes: dak.notes ?? null,
+                      dataLimitBytes: dak.dataLimitBytes,
+                      durationDays: (dak as DAKData).durationDays ?? null,
+                      expiresAt: dak.expiresAt ?? null,
+                    })}
                     isSelected={selectedKeys.has(dak.id)}
                     onSelect={() => handleSelectKey(dak.id)}
                     isTogglingStatus={togglingKeyId === dak.id}
@@ -2187,6 +2406,19 @@ export default function DynamicKeysPage() {
         results={bulkProgressResults}
         isPending={bulkToggleStatusMutation.isPending}
       />
+
+      {/* Edit DAK dialog */}
+      {editingDAK && (
+        <EditDAKDialog
+          open={!!editingDAK}
+          onOpenChange={(open) => !open && setEditingDAK(null)}
+          dakData={editingDAK}
+          onSuccess={() => {
+            refetch();
+            setEditingDAK(null);
+          }}
+        />
+      )}
     </div >
   );
 }
