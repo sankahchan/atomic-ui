@@ -51,61 +51,22 @@ import { NotificationBell } from '@/components/notification-bell';
  * Navigation items configuration
  * Each item represents a section in the sidebar navigation
  */
+/**
+ * Navigation items for route prefetching.
+ * These should match the actual routes in the sidebar.
+ */
 const navItems = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    description: 'Overview and statistics'
-  },
-  {
-    href: '/dashboard/servers',
-    label: 'Servers',
-    icon: Server,
-    description: 'Manage Outline servers'
-  },
-  {
-    href: '/dashboard/keys',
-    label: 'Access Keys',
-    icon: Key,
-    description: 'Manage VPN access keys'
-  },
-  {
-    href: '/dashboard/dynamic-keys',
-    label: 'Dynamic Keys',
-    icon: KeyRound,
-    description: 'Dynamic access key pools'
-  },
-  {
-    href: '/dashboard/archived',
-    label: 'Archived Keys',
-    icon: Archive,
-    description: 'View expired and deleted keys'
-  },
-  {
-    href: '/dashboard/health',
-    label: 'Health',
-    icon: Activity,
-    description: 'Server health monitoring'
-  },
-  {
-    href: '/dashboard/notifications',
-    label: 'Notifications',
-    icon: Bell,
-    description: 'Alert settings'
-  },
-  {
-    href: '/dashboard/users',
-    label: 'User Management',
-    icon: User,
-    description: 'Manage users'
-  },
-  {
-    href: '/dashboard/settings',
-    label: 'Settings',
-    icon: Settings,
-    description: 'Application settings'
-  },
+  { href: '/dashboard' },
+  { href: '/dashboard/servers' },
+  { href: '/dashboard/keys' },
+  { href: '/dashboard/dynamic-keys' },
+  { href: '/dashboard/security' },
+  { href: '/dashboard/users' },
+  { href: '/dashboard/settings' },
+  { href: '/dashboard/notifications' },
+  { href: '/dashboard/analytics' },
+  { href: '/dashboard/templates' },
+  { href: '/dashboard/archived' },
 ];
 
 import { useLocale } from '@/hooks/use-locale';

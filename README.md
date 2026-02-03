@@ -1,133 +1,137 @@
-# ⚛️ Atomic-UI
+# Atomic-UI
 
-**Advanced Outline VPN Management Panel**
+Advanced Outline VPN management panel built with Next.js 14, TypeScript, Prisma, and tRPC.
 
-A modern, feature-rich web application for managing Outline VPN servers. Built with Next.js 14, TypeScript, and a beautiful atomic-inspired dark theme.
+![Atomic-UI Screenshot](https://github.com/user-attachments/assets/e3a543e6-165f-472b-a46b-462a15c96ed0)
 
+## Features
 
-![New Note](https://github.com/user-attachments/assets/e3a543e6-165f-472b-a46b-462a15c96ed0)
+### Server management
+- Multi-server Outline support from a single dashboard
+- Server sync and health checks (latency, uptime, status)
+- DigitalOcean-based server provisioning flow
+- Security probe dashboard (TLS/certificate visibility)
 
-## ✨ Features
+### Access key management
+- Full CRUD for access keys and dynamic access keys
+- Key templates and bulk actions (extend, enable/disable, tag, archive, delete)
+- Data limits and reset strategies (daily/weekly/monthly/never)
+- Expiration modes (never/fixed/duration/from first use)
+- Subscription links and QR generation
 
-### Server Management
-- **Multi-Server Support**: Connect and manage multiple Outline servers from a single dashboard
-- **Auto-Deployment**: Provision new DigitalOcean droplets directly from the UI
-- **Real-time Health Monitoring**: Track server status, latency, and uptime
-- **One-click Sync**: Synchronize keys and metrics from Outline servers
+### Portal and self-service
+- Dedicated `/portal` experience for non-admin users
+- Dynamic subscription endpoint support (`/api/sub/:token`, `/api/subscription/:token`)
+- Live usage/device visibility
 
-### Access Key Management
-- **Advanced CRUD**: Create, read, update, and delete access keys with ease
-- **Smart Grouping**: Organize keys by server with collapsible groups for better management
-- **Key Templates**: Define standard configurations (e.g. "30 Day Plan") for quick key creation
-- **Bulk Operations**: Create, extend, or delete multiple keys at once
-- **Traffic Limits**: Set data usage limits (GB) with auto-reset strategies (Daily/Weekly/Monthly)
-- **Flexible Expiration**: Never, fixed date, duration from creation, or start-on-first-use
-- **Mobile Optimized**: Responsive card views and touch-friendly controls for on-the-go management
-- **Sharing**: Auto-generated QR codes and subscription URLs (Dynamic Keys)
+### Security and auth
+- Roles: `ADMIN` and non-admin user roles (`USER` / `CLIENT`)
+- Session cookie auth with DB-backed session revocation
+- 2FA support: TOTP, recovery codes, and WebAuthn passkeys
+- Dashboard access rules (IP/CIDR/Country)
 
-### User Portal & Self-Service
-- **Client Portal**: Dedicated area for users to view their keys, usage stats, and subscription links
-- **Dynamic Access Keys**: Single subscription URL that automatically updates with assigned keys
-- **My Device**: Auto-detection of VPN connection status
+### Integrations
+- Telegram notification + command integration
+- Backup/restore flows (admin-protected)
+- CSV/JSON export (admin-protected)
 
-### Analytics & Reporting
-- **Traffic History**: Interactive charts showing usage trends (24h, 7d, 30d)
-- **Top Users**: Identify high-bandwidth consumers
-- **Peak Hours**: Heatmap visualization of network activity
+## Quick start
 
-### Security
-- **Role-based Access**: Admin, staff, and viewer roles
-- **Firewall Rules**: Geo-blocking and IP restriction for the dashboard
-- **Secure Auth**: JWT authentication, bcrypt hashing, and session management
-
-### Telegram Bot Integration
-- **Notifications**: Receive admin alerts for expiry and high usage
-- **Commands**: Check status, usage, and system info via Telegram
-- **User Linking**: Link Telegram accounts to users for direct messaging
-
-## 🚀 Quick Start
-
-### One-Command Installation (Recommended for VPS)
-
-Deploy instantly on Ubuntu/Debian with a single command:
-
-```bash
-wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
-```
-
-After installation:
-- Access panel at `http://YOUR_IP:2053/YOUR_PATH/`
-- Default login: `admin` / `admin123`
-- Run `atomic-ui` for management menu
-
-### Docker Installation
+### Local development
 
 ```bash
 git clone https://github.com/sankahchan/atomic-ui.git
 cd atomic-ui
 cp .env.example .env
-# Edit .env with your details
+npm install
+npm run db:generate
+npm run db:push
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+### Docker
+
+```bash
+git clone https://github.com/sankahchan/atomic-ui.git
+cd atomic-ui
+cp .env.example .env
 docker-compose up -d --build
 ```
 
-Access the dashboard at `http://localhost:3000`.
+### One-command install (VPS)
 
-**Default Credentials**:
-Check the logs on first run for the generated admin credentials:
 ```bash
-docker-compose logs atomic-ui | grep "Login Credentials" -A 2
+wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
-See [DEPLOY.md](DEPLOY.md) for detailed production deployment instructions.
+For production deployment details, see [DEPLOY.md](DEPLOY.md).
 
-## 📁 Project Structure
+## Environment variables
 
+Set these in `.env` before production use:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | Yes | SQLite DSN (example: `file:./data/atomic-ui.db`) |
+| `JWT_SECRET` | Yes | Session signing secret; must be strong and unique |
+| `SESSION_EXPIRY_DAYS` | No | Session TTL in days (default: `7`) |
+| `TOTP_ENCRYPTION_KEY` | Strongly recommended | Stable key for encrypting TOTP secrets |
+| `CRON_SECRET` | Strongly recommended | Protects task endpoints (`/api/health-check`, `/api/tasks/check-expirations`) |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical public URL used by webhook/subscription links |
+| `APP_URL` | Recommended | App base URL for server-side flows |
+| `TELEGRAM_BOT_TOKEN` | Optional | Bot token from @BotFather |
+| `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from UI |
+
+## Security checklist
+
+- Set `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, and `CRON_SECRET` before going live.
+- Use HTTPS in production.
+- Set `NEXT_PUBLIC_APP_URL` to avoid host-header-derived callback URLs.
+- Restrict access to backup/export/admin routes to trusted users only.
+- Rotate credentials after initial setup.
+
+## Useful scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run db:generate
+npm run db:push
+npm run db:migrate
+npm run db:studio
 ```
+
+## Project structure
+
+```text
 atomic-ui/
-├── prisma/             # Database schema
-├── scripts/            # Setup and utility scripts
+├── prisma/
+├── scripts/
 ├── src/
-│   ├── app/            # Next.js App Router pages
-│   ├── components/     # UI Components (shadcn/ui)
-│   ├── lib/            # Utilities (Auth, DB, Security)
-│   ├── server/         # Backend Logic
-│   │   ├── routers/    # tRPC API Routers
-│   │   ├── scheduler.ts # Background Jobs (Cron)
-│   └── types/          # TypeScript definitions
-├── docker-compose.yml  # Docker configuration
-└── Dockerfile          # Container definition
+│   ├── app/
+│   ├── components/
+│   ├── hooks/
+│   ├── lib/
+│   ├── server/
+│   │   └── routers/
+│   └── types/
+├── docker-compose.yml
+└── Dockerfile
 ```
 
-## 🔧 Configuration
+## Tech stack
 
-Key environment variables in `.env`:
+- Next.js 14 (App Router)
+- TypeScript
+- Prisma + SQLite
+- tRPC + React Query
+- Tailwind CSS + shadcn/ui
+- Recharts
 
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET` | Secret for signing session tokens (Required) |
-| `APP_URL` | Public URL for subscription links (e.g. `https://vpn.example.com`) |
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `DIGITALOCEAN_TOKEN` | (Optional) Token for auto-deployment feature |
-| `DEFAULT_ADMIN_EMAIL` | Email for initial admin account |
+## License
 
-## 🛠 Tech Stack
-
-- **Framework**: Next.js 14
-- **Language**: TypeScript
-- **Database**: SQLite (via Prisma)
-- **API**: tRPC
-- **Styling**: Tailwind CSS, shadcn/ui
-- **Charts**: Recharts
-- **Maps**: react-simple-maps (Server locations)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read the contributing guidelines before submitting a PR.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-Made with ⚛️ by [sankahchan](https://github.com/sankahchan)
+MIT. See [LICENSE](LICENSE).

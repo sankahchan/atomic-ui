@@ -560,7 +560,7 @@ function KeyAlertsCard() {
                               ? t('notifications.key_alerts.day_left')
                               : `${key.daysRemaining} ${t('notifications.key_alerts.days_left')}`}
                         </Badge>
-                        <Link href={`/dashboard/access-keys`}>
+                        <Link href={`/dashboard/keys`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
@@ -623,7 +623,7 @@ function KeyAlertsCard() {
                         >
                           {key.usagePercent}%
                         </Badge>
-                        <Link href={`/dashboard/access-keys`}>
+                        <Link href={`/dashboard/keys`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ExternalLink className="w-4 h-4" />
                           </Button>

@@ -87,7 +87,7 @@ export const usersRouter = router({
                 newPassword: z.string().min(6),
             })
         )
-        .mutation(async ({ ctx, input }) => {
+        .mutation(async ({ input }) => {
             const passwordHash = await hashPassword(input.newPassword);
 
             await db.user.update({
@@ -95,7 +95,7 @@ export const usersRouter = router({
                 data: { passwordHash },
             });
 
-            // Ideally invalidate sessions here, but simple update is fine for MVP
+            // Invalidate sessions for the user
             await db.session.deleteMany({
                 where: { userId: input.id },
             });
