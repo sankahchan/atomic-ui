@@ -27,11 +27,15 @@ import { jwtVerify } from 'jose';
  */
 const publicRoutes = [
   '/login',
+  '/verify-2fa',
   '/sub/',                  // Subscription URLs (Pages)
   '/api/subscription/',     // Subscription API (Bypass auth)
   '/api/sub/',              // Alternative Subscription API
   '/api/health',            // Health check endpoint
+  '/api/health-check',      // Background server checks (cron/manual secret)
+  '/api/telegram/webhook',  // Telegram webhook from external service
   '/api/trpc/auth.login',   // Login API endpoint
+  '/api/trpc/auth.verify2FA', // 2FA verification endpoint
   '/api/trpc/auth.logout',  // Logout API endpoint
   '/api/tasks/',            // Background tasks (cron jobs)
   '/_next',                 // Next.js static files

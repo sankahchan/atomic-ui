@@ -301,6 +301,7 @@ function DisableTotpDialog({
 function WebAuthnSection() {
     const { toast } = useToast();
     const utils = trpc.useUtils();
+    const [deletingCredentialId, setDeletingCredentialId] = useState<string | null>(null);
 
     const { data: status, refetch } = trpc.security.get2FAStatus.useQuery();
 
@@ -316,9 +317,13 @@ function WebAuthnSection() {
     const deleteCredMutation = trpc.security.deleteWebAuthnCredential.useMutation({
         onSuccess: () => {
             toast({ title: 'Passkey Removed' });
+            setDeletingCredentialId(null);
             refetch();
         },
-        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+        onError: (err) => {
+            setDeletingCredentialId(null);
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        },
     });
 
     const handleRegisterPasskey = async () => {
@@ -372,11 +377,17 @@ function WebAuthnSection() {
                                     size="icon"
                                     onClick={() => {
                                         if (confirm('Remove this passkey?')) {
+                                            setDeletingCredentialId(cred.id);
                                             deleteCredMutation.mutate({ credentialId: cred.id });
                                         }
                                     }}
+                                    disabled={deleteCredMutation.isPending && deletingCredentialId === cred.id}
                                 >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                    {deleteCredMutation.isPending && deletingCredentialId === cred.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                    ) : (
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    )}
                                 </Button>
                             </div>
                         ))}
@@ -392,11 +403,17 @@ function WebAuthnSection() {
                     onClick={handleRegisterPasskey}
                     disabled={generateRegOptionsMutation.isPending || verifyRegMutation.isPending}
                 >
-                    {(generateRegOptionsMutation.isPending || verifyRegMutation.isPending) && (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {generateRegOptionsMutation.isPending || verifyRegMutation.isPending ? (
+                        <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Adding Passkey...
+                        </>
+                    ) : (
+                        <>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Passkey
+                        </>
                     )}
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Passkey
                 </Button>
             </CardContent>
         </Card>

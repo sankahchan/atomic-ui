@@ -11,7 +11,7 @@ import { getCurrentUser } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   // Check authentication
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

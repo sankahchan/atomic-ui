@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,8 @@ export function ServerList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [syncingServerId, setSyncingServerId] = useState<string | null>(null);
+    const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
+    const router = useRouter();
 
     // Fetch servers list
     const { data: servers, isLoading, refetch } = trpc.servers.list.useQuery({
@@ -65,6 +68,7 @@ export function ServerList() {
                 description: t('servers.toast.deleted_desc'),
             });
             refetch();
+            setDeletingServerId(null);
         },
         onError: (error) => {
             toast({
@@ -72,6 +76,7 @@ export function ServerList() {
                 description: error.message,
                 variant: 'destructive',
             });
+            setDeletingServerId(null);
         },
     });
 
@@ -81,6 +86,13 @@ export function ServerList() {
         server.location?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    useEffect(() => {
+        router.prefetch('/dashboard/servers/deploy');
+        servers?.slice(0, 8).forEach((server) => {
+            router.prefetch(`/dashboard/servers/${server.id}`);
+        });
+    }, [router, servers]);
+
     const handleSync = (serverId: string) => {
         setSyncingServerId(serverId);
         syncMutation.mutate({ id: serverId });
@@ -88,6 +100,7 @@ export function ServerList() {
 
     const handleDelete = (serverId: string, serverName: string) => {
         if (confirm(`${t('servers.confirm_delete')} "${serverName}"?\n\n${t('servers.confirm_delete_desc')}`)) {
+            setDeletingServerId(serverId);
             deleteMutation.mutate({ id: serverId });
         }
     };
@@ -109,9 +122,9 @@ export function ServerList() {
                     <Button
                         variant="outline"
                         onClick={() => refetch()}
-                        disabled={isLoading}
+                        disabled={isLoading || syncMutation.isPending || deleteMutation.isPending}
                     >
-                        <RefreshCw className={cn('w-4 h-4 mr-2', isLoading && 'animate-spin')} />
+                        <RefreshCw className={cn('w-4 h-4 mr-2', (isLoading || syncMutation.isPending || deleteMutation.isPending) && 'animate-spin')} />
                         {t('servers.refresh')}
                     </Button>
                 </div>
@@ -146,6 +159,7 @@ export function ServerList() {
                             onSync={() => handleSync(server.id)}
                             onDelete={() => handleDelete(server.id, server.name)}
                             isSyncing={syncingServerId === server.id && syncMutation.isPending}
+                            isDeleting={deletingServerId === server.id && deleteMutation.isPending}
                         />
                     ))}
                 </div>

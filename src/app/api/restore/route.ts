@@ -2,26 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
-import { pipeline } from 'stream/promises';
-import { createWriteStream } from 'fs';
-
-// Helper to save uploaded file to temp path
-async function saveFile(file: File): Promise<string> {
-    const tempDir = path.join(process.cwd(), 'tmp');
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-    }
-    const tempPath = path.join(tempDir, `upload-${Date.now()}.zip`);
-    const stream = file.stream() as unknown as ReadableStream;
-    // Convert web stream to node stream
-    // @ts-ignore
-    const nodeStream = Readable.fromWeb(stream);
-    await pipeline(nodeStream, createWriteStream(tempPath));
-    return tempPath;
-}
+import { getCurrentUser } from '@/lib/auth';
+import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 
 export async function POST(req: NextRequest) {
     try {
+        const user = await getCurrentUser();
+        if (!user || user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const formData = await req.formData();
         const file = formData.get('backup') as File;
 
@@ -36,12 +26,13 @@ export async function POST(req: NextRequest) {
         const zip = new AdmZip(buffer);
         const zipEntries = zip.getEntries();
 
+        const dbBasename = path.basename(resolveSqliteDbPath());
         let dbFound = false;
         let envFound = false;
 
         // Validate zip contents
         zipEntries.forEach((entry) => {
-            if (entry.entryName === 'atomic-ui.db') dbFound = true;
+            if (entry.entryName === 'atomic-ui.db' || entry.entryName === dbBasename) dbFound = true;
             if (entry.entryName === '.env') envFound = true;
         });
 
@@ -50,21 +41,27 @@ export async function POST(req: NextRequest) {
         }
 
         // Define target paths
-        const dbPath = path.join(process.cwd(), 'prisma', 'data', 'atomic-ui.db');
+        const dbPath = resolveSqliteDbPath();
         const envPath = path.join(process.cwd(), '.env');
+        fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
         // Create backup of current state before restoring (just in case)
         if (fs.existsSync(dbPath)) fs.copyFileSync(dbPath, `${dbPath}.bak`);
         if (fs.existsSync(envPath)) fs.copyFileSync(envPath, `${envPath}.bak`);
 
-        // Extract files
-        if (dbFound) {
-            zip.extractEntryTo('atomic-ui.db', path.dirname(dbPath), false, true);
+        // Restore database file from archive entry
+        const dbEntry = zip.getEntry('atomic-ui.db') || zip.getEntry(dbBasename);
+        if (!dbEntry) {
+            return NextResponse.json({ error: 'Invalid backup: atomic-ui.db entry is missing' }, { status: 400 });
         }
+        fs.writeFileSync(dbPath, dbEntry.getData());
 
+        // Restore environment file if present
         if (envFound) {
-            // Overwrite .env
-            zip.extractEntryTo('.env', process.cwd(), false, true);
+            const envEntry = zip.getEntry('.env');
+            if (envEntry) {
+                fs.writeFileSync(envPath, envEntry.getData());
+            }
         }
 
         return NextResponse.json({ success: true, message: 'Restore complete. Please restart the service.' });

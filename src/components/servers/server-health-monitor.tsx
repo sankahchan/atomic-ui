@@ -35,28 +35,6 @@ export function ServerHealthMonitor() {
     // Fetch server status with health data
     const { data: serverStatus, isLoading, refetch } = trpc.dashboard.serverStatus.useQuery();
 
-    // Test connection mutation for manual health checks
-    const testConnectionMutation = trpc.servers.testConnection.useMutation({
-        onSuccess: (result) => {
-            toast({
-                title: result.success ? t('health.toast.healthy') : t('health.toast.check_failed'),
-                description: result.success
-                    ? `${t('health.metrics.latency')}: ${result.latency}ms`
-                    : result.error || 'Unable to connect to server',
-                variant: result.success ? 'default' : 'destructive',
-            });
-            refetch();
-            setCheckingServerId(null);
-        },
-        onError: (error) => {
-            toast({
-                title: t('health.toast.check_error'),
-                description: error.message,
-                variant: 'destructive',
-            });
-            setCheckingServerId(null);
-        },
-    });
 
     // Calculate summary statistics
     const stats = {
@@ -77,9 +55,36 @@ export function ServerHealthMonitor() {
             : null,
     };
 
-    const handleManualCheck = (serverId: string, apiUrl: string, certSha256: string) => {
+    const handleManualCheck = async (serverId: string) => {
         setCheckingServerId(serverId);
-        testConnectionMutation.mutate({ apiUrl, apiCertSha256: certSha256 });
+        try {
+            const response = await fetch(`/api/health-check?serverId=${encodeURIComponent(serverId)}`, {
+                method: 'POST',
+            });
+
+            const result = await response.json().catch(() => null);
+
+            if (!response.ok || !result?.success) {
+                throw new Error(result?.error || 'Manual health check failed');
+            }
+
+            const first = Array.isArray(result.results) ? result.results[0] : null;
+            toast({
+                title: t('health.toast.manual_check'),
+                description: first
+                    ? `${first.status}${first.latencyMs != null ? ` • ${first.latencyMs}ms` : ''}`
+                    : t('health.toast.manual_check_desc'),
+            });
+            refetch();
+        } catch (error) {
+            toast({
+                title: t('health.toast.check_error'),
+                description: error instanceof Error ? error.message : 'Manual health check failed',
+                variant: 'destructive',
+            });
+        } finally {
+            setCheckingServerId(null);
+        }
     };
 
     return (
@@ -186,19 +191,7 @@ export function ServerHealthMonitor() {
                                 },
                             }}
                             onManualCheck={() => {
-                                // In a real scenario, we would need to pass the apiUrl and cert
-                                // But since serverStatus trpc endpoint doesn't return them for security/bandwidth reasons,
-                                // we need to either update the endpoint or fetch details.
-                                // However, the original code had a placeholder too:
-                                // "Would need to fetch apiUrl... For now, we'll just show a placeholder action"
-                                // So I will keep the placeholder behavior or try to implement it if possible?
-                                // The original code had: toast({ title: t('health.toast.manual_check') ... })
-                                // I'll stick to reproducing the original logic.
-
-                                toast({
-                                    title: t('health.toast.manual_check'),
-                                    description: t('health.toast.manual_check_desc'),
-                                });
+                                handleManualCheck(server.id);
                             }}
                             isChecking={checkingServerId === server.id}
                         />

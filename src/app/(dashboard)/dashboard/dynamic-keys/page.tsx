@@ -1289,6 +1289,7 @@ export default function DynamicKeysPage() {
   } | null>(null);
   const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | null>(null);
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('dynamic-keys');
 
@@ -1584,6 +1585,7 @@ export default function DynamicKeysPage() {
   };
 
   const handleExport = async (format: 'json' | 'csv') => {
+    setExportingFormat(format);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
@@ -1613,6 +1615,8 @@ export default function DynamicKeysPage() {
         description: 'Failed to export dynamic keys.',
         variant: 'destructive',
       });
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -1624,6 +1628,12 @@ export default function DynamicKeysPage() {
   };
 
   const hasActiveFilters = searchQuery || statusFilter || typeFilter;
+  const isBulkBusy =
+    bulkDeleteMutation.isPending ||
+    bulkExtendMutation.isPending ||
+    bulkToggleStatusMutation.isPending ||
+    bulkAddTagsMutation.isPending ||
+    bulkRemoveTagsMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -1853,17 +1863,21 @@ export default function DynamicKeysPage() {
         {/* Export dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export
+            <Button variant="outline" size="sm" disabled={!!exportingFormat}>
+              {exportingFormat ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {exportingFormat ? `Exporting ${exportingFormat.toUpperCase()}...` : 'Export'}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleExport('json')}>
+            <DropdownMenuItem onClick={() => handleExport('json')} disabled={!!exportingFormat}>
               <FileJson className="w-4 h-4 mr-2" />
               Export as JSON
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')}>
+            <DropdownMenuItem onClick={() => handleExport('csv')} disabled={!!exportingFormat}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Export as CSV
             </DropdownMenuItem>
@@ -1902,7 +1916,7 @@ export default function DynamicKeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {t('dynamic_keys.sync_servers')}
+            {syncAllMutation.isPending ? 'Syncing...' : t('dynamic_keys.sync_servers')}
           </Button>
 
           {/* View mode toggle - visible on all screens */}
@@ -1950,7 +1964,11 @@ export default function DynamicKeysPage() {
                   size="sm"
                   disabled={bulkToggleStatusMutation.isPending}
                 >
-                  <Power className="w-4 h-4 mr-2" />
+                  {bulkToggleStatusMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Power className="w-4 h-4 mr-2" />
+                  )}
                   Enable/Disable
                 </Button>
               </DropdownMenuTrigger>
@@ -1971,8 +1989,13 @@ export default function DynamicKeysPage() {
               variant="outline"
               size="sm"
               onClick={() => setBulkExtendDialogOpen(true)}
+              disabled={isBulkBusy}
             >
-              <Clock className="w-4 h-4 mr-2" />
+              {bulkExtendMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Clock className="w-4 h-4 mr-2" />
+              )}
               Extend Expiry
             </Button>
 
@@ -1984,7 +2007,11 @@ export default function DynamicKeysPage() {
                   size="sm"
                   disabled={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
                 >
-                  <Tag className="w-4 h-4 mr-2" />
+                  {bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Tag className="w-4 h-4 mr-2" />
+                  )}
                   Tags
                 </Button>
               </DropdownMenuTrigger>
@@ -2026,6 +2053,7 @@ export default function DynamicKeysPage() {
             size="sm"
             onClick={() => setSelectedKeys(new Set())}
             className="ml-auto"
+            disabled={isBulkBusy}
           >
             Clear selection
           </Button>

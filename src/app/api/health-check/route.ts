@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
 import { OutlineClient } from '@/lib/outline-api';
+import { getCurrentUser } from '@/lib/auth';
 
 /**
  * Health check result for a single server.
@@ -67,13 +68,22 @@ export async function POST(request: NextRequest) {
     const specificServerId = searchParams.get('serverId');
     const cronSecret = searchParams.get('secret');
 
-    // Verify cron secret if provided (for automated calls)
+    // Verify cron secret / admin session
     const expectedSecret = process.env.CRON_SECRET;
-    if (expectedSecret && cronSecret && cronSecret !== expectedSecret) {
-      return NextResponse.json(
-        { error: 'Invalid cron secret' },
-        { status: 401 }
-      );
+    const hasValidSecret = !!expectedSecret && cronSecret === expectedSecret;
+
+    if (expectedSecret) {
+      if (!hasValidSecret) {
+        const user = await getCurrentUser();
+        if (!user || user.role !== 'ADMIN') {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+      }
+    } else {
+      const user = await getCurrentUser();
+      if (!user || user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     // Fetch servers to check

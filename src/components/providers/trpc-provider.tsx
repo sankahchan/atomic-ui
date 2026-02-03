@@ -41,17 +41,19 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Consider data stale after 30 seconds
-            // This balances freshness with reducing unnecessary requests
-            staleTime: 30 * 1000,
+            // Keep data fresh a little longer to avoid repetitive refetches between page clicks
+            staleTime: 60 * 1000,
             
-            // Keep unused data in cache for 5 minutes
-            // Allows fast navigation back to previously viewed pages
-            gcTime: 5 * 60 * 1000,
+            // Keep unused data in cache longer for snappier back/forward navigation
+            gcTime: 10 * 60 * 1000,
             
-            // Retry failed requests up to 3 times
-            // Helps handle transient network issues
-            retry: 3,
+            // Retry once for transient errors, but don't retry auth/forbidden failures.
+            retry: (failureCount, error) => {
+              const maybeData = (error as { data?: { code?: string } } | undefined)?.data;
+              const code = maybeData?.code;
+              if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') return false;
+              return failureCount < 1;
+            },
             
             // Don't refetch on window focus for admin UI
             // Prevents jarring updates while working

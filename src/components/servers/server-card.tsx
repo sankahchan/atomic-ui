@@ -104,6 +104,7 @@ export function ServerCard({
     onSync,
     onDelete,
     isSyncing,
+    isDeleting,
 }: {
     server: {
         id: string;
@@ -130,6 +131,7 @@ export function ServerCard({
     onSync: () => void;
     onDelete: () => void;
     isSyncing?: boolean;
+    isDeleting?: boolean;
 }) {
     const { t } = useLocale();
     const status = server.healthCheck?.lastStatus || 'UNKNOWN';
@@ -280,10 +282,15 @@ export function ServerCard({
                             variant="ghost"
                             size="sm"
                             onClick={onDelete}
+                            disabled={isDeleting}
                             className="text-destructive hover:text-destructive"
                             title={t('servers.actions.delete')}
                         >
-                            <Trash2 className="w-4 h-4" />
+                            {isDeleting ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Trash2 className="w-4 h-4" />
+                            )}
                         </Button>
                     </div>
                 </div>

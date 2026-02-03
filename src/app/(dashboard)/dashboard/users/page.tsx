@@ -36,6 +36,7 @@ export default function UsersPage() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newUserEmail, setNewUserEmail] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
+    const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
     // Fetch users
     const { data: users, refetch, isLoading } = trpc.users.list.useQuery();
@@ -67,6 +68,7 @@ export default function UsersPage() {
                 title: 'User deleted',
                 description: 'User has been removed.',
             });
+            setDeletingUserId(null);
             refetch();
         },
         onError: (error) => {
@@ -75,6 +77,7 @@ export default function UsersPage() {
                 description: error.message,
                 variant: 'destructive',
             });
+            setDeletingUserId(null);
         },
     });
 
@@ -88,6 +91,7 @@ export default function UsersPage() {
 
     const handleDelete = (id: string, email: string) => {
         if (confirm(`Are you sure you want to delete user ${email}?`)) {
+            setDeletingUserId(id);
             deleteMutation.mutate({ id });
         }
     };
@@ -206,10 +210,14 @@ export default function UsersPage() {
                                             size="icon"
                                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                             onClick={() => handleDelete(user.id, user.email || 'Unknown')}
-                                            disabled={user.role === 'ADMIN'} // Prevent deleting admins for now
+                                            disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)} // Prevent deleting admins for now
                                             title={user.role === 'ADMIN' ? "Cannot delete admin" : "Delete user"}
                                         >
-                                            <Trash2 className="h-4 w-4" />
+                                            {deleteMutation.isPending && deletingUserId === user.id ? (
+                                                <RefreshCcw className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="h-4 w-4" />
+                                            )}
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -242,9 +250,13 @@ export default function UsersPage() {
                                 size="icon"
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-2 -mr-2"
                                 onClick={() => handleDelete(user.id, user.email || 'Unknown')}
-                                disabled={user.role === 'ADMIN'}
+                                disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)}
                             >
-                                <Trash2 className="h-4 w-4" />
+                                {deleteMutation.isPending && deletingUserId === user.id ? (
+                                    <RefreshCcw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                )}
                             </Button>
                         </div>
 

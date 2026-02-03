@@ -43,6 +43,7 @@ import {
   invalidateSession,
   getSessionToken,
 } from '@/lib/auth';
+import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 
 /**
  * Auth Router
@@ -176,7 +177,7 @@ const authRouter = router({
         }
 
         // Decrypt secret
-        const ENCRYPTION_KEY = process.env.TOTP_ENCRYPTION_KEY || cryptoModule.randomBytes(32).toString('hex');
+        const ENCRYPTION_KEY = getTotpEncryptionKeyHex();
         const [ivHex, encrypted] = totpRecord.encryptedSecret.split(':');
         const iv = Buffer.from(ivHex, 'hex');
         const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');

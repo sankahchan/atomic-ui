@@ -374,6 +374,14 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Warm route chunks for faster dashboard navigation.
+  useEffect(() => {
+    for (const item of navItems) {
+      router.prefetch(item.href);
+    }
+    router.prefetch('/portal');
+  }, [router]);
+
   // Fetch current user with error handling
   const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
     retry: 1,

@@ -13,7 +13,7 @@
  * - Responsive design
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,6 +127,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    router.prefetch('/dashboard');
+    router.prefetch('/portal');
+    router.prefetch('/verify-2fa');
+  }, [router]);
 
   // Login mutation using tRPC
   const loginMutation = trpc.auth.login.useMutation({

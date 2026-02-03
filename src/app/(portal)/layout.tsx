@@ -98,6 +98,12 @@ export default function PortalLayout({
     const { toast } = useToast();
     const [hasError, setHasError] = useState(false);
 
+    useEffect(() => {
+        router.prefetch('/portal');
+        router.prefetch('/login');
+        router.prefetch('/dashboard');
+    }, [router]);
+
     const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
         retry: 1,
         retryDelay: 500,

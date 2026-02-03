@@ -36,6 +36,12 @@ function Verify2FAContent() {
   const [recoveryCode, setRecoveryCode] = useState('');
   const [activeTab, setActiveTab] = useState<'totp' | 'recovery'>(totpEnabled ? 'totp' : 'recovery');
 
+  useEffect(() => {
+    router.prefetch('/dashboard');
+    router.prefetch('/portal');
+    router.prefetch('/login');
+  }, [router]);
+
   // Redirect if no temp token
   useEffect(() => {
     if (!tempToken) {

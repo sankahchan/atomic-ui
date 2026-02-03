@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,14 +27,17 @@ export function SessionProvider({
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
-    const [lastActivity, setLastActivity] = useState(Date.now());
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const lastActivityRef = useRef(Date.now());
+    const isLoggingOutRef = useRef(false);
 
     const resetTimer = () => {
-        setLastActivity(Date.now());
+        lastActivityRef.current = Date.now();
     };
 
     const logout = useCallback(() => {
+        if (isLoggingOutRef.current) return;
+        isLoggingOutRef.current = true;
+
         // Clear any local storage auth tokens if you use them
         // Call logout endpoint
         fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
@@ -51,7 +54,7 @@ export function SessionProvider({
         // Check periodically if timeout has been reached
         const checkTimeout = () => {
             const now = Date.now();
-            const timeSinceLastActivity = now - lastActivity;
+            const timeSinceLastActivity = now - lastActivityRef.current;
             const timeoutMs = timeoutMinutes * 60 * 1000;
 
             if (timeSinceLastActivity > timeoutMs) {
@@ -88,23 +91,16 @@ export function SessionProvider({
             window.addEventListener(event, throttledHandler);
         });
 
-        // Copy ref for cleanup
-        const timer = timerRef.current;
-
         return () => {
-            EVENTS.forEach((event) => {
-                window.removeEventListener(event, resetTimer);
-            });
-            if (timer) clearTimeout(timer);
             clearInterval(interval);
             EVENTS.forEach(event => {
                 window.removeEventListener(event, throttledHandler);
             });
         };
-    }, [pathname, timeoutMinutes, lastActivity, logout]);
+    }, [pathname, timeoutMinutes, logout]);
 
     return (
-        <SessionContext.Provider value={{ lastActivity }}>
+        <SessionContext.Provider value={{ lastActivity: lastActivityRef.current }}>
             {children}
         </SessionContext.Provider>
     );

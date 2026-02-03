@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
 import { OutlineClient } from '@/lib/outline-api';
+import { getCurrentUser } from '@/lib/auth';
 
 /**
  * POST Handler
@@ -39,13 +40,23 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const cronSecret = searchParams.get('secret');
 
-    // Verify cron secret if provided
+    // Verify cron secret / admin session
     const expectedSecret = process.env.CRON_SECRET;
-    if (expectedSecret && cronSecret && cronSecret !== expectedSecret) {
-      return NextResponse.json(
-        { error: 'Invalid cron secret' },
-        { status: 401 }
-      );
+    const hasValidSecret = !!expectedSecret && cronSecret === expectedSecret;
+
+    if (expectedSecret) {
+      if (!hasValidSecret) {
+        const user = await getCurrentUser();
+        if (!user || user.role !== 'ADMIN') {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+      }
+    } else {
+      // Fail closed when no cron secret is configured.
+      const user = await getCurrentUser();
+      if (!user || user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     // Run all expiration checks

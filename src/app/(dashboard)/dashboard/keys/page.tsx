@@ -1415,6 +1415,7 @@ export default function KeysPage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | null>(null);
   const [editingKey, setEditingKey] = useState<{
     id: string;
     name: string;
@@ -1852,6 +1853,7 @@ export default function KeysPage() {
   };
 
   const handleExport = async (format: 'json' | 'csv') => {
+    setExportingFormat(format);
     try {
       // Use fetch to trigger download
       const params = new URLSearchParams();
@@ -1882,6 +1884,8 @@ export default function KeysPage() {
         description: 'Failed to export keys.',
         variant: 'destructive',
       });
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -1893,6 +1897,13 @@ export default function KeysPage() {
   };
 
   const hasActiveFilters = searchQuery || statusFilter || serverFilter;
+  const isBulkBusy =
+    bulkDeleteMutation.isPending ||
+    bulkExtendMutation.isPending ||
+    bulkToggleStatusMutation.isPending ||
+    bulkAddTagsMutation.isPending ||
+    bulkRemoveTagsMutation.isPending ||
+    bulkArchiveMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -2139,17 +2150,21 @@ export default function KeysPage() {
         {/* Export dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              {t('keys.export')}
+            <Button variant="outline" size="sm" disabled={!!exportingFormat}>
+              {exportingFormat ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {exportingFormat ? `Exporting ${exportingFormat.toUpperCase()}...` : t('keys.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleExport('json')}>
+            <DropdownMenuItem onClick={() => handleExport('json')} disabled={!!exportingFormat}>
               <FileJson className="w-4 h-4 mr-2" />
               {t('keys.export_json')}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')}>
+            <DropdownMenuItem onClick={() => handleExport('csv')} disabled={!!exportingFormat}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               {t('keys.export_csv')}
             </DropdownMenuItem>
@@ -2217,7 +2232,7 @@ export default function KeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {t('keys.sync')}
+            {syncAllMutation.isPending ? 'Syncing...' : t('keys.sync')}
           </Button>
         </div>
       </div>
@@ -2237,7 +2252,11 @@ export default function KeysPage() {
                   size="sm"
                   disabled={bulkToggleStatusMutation.isPending}
                 >
-                  <Power className="w-4 h-4 mr-2" />
+                  {bulkToggleStatusMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Power className="w-4 h-4 mr-2" />
+                  )}
                   Enable/Disable
                 </Button>
               </DropdownMenuTrigger>
@@ -2258,8 +2277,13 @@ export default function KeysPage() {
               variant="outline"
               size="sm"
               onClick={() => setBulkExtendDialogOpen(true)}
+              disabled={isBulkBusy}
             >
-              <Clock className="w-4 h-4 mr-2" />
+              {bulkExtendMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Clock className="w-4 h-4 mr-2" />
+              )}
               Extend Expiry
             </Button>
 
@@ -2271,7 +2295,11 @@ export default function KeysPage() {
                   size="sm"
                   disabled={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
                 >
-                  <Tag className="w-4 h-4 mr-2" />
+                  {bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Tag className="w-4 h-4 mr-2" />
+                  )}
                   Tags
                 </Button>
               </DropdownMenuTrigger>
@@ -2300,8 +2328,12 @@ export default function KeysPage() {
               onClick={handleBulkArchive}
               disabled={bulkArchiveMutation.isPending}
             >
-              <Archive className="w-4 h-4 mr-2" />
-              Archive
+              {bulkArchiveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Archive className="w-4 h-4 mr-2" />
+              )}
+              {bulkArchiveMutation.isPending ? 'Archiving...' : 'Archive'}
             </Button>
 
             {/* Delete */}
@@ -2324,6 +2356,7 @@ export default function KeysPage() {
             size="sm"
             onClick={() => setSelectedKeys(new Set())}
             className="ml-auto"
+            disabled={isBulkBusy}
           >
             {t('keys.clear_selection')}
           </Button>

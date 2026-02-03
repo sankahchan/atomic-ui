@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
     ShieldCheck, Plus, Trash2, Power, Globe, AlertTriangle,
     Lock, Unlock, CheckCircle, XCircle, AlertCircle, Server,
-    RefreshCw, Shield, Clock, ExternalLink
+    RefreshCw, Shield, Clock, ExternalLink, Loader2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BackButton } from '@/components/ui/back-button';
@@ -489,20 +489,32 @@ export default function SecurityPage() {
     const { toast } = useToast();
     const [createOpen, setCreateOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('status');
+    const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+    const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
     const { data: rules, isLoading, refetch } = trpc.security.listRules.useQuery();
 
     const toggleMutation = trpc.security.toggleRule.useMutation({
-        onSuccess: () => refetch(),
-        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+        onSuccess: () => {
+            setTogglingRuleId(null);
+            refetch();
+        },
+        onError: (err) => {
+            setTogglingRuleId(null);
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        },
     });
 
     const deleteMutation = trpc.security.deleteRule.useMutation({
         onSuccess: () => {
             toast({ title: 'Rule deleted' });
+            setDeletingRuleId(null);
             refetch();
         },
-        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+        onError: (err) => {
+            setDeletingRuleId(null);
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        },
     });
 
     const triggerProbeMutation = trpc.security.triggerSecurityProbe.useMutation({
@@ -528,7 +540,7 @@ export default function SecurityPage() {
                 <div className="flex items-center gap-2">
                     <Button variant="outline" onClick={() => triggerProbeMutation.mutate()} disabled={triggerProbeMutation.isPending}>
                         <RefreshCw className={`w-4 h-4 mr-2 ${triggerProbeMutation.isPending ? 'animate-spin' : ''}`} />
-                        Run Probe
+                        {triggerProbeMutation.isPending ? 'Running...' : 'Run Probe'}
                     </Button>
                 </div>
             </div>
@@ -628,20 +640,36 @@ export default function SecurityPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => toggleMutation.mutate({ id: rule.id })}
+                                                    onClick={() => {
+                                                        setTogglingRuleId(rule.id);
+                                                        toggleMutation.mutate({ id: rule.id });
+                                                    }}
+                                                    disabled={toggleMutation.isPending && togglingRuleId === rule.id}
                                                     title={rule.isActive ? "Disable Rule" : "Enable Rule"}
                                                 >
-                                                    <Power className={`w-4 h-4 ${rule.isActive ? 'text-green-500' : 'text-muted-foreground'}`} />
+                                                    {toggleMutation.isPending && togglingRuleId === rule.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                                    ) : (
+                                                        <Power className={`w-4 h-4 ${rule.isActive ? 'text-green-500' : 'text-muted-foreground'}`} />
+                                                    )}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
                                                     className="text-destructive"
+                                                    disabled={deleteMutation.isPending && deletingRuleId === rule.id}
                                                     onClick={() => {
-                                                        if (confirm('Delete this rule?')) deleteMutation.mutate({ id: rule.id });
+                                                        if (confirm('Delete this rule?')) {
+                                                            setDeletingRuleId(rule.id);
+                                                            deleteMutation.mutate({ id: rule.id });
+                                                        }
                                                     }}
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    {deleteMutation.isPending && deletingRuleId === rule.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4" />
+                                                    )}
                                                 </Button>
                                             </div>
                                         </div>

@@ -6,6 +6,7 @@ import { TOTP, generateSecret, generateURI, verify } from 'otplib';
 import * as QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 
 // Create TOTP instance
 const totp = new TOTP();
@@ -26,8 +27,8 @@ const APP_NAME = process.env.APP_NAME || 'Atomic UI';
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
 const RP_ORIGIN = process.env.NEXTAUTH_URL || process.env.APP_URL || 'http://localhost:3000';
 
-// Encryption key for TOTP secrets (should be 32 bytes for AES-256)
-const ENCRYPTION_KEY = process.env.TOTP_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+// Encryption key for TOTP secrets (32 bytes / 64 hex chars)
+const ENCRYPTION_KEY = getTotpEncryptionKeyHex();
 
 /**
  * Encrypt a TOTP secret for storage

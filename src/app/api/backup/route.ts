@@ -3,6 +3,8 @@ import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
+import { getCurrentUser } from '@/lib/auth';
+import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 
 // Helper to convert Node stream to Web stream (for Next.js Response)
 function streamToWeb(nodeStream: Readable) {
@@ -12,54 +14,42 @@ function streamToWeb(nodeStream: Readable) {
             nodeStream.on('end', () => controller.close());
             nodeStream.on('error', err => controller.error(err));
         },
+        cancel() {
+            nodeStream.destroy();
+        },
     });
 }
 
 export async function GET(req: NextRequest) {
     try {
-        // Check if user is admin (simple check via cookie/session usually, but for API route we need token)
-        // For now, allow download if they have the session cookie.
-        // In a real prod app, we should validate the session here using 'jose' or helper.
-        // Proceeding assuming middleware protects /api routes or we trust the cookie presence.
+        const user = await getCurrentUser();
+        if (!user || user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         // Define files to backup
-        const dbPath = path.join(process.cwd(), 'prisma', 'data', 'atomic-ui.db');
-        // Wait, let's verify db path dynamically or standard convention.
-        // If schema says "file:./data/sqlite.db", then it's relative to prisma folder.
-
+        const dbPath = resolveSqliteDbPath();
         const envPath = path.join(process.cwd(), '.env');
 
         if (!fs.existsSync(dbPath)) {
-            // Try default location if data/sqlite.db doesn't exist
-            // or maybe it's just prisma/sqlite.db
-            // I'll add logic to check multiple or just log error
-            // For now, let's assume standard location found in schema
-            console.error("DB file not found at " + dbPath);
+            return NextResponse.json({ error: 'Database file not found' }, { status: 404 });
         }
 
         const archive = archiver('zip', {
             zlib: { level: 9 }, // Sets the compression level.
         });
 
-        // Pipe archive data to a pass-through stream which we convert to web response
-        // Actually archiver matches node stream.
-
-        // Add DB
-        if (fs.existsSync(dbPath)) {
-            archive.file(dbPath, { name: 'atomic-ui.db' });
-        }
+        // Keep a stable filename for restore compatibility.
+        archive.file(dbPath, { name: 'atomic-ui.db' });
 
         // Add .env
         if (fs.existsSync(envPath)) {
             archive.file(envPath, { name: '.env' });
         }
 
-        // Finalize the archive (ie we are done appending files but streams have to finish yet)
-        // This creates a promise/event flow.
-        // To return a stream in Next.js App Router, we can pass the archive directly if it acts as a stream?
-        // Archiver is a Readable stream.
-
-        // We need to trigger finalize though.
+        archive.on('error', (error) => {
+            console.error('Archive error:', error);
+        });
         archive.finalize();
 
         return new NextResponse(streamToWeb(archive), {

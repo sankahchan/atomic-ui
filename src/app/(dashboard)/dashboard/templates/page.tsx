@@ -221,18 +221,25 @@ export default function TemplatesPage() {
     const { toast } = useToast();
     const [createOpen, setCreateOpen] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<any>(null);
+    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
     const { data: templates, isLoading, refetch } = trpc.templates.list.useQuery();
 
     const deleteMutation = trpc.templates.delete.useMutation({
         onSuccess: () => {
             toast({ title: 'Template deleted', description: 'The template has been removed.' });
+            setDeletingTemplateId(null);
             refetch();
-        }
+        },
+        onError: (err) => {
+            toast({ title: 'Failed to delete', description: err.message, variant: 'destructive' });
+            setDeletingTemplateId(null);
+        },
     });
 
     const handleDelete = (id: string) => {
         if (confirm('Are you sure you want to delete this template?')) {
+            setDeletingTemplateId(id);
             deleteMutation.mutate({ id });
         }
     };
@@ -279,8 +286,18 @@ export default function TemplatesPage() {
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTemplate(template)}>
                                             <Edit2 className="w-4 h-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(template.id)}>
-                                            <Trash2 className="w-4 h-4" />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive"
+                                            onClick={() => handleDelete(template.id)}
+                                            disabled={deleteMutation.isPending && deletingTemplateId === template.id}
+                                        >
+                                            {deleteMutation.isPending && deletingTemplateId === template.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4" />
+                                            )}
                                         </Button>
                                     </div>
                                 </CardTitle>

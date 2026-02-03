@@ -3,10 +3,10 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { TRPCError } from '@trpc/server';
-import { env } from 'process';
 import { db } from '@/lib/db';
 import { sendTelegramDocument } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
+import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 
 // Ensure backup directory exists
 const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
@@ -17,13 +17,7 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 // Helper to get DB path
 function getDbPath() {
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl || !dbUrl.startsWith('file:')) {
-        throw new Error('Database is not SQLite or DATABASE_URL is invalid');
-    }
-    // Remove 'file:' prefix
-    const relativePath = dbUrl.replace('file:', '');
-    return path.resolve(process.cwd(), 'prisma', relativePath);
+    return resolveSqliteDbPath();
 }
 
 export const backupRouter = router({
