@@ -413,6 +413,26 @@ create_service() {
     local PORT=$1
     print_step "Creating systemd service with port ${PORT}..."
 
+    # Check if standalone build exists and use it, otherwise use npm start
+    if [ -f "${INSTALL_DIR}/.next/standalone/server.js" ]; then
+        print_info "Using standalone server mode"
+
+        # Copy static files and public to standalone
+        cp -r "${INSTALL_DIR}/.next/static" "${INSTALL_DIR}/.next/standalone/.next/" 2>/dev/null || true
+        cp -r "${INSTALL_DIR}/public" "${INSTALL_DIR}/.next/standalone/" 2>/dev/null || true
+        cp "${INSTALL_DIR}/.env" "${INSTALL_DIR}/.next/standalone/" 2>/dev/null || true
+
+        # Copy prisma folder for database access
+        cp -r "${INSTALL_DIR}/prisma" "${INSTALL_DIR}/.next/standalone/" 2>/dev/null || true
+
+        EXEC_START="/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js"
+        WORKING_DIR="${INSTALL_DIR}/.next/standalone"
+    else
+        print_info "Using npm start mode"
+        EXEC_START="/usr/bin/npm start"
+        WORKING_DIR="${INSTALL_DIR}"
+    fi
+
     cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
 [Unit]
 Description=Atomic-UI - Outline VPN Management Panel
@@ -421,16 +441,17 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/node server.js
+WorkingDirectory=${WORKING_DIR}
+ExecStart=${EXEC_START}
 Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=${SERVICE_NAME}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
-Environment=NODE_OPTIONS=--max-old-space-size=384
+Environment=HOSTNAME=0.0.0.0
+Environment=NODE_OPTIONS=--max-old-space-size=512
 
 [Install]
 WantedBy=multi-user.target
@@ -440,12 +461,12 @@ EOF
         print_error "Failed to reload systemd daemon"
         return 1
     fi
-    
+
     if ! systemctl enable ${SERVICE_NAME} 2>&1; then
         print_error "Failed to enable service"
         return 1
     fi
-    
+
     if ! systemctl start ${SERVICE_NAME}; then
         print_error "Failed to start service"
         return 1
