@@ -14,6 +14,7 @@
 import cron from 'node-cron';
 import { snapshotTraffic } from '@/lib/services/analytics';
 import { checkExpirations } from '@/lib/services/expiration';
+import { checkBandwidthAlerts } from '@/lib/services/bandwidth-alerts';
 import { runHealthChecks, ensureHealthChecks } from '@/lib/services/health-check';
 import { logger } from '@/lib/logger';
 
@@ -48,7 +49,20 @@ export function initScheduler() {
         }
     });
 
-    // 3. Health Check (Every 2 minutes)
+    // 3. Bandwidth Alert Check (Every 5 minutes)
+    cron.schedule('*/5 * * * *', async () => {
+        logger.debug('⚠️ Running bandwidth alert check...');
+        try {
+            const result = await checkBandwidthAlerts();
+            if (result.alertsSent80 > 0 || result.alertsSent90 > 0 || result.autoDisabled > 0) {
+                logger.info(`⚠️ Bandwidth alerts: ${result.alertsSent80} at 80%, ${result.alertsSent90} at 90%, ${result.autoDisabled} auto-disabled`);
+            }
+        } catch (error) {
+            logger.error('❌ Bandwidth alert check failed:', error);
+        }
+    });
+
+    // 4. Health Check (Every 2 minutes)
     cron.schedule('*/2 * * * *', async () => {
         logger.debug('🏥 Running health checks...');
         try {

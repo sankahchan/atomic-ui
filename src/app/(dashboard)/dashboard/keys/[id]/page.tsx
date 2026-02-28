@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -139,6 +140,7 @@ function EditKeyDialog({
     durationDays: number | null;
     expiresAt: Date | null;
     expirationType: string | null;
+    autoDisableOnLimit: boolean;
   };
   onSuccess: () => void;
 }) {
@@ -154,6 +156,7 @@ function EditKeyDialog({
     dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
     durationDays: keyData.durationDays?.toString() || '',
     expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
+    autoDisableOnLimit: keyData.autoDisableOnLimit ?? true,
   });
 
   const updateMutation = trpc.keys.update.useMutation({
@@ -196,6 +199,7 @@ function EditKeyDialog({
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+      autoDisableOnLimit: formData.autoDisableOnLimit,
     } as any);
   };
 
@@ -252,25 +256,43 @@ function EditKeyDialog({
           </div>
 
           {formData.dataLimitGB && (
-            <div className="space-y-2">
-              <Label>Reset Strategy</Label>
-              <Select
-                value={formData.dataLimitResetStrategy}
-                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
-                  setFormData({ ...formData, dataLimitResetStrategy: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NEVER">Never Reset</SelectItem>
-                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label>Reset Strategy</Label>
+                <Select
+                  value={formData.dataLimitResetStrategy}
+                  onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                    setFormData({ ...formData, dataLimitResetStrategy: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NEVER">Never Reset</SelectItem>
+                    <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
+                    <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
+                    <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoDisable" className="text-sm font-medium">Auto-disable on limit</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically disable key when data limit is reached. Alerts are sent at 80% and 90%.
+                  </p>
+                </div>
+                <Switch
+                  id="autoDisable"
+                  checked={formData.autoDisableOnLimit}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, autoDisableOnLimit: checked })
+                  }
+                />
+              </div>
+            </>
           )}
 
           <div className="space-y-2">
@@ -1053,6 +1075,26 @@ export default function KeyDetailPage() {
                   />
                 )}
 
+                {key.dataLimitBytes && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(key as any).autoDisableOnLimit && (
+                      <Badge variant="outline" className="text-xs">
+                        Auto-disable on limit
+                      </Badge>
+                    )}
+                    {(key as any).bandwidthAlertAt80 && (
+                      <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-600">
+                        80% alert sent
+                      </Badge>
+                    )}
+                    {(key as any).bandwidthAlertAt90 && (
+                      <Badge variant="outline" className="text-xs border-red-500 text-red-600">
+                        90% alert sent
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
                 {(key as any).dataLimitResetStrategy && (key as any).dataLimitResetStrategy !== 'NEVER' && (
                   <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
                     <RefreshCw className="w-4 h-4" />
@@ -1233,6 +1275,7 @@ export default function KeyDetailPage() {
             durationDays: (key as any).durationDays,
             expiresAt: key.expiresAt,
             expirationType: (key as any).expirationType,
+            autoDisableOnLimit: (key as any).autoDisableOnLimit ?? true,
           }}
           onSuccess={() => refetch()}
         />

@@ -60,7 +60,7 @@ export async function checkPeriodicLimits() {
                     // New offset is current total (so effective usage becomes 0)
                     const newOffset = BigInt(Math.floor(currentTotal));
 
-                    // Reset DB
+                    // Reset DB (including bandwidth alert flags)
                     await db.accessKey.update({
                         where: { id: key.id },
                         data: {
@@ -68,6 +68,8 @@ export async function checkPeriodicLimits() {
                             usedBytes: BigInt(0),
                             lastDataLimitReset: now,
                             status: key.status === 'DEPLETED' ? 'ACTIVE' : undefined, // Reactivate if depleted
+                            bandwidthAlertAt80: false,
+                            bandwidthAlertAt90: false,
                         }
                     });
 

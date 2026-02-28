@@ -154,6 +154,11 @@ model AccessKey {
   firstUsedAt DateTime?
   lastUsedAt  DateTime?
   lastWarningSentAt DateTime?
+
+  // Bandwidth alerts & auto-disable
+  bandwidthAlertAt80 Boolean   @default(false) // true if 80% alert already sent
+  bandwidthAlertAt90 Boolean   @default(false) // true if 90% alert already sent
+  autoDisableOnLimit Boolean   @default(true)  // auto-disable when 100% reached
   
   // Disable tracking - when DISABLED, key is deleted from Outline server
   // but kept in DB for potential re-enabling

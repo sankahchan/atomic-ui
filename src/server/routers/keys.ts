@@ -88,6 +88,8 @@ const updateKeySchema = z.object({
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
+  // Bandwidth alert settings
+  autoDisableOnLimit: z.boolean().optional(),
 });
 
 /**
@@ -560,6 +562,17 @@ export const keysRouter = router({
         // Handle tags field (normalize for storage)
         if (data.tags !== undefined) {
           updateData.tags = data.tags ? formatTagsForStorage(data.tags) : '';
+        }
+
+        // Handle bandwidth alert settings
+        if (data.autoDisableOnLimit !== undefined) {
+          updateData.autoDisableOnLimit = data.autoDisableOnLimit;
+        }
+
+        // Reset bandwidth alert flags when data limit changes
+        if (data.dataLimitGB !== undefined) {
+          updateData.bandwidthAlertAt80 = false;
+          updateData.bandwidthAlertAt90 = false;
         }
 
         // Update the database record
