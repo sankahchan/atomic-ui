@@ -81,6 +81,7 @@ import {
   User,
   LinkIcon as LinkCopy,
   Pencil,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { ServerGroupList } from '@/components/keys/server-group-list';
@@ -1762,6 +1763,42 @@ export default function KeysPage() {
     },
   });
 
+  // Bulk move state
+  const [bulkMoveDialogOpen, setBulkMoveDialogOpen] = useState(false);
+  const [bulkMoveTargetServerId, setBulkMoveTargetServerId] = useState('');
+
+  // Bulk move mutation
+  const bulkMoveMutation = trpc.keys.bulkMove.useMutation({
+    onSuccess: (result) => {
+      setBulkProgressResults(result);
+      setBulkMoveDialogOpen(false);
+      setBulkMoveTargetServerId('');
+      setSelectedKeys(new Set());
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Move failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  const handleBulkMove = () => {
+    if (selectedKeys.size === 0 || !bulkMoveTargetServerId) return;
+    setBulkProgressTitle('Moving Keys');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    setBulkMoveDialogOpen(false);
+    bulkMoveMutation.mutate({
+      ids: Array.from(selectedKeys),
+      targetServerId: bulkMoveTargetServerId,
+    });
+  };
+
   const handleBulkExtend = (days: number) => {
     if (selectedKeys.size === 0) return;
     bulkExtendMutation.mutate({
@@ -1903,7 +1940,8 @@ export default function KeysPage() {
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
-    bulkArchiveMutation.isPending;
+    bulkArchiveMutation.isPending ||
+    bulkMoveMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -2321,6 +2359,21 @@ export default function KeysPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Move to Server */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkMoveDialogOpen(true)}
+              disabled={isBulkBusy}
+            >
+              {bulkMoveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ArrowRightLeft className="w-4 h-4 mr-2" />
+              )}
+              Move
+            </Button>
+
             {/* Archive */}
             <Button
               variant="outline"
@@ -2694,8 +2747,43 @@ export default function KeysPage() {
         onOpenChange={setBulkProgressDialogOpen}
         title={bulkProgressTitle}
         results={bulkProgressResults}
-        isPending={bulkToggleStatusMutation.isPending || bulkArchiveMutation.isPending}
+        isPending={bulkToggleStatusMutation.isPending || bulkArchiveMutation.isPending || bulkMoveMutation.isPending}
       />
+
+      {/* Bulk Move Dialog */}
+      <Dialog open={bulkMoveDialogOpen} onOpenChange={setBulkMoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move Keys to Server</DialogTitle>
+            <DialogDescription>
+              Move {selectedKeys.size} selected key{selectedKeys.size !== 1 ? 's' : ''} to a different server.
+              Keys will be recreated on the target server and removed from the current one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Target Server</Label>
+            <Select value={bulkMoveTargetServerId} onValueChange={setBulkMoveTargetServerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select target server..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(servers ?? []).map((s: { id: string; name: string; location?: string | null }) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}{s.location ? ` (${s.location})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkMoveDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleBulkMove} disabled={!bulkMoveTargetServerId}>
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
+              Move {selectedKeys.size} Key{selectedKeys.size !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editingKey && (
         <EditKeyDialog

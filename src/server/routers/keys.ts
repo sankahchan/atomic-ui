@@ -1803,4 +1803,100 @@ export const keysRouter = router({
 
     return results;
   }),
+
+  /**
+   * Bulk move keys to a different server.
+   *
+   * For each key, creates a new key on the target Outline server,
+   * copies settings (data limit, name), updates DB, and deletes
+   * the old key from the source server.
+   */
+  bulkMove: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+      targetServerId: z.string(),
+      deleteFromSource: z.boolean().default(true),
+    }))
+    .mutation(async ({ input }) => {
+      const results: { success: number; failed: number; errors: { id: string; name: string; error: string }[] } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      const targetServer = await db.server.findUnique({ where: { id: input.targetServerId } });
+      if (!targetServer) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Target server not found' });
+      }
+
+      const { createOutlineClient: createClient } = await import('@/lib/outline-api');
+      const targetClient = createClient(targetServer.apiUrl, targetServer.apiCertSha256);
+
+      for (const id of input.ids) {
+        try {
+          const key = await db.accessKey.findUnique({
+            where: { id },
+            include: { server: true },
+          });
+
+          if (!key) {
+            results.failed++;
+            results.errors.push({ id, name: 'Unknown', error: 'Key not found' });
+            continue;
+          }
+
+          if (key.serverId === input.targetServerId) {
+            results.failed++;
+            results.errors.push({ id, name: key.name, error: 'Already on target server' });
+            continue;
+          }
+
+          // Create key on target server
+          const newKey = await targetClient.createAccessKey({
+            name: key.name,
+            method: key.method || 'chacha20-ietf-poly1305',
+          });
+
+          // Copy data limit
+          if (key.dataLimitBytes) {
+            try {
+              await targetClient.setAccessKeyDataLimit(newKey.id, Number(key.dataLimitBytes));
+            } catch {
+              // Non-critical
+            }
+          }
+
+          // Update DB
+          await db.accessKey.update({
+            where: { id },
+            data: {
+              serverId: input.targetServerId,
+              outlineKeyId: newKey.id,
+              accessUrl: newKey.accessUrl,
+              password: newKey.password,
+              port: newKey.port,
+              method: newKey.method,
+              usageOffset: key.usedBytes,
+            },
+          });
+
+          // Delete from source
+          if (input.deleteFromSource) {
+            try {
+              const sourceClient = createClient(key.server.apiUrl, key.server.apiCertSha256);
+              await sourceClient.deleteAccessKey(key.outlineKeyId);
+            } catch {
+              // Non-critical — old key will eventually become orphaned
+            }
+          }
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ id, name: id, error: (error as Error).message });
+        }
+      }
+
+      return results;
+    }),
 });
