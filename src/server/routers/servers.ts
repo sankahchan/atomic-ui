@@ -748,6 +748,19 @@ export const serversRouter = router({
     }),
 
   /**
+   * Get load statistics for all active servers.
+   * Used by the load balancer UI to display server load distribution.
+   */
+  getLoadStats: protectedProcedure
+    .input(z.object({
+      serverTagIds: z.array(z.string()).optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const { getServerLoadStats } = await import('@/lib/services/load-balancer');
+      return getServerLoadStats(input?.serverTagIds);
+    }),
+
+  /**
    * Get current sync lock status
    */
   getSyncStatus: protectedProcedure.query(() => {
@@ -1137,5 +1150,60 @@ export const serversRouter = router({
       }
 
       return result;
+    }),
+
+  // ============================================
+  // Server Migration
+  // ============================================
+
+  /**
+   * Preview keys that will be migrated between servers.
+   * Returns source/target server info and the list of eligible keys.
+   */
+  migrationPreview: adminProcedure
+    .input(
+      z.object({
+        sourceServerId: z.string(),
+        targetServerId: z.string(),
+        keyIds: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getMigrationPreview } = await import('@/lib/services/server-migration');
+      return getMigrationPreview(
+        input.sourceServerId,
+        input.targetServerId,
+        input.keyIds,
+      );
+    }),
+
+  /**
+   * Migrate access keys from one server to another.
+   * Creates new keys on the target, updates DB, and optionally deletes from source.
+   */
+  migrateKeys: adminProcedure
+    .input(
+      z.object({
+        sourceServerId: z.string(),
+        targetServerId: z.string(),
+        keyIds: z.array(z.string()),
+        deleteFromSource: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ input }) => {
+      if (input.sourceServerId === input.targetServerId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Source and target servers must be different',
+        });
+      }
+
+      const { migrateKeys } = await import('@/lib/services/server-migration');
+      return migrateKeys(
+        input.sourceServerId,
+        input.targetServerId,
+        input.keyIds,
+        input.deleteFromSource,
+      );
     }),
 });

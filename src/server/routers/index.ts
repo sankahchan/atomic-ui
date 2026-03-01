@@ -28,6 +28,7 @@ import { analyticsRouter } from './analytics';
 import { dashboardRouter } from './dashboard';
 import { provisionRouter } from './provision';
 import { usersRouter } from './users';
+import { reportsRouter } from './reports';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
@@ -517,6 +518,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   provision: provisionRouter,
   users: usersRouter,
+  reports: reportsRouter,
 });
 
 /**

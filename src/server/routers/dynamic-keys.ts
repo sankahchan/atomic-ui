@@ -40,7 +40,7 @@ const createDAKSchema = z.object({
   // Encryption method
   method: z.enum(['chacha20-ietf-poly1305', 'aes-128-gcm', 'aes-192-gcm', 'aes-256-gcm']).optional().nullable(),
   // Load balancer algorithm
-  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN']).default('IP_HASH'),
+  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).default('IP_HASH'),
 });
 
 /**
@@ -70,7 +70,7 @@ const updateDAKSchema = z.object({
   // Protocol obfuscation prefix
   prefix: z.string().max(16).optional().nullable(),
   // Load balancer algorithm
-  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN']).optional(),
+  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).optional(),
   // Subscription page customization
   subscriptionTheme: z.enum(SUBSCRIPTION_THEMES).optional().nullable(),
   coverImage: z.string().url().optional().nullable(),
@@ -249,7 +249,7 @@ export const dynamicKeysRouter = router({
           daysRemaining,
           prefix: dak.prefix,
           method: dak.method,
-          loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
+          loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
           serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
           attachedKeysCount: dak._count.accessKeys,
           createdAt: dak.createdAt,
@@ -333,7 +333,7 @@ export const dynamicKeysRouter = router({
         durationDays: dak.durationDays,
         firstUsedAt: dak.firstUsedAt,
         prefix: dak.prefix,
-        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         accessKeys: dak.accessKeys,
         // Subscription page customization
@@ -341,6 +341,12 @@ export const dynamicKeysRouter = router({
         coverImage: dak.coverImage,
         coverImageType: dak.coverImageType,
         contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
+        // Rotation settings
+        rotationEnabled: dak.rotationEnabled,
+        rotationInterval: dak.rotationInterval,
+        lastRotatedAt: dak.lastRotatedAt,
+        nextRotationAt: dak.nextRotationAt,
+        rotationCount: dak.rotationCount,
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
@@ -399,7 +405,7 @@ export const dynamicKeysRouter = router({
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
-        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
@@ -535,7 +541,7 @@ export const dynamicKeysRouter = router({
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
-        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN',
+        loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
@@ -1382,4 +1388,77 @@ export const dynamicKeysRouter = router({
       usedBytes: usedBytes.toString(),
     }));
   }),
+
+  /**
+   * Update rotation settings for a Dynamic Access Key
+   */
+  updateRotation: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        rotationEnabled: z.boolean(),
+        rotationInterval: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { calculateNextRotation } = await import('@/lib/services/key-rotation');
+
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const now = new Date();
+      const nextRotationAt = input.rotationEnabled && input.rotationInterval !== 'NEVER'
+        ? calculateNextRotation(input.rotationInterval, now)
+        : null;
+
+      await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: {
+          rotationEnabled: input.rotationEnabled,
+          rotationInterval: input.rotationInterval,
+          nextRotationAt,
+        },
+      });
+
+      return { success: true, nextRotationAt };
+    }),
+
+  /**
+   * Manually trigger key rotation for a Dynamic Access Key
+   */
+  rotateNow: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const { triggerManualRotation } = await import('@/lib/services/key-rotation');
+
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const result = await triggerManualRotation(input.id);
+
+      if (!result.success) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Rotation failed: ${result.error}`,
+        });
+      }
+
+      return { success: true };
+    }),
 });

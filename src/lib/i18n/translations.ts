@@ -16,6 +16,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': 'Settings',
     'nav.users': 'User Management',
     'nav.portal': 'User Portal',
+    'nav.reports': 'Reports',
+    'nav.migration': 'Migration',
   },
   zh: {
     'nav.dashboard': '仪表板',
@@ -31,6 +33,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': '设置',
     'nav.users': '用户管理',
     'nav.portal': '用户门户',
+    'nav.reports': '报告',
+    'nav.migration': '迁移',
   },
   my: {
     'nav.dashboard': 'ဒက်ရှ်ဘုတ်',
@@ -46,6 +50,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': 'ဆက်တင်များ',
     'nav.users': 'အသုံးပြုသူများ',
     'nav.portal': 'အသုံးပြုသူ ပေါ်တယ်',
+    'nav.reports': 'အစီရင်ခံစာများ',
+    'nav.migration': 'ပြောင်းရွှေ့ခြင်း',
   },
   ja: {
     'nav.dashboard': 'ダッシュボード',
@@ -61,6 +67,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': '設定',
     'nav.users': 'ユーザー管理',
     'nav.portal': 'ユーザーポータル',
+    'nav.reports': 'レポート',
+    'nav.migration': '移行',
   },
   ko: {
     'nav.dashboard': '대시보드',
@@ -76,6 +84,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': '설정',
     'nav.users': '사용자 관리',
     'nav.portal': '사용자 포털',
+    'nav.reports': '보고서',
+    'nav.migration': '마이그레이션',
   },
   ru: {
     'nav.dashboard': 'Панель',
@@ -91,6 +101,8 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.settings': 'Настройки',
     'nav.users': 'Управление',
     'nav.portal': 'Портал',
+    'nav.reports': 'Отчёты',
+    'nav.migration': 'Миграция',
   },
 };
 

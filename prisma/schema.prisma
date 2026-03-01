@@ -280,6 +280,15 @@ model DynamicAccessKey {
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
   contactLinks   String?
 
+  // Key Auto-Rotation
+  // When enabled, underlying access keys are periodically replaced
+  // while keeping the subscription URL stable
+  rotationEnabled   Boolean   @default(false)
+  rotationInterval  String    @default("NEVER") // NEVER, DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  lastRotatedAt     DateTime?
+  nextRotationAt    DateTime?
+  rotationCount     Int       @default(0) // Total rotations performed
+
   accessKeys AccessKey[]
 
   createdAt DateTime @default(now())
@@ -730,4 +739,43 @@ model DashboardSecurityProbe {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ============================================
+// Monthly Usage Reports
+// ============================================
+
+model Report {
+  id          String   @id @default(cuid())
+
+  // Report metadata
+  name        String             // e.g., "Monthly Report - January 2026"
+  type        String @default("MONTHLY") // MONTHLY, WEEKLY, CUSTOM
+  status      String @default("GENERATING") // GENERATING, READY, FAILED
+
+  // Date range covered by this report
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Report content (stored as JSON string)
+  // Contains aggregated data: per-server totals, per-key usage, etc.
+  reportData  String?  // JSON blob
+
+  // Summary stats (for quick display without parsing full data)
+  totalServers    Int      @default(0)
+  totalKeys       Int      @default(0)
+  totalBytesUsed  BigInt   @default(0)
+  totalDeltaBytes BigInt   @default(0) // Usage during the period
+
+  // File reference for CSV download
+  csvFileName String?
+
+  // Who generated the report
+  generatedBy String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([periodStart, periodEnd])
+  @@index([status])
 }

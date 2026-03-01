@@ -40,6 +40,7 @@ import {
   BarChart3,
   FileText,
   ShieldCheck,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
@@ -67,6 +68,8 @@ const navItems = [
   { href: '/dashboard/analytics' },
   { href: '/dashboard/templates' },
   { href: '/dashboard/archived' },
+  { href: '/dashboard/reports' },
+  { href: '/dashboard/migration' },
 ];
 
 import { useLocale } from '@/hooks/use-locale';
@@ -129,6 +132,18 @@ function Sidebar({
       label: t('nav.users'),
       icon: User,
       description: 'Manage users'
+    },
+    {
+      href: '/dashboard/reports',
+      label: t('nav.reports'),
+      icon: FileText,
+      description: 'Monthly usage reports'
+    },
+    {
+      href: '/dashboard/migration',
+      label: t('nav.migration'),
+      icon: ArrowRightLeft,
+      description: 'Migrate keys between servers'
     },
     {
       href: '/dashboard/settings',

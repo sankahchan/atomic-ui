@@ -198,6 +198,7 @@ function CreateDAKDialog({
     expirationType: 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
     durationDays: string;
     method: string;
+    loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
   }>({
     name: '',
     type: 'SELF_MANAGED',
@@ -209,6 +210,7 @@ function CreateDAKDialog({
     expirationType: 'NEVER',
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
+    loadBalancerAlgorithm: 'IP_HASH',
   });
 
   const resetForm = () => {
@@ -223,6 +225,7 @@ function CreateDAKDialog({
       expirationType: 'NEVER',
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
+      loadBalancerAlgorithm: 'IP_HASH',
     });
   };
 
@@ -268,6 +271,7 @@ function CreateDAKDialog({
       expirationType: formData.expirationType,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
+      loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
     });
   };
 
@@ -342,6 +346,34 @@ function CreateDAKDialog({
             </Select>
             <p className="text-xs text-muted-foreground">
               ChaCha20 is recommended for mobile devices. AES-256-GCM is more secure but slower.
+            </p>
+          </div>
+
+          {/* Load Balancer Algorithm */}
+          <div className="space-y-2">
+            <Label>Load Balancer Algorithm</Label>
+            <Select
+              value={formData.loadBalancerAlgorithm}
+              onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value as typeof formData.loadBalancerAlgorithm })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select load balancing algorithm" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
+                <SelectItem value="RANDOM">Random</SelectItem>
+                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
+                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
+                ? 'Automatically routes to the server with lowest load based on key count and bandwidth.'
+                : formData.loadBalancerAlgorithm === 'IP_HASH'
+                ? 'Same client IP always connects to the same server for consistency.'
+                : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
+                ? 'Cycles through servers sequentially for even distribution.'
+                : 'Randomly selects a server for each connection.'}
             </p>
           </div>
 

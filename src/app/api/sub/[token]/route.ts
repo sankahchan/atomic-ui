@@ -23,6 +23,7 @@
  * - IP_HASH: Uses CRC32 of client IP for consistent server selection
  * - RANDOM: Randomly selects from available access keys
  * - ROUND_ROBIN: Cycles through access keys sequentially
+ * - LEAST_LOAD: Smart selection based on server load (key count + bandwidth)
  * 
  * SELF_MANAGED Mode:
  * - Automatically creates access keys on available servers
@@ -33,6 +34,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
+import { selectKeyByLeastLoad, selectLeastLoadedServer } from '@/lib/services/load-balancer';
 
 /**
  * Simple CRC32 implementation for IP-based hashing
@@ -188,6 +190,18 @@ async function selectAccessKey(
       break;
     }
 
+    case 'LEAST_LOAD': {
+      // Smart selection based on server load
+      const keysWithServer = accessKeys.map((key, idx) => ({
+        ...key,
+        _originalIndex: idx,
+        server: { id: key.server.id, name: key.server.name },
+      }));
+      const bestIndex = await selectKeyByLeastLoad(keysWithServer);
+      selectedIndex = bestIndex ?? 0;
+      break;
+    }
+
     default:
       // Default to IP_HASH
       const defaultHash = crc32(clientIp);
@@ -205,7 +219,8 @@ async function createSelfManagedKey(
   dakId: string,
   serverTagsJson: string | null,
   method: string | null,
-  prefix: string | null
+  prefix: string | null,
+  algorithm?: string
 ): Promise<{ accessUrl: string; server: { hostnameForAccessKeys: string | null } } | null> {
   const keyName = `self-managed-dak-${dakId}`;
 
@@ -255,8 +270,20 @@ async function createSelfManagedKey(
     return null;
   }
 
-  // Select a random server
-  const selectedServer = servers[Math.floor(Math.random() * servers.length)];
+  // Select server based on algorithm
+  let selectedServer;
+  if (algorithm === 'LEAST_LOAD' && servers.length > 1) {
+    // Use smart load-based selection
+    const leastLoaded = await selectLeastLoadedServer(serverTagIds);
+    if (leastLoaded) {
+      selectedServer = servers.find(s => s.id === leastLoaded.serverId) || servers[0];
+    } else {
+      selectedServer = servers[Math.floor(Math.random() * servers.length)];
+    }
+  } else {
+    // Default: random selection
+    selectedServer = servers[Math.floor(Math.random() * servers.length)];
+  }
 
   try {
     // Create key on Outline server
@@ -413,7 +440,8 @@ export async function GET(
           dynamicKey.id,
           dynamicKey.serverTagsJson,
           dynamicKey.method,
-          dynamicKey.prefix
+          dynamicKey.prefix,
+          dynamicKey.loadBalancerAlgorithm
         );
 
         if (!selfManagedResult) {

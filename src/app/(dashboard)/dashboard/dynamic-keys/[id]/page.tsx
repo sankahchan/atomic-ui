@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
@@ -61,6 +62,7 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
+  RotateCw,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -124,6 +126,7 @@ function EditDAKDialog({
     dataLimitBytes: bigint | null;
     durationDays: number | null;
     expiresAt: Date | null;
+    loadBalancerAlgorithm: string;
   };
   onSuccess: () => void;
 }) {
@@ -138,6 +141,7 @@ function EditDAKDialog({
       : '',
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+    loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
   });
 
   const updateMutation = trpc.dynamicKeys.update.useMutation({
@@ -179,6 +183,7 @@ function EditDAKDialog({
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+      loadBalancerAlgorithm: formData.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
     } as any);
   };
 
@@ -259,6 +264,34 @@ function EditDAKDialog({
             />
             <p className="text-xs text-muted-foreground">
               Or set a specific expiration date directly.
+            </p>
+          </div>
+
+          {/* Load Balancer Algorithm */}
+          <div className="space-y-2">
+            <Label>Load Balancer Algorithm</Label>
+            <Select
+              value={formData.loadBalancerAlgorithm}
+              onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select algorithm" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
+                <SelectItem value="RANDOM">Random</SelectItem>
+                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
+                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
+                ? 'Routes to the server with lowest load based on key count and bandwidth.'
+                : formData.loadBalancerAlgorithm === 'IP_HASH'
+                ? 'Same client IP always connects to the same server.'
+                : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
+                ? 'Cycles through servers sequentially.'
+                : 'Randomly selects a server.'}
             </p>
           </div>
 
@@ -619,6 +652,239 @@ function SubscriptionShareCard({
             </code>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * ServerLoadCard Component
+ * Shows server load distribution for load balancing visualization
+ */
+function ServerLoadCard() {
+  const { data: loadStats, isLoading } = trpc.servers.getLoadStats.useQuery(undefined, {
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Server className="w-4 h-4 text-primary" />
+            Server Load
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!loadStats || loadStats.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Server className="w-4 h-4 text-primary" />
+          Server Load Distribution
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Real-time load across active servers
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {loadStats.map((server) => (
+          <div key={server.serverId} className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium truncate max-w-[140px]" title={server.serverName}>
+                {server.serverName}
+              </span>
+              <span className="text-muted-foreground">
+                {server.activeKeyCount} keys · {server.loadScore}%
+              </span>
+            </div>
+            <Progress
+              value={server.loadScore}
+              className={cn(
+                'h-2',
+                server.loadScore >= 80 ? '[&>div]:bg-red-500'
+                  : server.loadScore >= 50 ? '[&>div]:bg-yellow-500'
+                  : '[&>div]:bg-green-500'
+              )}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * KeyRotationCard Component
+ * Manages key auto-rotation settings for a Dynamic Access Key
+ */
+function KeyRotationCard({
+  dakId,
+  rotationEnabled,
+  rotationInterval,
+  lastRotatedAt,
+  nextRotationAt,
+  rotationCount,
+  onUpdate,
+}: {
+  dakId: string;
+  rotationEnabled: boolean;
+  rotationInterval: string;
+  lastRotatedAt: Date | null;
+  nextRotationAt: Date | null;
+  rotationCount: number;
+  onUpdate: () => void;
+}) {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(rotationEnabled);
+  const [interval, setInterval] = useState(rotationInterval);
+
+  const updateMutation = trpc.dynamicKeys.updateRotation.useMutation({
+    onSuccess: (data) => {
+      toast({
+        title: 'Rotation settings updated',
+        description: enabled
+          ? `Keys will rotate ${interval.toLowerCase()}. Next rotation: ${data.nextRotationAt ? formatRelativeTime(data.nextRotationAt) : 'N/A'}`
+          : 'Key rotation has been disabled.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rotateMutation = trpc.dynamicKeys.rotateNow.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Keys rotated',
+        description: 'All attached keys have been rotated successfully.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Rotation failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate({
+      id: dakId,
+      rotationEnabled: enabled,
+      rotationInterval: interval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <RotateCw className="w-4 h-4 text-primary" />
+          Key Auto-Rotation
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Periodically replace underlying keys while keeping the subscription URL stable.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between">
+          <Label className="text-sm">Enable Rotation</Label>
+          <Switch
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+
+        {/* Interval Selector */}
+        {enabled && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Rotation Interval</Label>
+            <Select
+              value={interval}
+              onValueChange={setInterval}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DAILY">Daily</SelectItem>
+                <SelectItem value="WEEKLY">Weekly</SelectItem>
+                <SelectItem value="BIWEEKLY">Every 2 Weeks</SelectItem>
+                <SelectItem value="MONTHLY">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Save Button */}
+        {(enabled !== rotationEnabled || interval !== rotationInterval) && (
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+          >
+            {updateMutation.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+            Save Settings
+          </Button>
+        )}
+
+        {/* Stats */}
+        <div className="space-y-2 pt-2 border-t">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Total Rotations</span>
+            <span className="font-medium">{rotationCount}</span>
+          </div>
+          {lastRotatedAt && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Last Rotated</span>
+              <span>{formatRelativeTime(lastRotatedAt)}</span>
+            </div>
+          )}
+          {nextRotationAt && enabled && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Next Rotation</span>
+              <span>{formatRelativeTime(nextRotationAt)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Manual Rotate Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => rotateMutation.mutate({ id: dakId })}
+          disabled={rotateMutation.isPending}
+        >
+          {rotateMutation.isPending ? (
+            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+          ) : (
+            <RotateCw className="w-3 h-3 mr-1" />
+          )}
+          Rotate Now
+        </Button>
       </CardContent>
     </Card>
   );
@@ -1087,6 +1353,16 @@ export default function DynamicKeyDetailPage() {
                 <span className="font-medium">{dak.status}</span>
               </div>
               <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Load Balancer</span>
+                <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
+                  {dak.loadBalancerAlgorithm === 'IP_HASH' ? 'IP Hash'
+                    : dak.loadBalancerAlgorithm === 'ROUND_ROBIN' ? 'Round Robin'
+                    : dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? '⚡ Least Load'
+                    : dak.loadBalancerAlgorithm === 'RANDOM' ? 'Random'
+                    : dak.loadBalancerAlgorithm}
+                </Badge>
+              </div>
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t('dynamic_keys.detail.created')}</span>
                 <span>{formatDateTime(dak.createdAt)}</span>
               </div>
@@ -1096,6 +1372,20 @@ export default function DynamicKeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Server Load Distribution */}
+          <ServerLoadCard />
+
+          {/* Key Auto-Rotation */}
+          <KeyRotationCard
+            dakId={dak.id}
+            rotationEnabled={dak.rotationEnabled}
+            rotationInterval={dak.rotationInterval}
+            lastRotatedAt={dak.lastRotatedAt ?? null}
+            nextRotationAt={dak.nextRotationAt ?? null}
+            rotationCount={dak.rotationCount}
+            onUpdate={() => refetch()}
+          />
 
           {/* Connection Sessions */}
           <DAKConnectionSessionsCard dakId={dak.id} />
@@ -1201,6 +1491,7 @@ export default function DynamicKeyDetailPage() {
             dataLimitBytes: dak.dataLimitBytes,
             durationDays: dak.durationDays ?? null,
             expiresAt: dak.expiresAt ?? null,
+            loadBalancerAlgorithm: dak.loadBalancerAlgorithm ?? 'IP_HASH',
           }}
           onSuccess={() => refetch()}
         />

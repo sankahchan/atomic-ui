@@ -16,6 +16,7 @@ import { snapshotTraffic } from '@/lib/services/analytics';
 import { checkExpirations } from '@/lib/services/expiration';
 import { checkBandwidthAlerts } from '@/lib/services/bandwidth-alerts';
 import { runHealthChecks, ensureHealthChecks } from '@/lib/services/health-check';
+import { checkKeyRotations } from '@/lib/services/key-rotation';
 import { logger } from '@/lib/logger';
 
 let isSchedulerRunning = false;
@@ -70,6 +71,19 @@ export function initScheduler() {
             logger.debug(`✅ Health check complete: ${result.up} up, ${result.down} down, ${result.slow} slow`);
         } catch (error) {
             logger.error('❌ Health check failed:', error);
+        }
+    });
+
+    // 5. Key Rotation Check (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        logger.debug('🔄 Running key rotation check...');
+        try {
+            const result = await checkKeyRotations();
+            if (result.rotated > 0 || result.errors.length > 0) {
+                logger.info(`🔄 Key rotation: ${result.rotated} rotated, ${result.skipped} skipped, ${result.errors.length} errors`);
+            }
+        } catch (error) {
+            logger.error('❌ Key rotation check failed:', error);
         }
     });
 
