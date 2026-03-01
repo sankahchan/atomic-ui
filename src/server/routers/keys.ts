@@ -1899,4 +1899,49 @@ export const keysRouter = router({
 
       return results;
     }),
+
+  /**
+   * Get 7-day sparkline data for a batch of access keys.
+   *
+   * Aggregates TrafficLog deltaBytes per day for the last 7 days.
+   * Returns a map of keyId → daily data points.
+   */
+  getSparklines: protectedProcedure
+    .input(z.object({
+      keyIds: z.array(z.string()).max(100),
+    }))
+    .query(async ({ input }) => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const logs = await db.trafficLog.findMany({
+        where: {
+          accessKeyId: { in: input.keyIds },
+          recordedAt: { gte: sevenDaysAgo },
+        },
+        orderBy: { recordedAt: 'asc' },
+        select: {
+          accessKeyId: true,
+          deltaBytes: true,
+          recordedAt: true,
+        },
+      });
+
+      // Group by keyId and aggregate per day
+      const sparklines: Record<string, { date: string; bytes: number }[]> = {};
+
+      for (const log of logs) {
+        const day = log.recordedAt.toISOString().split('T')[0];
+        if (!sparklines[log.accessKeyId]) {
+          sparklines[log.accessKeyId] = [];
+        }
+        const existing = sparklines[log.accessKeyId].find((d) => d.date === day);
+        if (existing) {
+          existing.bytes += Number(log.deltaBytes);
+        } else {
+          sparklines[log.accessKeyId].push({ date: day, bytes: Number(log.deltaBytes) });
+        }
+      }
+
+      return sparklines;
+    }),
 });

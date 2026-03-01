@@ -16,7 +16,7 @@
  * - Detailed key information with copy functionality
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -84,6 +84,7 @@ import {
   ArrowRightLeft,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
+import { TrafficSparkline } from '@/components/ui/traffic-chart';
 import { ServerGroupList } from '@/components/keys/server-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
@@ -1167,6 +1168,7 @@ function KeyRow({
   onCopyAccessUrl,
   onCopySubscriptionUrl,
   onEdit,
+  sparklineData,
 }: {
   accessKey: {
     id: string;
@@ -1200,6 +1202,7 @@ function KeyRow({
   onCopyAccessUrl: () => void;
   onCopySubscriptionUrl: () => void;
   onEdit: () => void;
+  sparklineData?: { date: string; bytes: number }[];
 }) {
   const { t } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
@@ -1281,6 +1284,19 @@ function KeyRow({
           limitBytes={accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : undefined}
           className="min-w-[140px]"
         />
+      </td>
+
+      {/* 7-Day Traffic Sparkline */}
+      <td className="px-2 py-3 hidden xl:table-cell">
+        <div className="w-[100px] h-[32px]">
+          {sparklineData && sparklineData.length > 0 ? (
+            <TrafficSparkline data={sparklineData} height={32} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/40">
+              No data
+            </div>
+          )}
+        </div>
       </td>
 
       {/* Devices */}
@@ -1564,6 +1580,16 @@ export default function KeysPage() {
     refetchInterval: 3000, // Always poll for responsive online detection
     refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
   });
+
+  // Fetch 7-day sparkline data for visible keys
+  const keyIdsForSparklines = useMemo(
+    () => data?.items?.map((k) => k.id) ?? [],
+    [data?.items],
+  );
+  const { data: sparklineMap } = trpc.keys.getSparklines.useQuery(
+    { keyIds: keyIdsForSparklines },
+    { enabled: keyIdsForSparklines.length > 0, staleTime: 60_000 },
+  );
 
   // Track online status via activity hook (delta-based)
   const { onlineCount, isOnline } = useKeyActivity(liveMetrics);
@@ -2598,6 +2624,7 @@ export default function KeysPage() {
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.server')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.status')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.usage')}</th>
+                <th className="text-left px-2 py-3 text-sm font-medium text-muted-foreground hidden xl:table-cell">7-Day</th>
                 <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Devices</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.expires')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.actions')}</th>
@@ -2607,7 +2634,7 @@ export default function KeysPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="h-12 bg-muted rounded animate-pulse" />
                     </td>
                   </tr>
@@ -2624,6 +2651,7 @@ export default function KeysPage() {
                     onSelect={() => handleSelectKey(key.id)}
                     isTogglingStatus={togglingKeyId === key.id}
                     isOnline={checkIsOnline(key.id, key.status)}
+                    sparklineData={sparklineMap?.[key.id]}
                     onCopyAccessUrl={() => {
                       if (key.accessUrl) {
                         copyToClipboard(key.accessUrl, 'Copied', 'Access URL copied to clipboard');

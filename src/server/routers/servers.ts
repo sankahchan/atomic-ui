@@ -1206,4 +1206,180 @@ export const serversRouter = router({
         input.deleteFromSource,
       );
     }),
+
+  // ============================================
+  // Export / Import
+  // ============================================
+
+  /**
+   * Export servers as JSON for backup or migration to another instance.
+   * Includes server config, tags, and health check settings.
+   */
+  exportServers: adminProcedure
+    .input(z.object({
+      serverIds: z.array(z.string()).optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const where: Record<string, unknown> = {};
+      if (input?.serverIds && input.serverIds.length > 0) {
+        where.id = { in: input.serverIds };
+      }
+
+      const servers = await db.server.findMany({
+        where,
+        include: {
+          tags: { include: { tag: true } },
+          healthCheck: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+      });
+
+      const exported = servers.map((s) => ({
+        name: s.name,
+        apiUrl: s.apiUrl,
+        apiCertSha256: s.apiCertSha256,
+        location: s.location,
+        countryCode: s.countryCode,
+        isDefault: s.isDefault,
+        isActive: s.isActive,
+        maxKeys: s.maxKeys,
+        sortOrder: s.sortOrder,
+        hostnameForAccessKeys: s.hostnameForAccessKeys,
+        portForNewAccessKeys: s.portForNewAccessKeys,
+        metricsEnabled: s.metricsEnabled,
+        tags: s.tags.map((t) => t.tag.name),
+        healthCheck: s.healthCheck ? {
+          isEnabled: s.healthCheck.isEnabled,
+          checkIntervalMins: s.healthCheck.checkIntervalMins,
+          latencyThresholdMs: s.healthCheck.latencyThresholdMs,
+        } : null,
+      }));
+
+      return {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        serverCount: exported.length,
+        servers: exported,
+      };
+    }),
+
+  /**
+   * Import servers from a JSON export.
+   * Creates new servers and their associated tags.
+   * Validates connectivity before saving.
+   */
+  importServers: adminProcedure
+    .input(z.object({
+      servers: z.array(z.object({
+        name: z.string().min(1).max(100),
+        apiUrl: z.string().url(),
+        apiCertSha256: z.string().min(64).max(64),
+        location: z.string().max(100).optional().nullable(),
+        countryCode: z.string().length(2).optional().nullable(),
+        isDefault: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+        maxKeys: z.number().int().positive().optional().nullable(),
+        sortOrder: z.number().int().optional(),
+        tags: z.array(z.string()).optional(),
+        healthCheck: z.object({
+          isEnabled: z.boolean(),
+          checkIntervalMins: z.number().int().positive().optional(),
+          latencyThresholdMs: z.number().int().positive().optional(),
+        }).optional().nullable(),
+      })),
+      skipValidation: z.boolean().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const results: { imported: number; skipped: number; failed: number; errors: string[] } = {
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const serverData of input.servers) {
+        try {
+          // Check if server with same apiUrl already exists
+          const existing = await db.server.findFirst({
+            where: { apiUrl: serverData.apiUrl },
+          });
+
+          if (existing) {
+            results.skipped++;
+            results.errors.push(`"${serverData.name}" skipped — server with same API URL already exists`);
+            continue;
+          }
+
+          // Optionally validate connection
+          if (!input.skipValidation) {
+            try {
+              const client = createOutlineClient(serverData.apiUrl, serverData.apiCertSha256);
+              await client.getServerInfo();
+            } catch {
+              results.failed++;
+              results.errors.push(`"${serverData.name}" failed — could not connect to Outline API`);
+              continue;
+            }
+          }
+
+          // Resolve tags — create if they don't exist
+          const tagIds: string[] = [];
+          if (serverData.tags && serverData.tags.length > 0) {
+            for (const tagName of serverData.tags) {
+              let tag = await db.tag.findUnique({ where: { name: tagName } });
+              if (!tag) {
+                tag = await db.tag.create({ data: { name: tagName } });
+              }
+              tagIds.push(tag.id);
+            }
+          }
+
+          // Create server
+          const server = await db.server.create({
+            data: {
+              name: serverData.name,
+              apiUrl: serverData.apiUrl,
+              apiCertSha256: serverData.apiCertSha256,
+              location: serverData.location ?? null,
+              countryCode: serverData.countryCode ?? null,
+              isDefault: serverData.isDefault ?? false,
+              isActive: serverData.isActive ?? true,
+              maxKeys: serverData.maxKeys ?? null,
+              sortOrder: serverData.sortOrder ?? 0,
+              tags: tagIds.length > 0
+                ? { create: tagIds.map((id) => ({ tagId: id })) }
+                : undefined,
+            },
+          });
+
+          // Create health check record
+          if (serverData.healthCheck) {
+            await db.healthCheck.create({
+              data: {
+                serverId: server.id,
+                isEnabled: serverData.healthCheck.isEnabled,
+                checkIntervalMins: serverData.healthCheck.checkIntervalMins ?? 5,
+                latencyThresholdMs: serverData.healthCheck.latencyThresholdMs ?? 500,
+                lastStatus: 'UNKNOWN',
+              },
+            });
+          } else {
+            await db.healthCheck.create({
+              data: {
+                serverId: server.id,
+                isEnabled: true,
+                lastStatus: 'UNKNOWN',
+              },
+            });
+          }
+
+          results.imported++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`"${serverData.name}" failed — ${(error as Error).message}`);
+        }
+      }
+
+      return results;
+    }),
 });

@@ -171,6 +171,9 @@ export default function SubscriptionPage() {
 
   const [keyData, setKeyData] = useState<KeyData | null>(null);
   const [settings, setSettings] = useState<SettingsData>({});
+  // Detect system dark mode preference for default theme
+  const [systemPrefersDark, setSystemPrefersDark] = useState(true);
+  const [themeId, setThemeId] = useState<string>('dark');
   const [theme, setTheme] = useState<SubscriptionTheme>(getTheme('dark'));
   const [branding, setBranding] = useState<SubscriptionBranding>(defaultBranding);
   const [platform, setPlatform] = useState<Platform>('android');
@@ -180,6 +183,24 @@ export default function SubscriptionPage() {
   const [copied, setCopied] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState<ContactLink | null>(null);
   const [usageAlert, setUsageAlert] = useState<number | null>(null);
+
+  // Listen for system color scheme changes
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemPrefersDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Toggle between dark and light (only for generic dark/light themes)
+  const handleThemeToggle = () => {
+    const newId = themeId === 'dark' ? 'light' : themeId === 'light' ? 'dark' : themeId;
+    setThemeId(newId);
+    setTheme(getTheme(newId));
+  };
+
+  const isDarkTheme = themeId !== 'light';
 
   // Generate QR code with logo overlay
   async function generateQRCode(accessUrl: string, logoUrl: string, logoSizePercent: number) {
@@ -255,9 +276,12 @@ export default function SubscriptionPage() {
           // Settings fetch failed, use defaults
         }
 
-        // Set theme
-        const themeId = data.subscriptionTheme || settingsData.defaultSubscriptionTheme || 'dark';
-        setTheme(getTheme(themeId));
+        // Set theme (respects system preference when no explicit theme is configured)
+        const resolvedThemeId = data.subscriptionTheme
+          || settingsData.defaultSubscriptionTheme
+          || (systemPrefersDark ? 'dark' : 'light');
+        setThemeId(resolvedThemeId);
+        setTheme(getTheme(resolvedThemeId));
 
         // Generate QR code
         if (data.accessUrl) {
@@ -276,13 +300,16 @@ export default function SubscriptionPage() {
     fetchData();
   }, [token]);
 
-  // Update theme when keyData changes
+  // Update theme when keyData or system preference changes
   useEffect(() => {
     if (keyData) {
-      const themeId = keyData.subscriptionTheme || settings.defaultSubscriptionTheme || 'dark';
-      setTheme(getTheme(themeId));
+      const resolvedId = keyData.subscriptionTheme
+        || settings.defaultSubscriptionTheme
+        || (systemPrefersDark ? 'dark' : 'light');
+      setThemeId(resolvedId);
+      setTheme(getTheme(resolvedId));
     }
-  }, [keyData, settings.defaultSubscriptionTheme]);
+  }, [keyData, settings.defaultSubscriptionTheme, systemPrefersDark]);
 
   // Check usage alerts
   useEffect(() => {
@@ -606,6 +633,25 @@ export default function SubscriptionPage() {
         )}
 
         <div className="relative z-10 max-w-md mx-auto space-y-4 px-4 py-8 pb-safe">
+
+          {/* Dark/Light Theme Toggle */}
+          {(themeId === 'dark' || themeId === 'light') && (
+            <button
+              onClick={handleThemeToggle}
+              className="fixed top-4 right-4 z-50 p-2 rounded-full transition-all backdrop-blur-sm"
+              style={{
+                backgroundColor: isDarkTheme ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                color: isDarkTheme ? '#e4e4e7' : '#3f3f46',
+              }}
+              title={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkTheme ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+              )}
+            </button>
+          )}
 
           {/* Welcome Message */}
           {branding.showWelcome && branding.welcomeMessage && (

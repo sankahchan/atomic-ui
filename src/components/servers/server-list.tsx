@@ -10,12 +10,17 @@ import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
     Plus,
     Search,
     RefreshCw,
     Globe,
     Cloud,
+    Download,
+    Upload,
+    Loader2,
 } from 'lucide-react';
 import { ServerCard } from './server-card';
 import { AddServerDialog } from './add-server-dialog';
@@ -33,6 +38,8 @@ export function ServerList() {
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [syncingServerId, setSyncingServerId] = useState<string | null>(null);
     const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [importJson, setImportJson] = useState('');
     const router = useRouter();
 
     // Fetch servers list
@@ -79,6 +86,65 @@ export function ServerList() {
             setDeletingServerId(null);
         },
     });
+
+    // Export servers query (lazy — only fetch when user triggers)
+    const exportQuery = trpc.servers.exportServers.useQuery(undefined, { enabled: false });
+
+    // Import servers mutation
+    const importMutation = trpc.servers.importServers.useMutation({
+        onSuccess: (result) => {
+            const parts: string[] = [];
+            if (result.imported > 0) parts.push(`${result.imported} imported`);
+            if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+            if (result.failed > 0) parts.push(`${result.failed} failed`);
+            toast({
+                title: 'Import complete',
+                description: parts.join(', ') + (result.errors.length > 0 ? `\n${result.errors[0]}` : ''),
+                variant: result.failed > 0 ? 'destructive' : 'default',
+            });
+            setImportDialogOpen(false);
+            setImportJson('');
+            refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const handleExport = async () => {
+        try {
+            const result = await exportQuery.refetch();
+            if (result.data) {
+                const json = JSON.stringify(result.data, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `servers-export-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast({ title: 'Export complete', description: `${result.data.serverCount} servers exported.` });
+            }
+        } catch {
+            toast({ title: 'Export failed', variant: 'destructive' });
+        }
+    };
+
+    const handleImport = () => {
+        try {
+            const parsed = JSON.parse(importJson);
+            const serversData = parsed.servers || parsed;
+            if (!Array.isArray(serversData)) {
+                toast({ title: 'Invalid format', description: 'Expected a JSON array of servers or an export file.', variant: 'destructive' });
+                return;
+            }
+            importMutation.mutate({ servers: serversData });
+        } catch {
+            toast({ title: 'Invalid JSON', description: 'Please paste valid JSON.', variant: 'destructive' });
+        }
+    };
 
     // Filter servers by search query
     const filteredServers = servers?.filter((server) =>
@@ -130,6 +196,14 @@ export function ServerList() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport} disabled={exportQuery.isFetching}>
+                        {exportQuery.isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                        Export
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import
+                    </Button>
                     <Button asChild variant="secondary">
                         <Link href="/dashboard/servers/deploy">
                             <Cloud className="mr-2 h-4 w-4" />
@@ -189,6 +263,35 @@ export function ServerList() {
                 onOpenChange={setAddDialogOpen}
                 onSuccess={() => refetch()}
             />
+
+            {/* Import dialog */}
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Import Servers</DialogTitle>
+                        <DialogDescription>
+                            Paste a JSON export file to import servers. Servers with duplicate API URLs will be skipped.
+                            Connectivity will be validated before importing.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <Label>JSON Data</Label>
+                        <textarea
+                            className="w-full min-h-[200px] p-3 rounded-lg border border-border bg-background text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            placeholder={'Paste exported JSON here...\n\n{\n  "servers": [\n    { "name": "...", "apiUrl": "...", "apiCertSha256": "..." }\n  ]\n}'}
+                            value={importJson}
+                            onChange={(e) => setImportJson(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleImport} disabled={!importJson.trim() || importMutation.isPending}>
+                            {importMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                            {importMutation.isPending ? 'Importing...' : 'Import'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
