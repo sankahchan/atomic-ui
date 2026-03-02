@@ -237,7 +237,7 @@ export default function MigrationPage() {
   const sourceOptions = servers.filter((s) => s.id !== targetServerId);
   const targetOptions = servers.filter((s) => s.id !== sourceServerId);
 
-  const previewKeys = previewQuery.data?.keys ?? [];
+  const previewKeys = useMemo(() => previewQuery.data?.keys ?? [], [previewQuery.data?.keys]);
   const allKeyIds = useMemo(() => new Set(previewKeys.map((k) => k.id)), [previewKeys]);
 
   const allSelected = selectedKeyIds.size > 0 && selectedKeyIds.size === allKeyIds.size;

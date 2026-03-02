@@ -192,7 +192,7 @@ export async function generateReportData(
   }
 
   // Top 10 consumers by total usage
-  allKeyUsage.sort((a, b) => (b.usedBytes > a.usedBytes ? 1 : -1));
+  allKeyUsage.sort((a, b) => (b.usedBytes > a.usedBytes ? 1 : b.usedBytes < a.usedBytes ? -1 : 0));
   const topConsumers = allKeyUsage.slice(0, 10).map((k) => ({
     keyName: k.keyName,
     serverName: k.serverName,

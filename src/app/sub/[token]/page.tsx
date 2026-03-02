@@ -276,12 +276,7 @@ export default function SubscriptionPage() {
           // Settings fetch failed, use defaults
         }
 
-        // Set theme (respects system preference when no explicit theme is configured)
-        const resolvedThemeId = data.subscriptionTheme
-          || settingsData.defaultSubscriptionTheme
-          || (systemPrefersDark ? 'dark' : 'light');
-        setThemeId(resolvedThemeId);
-        setTheme(getTheme(resolvedThemeId));
+        // Theme is resolved by the separate useEffect that watches keyData + systemPrefersDark
 
         // Generate QR code
         if (data.accessUrl) {

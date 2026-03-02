@@ -150,8 +150,8 @@ export const reportsRouter = router({
       const existing = await db.report.findFirst({
         where: {
           type: input.type,
-          periodStart: { gte: periodStart, lte: periodStart },
-          periodEnd: { gte: periodEnd, lte: periodEnd },
+          periodStart,
+          periodEnd,
           status: 'READY',
         },
       });

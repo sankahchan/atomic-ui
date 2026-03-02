@@ -1290,7 +1290,7 @@ function KeyRow({
       <td className="px-2 py-3 hidden xl:table-cell">
         <div className="w-[100px] h-[32px]">
           {sparklineData && sparklineData.length > 0 ? (
-            <TrafficSparkline data={sparklineData} height={32} />
+            <TrafficSparkline data={sparklineData} height={32} id={accessKey.id} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/40">
               No data

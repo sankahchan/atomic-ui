@@ -177,16 +177,19 @@ export function TrafficSparkline({
   data,
   height = 40,
   color = 'hsl(var(--primary))',
+  id,
 }: {
   data: TrafficDataPoint[];
   height?: number;
   color?: string;
+  id?: string;
 }) {
+  const gradientId = id ? `sparklineGradient-${id}` : `sparklineGradient-${Math.random().toString(36).slice(2, 9)}`;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id="sparklineGradient" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
@@ -197,7 +200,7 @@ export function TrafficSparkline({
           stroke={color}
           strokeWidth={1.5}
           fillOpacity={1}
-          fill="url(#sparklineGradient)"
+          fill={`url(#${gradientId})`}
         />
       </AreaChart>
     </ResponsiveContainer>
