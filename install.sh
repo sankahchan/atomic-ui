@@ -164,7 +164,7 @@ cd "$INSTALL_DIR"
 # Clean install npm dependencies (memory-limited for low-RAM VPS)
 echo -e "${BLUE}[*]${NC} Installing npm dependencies..."
 rm -rf node_modules .next package-lock.json 2>/dev/null || true
-export NODE_OPTIONS="--max-old-space-size=512"
+export NODE_OPTIONS="--max-old-space-size=1024"
 if ! npm install --production=false --silent 2>&1; then
     echo -e "${YELLOW}[!]${NC} npm install failed, trying with --legacy-peer-deps..."
     if ! npm install --production=false --legacy-peer-deps --silent 2>&1; then
