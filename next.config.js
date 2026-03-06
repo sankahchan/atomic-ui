@@ -18,6 +18,11 @@ const nextConfig = {
     NEXT_PUBLIC_BASE_PATH: panelPath,
   },
 
+  // Skip linting and type-checking during build to reduce memory usage
+  // (these are run separately in development)
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+
   // External packages for server components (required for Prisma and native modules)
   experimental: {
     instrumentationHook: true,

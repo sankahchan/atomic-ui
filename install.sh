@@ -105,6 +105,33 @@ echo -e "${BLUE}[*]${NC} Installing system dependencies..."
 apt-get update -qq
 apt-get install -y -qq git curl wget unzip openssl lsof > /dev/null
 
+# Ensure swap exists for low-memory VPS (1GB RAM)
+echo -e "${BLUE}[*]${NC} Checking memory and swap..."
+TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+echo -e "${GREEN}[✓]${NC} RAM: ${TOTAL_RAM_MB}MB, Swap: ${SWAP_MB}MB"
+
+if [ "$SWAP_MB" -lt 512 ] && [ "$TOTAL_RAM_MB" -lt 2048 ]; then
+    echo -e "${YELLOW}[!]${NC} Low memory detected. Creating 2GB swap for build..."
+    if [ ! -f /swapfile ]; then
+        fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+        chmod 600 /swapfile
+        mkswap /swapfile > /dev/null
+        swapon /swapfile
+        # Persist across reboots
+        if ! grep -q '/swapfile' /etc/fstab; then
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        fi
+        echo -e "${GREEN}[✓]${NC} 2GB swap created and activated"
+    else
+        # Swap file exists but not active
+        if ! swapon --show | grep -q '/swapfile'; then
+            swapon /swapfile 2>/dev/null || true
+        fi
+        echo -e "${GREEN}[✓]${NC} Existing swap activated"
+    fi
+fi
+
 # Install Node.js if needed
 if ! command -v node &> /dev/null || [ "$(node -v | cut -d'v' -f2 | cut -d'.' -f1)" -lt 18 ]; then
     echo -e "${BLUE}[*]${NC} Installing Node.js 20.x..."
@@ -134,9 +161,10 @@ echo -e "${GREEN}[✓]${NC} Downloaded to $INSTALL_DIR"
 
 cd "$INSTALL_DIR"
 
-# Clean install npm dependencies
+# Clean install npm dependencies (memory-limited for low-RAM VPS)
 echo -e "${BLUE}[*]${NC} Installing npm dependencies..."
 rm -rf node_modules .next package-lock.json 2>/dev/null || true
+export NODE_OPTIONS="--max-old-space-size=512"
 if ! npm install --production=false --silent 2>&1; then
     echo -e "${YELLOW}[!]${NC} npm install failed, trying with --legacy-peer-deps..."
     if ! npm install --production=false --legacy-peer-deps --silent 2>&1; then
@@ -145,6 +173,7 @@ if ! npm install --production=false --silent 2>&1; then
         exit 1
     fi
 fi
+unset NODE_OPTIONS
 
 if [ ! -d "$INSTALL_DIR/node_modules" ]; then
     echo -e "${RED}[✗]${NC} node_modules directory not found after npm install"
