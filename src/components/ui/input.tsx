@@ -39,7 +39,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         type={type}
         className={cn(
           // Base styles: full width, consistent height, padding, and border radius
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2',
+          'flex h-10 w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-light)] px-3 py-2',
           // Typography: consistent text size
           'text-sm',
           // Focus states: ring effect with primary color for accessibility

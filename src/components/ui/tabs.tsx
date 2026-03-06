@@ -65,7 +65,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     className={cn(
       // Layout: horizontal arrangement with consistent spacing
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1',
+      'inline-flex h-10 items-center justify-center rounded-lg bg-[var(--glass-bg-light)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border border-[var(--glass-border)] p-1',
       // Text styling for the tab triggers
       'text-muted-foreground',
       className
@@ -99,7 +99,7 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       // Base layout and sizing
-      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5',
+      'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5',
       // Typography
       'text-sm font-medium',
       // Focus ring for keyboard navigation
@@ -108,7 +108,7 @@ const TabsTrigger = React.forwardRef<
       // Disabled state
       'disabled:pointer-events-none disabled:opacity-50',
       // Active state - elevated appearance with shadow
-      'data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+      'data-[state=active]:bg-[var(--glass-bg)] data-[state=active]:text-foreground data-[state=active]:shadow-[var(--glass-shadow)]',
       // Smooth transition between states
       'transition-all',
       className

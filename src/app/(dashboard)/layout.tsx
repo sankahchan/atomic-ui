@@ -2,14 +2,13 @@
 
 /**
  * Dashboard Layout
- * 
- * This is the main layout for all authenticated pages in Atomic-UI. It provides
- * a consistent structure with a collapsible sidebar for navigation, a header
- * with user actions, and the main content area.
- * 
- * The layout is designed to be responsive, with the sidebar collapsing to a
- * drawer on mobile devices. It also handles authentication state, redirecting
- * unauthenticated users to the login page.
+ *
+ * Main layout for all authenticated pages in Atomic-UI.
+ * Features a glassmorphism design with:
+ * - Collapsible glass sidebar (desktop)
+ * - Bottom tab bar navigation (mobile)
+ * - Animated gradient mesh background
+ * - Glass-styled header
  */
 
 import { useState, useEffect } from 'react';
@@ -24,20 +23,13 @@ import {
   Server,
   Key,
   KeyRound,
-  Activity,
-  Bell,
   Settings,
   LogOut,
-  Menu,
-  X,
   ChevronLeft,
   Atom,
   Moon,
   Sun,
   User,
-  Archive,
-  Globe,
-  BarChart3,
   FileText,
   ShieldCheck,
   ArrowRightLeft,
@@ -47,14 +39,11 @@ import { useTheme } from 'next-themes';
 import { LanguageSelector } from '@/components/ui/language-selector';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { NotificationBell } from '@/components/notification-bell';
+import { BottomTabBar } from '@/components/layout/bottom-tab-bar';
+import { GradientMeshBackground } from '@/components/layout/gradient-mesh-bg';
 
 /**
- * Navigation items configuration
- * Each item represents a section in the sidebar navigation
- */
-/**
  * Navigation items for route prefetching.
- * These should match the actual routes in the sidebar.
  */
 const navItems = [
   { href: '/dashboard' },
@@ -75,133 +64,107 @@ const navItems = [
 import { useLocale } from '@/hooks/use-locale';
 
 /**
- * Sidebar Component
- * 
- * The collapsible sidebar contains the main navigation for the dashboard.
- * It features a logo, navigation links, and a collapse toggle.
+ * Sidebar Component (Desktop only)
+ *
+ * Glass-styled collapsible sidebar with navigation links.
  */
 function Sidebar({
   isCollapsed,
   onToggle,
-  isMobile = false,
-  onClose,
 }: {
   isCollapsed: boolean;
   onToggle: () => void;
-  isMobile?: boolean;
-  onClose?: () => void;
 }) {
   const pathname = usePathname();
   const { t } = useLocale();
 
-  const navItems = [
+  const sidebarNavItems = [
     {
       href: '/dashboard',
       label: t('nav.dashboard'),
       icon: LayoutDashboard,
-      description: 'Overview and statistics'
     },
     {
       href: '/dashboard/servers',
       label: t('nav.servers'),
       icon: Server,
-      description: 'Manage Outline servers'
     },
     {
       href: '/dashboard/keys',
       label: t('nav.keys'),
       icon: Key,
-      description: 'Manage VPN access keys'
     },
     {
       href: '/dashboard/dynamic-keys',
       label: t('nav.dynamic_keys'),
       icon: KeyRound,
-      description: 'Dynamic access key pools'
     },
     {
       href: '/dashboard/security',
       label: t('nav.security'),
       icon: ShieldCheck,
-      description: 'Firewall and access rules'
     },
-
-
     {
       href: '/dashboard/users',
       label: t('nav.users'),
       icon: User,
-      description: 'Manage users'
     },
     {
       href: '/dashboard/reports',
       label: t('nav.reports'),
       icon: FileText,
-      description: 'Monthly usage reports'
     },
     {
       href: '/dashboard/migration',
       label: t('nav.migration'),
       icon: ArrowRightLeft,
-      description: 'Migrate keys between servers'
     },
     {
       href: '/dashboard/settings',
       label: t('nav.settings'),
       icon: Settings,
-      description: 'Application settings'
     },
   ];
 
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border/50',
+        'fixed inset-y-0 left-0 z-50 flex flex-col glass-sidebar',
         'transition-all duration-300 ease-in-out',
-        isCollapsed && !isMobile ? 'w-16' : 'w-64',
-        isMobile && 'shadow-2xl'
+        isCollapsed ? 'w-16' : 'w-64'
       )}
     >
       {/* Logo and brand */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-border/50">
+      <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--glass-border)]">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative w-8 h-8 flex items-center justify-center">
             <Atom className="w-6 h-6 text-primary" />
           </div>
-          {(!isCollapsed || isMobile) && (
+          {!isCollapsed && (
             <span className="text-lg font-bold text-gradient-atomic">
               Atomic-UI
             </span>
           )}
         </Link>
 
-        {/* Mobile close button */}
-        {isMobile && onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
-        )}
-
         {/* Desktop collapse toggle */}
-        {!isMobile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggle}
-            className="hidden lg:flex"
-          >
-            <ChevronLeft className={cn(
-              'h-4 w-4 transition-transform',
-              isCollapsed && 'rotate-180'
-            )} />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
+          className="hidden lg:flex"
+        >
+          <ChevronLeft className={cn(
+            'h-4 w-4 transition-transform',
+            isCollapsed && 'rotate-180'
+          )} />
+        </Button>
       </div>
 
       {/* Navigation links */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {sidebarNavItems.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
 
@@ -209,21 +172,20 @@ function Sidebar({
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  onClick={isMobile ? onClose : undefined}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg',
-                    'transition-all duration-150',
-                    'hover:bg-muted',
-                    isActive && 'bg-primary/10 text-primary',
-                    !isActive && 'text-muted-foreground hover:text-foreground'
+                    'transition-all duration-200',
+                    isActive
+                      ? 'bg-primary/15 text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-[var(--glass-bg)]'
                   )}
-                  title={isCollapsed && !isMobile ? item.label : undefined}
+                  title={isCollapsed ? item.label : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
                     isActive && 'text-primary'
                   )} />
-                  {(!isCollapsed || isMobile) && (
+                  {!isCollapsed && (
                     <span className="text-sm font-medium">{item.label}</span>
                   )}
                 </Link>
@@ -234,8 +196,8 @@ function Sidebar({
       </nav>
 
       {/* Sidebar footer */}
-      {(!isCollapsed || isMobile) && (
-        <div className="p-4 border-t border-border/50">
+      {!isCollapsed && (
+        <div className="p-4 border-t border-[var(--glass-border)]">
           <p className="text-xs text-muted-foreground text-center">
             v1.0.0 • sankahchan
           </p>
@@ -247,47 +209,44 @@ function Sidebar({
 
 /**
  * Header Component
- * 
- * The top header contains the mobile menu toggle, page title,
- * theme switcher, and user actions.
+ *
+ * Glass-styled header with theme toggle, notifications, and user actions.
+ * No hamburger menu on mobile — bottom tab bar handles navigation instead.
  */
 function Header({
-  onMenuClick,
   user,
   onLogout,
 }: {
-  onMenuClick: () => void;
   user: { email: string; role: string } | null;
   onLogout: () => void;
 }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Avoid hydration mismatch by only showing theme toggle after mount
   useEffect(() => {
     setMounted(true);
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 h-14 lg:h-16 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))]">
       <div className="flex items-center justify-between h-full px-4">
-        {/* Left side: Menu button (mobile) */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMenuClick}
-            className="lg:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+        {/* Left side: Logo on mobile */}
+        <div className="flex items-center gap-3 lg:hidden">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <Atom className="w-5 h-5 text-primary" />
+            <span className="text-base font-bold text-gradient-atomic">
+              Atomic-UI
+            </span>
+          </Link>
         </div>
 
+        {/* Left side: empty spacer on desktop */}
+        <div className="hidden lg:block" />
+
         {/* Right side: Theme toggle, user menu, logout */}
-        <div className="flex items-center gap-2">
-          {/* Theme toggle */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {mounted && (
-            <div className="flex items-center gap-1">
+            <>
               <LanguageSelector />
               <NotificationBell />
               <Button
@@ -295,22 +254,23 @@ function Header({
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                className="h-9 w-9"
               >
                 {theme === 'dark' ? (
-                  <Sun className="h-5 w-5" />
+                  <Sun className="h-4 w-4" />
                 ) : (
-                  <Moon className="h-5 w-5" />
+                  <Moon className="h-4 w-4" />
                 )}
               </Button>
-            </div>
+            </>
           )}
 
-          {/* User info */}
+          {/* User info - desktop only */}
           {user && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)]">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{user.email}</span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
+              <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/20 text-primary font-medium">
                 {user.role}
               </span>
             </div>
@@ -322,9 +282,9 @@ function Header({
             size="icon"
             onClick={onLogout}
             title="Logout"
-            className="text-muted-foreground hover:text-foreground"
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -334,10 +294,10 @@ function Header({
 
 /**
  * DashboardLayout Component
- * 
- * The main layout wrapper that combines the sidebar, header, and content area.
- * It handles authentication state and provides a consistent structure for
- * all dashboard pages.
+ *
+ * Main layout wrapper with glassmorphism design.
+ * Desktop: Glass sidebar + header + content
+ * Mobile: Header + content + bottom tab bar
  */
 export default function DashboardLayout({
   children,
@@ -347,7 +307,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   // Warm route chunks for faster dashboard navigation.
@@ -396,14 +355,14 @@ export default function DashboardLayout({
     logoutMutation.mutate();
   };
 
-  // Show loading state while checking authentication
+  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <GradientMeshBackground />
+        <div className="flex flex-col items-center gap-4 relative z-10">
           <Atom className="h-12 w-12 text-primary animate-spin" />
           <p className="text-muted-foreground">Loading...</p>
-          {/* Fallback logout if stuck in loading */}
           <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
             <Button variant="ghost" size="sm" onClick={() => {
               document.cookie = 'atomic-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -417,11 +376,12 @@ export default function DashboardLayout({
     );
   }
 
-  // Show error state if authentication check failed
+  // Error state
   if (hasError || isError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center p-8">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <GradientMeshBackground />
+        <div className="flex flex-col items-center gap-4 text-center p-8 relative z-10">
           <Atom className="h-12 w-12 text-red-500" />
           <h2 className="text-xl font-semibold text-foreground">Connection Error</h2>
           <p className="text-muted-foreground max-w-md">
@@ -444,24 +404,9 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden bg-diagonal-stripes-light dark:bg-none">
-      {/* Mobile sidebar overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Mobile sidebar */}
-      {mobileMenuOpen && (
-        <Sidebar
-          isCollapsed={false}
-          onToggle={() => { }}
-          isMobile
-          onClose={() => setMobileMenuOpen(false)}
-        />
-      )}
+    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden">
+      {/* Animated gradient mesh background */}
+      <GradientMeshBackground />
 
       {/* Desktop sidebar */}
       <div className="hidden lg:block">
@@ -473,24 +418,26 @@ export default function DashboardLayout({
 
       {/* Main content area */}
       <div className={cn(
-        'flex flex-col min-h-screen transition-all duration-300',
+        'relative flex flex-col min-h-screen transition-all duration-300',
         'lg:ml-64',
         sidebarCollapsed && 'lg:ml-16'
       )}>
         {/* Header */}
         <Header
-          onMenuClick={() => setMobileMenuOpen(true)}
           user={user}
           onLogout={handleLogout}
         />
 
-        {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8">
+        {/* Page content — extra bottom padding on mobile for tab bar */}
+        <main className="flex-1 p-4 md:p-6 lg:p-8 pb-24 lg:pb-8">
           {children}
         </main>
       </div>
 
-      {/* Scroll to top button for mobile */}
+      {/* Mobile bottom tab bar */}
+      <BottomTabBar />
+
+      {/* Scroll to top button */}
       <ScrollToTop />
     </div>
   );

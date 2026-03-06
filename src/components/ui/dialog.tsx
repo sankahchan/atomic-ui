@@ -46,7 +46,7 @@ const DialogOverlay = React.forwardRef<
       // Fixed positioning to cover the viewport
       'fixed inset-0 z-50',
       // Semi-transparent black background
-      'bg-black/80',
+      'bg-black/40 backdrop-blur-sm',
       // Fade in/out animations
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -79,7 +79,7 @@ const DialogContent = React.forwardRef<
         // Grid layout for consistent structure
         'grid w-full max-w-lg gap-4 max-h-[85dvh] overflow-y-auto',
         // Card-like appearance
-        'border bg-background p-6 shadow-lg rounded-lg',
+        'p-6 rounded-2xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur-xl)] [-webkit-backdrop-filter:blur(var(--glass-blur-xl))] border border-[var(--glass-border)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]',
         // Duration for animations
         'duration-200',
         // Open/close animations

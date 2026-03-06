@@ -145,9 +145,7 @@ function Verify2FAContent() {
       <Card
         className={cn(
           'w-full max-w-md mx-4 relative z-10',
-          'bg-white/90 dark:bg-[#1e2a3b]/95',
-          'backdrop-blur-xl',
-          'border border-gray-200/50 dark:border-gray-700/50',
+          'glass-medium',
           'rounded-2xl shadow-xl'
         )}
       >

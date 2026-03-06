@@ -56,7 +56,7 @@ function CompactKPICard({
   href?: string;
 }) {
   const content = (
-    <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-zinc-900/70 transition-all">
+    <Card className="hover:bg-white/10 dark:hover:bg-white/5 transition-all">
       <CardContent className="p-3">
         <div className="flex items-start justify-between">
           <div>
@@ -349,7 +349,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Traffic Chart - Full Width, Medium Height */}
-        <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50">
+        <Card>
           <CardHeader className="pb-2 pt-3 px-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -357,7 +357,7 @@ export default function DashboardPage() {
                   <TrendingUp className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
+                  <CardTitle className="text-sm font-semibold">
                     Total Traffic
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -394,7 +394,7 @@ export default function DashboardPage() {
         {/* Analytics Row 1: Top Consumers + Anomalies */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Top Consumers */}
-          <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50">
+          <Card className="">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -468,7 +468,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Usage Anomalies */}
-          <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50">
+          <Card className="">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded bg-amber-100 dark:bg-amber-500/20">
@@ -529,7 +529,7 @@ export default function DashboardPage() {
         {/* Analytics Row 2: Top Users + Peak Hours */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Top Users All-Time */}
-          <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50">
+          <Card className="">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded bg-blue-100 dark:bg-blue-500/20">
@@ -574,7 +574,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Peak Usage Hours Heatmap */}
-          <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50">
+          <Card className="">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded bg-purple-100 dark:bg-purple-500/20">
@@ -654,7 +654,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           {/* Server Status - 4 cols */}
           <div className="lg:col-span-4">
-            <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50 h-full">
+            <Card className="h-full">
               <CardHeader className="pb-1 pt-2 px-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -695,7 +695,7 @@ export default function DashboardPage() {
 
           {/* Recent Activity - 8 cols */}
           <div className="lg:col-span-8">
-            <Card className="bg-white/50 dark:bg-zinc-900/50 border-gray-200/50 dark:border-zinc-800/50 h-full">
+            <Card className="h-full">
               <CardHeader className="pb-1 pt-2 px-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1 rounded bg-amber-100 dark:bg-amber-500/20">

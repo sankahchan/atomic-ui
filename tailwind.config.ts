@@ -123,6 +123,20 @@ const config: Config = {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        'mesh-float': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '25%': { transform: 'translate(5%, 5%) scale(1.05)' },
+          '50%': { transform: 'translate(-3%, 8%) scale(0.95)' },
+          '75%': { transform: 'translate(7%, -3%) scale(1.02)' },
+        },
+        'slide-up': {
+          from: { opacity: '0', transform: 'translateY(100%)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'tab-indicator': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -132,6 +146,14 @@ const config: Config = {
         'slide-in-right': 'slide-in-right 0.3s ease-out',
         'spin-slow': 'spin-slow 3s linear infinite',
         shimmer: 'shimmer 2s linear infinite',
+        'mesh-float': 'mesh-float 20s ease-in-out infinite',
+        'slide-up': 'slide-up 0.3s ease-out',
+        'tab-indicator': 'tab-indicator 0.2s ease-out',
+      },
+      backdropBlur: {
+        glass: '12px',
+        'glass-lg': '20px',
+        'glass-xl': '40px',
       },
       // Background patterns
       backgroundImage: {

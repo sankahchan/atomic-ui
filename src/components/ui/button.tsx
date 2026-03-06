@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
  */
 const buttonVariants = cva(
   // Base styles applied to all buttons
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -20,11 +20,11 @@ const buttonVariants = cva(
         // Destructive actions like delete
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         // Bordered button for secondary actions
-        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        outline: 'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border-[var(--glass-border)] hover:bg-[var(--glass-bg-medium)] hover:text-accent-foreground',
         // Subtle background button
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        secondary: 'bg-[var(--glass-bg-medium)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] text-secondary-foreground hover:bg-[var(--glass-bg)]',
         // Minimal button with no background
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        ghost: 'hover:bg-[var(--glass-bg-light)] hover:text-accent-foreground',
         // Text-only button that looks like a link
         link: 'text-primary underline-offset-4 hover:underline',
       },

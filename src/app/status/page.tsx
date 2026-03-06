@@ -128,7 +128,7 @@ function UptimeBar({ percent }: { percent: number }) {
   return (
     <div className="flex gap-[2px]" title={`${percent.toFixed(2)}% uptime`}>
       {Array.from({ length: segments }, (_, i) => {
-        let color = 'bg-zinc-700';
+        let color = 'bg-muted';
         if (i < filled) {
           if (percent >= 99) color = 'bg-emerald-500';
           else if (percent >= 95) color = 'bg-amber-500';
@@ -177,18 +177,21 @@ export default function StatusPage() {
   const overall = data ? getOverallStatus(data.servers) : null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-background text-foreground relative">
+      {/* Gradient mesh background */}
+      <div className="bg-mesh fixed inset-0 -z-10" />
+
       {/* Header */}
-      <header className="border-b border-zinc-800">
+      <header className="border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-6">
           <h1 className="text-xl font-bold tracking-tight">System Status</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Real-time health monitoring
           </p>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8 relative">
         {/* Loading state */}
         {loading && (
           <div className="flex items-center justify-center py-20">
@@ -209,7 +212,7 @@ export default function StatusPage() {
         {data && !loading && (
           <>
             {/* Overall status banner */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+            <div className="glass rounded-xl p-6">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className={`h-3 w-3 rounded-full ${overall?.color}`} />
@@ -220,7 +223,7 @@ export default function StatusPage() {
                 </span>
               </div>
               {data.checkedAt && (
-                <p className="text-xs text-zinc-600 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Last updated: {new Date(data.checkedAt).toLocaleString()}
                 </p>
               )}
@@ -229,7 +232,7 @@ export default function StatusPage() {
             {/* Server list */}
             <div className="space-y-4">
               {data.servers.length === 0 ? (
-                <div className="text-center py-12 text-zinc-600">
+                <div className="text-center py-12 text-muted-foreground">
                   No servers configured
                 </div>
               ) : (
@@ -238,7 +241,7 @@ export default function StatusPage() {
                   return (
                     <div
                       key={server.id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4"
+                      className="glass rounded-xl p-5 space-y-4"
                     >
                       {/* Server header */}
                       <div className="flex items-center justify-between">
@@ -255,13 +258,13 @@ export default function StatusPage() {
                       <UptimeBar percent={server.uptimePercent} />
 
                       {/* Stats row */}
-                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <div className="flex items-center gap-4">
                           <span>
-                            Uptime: <span className="text-zinc-300">{server.uptimePercent.toFixed(2)}%</span>
+                            Uptime: <span className="text-foreground">{server.uptimePercent.toFixed(2)}%</span>
                           </span>
                           <span>
-                            Latency: <span className="text-zinc-300">{formatLatency(server.latencyMs)}</span>
+                            Latency: <span className="text-foreground">{formatLatency(server.latencyMs)}</span>
                           </span>
                         </div>
                         <span>
@@ -275,7 +278,7 @@ export default function StatusPage() {
             </div>
 
             {/* Footer */}
-            <div className="text-center text-xs text-zinc-700 pt-4">
+            <div className="text-center text-xs text-muted-foreground pt-4">
               Powered by Atomic-UI
             </div>
           </>

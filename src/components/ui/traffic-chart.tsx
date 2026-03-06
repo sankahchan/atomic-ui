@@ -49,7 +49,7 @@ function CustomTooltip({
 }) {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+      <div className="bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border border-[var(--glass-border)] rounded-lg shadow-lg p-3">
         <p className="text-sm font-medium">{label}</p>
         <p className="text-lg font-bold text-primary">
           {formatBytes(BigInt(payload[0].value))}

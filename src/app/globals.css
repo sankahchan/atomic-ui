@@ -63,6 +63,25 @@
 
     /* Border radius */
     --radius: 0.5rem;
+
+    /* Glassmorphism tokens - Light mode */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-bg-medium: rgba(255, 255, 255, 0.5);
+    --glass-bg-light: rgba(255, 255, 255, 0.3);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --glass-blur: 12px;
+    --glass-blur-lg: 20px;
+    --glass-blur-xl: 40px;
+
+    /* Gradient mesh background colors */
+    --mesh-color-1: rgba(6, 182, 212, 0.08);
+    --mesh-color-2: rgba(139, 92, 246, 0.06);
+    --mesh-color-3: rgba(59, 130, 246, 0.05);
+
+    /* Bottom tab bar */
+    --bottom-bar-height: 4.5rem;
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /**
@@ -108,6 +127,18 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 187 94% 43%;
+
+    /* Glassmorphism tokens - Dark mode */
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-medium: rgba(255, 255, 255, 0.08);
+    --glass-bg-light: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+    /* Gradient mesh background colors - Dark mode */
+    --mesh-color-1: rgba(6, 182, 212, 0.12);
+    --mesh-color-2: rgba(139, 92, 246, 0.08);
+    --mesh-color-3: rgba(59, 130, 246, 0.06);
   }
 }
 
@@ -274,14 +305,104 @@
  * These define reusable component patterns that are used across the app.
  */
 @layer components {
+  /* Glassmorphism utility classes */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .glass-medium {
+    background: var(--glass-bg-medium);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-light {
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur-lg));
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-sidebar {
+    background: var(--glass-bg-medium);
+    backdrop-filter: blur(var(--glass-blur-xl));
+    -webkit-backdrop-filter: blur(var(--glass-blur-xl));
+    border-right: 1px solid var(--glass-border);
+  }
+
+  .glass-bottom-bar {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur-xl));
+    -webkit-backdrop-filter: blur(var(--glass-blur-xl));
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.1);
+    padding-bottom: var(--safe-area-bottom);
+  }
+
+  /* Fallback for browsers without backdrop-filter */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass, .glass-medium, .glass-light, .glass-sidebar, .glass-bottom-bar {
+      background: hsl(var(--card));
+    }
+  }
+
+  /* Animated gradient mesh background */
+  .bg-mesh {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .bg-mesh::before,
+  .bg-mesh::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: mesh-float 20s ease-in-out infinite;
+  }
+
+  .bg-mesh::before {
+    width: 60%;
+    height: 60%;
+    top: -20%;
+    right: -10%;
+    background: var(--mesh-color-1);
+  }
+
+  .bg-mesh::after {
+    width: 50%;
+    height: 50%;
+    bottom: -10%;
+    left: -10%;
+    background: var(--mesh-color-2);
+    animation-delay: -10s;
+    animation-direction: reverse;
+  }
+
+  @keyframes mesh-float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(5%, 5%) scale(1.05); }
+    50% { transform: translate(-3%, 8%) scale(0.95); }
+    75% { transform: translate(7%, -3%) scale(1.02); }
+  }
+
   /* Card with subtle hover effect */
   .card-hover {
-    @apply transition-all duration-200;
+    @apply transition-all duration-300;
   }
 
   .card-hover:hover {
     @apply shadow-lg;
     transform: translateY(-2px);
+    border-color: hsl(var(--primary) / 0.3);
   }
 
   /* Sidebar navigation item */
@@ -380,7 +501,12 @@
 
   /* Stat card */
   .stat-card {
-    @apply bg-card rounded-xl border p-6;
+    @apply rounded-xl p-6;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     @apply transition-all duration-200;
   }
 
@@ -476,6 +602,21 @@
     to {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 }

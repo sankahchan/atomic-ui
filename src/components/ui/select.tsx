@@ -43,7 +43,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       // Match input styling
-      'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm',
+      'flex h-10 w-full items-center justify-between rounded-md border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2 text-sm',
       // Focus ring styling
       'ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
       // Placeholder styling
@@ -127,7 +127,7 @@ const SelectContent = React.forwardRef<
         // Base positioning
         'relative z-50 max-h-96 min-w-[8rem] overflow-hidden',
         // Visual styling
-        'rounded-md border bg-popover text-popover-foreground shadow-md',
+        'rounded-xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border border-[var(--glass-border)] text-popover-foreground shadow-md',
         // Animations
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',

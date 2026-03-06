@@ -69,7 +69,7 @@ export function ServerGroupList<T extends GroupableKey>({
 
     if (keys.length === 0) {
         return (
-            <div className="text-center py-12 border rounded-xl bg-card border-dashed">
+            <div className="text-center py-12 glass rounded-xl border-dashed">
                 <p className="text-muted-foreground">No keys found.</p>
             </div>
         );

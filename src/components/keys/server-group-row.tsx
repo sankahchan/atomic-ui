@@ -52,7 +52,7 @@ export function ServerGroupRow({
         <Collapsible
             open={isOpen}
             onOpenChange={handleOpenChange}
-            className="border rounded-xl bg-card shadow-sm mb-4 overflow-hidden"
+            className="glass rounded-xl mb-4 overflow-hidden"
         >
             <div className="flex items-center justify-between p-4 bg-muted/30">
                 <div className="flex items-center gap-4">
