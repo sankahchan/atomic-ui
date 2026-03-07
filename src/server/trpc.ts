@@ -70,10 +70,11 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
         // If it's already a TRPCError, rethrow
         if (error instanceof TRPCError) throw error;
 
-        // Log other errors but don't block access if DB fails? 
-        // Best to fail closed for security.
         console.error('Security check failed:', error);
-        // Optional: throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Security check failed' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Security check failed',
+        });
       }
     }
   }
@@ -140,6 +141,7 @@ const enforceAuth = t.middleware(({ ctx, next }) => {
   return next({
     ctx: {
       user: ctx.user,
+      clientIp: ctx.clientIp,
     },
   });
 });
@@ -169,6 +171,7 @@ const enforceAdmin = t.middleware(({ ctx, next }) => {
   return next({
     ctx: {
       user: ctx.user,
+      clientIp: ctx.clientIp,
     },
   });
 });

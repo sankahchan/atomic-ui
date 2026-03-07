@@ -31,8 +31,10 @@ import {
   Sun,
   User,
   FileText,
+  ScrollText,
   ShieldCheck,
   ArrowRightLeft,
+  Smartphone,
 } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
@@ -58,6 +60,8 @@ const navItems = [
   { href: '/dashboard/templates' },
   { href: '/dashboard/archived' },
   { href: '/dashboard/reports' },
+  { href: '/dashboard/audit' },
+  { href: '/dashboard/sessions' },
   { href: '/dashboard/migration' },
 ];
 
@@ -113,6 +117,16 @@ function Sidebar({
       href: '/dashboard/reports',
       label: t('nav.reports'),
       icon: FileText,
+    },
+    {
+      href: '/dashboard/audit',
+      label: t('nav.audit'),
+      icon: ScrollText,
+    },
+    {
+      href: '/dashboard/sessions',
+      label: t('nav.sessions'),
+      icon: Smartphone,
     },
     {
       href: '/dashboard/migration',

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { getCurrentUser } from '@/lib/auth';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
+import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
     try {
@@ -63,6 +64,17 @@ export async function POST(req: NextRequest) {
                 fs.writeFileSync(envPath, envEntry.getData());
             }
         }
+
+        await writeAuditLog({
+            userId: user.id,
+            ip: getRequestIpFromHeaders(req.headers),
+            action: 'BACKUP_RESTORE',
+            entity: 'BACKUP',
+            details: {
+                hasEnv: envFound,
+                restoredDatabase: dbBasename,
+            },
+        });
 
         return NextResponse.json({ success: true, message: 'Restore complete. Please restart the service.' });
 

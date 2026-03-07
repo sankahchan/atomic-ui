@@ -1,4 +1,4 @@
-import { router, protectedProcedure } from '../trpc';
+import { router, protectedProcedure, adminProcedure } from '../trpc';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -64,7 +64,7 @@ export const systemRouter = router({
     /**
      * Get current system statistics
      */
-    getStats: protectedProcedure.query(async () => {
+    getStats: adminProcedure.query(async () => {
         const memTotal = os.totalmem();
         const memFree = os.freemem();
         const memUsed = memTotal - memFree;

@@ -7,7 +7,7 @@
  * receiving alerts about important system events and view key alerts.
  */
 
-import { useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,10 +17,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
-import { cn, formatBytes } from '@/lib/utils';
+import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import {
   Plus,
   Bell,
@@ -39,6 +41,10 @@ import {
   HardDrive,
   ExternalLink,
   RefreshCw,
+  History,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 
@@ -58,7 +64,21 @@ const EVENT_TYPES = [
   { id: 'KEY_EXPIRED', labelKey: 'notifications.event.KEY_EXPIRED' },
   { id: 'TRAFFIC_WARNING', labelKey: 'notifications.event.TRAFFIC_WARNING' },
   { id: 'TRAFFIC_DEPLETED', labelKey: 'notifications.event.TRAFFIC_DEPLETED' },
-];
+  { id: 'AUDIT_ALERT', labelKey: 'notifications.event.AUDIT_ALERT' },
+] as const;
+
+type NotificationEventId = (typeof EVENT_TYPES)[number]['id'];
+const MAX_NOTIFICATION_COOLDOWN_MINUTES = 24 * 60;
+const WEBHOOK_HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const RESERVED_WEBHOOK_HEADERS = new Set([
+  'content-type',
+  'content-length',
+  'host',
+  'user-agent',
+  'x-atomic-event',
+  'x-atomic-timestamp',
+  'x-atomic-signature',
+]);
 
 /**
  * Channel type configuration with icons and descriptions
@@ -94,8 +114,202 @@ type Channel = {
   type: ChannelType;
   isActive: boolean;
   config: Record<string, string>;
-  events: string[];
+  events: NotificationEventId[];
 };
+
+type DeliveryStatusFilter = 'ALL' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+type EventCooldownInputs = Partial<Record<NotificationEventId, string>>;
+type WebhookHeaderRow = {
+  id: string;
+  key: string;
+  value: string;
+};
+
+type DeliveryLog = {
+  id: string;
+  channelId: string | null;
+  channelName: string | null;
+  channelType: string | null;
+  channelIsActive: boolean | null;
+  channelMissing: boolean;
+  event: string;
+  message: string;
+  status: string;
+  error: string | null;
+  sentAt: Date;
+  accessKeyId: string | null;
+  accessKeyName: string | null;
+  canRetry: boolean;
+  retryQueued?: boolean;
+};
+
+function getEventLabel(eventId: string, t: (key: string) => string) {
+  const isTestEvent = eventId.startsWith('TEST_');
+  const normalizedEventId = isTestEvent ? eventId.slice(5) : eventId;
+  const knownEvent = EVENT_TYPES.find((event) => event.id === normalizedEventId);
+  const baseLabel = knownEvent ? t(knownEvent.labelKey) : normalizedEventId.replaceAll('_', ' ');
+
+  return isTestEvent ? `${t('notifications.delivery.test_prefix')} ${baseLabel}` : baseLabel;
+}
+
+function getChannelLabel(log: DeliveryLog, t: (key: string) => string) {
+  if (log.channelName) {
+    return log.channelName;
+  }
+
+  if (log.channelId && log.channelMissing) {
+    return t('notifications.delivery.deleted_channel');
+  }
+
+  return t('notifications.delivery.system');
+}
+
+function getStatusLabel(status: string, t: (key: string) => string) {
+  if (status === 'SUCCESS' || status === 'FAILED' || status === 'SKIPPED') {
+    return t(`notifications.status.${status}`);
+  }
+
+  return status;
+}
+
+function getStatusBadgeClass(status: string) {
+  if (status === 'SUCCESS') {
+    return 'border-emerald-500/40 text-emerald-500';
+  }
+
+  if (status === 'SKIPPED') {
+    return 'border-amber-500/40 text-amber-500';
+  }
+
+  return '';
+}
+
+function parseStoredEventCooldowns(value?: string): EventCooldownInputs {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([key, rawValue]) => EVENT_TYPES.some((event) => event.id === key) && typeof rawValue === 'number')
+        .map(([key, rawValue]) => [key, String(rawValue)]),
+    ) as EventCooldownInputs;
+  } catch {
+    return {};
+  }
+}
+
+function parseCooldownNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return 0;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_NOTIFICATION_COOLDOWN_MINUTES) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function createWebhookHeaderRow(key = '', value = ''): WebhookHeaderRow {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    key,
+    value,
+  };
+}
+
+function parseStoredWebhookHeaders(value?: string): WebhookHeaderRow[] {
+  if (!value) {
+    return [createWebhookHeaderRow()];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return [createWebhookHeaderRow()];
+    }
+
+    const rows = Object.entries(parsed)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      .map(([key, headerValue]) => createWebhookHeaderRow(key, headerValue));
+
+    return rows.length > 0 ? rows : [createWebhookHeaderRow()];
+  } catch {
+    return [createWebhookHeaderRow()];
+  }
+}
+
+function buildWebhookHeadersPayload(headers: WebhookHeaderRow[]) {
+  const next: Record<string, string> = {};
+  const seenHeaders = new Set<string>();
+
+  for (const header of headers) {
+    const key = header.key.trim();
+    const value = header.value.trim();
+
+    if (!key && !value) {
+      continue;
+    }
+
+    if (!key || !WEBHOOK_HEADER_NAME_PATTERN.test(key)) {
+      return null;
+    }
+
+    const normalizedKey = key.toLowerCase();
+    if (RESERVED_WEBHOOK_HEADERS.has(normalizedKey) || seenHeaders.has(normalizedKey)) {
+      return null;
+    }
+
+    seenHeaders.add(normalizedKey);
+    next[key] = value;
+  }
+
+  return next;
+}
+
+function buildEventCooldownPayload(eventCooldowns: EventCooldownInputs) {
+  const next: Partial<Record<NotificationEventId, number>> = {};
+
+  for (const [eventId, rawValue] of Object.entries(eventCooldowns) as Array<[NotificationEventId, string]>) {
+    if (!rawValue.trim()) {
+      continue;
+    }
+
+    const parsed = parseCooldownNumber(rawValue);
+    if (parsed === null) {
+      return null;
+    }
+
+    next[eventId] = parsed;
+  }
+
+  return next;
+}
+
+function getChannelRuleSummary(channel: Channel, t: (key: string) => string) {
+  const defaultCooldown = parseCooldownNumber(channel.config.cooldownMinutes || '0') ?? 0;
+  const eventCooldowns = parseStoredEventCooldowns(channel.config.eventCooldowns);
+  const overrideCount = Object.keys(eventCooldowns).length;
+
+  if (defaultCooldown === 0 && overrideCount === 0) {
+    return t('notifications.rules.none');
+  }
+
+  const parts = [];
+  if (defaultCooldown > 0) {
+    parts.push(`${t('notifications.rules.default_short')} ${defaultCooldown}m`);
+  }
+  if (overrideCount > 0) {
+    parts.push(`${overrideCount} ${t('notifications.rules.overrides_short')}`);
+  }
+
+  return parts.join(' · ');
+}
 
 /**
  * ChannelDialog Component
@@ -113,15 +327,60 @@ function ChannelDialog({
 }) {
   const { toast } = useToast();
   const { t } = useLocale();
-  const [isLoading, setIsLoading] = useState(false);
+  const utils = trpc.useUtils();
+  const saveChannelMutation = trpc.notifications.saveChannel.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: editChannel ? t('notifications.toast.channel_updated') : t('notifications.toast.channel_created'),
+        description: t('notifications.toast.success_desc'),
+      });
+      await Promise.all([
+        utils.notifications.listChannels.invalidate(),
+        utils.notifications.listLogs.invalidate(),
+        utils.notifications.queueStatus.invalidate(),
+      ]);
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast({
+        title: t('settings.toast.failed_save'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
   const [formData, setFormData] = useState({
+    id: editChannel?.id,
     name: editChannel?.name || '',
     type: editChannel?.type || 'TELEGRAM' as ChannelType,
-    telegramChatId: editChannel?.type === 'TELEGRAM' ? editChannel.config.chatId : '',
-    email: editChannel?.type === 'EMAIL' ? editChannel.config.email : '',
-    webhookUrl: editChannel?.type === 'WEBHOOK' ? editChannel.config.url : '',
+    isActive: editChannel?.isActive ?? true,
+    cooldownMinutes: editChannel?.config.cooldownMinutes || '0',
+    eventCooldowns: parseStoredEventCooldowns(editChannel?.config.eventCooldowns),
+    telegramChatId: editChannel?.type === 'TELEGRAM' ? editChannel.config.chatId || '' : '',
+    email: editChannel?.type === 'EMAIL' ? editChannel.config.email || '' : '',
+    webhookUrl: editChannel?.type === 'WEBHOOK' ? editChannel.config.url || '' : '',
+    webhookSigningSecret: editChannel?.type === 'WEBHOOK' ? editChannel.config.signingSecret || '' : '',
+    webhookHeaders: parseStoredWebhookHeaders(editChannel?.type === 'WEBHOOK' ? editChannel.config.headers : undefined),
     events: editChannel?.events || [],
   });
+
+  useEffect(() => {
+    setFormData({
+      id: editChannel?.id,
+      name: editChannel?.name || '',
+      type: editChannel?.type || 'TELEGRAM',
+      isActive: editChannel?.isActive ?? true,
+      cooldownMinutes: editChannel?.config.cooldownMinutes || '0',
+      eventCooldowns: parseStoredEventCooldowns(editChannel?.config.eventCooldowns),
+      telegramChatId: editChannel?.type === 'TELEGRAM' ? editChannel.config.chatId || '' : '',
+      email: editChannel?.type === 'EMAIL' ? editChannel.config.email || '' : '',
+      webhookUrl: editChannel?.type === 'WEBHOOK' ? editChannel.config.url || '' : '',
+      webhookSigningSecret: editChannel?.type === 'WEBHOOK' ? editChannel.config.signingSecret || '' : '',
+      webhookHeaders: parseStoredWebhookHeaders(editChannel?.type === 'WEBHOOK' ? editChannel.config.headers : undefined),
+      events: editChannel?.events || [],
+    });
+  }, [editChannel, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,29 +421,72 @@ function ChannelDialog({
       return;
     }
 
-    setIsLoading(true);
+    const webhookHeaders = buildWebhookHeadersPayload(formData.webhookHeaders);
+    if (formData.type === 'WEBHOOK' && !webhookHeaders) {
+      toast({
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.webhook_headers_invalid'),
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const cooldownMinutes = parseCooldownNumber(formData.cooldownMinutes);
+    if (cooldownMinutes === null) {
+      toast({
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.cooldown_invalid'),
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    toast({
-      title: editChannel ? t('notifications.toast.channel_updated') : t('notifications.toast.channel_created'),
-      description: t('notifications.toast.success_desc'),
+    const eventCooldowns = buildEventCooldownPayload(formData.eventCooldowns);
+    if (!eventCooldowns) {
+      toast({
+        title: t('notifications.toast.validation_error'),
+        description: t('notifications.toast.cooldown_invalid'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    saveChannelMutation.mutate({
+      id: formData.id,
+      name: formData.name.trim(),
+      type: formData.type,
+      isActive: formData.isActive,
+      cooldownMinutes,
+      eventCooldowns,
+      telegramChatId: formData.type === 'TELEGRAM' ? formData.telegramChatId.trim() : undefined,
+      email: formData.type === 'EMAIL' ? formData.email.trim() : undefined,
+      webhookUrl: formData.type === 'WEBHOOK' ? formData.webhookUrl.trim() : undefined,
+      webhookSigningSecret: formData.type === 'WEBHOOK' ? formData.webhookSigningSecret.trim() : undefined,
+      webhookHeaders: formData.type === 'WEBHOOK' ? formData.webhookHeaders.map((header) => ({
+        key: header.key,
+        value: header.value,
+      })) : [],
+      events: formData.events,
     });
-
-    setIsLoading(false);
-    onSuccess();
-    onOpenChange(false);
   };
 
-  const toggleEvent = (eventId: string) => {
+  const toggleEvent = (eventId: NotificationEventId) => {
     setFormData((prev) => ({
       ...prev,
       events: prev.events.includes(eventId)
         ? prev.events.filter((e) => e !== eventId)
         : [...prev.events, eventId],
+      eventCooldowns: prev.events.includes(eventId)
+        ? Object.fromEntries(
+            Object.entries(prev.eventCooldowns).filter(([key]) => key !== eventId),
+          ) as EventCooldownInputs
+        : prev.eventCooldowns,
     }));
   };
+
+  const cooldownEvents = formData.events.length > 0
+    ? EVENT_TYPES.filter((event) => formData.events.includes(event.id))
+    : EVENT_TYPES;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,6 +510,17 @@ function ChannelDialog({
               placeholder={t('notifications.dialog.name_placeholder')}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">Channel Active</p>
+              <p className="text-xs text-muted-foreground">Inactive channels are kept but won&apos;t receive alerts.</p>
+            </div>
+            <Switch
+              checked={formData.isActive}
+              onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
             />
           </div>
 
@@ -261,24 +574,122 @@ function ChannelDialog({
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                {t('notifications.dialog.email_help')}
+              </p>
             </div>
           )}
 
           {formData.type === 'WEBHOOK' && (
-            <div className="space-y-2">
-              <Label htmlFor="webhookUrl">{t('notifications.dialog.webhook')}</Label>
-              <Input
-                id="webhookUrl"
-                type="url"
-                placeholder={t('notifications.dialog.webhook_placeholder')}
-                value={formData.webhookUrl}
-                onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('notifications.dialog.webhook_help')}
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="webhookUrl">{t('notifications.dialog.webhook')}</Label>
+                <Input
+                  id="webhookUrl"
+                  type="url"
+                  placeholder={t('notifications.dialog.webhook_placeholder')}
+                  value={formData.webhookUrl}
+                  onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('notifications.dialog.webhook_help')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="webhookSigningSecret">{t('notifications.dialog.webhook_signing')}</Label>
+                <Input
+                  id="webhookSigningSecret"
+                  type="password"
+                  placeholder={t('notifications.dialog.webhook_signing_placeholder')}
+                  value={formData.webhookSigningSecret}
+                  onChange={(e) => setFormData({ ...formData, webhookSigningSecret: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('notifications.dialog.webhook_signing_help')}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <Label>{t('notifications.dialog.webhook_headers')}</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('notifications.dialog.webhook_headers_help')}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFormData((prev) => ({
+                      ...prev,
+                      webhookHeaders: [...prev.webhookHeaders, createWebhookHeaderRow()],
+                    }))}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t('notifications.dialog.webhook_add_header')}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {formData.webhookHeaders.map((header) => (
+                    <div key={header.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                      <Input
+                        placeholder={t('notifications.dialog.webhook_header_name')}
+                        value={header.key}
+                        onChange={(e) => setFormData((prev) => ({
+                          ...prev,
+                          webhookHeaders: prev.webhookHeaders.map((row) =>
+                            row.id === header.id ? { ...row, key: e.target.value } : row,
+                          ),
+                        }))}
+                      />
+                      <Input
+                        placeholder={t('notifications.dialog.webhook_header_value')}
+                        value={header.value}
+                        onChange={(e) => setFormData((prev) => ({
+                          ...prev,
+                          webhookHeaders: prev.webhookHeaders.map((row) =>
+                            row.id === header.id ? { ...row, value: e.target.value } : row,
+                          ),
+                        }))}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setFormData((prev) => ({
+                          ...prev,
+                          webhookHeaders:
+                            prev.webhookHeaders.length === 1
+                              ? [createWebhookHeaderRow()]
+                              : prev.webhookHeaders.filter((row) => row.id !== header.id),
+                        }))}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="cooldownMinutes">{t('notifications.rules.default')}</Label>
+            <Input
+              id="cooldownMinutes"
+              type="number"
+              min={0}
+              max={MAX_NOTIFICATION_COOLDOWN_MINUTES}
+              value={formData.cooldownMinutes}
+              onChange={(e) => setFormData({ ...formData, cooldownMinutes: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('notifications.rules.default_help')}
+            </p>
+          </div>
 
           {/* Event subscriptions */}
           <div className="space-y-3">
@@ -314,6 +725,42 @@ function ChannelDialog({
             </div>
           </div>
 
+          <div className="space-y-3">
+            <Label>{t('notifications.rules.overrides')}</Label>
+            <p className="text-xs text-muted-foreground">
+              {t('notifications.rules.overrides_help')}
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {cooldownEvents.map((event) => (
+                <div key={event.id} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-sm">{t(event.labelKey)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('notifications.rules.override_hint')}
+                      </p>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={MAX_NOTIFICATION_COOLDOWN_MINUTES}
+                      className="w-28"
+                      value={formData.eventCooldowns[event.id] ?? ''}
+                      placeholder={t('notifications.rules.use_default')}
+                      onChange={(e) => setFormData((prev) => ({
+                        ...prev,
+                        eventCooldowns: {
+                          ...prev.eventCooldowns,
+                          [event.id]: e.target.value,
+                        },
+                      }))}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -322,8 +769,8 @@ function ChannelDialog({
             >
               {t('notifications.dialog.cancel')}
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            <Button type="submit" disabled={saveChannelMutation.isPending}>
+              {saveChannelMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editChannel ? t('notifications.dialog.save') : t('notifications.dialog.create')}
             </Button>
           </DialogFooter>
@@ -387,6 +834,11 @@ function ChannelCard({
               <span className="text-sm text-muted-foreground">{t('notifications.events.none')}</span>
             )}
           </div>
+        </div>
+
+        <div className="mb-4 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{t('notifications.rules.title')}:</span>{' '}
+          {getChannelRuleSummary(channel, t)}
         </div>
 
         {/* Actions */}
@@ -646,15 +1098,474 @@ function KeyAlertsCard() {
   );
 }
 
+function QueueStatusCard() {
+  const { toast } = useToast();
+  const { t } = useLocale();
+  const utils = trpc.useUtils();
+  const { data, isLoading, isFetching } = trpc.notifications.queueStatus.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+  });
+  const processQueueMutation = trpc.notifications.processQueueNow.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: t('notifications.queue.processed'),
+        description:
+          result.claimed > 0
+            ? `${result.delivered} ${t('notifications.queue.delivered')}, ${result.rescheduled} ${t('notifications.queue.rescheduled')}, ${result.failed} ${t('notifications.queue.failed_count')}`
+            : t('notifications.queue.nothing_due'),
+      });
+
+      await Promise.all([
+        utils.notifications.queueStatus.invalidate(),
+        utils.notifications.listLogs.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: t('notifications.queue.process_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{t('notifications.queue.title')}</CardTitle>
+            <CardDescription>{t('notifications.queue.desc')}</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {isFetching && !isLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : null}
+            <Button
+              variant="outline"
+              onClick={() => processQueueMutation.mutate({ limit: 50 })}
+              disabled={processQueueMutation.isPending || isLoading}
+            >
+              {processQueueMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              {t('notifications.queue.process_now')}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.due_now')}</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.dueNowCount ?? 0}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.pending')}</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.pendingCount ?? 0}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.retrying')}</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.retryingCount ?? 0}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.processing')}</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.processingCount ?? 0}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.failed')}</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.failedCount ?? 0}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {t('notifications.queue.success_today')}: <span className="font-medium text-foreground">{data?.successTodayCount ?? 0}</span>
+              </span>
+              <span>
+                {data?.nextDelivery
+                  ? `${t('notifications.queue.next_attempt')}: ${formatDateTime(data.nextDelivery.nextAttemptAt)}`
+                  : t('notifications.queue.empty')}
+              </span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
+  const { toast } = useToast();
+  const { t } = useLocale();
+  const utils = trpc.useUtils();
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<DeliveryStatusFilter>('ALL');
+  const [channelId, setChannelId] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search.trim());
+
+  useEffect(() => {
+    setPage(1);
+  }, [status, channelId, deferredSearch]);
+
+  const { data, isLoading, isFetching } = trpc.notifications.listLogs.useQuery(
+    {
+      page,
+      pageSize: 15,
+      status,
+      channelId: channelId === 'ALL' ? undefined : channelId,
+      search: deferredSearch || undefined,
+    },
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const retryLogMutation = trpc.notifications.retryLog.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: result.alreadyQueued ? t('notifications.toast.retry_already_queued') : t('notifications.toast.retry_queued'),
+        description: result.alreadyQueued
+          ? t('notifications.toast.retry_already_queued_desc')
+          : t('notifications.toast.retry_queued_desc'),
+      });
+      await Promise.all([
+        utils.notifications.listLogs.invalidate(),
+        utils.notifications.queueStatus.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: t('notifications.toast.retry_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const logs: DeliveryLog[] = data?.items ?? [];
+  const retryingLogId = retryLogMutation.isPending ? retryLogMutation.variables?.logId : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              {t('notifications.delivery.title')}
+            </CardTitle>
+            <CardDescription>{t('notifications.delivery.desc')}</CardDescription>
+          </div>
+          {isFetching && !isLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="delivery-search">{t('notifications.delivery.search')}</Label>
+            <Input
+              id="delivery-search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('notifications.delivery.search_placeholder')}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('notifications.delivery.channel')}</Label>
+            <Select value={channelId} onValueChange={setChannelId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('notifications.delivery.all_channels')}</SelectItem>
+                {channels.map((channel) => (
+                  <SelectItem key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('notifications.delivery.status')}</Label>
+            <Select value={status} onValueChange={(value) => setStatus(value as DeliveryStatusFilter)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('notifications.delivery.all_statuses')}</SelectItem>
+                <SelectItem value="SUCCESS">{t('notifications.status.SUCCESS')}</SelectItem>
+                <SelectItem value="FAILED">{t('notifications.status.FAILED')}</SelectItem>
+                <SelectItem value="SKIPPED">{t('notifications.status.SKIPPED')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            {data?.total ?? 0} {t('notifications.delivery.results')}
+          </span>
+          <span>
+            {t('notifications.delivery.page')} {data?.page ?? 1} / {data?.totalPages ?? 1}
+          </span>
+        </div>
+
+        <div className="space-y-3 md:hidden">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              {t('notifications.delivery.empty')}
+            </div>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className="rounded-lg border p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{getEventLabel(log.event, t)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(log.sentAt)} · {formatRelativeTime(log.sentAt)}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={log.status === 'FAILED' ? 'destructive' : 'outline'}
+                    className={cn(getStatusBadgeClass(log.status))}
+                  >
+                    {getStatusLabel(log.status, t)}
+                  </Badge>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">{t('notifications.delivery.channel')}: </span>
+                    {getChannelLabel(log, t)}
+                  </p>
+                  <p className="break-words">
+                    <span className="text-muted-foreground">{t('notifications.delivery.message')}: </span>
+                    {log.message}
+                  </p>
+                  {log.error ? (
+                    <p className="break-words text-destructive">
+                      <span className="text-muted-foreground">{t('notifications.delivery.error')}: </span>
+                      {log.error}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-muted-foreground">{t('notifications.delivery.key')}: </span>
+                    {log.accessKeyName ?? '-'}
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  {log.canRetry ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => retryLogMutation.mutate({ logId: log.id })}
+                      disabled={retryingLogId === log.id}
+                    >
+                      {retryingLogId === log.id ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                      )}
+                      {t('notifications.delivery.retry')}
+                    </Button>
+                  ) : log.retryQueued ? (
+                    <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+                      {t('notifications.delivery.retry_queued')}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('notifications.delivery.time')}</TableHead>
+                <TableHead>{t('notifications.delivery.channel')}</TableHead>
+                <TableHead>{t('notifications.delivery.event')}</TableHead>
+                <TableHead>{t('notifications.delivery.status')}</TableHead>
+                <TableHead>{t('notifications.delivery.message')}</TableHead>
+                <TableHead>{t('notifications.delivery.error')}</TableHead>
+                <TableHead>{t('notifications.delivery.key')}</TableHead>
+                <TableHead className="text-right">{t('notifications.delivery.actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mx-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                    {t('notifications.delivery.empty')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="min-w-40">
+                      <div className="space-y-1">
+                        <p className="text-sm">{formatDateTime(log.sentAt)}</p>
+                        <p className="text-xs text-muted-foreground">{formatRelativeTime(log.sentAt)}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-40">
+                      <div className="space-y-1">
+                        <p className="font-medium">{getChannelLabel(log, t)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {log.channelType ? t(`notifications.type.${log.channelType}`) : t('notifications.delivery.system')}
+                          {log.channelIsActive === false ? ` · ${t('notifications.channel_inactive')}` : ''}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-36">{getEventLabel(log.event, t)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={log.status === 'FAILED' ? 'destructive' : 'outline'}
+                        className={cn(getStatusBadgeClass(log.status))}
+                      >
+                        {getStatusLabel(log.status, t)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-sm whitespace-normal break-words text-sm">{log.message}</TableCell>
+                    <TableCell className="max-w-xs whitespace-normal break-words text-sm text-destructive">
+                      {log.error ?? '—'}
+                    </TableCell>
+                    <TableCell>{log.accessKeyName ?? '—'}</TableCell>
+                    <TableCell className="text-right">
+                      {log.canRetry ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => retryLogMutation.mutate({ logId: log.id })}
+                          disabled={retryingLogId === log.id}
+                        >
+                          {retryingLogId === log.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                          )}
+                          {t('notifications.delivery.retry')}
+                        </Button>
+                      ) : log.retryQueued ? (
+                        <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+                          {t('notifications.delivery.retry_queued')}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {logs.length > 0 ? `${logs.length} / ${data?.total ?? logs.length}` : `0 / ${data?.total ?? 0}`} {t('notifications.delivery.visible')}
+          </div>
+          <div className="flex items-center gap-2 self-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+              disabled={page <= 1 || isLoading}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              {t('notifications.delivery.previous')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((currentPage) => currentPage + 1)}
+              disabled={isLoading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
+            >
+              {t('notifications.delivery.next')}
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 /**
  * NotificationsPage Component
  */
 export default function NotificationsPage() {
   const { toast } = useToast();
   const { t } = useLocale();
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const utils = trpc.useUtils();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editChannel, setEditChannel] = useState<Channel | null>(null);
+
+  const { data: channels = [], isLoading: isChannelsLoading } = trpc.notifications.listChannels.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
+  const deleteChannelMutation = trpc.notifications.deleteChannel.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: t('notifications.toast.deleted'),
+        description: t('notifications.toast.deleted_desc'),
+      });
+      await Promise.all([
+        utils.notifications.listChannels.invalidate(),
+        utils.notifications.listLogs.invalidate(),
+        utils.notifications.queueStatus.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const testChannelMutation = trpc.notifications.testChannel.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: t('notifications.toast.test_sent'),
+        description: t('notifications.toast.test_desc'),
+      });
+      await Promise.all([
+        utils.notifications.listLogs.invalidate(),
+        utils.notifications.queueStatus.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Test failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleEdit = (channel: Channel) => {
     setEditChannel(channel);
@@ -663,19 +1574,12 @@ export default function NotificationsPage() {
 
   const handleDelete = (channel: Channel) => {
     if (confirm(`${t('notifications.confirm_delete')} "${channel.name}"?`)) {
-      setChannels(channels.filter((c) => c.id !== channel.id));
-      toast({
-        title: t('notifications.toast.deleted'),
-        description: t('notifications.toast.deleted_desc'),
-      });
+      deleteChannelMutation.mutate({ id: channel.id });
     }
   };
 
   const handleTest = async (channel: Channel) => {
-    toast({
-      title: t('notifications.toast.test_sent'),
-      description: t('notifications.toast.test_desc'),
-    });
+    testChannelMutation.mutate({ id: channel.id });
   };
 
   const handleOpenCreate = () => {
@@ -702,6 +1606,8 @@ export default function NotificationsPage() {
 
       {/* Key Alerts Card - Primary feature */}
       <KeyAlertsCard />
+
+      <QueueStatusCard />
 
       {/* Info card */}
       <Card className="bg-muted/50 border-dashed">
@@ -735,7 +1641,22 @@ export default function NotificationsPage() {
       </Card>
 
       {/* Channels grid */}
-      {channels.length > 0 ? (
+      {isChannelsLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((item) => (
+            <Card key={item}>
+              <CardContent className="p-5">
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-5 w-32 rounded bg-muted" />
+                  <div className="h-4 w-24 rounded bg-muted" />
+                  <div className="h-16 rounded bg-muted" />
+                  <div className="h-9 rounded bg-muted" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : channels.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {channels.map((channel) => (
             <ChannelCard
@@ -763,13 +1684,20 @@ export default function NotificationsPage() {
         </Card>
       )}
 
+      <DeliveryHistoryCard channels={channels} />
+
       {/* Channel dialog */}
       <ChannelDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditChannel(null);
+          }
+        }}
         editChannel={editChannel}
         onSuccess={() => {
-          // In production, this would refetch from the API
+          setEditChannel(null);
         }}
       />
     </div>

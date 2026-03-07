@@ -7,8 +7,10 @@
  * - Traffic usage snapshots (Hourly)
  * - Expiration checks (Every 5 mins)
  * - Health checks (Every 2 mins)
- * - Data limit resets (Daily)
- * - Notification checks (Every 5 mins)
+ * - Key rotation checks (Every 15 mins)
+ * - Audit log cleanup (Daily)
+ * - Backup verification (Daily)
+ * - Notification queue processing (Every minute)
  */
 
 import cron from 'node-cron';
@@ -17,6 +19,9 @@ import { checkExpirations } from '@/lib/services/expiration';
 import { checkBandwidthAlerts } from '@/lib/services/bandwidth-alerts';
 import { runHealthChecks, ensureHealthChecks } from '@/lib/services/health-check';
 import { checkKeyRotations } from '@/lib/services/key-rotation';
+import { cleanupOldAuditLogs } from '@/lib/services/audit-log';
+import { verifyLatestBackups } from '@/lib/services/backup-verification';
+import { processNotificationQueue } from '@/lib/services/notification-queue';
 import { logger } from '@/lib/logger';
 
 let isSchedulerRunning = false;
@@ -87,6 +92,51 @@ export function initScheduler() {
         }
     });
 
+    // 6. Audit Log Cleanup (Daily at 03:30)
+    cron.schedule('30 3 * * *', async () => {
+        logger.debug('🧹 Running audit log cleanup...');
+        try {
+            const result = await cleanupOldAuditLogs({ triggeredBy: 'scheduler' });
+            if (!result.cleanupEnabled) {
+                logger.debug('ℹ️ Audit log cleanup skipped because retention is disabled');
+                return;
+            }
+
+            if (result.deletedCount > 0) {
+                logger.info(`🧹 Audit log cleanup removed ${result.deletedCount} entries`);
+            }
+        } catch (error) {
+            logger.error('❌ Audit log cleanup failed:', error);
+        }
+    });
+
+    // 7. Notification Queue Processing (Every minute)
+    cron.schedule('* * * * *', async () => {
+        logger.debug('📨 Processing notification queue...');
+        try {
+            const result = await processNotificationQueue({ limit: 50 });
+            if (result.claimed > 0) {
+                logger.info(`📨 Notification queue: ${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`);
+            }
+        } catch (error) {
+            logger.error('❌ Notification queue processing failed:', error);
+        }
+    });
+
+    // 8. Backup Verification (Daily at 04:00)
+    cron.schedule('0 4 * * *', async () => {
+        logger.debug('🧪 Running scheduled backup verification...');
+        try {
+            const result = await verifyLatestBackups({ limit: 3, triggeredBy: 'scheduler' });
+            if (result.length > 0) {
+                const failed = result.filter((item) => item.status === 'FAILED').length;
+                logger.info(`🧪 Backup verification: ${result.length - failed} passed, ${failed} failed`);
+            }
+        } catch (error) {
+            logger.error('❌ Backup verification failed:', error);
+        }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.debug('⏰ Running initial expiration check on startup...');
@@ -95,6 +145,16 @@ export function initScheduler() {
             logger.debug(`✅ Initial expiration check complete: ${result.expiredKeys} expired, ${result.depletedKeys} depleted, ${result.archivedKeys} archived`);
         } catch (error) {
             logger.error('❌ Initial expiration check failed:', error);
+        }
+
+        logger.debug('📨 Processing initial notification queue on startup...');
+        try {
+            const result = await processNotificationQueue({ limit: 25 });
+            if (result.claimed > 0) {
+                logger.debug(`✅ Initial notification queue: ${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`);
+            }
+        } catch (error) {
+            logger.error('❌ Initial notification queue processing failed:', error);
         }
 
         // Ensure health check records exist for all servers

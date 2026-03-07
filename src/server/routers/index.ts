@@ -25,10 +25,13 @@ import { archivedKeysRouter } from './archived-keys';
 import { systemRouter } from './system';
 import { backupRouter } from './backup';
 import { analyticsRouter } from './analytics';
+import { auditRouter } from './audit';
 import { dashboardRouter } from './dashboard';
 import { provisionRouter } from './provision';
 import { usersRouter } from './users';
 import { reportsRouter } from './reports';
+import { notificationsRouter } from './notifications';
+import { sessionsRouter } from './sessions';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
@@ -516,6 +519,9 @@ export const appRouter = router({
   system: systemRouter,
   backup: backupRouter,
   analytics: analyticsRouter,
+  audit: auditRouter,
+  notifications: notificationsRouter,
+  sessions: sessionsRouter,
   provision: provisionRouter,
   users: usersRouter,
   reports: reportsRouter,

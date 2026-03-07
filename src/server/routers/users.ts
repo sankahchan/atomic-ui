@@ -4,6 +4,7 @@ import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { writeAuditLog } from '@/lib/audit';
 
 export const usersRouter = router({
     // List all users (Admin only)
@@ -30,7 +31,7 @@ export const usersRouter = router({
                 password: z.string().min(6),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const existingUser = await db.user.findUnique({
                 where: { email: input.email },
             });
@@ -57,6 +58,18 @@ export const usersRouter = router({
                 },
             });
 
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'USER_CREATE',
+                entity: 'USER',
+                entityId: user.id,
+                details: {
+                    email: user.email,
+                    role: user.role,
+                },
+            });
+
             return user;
         }),
 
@@ -76,6 +89,17 @@ export const usersRouter = router({
                 where: { id: input.id },
             });
 
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'USER_DELETE',
+                entity: 'USER',
+                entityId: input.id,
+                details: {
+                    deletedUserId: input.id,
+                },
+            });
+
             return { success: true };
         }),
 
@@ -87,7 +111,7 @@ export const usersRouter = router({
                 newPassword: z.string().min(6),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const passwordHash = await hashPassword(input.newPassword);
 
             await db.user.update({
@@ -98,6 +122,17 @@ export const usersRouter = router({
             // Invalidate sessions for the user
             await db.session.deleteMany({
                 where: { userId: input.id },
+            });
+
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'USER_PASSWORD_RESET',
+                entity: 'USER',
+                entityId: input.id,
+                details: {
+                    resetUserId: input.id,
+                },
             });
 
             return { success: true };

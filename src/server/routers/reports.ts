@@ -6,16 +6,17 @@
  */
 
 import { z } from 'zod';
-import { router, protectedProcedure, adminProcedure } from '../trpc';
+import { router, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { generateReportData } from '@/lib/services/report-generator';
+import { writeAuditLog } from '@/lib/audit';
 
 export const reportsRouter = router({
   /**
    * List all generated reports with pagination
    */
-  list: protectedProcedure
+  list: adminProcedure
     .input(
       z.object({
         page: z.number().int().min(1).default(1),
@@ -73,7 +74,7 @@ export const reportsRouter = router({
   /**
    * Get a single report with full data
    */
-  getById: protectedProcedure
+  getById: adminProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const report = await db.report.findUnique({
@@ -192,6 +193,19 @@ export const reportsRouter = router({
           },
         });
 
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'REPORT_GENERATE',
+          entity: 'REPORT',
+          entityId: report.id,
+          details: {
+            type: input.type,
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+          },
+        });
+
         return {
           id: report.id,
           name: reportName,
@@ -219,7 +233,7 @@ export const reportsRouter = router({
    */
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const report = await db.report.findUnique({
         where: { id: input.id },
       });
@@ -232,6 +246,18 @@ export const reportsRouter = router({
       }
 
       await db.report.delete({ where: { id: input.id } });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'REPORT_DELETE',
+        entity: 'REPORT',
+        entityId: report.id,
+        details: {
+          name: report.name,
+          type: report.type,
+        },
+      });
 
       return { success: true };
     }),

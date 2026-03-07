@@ -45,49 +45,34 @@ export async function snapshotTraffic(): Promise<TrafficSnapshot> {
 
                 // 3. Process each key
                 for (const key of server.accessKeys) {
-                    const currentBytes = usageData.bytesByAccessKey[key.outlineKeyId] || 0;
-                    const currentBigInt = BigInt(Math.floor(currentBytes));
+                    const rawBytes = usageData.bytesByAccessKey[key.outlineKeyId] || 0;
+                    const rawBigInt = BigInt(Math.floor(rawBytes));
+                    const offset = key.usageOffset || BigInt(0);
+                    const effectiveUsedBytes = rawBigInt < offset ? rawBigInt : rawBigInt - offset;
 
-                    // 4. Find the last log to calculate delta
-                    const lastLog = await db.trafficLog.findFirst({
-                        where: { accessKeyId: key.id },
-                        orderBy: { recordedAt: 'desc' },
-                    });
-
-                    // Calculate delta
-                    // Use 0 if no previous log, or if usage has reset (current < last)
-                    // For periodic resets (e.g. monthly), Outline might reset the counter.
-                    // IF Atomic-UI handles resets, we might still see monotonically increasing stats from Outline depending on reset strategy.
-                    // Assuming Outline returns CUMULATIVE usage since its own internal reset.
                     let delta = BigInt(0);
-
-                    if (lastLog) {
-                        if (currentBigInt >= lastLog.bytesUsed) {
-                            delta = currentBigInt - lastLog.bytesUsed;
-                        } else {
-                            // Usage reset occurred on server side
-                            delta = currentBigInt;
-                        }
+                    if (effectiveUsedBytes >= key.usedBytes) {
+                        delta = effectiveUsedBytes - key.usedBytes;
                     } else {
-                        // First log, delta is entire current usage
-                        delta = currentBigInt;
+                        delta = effectiveUsedBytes;
                     }
 
                     // 5. Create new log
                     await db.trafficLog.create({
                         data: {
                             accessKeyId: key.id,
-                            bytesUsed: currentBigInt,
+                            bytesUsed: effectiveUsedBytes,
                             deltaBytes: delta,
                         },
                     });
 
-                    // 6. Update the key's 'usedBytes' field as well to keep it in sync
-                    // Atomic-UI's 'usedBytes' is intended to be 'Total Used', but often we sync it from Outline.
-                    // Let's ensure it reflects the latest known value.
+                    // 6. Keep the key record aligned with the effective cumulative usage.
                     await db.accessKey.update({
                         where: { id: key.id },
-                        data: { usedBytes: currentBigInt },
+                        data: {
+                            usedBytes: effectiveUsedBytes,
+                            ...(rawBigInt < offset ? { usageOffset: BigInt(0) } : {}),
+                        },
                     });
 
                     result.success++;

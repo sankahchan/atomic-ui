@@ -35,7 +35,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes, formatRelativeTime, formatDateTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
-import { useKeyActivity } from '@/hooks/use-key-activity';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Plus,
@@ -1574,8 +1573,7 @@ export default function KeysPage() {
     refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
   });
 
-  // Fetch live metrics directly from Outline servers - always poll every 3 seconds
-  // This provides real-time online detection independent of auto-sync setting
+  // Fetch live usage plus recent server-side session state every 3 seconds.
   const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
     refetchInterval: 3000, // Always poll for responsive online detection
     refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
@@ -1591,14 +1589,17 @@ export default function KeysPage() {
     { enabled: keyIdsForSparklines.length > 0, staleTime: 60_000 },
   );
 
-  // Track online status via activity hook (delta-based)
-  const { onlineCount, isOnline } = useKeyActivity(liveMetrics);
+  const onlineKeyIds = useMemo(
+    () => new Set((liveMetrics ?? []).filter((metric) => metric.isOnline).map((metric) => metric.id)),
+    [liveMetrics],
+  );
+  const onlineCount = onlineKeyIds.size;
 
-  // Helper to check if a key is online (disabled keys are never online)
-  const checkIsOnline = (keyId: string, status?: string) => {
-    if (status === 'DISABLED') return false;
-    return isOnline(keyId);
-  };
+  // Helper to check if a key is online using recent server-side session activity.
+  const checkIsOnline = useCallback(
+    (keyId: string, status?: string) => status === 'ACTIVE' && onlineKeyIds.has(keyId),
+    [onlineKeyIds],
+  );
 
   // Sync all servers mutation
   const syncAllMutation = trpc.servers.syncAll.useMutation({

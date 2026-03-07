@@ -367,12 +367,7 @@ export interface TelegramConfig {
  * Email notification configuration.
  */
 export interface EmailConfig {
-  smtpHost: string;
-  smtpPort: number;
-  smtpUser: string;
-  smtpPass: string;
-  fromAddress: string;
-  toAddresses: string[];
+  email: string;
 }
 
 /**

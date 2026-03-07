@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc';
+import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 
@@ -126,7 +126,7 @@ export const analyticsRouter = router({
   /**
    * Get top consumers by usage delta over a time range
    */
-  topConsumers: protectedProcedure
+  topConsumers: adminProcedure
     .input(z.object({
       range: timeRangeSchema.default('24h'),
       limit: z.number().int().min(1).max(50).default(10),
@@ -226,7 +226,7 @@ export const analyticsRouter = router({
   /**
    * Detect anomalies - keys with usage rate > 3x their baseline
    */
-  anomalies: protectedProcedure
+  anomalies: adminProcedure
     .input(z.object({
       range: timeRangeSchema.default('24h'),
       threshold: z.number().default(3), // Multiplier threshold
@@ -370,7 +370,7 @@ export const analyticsRouter = router({
       keyId: z.string(),
       keyType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY']).default('ACCESS_KEY'),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       // Get key details
       let currentUsage: bigint;
       let dataLimit: bigint | null;
@@ -380,6 +380,7 @@ export const analyticsRouter = router({
         const key = await db.accessKey.findUnique({
           where: { id: input.keyId },
           select: {
+            userId: true,
             name: true,
             usedBytes: true,
             dataLimitBytes: true,
@@ -397,6 +398,13 @@ export const analyticsRouter = router({
           };
         }
 
+        if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to forecast this key',
+          });
+        }
+
         currentUsage = key.usedBytes;
         dataLimit = key.dataLimitBytes;
         keyName = key.name;
@@ -404,6 +412,7 @@ export const analyticsRouter = router({
         const dak = await db.dynamicAccessKey.findUnique({
           where: { id: input.keyId },
           select: {
+            userId: true,
             name: true,
             usedBytes: true,
             dataLimitBytes: true,
@@ -419,6 +428,13 @@ export const analyticsRouter = router({
             confidence: 'low' as const,
             message: 'Key not found',
           };
+        }
+
+        if (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to forecast this key',
+          });
         }
 
         currentUsage = dak.usedBytes;
@@ -533,7 +549,26 @@ export const analyticsRouter = router({
       keyId: z.string(),
       range: timeRangeSchema.default('7d'),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.keyId },
+        select: { userId: true },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this usage history',
+        });
+      }
+
       const cutoff = getDateCutoff(input.range);
 
       const snapshots = await db.usageSnapshot.findMany({
@@ -559,7 +594,7 @@ export const analyticsRouter = router({
   /**
    * Get overall analytics summary
    */
-  summary: protectedProcedure
+  summary: adminProcedure
     .input(z.object({
       range: timeRangeSchema.default('24h'),
     }))

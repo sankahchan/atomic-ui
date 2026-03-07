@@ -54,39 +54,50 @@ export interface TelegramConfig {
  * Get Telegram bot configuration from database
  */
 export async function getTelegramConfig(): Promise<TelegramConfig | null> {
-    const channel = await db.notificationChannel.findFirst({
+    const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
+    if (settings) {
+        try {
+            const config = JSON.parse(settings.value);
+            if (config.isEnabled && config.botToken) {
+                return {
+                    botToken: config.botToken,
+                    adminChatIds: config.adminChatIds || [],
+                };
+            }
+        } catch { }
+    }
+
+    const channels = await db.notificationChannel.findMany({
         where: {
             type: 'TELEGRAM',
             isActive: true,
         },
+        orderBy: { createdAt: 'desc' },
     });
 
-    if (!channel) {
-        // Fallback to old settings table if exists (migration path)
-        const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
-        if (settings) {
-            try {
-                const config = JSON.parse(settings.value);
-                if (config.isEnabled && config.botToken) {
-                    return {
-                        botToken: config.botToken,
-                        adminChatIds: config.adminChatIds || [],
-                    };
-                }
-            } catch { }
-        }
-        return null;
+    for (const channel of channels) {
+        try {
+            const config = JSON.parse(channel.config) as Record<string, unknown>;
+            const botToken =
+                (typeof config.botToken === 'string' && config.botToken.trim()) ||
+                process.env.TELEGRAM_BOT_TOKEN ||
+                null;
+            const adminChatIds = Array.isArray(config.adminChatIds)
+                ? config.adminChatIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+                : typeof config.chatId === 'string' && config.chatId.trim().length > 0
+                    ? [config.chatId]
+                    : [];
+
+            if (botToken && adminChatIds.length > 0) {
+                return {
+                    botToken,
+                    adminChatIds,
+                };
+            }
+        } catch { }
     }
 
-    try {
-        const config = JSON.parse(channel.config);
-        return {
-            botToken: config.botToken,
-            adminChatIds: config.adminChatIds || [],
-        };
-    } catch {
-        return null;
-    }
+    return null;
 }
 
 /**

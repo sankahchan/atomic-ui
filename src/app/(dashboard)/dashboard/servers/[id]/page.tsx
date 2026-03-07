@@ -14,7 +14,7 @@
  * - Actions: Sync, edit, and danger zone operations
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -235,6 +235,8 @@ export default function ServerDetailPage() {
   const serverId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [lifecycleMode, setLifecycleMode] = useState('ACTIVE');
+  const [lifecycleNote, setLifecycleNote] = useState('');
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
@@ -277,11 +279,44 @@ export default function ServerDetailPage() {
       });
     },
   });
+  const lifecycleMutation = trpc.servers.setLifecycleMode.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Server mode updated',
+        description: 'Assignment safeguards were updated for this server.',
+      });
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to update server mode',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!server) {
+      return;
+    }
+
+    setLifecycleMode(server.lifecycleMode || 'ACTIVE');
+    setLifecycleNote(server.lifecycleNote || '');
+  }, [server]);
 
   const handleDelete = () => {
     if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
       deleteMutation.mutate({ id: serverId });
     }
+  };
+
+  const handleSaveLifecycle = () => {
+    lifecycleMutation.mutate({
+      id: serverId,
+      lifecycleMode: lifecycleMode as 'ACTIVE' | 'DRAINING' | 'MAINTENANCE',
+      lifecycleNote: lifecycleNote.trim() || undefined,
+    });
   };
 
   // Loading state
@@ -346,6 +381,14 @@ export default function ServerDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
+            <Badge variant="outline" className={cn(
+              server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
+              server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
+            )}>
+              {server.lifecycleMode}
+            </Badge>
+          ) : null}
           <Button
             variant="outline"
             onClick={() => syncMutation.mutate({ id: serverId })}
@@ -495,57 +538,110 @@ export default function ServerDetailPage() {
         </Card>
 
         {/* Health Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              {t('server_details.health.title')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-center py-4">
-              <div className={cn(
-                'w-24 h-24 rounded-full flex items-center justify-center',
-                `${status.bg}/20`
-              )}>
-                <StatusIcon className={cn('w-12 h-12', status.color)} />
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                {t('server_details.health.title')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-center py-4">
+                <div className={cn(
+                  'w-24 h-24 rounded-full flex items-center justify-center',
+                  `${status.bg}/20`
+                )}>
+                  <StatusIcon className={cn('w-12 h-12', status.color)} />
+                </div>
               </div>
-            </div>
 
-            <div className="text-center">
-              <p className={cn('text-xl font-semibold', status.color)}>{t(status.labelKey)}</p>
-              {server.healthCheck?.lastCheckedAt && (
-                <p className="text-sm text-muted-foreground">
-                  {t('server_details.health.last_checked')} {formatRelativeTime(server.healthCheck.lastCheckedAt)}
-                </p>
-              )}
-            </div>
+              <div className="text-center">
+                <p className={cn('text-xl font-semibold', status.color)}>{t(status.labelKey)}</p>
+                {server.healthCheck?.lastCheckedAt && (
+                  <p className="text-sm text-muted-foreground">
+                    {t('server_details.health.last_checked')} {formatRelativeTime(server.healthCheck.lastCheckedAt)}
+                  </p>
+                )}
+              </div>
 
-            {server.healthCheck && (
-              <div className="space-y-3 pt-4 border-t border-border">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">{t('server_details.health.uptime')}</span>
-                    <span>{server.healthCheck.uptimePercent.toFixed(1)}%</span>
+              {server.healthCheck && (
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">{t('server_details.health.uptime')}</span>
+                      <span>{server.healthCheck.uptimePercent.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={server.healthCheck.uptimePercent} className="h-2" />
                   </div>
-                  <Progress value={server.healthCheck.uptimePercent} className="h-2" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('server_details.health.total_checks')}</span>
+                    <span>{server.healthCheck.totalChecks}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('server_details.health.successful')}</span>
+                    <span className="text-green-500">{server.healthCheck.successfulChecks}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('server_details.health.failed')}</span>
+                    <span className="text-red-500">{server.healthCheck.failedChecks}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('server_details.health.total_checks')}</span>
-                  <span>{server.healthCheck.totalChecks}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('server_details.health.successful')}</span>
-                  <span className="text-green-500">{server.healthCheck.successfulChecks}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('server_details.health.failed')}</span>
-                  <span className="text-red-500">{server.healthCheck.failedChecks}</span>
-                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Assignment Mode</CardTitle>
+              <CardDescription>
+                Control whether this server accepts new keys and migrations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Mode</Label>
+                <Select value={lifecycleMode} onValueChange={setLifecycleMode}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="DRAINING">Draining</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              <div className="space-y-2">
+                <Label htmlFor="lifecycleNote">Operator Note</Label>
+                <Input
+                  id="lifecycleNote"
+                  placeholder="Optional note shown to admins"
+                  value={lifecycleNote}
+                  onChange={(e) => setLifecycleNote(e.target.value)}
+                />
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <p>`Active` accepts new keys and migrations.</p>
+                <p>`Draining` keeps existing keys but blocks new assignments.</p>
+                <p>`Maintenance` blocks new assignments while the server is being worked on.</p>
+              </div>
+
+              {server.lifecycleChangedAt ? (
+                <p className="text-xs text-muted-foreground">
+                  Last changed {formatRelativeTime(server.lifecycleChangedAt)}
+                </p>
+              ) : null}
+
+              <Button onClick={handleSaveLifecycle} disabled={lifecycleMutation.isPending}>
+                {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save Mode
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Access Keys Section */}

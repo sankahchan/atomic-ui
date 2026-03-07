@@ -27,15 +27,17 @@ const APP_NAME = process.env.APP_NAME || 'Atomic UI';
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
 const RP_ORIGIN = process.env.NEXTAUTH_URL || process.env.APP_URL || 'http://localhost:3000';
 
-// Encryption key for TOTP secrets (32 bytes / 64 hex chars)
-const ENCRYPTION_KEY = getTotpEncryptionKeyHex();
+function getEncryptionKeyBuffer() {
+    const encryptionKey = getTotpEncryptionKeyHex();
+    return Buffer.from(encryptionKey.slice(0, 64), 'hex');
+}
 
 /**
  * Encrypt a TOTP secret for storage
  */
 function encryptSecret(secret: string): string {
     const iv = crypto.randomBytes(16);
-    const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
+    const key = getEncryptionKeyBuffer();
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(secret, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -48,7 +50,7 @@ function encryptSecret(secret: string): string {
 function decryptSecret(encryptedData: string): string {
     const [ivHex, encrypted] = encryptedData.split(':');
     const iv = Buffer.from(ivHex, 'hex');
-    const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
+    const key = getEncryptionKeyBuffer();
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

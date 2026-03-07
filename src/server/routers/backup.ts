@@ -7,9 +7,8 @@ import { db } from '@/lib/db';
 import { sendTelegramDocument } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
-
-// Ensure backup directory exists
-const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
+import { writeAuditLog } from '@/lib/audit';
+import { BACKUP_DIR, verifyBackupFile } from '@/lib/services/backup-verification';
 
 if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -18,6 +17,18 @@ if (!fs.existsSync(BACKUP_DIR)) {
 // Helper to get DB path
 function getDbPath() {
     return resolveSqliteDbPath();
+}
+
+function parseVerificationDetails(details: string | null) {
+    if (!details) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(details) as Record<string, unknown>;
+    } catch {
+        return { raw: details };
+    }
 }
 
 export const backupRouter = router({
@@ -44,7 +55,39 @@ export const backupRouter = router({
                 })
                 .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-            return backups;
+            const verifications = backups.length > 0
+              ? await db.backupVerification.findMany({
+                  where: {
+                    filename: {
+                      in: backups.map((backup) => backup.filename),
+                    },
+                  },
+                  orderBy: {
+                    verifiedAt: 'desc',
+                  },
+                })
+              : [];
+            const latestVerificationByFilename = new Map<string, (typeof verifications)[number]>();
+            for (const verification of verifications) {
+              if (!latestVerificationByFilename.has(verification.filename)) {
+                latestVerificationByFilename.set(verification.filename, verification);
+              }
+            }
+
+            return backups.map((backup) => ({
+              ...backup,
+              latestVerification: (() => {
+                const verification = latestVerificationByFilename.get(backup.filename);
+                if (!verification) {
+                    return null;
+                }
+
+                return {
+                    ...verification,
+                    details: parseVerificationDetails(verification.details),
+                };
+              })(),
+            }));
         } catch (error: any) {
             logger.error('Failed to list backups:', error);
             throw new TRPCError({
@@ -57,7 +100,7 @@ export const backupRouter = router({
     /**
      * Create a new backup
      */
-    create: adminProcedure.mutation(async () => {
+    create: adminProcedure.mutation(async ({ ctx }) => {
         try {
             const dbPath = getDbPath();
 
@@ -101,7 +144,31 @@ export const backupRouter = router({
                 // Don't fail the request, just log
             }
 
-            return { success: true, filename: backupFilename };
+            const verification = await verifyBackupFile(backupFilename, {
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                triggeredBy: 'create',
+                writeAuditEntry: false,
+            });
+
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'BACKUP_CREATE',
+                entity: 'BACKUP',
+                entityId: backupFilename,
+                details: {
+                    filename: backupFilename,
+                    verificationStatus: verification.status,
+                    restoreReady: verification.restoreReady,
+                },
+            });
+
+            return {
+                success: true,
+                filename: backupFilename,
+                verification,
+            };
         } catch (error: any) {
             logger.error('Failed to create backup:', error);
             throw new TRPCError({
@@ -109,14 +176,38 @@ export const backupRouter = router({
                 message: error.message || 'Failed to create backup',
             });
         }
-    }),
+        }),
+
+    verificationHistory: adminProcedure
+        .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }).optional())
+        .query(async ({ input }) => {
+            const items = await db.backupVerification.findMany({
+                orderBy: { verifiedAt: 'desc' },
+                take: input?.limit ?? 20,
+            });
+
+            return items.map((item) => ({
+                ...item,
+                details: parseVerificationDetails(item.details),
+            }));
+        }),
+
+    verify: adminProcedure
+        .input(z.object({ filename: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+            return verifyBackupFile(input.filename, {
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                triggeredBy: 'admin',
+            });
+        }),
 
     /**
      * Restore a backup
      */
     restore: adminProcedure
         .input(z.object({ filename: z.string() }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             try {
                 const backupPath = path.join(BACKUP_DIR, input.filename);
                 const dbPath = getDbPath();
@@ -125,6 +216,19 @@ export const backupRouter = router({
                     throw new TRPCError({
                         code: 'NOT_FOUND',
                         message: 'Backup file not found',
+                    });
+                }
+
+                const verification = await verifyBackupFile(input.filename, {
+                    userId: ctx.user.id,
+                    ip: ctx.clientIp,
+                    triggeredBy: 'restore-precheck',
+                });
+
+                if (!verification.restoreReady) {
+                    throw new TRPCError({
+                        code: 'BAD_REQUEST',
+                        message: verification.error || 'Backup verification failed. Restore aborted.',
                     });
                 }
 
@@ -137,6 +241,19 @@ export const backupRouter = router({
 
                 // Restore
                 fs.copyFileSync(backupPath, dbPath);
+
+                await writeAuditLog({
+                    userId: ctx.user.id,
+                    ip: ctx.clientIp,
+                    action: 'BACKUP_RESTORE',
+                    entity: 'BACKUP',
+                    entityId: input.filename,
+                    details: {
+                        filename: input.filename,
+                        safetyBackup: path.basename(safetyBackup),
+                        verificationStatus: verification.status,
+                    },
+                });
 
                 return { success: true };
             } catch (error: any) {
@@ -153,13 +270,24 @@ export const backupRouter = router({
      */
     delete: adminProcedure
         .input(z.object({ filename: z.string() }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             try {
                 const backupPath = path.join(BACKUP_DIR, input.filename);
 
                 if (fs.existsSync(backupPath)) {
                     fs.unlinkSync(backupPath);
                 }
+
+                await writeAuditLog({
+                    userId: ctx.user.id,
+                    ip: ctx.clientIp,
+                    action: 'BACKUP_DELETE',
+                    entity: 'BACKUP',
+                    entityId: input.filename,
+                    details: {
+                        filename: input.filename,
+                    },
+                });
 
                 return { success: true };
             } catch (error: any) {

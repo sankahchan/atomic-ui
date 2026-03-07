@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { getCurrentUser } from '@/lib/auth';
+import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 
 const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
 
@@ -40,6 +41,18 @@ export async function GET(req: NextRequest) {
             },
             cancel() {
                 fileStream.destroy();
+            },
+        });
+
+        await writeAuditLog({
+            userId: user.id,
+            ip: getRequestIpFromHeaders(req.headers),
+            action: 'BACKUP_DOWNLOAD',
+            entity: 'BACKUP',
+            entityId: safeFilename,
+            details: {
+                filename: safeFilename,
+                size: stats.size,
             },
         });
 

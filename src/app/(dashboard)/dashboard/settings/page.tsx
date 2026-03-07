@@ -9,10 +9,20 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
@@ -22,6 +32,7 @@ import {
   Bell,
   Shield,
   Globe,
+  Plus,
   Save,
   Loader2,
   RefreshCw,
@@ -31,14 +42,76 @@ import {
   Trash2,
   FileText,
   History,
+  ScrollText,
+  ExternalLink,
   ChevronRight,
   Info,
   Palette,
+  Pencil,
+  TestTube,
 } from 'lucide-react';
 import Link from 'next/link';
 
 // Section type for the collapsible cards
-type SectionId = 'general' | 'health' | 'backup' | 'notifications' | 'security' | 'about' | 'subscription' | null;
+type SectionId = 'general' | 'health' | 'backup' | 'audit' | 'notifications' | 'security' | 'about' | 'subscription' | null;
+
+type AuditAlertRule = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  actions: string[];
+  entities: string[];
+  actorIds: string[];
+  keywords: string[];
+  throttleMinutes: number;
+  matchWindowMinutes: number;
+  minMatches: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AuditAlertRuleFormState = {
+  id?: string;
+  name: string;
+  isActive: boolean;
+  actions: string;
+  entities: string;
+  actorIds: string;
+  keywords: string;
+  throttleMinutes: string;
+  matchWindowMinutes: string;
+  minMatches: string;
+};
+
+const AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES = 24 * 60;
+const AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES = 24 * 60;
+const AUDIT_ALERT_RULE_MAX_MIN_MATCHES = 50;
+
+function buildAuditAlertRuleForm(rule?: AuditAlertRule | null): AuditAlertRuleFormState {
+  return {
+    id: rule?.id,
+    name: rule?.name ?? '',
+    isActive: rule?.isActive ?? true,
+    actions: rule?.actions.join(', ') ?? '',
+    entities: rule?.entities.join(', ') ?? '',
+    actorIds: rule?.actorIds.join(', ') ?? '',
+    keywords: rule?.keywords.join(', ') ?? '',
+    throttleMinutes: String(rule?.throttleMinutes ?? 30),
+    matchWindowMinutes: String(rule?.matchWindowMinutes ?? 10),
+    minMatches: String(rule?.minMatches ?? 1),
+  };
+}
+
+function splitCommaSeparated(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean),
+    ),
+  );
+}
 
 /**
  * Collapsible Section Card
@@ -100,10 +173,17 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { t } = useLocale();
   const [openSection, setOpenSection] = useState<SectionId>(null);
+  const utils = trpc.useUtils();
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
   const { data: currentUser } = trpc.auth.me.useQuery();
+  const { data: auditRetentionStatus } = trpc.audit.retentionStatus.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const { data: auditAlertRules } = trpc.audit.listAlertRules.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
 
   // Update setting mutation
   const updateMutation = trpc.settings.update.useMutation({
@@ -148,12 +228,21 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [auditRetentionDaysInput, setAuditRetentionDaysInput] = useState('180');
+  const [auditRuleDialogOpen, setAuditRuleDialogOpen] = useState(false);
+  const [auditRuleForm, setAuditRuleForm] = useState<AuditAlertRuleFormState>(buildAuditAlertRuleForm());
 
   useEffect(() => {
     if (currentUser?.email) {
       setUsername(currentUser.email);
     }
   }, [currentUser?.email]);
+
+  useEffect(() => {
+    if (auditRetentionStatus) {
+      setAuditRetentionDaysInput(String(auditRetentionStatus.retentionDays));
+    }
+  }, [auditRetentionStatus]);
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,10 +274,22 @@ export default function SettingsPage() {
 
   // Backup & Restore
   const { data: backups, refetch: refetchBackups } = trpc.backup.list.useQuery();
+  const { data: backupVerificationHistory, refetch: refetchBackupVerificationHistory } =
+    trpc.backup.verificationHistory.useQuery({ limit: 10 });
+  const { data: auditLogs } = trpc.audit.list.useQuery({ pageSize: 10 });
   const createBackupMutation = trpc.backup.create.useMutation({
-    onSuccess: () => {
-      toast({ title: t('settings.backup.create_success') });
-      refetchBackups();
+    onSuccess: async (result) => {
+      toast({
+        title: t('settings.backup.create_success'),
+        description: result.verification.restoreReady
+          ? 'Backup created and verified successfully.'
+          : result.verification.error ?? 'Backup created, but verification failed.',
+        variant: result.verification.restoreReady ? 'default' : 'destructive',
+      });
+      await Promise.all([
+        refetchBackups(),
+        refetchBackupVerificationHistory(),
+      ]);
     },
     onError: (error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -209,6 +310,122 @@ export default function SettingsPage() {
     onSuccess: () => {
       toast({ title: t('settings.backup.delete_success') });
       refetchBackups();
+    },
+  });
+  const verifyBackupMutation = trpc.backup.verify.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: result.restoreReady ? 'Backup verification passed' : 'Backup verification failed',
+        description: result.restoreReady
+          ? `${result.filename} is ready to restore.`
+          : result.error ?? 'Backup verification failed.',
+        variant: result.restoreReady ? 'default' : 'destructive',
+      });
+      await Promise.all([
+        refetchBackups(),
+        refetchBackupVerificationHistory(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Backup verification failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const updateAuditRetentionMutation = trpc.audit.updateRetention.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Audit retention updated',
+        description: result.cleanupEnabled
+          ? `Audit logs older than ${result.retentionDays} days will be cleaned up automatically.`
+          : 'Automatic audit log cleanup is disabled.',
+      });
+      await utils.audit.retentionStatus.invalidate();
+      await utils.audit.list.invalidate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to update retention',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const cleanupAuditLogsMutation = trpc.audit.cleanupOld.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Audit cleanup complete',
+        description: result.cleanupEnabled
+          ? `Removed ${result.deletedCount} audit entries older than ${result.retentionDays} days.`
+          : 'Automatic cleanup is disabled, so no audit entries were removed.',
+      });
+      await Promise.all([
+        utils.audit.retentionStatus.invalidate(),
+        utils.audit.list.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Audit cleanup failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const upsertAuditAlertRuleMutation = trpc.audit.upsertAlertRule.useMutation({
+    onSuccess: async (rule) => {
+      toast({
+        title: auditRuleForm.id ? 'Audit rule updated' : 'Audit rule created',
+        description: `Rule "${rule.name}" is now ${rule.isActive ? 'active' : 'disabled'}.`,
+      });
+      setAuditRuleDialogOpen(false);
+      setAuditRuleForm(buildAuditAlertRuleForm());
+      await Promise.all([
+        utils.audit.listAlertRules.invalidate(),
+        utils.audit.list.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to save audit rule',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const deleteAuditAlertRuleMutation = trpc.audit.deleteAlertRule.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Audit rule deleted',
+      });
+      await Promise.all([
+        utils.audit.listAlertRules.invalidate(),
+        utils.audit.list.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to delete audit rule',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const testAuditAlertRuleMutation = trpc.audit.testAlertRule.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Audit alert test sent',
+        description: `Delivered ${result.delivered} alert(s) across ${result.recipients} recipient target(s).`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Audit alert test failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -232,8 +449,116 @@ export default function SettingsPage() {
     window.open(`/api/backup/download?filename=${filename}`, '_blank');
   };
 
+  const handleVerifyBackup = (filename: string) => {
+    verifyBackupMutation.mutate({ filename });
+  };
+
   const handleSaveSetting = (key: string, value: unknown) => {
     updateMutation.mutate({ key, value });
+  };
+
+  const parsedAuditRetentionDays = Number(auditRetentionDaysInput);
+  const isAuditRetentionDaysValid =
+    auditRetentionDaysInput.trim() !== '' &&
+    Number.isInteger(parsedAuditRetentionDays) &&
+    parsedAuditRetentionDays >= 0 &&
+    parsedAuditRetentionDays <= 3650;
+  const canSaveAuditRetention =
+    isAuditRetentionDaysValid &&
+    parsedAuditRetentionDays !== auditRetentionStatus?.retentionDays &&
+    !updateAuditRetentionMutation.isPending;
+
+  const handleSaveAuditRetention = () => {
+    if (!isAuditRetentionDaysValid) {
+      toast({
+        title: 'Invalid retention value',
+        description: 'Enter a whole number between 0 and 3650 days.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateAuditRetentionMutation.mutate({
+      retentionDays: parsedAuditRetentionDays,
+    });
+  };
+
+  const openCreateAuditRuleDialog = () => {
+    setAuditRuleForm(buildAuditAlertRuleForm());
+    setAuditRuleDialogOpen(true);
+  };
+
+  const openEditAuditRuleDialog = (rule: AuditAlertRule) => {
+    setAuditRuleForm(buildAuditAlertRuleForm(rule));
+    setAuditRuleDialogOpen(true);
+  };
+
+  const handleSaveAuditRule = () => {
+    const ruleName = auditRuleForm.name.trim();
+    const throttleMinutes = Number(auditRuleForm.throttleMinutes);
+    const matchWindowMinutes = Number(auditRuleForm.matchWindowMinutes);
+    const minMatches = Number(auditRuleForm.minMatches);
+
+    if (!ruleName) {
+      toast({
+        title: 'Rule name is required',
+        description: 'Give the audit alert rule a clear name before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      !Number.isInteger(throttleMinutes) ||
+      throttleMinutes < 0 ||
+      throttleMinutes > AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES
+    ) {
+      toast({
+        title: 'Invalid throttle value',
+        description: `Enter a whole number between 0 and ${AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES} minutes.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      !Number.isInteger(matchWindowMinutes) ||
+      matchWindowMinutes < 1 ||
+      matchWindowMinutes > AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES
+    ) {
+      toast({
+        title: 'Invalid burst window',
+        description: `Enter a whole number between 1 and ${AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES} minutes.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      !Number.isInteger(minMatches) ||
+      minMatches < 1 ||
+      minMatches > AUDIT_ALERT_RULE_MAX_MIN_MATCHES
+    ) {
+      toast({
+        title: 'Invalid threshold',
+        description: `Enter a whole number between 1 and ${AUDIT_ALERT_RULE_MAX_MIN_MATCHES}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    upsertAuditAlertRuleMutation.mutate({
+      id: auditRuleForm.id,
+      name: ruleName,
+      isActive: auditRuleForm.isActive,
+      actions: splitCommaSeparated(auditRuleForm.actions),
+      entities: splitCommaSeparated(auditRuleForm.entities),
+      actorIds: splitCommaSeparated(auditRuleForm.actorIds),
+      keywords: splitCommaSeparated(auditRuleForm.keywords),
+      throttleMinutes,
+      matchWindowMinutes,
+      minMatches,
+    });
   };
 
   if (isLoading) {
@@ -436,14 +761,54 @@ export default function SettingsPage() {
                 ) : (
                   backups?.map((backup) => (
                     <div key={backup.filename} className="grid grid-cols-12 gap-2 p-3 border-t items-center hover:bg-muted/30 text-sm">
-                      <div className="col-span-6 flex items-center gap-2 truncate">
-                        <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="font-mono text-xs truncate">{backup.filename}</span>
+                      <div className="col-span-6 min-w-0">
+                        <div className="flex items-center gap-2 truncate">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <span className="font-mono text-xs truncate">{backup.filename}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={
+                              backup.latestVerification
+                                ? backup.latestVerification.restoreReady
+                                  ? 'default'
+                                  : 'destructive'
+                                : 'secondary'
+                            }
+                          >
+                            {backup.latestVerification
+                              ? backup.latestVerification.restoreReady
+                                ? 'Verified'
+                                : 'Verification failed'
+                              : 'Unverified'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {backup.latestVerification
+                              ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
+                              : 'No verification recorded yet'}
+                          </span>
+                        </div>
+                        {backup.latestVerification?.error ? (
+                          <p className="mt-1 text-xs text-destructive">{backup.latestVerification.error}</p>
+                        ) : null}
                       </div>
                       <div className="col-span-3 text-xs text-muted-foreground">
                         {Math.round(backup.size / 1024)} KB
                       </div>
                       <div className="col-span-3 flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleVerifyBackup(backup.filename)}
+                          disabled={verifyBackupMutation.isPending}
+                        >
+                          {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <TestTube className="w-3.5 h-3.5" />
+                          )}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -475,8 +840,493 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Recent Verification History</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Daily checks validate the newest backups and every restore now performs a verification pre-check.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchBackupVerificationHistory()}
+                  disabled={verifyBackupMutation.isPending}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+
+              {backupVerificationHistory && backupVerificationHistory.length > 0 ? (
+                <div className="space-y-2">
+                  {backupVerificationHistory.map((verification) => (
+                    <div
+                      key={verification.id}
+                      className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-start sm:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{verification.filename}</span>
+                          <Badge
+                            variant={
+                              verification.restoreReady && verification.status === 'SUCCESS'
+                                ? 'default'
+                                : 'destructive'
+                            }
+                          >
+                            {verification.restoreReady && verification.status === 'SUCCESS'
+                              ? 'Restore ready'
+                              : 'Failed'}
+                          </Badge>
+                          <Badge variant="outline">
+                            {verification.triggeredBy || 'manual'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(verification.verifiedAt).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          SHA-256: {verification.fileHashSha256 ? `${verification.fileHashSha256.slice(0, 12)}...` : 'n/a'}
+                        </p>
+                        {verification.error ? (
+                          <p className="text-xs text-destructive">{verification.error}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Integrity: {verification.integrityCheck || 'n/a'} | Tables: {verification.tableCount ?? 'n/a'} | Users: {verification.userCount ?? 'n/a'} | Keys: {verification.accessKeyCount ?? 'n/a'}
+                          </p>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleVerifyBackup(verification.filename)}
+                        disabled={verifyBackupMutation.isPending}
+                      >
+                        {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === verification.filename ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <TestTube className="w-4 h-4 mr-2" />
+                        )}
+                        Verify Again
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                  No backup verification history yet.
+                </div>
+              )}
+            </div>
           </div>
         </SectionCard>
+
+        <SectionCard
+          id="audit"
+          icon={ScrollText}
+          title="Audit Log"
+          description="Recent admin activity across backups, users, reports, and servers"
+          isOpen={openSection === 'audit'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="auditRetentionDays">Retention (days)</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="auditRetentionDays"
+                      type="number"
+                      min="0"
+                      max="3650"
+                      value={auditRetentionDaysInput}
+                      onChange={(e) => setAuditRetentionDaysInput(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveAuditRetention}
+                      disabled={!canSaveAuditRetention}
+                    >
+                      {updateAuditRetentionMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Retention
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set to `0` to keep audit logs forever. Automatic cleanup runs daily when retention is enabled.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs text-muted-foreground">Total Entries</p>
+                    <p className="mt-1 text-lg font-semibold">{auditRetentionStatus?.totalEntries ?? 0}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs text-muted-foreground">Eligible for Cleanup</p>
+                    <p className="mt-1 text-lg font-semibold">{auditRetentionStatus?.deletableEntries ?? 0}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs text-muted-foreground">Cutoff Date</p>
+                    <p className="mt-1 text-sm font-medium">
+                      {auditRetentionStatus?.cutoffDate
+                        ? new Date(auditRetentionStatus.cutoffDate).toLocaleString()
+                        : 'Cleanup disabled'}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 p-3">
+                    <p className="text-xs text-muted-foreground">Oldest Entry</p>
+                    <p className="mt-1 text-sm font-medium">
+                      {auditRetentionStatus?.oldestEntryAt
+                        ? new Date(auditRetentionStatus.oldestEntryAt).toLocaleString()
+                        : 'No audit entries'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cleanupAuditLogsMutation.mutate()}
+                    disabled={
+                      cleanupAuditLogsMutation.isPending ||
+                      !auditRetentionStatus?.cleanupEnabled ||
+                      (auditRetentionStatus?.deletableEntries ?? 0) === 0
+                    }
+                  >
+                    {cleanupAuditLogsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Cleanup Old Entries Now
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Use manual cleanup to apply the retention window immediately instead of waiting for the daily scheduler.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-muted p-2">
+                    <Info className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">How retention works</p>
+                    <p className="text-sm text-muted-foreground">
+                      Audit cleanup removes entries older than the configured retention window and records the cleanup itself as a new audit event.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>Automatic cleanup schedule: every day at 03:30 server time.</p>
+                  <p>Recommended retention: 90 to 365 days for most admin panels.</p>
+                  <p>If you need indefinite history, set retention to `0` and rely on database backups instead.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold">Alert Rules</h3>
+                    <Badge variant="secondary">
+                      {auditAlertRules?.filter((rule) => rule.isActive).length ?? 0} active
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Send real-time alerts when a new audit entry matches one of these rules. Delivery uses Telegram admin chats from bot settings and any webhook channels subscribed to `AUDIT_ALERT`.
+                  </p>
+                </div>
+
+                <Button size="sm" onClick={openCreateAuditRuleDialog}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Rule
+                </Button>
+              </div>
+
+              {auditAlertRules && auditAlertRules.length > 0 ? (
+                <div className="space-y-3">
+                  {auditAlertRules.map((rule) => (
+                    <div key={rule.id} className="rounded-lg border p-4 space-y-3">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{rule.name}</p>
+                            <Badge variant={rule.isActive ? 'default' : 'secondary'}>
+                              {rule.isActive ? 'Active' : 'Disabled'}
+                            </Badge>
+                            <Badge variant="outline">
+                              Throttle {rule.throttleMinutes}m
+                            </Badge>
+                            <Badge variant="outline">
+                              Threshold {rule.minMatches} / {rule.matchWindowMinutes}m
+                            </Badge>
+                          </div>
+                          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                            <p>Actions: {rule.actions.length > 0 ? rule.actions.join(', ') : 'Any action'}</p>
+                            <p>Entities: {rule.entities.length > 0 ? rule.entities.join(', ') : 'Any entity'}</p>
+                            <p>Actors: {rule.actorIds.length > 0 ? rule.actorIds.join(', ') : 'Any actor'}</p>
+                            <p>Keywords: {rule.keywords.length > 0 ? rule.keywords.join(', ') : 'No keyword filter'}</p>
+                            <p>Burst window: {rule.matchWindowMinutes} minutes</p>
+                            <p>Minimum matches: {rule.minMatches}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Updated {new Date(rule.updatedAt).toLocaleString()}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => testAuditAlertRuleMutation.mutate({ id: rule.id })}
+                            disabled={testAuditAlertRuleMutation.isPending}
+                          >
+                            {testAuditAlertRuleMutation.isPending && testAuditAlertRuleMutation.variables?.id === rule.id ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <TestTube className="w-4 h-4 mr-2" />
+                            )}
+                            Test
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => openEditAuditRuleDialog(rule)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm(`Delete audit alert rule "${rule.name}"?`)) {
+                                deleteAuditAlertRuleMutation.mutate({ id: rule.id });
+                              }
+                            }}
+                            disabled={deleteAuditAlertRuleMutation.isPending}
+                          >
+                            {deleteAuditAlertRuleMutation.isPending && deleteAuditAlertRuleMutation.variables?.id === rule.id ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 mr-2" />
+                            )}
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                  No audit alert rules yet. Create a rule for high-risk actions like `BACKUP_RESTORE`, `USER_DELETE`, or `SERVER_DELETE`.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/audit">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Full Audit Log
+                </Link>
+              </Button>
+            </div>
+
+            <div className="rounded-lg border overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
+              <div className="col-span-3">Time</div>
+              <div className="col-span-3">Action</div>
+              <div className="col-span-2">Entity</div>
+              <div className="col-span-2">Actor</div>
+              <div className="col-span-2">Target</div>
+            </div>
+            <div className="max-h-[260px] overflow-y-auto">
+              {auditLogs?.items.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  No audit entries yet.
+                </div>
+              ) : (
+                auditLogs?.items.map((log) => (
+                  <div key={log.id} className="grid grid-cols-12 gap-2 p-3 border-t items-center text-sm hover:bg-muted/30">
+                    <div className="col-span-3 text-xs text-muted-foreground">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </div>
+                    <div className="col-span-3 font-medium break-words">
+                      {log.action}
+                    </div>
+                    <div className="col-span-2 text-xs text-muted-foreground">
+                      {log.entity}
+                    </div>
+                    <div className="col-span-2 text-xs text-muted-foreground break-all">
+                      {log.userEmail || log.userId || 'System'}
+                    </div>
+                    <div className="col-span-2 text-xs font-mono text-muted-foreground break-all">
+                      {log.entityId || '-'}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          </div>
+        </SectionCard>
+
+        <Dialog open={auditRuleDialogOpen} onOpenChange={setAuditRuleDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{auditRuleForm.id ? 'Edit Audit Alert Rule' : 'Create Audit Alert Rule'}</DialogTitle>
+              <DialogDescription>
+                Match new audit entries by action, entity, actor, or keywords and send notifications to configured admin recipients.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="auditRuleName">Rule Name</Label>
+                <Input
+                  id="auditRuleName"
+                  value={auditRuleForm.name}
+                  onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Restore operations"
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Rule Enabled</p>
+                  <p className="text-xs text-muted-foreground">
+                    Disabled rules stay saved but do not trigger notifications.
+                  </p>
+                </div>
+                <Switch
+                  checked={auditRuleForm.isActive}
+                  onCheckedChange={(checked) => setAuditRuleForm((prev) => ({ ...prev, isActive: checked }))}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleActions">Actions</Label>
+                  <Input
+                    id="auditRuleActions"
+                    value={auditRuleForm.actions}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, actions: e.target.value }))}
+                    placeholder="USER_DELETE, BACKUP_RESTORE"
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated. Leave blank to match any action.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleEntities">Entities</Label>
+                  <Input
+                    id="auditRuleEntities"
+                    value={auditRuleForm.entities}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, entities: e.target.value }))}
+                    placeholder="USER, BACKUP, SERVER"
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated. Leave blank to match any entity.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleActors">Actor User IDs</Label>
+                  <Input
+                    id="auditRuleActors"
+                    value={auditRuleForm.actorIds}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, actorIds: e.target.value }))}
+                    placeholder="clx..., cly..."
+                  />
+                  <p className="text-xs text-muted-foreground">Optional. Limit alerts to specific actor IDs.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleThrottle">Throttle (minutes)</Label>
+                  <Input
+                    id="auditRuleThrottle"
+                    type="number"
+                    min="0"
+                    max={String(AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES)}
+                    value={auditRuleForm.throttleMinutes}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, throttleMinutes: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">Set to `0` to alert every time the threshold is reached.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleMatchWindow">Burst Window (minutes)</Label>
+                  <Input
+                    id="auditRuleMatchWindow"
+                    type="number"
+                    min="1"
+                    max={String(AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES)}
+                    value={auditRuleForm.matchWindowMinutes}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, matchWindowMinutes: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Matching audit entries inside this rolling window count toward the threshold.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleMinMatches">Minimum Matches</Label>
+                  <Input
+                    id="auditRuleMinMatches"
+                    type="number"
+                    min="1"
+                    max={String(AUDIT_ALERT_RULE_MAX_MIN_MATCHES)}
+                    value={auditRuleForm.minMatches}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, minMatches: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set to `1` for immediate alerts, or higher for burst and threshold rules.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="auditRuleKeywords">Keywords</Label>
+                  <Input
+                    id="auditRuleKeywords"
+                    value={auditRuleForm.keywords}
+                    onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, keywords: e.target.value }))}
+                    placeholder="restore, deleted, production"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional. Case-insensitive matches across audit action, entity, target, IP, and serialized details.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAuditRuleDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveAuditRule} disabled={upsertAuditAlertRuleMutation.isPending}>
+                {upsertAuditAlertRuleMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Rule
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Notifications */}
         <SectionCard
@@ -492,10 +1342,10 @@ export default function SettingsPage() {
               {t('settings.notifications.info')}
             </p>
             <Button variant="outline" size="sm" asChild>
-              <a href="/dashboard/notifications">
+              <Link href="/dashboard/notifications">
                 <Bell className="w-4 h-4 mr-2" />
                 {t('settings.notifications.btn')}
-              </a>
+              </Link>
             </Button>
           </div>
         </SectionCard>

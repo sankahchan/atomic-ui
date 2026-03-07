@@ -2,9 +2,9 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
+import { getJwtSecretBytes } from './session-secret';
 
 // Constants for authentication
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'atomic-ui-default-secret');
 const SESSION_COOKIE_NAME = 'atomic-session';
 // Validate session expiry
 const getSessionExpiryDays = () => {
@@ -58,6 +58,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export async function createSession(userId: string, email: string, role: string): Promise<string> {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
+  const jwtSecret = getJwtSecretBytes();
 
   // Create the JWT with user information
   const token = await new SignJWT({
@@ -68,7 +69,7 @@ export async function createSession(userId: string, email: string, role: string)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(expiresAt)
-    .sign(JWT_SECRET);
+    .sign(jwtSecret);
 
   // Store the session in the database for tracking and revocation
   await db.session.create({
@@ -88,7 +89,7 @@ export async function createSession(userId: string, email: string, role: string)
  */
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecretBytes());
 
     // Check if the session exists in the database (not revoked)
     const session = await db.session.findUnique({

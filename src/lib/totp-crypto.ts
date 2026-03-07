@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getJwtSecretString } from './session-secret';
 
 let warnedFallback = false;
 
@@ -22,6 +23,10 @@ export function getTotpEncryptionKeyHex(): string {
     console.warn('[Security] TOTP_ENCRYPTION_KEY is not set. Falling back to a derived key.');
   }
 
-  const fallback = process.env.JWT_SECRET || 'atomic-ui-default-secret';
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('TOTP_ENCRYPTION_KEY must be set in production.');
+  }
+
+  const fallback = getJwtSecretString();
   return crypto.createHash('sha256').update(`totp:${fallback}`).digest('hex');
 }

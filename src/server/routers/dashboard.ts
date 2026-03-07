@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc';
+import { router, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 
@@ -8,7 +8,7 @@ export const dashboardRouter = router({
     /**
      * Get traffic history for charts (last 30 days by default).
      */
-    trafficHistory: protectedProcedure
+    trafficHistory: adminProcedure
         .input(
             z.object({
                 days: z.number().int().min(1).max(365).default(30),
@@ -34,7 +34,7 @@ export const dashboardRouter = router({
             const trafficLogs = await db.trafficLog.findMany({
                 where,
                 select: {
-                    bytesUsed: true,
+                    deltaBytes: true,
                     recordedAt: true,
                 },
                 orderBy: { recordedAt: 'asc' },
@@ -45,7 +45,7 @@ export const dashboardRouter = router({
 
             for (const log of trafficLogs) {
                 const dateKey = log.recordedAt.toISOString().split('T')[0];
-                dailyTraffic[dateKey] = (dailyTraffic[dateKey] || BigInt(0)) + log.bytesUsed;
+                dailyTraffic[dateKey] = (dailyTraffic[dateKey] || BigInt(0)) + log.deltaBytes;
             }
 
             // Fill in missing days with 0
@@ -70,7 +70,7 @@ export const dashboardRouter = router({
     /**
      * Get overview statistics for the dashboard.
      */
-    stats: protectedProcedure.query(async () => {
+    stats: adminProcedure.query(async () => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -160,7 +160,7 @@ export const dashboardRouter = router({
     /**
      * Get server status list for dashboard cards.
      */
-    serverStatus: protectedProcedure.query(async () => {
+    serverStatus: adminProcedure.query(async () => {
         const servers = await db.server.findMany({
             where: { isActive: true },
             include: {
@@ -186,7 +186,7 @@ export const dashboardRouter = router({
     /**
      * Get recent activity for the dashboard.
      */
-    recentActivity: protectedProcedure.query(async () => {
+    recentActivity: adminProcedure.query(async () => {
         // Get recently created keys
         const recentKeys = await db.accessKey.findMany({
             take: 10,
@@ -229,7 +229,7 @@ export const dashboardRouter = router({
     /**
      * Get top users by bandwidth usage.
      */
-    topUsers: protectedProcedure
+    topUsers: adminProcedure
         .input(z.object({
             limit: z.number().int().min(1).max(100).default(5),
         }).optional())
@@ -264,7 +264,7 @@ export const dashboardRouter = router({
     /**
      * Get peak usage hours (heatmap data).
      */
-    peakHours: protectedProcedure
+    peakHours: adminProcedure
         .input(z.object({
             days: z.number().int().default(30)
         }).optional())

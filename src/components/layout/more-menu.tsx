@@ -6,9 +6,11 @@ import {
   ShieldCheck,
   Users,
   FileText,
+  ScrollText,
   ArrowRightLeft,
   Settings,
   Bell,
+  Smartphone,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,12 +19,14 @@ import { useLocale } from '@/hooks/use-locale';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 const items = [
-  { href: '/security', icon: ShieldCheck, labelKey: 'nav.security' },
-  { href: '/users', icon: Users, labelKey: 'nav.users' },
-  { href: '/reports', icon: FileText, labelKey: 'nav.reports' },
-  { href: '/migration', icon: ArrowRightLeft, labelKey: 'nav.migration' },
-  { href: '/settings', icon: Settings, labelKey: 'nav.settings' },
-  { href: '/notifications', icon: Bell, labelKey: 'nav.notifications' },
+  { href: '/dashboard/security', icon: ShieldCheck, labelKey: 'nav.security' },
+  { href: '/dashboard/users', icon: Users, labelKey: 'nav.users' },
+  { href: '/dashboard/reports', icon: FileText, labelKey: 'nav.reports' },
+  { href: '/dashboard/audit', icon: ScrollText, labelKey: 'nav.audit' },
+  { href: '/dashboard/sessions', icon: Smartphone, labelKey: 'nav.sessions' },
+  { href: '/dashboard/migration', icon: ArrowRightLeft, labelKey: 'nav.migration' },
+  { href: '/dashboard/settings', icon: Settings, labelKey: 'nav.settings' },
+  { href: '/dashboard/notifications', icon: Bell, labelKey: 'nav.notifications' },
 ] as const;
 
 interface MoreMenuProps {

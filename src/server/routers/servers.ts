@@ -17,6 +17,9 @@ import { createOutlineClient, parseOutlineConfig } from '@/lib/outline-api';
 import { TRPCError } from '@trpc/server';
 import { logger } from '@/lib/logger';
 import { acquireSyncLock, releaseSyncLock, getSyncLockStatus } from '@/lib/sync-lock';
+import { writeAuditLog } from '@/lib/audit';
+import { CONNECTION_SESSION_TIMEOUT_MS } from '@/lib/services/session-management';
+import { serverLifecycleModeSchema } from '@/lib/services/server-lifecycle';
 
 /**
  * Input validation schema for creating a new server.
@@ -32,6 +35,8 @@ const createServerSchema = z.object({
   location: z.string().max(100).optional(),
   countryCode: z.string().length(2).optional(),
   isDefault: z.boolean().optional(),
+  lifecycleMode: serverLifecycleModeSchema.optional(),
+  lifecycleNote: z.string().max(280).optional().nullable(),
   tagIds: z.array(z.string()).optional(),
   enableHealthCheck: z.boolean().default(true),
 });
@@ -47,6 +52,8 @@ const updateServerSchema = z.object({
   countryCode: z.string().length(2).optional().nullable(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  lifecycleMode: serverLifecycleModeSchema.optional(),
+  lifecycleNote: z.string().max(280).optional().nullable(),
   maxKeys: z.number().int().positive().optional().nullable(),
   tagIds: z.array(z.string()).optional(),
 });
@@ -59,6 +66,8 @@ const parseConfigSchema = z.object({
   config: z.string(),
 });
 
+const MIN_ONLINE_ACTIVITY_BYTES = 1024;
+
 export const serversRouter = router({
   /**
    * List all servers with optional filtering.
@@ -66,7 +75,7 @@ export const serversRouter = router({
    * Returns servers with their related tags, health check status,
    * and key counts. Results can be filtered by active status and tags.
    */
-  list: protectedProcedure
+  list: adminProcedure
     .input(
       z.object({
         includeInactive: z.boolean().optional(),
@@ -160,7 +169,7 @@ export const serversRouter = router({
    * Includes all related data and fetches fresh metrics
    * from the Outline API if the server is reachable.
    */
-  getById: protectedProcedure
+  getById: adminProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const server = await db.server.findUnique({
@@ -209,7 +218,7 @@ export const serversRouter = router({
    */
   create: adminProcedure
     .input(createServerSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       // Create an Outline client to test the connection
       const client = createOutlineClient(input.apiUrl, input.apiCertSha256);
 
@@ -253,6 +262,9 @@ export const serversRouter = router({
           location: input.location,
           countryCode: input.countryCode,
           isDefault: input.isDefault ?? false,
+          lifecycleMode: input.lifecycleMode ?? 'ACTIVE',
+          lifecycleNote: input.lifecycleNote ?? null,
+          lifecycleChangedAt: new Date(),
           outlineServerId: serverInfo.serverId,
           outlineName: serverInfo.name,
           outlineVersion: serverInfo.version,
@@ -291,6 +303,22 @@ export const serversRouter = router({
         });
       }
 
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_CREATE',
+        entity: 'SERVER',
+        entityId: server.id,
+        details: {
+          name: server.name,
+          location: server.location,
+          countryCode: server.countryCode,
+          isDefault: server.isDefault,
+          lifecycleMode: server.lifecycleMode,
+          lifecycleNote: server.lifecycleNote,
+        },
+      });
+
       return {
         ...server,
         tags: server.tags.map((st) => st.tag),
@@ -306,7 +334,7 @@ export const serversRouter = router({
    */
   update: adminProcedure
     .input(updateServerSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, tagIds, ...data } = input;
 
       // Check if the server exists
@@ -334,6 +362,11 @@ export const serversRouter = router({
         where: { id },
         data: {
           ...data,
+          ...(data.lifecycleMode || data.lifecycleNote !== undefined
+            ? {
+                lifecycleChangedAt: new Date(),
+              }
+            : {}),
           // Update tags if provided
           tags: tagIds
             ? {
@@ -354,10 +387,90 @@ export const serversRouter = router({
         },
       });
 
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_UPDATE',
+        entity: 'SERVER',
+        entityId: server.id,
+        details: {
+          name: server.name,
+          location: server.location,
+          countryCode: server.countryCode,
+          isDefault: server.isDefault,
+          isActive: server.isActive,
+          lifecycleMode: server.lifecycleMode,
+          lifecycleNote: server.lifecycleNote,
+        },
+      });
+
       return {
         ...server,
         tags: server.tags.map((st) => st.tag),
       };
+    }),
+
+  setLifecycleMode: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        lifecycleMode: serverLifecycleModeSchema,
+        lifecycleNote: z.string().max(280).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await db.server.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          lifecycleMode: true,
+          lifecycleNote: true,
+          isActive: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Server not found',
+        });
+      }
+
+      const server = await db.server.update({
+        where: { id: input.id },
+        data: {
+          lifecycleMode: input.lifecycleMode,
+          lifecycleNote: input.lifecycleNote?.trim() || null,
+          lifecycleChangedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+          lifecycleMode: true,
+          lifecycleNote: true,
+          lifecycleChangedAt: true,
+          isActive: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_LIFECYCLE_UPDATE',
+        entity: 'SERVER',
+        entityId: server.id,
+        details: {
+          name: server.name,
+          previousMode: existing.lifecycleMode,
+          previousNote: existing.lifecycleNote,
+          lifecycleMode: server.lifecycleMode,
+          lifecycleNote: server.lifecycleNote,
+          isActive: server.isActive,
+        },
+      });
+
+      return server;
     }),
 
   /**
@@ -370,7 +483,7 @@ export const serversRouter = router({
    */
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const server = await db.server.findUnique({
         where: { id: input.id },
       });
@@ -387,6 +500,18 @@ export const serversRouter = router({
         where: { id: input.id },
       });
 
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_DELETE',
+        entity: 'SERVER',
+        entityId: server.id,
+        details: {
+          name: server.name,
+          apiUrl: server.apiUrl,
+        },
+      });
+
       return { success: true };
     }),
 
@@ -397,9 +522,9 @@ export const serversRouter = router({
    * metrics from the Outline server and updates the local database.
    * It should be called periodically or when the user requests a refresh.
    */
-  sync: protectedProcedure
+  sync: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const server = await db.server.findUnique({
         where: { id: input.id },
       });
@@ -532,9 +657,8 @@ export const serversRouter = router({
               console.log(`📉 Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dataLimit} bytes`);
             }
 
-            // Update lastUsedAt if there's any traffic increase (for online detection)
-            // Use very low threshold (100 bytes) for responsive online status
-            const hasTraffic = bytesTransferred > 100;
+            // Ignore tiny probe traffic so it does not keep keys falsely "online".
+            const hasTraffic = bytesTransferred >= MIN_ONLINE_ACTIVITY_BYTES;
             if (hasTraffic) {
               updateData.lastUsedAt = new Date();
             }
@@ -547,7 +671,6 @@ export const serversRouter = router({
 
             // Session tracking for device estimation
             const now = new Date();
-            const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = session ended
 
             if (hasTraffic) {
               // Check for active session
@@ -600,12 +723,13 @@ export const serversRouter = router({
                   accessKeyId: existingKey.id,
                   isActive: true,
                   lastActiveAt: {
-                    lt: new Date(now.getTime() - SESSION_TIMEOUT_MS),
+                    lt: new Date(now.getTime() - CONNECTION_SESSION_TIMEOUT_MS),
                   },
                 },
                 data: {
                   isActive: false,
                   endedAt: now,
+                  endedReason: 'INACTIVITY_TIMEOUT',
                 },
               });
 
@@ -632,7 +756,8 @@ export const serversRouter = router({
               await db.trafficLog.create({
                 data: {
                   accessKeyId: existingKey.id,
-                  bytesUsed: BigInt(bytesTransferred),
+                  bytesUsed: BigInt(effectiveUsedBytes),
+                  deltaBytes: BigInt(bytesTransferred),
                   recordedAt: new Date(),
                 },
               });
@@ -675,7 +800,7 @@ export const serversRouter = router({
           });
         }
 
-        return {
+        const result = {
           success: true,
           keysFound: outlineKeys.length,
           keysCreated: outlineKeys.length - (await db.accessKey.count({
@@ -683,6 +808,21 @@ export const serversRouter = router({
           })),
           keysRemoved: orphanedKeys.length,
         };
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'SERVER_SYNC',
+          entity: 'SERVER',
+          entityId: server.id,
+          details: {
+            name: server.name,
+            keysFound: result.keysFound,
+            keysRemoved: result.keysRemoved,
+          },
+        });
+
+        return result;
       } catch (error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -695,7 +835,7 @@ export const serversRouter = router({
    * Get active connection count and live bandwidth by checking metric deltas.
    * This estimates "Active Connections" by seeing which keys are transmitting data.
    */
-  getLiveStats: protectedProcedure
+  getLiveStats: adminProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const server = await db.server.findUnique({
@@ -751,7 +891,7 @@ export const serversRouter = router({
    * Get load statistics for all active servers.
    * Used by the load balancer UI to display server load distribution.
    */
-  getLoadStats: protectedProcedure
+  getLoadStats: adminProcedure
     .input(z.object({
       serverTagIds: z.array(z.string()).optional(),
     }).optional())
@@ -763,7 +903,7 @@ export const serversRouter = router({
   /**
    * Get current sync lock status
    */
-  getSyncStatus: protectedProcedure.query(() => {
+  getSyncStatus: adminProcedure.query(() => {
     return getSyncLockStatus();
   }),
 
@@ -773,7 +913,7 @@ export const serversRouter = router({
    * This is useful for auto-sync functionality to keep all keys updated.
    * Uses a lock to prevent concurrent sync operations.
    */
-  syncAll: protectedProcedure.mutation(async () => {
+  syncAll: adminProcedure.mutation(async ({ ctx }) => {
     // Try to acquire sync lock
     const operationId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const lockResult = acquireSyncLock(operationId);
@@ -829,13 +969,12 @@ export const serversRouter = router({
           | { type: 'updateSession'; id: string; data: { lastActiveAt: Date; bytesUsed: { increment: bigint } } }
           | { type: 'createSession'; data: { accessKeyId: string; bytesUsed: bigint } }
           | { type: 'closeStaleSession'; accessKeyId: string; before: Date }
-          | { type: 'createTrafficLog'; data: { accessKeyId: string; bytesUsed: bigint; recordedAt: Date } };
+          | { type: 'createTrafficLog'; data: { accessKeyId: string; bytesUsed: bigint; deltaBytes: bigint; recordedAt: Date } };
 
         const dbOperations: DbOperation[] = [];
         const sessionUpdates: { keyId: string; hasTraffic: boolean; bytesTransferred: number; existingKey: typeof existingKeys[0] }[] = [];
 
         const now = new Date();
-        const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 
         // Process each outline key and collect updates
         for (const outlineKey of outlineKeys) {
@@ -904,7 +1043,7 @@ export const serversRouter = router({
             logger.debug(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
           }
 
-          const hasTraffic = bytesTransferred > 100;
+          const hasTraffic = bytesTransferred >= MIN_ONLINE_ACTIVITY_BYTES;
           if (hasTraffic) {
             updateData.lastUsedAt = now;
           }
@@ -922,7 +1061,8 @@ export const serversRouter = router({
               type: 'createTrafficLog',
               data: {
                 accessKeyId: existingKey.id,
-                bytesUsed: BigInt(bytesTransferred),
+                bytesUsed: BigInt(effectiveUsedBytes),
+                deltaBytes: BigInt(bytesTransferred),
                 recordedAt: now,
               },
             });
@@ -995,9 +1135,9 @@ export const serversRouter = router({
                 where: {
                   accessKeyId: keyId,
                   isActive: true,
-                  lastActiveAt: { lt: new Date(now.getTime() - SESSION_TIMEOUT_MS) },
+                  lastActiveAt: { lt: new Date(now.getTime() - CONNECTION_SESSION_TIMEOUT_MS) },
                 },
-                data: { isActive: false, endedAt: now },
+                data: { isActive: false, endedAt: now, endedReason: 'INACTIVITY_TIMEOUT' },
               });
 
               const activeSessionCount = await tx.connectionSession.count({
@@ -1084,6 +1224,18 @@ export const serversRouter = router({
       }
     }
 
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_SYNC_ALL',
+        entity: 'SERVER',
+        details: {
+          totalServers: results.length,
+          successfulServers: results.filter((result) => result.success).length,
+          failedServers: results.filter((result) => !result.success).length,
+        },
+      });
+
       return { results, syncedAt: new Date() };
     } finally {
       // Always release the lock when done
@@ -1097,7 +1249,7 @@ export const serversRouter = router({
    * This is useful for validating API credentials before adding a server
    * or for troubleshooting connectivity issues.
    */
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(
       z.object({
         apiUrl: z.string().url(),
@@ -1243,6 +1395,8 @@ export const serversRouter = router({
         isDefault: s.isDefault,
         isActive: s.isActive,
         maxKeys: s.maxKeys,
+        lifecycleMode: s.lifecycleMode,
+        lifecycleNote: s.lifecycleNote,
         sortOrder: s.sortOrder,
         hostnameForAccessKeys: s.hostnameForAccessKeys,
         portForNewAccessKeys: s.portForNewAccessKeys,
@@ -1279,6 +1433,8 @@ export const serversRouter = router({
         isDefault: z.boolean().optional(),
         isActive: z.boolean().optional(),
         maxKeys: z.number().int().positive().optional().nullable(),
+        lifecycleMode: serverLifecycleModeSchema.optional(),
+        lifecycleNote: z.string().max(280).optional().nullable(),
         sortOrder: z.number().int().optional(),
         tags: z.array(z.string()).optional(),
         healthCheck: z.object({
@@ -1345,6 +1501,9 @@ export const serversRouter = router({
               isDefault: serverData.isDefault ?? false,
               isActive: serverData.isActive ?? true,
               maxKeys: serverData.maxKeys ?? null,
+              lifecycleMode: serverData.lifecycleMode ?? 'ACTIVE',
+              lifecycleNote: serverData.lifecycleNote ?? null,
+              lifecycleChangedAt: new Date(),
               sortOrder: serverData.sortOrder ?? 0,
               tags: tagIds.length > 0
                 ? { create: tagIds.map((id) => ({ tagId: id })) }

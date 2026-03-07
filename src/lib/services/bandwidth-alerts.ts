@@ -184,6 +184,7 @@ async function autoDisableKey(key: {
             data: {
                 isActive: false,
                 endedAt: new Date(),
+                endedReason: 'KEY_DEPLETED',
             },
         });
     } catch (error) {

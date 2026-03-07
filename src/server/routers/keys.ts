@@ -19,6 +19,7 @@ import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
 import { formatTagsForStorage } from '@/lib/tags';
+import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 
 /**
  * Validation schema for creating a new access key.
@@ -36,6 +37,9 @@ const ENCRYPTION_METHODS = [
   'aes-192-gcm',
   'aes-256-gcm',
 ] as const;
+
+const ONLINE_SESSION_WINDOW_MS = 60 * 1000;
+const MIN_LIVE_ACTIVITY_BYTES = BigInt(1024);
 
 const createKeySchema = z.object({
   serverId: z.string(),
@@ -198,11 +202,16 @@ export const keysRouter = router({
         where.dynamicKeyId = null;
       }
 
-      // Quick filter: Online (lastUsedAt within 90s AND not disabled)
+      // Quick filter: Online (recent active connection session)
       if (online) {
-        const onlineThreshold = new Date(Date.now() - 90 * 1000);
-        where.lastUsedAt = { gte: onlineThreshold };
-        where.status = { not: 'DISABLED' };
+        const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
+        where.status = 'ACTIVE';
+        where.sessions = {
+          some: {
+            isActive: true,
+            lastActiveAt: { gte: onlineThreshold },
+          },
+        };
       }
 
       // Quick filter: Expiring within 7 days
@@ -372,6 +381,14 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Server not found',
+        });
+      }
+
+      const assignmentCheck = canAssignKeysToServer(server);
+      if (!assignmentCheck.allowed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: assignmentCheck.reason,
         });
       }
 
@@ -739,6 +756,13 @@ export const keysRouter = router({
 
       // Create keys on each server
       for (const server of servers) {
+        const assignmentCheck = canAssignKeysToServer(server);
+        if (!assignmentCheck.allowed) {
+          results.failed += input.count;
+          results.errors.push(`${server.name}: ${assignmentCheck.reason}`);
+          continue;
+        }
+
         const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
 
         for (let i = 1; i <= input.count; i++) {
@@ -871,6 +895,11 @@ export const keysRouter = router({
           }
 
           if (input.enable) {
+            const assignmentCheck = canAssignKeysToServer(key.server);
+            if (!assignmentCheck.allowed) {
+              throw new Error(assignmentCheck.reason);
+            }
+
             // ENABLE: Recreate the key on Outline server
             const newOutlineKey = await client.createAccessKey({
               name: key.name,
@@ -921,7 +950,7 @@ export const keysRouter = router({
             // Close any active sessions
             await db.connectionSession.updateMany({
               where: { accessKeyId: key.id, isActive: true },
-              data: { isActive: false, endedAt: new Date() },
+              data: { isActive: false, endedAt: new Date(), endedReason: 'KEY_DISABLED' },
             });
           }
 
@@ -1209,6 +1238,14 @@ export const keysRouter = router({
       const isCurrentlyDisabled = key.status === 'DISABLED';
 
       if (isCurrentlyDisabled) {
+        const assignmentCheck = canAssignKeysToServer(key.server);
+        if (!assignmentCheck.allowed) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: assignmentCheck.reason,
+          });
+        }
+
         // === ENABLE: Recreate the key on Outline server ===
         try {
           // Try to recreate with the original key ID if possible
@@ -1305,6 +1342,7 @@ export const keysRouter = router({
           data: {
             isActive: false,
             endedAt: new Date(),
+            endedReason: 'KEY_ARCHIVED',
           },
         });
 
@@ -1493,14 +1531,11 @@ export const keysRouter = router({
   /**
    * Get online/active users (keys with active connection sessions).
    *
-   * A key is considered "online" if:
-   * - It has status ACTIVE (not DISABLED, EXPIRED, etc.)
-   * - AND it has recent traffic (lastUsedAt within ONLINE_WINDOW)
-   *
-   * DISABLED keys are always offline since they're deleted from Outline.
+   * A key is considered "online" when it has a recent active connection session.
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    // Only fetch ACTIVE keys - disabled keys are always offline
+    const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
+
     const activeKeys = await db.accessKey.findMany({
       where: {
         status: 'ACTIVE',
@@ -1510,20 +1545,22 @@ export const keysRouter = router({
         usedBytes: true,
         lastUsedAt: true,
         estimatedDevices: true,
+        sessions: {
+          where: {
+            isActive: true,
+            lastActiveAt: { gte: onlineThreshold },
+          },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
-
-    // Online = lastUsedAt within 30 seconds for more responsive detection
-    const ONLINE_WINDOW_MS = 30 * 1000;
-    const now = Date.now();
 
     return activeKeys.map(key => ({
       id: key.id,
       usedBytes: key.usedBytes.toString(),
       lastUsedAt: key.lastUsedAt?.toISOString() || null,
-      isOnline: key.lastUsedAt 
-        ? (now - key.lastUsedAt.getTime()) <= ONLINE_WINDOW_MS
-        : false,
+      isOnline: key.sessions.length > 0,
       estimatedDevices: key.estimatedDevices,
     }));
   }),
@@ -1725,10 +1762,11 @@ export const keysRouter = router({
 
   /**
    * Get live metrics directly from Outline servers.
-   * This fetches real-time traffic data and updates lastUsedAt for keys with new traffic,
-   * enabling responsive online status detection without requiring full sync.
+   * Online status comes from recent connection sessions, while usedBytes is refreshed
+   * directly from Outline for responsive UI updates.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
+    const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
     const servers = await db.server.findMany({
       where: { isActive: true },
       select: {
@@ -1742,12 +1780,20 @@ export const keysRouter = router({
             outlineKeyId: true,
             usageOffset: true,
             usedBytes: true, // Need current bytes for comparison
+            sessions: {
+              where: {
+                isActive: true,
+                lastActiveAt: { gte: onlineThreshold },
+              },
+              select: { id: true },
+              take: 1,
+            },
           },
         },
       },
     });
 
-    const results: Array<{ id: string; usedBytes: string }> = [];
+    const resultsMap = new Map<string, { id: string; usedBytes: string; isOnline: boolean }>();
     const keysWithNewTraffic: string[] = [];
 
     // Build a map of key id -> current stored bytes for comparison
@@ -1755,6 +1801,11 @@ export const keysRouter = router({
     for (const server of servers) {
       for (const key of server.accessKeys) {
         keyBytesMap.set(key.id, key.usedBytes);
+        resultsMap.set(key.id, {
+          id: key.id,
+          usedBytes: key.usedBytes.toString(),
+          isOnline: key.sessions.length > 0,
+        });
       }
     }
 
@@ -1773,14 +1824,16 @@ export const keysRouter = router({
               const offset = Number(key.usageOffset || 0);
               const effectiveBytes = rawBytes < offset ? rawBytes : rawBytes - offset;
 
-              results.push({
+              resultsMap.set(key.id, {
                 id: key.id,
                 usedBytes: effectiveBytes.toString(),
+                isOnline: resultsMap.get(key.id)?.isOnline ?? false,
               });
 
-              // Check if traffic increased - mark for lastUsedAt update
+              // Only treat meaningful traffic as fresh activity for "last seen".
               const storedBytes = keyBytesMap.get(key.id) || BigInt(0);
-              if (BigInt(effectiveBytes) > storedBytes) {
+              const trafficDelta = BigInt(effectiveBytes) - storedBytes;
+              if (trafficDelta >= MIN_LIVE_ACTIVITY_BYTES) {
                 keysWithNewTraffic.push(key.id);
               }
             }
@@ -1801,7 +1854,7 @@ export const keysRouter = router({
       });
     }
 
-    return results;
+    return Array.from(resultsMap.values());
   }),
 
   /**
@@ -1827,6 +1880,11 @@ export const keysRouter = router({
       const targetServer = await db.server.findUnique({ where: { id: input.targetServerId } });
       if (!targetServer) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Target server not found' });
+      }
+
+      const assignmentCheck = canAssignKeysToServer(targetServer);
+      if (!assignmentCheck.allowed) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: assignmentCheck.reason });
       }
 
       const { createOutlineClient: createClient } = await import('@/lib/outline-api');

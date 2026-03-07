@@ -67,6 +67,9 @@ model Server {
   isDefault     Boolean  @default(false)
   isActive      Boolean  @default(true)
   maxKeys       Int?
+  lifecycleMode String   @default("ACTIVE") // ACTIVE, DRAINING, MAINTENANCE
+  lifecycleNote String?
+  lifecycleChangedAt DateTime?
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -201,6 +204,7 @@ model AccessKey {
   updatedAt   DateTime     @updatedAt
   trafficLogs TrafficLog[]
   notifications NotificationLog[]
+  notificationDeliveries NotificationDelivery[]
   sessions    ConnectionSession[]
 
   @@unique([serverId, outlineKeyId])
@@ -328,9 +332,11 @@ model ConnectionSession {
 
   // Is this session currently active?
   isActive    Boolean   @default(true)
+  endedReason String?
 
   @@index([accessKeyId, isActive])
   @@index([accessKeyId, startedAt])
+  @@index([isActive, lastActiveAt])
 }
 
 // ============================================
@@ -440,8 +446,63 @@ model NotificationChannel {
   events   String // JSON array of NotificationEvent
   isActive Boolean @default(true)
 
+  deliveries NotificationDelivery[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model NotificationDelivery {
+  id            String   @id @default(cuid())
+  channelId     String?
+  channel       NotificationChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  event         String
+  message       String
+  payload       String?
+  payloadMode   String   @default("WRAPPED") // WRAPPED, RAW
+  cooldownKey   String?
+  status        String   @default("PENDING") // PENDING, PROCESSING, RETRYING, SUCCESS, FAILED
+  attemptCount  Int      @default(0)
+  maxAttempts   Int      @default(5)
+  nextAttemptAt DateTime @default(now())
+  lastAttemptAt DateTime?
+  processedAt   DateTime?
+  lastError     String?
+  
+  // Optional relation to access key
+  accessKeyId String?
+  accessKey   AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: SetNull)
+  sourceLogId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([channelId])
+  @@index([accessKeyId])
+  @@index([sourceLogId])
+  @@index([createdAt])
+  @@index([channelId, event, cooldownKey, createdAt])
+}
+
+model BackupVerification {
+  id             String   @id @default(cuid())
+  filename       String
+  status         String
+  triggeredBy    String?
+  fileSizeBytes  BigInt
+  fileHashSha256 String?
+  restoreReady   Boolean  @default(false)
+  integrityCheck String?
+  tableCount     Int?
+  accessKeyCount Int?
+  userCount      Int?
+  error          String?
+  details        String?
+  verifiedAt     DateTime @default(now())
+
+  @@index([filename, verifiedAt])
+  @@index([verifiedAt])
 }
 
 model NotificationLog {

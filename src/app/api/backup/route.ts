@@ -5,6 +5,7 @@ import path from 'path';
 import { Readable } from 'stream';
 import { getCurrentUser } from '@/lib/auth';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
+import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 
 // Helper to convert Node stream to Web stream (for Next.js Response)
 function streamToWeb(nodeStream: Readable) {
@@ -51,6 +52,16 @@ export async function GET(req: NextRequest) {
             console.error('Archive error:', error);
         });
         archive.finalize();
+
+        await writeAuditLog({
+            userId: user.id,
+            ip: getRequestIpFromHeaders(req.headers),
+            action: 'BACKUP_EXPORT',
+            entity: 'BACKUP',
+            details: {
+                type: 'full-system-zip',
+            },
+        });
 
         return new NextResponse(streamToWeb(archive), {
             headers: {

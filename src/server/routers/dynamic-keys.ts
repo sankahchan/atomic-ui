@@ -665,7 +665,7 @@ export const dynamicKeysRouter = router({
           // Close active sessions
           await db.connectionSession.updateMany({
             where: { accessKeyId: key.id, isActive: true },
-            data: { isActive: false, endedAt: new Date() },
+            data: { isActive: false, endedAt: new Date(), endedReason: 'KEY_DISABLED' },
           });
         }
       }
@@ -818,7 +818,7 @@ export const dynamicKeysRouter = router({
               // Close active sessions
               await db.connectionSession.updateMany({
                 where: { accessKeyId: key.id, isActive: true },
-                data: { isActive: false, endedAt: new Date() },
+                data: { isActive: false, endedAt: new Date(), endedReason: 'KEY_DISABLED' },
               });
             }
           }

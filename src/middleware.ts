@@ -20,6 +20,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getJwtSecretString } from '@/lib/session-secret';
 
 /**
  * Routes that don't require authentication
@@ -56,7 +57,7 @@ function isPublicRoute(pathname: string): boolean {
  * The secret is read from environment variables.
  */
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || 'atomic-ui-default-secret';
+  const secret = getJwtSecretString();
   return new TextEncoder().encode(secret);
 }
 

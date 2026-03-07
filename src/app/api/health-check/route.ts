@@ -20,6 +20,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
 import { OutlineClient } from '@/lib/outline-api';
 import { getCurrentUser } from '@/lib/auth';
+import {
+  channelSupportsEvent,
+  parseNotificationChannelRecord,
+} from '@/lib/services/notification-channels';
+import { enqueueNotificationsForChannels } from '@/lib/services/notification-queue';
 
 /**
  * Health check result for a single server.
@@ -110,13 +115,17 @@ export async function POST(request: NextRequest) {
       servers.map((server) => performHealthCheck(server))
     );
 
+    const previousStatusByServerId = new Map(
+      servers.map((server) => [server.id, server.healthCheck?.lastStatus ?? 'UNKNOWN']),
+    );
+
     // Process results and update database
     for (const result of results) {
       await updateHealthCheckRecord(result);
     }
 
     // Check for status changes and send notifications
-    await processStatusChanges(results);
+    await processStatusChanges(results, previousStatusByServerId);
 
     return NextResponse.json({
       success: true,
@@ -290,7 +299,10 @@ async function updateHealthCheckRecord(result: HealthCheckResult): Promise<void>
  * This function checks if any servers have changed status since the last
  * check and sends notifications through configured channels (Telegram, email, etc.)
  */
-async function processStatusChanges(results: HealthCheckResult[]): Promise<void> {
+async function processStatusChanges(
+  results: HealthCheckResult[],
+  previousStatusByServerId: Map<string, string>,
+): Promise<void> {
   // Get notification settings
   const notificationsEnabled = await prisma.settings.findUnique({
     where: { key: 'enableNotifications' },
@@ -301,26 +313,51 @@ async function processStatusChanges(results: HealthCheckResult[]): Promise<void>
   }
 
   // Get notification channels
-  const channels = await prisma.notificationChannel.findMany({
+  const rawChannels = await prisma.notificationChannel.findMany({
     where: { isActive: true },
   });
+  const channels = rawChannels
+    .map((channel) => parseNotificationChannelRecord(channel))
+    .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
+    .filter((channel) => channelSupportsEvent(channel, 'SERVER_DOWN'));
 
   if (channels.length === 0) {
     return;
   }
 
   // Check for servers that went down
-  const downServers = results.filter((r) => r.status === 'DOWN');
+  const downServers = results.filter(
+    (result) => result.status === 'DOWN' && previousStatusByServerId.get(result.serverId) !== 'DOWN',
+  );
   
   if (downServers.length > 0) {
     const message = formatAlertMessage(downServers);
-    
-    for (const channel of channels) {
-      try {
-        await sendNotification(channel, message);
-      } catch (error) {
-        console.error(`Failed to send notification via ${channel.type}:`, error);
-      }
+
+    try {
+      const cooldownKey = downServers
+        .map((server) => server.serverId)
+        .sort()
+        .join(',');
+
+      await enqueueNotificationsForChannels({
+        channelIds: channels.map((channel) => channel.id),
+        event: 'SERVER_DOWN',
+        message,
+        cooldownKey,
+        payload: {
+          type: 'server_alert',
+          downServers: downServers.map((server) => ({
+            serverId: server.serverId,
+            serverName: server.serverName,
+            status: server.status,
+            latencyMs: server.latencyMs,
+            error: server.error,
+            checkedAt: server.checkedAt.toISOString(),
+          })),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to enqueue server down notifications:', error);
     }
   }
 }
@@ -350,94 +387,3 @@ Checked at: ${new Date().toISOString()}`;
  * - Email: Would integrate with email service (not implemented)
  * - Webhook: Sends POST request to configured URL
  */
-async function sendNotification(
-  channel: {
-    type: string;
-    config: unknown;
-  },
-  message: string
-): Promise<void> {
-  const config = channel.config as Record<string, string>;
-
-  switch (channel.type) {
-    case 'TELEGRAM':
-      await sendTelegramNotification(config, message);
-      break;
-
-    case 'WEBHOOK':
-      await sendWebhookNotification(config, message);
-      break;
-
-    case 'EMAIL':
-      // Email notification would go here
-      console.log('Email notifications not yet implemented');
-      break;
-
-    default:
-      console.warn(`Unknown notification channel type: ${channel.type}`);
-  }
-}
-
-/**
- * Send a notification via Telegram Bot API.
- */
-async function sendTelegramNotification(
-  config: Record<string, string>,
-  message: string
-): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || config.botToken;
-  const chatId = config.chatId;
-
-  if (!botToken || !chatId) {
-    throw new Error('Telegram bot token or chat ID not configured');
-  }
-
-  const response = await fetch(
-    `https://api.telegram.org/bot${botToken}/sendMessage`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Telegram API error: ${error}`);
-  }
-}
-
-/**
- * Send a notification via webhook.
- */
-async function sendWebhookNotification(
-  config: Record<string, string>,
-  message: string
-): Promise<void> {
-  const webhookUrl = config.url;
-
-  if (!webhookUrl) {
-    throw new Error('Webhook URL not configured');
-  }
-
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(config.headers ? JSON.parse(config.headers) : {}),
-    },
-    body: JSON.stringify({
-      type: 'server_alert',
-      message,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Webhook request failed: ${response.status}`);
-  }
-}

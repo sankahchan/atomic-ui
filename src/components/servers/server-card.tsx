@@ -122,6 +122,8 @@ export function ServerCard({
             lastLatencyMs: number | null;
             uptimePercent: number;
         } | null;
+        lifecycleMode?: string | null;
+        lifecycleNote?: string | null;
         metrics?: {
             totalBandwidth: bigint;
             activeKeys: number;
@@ -144,6 +146,12 @@ export function ServerCard({
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.UNKNOWN;
+    const lifecycleMode = server.lifecycleMode || 'ACTIVE';
+    const lifecycleConfig = {
+        ACTIVE: { label: 'Active', className: 'border-emerald-500/30 text-emerald-500' },
+        DRAINING: { label: 'Draining', className: 'border-amber-500/30 text-amber-500' },
+        MAINTENANCE: { label: 'Maintenance', className: 'border-sky-500/30 text-sky-500' },
+    }[lifecycleMode as 'ACTIVE' | 'DRAINING' | 'MAINTENANCE'] ?? { label: lifecycleMode, className: 'border-muted-foreground/30 text-muted-foreground' };
 
     // Heuristic to check if server is local (localhost or 127.0.0.1)
     // In a real multi-server setup, we might need a dedicated flag in the DB
@@ -170,6 +178,11 @@ export function ServerCard({
                             </Link>
                             {server.location && (
                                 <p className="text-sm text-muted-foreground">{server.location}</p>
+                            )}
+                            {lifecycleMode !== 'ACTIVE' && (
+                                <Badge variant="outline" className={cn('mt-2 text-[10px]', lifecycleConfig.className)}>
+                                    {lifecycleConfig.label}
+                                </Badge>
                             )}
                         </div>
                     </div>

@@ -82,6 +82,11 @@ Set these in `.env` before production use:
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical public URL used by webhook/subscription links |
 | `APP_URL` | Recommended | App base URL for server-side flows |
 | `TELEGRAM_BOT_TOKEN` | Optional | Bot token from @BotFather |
+| `SMTP_HOST` | Optional | SMTP host for `EMAIL` notification channels |
+| `SMTP_PORT` | Optional | SMTP port (for example `587` or `465`) |
+| `SMTP_USER` | Optional | SMTP username; pair with `SMTP_PASS` if auth is required |
+| `SMTP_PASS` | Optional | SMTP password; pair with `SMTP_USER` if auth is required |
+| `SMTP_FROM` | Optional | Default sender address for `EMAIL` notification channels |
 | `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from UI |
 
 ## Security checklist
