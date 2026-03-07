@@ -7,6 +7,7 @@
  * receiving alerts about important system events and view key alerts.
  */
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -1012,7 +1013,7 @@ function KeyAlertsCard() {
                               ? t('notifications.key_alerts.day_left')
                               : `${key.daysRemaining} ${t('notifications.key_alerts.days_left')}`}
                         </Badge>
-                        <Link href={`/dashboard/keys`}>
+                        <Link href={`/dashboard/keys/${key.id}`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
@@ -1075,7 +1076,7 @@ function KeyAlertsCard() {
                         >
                           {key.usagePercent}%
                         </Badge>
-                        <Link href={`/dashboard/keys`}>
+                        <Link href={`/dashboard/keys/${key.id}`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
@@ -1105,6 +1106,7 @@ function QueueStatusCard() {
   const { data, isLoading, isFetching } = trpc.notifications.queueStatus.useQuery(undefined, {
     refetchOnWindowFocus: false,
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
   const processQueueMutation = trpc.notifications.processQueueNow.useMutation({
     onSuccess: async (result) => {
@@ -1226,6 +1228,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
     },
     {
       refetchOnWindowFocus: false,
+      placeholderData: keepPreviousData,
     },
   );
 

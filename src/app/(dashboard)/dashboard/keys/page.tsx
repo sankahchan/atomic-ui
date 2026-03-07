@@ -20,6 +20,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { keepPreviousData } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -177,12 +178,18 @@ function CreateKeyDialog({
   });
 
   // Fetch templates
-  const { data: templates } = trpc.templates.list.useQuery();
+  const { data: templates } = trpc.templates.list.useQuery(undefined, {
+    enabled: open,
+  });
 
   // Fetch servers for selection
-  const { data: servers } = trpc.servers.list.useQuery();
+  const { data: servers } = trpc.servers.list.useQuery(undefined, {
+    enabled: open,
+  });
   // Fetch users for assignment
-  const { data: users } = trpc.users.list.useQuery();
+  const { data: users } = trpc.users.list.useQuery(undefined, {
+    enabled: open,
+  });
   const { t } = useLocale();
 
   // Create key mutation
@@ -1563,6 +1570,8 @@ export default function KeysPage() {
     inactive30d: filters.quickFilters.inactive30d || undefined,
     tag: filters.tagFilter || undefined,
     owner: filters.ownerFilter || undefined,
+  }, {
+    placeholderData: keepPreviousData,
   });
 
   // Fetch servers for filter

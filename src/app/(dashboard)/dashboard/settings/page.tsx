@@ -174,14 +174,18 @@ export default function SettingsPage() {
   const { t } = useLocale();
   const [openSection, setOpenSection] = useState<SectionId>(null);
   const utils = trpc.useUtils();
+  const isBackupSectionOpen = openSection === 'backup';
+  const isAuditSectionOpen = openSection === 'audit';
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
   const { data: currentUser } = trpc.auth.me.useQuery();
-  const { data: auditRetentionStatus } = trpc.audit.retentionStatus.useQuery(undefined, {
+  const { data: auditRetentionStatus, isLoading: isAuditRetentionLoading } = trpc.audit.retentionStatus.useQuery(undefined, {
+    enabled: isAuditSectionOpen,
     refetchOnWindowFocus: false,
   });
-  const { data: auditAlertRules } = trpc.audit.listAlertRules.useQuery(undefined, {
+  const { data: auditAlertRules, isLoading: isAuditAlertRulesLoading } = trpc.audit.listAlertRules.useQuery(undefined, {
+    enabled: isAuditSectionOpen,
     refetchOnWindowFocus: false,
   });
 
@@ -273,10 +277,19 @@ export default function SettingsPage() {
   };
 
   // Backup & Restore
-  const { data: backups, refetch: refetchBackups } = trpc.backup.list.useQuery();
-  const { data: backupVerificationHistory, refetch: refetchBackupVerificationHistory } =
-    trpc.backup.verificationHistory.useQuery({ limit: 10 });
-  const { data: auditLogs } = trpc.audit.list.useQuery({ pageSize: 10 });
+  const { data: backups, isLoading: isBackupsLoading, refetch: refetchBackups } = trpc.backup.list.useQuery(undefined, {
+    enabled: isBackupSectionOpen,
+  });
+  const {
+    data: backupVerificationHistory,
+    isLoading: isBackupVerificationHistoryLoading,
+    refetch: refetchBackupVerificationHistory,
+  } = trpc.backup.verificationHistory.useQuery({ limit: 10 }, {
+    enabled: isBackupSectionOpen,
+  });
+  const { data: auditLogs, isLoading: isAuditLogsLoading } = trpc.audit.list.useQuery({ pageSize: 10 }, {
+    enabled: isAuditSectionOpen,
+  });
   const createBackupMutation = trpc.backup.create.useMutation({
     onSuccess: async (result) => {
       toast({
@@ -754,7 +767,11 @@ export default function SettingsPage() {
                 <div className="col-span-3 text-right">{t('settings.backup.actions')}</div>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
-                {backups?.length === 0 ? (
+                {isBackupsLoading ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : backups?.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground text-sm">
                     {t('settings.backup.empty')}
                   </div>
@@ -860,7 +877,11 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              {backupVerificationHistory && backupVerificationHistory.length > 0 ? (
+              {isBackupVerificationHistoryLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : backupVerificationHistory && backupVerificationHistory.length > 0 ? (
                 <div className="space-y-2">
                   {backupVerificationHistory.map((verification) => (
                     <div
@@ -934,6 +955,12 @@ export default function SettingsPage() {
           onToggle={setOpenSection}
         >
           <div className="space-y-4">
+            {isAuditRetentionLoading || isAuditAlertRulesLoading || isAuditLogsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-4 rounded-lg border p-4">
                 <div className="space-y-2">
@@ -1180,6 +1207,8 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+            </>
+            )}
           </div>
         </SectionCard>
 
