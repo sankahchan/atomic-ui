@@ -29,6 +29,7 @@ import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import {
   Server,
   Key,
@@ -474,8 +475,7 @@ export default function ServerDetailPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    navigator.clipboard.writeText(server.apiUrl);
-                    toast({ title: t('settings.toast.copied'), description: t('server_details.info.api_url') + ' copied.' });
+                    copyToClipboard(server.apiUrl, t('settings.toast.copied'), t('server_details.info.api_url') + ' copied.');
                   }}
                 >
                   <Copy className="w-4 h-4" />

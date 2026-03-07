@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Server, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import Link from 'next/link';
 
 export default function DeployServerPage() {
@@ -101,8 +102,7 @@ export default function DeployServerPage() {
     };
 
     const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        toast({ title: 'Copied', description: 'Command copied to clipboard' });
+        copyToClipboard(text, 'Copied', 'Command copied to clipboard');
     };
 
     return (

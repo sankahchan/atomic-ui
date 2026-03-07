@@ -606,11 +606,7 @@ function QRCodeDialog({
                 onClick={() => {
                   if (dak?.dynamicUrl) {
                     const ssconfUrl = getSsconfUrl(dak.dynamicUrl, dak.name);
-                    navigator.clipboard.writeText(ssconfUrl);
-                    toast({
-                      title: t('dynamic_keys.msg.copied'),
-                      description: 'ssconf URL copied for Outline app',
-                    });
+                    copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), 'ssconf URL copied for Outline app');
                   }
                 }}
               >

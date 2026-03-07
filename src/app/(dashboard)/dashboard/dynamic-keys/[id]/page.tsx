@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import QRCode from 'qrcode';
 import {
   AreaChart,
@@ -434,11 +435,7 @@ function SubscriptionShareCard({
 
   const copySubscriptionPageUrl = async () => {
     const url = getSubscriptionPageUrl();
-    await navigator.clipboard.writeText(url);
-    toast({
-      title: 'Copied!',
-      description: 'Subscription page URL copied to clipboard.',
-    });
+    await copyToClipboard(url, 'Copied!', 'Subscription page URL copied to clipboard.');
   };
 
   const theme = getTheme(selectedTheme);
@@ -1005,21 +1002,13 @@ export default function DynamicKeyDetailPage() {
     if (dak?.dynamicUrl) {
       // Copy ssconf:// URL for Outline client
       const ssconfUrl = getSsconfUrl();
-      navigator.clipboard.writeText(ssconfUrl);
-      toast({
-        title: t('dynamic_keys.msg.copied'),
-        description: 'Dynamic access key URL copied. Paste in Outline client.',
-      });
+      copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), 'Dynamic access key URL copied. Paste in Outline client.');
     }
   };
 
   const handleCopyToken = () => {
     if (dak?.dynamicUrl) {
-      navigator.clipboard.writeText(dak.dynamicUrl);
-      toast({
-        title: t('dynamic_keys.msg.copied'),
-        description: 'Subscription token copied to clipboard.',
-      });
+      copyToClipboard(dak.dynamicUrl, t('dynamic_keys.msg.copied'), 'Subscription token copied to clipboard.');
     }
   };
 

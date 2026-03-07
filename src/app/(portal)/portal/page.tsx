@@ -29,6 +29,7 @@ import {
     Key,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'react-qr-code';
@@ -62,11 +63,7 @@ export default function PortalPage() {
     const connectedKey = keys.find(k => k.accessUrl && myIp && k.accessUrl.includes(myIp));
 
     const handleCopyAccessKey = (text: string) => {
-        navigator.clipboard.writeText(text);
-        toast({
-            title: 'Copied to clipboard',
-            description: 'URL has been copied.',
-        });
+        copyToClipboard(text, 'Copied to clipboard', 'URL has been copied.');
     };
 
     if (isLoading || isLoadingDAKs || isLoadingIp) {

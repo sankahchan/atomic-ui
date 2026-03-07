@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
 import {
     Shield, Smartphone, Key, QrCode, Copy, CheckCircle, AlertTriangle,
     Trash2, Edit, Loader2, RefreshCw, ArrowLeft, Plus
@@ -117,8 +118,7 @@ function TotpSetupDialog({
                                     variant="outline"
                                     size="icon"
                                     onClick={() => {
-                                        navigator.clipboard.writeText(initMutation.data!.secret);
-                                        toast({ title: 'Copied', description: 'Secret copied to clipboard.' });
+                                        copyToClipboard(initMutation.data!.secret, 'Copied', 'Secret copied to clipboard.');
                                     }}
                                 >
                                     <Copy className="h-4 w-4" />
@@ -183,11 +183,12 @@ function RecoveryCodesDialog({
     const { toast } = useToast();
     const [copied, setCopied] = useState(false);
 
-    const handleCopyAll = () => {
-        navigator.clipboard.writeText(codes.join('\n'));
-        setCopied(true);
-        toast({ title: 'Copied', description: 'Recovery codes copied to clipboard.' });
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopyAll = async () => {
+        const success = await copyToClipboard(codes.join('\n'), 'Copied', 'Recovery codes copied to clipboard.');
+        if (success) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     return (

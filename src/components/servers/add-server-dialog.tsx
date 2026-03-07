@@ -22,6 +22,7 @@ import {
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
 import { useLocale } from '@/hooks/use-locale';
 import {
     Server,
@@ -235,8 +236,11 @@ export function AddServerDialog({
                                     size="icon"
                                     className="absolute right-1 top-1 text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8"
                                     onClick={() => {
-                                        navigator.clipboard.writeText('sudo bash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-apps/master/server_manager/install_scripts/install_server.sh)"');
-                                        toast({ description: 'Command copied to clipboard' });
+                                        copyToClipboard(
+                                            'sudo bash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-apps/master/server_manager/install_scripts/install_server.sh)"',
+                                            'Copied',
+                                            'Command copied to clipboard'
+                                        );
                                     }}
                                 >
                                     <RefreshCw className="w-4 h-4 rotate-0 scale-100 transition-all dark:rotate-0 dark:scale-100 hidden" />
