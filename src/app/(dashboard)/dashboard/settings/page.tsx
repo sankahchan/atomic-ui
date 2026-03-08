@@ -597,50 +597,48 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-          <div className="space-y-4">
-            <BackButton href="/dashboard" label={t('nav.dashboard')} />
-            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-              <Globe className="h-3.5 w-3.5" />
-              {t('settings.hub.title')}
-            </span>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('settings.title')}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                {t('settings.subtitle')}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            {settingsShortcutItems.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Link key={item.href} href={item.href} className="block">
-                  <div className="h-full rounded-[1.35rem] border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:bg-white/[0.02]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-sm font-medium">{t(item.labelKey)}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t(item.descriptionKey)}
-                      </p>
-                    </div>
-                    <p className="mt-4 text-xs font-medium text-primary">
-                      {t('settings.hub.open')}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+        <div className="max-w-4xl space-y-4">
+          <BackButton href="/dashboard" label={t('nav.dashboard')} />
+          <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+            <Globe className="h-3.5 w-3.5" />
+            {t('settings.hub.title')}
+          </span>
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('settings.title')}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+              {t('settings.subtitle')}
+            </p>
           </div>
         </div>
       </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {settingsShortcutItems.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <Link key={item.href} href={item.href} className="block">
+              <div className="h-full rounded-[1.35rem] border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:bg-white/[0.02]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium">{t(item.labelKey)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t(item.descriptionKey)}
+                  </p>
+                </div>
+                <p className="mt-4 text-xs font-medium text-primary">
+                  {t('settings.hub.open')}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Collapsible Sections */}
       <div className="space-y-3">

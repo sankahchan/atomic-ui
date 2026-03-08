@@ -636,8 +636,8 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
-          <Card>
+        <section className="grid gap-6 xl:grid-cols-2 xl:items-start">
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -713,7 +713,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
@@ -771,8 +771,8 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
-          <Card>
+        <section className="grid gap-6 xl:grid-cols-2 xl:items-start">
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
@@ -814,7 +814,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-fuchsia-500/10 text-fuchsia-500">
@@ -886,8 +886,8 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <Card>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
@@ -926,7 +926,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
