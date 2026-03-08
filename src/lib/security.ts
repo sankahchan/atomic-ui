@@ -1,7 +1,8 @@
 import { db } from './db';
-import geoip from 'geoip-lite';
 import ipRangeCheck from 'ip-range-check';
+import fs from 'node:fs';
 import { isIP } from 'node:net';
+import path from 'node:path';
 
 export function normalizeIpAddress(rawIp: string | null | undefined): string | null {
     if (!rawIp) {
@@ -38,6 +39,60 @@ export function normalizeIpAddress(rawIp: string | null | undefined): string | n
     return isIP(ip) ? ip : null;
 }
 
+type GeoIpLookupResult = {
+    country?: string;
+} | null;
+
+type GeoIpLookupFn = (ip: string) => GeoIpLookupResult;
+
+let geoIpLookupPromise: Promise<GeoIpLookupFn | null> | null = null;
+
+function getGeoIpDataDirCandidates() {
+    return [
+        process.env.GEODATADIR,
+        path.join(process.cwd(), 'node_modules', 'geoip-lite', 'data'),
+        path.join(process.cwd(), '.next', 'standalone', 'node_modules', 'geoip-lite', 'data'),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+}
+
+async function getGeoIpLookup(): Promise<GeoIpLookupFn | null> {
+    if (!geoIpLookupPromise) {
+        geoIpLookupPromise = (async () => {
+            const dataDir = getGeoIpDataDirCandidates().find((candidate) => fs.existsSync(candidate));
+
+            if (dataDir) {
+                process.env.GEODATADIR = dataDir;
+                (globalThis as typeof globalThis & { geodatadir?: string }).geodatadir = dataDir;
+            }
+
+            try {
+                const geoIpModule = await import('geoip-lite');
+                const geoIp = ('default' in geoIpModule ? geoIpModule.default : geoIpModule) as {
+                    lookup?: (ip: string) => GeoIpLookupResult;
+                };
+
+                if (typeof geoIp.lookup !== 'function') {
+                    return null;
+                }
+
+                return (ip: string) => {
+                    try {
+                        return geoIp.lookup?.(ip) ?? null;
+                    } catch (error) {
+                        console.error('Error running geoip lookup:', error);
+                        return null;
+                    }
+                };
+            } catch (error) {
+                console.error('Failed to load geoip-lite:', error);
+                return null;
+            }
+        })();
+    }
+
+    return geoIpLookupPromise;
+}
+
 /**
  * Checks if an IP address is allowed based on the active Security Rules.
  * 
@@ -72,7 +127,7 @@ export async function checkIpAllowed(ip: string): Promise<{ allowed: boolean; re
 
     // 1. Check BLOCK rules
     for (const rule of blockRules) {
-        if (matchesRule(ip, rule)) {
+        if (await matchesRule(ip, rule)) {
             return {
                 allowed: false,
                 reason: `Access blocked by rule: ${rule.description || rule.targetType + ' ' + rule.targetValue}`
@@ -84,7 +139,7 @@ export async function checkIpAllowed(ip: string): Promise<{ allowed: boolean; re
     if (allowRules.length > 0) {
         let matched = false;
         for (const rule of allowRules) {
-            if (matchesRule(ip, rule)) {
+            if (await matchesRule(ip, rule)) {
                 matched = true;
                 break;
             }
@@ -97,7 +152,7 @@ export async function checkIpAllowed(ip: string): Promise<{ allowed: boolean; re
     return { allowed: true };
 }
 
-function matchesRule(ip: string, rule: { targetType: string; targetValue: string }): boolean {
+async function matchesRule(ip: string, rule: { targetType: string; targetValue: string }): Promise<boolean> {
     try {
         if (rule.targetType === 'IP') {
             return ip === rule.targetValue;
@@ -108,7 +163,12 @@ function matchesRule(ip: string, rule: { targetType: string; targetValue: string
         }
 
         if (rule.targetType === 'COUNTRY') {
-            const geo = geoip.lookup(ip);
+            const geoIpLookup = await getGeoIpLookup();
+            if (!geoIpLookup) {
+                return false;
+            }
+
+            const geo = geoIpLookup(ip);
             // geoip.lookup returns null for private IPs or unknown
             if (!geo) return false;
             return geo.country === rule.targetValue;
