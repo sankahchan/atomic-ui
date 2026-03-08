@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 import { useLocale } from '@/hooks/use-locale';
-import { locales, localeNames, localeFlags, type Locale } from '@/lib/i18n/config';
+import { supportedLocales, localeNames, localeFlags } from '@/lib/i18n/config';
 import { cn } from '@/lib/utils';
 
 interface LanguageSelectorProps {
@@ -32,13 +32,13 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
       <Button
         variant="ghost"
         size="sm"
-        className={cn(
-          'rounded-full px-3',
-          'bg-white/50 dark:bg-gray-800/50',
-          'border border-gray-200 dark:border-gray-600',
-          'opacity-50',
-          className
-        )}
+          className={cn(
+            'rounded-full px-2.5 md:px-3',
+            'bg-white/50 dark:bg-gray-800/50',
+            'border border-gray-200 dark:border-gray-600',
+            'opacity-50',
+            className
+          )}
       >
         <Globe className="h-4 w-4 mr-2" />
         <span className="hidden sm:inline">...</span>
@@ -53,7 +53,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
           variant="ghost"
           size="sm"
           className={cn(
-            'rounded-full px-3',
+            'rounded-full px-2.5 md:px-3',
             'bg-white/50 dark:bg-gray-800/50',
             'hover:bg-white dark:hover:bg-gray-700',
             'border border-gray-200 dark:border-gray-600',
@@ -62,13 +62,13 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
           )}
         >
           <span className="mr-2 text-base">{localeFlags[locale]}</span>
-          <span className="hidden sm:inline text-sm font-medium">
+          <span className="hidden md:inline text-sm font-medium">
             {localeNames[locale]}
           </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[160px]">
-        {locales.map((loc) => (
+        {supportedLocales.map((loc) => (
           <DropdownMenuItem
             key={loc}
             onClick={() => setLocale(loc)}

@@ -3,31 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  ShieldCheck,
-  Users,
-  FileText,
-  ScrollText,
-  ArrowRightLeft,
-  Settings,
-  Bell,
-  Smartphone,
   X,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
+import { adminToolNavItems } from './dashboard-nav';
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
-const items = [
-  { href: '/dashboard/security', icon: ShieldCheck, labelKey: 'nav.security' },
-  { href: '/dashboard/users', icon: Users, labelKey: 'nav.users' },
-  { href: '/dashboard/reports', icon: FileText, labelKey: 'nav.reports' },
-  { href: '/dashboard/audit', icon: ScrollText, labelKey: 'nav.audit' },
-  { href: '/dashboard/sessions', icon: Smartphone, labelKey: 'nav.sessions' },
-  { href: '/dashboard/migration', icon: ArrowRightLeft, labelKey: 'nav.migration' },
-  { href: '/dashboard/settings', icon: Settings, labelKey: 'nav.settings' },
-  { href: '/dashboard/notifications', icon: Bell, labelKey: 'nav.notifications' },
-] as const;
 
 interface MoreMenuProps {
   open: boolean;
@@ -36,8 +19,7 @@ interface MoreMenuProps {
 
 /**
  * MoreMenu
- * A slide-up sheet showing additional navigation items.
- * Only visible on mobile/tablet (lg:hidden).
+ * A full-height tools sheet for mobile dashboard navigation.
  */
 export function MoreMenu({ open, onClose }: MoreMenuProps) {
   const pathname = usePathname();
@@ -56,14 +38,19 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
 
       {/* Sheet */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass rounded-t-3xl p-6 animate-slide-up"
+        className="fixed inset-x-0 top-14 bottom-[calc(var(--bottom-bar-height)+var(--safe-area-bottom))] z-50 lg:hidden glass rounded-t-3xl px-5 pb-6 pt-5 animate-in slide-in-from-bottom-6 duration-200 overflow-y-auto"
         style={{
-          paddingBottom: 'calc(var(--bottom-bar-height) + var(--safe-area-bottom) + 1rem)',
+          paddingBottom: 'calc(var(--safe-area-bottom) + 1.5rem)',
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">More</h2>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">{t('nav.tools')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t('tools.subtitle')}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -74,9 +61,8 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           </button>
         </div>
 
-        {/* 3x2 Grid */}
-        <div className="grid grid-cols-3 gap-3">
-          {items.map((item) => {
+        <div className="space-y-3">
+          {adminToolNavItems.map((item) => {
             const fullHref = `${basePath}${item.href}`;
             const active = pathname.startsWith(fullHref);
             const Icon = item.icon;
@@ -86,14 +72,25 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
                 href={fullHref}
                 onClick={onClose}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1.5 rounded-2xl p-3 transition-colors',
+                  'flex items-center gap-4 rounded-2xl border p-4 transition-colors',
                   active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted'
+                    ? 'border-primary/30 bg-primary/10 text-primary'
+                    : 'border-border/60 text-foreground hover:bg-muted/70'
                 )}
               >
-                <Icon className="w-6 h-6" />
-                <span className="text-[10px]">{t(item.labelKey)}</span>
+                <div className={cn(
+                  'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl',
+                  active ? 'bg-primary/15' : 'bg-muted'
+                )}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{t(item.labelKey)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t(item.descriptionKey)}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </Link>
             );
           })}

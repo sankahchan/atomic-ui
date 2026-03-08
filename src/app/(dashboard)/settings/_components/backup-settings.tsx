@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Upload, AlertTriangle, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function BackupSettings() {
+    const router = useRouter();
     const { toast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
@@ -59,7 +61,7 @@ export function BackupSettings() {
 
             // Optional: reload page after a delay
             setTimeout(() => {
-                window.location.reload();
+                router.refresh();
             }, 2000);
 
         } catch (error) {

@@ -1,14 +1,17 @@
 /**
  * Internationalization Configuration
  *
- * Defines supported locales and their display names/flags.
- * Used by the language selector and translation system.
+ * Keeps the full translation registry available while limiting user-facing
+ * language selection to the project's supported locales.
  */
 
 export const locales = ['en', 'zh', 'my', 'ja', 'ko', 'ru'] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = 'en';
+export const supportedLocales = ['en', 'my'] as const;
+export type SupportedLocale = (typeof supportedLocales)[number];
+
+export const defaultLocale: SupportedLocale = 'en';
 
 export const localeNames: Record<Locale, string> = {
   en: 'English',
@@ -27,3 +30,7 @@ export const localeFlags: Record<Locale, string> = {
   ko: '🇰🇷',
   ru: '🇷🇺',
 };
+
+export function isSupportedLocale(value: string): value is SupportedLocale {
+  return supportedLocales.includes(value as SupportedLocale);
+}

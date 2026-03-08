@@ -9,26 +9,30 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { type Locale, defaultLocale, locales } from '@/lib/i18n/config';
+import {
+  type SupportedLocale,
+  defaultLocale,
+  isSupportedLocale,
+} from '@/lib/i18n/config';
 import { translations } from '@/lib/i18n/translations';
 
 const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
 const LOCALE_CHANGE_EVENT = 'atomic-ui-locale-change';
 
 export function useLocale() {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
+  const [locale, setLocaleState] = useState<SupportedLocale>(defaultLocale);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null;
-    if (stored && locales.includes(stored)) {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored && isSupportedLocale(stored)) {
       setLocaleState(stored);
     }
 
     // Listen for locale changes from other components
-    const handleLocaleChange = (event: CustomEvent<Locale>) => {
-      if (event.detail && locales.includes(event.detail)) {
+    const handleLocaleChange = (event: CustomEvent<SupportedLocale>) => {
+      if (event.detail && isSupportedLocale(event.detail)) {
         setLocaleState(event.detail);
       }
     };
@@ -36,8 +40,8 @@ export function useLocale() {
     // Listen for storage changes from other tabs
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === LOCALE_STORAGE_KEY && event.newValue) {
-        const newLocale = event.newValue as Locale;
-        if (locales.includes(newLocale)) {
+        const newLocale = event.newValue;
+        if (isSupportedLocale(newLocale)) {
           setLocaleState(newLocale);
         }
       }
@@ -52,7 +56,7 @@ export function useLocale() {
     };
   }, []);
 
-  const setLocale = useCallback((newLocale: Locale) => {
+  const setLocale = useCallback((newLocale: SupportedLocale) => {
     setLocaleState(newLocale);
     localStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
     // Dispatch custom event to notify other components in the same tab

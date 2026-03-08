@@ -145,7 +145,7 @@ export default function PortalLayout({
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4">
                 <p className="text-destructive">Failed to load user session.</p>
-                <Button onClick={() => window.location.reload()}>Retry</Button>
+                <Button onClick={() => router.refresh()}>Retry</Button>
             </div>
         );
     }

@@ -19,22 +19,13 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
-  Server,
-  Key,
-  KeyRound,
-  Settings,
   LogOut,
   ChevronLeft,
   Atom,
   Moon,
   Sun,
   User,
-  FileText,
-  ScrollText,
-  ShieldCheck,
-  ArrowRightLeft,
-  Smartphone,
+  LayoutGrid,
 } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
@@ -43,29 +34,23 @@ import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { NotificationBell } from '@/components/notification-bell';
 import { BottomTabBar } from '@/components/layout/bottom-tab-bar';
 import { GradientMeshBackground } from '@/components/layout/gradient-mesh-bg';
+import { MoreMenu } from '@/components/layout/more-menu';
+import { useLocale } from '@/hooks/use-locale';
+import {
+  adminToolNavItems,
+  primaryDashboardNavItems,
+  settingsShortcutItems,
+} from '@/components/layout/dashboard-nav';
 
 /**
  * Navigation items for route prefetching.
  */
 const navItems = [
-  { href: '/dashboard' },
-  { href: '/dashboard/servers' },
-  { href: '/dashboard/keys' },
-  { href: '/dashboard/dynamic-keys' },
-  { href: '/dashboard/security' },
-  { href: '/dashboard/users' },
-  { href: '/dashboard/settings' },
-  { href: '/dashboard/notifications' },
-  { href: '/dashboard/analytics' },
-  { href: '/dashboard/templates' },
-  { href: '/dashboard/archived' },
-  { href: '/dashboard/reports' },
-  { href: '/dashboard/audit' },
-  { href: '/dashboard/sessions' },
-  { href: '/dashboard/migration' },
+  ...primaryDashboardNavItems,
+  ...adminToolNavItems,
+  ...settingsShortcutItems,
+  { href: '/dashboard/tools' },
 ];
-
-import { useLocale } from '@/hooks/use-locale';
 
 /**
  * Sidebar Component (Desktop only)
@@ -81,64 +66,6 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const { t } = useLocale();
-
-  const sidebarNavItems = [
-    {
-      href: '/dashboard',
-      label: t('nav.dashboard'),
-      icon: LayoutDashboard,
-    },
-    {
-      href: '/dashboard/servers',
-      label: t('nav.servers'),
-      icon: Server,
-    },
-    {
-      href: '/dashboard/keys',
-      label: t('nav.keys'),
-      icon: Key,
-    },
-    {
-      href: '/dashboard/dynamic-keys',
-      label: t('nav.dynamic_keys'),
-      icon: KeyRound,
-    },
-    {
-      href: '/dashboard/security',
-      label: t('nav.security'),
-      icon: ShieldCheck,
-    },
-    {
-      href: '/dashboard/users',
-      label: t('nav.users'),
-      icon: User,
-    },
-    {
-      href: '/dashboard/reports',
-      label: t('nav.reports'),
-      icon: FileText,
-    },
-    {
-      href: '/dashboard/audit',
-      label: t('nav.audit'),
-      icon: ScrollText,
-    },
-    {
-      href: '/dashboard/sessions',
-      label: t('nav.sessions'),
-      icon: Smartphone,
-    },
-    {
-      href: '/dashboard/migration',
-      label: t('nav.migration'),
-      icon: ArrowRightLeft,
-    },
-    {
-      href: '/dashboard/settings',
-      label: t('nav.settings'),
-      icon: Settings,
-    },
-  ];
 
   return (
     <aside
@@ -178,7 +105,7 @@ function Sidebar({
       {/* Navigation links */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
-          {sidebarNavItems.map((item) => {
+          {primaryDashboardNavItems.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
 
@@ -193,14 +120,14 @@ function Sidebar({
                       ? 'bg-primary/15 text-primary shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-[var(--glass-bg)]'
                   )}
-                  title={isCollapsed ? item.label : undefined}
+                  title={isCollapsed ? t(item.labelKey) : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
                     isActive && 'text-primary'
                   )} />
                   {!isCollapsed && (
-                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="text-sm font-medium">{t(item.labelKey)}</span>
                   )}
                 </Link>
               </li>
@@ -230,11 +157,14 @@ function Sidebar({
 function Header({
   user,
   onLogout,
+  onOpenTools,
 }: {
   user: { email: string; role: string } | null;
   onLogout: () => void;
+  onOpenTools: () => void;
 }) {
   const { theme, setTheme } = useTheme();
+  const { t } = useLocale();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -254,11 +184,28 @@ function Header({
           </Link>
         </div>
 
-        {/* Left side: empty spacer on desktop */}
-        <div className="hidden lg:block" />
+        {/* Left side: tools button on desktop */}
+        <div className="hidden lg:flex items-center">
+          <Button variant="outline" size="sm" asChild className="glass border-[var(--glass-border)]">
+            <Link href="/dashboard/tools">
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              {t('nav.tools')}
+            </Link>
+          </Button>
+        </div>
 
         {/* Right side: Theme toggle, user menu, logout */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenTools}
+            title={t('nav.tools')}
+            className="h-9 w-9 lg:hidden"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+
           {mounted && (
             <>
               <LanguageSelector />
@@ -321,6 +268,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   // Warm route chunks for faster dashboard navigation.
@@ -380,7 +328,8 @@ export default function DashboardLayout({
           <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
             <Button variant="ghost" size="sm" onClick={() => {
               document.cookie = 'atomic-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-              window.location.href = '/login';
+              router.replace('/login');
+              router.refresh();
             }}>
               Taking too long? Sign out
             </Button>
@@ -402,7 +351,7 @@ export default function DashboardLayout({
             Unable to connect to the server. Please check your connection and try again.
           </p>
           <Button
-            onClick={() => window.location.reload()}
+            onClick={() => router.refresh()}
             className="mt-4"
           >
             Retry
@@ -440,6 +389,7 @@ export default function DashboardLayout({
         <Header
           user={user}
           onLogout={handleLogout}
+          onOpenTools={() => setMobileToolsOpen(true)}
         />
 
         {/* Page content — extra bottom padding on mobile for tab bar */}
@@ -450,6 +400,12 @@ export default function DashboardLayout({
 
       {/* Mobile bottom tab bar */}
       <BottomTabBar />
+
+      {/* Mobile tools sheet */}
+      <MoreMenu
+        open={mobileToolsOpen}
+        onClose={() => setMobileToolsOpen(false)}
+      />
 
       {/* Scroll to top button */}
       <ScrollToTop />

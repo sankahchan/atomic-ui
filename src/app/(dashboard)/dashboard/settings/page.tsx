@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { BackButton } from '@/components/ui/back-button';
+import { settingsShortcutItems } from '@/components/layout/dashboard-nav';
 import { cn } from '@/lib/utils';
 import {
   Bell,
@@ -170,6 +172,7 @@ function SectionCard({
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const { t } = useLocale();
   const [openSection, setOpenSection] = useState<SectionId>(null);
@@ -312,7 +315,7 @@ export default function SettingsPage() {
   const restoreBackupMutation = trpc.backup.restore.useMutation({
     onSuccess: () => {
       toast({ title: t('settings.backup.restore_success') });
-      window.location.reload();
+      router.refresh();
     },
     onError: (error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -597,6 +600,42 @@ export default function SettingsPage() {
           {t('settings.subtitle')}
         </p>
       </div>
+
+      <Card className="border-primary/15 bg-primary/[0.03]">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">{t('settings.hub.title')}</CardTitle>
+          <CardDescription>{t('settings.hub.subtitle')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-3">
+            {settingsShortcutItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link key={item.href} href={item.href} className="block">
+                  <div className="h-full rounded-xl border bg-background/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-sm font-medium">{t(item.labelKey)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t(item.descriptionKey)}
+                      </p>
+                    </div>
+                    <p className="mt-4 text-xs font-medium text-primary">
+                      {t('settings.hub.open')}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Collapsible Sections */}
       <div className="space-y-2">
