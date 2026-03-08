@@ -278,7 +278,7 @@ function CreateDAKDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-primary" />
@@ -304,7 +304,7 @@ function CreateDAKDialog({
           {/* Type selection */}
           <div className="space-y-3">
             <Label>{t('dynamic_keys.dialog.type')} *</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {Object.entries(DAK_TYPES).map(([key, config]) => (
                 <button
                   key={key}
@@ -379,7 +379,7 @@ function CreateDAKDialog({
           </div>
 
           {/* Contact info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dakEmail">{t('dynamic_keys.dialog.email')}</Label>
               <Input
@@ -2087,7 +2087,7 @@ export default function DynamicKeysPage() {
       </div>
 
       <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('dynamic_keys.mobile_filters')}</DialogTitle>
             <DialogDescription>{t('dynamic_keys.mobile_filters_desc')}</DialogDescription>
@@ -2241,7 +2241,7 @@ export default function DynamicKeysPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="sticky bottom-0 gap-2 border-t bg-background pt-4 sm:gap-0">
             <Button variant="outline" onClick={clearAllFilters}>
               <X className="w-4 h-4 mr-2" />
               {t('keys.clear_filters')}
@@ -2253,11 +2253,11 @@ export default function DynamicKeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex-wrap">
+        <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:gap-4">
           <span className="text-sm font-medium">
             {selectedKeys.size} key{selectedKeys.size > 1 ? 's' : ''} selected
           </span>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             {/* Enable/Disable dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -2354,7 +2354,7 @@ export default function DynamicKeysPage() {
             variant="ghost"
             size="sm"
             onClick={() => setSelectedKeys(new Set())}
-            className="ml-auto"
+            className="w-full sm:ml-auto sm:w-auto"
             disabled={isBulkBusy}
           >
             Clear selection

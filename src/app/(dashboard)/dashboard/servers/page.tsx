@@ -28,9 +28,13 @@ export default function ServersPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="health">Health & Monitoring</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2">
+          <TabsTrigger value="overview" className="min-w-0 whitespace-normal px-3 py-2 text-xs sm:text-sm">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="health" className="min-w-0 whitespace-normal px-3 py-2 text-xs sm:text-sm">
+            Health & Monitoring
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">

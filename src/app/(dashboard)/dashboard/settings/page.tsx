@@ -137,29 +137,33 @@ function SectionCard({
 }) {
   return (
     <Card className={cn('transition-all duration-200', isOpen && 'ring-1 ring-primary/20')}>
-      <CardHeader
-        className="cursor-pointer select-none py-4"
+      <button
+        type="button"
+        className="w-full text-left"
         onClick={() => onToggle(isOpen ? null : id)}
+        aria-expanded={isOpen}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'p-2 rounded-lg',
-              isOpen ? 'bg-primary/10' : 'bg-muted'
-            )}>
-              <Icon className={cn('w-5 h-5', isOpen ? 'text-primary' : 'text-muted-foreground')} />
+        <CardHeader className="cursor-pointer select-none py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                'p-2 rounded-lg',
+                isOpen ? 'bg-primary/10' : 'bg-muted'
+              )}>
+                <Icon className={cn('w-5 h-5', isOpen ? 'text-primary' : 'text-muted-foreground')} />
+              </div>
+              <div>
+                <CardTitle className="text-base">{title}</CardTitle>
+                <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-base">{title}</CardTitle>
-              <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
-            </div>
+            <ChevronRight className={cn(
+              'w-5 h-5 text-muted-foreground transition-transform duration-200',
+              isOpen && 'rotate-90'
+            )} />
           </div>
-          <ChevronRight className={cn(
-            'w-5 h-5 text-muted-foreground transition-transform duration-200',
-            isOpen && 'rotate-90'
-          )} />
-        </div>
-      </CardHeader>
+        </CardHeader>
+      </button>
       {isOpen && (
         <CardContent className="pt-0 pb-4 animate-in slide-in-from-top-2 duration-200">
           <div className="border-t pt-4">
@@ -607,7 +611,7 @@ export default function SettingsPage() {
           <CardDescription>{t('settings.hub.subtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {settingsShortcutItems.map((item) => {
               const Icon = item.icon;
 
@@ -799,7 +803,104 @@ export default function SettingsPage() {
               {t('settings.backup.create')}
             </Button>
 
-            <div className="rounded-lg border overflow-hidden">
+            <div className="space-y-3 md:hidden">
+              {isBackupsLoading ? (
+                <div className="flex items-center justify-center rounded-lg border p-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : backups?.length === 0 ? (
+                <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                  {t('settings.backup.empty')}
+                </div>
+              ) : (
+                backups?.map((backup) => (
+                  <div key={backup.filename} className="rounded-lg border p-4 space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-xs break-all">{backup.filename}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {Math.round(backup.size / 1024)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={
+                            backup.latestVerification
+                              ? backup.latestVerification.restoreReady
+                                ? 'default'
+                                : 'destructive'
+                              : 'secondary'
+                          }
+                        >
+                          {backup.latestVerification
+                            ? backup.latestVerification.restoreReady
+                              ? 'Verified'
+                              : 'Verification failed'
+                            : 'Unverified'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {backup.latestVerification
+                            ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
+                            : 'No verification recorded yet'}
+                        </span>
+                      </div>
+                      {backup.latestVerification?.error ? (
+                        <p className="text-xs text-destructive">{backup.latestVerification.error}</p>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => handleVerifyBackup(backup.filename)}
+                        disabled={verifyBackupMutation.isPending}
+                      >
+                        {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <TestTube className="w-4 h-4 mr-2" />
+                        )}
+                        Verify
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => handleDownloadBackup(backup.filename)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => handleRestoreBackup(backup.filename)}
+                        disabled={restoreBackupMutation.isPending}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
+                        Restore
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteBackup(backup.filename)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="hidden overflow-hidden rounded-lg border md:block">
               <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
                 <div className="col-span-6">{t('settings.backup.filename')}</div>
                 <div className="col-span-3">{t('settings.backup.size')}</div>
@@ -1210,42 +1311,72 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            <div className="rounded-lg border overflow-hidden">
-            <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
-              <div className="col-span-3">Time</div>
-              <div className="col-span-3">Action</div>
-              <div className="col-span-2">Entity</div>
-              <div className="col-span-2">Actor</div>
-              <div className="col-span-2">Target</div>
-            </div>
-            <div className="max-h-[260px] overflow-y-auto">
+            <div className="space-y-3 md:hidden">
               {auditLogs?.items.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
                   No audit entries yet.
                 </div>
               ) : (
                 auditLogs?.items.map((log) => (
-                  <div key={log.id} className="grid grid-cols-12 gap-2 p-3 border-t items-center text-sm hover:bg-muted/30">
-                    <div className="col-span-3 text-xs text-muted-foreground">
+                  <div key={log.id} className="rounded-lg border p-4 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium break-words">{log.action}</p>
+                      <Badge variant="outline">{log.entity}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
                       {new Date(log.createdAt).toLocaleString()}
-                    </div>
-                    <div className="col-span-3 font-medium break-words">
-                      {log.action}
-                    </div>
-                    <div className="col-span-2 text-xs text-muted-foreground">
-                      {log.entity}
-                    </div>
-                    <div className="col-span-2 text-xs text-muted-foreground break-all">
-                      {log.userEmail || log.userId || 'System'}
-                    </div>
-                    <div className="col-span-2 text-xs font-mono text-muted-foreground break-all">
-                      {log.entityId || '-'}
+                    </p>
+                    <div className="grid gap-2 text-xs sm:grid-cols-2">
+                      <div>
+                        <p className="text-muted-foreground">Actor</p>
+                        <p className="break-all">{log.userEmail || log.userId || 'System'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Target</p>
+                        <p className="break-all font-mono">{log.entityId || '-'}</p>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
-          </div>
+
+            <div className="hidden overflow-hidden rounded-lg border md:block">
+              <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
+                <div className="col-span-3">Time</div>
+                <div className="col-span-3">Action</div>
+                <div className="col-span-2">Entity</div>
+                <div className="col-span-2">Actor</div>
+                <div className="col-span-2">Target</div>
+              </div>
+              <div className="max-h-[260px] overflow-y-auto">
+                {auditLogs?.items.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    No audit entries yet.
+                  </div>
+                ) : (
+                  auditLogs?.items.map((log) => (
+                    <div key={log.id} className="grid grid-cols-12 gap-2 p-3 border-t items-center text-sm hover:bg-muted/30">
+                      <div className="col-span-3 text-xs text-muted-foreground">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </div>
+                      <div className="col-span-3 font-medium break-words">
+                        {log.action}
+                      </div>
+                      <div className="col-span-2 text-xs text-muted-foreground">
+                        {log.entity}
+                      </div>
+                      <div className="col-span-2 text-xs text-muted-foreground break-all">
+                        {log.userEmail || log.userId || 'System'}
+                      </div>
+                      <div className="col-span-2 text-xs font-mono text-muted-foreground break-all">
+                        {log.entityId || '-'}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             </>
             )}
           </div>

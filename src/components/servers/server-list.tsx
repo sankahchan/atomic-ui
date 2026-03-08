@@ -174,7 +174,52 @@ export function ServerList() {
     return (
         <div className="space-y-6">
             {/* Search and filters */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between">
+            <div className="space-y-3 md:hidden">
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder={t('servers.search_placeholder')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        onClick={() => refetch()}
+                        disabled={isLoading || syncMutation.isPending || deleteMutation.isPending}
+                        aria-label={t('servers.refresh')}
+                    >
+                        <RefreshCw className={cn('w-4 h-4', (isLoading || syncMutation.isPending || deleteMutation.isPending) && 'animate-spin')} />
+                    </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="w-full justify-center" onClick={handleExport} disabled={exportQuery.isFetching}>
+                        {exportQuery.isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                        Export
+                    </Button>
+                    <Button variant="outline" className="w-full justify-center" onClick={() => setImportDialogOpen(true)}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import
+                    </Button>
+                    <Button asChild variant="secondary" className="w-full justify-center">
+                        <Link href="/dashboard/servers/deploy">
+                            <Cloud className="mr-2 h-4 w-4" />
+                            Deploy New
+                        </Link>
+                    </Button>
+                    <Button onClick={() => setAddDialogOpen(true)} className="w-full justify-center">
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t('servers.add')}
+                    </Button>
+                </div>
+            </div>
+
+            <div className="hidden md:flex md:flex-col lg:flex-row gap-4 justify-between">
                 <div className="flex items-center gap-4 flex-1">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

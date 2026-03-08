@@ -25,16 +25,16 @@ export function HealthSummaryCard({
 }) {
     return (
         <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
                 <div className="flex items-start justify-between">
                     <div className="space-y-1">
                         <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                        <p className="text-3xl font-bold">{value}</p>
+                        <p className="text-2xl font-bold sm:text-3xl">{value}</p>
                         {description && (
                             <p className="text-xs text-muted-foreground">{description}</p>
                         )}
                     </div>
-                    <div className={cn('p-3 rounded-xl', color)}>
+                    <div className={cn('rounded-xl p-2.5 sm:p-3', color)}>
                         <Icon className="w-5 h-5" />
                     </div>
                 </div>

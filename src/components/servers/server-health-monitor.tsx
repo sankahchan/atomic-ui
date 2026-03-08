@@ -90,9 +90,10 @@ export function ServerHealthMonitor() {
     return (
         <div className="space-y-6">
             {/* Page header actions */}
-            <div className="flex justify-end">
+            <div className="flex justify-stretch sm:justify-end">
                 <Button
                     variant="outline"
+                    className="w-full sm:w-auto"
                     onClick={() => refetch()}
                     disabled={isLoading}
                 >
@@ -148,7 +149,7 @@ export function ServerHealthMonitor() {
                         <Activity className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                         <div className="space-y-2">
                             <p className="text-sm font-medium">{t('health.explanation.title')}</p>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                                 {Object.entries(healthStatusConfig).map(([key, value]) => (
                                     <div key={key} className="flex items-center gap-2">
                                         <value.icon className={cn('w-4 h-4', value.color)} />

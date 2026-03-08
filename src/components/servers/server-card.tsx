@@ -267,37 +267,40 @@ export function ServerCard({
 
             {/* Footer Actions */}
             <div className="px-5 py-3 border-t border-border/50 bg-muted/10">
-                <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         {server.outlineVersion && `v${server.outlineVersion}`}
                         {server.healthCheck?.uptimePercent !== undefined && (
-                            <span className="ml-2">
+                            <span>
                                 {t('servers.uptime')}: {server.healthCheck.uptimePercent.toFixed(1)}%
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-1">
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-9 w-full sm:w-9"
                             onClick={onSync}
                             disabled={isSyncing}
                             title={t('servers.actions.sync')}
+                            aria-label={t('servers.actions.sync')}
                         >
                             <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
                         </Button>
-                        <Link href={`/dashboard/servers/${server.id}`}>
-                            <Button variant="ghost" size="sm" title={t('servers.actions.view')}>
+                        <Button asChild variant="ghost" size="icon" className="h-9 w-full sm:w-9" title={t('servers.actions.view')}>
+                            <Link href={`/dashboard/servers/${server.id}`} aria-label={t('servers.actions.view')}>
                                 <ExternalLink className="w-4 h-4" />
-                            </Button>
-                        </Link>
+                            </Link>
+                        </Button>
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-9 w-full text-destructive hover:text-destructive sm:w-9"
                             onClick={onDelete}
                             disabled={isDeleting}
-                            className="text-destructive hover:text-destructive"
                             title={t('servers.actions.delete')}
+                            aria-label={t('servers.actions.delete')}
                         >
                             {isDeleting ? (
                                 <RefreshCw className="w-4 h-4 animate-spin" />
