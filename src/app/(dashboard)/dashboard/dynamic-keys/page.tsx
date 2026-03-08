@@ -90,14 +90,14 @@ const ENCRYPTION_METHODS = [
 const DAK_TYPES = {
   SELF_MANAGED: {
     labelKey: 'dynamic_keys.type.self_managed',
-    description: 'Automatically creates and rotates keys across servers',
+    descriptionKey: 'dynamic_keys.dialog.type.self_managed_desc',
     icon: Shuffle,
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
   },
   MANUAL: {
     labelKey: 'dynamic_keys.type.manual',
-    description: 'Manually attach and detach keys as needed',
+    descriptionKey: 'dynamic_keys.dialog.type.manual_desc',
     icon: Settings,
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
@@ -234,7 +234,7 @@ function CreateDAKDialog({
     onSuccess: (data) => {
       toast({
         title: t('dynamic_keys.msg.created'),
-        description: `"${data.name}" has been created successfully.`,
+        description: t('dynamic_keys.msg.created_desc'),
       });
       onSuccess();
       onOpenChange(false);
@@ -242,7 +242,7 @@ function CreateDAKDialog({
     },
     onError: (error) => {
       toast({
-        title: 'Error creating dynamic key',
+        title: t('dynamic_keys.msg.create_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -254,8 +254,8 @@ function CreateDAKDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a name for the dynamic key.',
+        title: t('dynamic_keys.msg.validation'),
+        description: t('dynamic_keys.msg.validation_name_desc'),
         variant: 'destructive',
       });
       return;
@@ -320,7 +320,7 @@ function CreateDAKDialog({
                   <config.icon className={cn('w-5 h-5 mb-2', config.color)} />
                   <p className="font-medium text-sm">{t(config.labelKey)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {config.description}
+                    {t(config.descriptionKey)}
                   </p>
                 </button>
               ))}
@@ -335,7 +335,7 @@ function CreateDAKDialog({
               onValueChange={(value) => setFormData({ ...formData, method: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select encryption method" />
+                <SelectValue placeholder={t('dynamic_keys.dialog.encryption_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {ENCRYPTION_METHODS.map((method) => (
@@ -346,35 +346,35 @@ function CreateDAKDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              ChaCha20 is recommended for mobile devices. AES-256-GCM is more secure but slower.
+              {t('dynamic_keys.dialog.encryption_help')}
             </p>
           </div>
 
           {/* Load Balancer Algorithm */}
           <div className="space-y-2">
-            <Label>Load Balancer Algorithm</Label>
+            <Label>{t('dynamic_keys.dialog.load_balancer')}</Label>
             <Select
               value={formData.loadBalancerAlgorithm}
               onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value as typeof formData.loadBalancerAlgorithm })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select load balancing algorithm" />
+                <SelectValue placeholder={t('dynamic_keys.dialog.load_balancer_placeholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
-                <SelectItem value="RANDOM">Random</SelectItem>
-                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
-                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
+                <SelectItem value="IP_HASH">{t('dynamic_keys.dialog.load_balancer.ip_hash')}</SelectItem>
+                <SelectItem value="RANDOM">{t('dynamic_keys.dialog.load_balancer.random')}</SelectItem>
+                <SelectItem value="ROUND_ROBIN">{t('dynamic_keys.dialog.load_balancer.round_robin')}</SelectItem>
+                <SelectItem value="LEAST_LOAD">{t('dynamic_keys.dialog.load_balancer.least_load')}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
-                ? 'Automatically routes to the server with lowest load based on key count and bandwidth.'
+                ? t('dynamic_keys.dialog.load_balancer_desc.least_load')
                 : formData.loadBalancerAlgorithm === 'IP_HASH'
-                ? 'Same client IP always connects to the same server for consistency.'
+                ? t('dynamic_keys.dialog.load_balancer_desc.ip_hash')
                 : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
-                ? 'Cycles through servers sequentially for even distribution.'
-                : 'Randomly selects a server for each connection.'}
+                ? t('dynamic_keys.dialog.load_balancer_desc.round_robin')
+                : t('dynamic_keys.dialog.load_balancer_desc.random')}
             </p>
           </div>
 
@@ -385,7 +385,7 @@ function CreateDAKDialog({
               <Input
                 id="dakEmail"
                 type="email"
-                placeholder="user@example.com"
+                placeholder={t('dynamic_keys.dialog.email_placeholder')}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
@@ -394,7 +394,7 @@ function CreateDAKDialog({
               <Label htmlFor="dakTelegram">{t('dynamic_keys.dialog.telegram')}</Label>
               <Input
                 id="dakTelegram"
-                placeholder="@username or ID"
+                placeholder={t('dynamic_keys.dialog.telegram_placeholder')}
                 value={formData.telegramId}
                 onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
               />
@@ -407,7 +407,7 @@ function CreateDAKDialog({
             <Input
               id="dakDataLimit"
               type="number"
-              placeholder="Leave empty for unlimited"
+              placeholder={t('dynamic_keys.dialog.data_limit_placeholder')}
               value={formData.dataLimitGB}
               onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
               min="0"
@@ -421,7 +421,7 @@ function CreateDAKDialog({
           {/* Data Limit Reset Strategy */}
           {formData.dataLimitGB && (
             <div className="space-y-2">
-              <Label>Reset Strategy</Label>
+              <Label>{t('dynamic_keys.dialog.reset_strategy')}</Label>
               <Select
                 value={formData.dataLimitResetStrategy}
                 onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
@@ -432,10 +432,10 @@ function CreateDAKDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NEVER">Never Reset</SelectItem>
-                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                  <SelectItem value="NEVER">{t('dynamic_keys.dialog.reset.never')}</SelectItem>
+                  <SelectItem value="DAILY">{t('dynamic_keys.dialog.reset.daily')}</SelectItem>
+                  <SelectItem value="WEEKLY">{t('dynamic_keys.dialog.reset.weekly')}</SelectItem>
+                  <SelectItem value="MONTHLY">{t('dynamic_keys.dialog.reset.monthly')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -455,8 +455,8 @@ function CreateDAKDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NEVER">{t('dynamic_keys.expires.never')}</SelectItem>
-                <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
-                <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
+                <SelectItem value="DURATION_FROM_CREATION">{t('dynamic_keys.dialog.expiration.duration_from_creation')}</SelectItem>
+                <SelectItem value="START_ON_FIRST_USE">{t('dynamic_keys.dialog.expiration.start_on_first_use')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -482,7 +482,7 @@ function CreateDAKDialog({
             <Label htmlFor="dakNotes">{t('dynamic_keys.dialog.notes')}</Label>
             <Input
               id="dakNotes"
-              placeholder="Optional notes about this dynamic key"
+              placeholder={t('dynamic_keys.dialog.notes_placeholder')}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
@@ -587,7 +587,7 @@ function QRCodeDialog({
             />
           ) : (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">Failed to generate</p>
+              <p className="text-muted-foreground text-sm">{t('dynamic_keys.dialog.generate_failed')}</p>
             </div>
           )}
 
@@ -599,7 +599,7 @@ function QRCodeDialog({
                 onClick={handleCopyUrl}
               >
                 <Copy className="w-4 h-4 mr-2" />
-                Copy URL
+                {t('dynamic_keys.actions.copy_url')}
               </Button>
               <Button
                 variant="outline"
@@ -617,7 +617,7 @@ function QRCodeDialog({
             </div>
 
             <div className="p-2 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Subscription URL:</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('dynamic_keys.detail.subscription_url')}:</p>
               <code className="text-xs break-all select-all">
                 {dak?.dynamicUrl ? getSubscriptionUrl(dak.dynamicUrl) : ''}
               </code>
@@ -909,6 +909,7 @@ function EditDAKDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [formData, setFormData] = useState({
     name: dakData.name,
     email: dakData.email || '',
@@ -938,15 +939,15 @@ function EditDAKDialog({
   const updateMutation = trpc.dynamicKeys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Dynamic Key updated',
-        description: 'The dynamic access key has been updated successfully.',
+        title: t('dynamic_keys.msg.updated'),
+        description: t('dynamic_keys.msg.updated_desc'),
       });
       onSuccess();
       onOpenChange(false);
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: t('dynamic_keys.msg.update_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -958,8 +959,8 @@ function EditDAKDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a name.',
+        title: t('dynamic_keys.msg.validation'),
+        description: t('dynamic_keys.msg.validation_edit_name_desc'),
         variant: 'destructive',
       });
       return;
@@ -981,15 +982,15 @@ function EditDAKDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Dynamic Key</DialogTitle>
+          <DialogTitle>{t('dynamic_keys.dialog.edit_title')}</DialogTitle>
           <DialogDescription>
-            Update the dynamic key configuration.
+            {t('dynamic_keys.dialog.edit_desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="editName">Name</Label>
+            <Label htmlFor="editName">{t('dynamic_keys.dialog.name')}</Label>
             <Input
               id="editName"
               value={formData.name}
@@ -998,7 +999,7 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editEmail">Email</Label>
+            <Label htmlFor="editEmail">{t('dynamic_keys.dialog.email')}</Label>
             <Input
               id="editEmail"
               type="email"
@@ -1008,7 +1009,7 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editTelegram">Telegram ID</Label>
+            <Label htmlFor="editTelegram">{t('dynamic_keys.dialog.telegram')}</Label>
             <Input
               id="editTelegram"
               value={formData.telegramId}
@@ -1017,11 +1018,11 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
+            <Label htmlFor="editDataLimit">{t('dynamic_keys.dialog.data_limit')}</Label>
             <Input
               id="editDataLimit"
               type="number"
-              placeholder="Leave empty for unlimited"
+              placeholder={t('dynamic_keys.dialog.data_limit_placeholder')}
               value={formData.dataLimitGB}
               onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
               min="0"
@@ -1030,22 +1031,22 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editDuration">Duration (Days)</Label>
+            <Label htmlFor="editDuration">{t('dynamic_keys.dialog.duration')}</Label>
             <Input
               id="editDuration"
               type="number"
-              placeholder="e.g., 30, 45, 60"
+              placeholder="30"
               value={formData.durationDays}
               onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
               min="1"
             />
             <p className="text-xs text-muted-foreground">
-              Set the validity period in days. This will recalculate the expiration date.
+              {t('dynamic_keys.dialog.duration_help')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editExpiration">Expiration Date</Label>
+            <Label htmlFor="editExpiration">{t('dynamic_keys.dialog.expiration_date')}</Label>
             <Input
               id="editExpiration"
               type="date"
@@ -1053,12 +1054,12 @@ function EditDAKDialog({
               onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Or set a specific expiration date directly.
+              {t('dynamic_keys.dialog.expiration_date_help')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editNotes">Notes</Label>
+            <Label htmlFor="editNotes">{t('dynamic_keys.dialog.notes')}</Label>
             <Input
               id="editNotes"
               value={formData.notes}
@@ -1068,11 +1069,11 @@ function EditDAKDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('dynamic_keys.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              {t('dynamic_keys.dialog.save_changes')}
             </Button>
           </DialogFooter>
         </form>
@@ -1147,7 +1148,7 @@ function DAKRow({
               <p className="text-xs text-muted-foreground">{dak.email}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+              {t('dynamic_keys.last_seen')} {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : t('dynamic_keys.never_seen')}
             </p>
             {dak.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -1243,7 +1244,7 @@ function DAKRow({
             )}
             onClick={onToggleStatus}
             disabled={isTogglingStatus}
-            title={dak.status === 'DISABLED' ? 'Enable key' : 'Disable key'}
+            title={dak.status === 'DISABLED' ? t('dynamic_keys.actions.enable') : t('dynamic_keys.actions.disable')}
           >
             {isTogglingStatus ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -1266,7 +1267,7 @@ function DAKRow({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="w-4 h-4 mr-2" />
-                Edit
+                {t('dynamic_keys.actions.edit')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
@@ -1274,7 +1275,7 @@ function DAKRow({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyUrl}>
                 <Copy className="w-4 h-4 mr-2" />
-                Copy URL
+                {t('dynamic_keys.actions.copy_url')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -2401,7 +2402,7 @@ export default function DynamicKeysPage() {
                               <p className="text-xs text-muted-foreground">{dak.email}</p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+                              {t('dynamic_keys.last_seen')} {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : t('dynamic_keys.never_seen')}
                             </p>
                             {dak.tags && (
                               <div className="flex flex-wrap gap-1 mt-1">
@@ -2439,13 +2440,13 @@ export default function DynamicKeysPage() {
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{dak.attachedKeysCount} keys attached</span>
+                        <span className="text-muted-foreground">{dak.attachedKeysCount} {t('dynamic_keys.mobile.attached_keys').toLowerCase()}</span>
                         <span className={cn('text-muted-foreground', dak.daysRemaining !== null && dak.daysRemaining <= 7 && 'text-red-500')}>
                           {dak.expiresAt
                             ? dak.daysRemaining !== null && dak.daysRemaining >= 0
-                              ? `${dak.daysRemaining}d left`
-                              : 'Expired'
-                            : 'Never'}
+                              ? `${dak.daysRemaining}${t('dynamic_keys.expires.days_left')}`
+                              : t('dynamic_keys.expires.expired')
+                            : t('dynamic_keys.expires.never')}
                         </span>
                       </div>
 
@@ -2465,12 +2466,12 @@ export default function DynamicKeysPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
-                                <Eye className="w-4 h-4 mr-2" />
-                                Details
-                              </Link>
-                            </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  {t('dynamic_keys.actions.details')}
+                </Link>
+              </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setEditingDAK({
                               id: dak.id,
                               name: dak.name,
@@ -2482,16 +2483,16 @@ export default function DynamicKeysPage() {
                               expiresAt: dak.expiresAt ?? null,
                             })}>
                               <Pencil className="w-4 h-4 mr-2" />
-                              Edit
+                              {t('dynamic_keys.actions.edit')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleStatus(dak)}>
                               <Power className="w-4 h-4 mr-2" />
-                              {dak.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                              {dak.status === 'DISABLED' ? t('dynamic_keys.actions.enable') : t('dynamic_keys.actions.disable')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleDelete(dak)} className="text-destructive">
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
+                              {t('dynamic_keys.actions.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -2551,7 +2552,7 @@ export default function DynamicKeysPage() {
                       </Link>
                       {dak.email ? <p className="truncate text-xs text-muted-foreground">{dak.email}</p> : null}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+                        {t('dynamic_keys.last_seen')} {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : t('dynamic_keys.never_seen')}
                       </p>
                     </div>
                   </div>
@@ -2597,11 +2598,11 @@ export default function DynamicKeysPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border bg-background p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Attached Keys</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('dynamic_keys.mobile.attached_keys')}</p>
                     <p className="mt-1 text-sm font-medium">{dak.attachedKeysCount}</p>
                   </div>
                   <div className="rounded-lg border bg-background p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expires</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('dynamic_keys.mobile.expires')}</p>
                     <p className={cn('mt-1 text-sm font-medium', dak.daysRemaining != null && dak.daysRemaining <= 3 && 'text-orange-500')}>
                       {dak.expiresAt ? formatRelativeTime(dak.expiresAt) : t('dynamic_keys.expires.never')}
                     </p>
@@ -2612,7 +2613,7 @@ export default function DynamicKeysPage() {
                   <Button asChild variant="outline" size="sm" className="justify-center">
                     <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Details
+                      {t('dynamic_keys.actions.details')}
                     </Link>
                   </Button>
                   <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => handleCopyUrl(dak)}>
@@ -2639,15 +2640,15 @@ export default function DynamicKeysPage() {
                         expiresAt: dak.expiresAt ?? null,
                       })}>
                         <Pencil className="w-4 h-4 mr-2" />
-                        Edit
+                        {t('dynamic_keys.actions.edit')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleToggleStatus(dak)}>
                         <Power className="w-4 h-4 mr-2" />
-                        {dak.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                        {dak.status === 'DISABLED' ? t('dynamic_keys.actions.enable') : t('dynamic_keys.actions.disable')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleDelete(dak)} className="text-destructive">
                         <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
+                        {t('dynamic_keys.actions.delete')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

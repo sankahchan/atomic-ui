@@ -517,8 +517,8 @@ function ChannelDialog({
 
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
-              <p className="text-sm font-medium">Channel Active</p>
-              <p className="text-xs text-muted-foreground">Inactive channels are kept but won&apos;t receive alerts.</p>
+              <p className="text-sm font-medium">{t('notifications.channel_active_title')}</p>
+              <p className="text-xs text-muted-foreground">{t('notifications.channel_active_desc')}</p>
             </div>
             <Switch
               checked={formData.isActive}
@@ -1497,7 +1497,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                       <Button asChild variant="outline" size="sm" className="w-full justify-center">
                         <Link href={`/dashboard/keys/${log.accessKeyId}`}>
                           <ExternalLink className="w-4 h-4 mr-2" />
-                          Open Key
+                          {t('notifications.delivery.open_key')}
                         </Link>
                       </Button>
                     ) : null}

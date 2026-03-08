@@ -142,6 +142,13 @@ function formatAuditDetailValue(value: unknown) {
   return String(value);
 }
 
+function formatTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 function AuditDetailDialog({
   log,
   open,
@@ -151,6 +158,8 @@ function AuditDetailDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useLocale();
+
   if (!log) return null;
 
   const detailJson = log.details ? JSON.stringify(log.details, null, 2) : null;
@@ -174,25 +183,25 @@ function AuditDetailDialog({
         <div className="grid gap-3 sm:grid-cols-2">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Metadata</CardTitle>
+              <CardTitle className="text-sm">{t('audit.detail.metadata')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Action</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.action')}</p>
                 <p className="mt-1 break-words font-medium">{log.action}</p>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Entity</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.entity')}</p>
                 <Badge className={cn('border', getEntityBadgeClass(log.entity))}>
                   {log.entity}
                 </Badge>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Entity ID</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.entity_id')}</p>
                 <p className="mt-1 break-all font-mono text-xs">{log.entityId || '-'}</p>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Timestamp</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.timestamp')}</p>
                 <p className="mt-1">{formatDateTime(log.createdAt)}</p>
               </div>
             </CardContent>
@@ -200,19 +209,19 @@ function AuditDetailDialog({
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Actor</CardTitle>
+              <CardTitle className="text-sm">{t('audit.detail.actor')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">User</p>
-                <p className="mt-1 break-all">{log.userEmail || log.userId || 'System'}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.user')}</p>
+                <p className="mt-1 break-all">{log.userEmail || log.userId || t('audit.system')}</p>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">User ID</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.user_id')}</p>
                 <p className="mt-1 break-all font-mono text-xs">{log.userId || '-'}</p>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">IP</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.detail.ip')}</p>
                 <p className="mt-1 break-all font-mono text-xs">{log.ip || '-'}</p>
               </div>
             </CardContent>
@@ -221,7 +230,7 @@ function AuditDetailDialog({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Details</CardTitle>
+            <CardTitle className="text-sm">{t('audit.detail.details')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {detailEntries.length > 0 ? (
@@ -239,14 +248,14 @@ function AuditDetailDialog({
 
             {detailJson ? (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Raw Details</p>
+                <p className="text-xs font-medium text-muted-foreground">{t('audit.detail.raw_details')}</p>
                 <pre className="rounded-lg bg-muted/40 p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
                   {detailJson}
                 </pre>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground text-center">
-                No structured details recorded for this action.
+                {t('audit.detail.no_structured_details')}
               </div>
             )}
           </CardContent>
@@ -344,8 +353,8 @@ export default function AuditPage() {
   const handleExportCsv = async () => {
     if (hasInvalidDateRange) {
       toast({
-        title: 'Export failed',
-        description: 'Choose a valid date range before exporting.',
+        title: t('audit.export.failed'),
+        description: t('audit.export.failed_invalid_range'),
         variant: 'destructive',
       });
       return;
@@ -359,18 +368,18 @@ export default function AuditPage() {
       }
 
       if (!result.data) {
-        throw new Error('No CSV export data was returned.');
+        throw new Error(t('audit.export.no_data'));
       }
 
       downloadFile(`\uFEFF${result.data.data}`, result.data.filename, 'text/csv;charset=utf-8;');
       toast({
-        title: 'Export complete',
-        description: 'Audit log exported as CSV.',
+        title: t('audit.export.complete'),
+        description: t('audit.export.complete_desc'),
       });
     } catch (error) {
       toast({
-        title: 'Export failed',
-        description: error instanceof Error ? error.message : 'Failed to export audit log.',
+        title: t('audit.export.failed'),
+        description: error instanceof Error ? error.message : t('audit.export.failed'),
         variant: 'destructive',
       });
     }
@@ -396,26 +405,26 @@ export default function AuditPage() {
           <BackButton href="/dashboard" label={t('nav.dashboard')} />
           <h1 className="text-2xl font-bold tracking-tight">{t('nav.audit')}</h1>
           <p className="text-muted-foreground">
-            Review recent administrative activity, investigate changes, and inspect structured action details.
+            {t('audit.subtitle')}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:min-w-[360px]">
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Total Entries</p>
+              <p className="text-xs text-muted-foreground">{t('audit.summary.total_entries')}</p>
               <p className="text-2xl font-bold">{totalEntries}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Current Page</p>
+              <p className="text-xs text-muted-foreground">{t('audit.summary.current_page')}</p>
               <p className="text-2xl font-bold">{page}</p>
             </CardContent>
           </Card>
           <Card className="col-span-2 md:col-span-1">
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Visible Rows</p>
+              <p className="text-xs text-muted-foreground">{t('audit.summary.visible_rows')}</p>
               <p className="text-2xl font-bold">{currentItems.length}</p>
             </CardContent>
           </Card>
@@ -426,26 +435,26 @@ export default function AuditPage() {
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="w-4 h-4 text-primary" />
-            Filters
+            {t('audit.filters.title')}
           </CardTitle>
           <CardDescription>
-            Narrow the audit stream by action, entity type, actor, or a specific date range.
+            {t('audit.filters.desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
-              <Label htmlFor="actionFilter">Action</Label>
+              <Label htmlFor="actionFilter">{t('audit.filters.action')}</Label>
               <Input
                 id="actionFilter"
-                placeholder="SERVER_SYNC, USER_DELETE..."
+                placeholder={t('audit.filters.action_placeholder')}
                 value={actionFilter}
                 onChange={(e) => handleActionChange(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Entity</Label>
+              <Label>{t('audit.filters.entity')}</Label>
               <Select value={entityFilter} onValueChange={handleEntityChange}>
                 <SelectTrigger>
                   <SelectValue />
@@ -453,7 +462,7 @@ export default function AuditPage() {
                 <SelectContent>
                   {ENTITY_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option === 'ALL' ? 'All entities' : option}
+                      {option === 'ALL' ? t('audit.filters.all_entities') : option}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -461,13 +470,13 @@ export default function AuditPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Actor</Label>
+              <Label>{t('audit.filters.actor')}</Label>
               <Select value={userFilter} onValueChange={handleUserChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All actors</SelectItem>
+                  <SelectItem value="ALL">{t('audit.filters.all_actors')}</SelectItem>
                   {users?.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.email}
@@ -478,7 +487,7 @@ export default function AuditPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dateFromFilter">From</Label>
+              <Label htmlFor="dateFromFilter">{t('audit.filters.from')}</Label>
               <Input
                 id="dateFromFilter"
                 type="date"
@@ -488,7 +497,7 @@ export default function AuditPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dateToFilter">To</Label>
+              <Label htmlFor="dateToFilter">{t('audit.filters.to')}</Label>
               <Input
                 id="dateToFilter"
                 type="date"
@@ -498,7 +507,7 @@ export default function AuditPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rows Per Page</Label>
+              <Label>{t('audit.filters.rows_per_page')}</Label>
               <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
                 <SelectTrigger>
                   <SelectValue />
@@ -506,7 +515,7 @@ export default function AuditPage() {
                 <SelectContent>
                   {PAGE_SIZE_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option} rows
+                      {option} {t('audit.filters.rows')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -518,15 +527,15 @@ export default function AuditPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Shield className="w-4 h-4" />
-                <span>Every recorded admin action is stored with timestamp, actor, and optional structured metadata.</span>
+                <span>{t('audit.filters.hint')}</span>
               </div>
               {hasInvalidDateRange ? (
-                <p className="text-sm text-destructive">The start date must be on or before the end date.</p>
+                <p className="text-sm text-destructive">{t('audit.filters.invalid_range')}</p>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear Filters
+                {t('audit.filters.clear')}
               </Button>
               <Button size="sm" onClick={handleExportCsv} disabled={hasInvalidDateRange || isExportingCsv}>
                 {isExportingCsv ? (
@@ -534,7 +543,7 @@ export default function AuditPage() {
                 ) : (
                   <Download className="w-4 h-4 mr-2" />
                 )}
-                Export CSV
+                {t('audit.filters.export_csv')}
               </Button>
             </div>
           </div>
@@ -545,20 +554,20 @@ export default function AuditPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Entity</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead className="text-right">Details</TableHead>
+              <TableHead>{t('audit.table.time')}</TableHead>
+              <TableHead>{t('audit.table.action')}</TableHead>
+              <TableHead>{t('audit.table.entity')}</TableHead>
+              <TableHead>{t('audit.table.actor')}</TableHead>
+              <TableHead>{t('audit.table.ip')}</TableHead>
+              <TableHead>{t('audit.table.target')}</TableHead>
+              <TableHead className="text-right">{t('audit.table.details')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {hasInvalidDateRange ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  Choose a valid date range to load audit log entries.
+                  {t('audit.empty.invalid_range')}
                 </TableCell>
               </TableRow>
             ) : isLoading ? (
@@ -566,14 +575,14 @@ export default function AuditPage() {
                 <TableCell colSpan={7} className="h-32 text-center">
                   <div className="inline-flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading audit logs...
+                    {t('audit.empty.loading')}
                   </div>
                 </TableCell>
               </TableRow>
             ) : currentItems.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  No audit log entries match the current filters.
+                  {t('audit.empty.no_match')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -592,7 +601,7 @@ export default function AuditPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="break-all">{log.userEmail || log.userId || 'System'}</span>
+                      <span className="break-all">{log.userEmail || log.userId || t('audit.system')}</span>
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{log.ip || '-'}</TableCell>
@@ -600,7 +609,7 @@ export default function AuditPage() {
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}>
                       <Eye className="w-4 h-4 mr-2" />
-                      View
+                      {t('audit.actions.view')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -615,10 +624,10 @@ export default function AuditPage() {
         keyExtractor={(log) => log.id}
         emptyMessage={
           hasInvalidDateRange
-            ? 'Choose a valid date range to load audit log entries.'
+            ? t('audit.empty.invalid_range')
             : isLoading
-              ? 'Loading audit logs...'
-              : 'No audit log entries match the current filters.'
+              ? t('audit.empty.loading')
+              : t('audit.empty.no_match')
         }
         renderCard={(log) => (
           <div className="space-y-4">
@@ -634,22 +643,22 @@ export default function AuditPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Time</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.time')}</p>
                 <p className="mt-1 text-xs">{formatDateTime(log.createdAt)}</p>
               </div>
               <div className="rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actor</p>
-                <p className="mt-1 break-all text-xs">{log.userEmail || log.userId || 'System'}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.actor')}</p>
+                <p className="mt-1 break-all text-xs">{log.userEmail || log.userId || t('audit.system')}</p>
               </div>
               <div className="col-span-2 rounded-lg bg-muted/30 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Target</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.target')}</p>
                 <p className="mt-1 break-all font-mono text-xs">{log.entityId || '-'}</p>
               </div>
             </div>
 
             <Button variant="outline" size="sm" className="w-full" onClick={() => setSelectedLog(log)}>
               <Eye className="w-4 h-4 mr-2" />
-              View Details
+              {t('audit.actions.view_details')}
             </Button>
           </div>
         )}
@@ -657,7 +666,7 @@ export default function AuditPage() {
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          Page {page} of {totalPages}
+          {formatTemplate(t('audit.pagination.page_of'), { page, total: totalPages })}
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -667,7 +676,7 @@ export default function AuditPage() {
             disabled={page <= 1}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
-            Previous
+            {t('audit.pagination.previous')}
           </Button>
           <Button
             variant="outline"
@@ -675,7 +684,7 @@ export default function AuditPage() {
             onClick={() => setPage((prev) => prev + 1)}
             disabled={page >= totalPages}
           >
-            Next
+            {t('audit.pagination.next')}
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>

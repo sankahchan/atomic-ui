@@ -196,8 +196,8 @@ function CreateKeyDialog({
   const createMutation = trpc.keys.create.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Access key created',
-        description: 'The new access key has been created successfully.',
+        title: t('keys.toast.created'),
+        description: t('keys.toast.created_desc'),
       });
       onSuccess();
       onOpenChange(false);
@@ -205,7 +205,7 @@ function CreateKeyDialog({
     },
     onError: (error) => {
       toast({
-        title: 'Failed to create key',
+        title: t('keys.toast.create_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -286,8 +286,8 @@ function CreateKeyDialog({
 
     if (!formData.serverId || !formData.name) {
       toast({
-        title: 'Validation error',
-        description: 'Please select a server and enter a name.',
+        title: t('keys.toast.validation'),
+        description: t('keys.toast.validation_create_desc'),
         variant: 'destructive',
       });
       return;
@@ -330,10 +330,10 @@ function CreateKeyDialog({
               onValueChange={handleTemplateChange}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a template" />
+                <SelectValue placeholder={t('keys.dialog.template_placeholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t('keys.dialog.template_none')}</SelectItem>
                 {templates?.map((tpl) => (
                   <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
                 ))}
@@ -351,7 +351,7 @@ function CreateKeyDialog({
               onValueChange={(value) => setFormData({ ...formData, serverId: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a server" />
+                <SelectValue placeholder={t('keys.form.server_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {servers?.map((server) => (
@@ -369,7 +369,7 @@ function CreateKeyDialog({
             <Label htmlFor="name">{t('keys.form.name')} *</Label>
             <Input
               id="name"
-              placeholder="e.g., John's Phone"
+              placeholder={t('keys.form.name_placeholder')}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -377,16 +377,16 @@ function CreateKeyDialog({
 
           {/* User Assignment */}
           <div className="space-y-2">
-            <Label>Assign to User (Optional)</Label>
+            <Label>{t('keys.form.user')}</Label>
             <Select
               value={formData.userId}
               onValueChange={(value) => setFormData({ ...formData, userId: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a user" />
+                <SelectValue placeholder={t('keys.form.user_placeholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unassigned">Unassigned (Admin only)</SelectItem>
+                <SelectItem value="unassigned">{t('keys.form.user_unassigned')}</SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.email} (Keys: {(user as any)._count?.accessKeys || 0})
@@ -404,7 +404,7 @@ function CreateKeyDialog({
               onValueChange={(value) => setFormData({ ...formData, method: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select encryption method" />
+                <SelectValue placeholder={t('keys.form.method_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {ENCRYPTION_METHODS.map((method) => (
@@ -415,7 +415,7 @@ function CreateKeyDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              ChaCha20 is recommended for mobile devices. AES-256-GCM is more secure but slower.
+              {t('keys.form.method_help')}
             </p>
           </div>
 
@@ -426,7 +426,7 @@ function CreateKeyDialog({
               <Input
                 id="email"
                 type="email"
-                placeholder="john@example.com"
+                placeholder={t('keys.form.email_placeholder')}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
@@ -435,7 +435,7 @@ function CreateKeyDialog({
               <Label htmlFor="telegramId">{t('keys.form.telegram')}</Label>
               <Input
                 id="telegramId"
-                placeholder="@username or ID"
+                placeholder={t('keys.form.telegram_placeholder')}
                 value={formData.telegramId}
                 onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
               />
@@ -448,21 +448,21 @@ function CreateKeyDialog({
             <Input
               id="dataLimit"
               type="number"
-              placeholder="Leave empty for unlimited"
+              placeholder={t('keys.form.data_limit_placeholder')}
               value={formData.dataLimitGB}
               onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
               min="0"
               step="0.5"
             />
             <p className="text-xs text-muted-foreground">
-              Leave empty for unlimited data usage.
+              {t('keys.form.data_limit_help')}
             </p>
           </div>
 
           {/* Data Limit Reset Strategy */}
           {formData.dataLimitGB && (
             <div className="space-y-2">
-              <Label>Reset Strategy</Label>
+              <Label>{t('keys.form.reset_strategy')}</Label>
               <Select
                 value={formData.dataLimitResetStrategy}
                 onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
@@ -473,10 +473,10 @@ function CreateKeyDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NEVER">Never Reset</SelectItem>
-                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                  <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
+                  <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
+                  <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
+                  <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -496,8 +496,8 @@ function CreateKeyDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NEVER">{t('keys.never_expires')}</SelectItem>
-                <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
-                <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
+                <SelectItem value="DURATION_FROM_CREATION">{t('keys.form.expiration.duration_from_creation')}</SelectItem>
+                <SelectItem value="START_ON_FIRST_USE">{t('keys.form.expiration.start_on_first_use')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -506,7 +506,7 @@ function CreateKeyDialog({
           {(formData.expirationType === 'DURATION_FROM_CREATION' ||
             formData.expirationType === 'START_ON_FIRST_USE') && (
               <div className="space-y-2">
-                <Label htmlFor="durationDays">Duration (days)</Label>
+                <Label htmlFor="durationDays">{t('keys.form.duration')}</Label>
                 <Input
                   id="durationDays"
                   type="number"
@@ -523,7 +523,7 @@ function CreateKeyDialog({
             <Label htmlFor="notes">{t('keys.form.notes')}</Label>
             <Input
               id="notes"
-              placeholder="Optional notes about this key"
+              placeholder={t('keys.form.notes_placeholder')}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
@@ -592,9 +592,9 @@ function QRCodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>QR Code: {keyName}</DialogTitle>
+          <DialogTitle>{t('keys.actions.show_qr')}: {keyName}</DialogTitle>
           <DialogDescription>
-            Scan this code with a Shadowsocks client to connect.
+            {t('keys.dialog.qr_desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -608,7 +608,7 @@ function QRCodeDialog({
             />
           ) : (
             <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">Failed to load</p>
+              <p className="text-muted-foreground text-sm">{t('keys.dialog.qr_failed')}</p>
             </div>
           )}
 
@@ -620,7 +620,7 @@ function QRCodeDialog({
               onClick={handleCopyUrl}
             >
               <Copy className="w-4 h-4 mr-2" />
-              Copy Access URL
+              {t('keys.actions.copy_access_url')}
             </Button>
           )}
         </div>
@@ -653,11 +653,11 @@ function DeleteKeyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('keys.delete_title') || 'Delete Access Key'}</DialogTitle>
+          <DialogTitle>{t('keys.delete_title')}</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete &quot;{keyName}&quot;?
             <br />
-            {t('keys.confirm_delete_desc') || 'This action cannot be undone. The key will be permanently removed from the server.'}
+            {t('keys.confirm_delete_desc')}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -945,6 +945,7 @@ function EditKeyDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { t } = useLocale();
   const [formData, setFormData] = useState({
     name: keyData.name,
     email: keyData.email || '',
@@ -977,15 +978,15 @@ function EditKeyDialog({
   const updateMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Key updated',
-        description: 'The access key has been updated successfully.',
+        title: t('keys.toast.updated'),
+        description: t('keys.toast.updated_desc'),
       });
       onSuccess();
       onOpenChange(false);
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: t('keys.toast.update_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -997,8 +998,8 @@ function EditKeyDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a key name.',
+        title: t('keys.toast.validation'),
+        description: t('keys.toast.validation_name_desc'),
         variant: 'destructive',
       });
       return;
@@ -1021,15 +1022,15 @@ function EditKeyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Access Key</DialogTitle>
+          <DialogTitle>{t('keys.dialog.edit_title')}</DialogTitle>
           <DialogDescription>
-            Update the key configuration. Name changes will sync to Outline.
+            {t('keys.dialog.edit_desc')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="editName">Name</Label>
+            <Label htmlFor="editName">{t('keys.form.name')}</Label>
             <Input
               id="editName"
               value={formData.name}
@@ -1038,7 +1039,7 @@ function EditKeyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editEmail">Email</Label>
+            <Label htmlFor="editEmail">{t('keys.form.email')}</Label>
             <Input
               id="editEmail"
               type="email"
@@ -1048,7 +1049,7 @@ function EditKeyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editTelegram">Telegram ID</Label>
+            <Label htmlFor="editTelegram">{t('keys.form.telegram')}</Label>
             <Input
               id="editTelegram"
               value={formData.telegramId}
@@ -1057,11 +1058,11 @@ function EditKeyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
+            <Label htmlFor="editDataLimit">{t('keys.form.data_limit')}</Label>
             <Input
               id="editDataLimit"
               type="number"
-              placeholder="Leave empty for unlimited"
+              placeholder={t('keys.form.data_limit_placeholder')}
               value={formData.dataLimitGB}
               onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
               min="0"
@@ -1071,7 +1072,7 @@ function EditKeyDialog({
 
           {formData.dataLimitGB && (
             <div className="space-y-2">
-              <Label>Reset Strategy</Label>
+              <Label>{t('keys.form.reset_strategy')}</Label>
               <Select
                 value={formData.dataLimitResetStrategy}
                 onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
@@ -1082,32 +1083,32 @@ function EditKeyDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NEVER">Never Reset</SelectItem>
-                  <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
+                  <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
+                  <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
+                  <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
+                  <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="editDuration">Duration (Days)</Label>
+            <Label htmlFor="editDuration">{t('keys.form.duration')}</Label>
             <Input
               id="editDuration"
               type="number"
-              placeholder="e.g., 30, 45, 60"
+              placeholder="30"
               value={formData.durationDays}
               onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
               min="1"
             />
             <p className="text-xs text-muted-foreground">
-              Set the validity period in days. This will recalculate the expiration date.
+              {t('keys.form.duration_help')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editExpiration">Expiration Date</Label>
+            <Label htmlFor="editExpiration">{t('keys.form.expiration_date')}</Label>
             <Input
               id="editExpiration"
               type="date"
@@ -1115,12 +1116,12 @@ function EditKeyDialog({
               onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Or set a specific expiration date directly.
+              {t('keys.form.expiration_date_help')}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editNotes">Notes</Label>
+            <Label htmlFor="editNotes">{t('keys.form.notes')}</Label>
             <Input
               id="editNotes"
               value={formData.notes}
@@ -1130,11 +1131,11 @@ function EditKeyDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('keys.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              {t('keys.dialog.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -1245,7 +1246,7 @@ function KeyRow({
               <p className="text-xs text-muted-foreground">{accessKey.email}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Last seen: {accessKey.lastUsedAt ? formatRelativeTime(accessKey.lastUsedAt) : 'Never'}
+              {t('keys.last_seen')} {accessKey.lastUsedAt ? formatRelativeTime(accessKey.lastUsedAt) : t('keys.never_seen')}
             </p>
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -1299,7 +1300,7 @@ function KeyRow({
             <TrafficSparkline data={sparklineData} height={32} id={accessKey.id} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/40">
-              No data
+              {t('keys.sparkline.empty')}
             </div>
           )}
         </div>
@@ -1323,15 +1324,15 @@ function KeyRow({
             accessKey.isExpiringSoon && 'text-orange-500'
           )}>
             {accessKey.daysRemaining != null && accessKey.daysRemaining > 0 ? (
-              <span>{accessKey.daysRemaining}d remaining</span>
+              <span>{accessKey.daysRemaining}{t('keys.expires.remaining_days')}</span>
             ) : accessKey.daysRemaining === 0 ? (
-              <span>Expires today</span>
+              <span>{t('keys.expires.today')}</span>
             ) : (
-              <span className="text-red-500">Expired</span>
+              <span className="text-red-500">{t('keys.expires.expired')}</span>
             )}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">Never</span>
+          <span className="text-sm text-muted-foreground">{t('keys.never_expires')}</span>
         )}
       </td>
 
@@ -1343,7 +1344,7 @@ function KeyRow({
             size="icon"
             className="h-8 w-8"
             onClick={onShowQR}
-            title="Show QR Code"
+            title={t('keys.actions.show_qr')}
           >
             <QrCode className="w-4 h-4" />
           </Button>
@@ -1356,7 +1357,7 @@ function KeyRow({
             )}
             onClick={onToggleStatus}
             disabled={isTogglingStatus}
-            title={accessKey.status === 'DISABLED' ? 'Enable key' : 'Disable key'}
+            title={accessKey.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
           >
             {isTogglingStatus ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -1374,25 +1375,25 @@ function KeyRow({
               <DropdownMenuItem asChild>
                 <Link href={`/dashboard/keys/${accessKey.id}`} className="cursor-pointer">
                   <Eye className="w-4 h-4 mr-2" />
-                  View Details
+                  {t('keys.actions.view_details')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="w-4 h-4 mr-2" />
-                Edit
+                {t('keys.actions.edit')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
-                Show QR Code
+                {t('keys.actions.show_qr')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onCopyAccessUrl}>
                 <Copy className="w-4 h-4 mr-2" />
-                Copy Access URL
+                {t('keys.actions.copy_access_url')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopySubscriptionUrl}>
                 <Share2 className="w-4 h-4 mr-2" />
-                Copy Subscription URL
+                {t('keys.actions.copy_subscription_url')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -1400,7 +1401,7 @@ function KeyRow({
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Key
+                {t('keys.actions.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1492,7 +1493,7 @@ export default function KeysPage() {
                 )}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Last seen: {key.lastUsedAt ? formatRelativeTime(key.lastUsedAt) : 'Never'}
+                {t('keys.last_seen')} {key.lastUsedAt ? formatRelativeTime(key.lastUsedAt) : t('keys.never_seen')}
               </p>
             </div>
           </div>
@@ -1503,7 +1504,7 @@ export default function KeysPage() {
             </Badge>
             {isOnline ? (
               <Badge variant="outline" className="border-green-500/40 text-green-500">
-                Online
+                {t('keys.status.online')}
               </Badge>
             ) : null}
           </div>
@@ -1540,14 +1541,14 @@ export default function KeysPage() {
 
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border bg-background p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Devices</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.devices')}</p>
             <p className="mt-1 flex items-center gap-1 text-sm font-medium">
               <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
               {key.estimatedDevices || 0}
             </p>
           </div>
           <div className="rounded-lg border bg-background p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expires</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.expires')}</p>
             <p className={cn('mt-1 text-sm font-medium', key.isExpiringSoon && 'text-red-500')}>
               {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
             </p>
@@ -1558,7 +1559,7 @@ export default function KeysPage() {
           <Button asChild variant="outline" size="sm" className="justify-center">
             <Link href={`/dashboard/keys/${key.id}`}>
               <Eye className="mr-2 h-4 w-4" />
-              View Details
+              {t('keys.actions.view_details')}
             </Link>
           </Button>
           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setQrDialogKey({ id: key.id, name: key.name })}>
@@ -1573,15 +1574,15 @@ export default function KeysPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setEditingKey(key)}>
                 <Pencil className="w-4 h-4 mr-2" />
-                Edit
+                {t('keys.actions.edit')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                 <Power className="w-4 h-4 mr-2" />
-                {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                {t('keys.actions.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -2903,21 +2904,21 @@ export default function KeysPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/keys/${key.id}`}>
                               <Eye className="w-4 h-4 mr-2" />
-                              View Details
+                              {t('keys.actions.view_details')}
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setEditingKey(key)}>
                             <Pencil className="w-4 h-4 mr-2" />
-                            Edit
+                            {t('keys.actions.edit')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                             <Power className="w-4 h-4 mr-2" />
-                            {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                            {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            {t('keys.actions.delete')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
