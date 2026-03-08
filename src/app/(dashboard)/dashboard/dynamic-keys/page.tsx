@@ -2532,63 +2532,129 @@ export default function DynamicKeysPage() {
         <MobileCardView
           className="md:hidden mb-6"
           data={dynamicKeys}
-          renderCard={(dak) => (
-            <div className="space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  {checkIsOnline(dak.id) && <OnlineIndicator isOnline={true} />}
-                  <div>
-                    <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="font-medium hover:underline">
-                      {dak.name}
-                    </Link>
-                    {dak.email && <p className="text-xs text-muted-foreground">{dak.email}</p>}
-                    <p className="text-xs text-muted-foreground">
-                      Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+          renderCard={(dak) => {
+            const online = checkIsOnline(dak.id);
+            const typeConfig = DAK_TYPES[dak.type] || DAK_TYPES.MANUAL;
+            const statusBadgeConfig = statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
+            const tags = typeof dak.tags === 'string'
+              ? dak.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+              : [];
+
+            return (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex items-start gap-2">
+                    {online ? <OnlineIndicator isOnline={true} /> : null}
+                    <div className="min-w-0">
+                      <Link href={`/dashboard/dynamic-keys/${dak.id}`} className="block truncate font-medium hover:underline">
+                        {dak.name}
+                      </Link>
+                      {dak.email ? <p className="truncate text-xs text-muted-foreground">{dak.email}</p> : null}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Last seen: {dak.firstUsedAt ? formatRelativeTime(dak.firstUsedAt) : 'Never'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={cn('border', statusBadgeConfig.color)}>
+                      {t(statusBadgeConfig.labelKey)}
+                    </Badge>
+                    <Badge variant="outline" className={cn('border', typeConfig.bgColor, typeConfig.color)}>
+                      <typeConfig.icon className="mr-1 h-3 w-3" />
+                      {t(typeConfig.labelKey)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.slice(0, 3).map((tag) => (
+                      <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {tag}
+                      </span>
+                    ))}
+                    {tags.length > 3 ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        +{tags.length - 3}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="rounded-lg border bg-muted/25 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{t('dynamic_keys.total_usage')}</span>
+                    <span className="font-medium">
+                      {formatBytes(BigInt(dak.usedBytes ?? 0))}
+                      {dak.dataLimitBytes ? ` / ${formatBytes(BigInt(dak.dataLimitBytes))}` : ''}
+                    </span>
+                  </div>
+                  <SegmentedUsageBarCompact
+                    valueBytes={Number(dak.usedBytes)}
+                    limitBytes={dak.dataLimitBytes ? Number(dak.dataLimitBytes) : undefined}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border bg-background p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Attached Keys</p>
+                    <p className="mt-1 text-sm font-medium">{dak.attachedKeysCount}</p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expires</p>
+                    <p className={cn('mt-1 text-sm font-medium', dak.daysRemaining != null && dak.daysRemaining <= 3 && 'text-orange-500')}>
+                      {dak.expiresAt ? formatRelativeTime(dak.expiresAt) : t('dynamic_keys.expires.never')}
                     </p>
-                    {dak.tags && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {dak.tags.split(',').filter(Boolean).map((tag) => (
-                          <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
-                            {tag.trim()}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
-                <Badge className={cn('border', (statusConfig[dak.status as keyof typeof statusConfig] || statusConfig.ACTIVE).color)}>
-                  {dak.status}
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
-                  <div className={cn('text-xs flex items-center gap-1', (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).color)}>
-                    {(() => { const Icon = (DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).icon; return <Icon className="w-3 h-3" />; })()}
-                    {t((DAK_TYPES[dak.type] || DAK_TYPES.MANUAL).labelKey)}
-                  </div>
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-t border-border/50 pt-2">
+                  <Button asChild variant="outline" size="sm" className="justify-center">
+                    <Link href={`/dashboard/dynamic-keys/${dak.id}`}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Details
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => handleCopyUrl(dak)}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => handleShowQR(dak)}>
+                    <QrCode className="w-4 h-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingDAK({
+                        id: dak.id,
+                        name: dak.name,
+                        email: dak.email ?? null,
+                        telegramId: dak.telegramId ?? null,
+                        notes: dak.notes ?? null,
+                        dataLimitBytes: dak.dataLimitBytes,
+                        durationDays: (dak as DAKData).durationDays ?? null,
+                        expiresAt: dak.expiresAt ?? null,
+                      })}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleStatus(dak)}>
+                        <Power className="w-4 h-4 mr-2" />
+                        {dak.status === 'DISABLED' ? 'Enable' : 'Disable'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDelete(dak)} className="text-destructive">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Smartphone className="w-3 h-3" />
-                  <span>{0 || 0}</span>
-                </div>
               </div>
-
-              <div className="space-y-1">
-                <SegmentedUsageBarCompact
-                  valueBytes={Number(dak.usedBytes)}
-                  limitBytes={dak.dataLimitBytes ? Number(dak.dataLimitBytes) : undefined}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
-                <Button variant="ghost" size="sm" onClick={() => handleCopyUrl(dak)}><Copy className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => handleShowQR(dak)}><QrCode className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(dak)}><Power className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(dak)} className="text-destructive"><Trash2 className="w-4 h-4" /></Button>
-              </div>
-            </div>
-          )}
+            );
+          }}
           keyExtractor={(item) => item.id}
         />
       )}

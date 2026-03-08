@@ -116,6 +116,32 @@ function downloadFile(content: string, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function isRenderableAuditDetailValue(value: unknown) {
+  return (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null ||
+    (Array.isArray(value) && value.every((entry) => ['string', 'number', 'boolean'].includes(typeof entry) || entry === null))
+  );
+}
+
+function formatAuditDetailValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry)).join(', ');
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  return String(value);
+}
+
 function AuditDetailDialog({
   log,
   open,
@@ -128,10 +154,13 @@ function AuditDetailDialog({
   if (!log) return null;
 
   const detailJson = log.details ? JSON.stringify(log.details, null, 2) : null;
+  const detailEntries = log.details
+    ? Object.entries(log.details).filter(([, value]) => isRenderableAuditDetailValue(value))
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ScrollText className="w-5 h-5 text-primary" />
@@ -142,29 +171,29 @@ function AuditDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Metadata</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Action</span>
-                <span className="font-medium">{log.action}</span>
+            <CardContent className="grid gap-3 text-sm">
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Action</p>
+                <p className="mt-1 break-words font-medium">{log.action}</p>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Entity</span>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Entity</p>
                 <Badge className={cn('border', getEntityBadgeClass(log.entity))}>
                   {log.entity}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Entity ID</span>
-                <span className="font-mono text-xs break-all text-right">{log.entityId || '-'}</span>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Entity ID</p>
+                <p className="mt-1 break-all font-mono text-xs">{log.entityId || '-'}</p>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Timestamp</span>
-                <span>{formatDateTime(log.createdAt)}</span>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Timestamp</p>
+                <p className="mt-1">{formatDateTime(log.createdAt)}</p>
               </div>
             </CardContent>
           </Card>
@@ -173,18 +202,18 @@ function AuditDetailDialog({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Actor</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">User</span>
-                <span className="text-right break-all">{log.userEmail || log.userId || 'System'}</span>
+            <CardContent className="grid gap-3 text-sm">
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">User</p>
+                <p className="mt-1 break-all">{log.userEmail || log.userId || 'System'}</p>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">User ID</span>
-                <span className="font-mono text-xs break-all text-right">{log.userId || '-'}</span>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">User ID</p>
+                <p className="mt-1 break-all font-mono text-xs">{log.userId || '-'}</p>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">IP</span>
-                <span className="font-mono text-xs break-all text-right">{log.ip || '-'}</span>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">IP</p>
+                <p className="mt-1 break-all font-mono text-xs">{log.ip || '-'}</p>
               </div>
             </CardContent>
           </Card>
@@ -194,11 +223,27 @@ function AuditDetailDialog({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Details</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {detailEntries.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {detailEntries.map(([key, value]) => (
+                  <div key={key} className="rounded-lg bg-muted/30 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {prettifyLabel(key)}
+                    </p>
+                    <p className="mt-1 break-words text-sm">{formatAuditDetailValue(value)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             {detailJson ? (
-              <pre className="rounded-lg bg-muted/40 p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
-                {detailJson}
-              </pre>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Raw Details</p>
+                <pre className="rounded-lg bg-muted/40 p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
+                  {detailJson}
+                </pre>
+              </div>
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground text-center">
                 No structured details recorded for this action.
@@ -576,21 +621,30 @@ export default function AuditPage() {
               : 'No audit log entries match the current filters.'
         }
         renderCard={(log) => (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{prettifyLabel(log.action)}</p>
-                <p className="text-xs text-muted-foreground font-mono">{log.action}</p>
+              <div className="min-w-0">
+                <p className="font-medium break-words">{prettifyLabel(log.action)}</p>
+                <p className="break-all font-mono text-xs text-muted-foreground">{log.action}</p>
               </div>
               <Badge className={cn('border', getEntityBadgeClass(log.entity))}>
                 {log.entity}
               </Badge>
             </div>
 
-            <div className="space-y-1 text-sm">
-              <p className="text-muted-foreground">{formatDateTime(log.createdAt)}</p>
-              <p className="break-all">{log.userEmail || log.userId || 'System'}</p>
-              <p className="font-mono text-xs text-muted-foreground break-all">{log.entityId || '-'}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Time</p>
+                <p className="mt-1 text-xs">{formatDateTime(log.createdAt)}</p>
+              </div>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actor</p>
+                <p className="mt-1 break-all text-xs">{log.userEmail || log.userId || 'System'}</p>
+              </div>
+              <div className="col-span-2 rounded-lg bg-muted/30 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Target</p>
+                <p className="mt-1 break-all font-mono text-xs">{log.entityId || '-'}</p>
+              </div>
             </div>
 
             <Button variant="outline" size="sm" className="w-full" onClick={() => setSelectedLog(log)}>

@@ -1464,86 +1464,127 @@ export default function KeysPage() {
   const renderKeyCard = (key: any) => {
     const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
     const StatusIcon = config.icon;
+    const isOnline = checkIsOnline(key.id, key.status);
+    const usedBytes = formatBytes(BigInt(key.usedBytes ?? 0));
+    const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
+    const tags = typeof key.tags === 'string'
+      ? key.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean)
+      : [];
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <OnlineIndicator isOnline={checkIsOnline(key.id, key.status)} />
-            <div>
-              <Link href={`/dashboard/keys/${key.id}`} className="font-medium hover:underline">
+          <div className="min-w-0 flex items-start gap-2">
+            <OnlineIndicator isOnline={isOnline} />
+            <div className="min-w-0">
+              <Link href={`/dashboard/keys/${key.id}`} className="block truncate font-medium hover:underline">
                 {key.name}
               </Link>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {key.email ? (
+                <p className="truncate text-xs text-muted-foreground">{key.email}</p>
+              ) : null}
+              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                 {key.server && (
                   <>
                     {key.server.countryCode && <span>{getCountryFlag(key.server.countryCode)}</span>}
-                    <span>{key.server.name}</span>
+                    <span className="truncate">{key.server.name}</span>
                   </>
                 )}
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Last seen: {key.lastUsedAt ? formatRelativeTime(key.lastUsedAt) : 'Never'}
+              </p>
             </div>
           </div>
-          <Badge className={cn('border', config.color)}>
-            <StatusIcon className="w-3 h-3 mr-1" />
-            {t(config.labelKey)}
-          </Badge>
+          <div className="ml-3 flex flex-col items-end gap-2">
+            <Badge className={cn('border', config.color)}>
+              <StatusIcon className="w-3 h-3 mr-1" />
+              {t(config.labelKey)}
+            </Badge>
+            {isOnline ? (
+              <Badge variant="outline" className="border-green-500/40 text-green-500">
+                Online
+              </Badge>
+            ) : null}
+          </div>
         </div>
 
-        <div className="space-y-1">
+        {tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.slice(0, 3).map((tag: string) => (
+              <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                {tag}
+              </span>
+            ))}
+            {tags.length > 3 ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                +{tags.length - 3}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="rounded-lg border bg-muted/25 p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{t('keys.table.usage')}</span>
+            <span className="font-medium">
+              {usedBytes}
+              {limitBytes ? ` / ${limitBytes}` : ''}
+            </span>
+          </div>
           <SegmentedUsageBarCompact
             valueBytes={Number(key.usedBytes)}
             limitBytes={key.dataLimitBytes ? Number(key.dataLimitBytes) : undefined}
           />
         </div>
 
-        <div className="flex items-center justify-between text-xs pt-1">
-          <span className="text-muted-foreground">Devices</span>
-          <span className="flex items-center gap-1">
-            <Smartphone className="w-3 h-3" />
-            {key.estimatedDevices || 0}
-          </span>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Devices</p>
+            <p className="mt-1 flex items-center gap-1 text-sm font-medium">
+              <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+              {key.estimatedDevices || 0}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Expires</p>
+            <p className={cn('mt-1 text-sm font-medium', key.isExpiringSoon && 'text-red-500')}>
+              {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-          <div className="text-xs text-muted-foreground">
-            {key.expiresAt ? (
-              <span className={cn(key.isExpiringSoon && 'text-red-500')}>
-                {t('keys.expires_in')} {formatRelativeTime(key.expiresAt)}
-              </span>
-            ) : (
-              <span>{t('keys.never_expires')}</span>
-            )}
-          </div>
-
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setQrDialogKey({ id: key.id, name: key.name })}>
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-t border-border/50 pt-2">
+          <Button asChild variant="outline" size="sm" className="justify-center">
+            <Link href={`/dashboard/keys/${key.id}`}>
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </Link>
+          </Button>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setQrDialogKey({ id: key.id, name: key.name })}>
               <QrCode className="w-4 h-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/keys/${key.id}`}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Details
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
-                  <Power className="w-4 h-4 mr-2" />
-                  {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditingKey(key)}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
+                <Power className="w-4 h-4 mr-2" />
+                {key.status === 'DISABLED' ? 'Enable' : 'Disable'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDelete(key.id, key.name)} className="text-destructive">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     );

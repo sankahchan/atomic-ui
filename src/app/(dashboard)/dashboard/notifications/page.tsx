@@ -1436,10 +1436,10 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             </div>
           ) : (
             logs.map((log) => (
-              <div key={log.id} className="rounded-lg border p-4 space-y-3">
+              <div key={log.id} className="rounded-lg border p-4 space-y-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{getEventLabel(log.event, t)}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium break-words">{getEventLabel(log.event, t)}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatDateTime(log.sentAt)} · {formatRelativeTime(log.sentAt)}
                     </p>
@@ -1451,47 +1451,78 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                     {getStatusLabel(log.status, t)}
                   </Badge>
                 </div>
-                <div className="space-y-1 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">{t('notifications.delivery.channel')}: </span>
-                    {getChannelLabel(log, t)}
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg bg-muted/40 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {t('notifications.delivery.channel')}
+                    </p>
+                    <p className="mt-1 break-words text-sm font-medium">
+                      {getChannelLabel(log, t)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted/40 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {t('notifications.delivery.key')}
+                    </p>
+                    <p className="mt-1 break-words text-sm font-medium">
+                      {log.accessKeyName ?? '-'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-muted/30 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {t('notifications.delivery.message')}
                   </p>
-                  <p className="break-words">
-                    <span className="text-muted-foreground">{t('notifications.delivery.message')}: </span>
+                  <p className="mt-1 break-words text-sm leading-5">
                     {log.message}
                   </p>
+                </div>
+
+                <div className="space-y-1 text-sm">
                   {log.error ? (
-                    <p className="break-words text-destructive">
-                      <span className="text-muted-foreground">{t('notifications.delivery.error')}: </span>
-                      {log.error}
-                    </p>
-                  ) : null}
-                  <p>
-                    <span className="text-muted-foreground">{t('notifications.delivery.key')}: </span>
-                    {log.accessKeyName ?? '-'}
-                  </p>
-                </div>
-                <div className="flex justify-end">
-                  {log.canRetry ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => retryLogMutation.mutate({ logId: log.id })}
-                      disabled={retryingLogId === log.id}
-                    >
-                      {retryingLogId === log.id ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                      )}
-                      {t('notifications.delivery.retry')}
-                    </Button>
-                  ) : log.retryQueued ? (
-                    <Badge variant="outline" className="border-amber-500/40 text-amber-500">
-                      {t('notifications.delivery.retry_queued')}
-                    </Badge>
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-destructive">
+                      <p className="text-[11px] uppercase tracking-wide text-destructive/80">
+                        {t('notifications.delivery.error')}
+                      </p>
+                      <p className="mt-1 break-words text-sm leading-5">{log.error}</p>
+                    </div>
                   ) : null}
                 </div>
+
+                {(log.accessKeyId || log.canRetry || log.retryQueued) ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {log.accessKeyId ? (
+                      <Button asChild variant="outline" size="sm" className="w-full justify-center">
+                        <Link href={`/dashboard/keys/${log.accessKeyId}`}>
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open Key
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {log.canRetry ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => retryLogMutation.mutate({ logId: log.id })}
+                        disabled={retryingLogId === log.id}
+                      >
+                        {retryingLogId === log.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                        )}
+                        {t('notifications.delivery.retry')}
+                      </Button>
+                    ) : log.retryQueued ? (
+                      <div className={cn('flex items-center justify-center rounded-lg border px-3 py-2 text-sm', 'border-amber-500/40 text-amber-500')}>
+                        {t('notifications.delivery.retry_queued')}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ))
           )}
