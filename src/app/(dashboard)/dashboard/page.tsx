@@ -17,7 +17,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
-  Calendar,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -294,16 +293,6 @@ function ForecastTooltip({
   );
 }
 
-function getHeatmapColor(bytes: number, maxBytes: number) {
-  if (bytes === 0) return 'bg-muted/30';
-  const intensity = bytes / maxBytes;
-  if (intensity < 0.2) return 'bg-cyan-500/15';
-  if (intensity < 0.4) return 'bg-cyan-500/35';
-  if (intensity < 0.6) return 'bg-cyan-500/55';
-  if (intensity < 0.8) return 'bg-cyan-500/75';
-  return 'bg-cyan-500';
-}
-
 export default function DashboardPage() {
   const [trafficDays, setTrafficDays] = useState(30);
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
@@ -321,7 +310,6 @@ export default function DashboardPage() {
   const { data: activity } = trpc.dashboard.recentActivity.useQuery();
   const { data: trafficHistory, isLoading: trafficLoading } = trpc.dashboard.trafficHistory.useQuery({ days: trafficDays });
   const { data: topUsers, isLoading: loadingTopUsers } = trpc.dashboard.topUsers.useQuery({ limit: 5 });
-  const { data: peakHours, isLoading: loadingPeakHours } = trpc.dashboard.peakHours.useQuery({ days: trafficDays });
   const { data: topConsumers, isLoading: loadingTopConsumers } = trpc.analytics.topConsumers.useQuery({
     range: topConsumersRange,
     limit: 5,
@@ -331,7 +319,6 @@ export default function DashboardPage() {
   });
 
   const totalTraffic = trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) || BigInt(0);
-  const maxPeakBytes = peakHours?.reduce((max, curr) => Math.max(max, curr.bytes), 0) || 0;
   const totalServerKeys = serverStatus?.reduce((sum, item) => sum + item.keyCount, 0) || 0;
   const attentionCount =
     (stats?.downServers || 0) +
@@ -340,17 +327,6 @@ export default function DashboardPage() {
   const healthyShare = stats?.totalServers
     ? Math.round(((stats.activeServers || 0) / stats.totalServers) * 100)
     : 0;
-
-  const daysOfWeek = [
-    t('days.sunday') || 'Sun',
-    t('days.monday') || 'Mon',
-    t('days.tuesday') || 'Tue',
-    t('days.wednesday') || 'Wed',
-    t('days.thursday') || 'Thu',
-    t('days.friday') || 'Fri',
-    t('days.saturday') || 'Sat',
-  ];
-  const hours = Array.from({ length: 24 }, (_, i) => i);
 
   if (statsLoading || !mounted) {
     return (
@@ -771,7 +747,7 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        <section>
           <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
@@ -809,77 +785,6 @@ export default function DashboardPage() {
                   <Users className="mb-3 h-10 w-10 text-muted-foreground/50" />
                   <p className="text-sm font-semibold">{t('dashboard.no_top_users_title')}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_top_users_desc')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="self-start">
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-fuchsia-500/10 text-fuchsia-500">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">{t('dashboard.peak_usage_title')}</CardTitle>
-                  <CardDescription>{t('dashboard.peak_usage_desc')}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loadingPeakHours ? (
-                <div className="h-[250px] rounded-[1.6rem] bg-muted animate-pulse" />
-              ) : (
-                <div className="rounded-[1.6rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.02]">
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[420px]">
-                      <div className="mb-2 flex">
-                        <div className="w-10 shrink-0" />
-                        <div className="flex flex-1 justify-between px-1">
-                          {hours.filter((hour) => hour % 6 === 0).map((hour) => (
-                            <div key={hour} className="w-5 text-center text-[10px] text-muted-foreground">
-                              {hour.toString().padStart(2, '0')}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        {daysOfWeek.map((day, dayIndex) => (
-                          <div key={dayIndex} className="flex items-center gap-1">
-                            <div className="w-10 shrink-0 text-[10px] font-medium text-muted-foreground">
-                              {day}
-                            </div>
-                            <div className="grid flex-1 grid-cols-24 gap-px">
-                              {hours.map((hour) => {
-                                const dataPoint = peakHours?.find((point) => point.day === dayIndex && point.hour === hour);
-                                const bytes = dataPoint?.bytes || 0;
-                                return (
-                                  <div
-                                    key={hour}
-                                    className={cn('h-4 rounded-[4px] transition-colors', getHeatmapColor(bytes, maxPeakBytes))}
-                                    title={`${day} ${hour}:00 - ${formatBytes(BigInt(bytes))}`}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
-                        <span>{t('dashboard.low')}</span>
-                        <div className="flex gap-px">
-                          <div className="h-2.5 w-2.5 rounded-[4px] bg-cyan-500/15" />
-                          <div className="h-2.5 w-2.5 rounded-[4px] bg-cyan-500/35" />
-                          <div className="h-2.5 w-2.5 rounded-[4px] bg-cyan-500/55" />
-                          <div className="h-2.5 w-2.5 rounded-[4px] bg-cyan-500/75" />
-                          <div className="h-2.5 w-2.5 rounded-[4px] bg-cyan-500" />
-                        </div>
-                        <span>{t('dashboard.high')}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </CardContent>
