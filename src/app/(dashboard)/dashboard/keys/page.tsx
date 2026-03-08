@@ -132,6 +132,13 @@ const statusConfig = {
   },
 };
 
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 /**
  * CreateKeyDialog Component
  * 
@@ -324,7 +331,7 @@ function CreateKeyDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Template Selection */}
           <div className="space-y-2">
-            <Label>Apply Template</Label>
+            <Label>{t('keys.dialog.apply_template')}</Label>
             <Select
               value={formData.templateId}
               onValueChange={handleTemplateChange}
@@ -584,7 +591,7 @@ function QRCodeDialog({
 
   const handleCopyUrl = async () => {
     if (keyData?.accessUrl) {
-      await copyToClipboard(keyData.accessUrl);
+      await copyToClipboard(keyData.accessUrl, t('keys.toast.copied'), t('keys.toast.copy_access_url'));
     }
   };
 
@@ -655,7 +662,7 @@ function DeleteKeyDialog({
         <DialogHeader>
           <DialogTitle>{t('keys.delete_title')}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete &quot;{keyName}&quot;?
+            {t('keys.confirm_delete')} &quot;{keyName}&quot;?
             <br />
             {t('keys.confirm_delete_desc')}
           </DialogDescription>
@@ -697,6 +704,7 @@ function BulkExtendDialog({
   const [customDays, setCustomDays] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const { t } = useLocale();
+  const selectedLabel = count === 1 ? t('keys.bulk.selected_singular') : t('keys.bulk.selected_plural');
 
   const quickOptions = [7, 14, 30, 60, 90];
 
@@ -706,10 +714,13 @@ function BulkExtendDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" />
-            Extend Expiration
+            {t('keys.bulk.extend_title')}
           </DialogTitle>
           <DialogDescription>
-            Extend {count} selected key{count > 1 ? 's' : ''}. This will add days to their current expiration date and reactivate them if expired.
+            {fillTemplate(
+              t(count === 1 ? 'keys.bulk.extend_desc_single' : 'keys.bulk.extend_desc'),
+              { count, items: selectedLabel },
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -733,18 +744,18 @@ function BulkExtendDialog({
               size="sm"
               onClick={() => setUseCustom(true)}
             >
-              Custom
+              {t('keys.bulk.custom')}
             </Button>
           </div>
 
           {useCustom && (
             <div className="space-y-2">
-              <Label htmlFor="customDays">Custom Days</Label>
+              <Label htmlFor="customDays">{t('keys.bulk.custom_days')}</Label>
               <Input
                 id="customDays"
                 type="number"
                 min="1"
-                placeholder="Enter number of days"
+                placeholder={t('keys.bulk.custom_days_placeholder')}
                 value={customDays}
                 onChange={(e) => setCustomDays(e.target.value)}
               />
@@ -761,7 +772,9 @@ function BulkExtendDialog({
             disabled={isPending || (useCustom && !customDays)}
           >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Extend +{useCustom ? (customDays || '0') : days} days
+            {fillTemplate(t('keys.bulk.extend_confirm'), {
+              days: useCustom ? (customDays || '0') : days,
+            })}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -791,6 +804,7 @@ function BulkTagsDialog({
 }) {
   const [tags, setTags] = useState('');
   const { t } = useLocale();
+  const selectedLabel = count === 1 ? t('keys.bulk.selected_singular') : t('keys.bulk.selected_plural');
 
   const handleSubmit = () => {
     if (tags.trim()) {
@@ -804,27 +818,27 @@ function BulkTagsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary" />
-            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+            {mode === 'add' ? t('keys.bulk.tags_add_title') : t('keys.bulk.tags_remove_title')}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'add'
-              ? `Add tags to ${count} selected key${count > 1 ? 's' : ''}.`
-              : `Remove tags from ${count} selected key${count > 1 ? 's' : ''}.`
-            }
+            {fillTemplate(
+              t(mode === 'add' ? 'keys.bulk.tags_add_desc' : 'keys.bulk.tags_remove_desc'),
+              { count, items: selectedLabel },
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Label htmlFor="tags">{t('keys.bulk.tags_label')}</Label>
             <Input
               id="tags"
-              placeholder="e.g., premium, vip, trial"
+              placeholder={t('keys.bulk.tags_placeholder')}
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Enter tags separated by commas. Tags are case-insensitive.
+              {t('keys.bulk.tags_help')}
             </p>
           </div>
         </div>
@@ -839,7 +853,7 @@ function BulkTagsDialog({
             variant={mode === 'remove' ? 'destructive' : 'default'}
           >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+            {mode === 'add' ? t('keys.bulk.add_tags') : t('keys.bulk.remove_tags')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -865,6 +879,7 @@ function BulkProgressDialog({
   results: { success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null;
   isPending: boolean;
 }) {
+  const { t } = useLocale();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -876,24 +891,24 @@ function BulkProgressDialog({
           {isPending ? (
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Processing...</p>
+              <p className="text-sm text-muted-foreground">{t('keys.bulk.progress.processing')}</p>
             </div>
           ) : results ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                   <p className="text-2xl font-bold text-green-500">{results.success}</p>
-                  <p className="text-sm text-green-500">Successful</p>
+                  <p className="text-sm text-green-500">{t('keys.bulk.progress.successful')}</p>
                 </div>
                 <div className="flex-1 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
                   <p className="text-2xl font-bold text-red-500">{results.failed}</p>
-                  <p className="text-sm text-red-500">Failed</p>
+                  <p className="text-sm text-red-500">{t('keys.bulk.progress.failed')}</p>
                 </div>
               </div>
 
               {results.errors && results.errors.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Errors:</p>
+                  <p className="text-sm font-medium">{t('keys.bulk.progress.errors')}</p>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {results.errors.map((err, i) => (
                       <div key={i} className="text-xs p-2 rounded bg-red-500/10 text-red-400">
@@ -909,7 +924,7 @@ function BulkProgressDialog({
 
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} disabled={isPending}>
-            {isPending ? 'Processing...' : 'Close'}
+            {isPending ? t('keys.bulk.progress.processing') : t('keys.bulk.progress.close')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1148,10 +1163,12 @@ function EditKeyDialog({
  * Online indicator component with blinking animation
  */
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
+  const { t } = useLocale();
+
   if (!isOnline) return null;
 
   return (
-    <span className="relative flex h-2 w-2 mr-2" title="Currently active">
+    <span className="relative flex h-2 w-2 mr-2" title={t('keys.online_active')}>
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
     </span>
@@ -1456,6 +1473,14 @@ export default function KeysPage() {
   const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const { t } = useLocale();
   const router = useRouter();
+  const getItemLabel = useCallback(
+    (count: number) => t(count === 1 ? 'keys.bulk.item_singular' : 'keys.bulk.item_plural'),
+    [t],
+  );
+  const getSelectedLabel = useCallback(
+    (count: number) => t(count === 1 ? 'keys.bulk.selected_singular' : 'keys.bulk.selected_plural'),
+    [t],
+  );
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('access-keys');
 
@@ -1680,15 +1705,15 @@ export default function KeysPage() {
   const deleteMutation = trpc.keys.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Key deleted',
-        description: 'The access key has been deleted.',
+        title: t('keys.toast.deleted'),
+        description: t('keys.toast.deleted_desc'),
       });
       refetch();
       refetchStats();
     },
     onError: (error) => {
       toast({
-        title: 'Delete failed',
+        title: t('keys.toast.delete_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1699,8 +1724,11 @@ export default function KeysPage() {
   const toggleStatusMutation = trpc.keys.toggleStatus.useMutation({
     onSuccess: (result) => {
       toast({
-        title: result.status === 'DISABLED' ? 'Key disabled' : 'Key enabled',
-        description: `${result.name} is now ${result.status.toLowerCase()}.`,
+        title: result.status === 'DISABLED' ? t('keys.toast.status_disabled') : t('keys.toast.status_enabled'),
+        description: fillTemplate(t('keys.toast.status_changed_desc'), {
+          name: result.name,
+          status: result.status.toLowerCase(),
+        }),
       });
       refetch();
       refetchStats();
@@ -1708,7 +1736,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Status change failed',
+        title: t('keys.toast.status_change_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1720,8 +1748,11 @@ export default function KeysPage() {
   const bulkDeleteMutation = trpc.keys.bulkDelete.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Bulk delete complete',
-        description: `Deleted ${result.success} keys. ${result.failed} failed.`,
+        title: t('keys.toast.bulk_delete_complete'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'keys.toast.bulk_delete_complete_desc_single' : 'keys.toast.bulk_delete_complete_desc'),
+          { success: result.success, failed: result.failed },
+        ),
       });
       setSelectedKeys(new Set());
       refetch();
@@ -1729,7 +1760,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Bulk delete failed',
+        title: t('keys.toast.bulk_delete_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1749,8 +1780,11 @@ export default function KeysPage() {
   const bulkExtendMutation = trpc.keys.bulkExtend.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Extension complete',
-        description: `Extended ${result.success} keys.`,
+        title: t('keys.toast.extension_complete'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'keys.toast.extension_complete_desc_single' : 'keys.toast.extension_complete_desc'),
+          { success: result.success },
+        ),
       });
       setBulkExtendDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1759,7 +1793,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Extension failed',
+        title: t('keys.toast.extension_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1776,7 +1810,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Bulk status change failed',
+        title: t('keys.toast.bulk_status_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1788,8 +1822,11 @@ export default function KeysPage() {
   const bulkAddTagsMutation = trpc.keys.bulkAddTags.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Tags added',
-        description: `Added tags to ${result.success} keys.`,
+        title: t('keys.toast.tags_added'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'keys.toast.tags_added_desc_single' : 'keys.toast.tags_added_desc'),
+          { success: result.success },
+        ),
       });
       setBulkTagsDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1797,7 +1834,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to add tags',
+        title: t('keys.toast.add_tags_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1808,8 +1845,11 @@ export default function KeysPage() {
   const bulkRemoveTagsMutation = trpc.keys.bulkRemoveTags.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Tags removed',
-        description: `Removed tags from ${result.success} keys.`,
+        title: t('keys.toast.tags_removed'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'keys.toast.tags_removed_desc_single' : 'keys.toast.tags_removed_desc'),
+          { success: result.success },
+        ),
       });
       setBulkTagsDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1817,7 +1857,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to remove tags',
+        title: t('keys.toast.remove_tags_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1834,7 +1874,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Archive failed',
+        title: t('keys.toast.archive_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1858,7 +1898,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Move failed',
+        title: t('keys.toast.move_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1868,7 +1908,7 @@ export default function KeysPage() {
 
   const handleBulkMove = () => {
     if (selectedKeys.size === 0 || !bulkMoveTargetServerId) return;
-    setBulkProgressTitle('Moving Keys');
+    setBulkProgressTitle(t('keys.bulk.progress_title.moving'));
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
     setBulkMoveDialogOpen(false);
@@ -1888,7 +1928,9 @@ export default function KeysPage() {
 
   const handleBulkToggleStatus = (enable: boolean) => {
     if (selectedKeys.size === 0) return;
-    setBulkProgressTitle(enable ? 'Enabling Keys' : 'Disabling Keys');
+    setBulkProgressTitle(
+      enable ? t('keys.bulk.progress_title.enabling') : t('keys.bulk.progress_title.disabling'),
+    );
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
     bulkToggleStatusMutation.mutate({
@@ -1914,8 +1956,11 @@ export default function KeysPage() {
 
   const handleBulkArchive = () => {
     if (selectedKeys.size === 0) return;
-    if (confirm(`Are you sure you want to archive ${selectedKeys.size} key(s)?\n\nArchived keys will be removed from the server but kept in records for 3 months.`)) {
-      setBulkProgressTitle('Archiving Keys');
+    if (confirm(fillTemplate(t('keys.bulk.archive_confirm'), {
+      count: selectedKeys.size,
+      items: getItemLabel(selectedKeys.size),
+    }))) {
+      setBulkProgressTitle(t('keys.bulk.progress_title.archiving'));
       setBulkProgressResults(null);
       setBulkProgressDialogOpen(true);
       bulkArchiveMutation.mutate({
@@ -1978,7 +2023,7 @@ export default function KeysPage() {
       params.set('format', format);
 
       const response = await fetch(`/api/export-keys?${params.toString()}`);
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) throw new Error(t('keys.toast.export_failed'));
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -1991,13 +2036,15 @@ export default function KeysPage() {
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: 'Export complete',
-        description: `Keys exported as ${format.toUpperCase()}.`,
+        title: t('keys.export_complete'),
+        description: fillTemplate(t('keys.export_complete_desc'), {
+          format: format.toUpperCase(),
+        }),
       });
     } catch {
       toast({
-        title: 'Export failed',
-        description: 'Failed to export keys.',
+        title: t('keys.toast.export_failed'),
+        description: t('keys.toast.export_failed'),
         variant: 'destructive',
       });
     } finally {
@@ -2117,7 +2164,7 @@ export default function KeysPage() {
                       <HelpCircle className="w-3 h-3 text-green-500/50" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Users active within the last 30 seconds</p>
+                      <p>{t('keys.online_tooltip')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -2204,7 +2251,7 @@ export default function KeysPage() {
               size="sm"
               className="h-9 flex-1 px-2"
               onClick={() => setViewMode('group')}
-              title="Group by Server"
+              title={t('keys.view.group_by_server')}
             >
               <ListIcon className="w-4 h-4" />
             </Button>
@@ -2217,7 +2264,7 @@ export default function KeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? 'Syncing...' : t('keys.sync')}
+            {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
           </Button>
         </div>
 
@@ -2241,7 +2288,7 @@ export default function KeysPage() {
 
       {/* Quick Filter Pills */}
       <div className="hidden md:flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground mr-1">Quick filters:</span>
+        <span className="text-sm text-muted-foreground mr-1">{t('keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
           size="sm"
@@ -2249,7 +2296,7 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
         >
           <Wifi className="w-3 h-3 mr-1" />
-          Online
+          {t('keys.quick_filters.online')}
         </Button>
         <Button
           variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
@@ -2258,7 +2305,7 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
         >
           <Clock className="w-3 h-3 mr-1" />
-          Expiring &lt; 7d
+          {t('keys.quick_filters.expiring7d')}
         </Button>
         <Button
           variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -2267,7 +2314,7 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
         >
           <AlertTriangle className="w-3 h-3 mr-1" />
-          Over 80% Quota
+          {t('keys.quick_filters.over_quota')}
         </Button>
         <Button
           variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
@@ -2276,14 +2323,14 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
         >
           <EyeOff className="w-3 h-3 mr-1" />
-          Inactive 30d
+          {t('keys.quick_filters.inactive30d')}
         </Button>
         
         {/* Tag filter */}
         <div className="flex items-center gap-1 ml-2">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Filter by tag"
+            placeholder={t('keys.quick_filters.tag_placeholder')}
             value={filters.tagFilter || ''}
             onChange={(e) => setTagFilter(e.target.value || undefined)}
             className="h-7 w-28 text-xs"
@@ -2294,7 +2341,7 @@ export default function KeysPage() {
         <div className="flex items-center gap-1">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Filter by owner"
+            placeholder={t('keys.quick_filters.owner_placeholder')}
             value={filters.ownerFilter || ''}
             onChange={(e) => setOwnerFilter(e.target.value || undefined)}
             className="h-7 w-28 text-xs"
@@ -2309,7 +2356,7 @@ export default function KeysPage() {
             onClick={clearPersistedFilters}
           >
             <X className="w-3 h-3 mr-1" />
-            Clear
+            {t('keys.clear_filters')}
           </Button>
         )}
       </div>
@@ -2390,7 +2437,9 @@ export default function KeysPage() {
               ) : (
                 <Download className="w-4 h-4 mr-2" />
               )}
-              {exportingFormat ? `Exporting ${exportingFormat.toUpperCase()}...` : t('keys.export')}
+              {exportingFormat
+                ? fillTemplate(t('keys.exporting'), { format: exportingFormat.toUpperCase() })
+                : t('keys.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -2429,7 +2478,7 @@ export default function KeysPage() {
               size="sm"
               className="h-8 px-2"
               onClick={() => setViewMode('group')}
-              title="Group by Server"
+              title={t('keys.view.group_by_server')}
             >
               <ListIcon className="w-4 h-4" />
             </Button>
@@ -2466,7 +2515,7 @@ export default function KeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? 'Syncing...' : t('keys.sync')}
+            {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
           </Button>
         </div>
       </div>
@@ -2528,7 +2577,7 @@ export default function KeysPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Quick filters</Label>
+              <Label>{t('keys.quick_filters.label')}</Label>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -2537,7 +2586,7 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
                 >
                   <Wifi className="w-3 h-3 mr-1" />
-                  Online
+                  {t('keys.quick_filters.online')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
@@ -2546,7 +2595,7 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
                 >
                   <Clock className="w-3 h-3 mr-1" />
-                  Expiring &lt; 7d
+                  {t('keys.quick_filters.expiring7d')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -2555,7 +2604,7 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
                 >
                   <AlertTriangle className="w-3 h-3 mr-1" />
-                  Over 80% Quota
+                  {t('keys.quick_filters.over_quota')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
@@ -2564,26 +2613,26 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
                 >
                   <EyeOff className="w-3 h-3 mr-1" />
-                  Inactive 30d
+                  {t('keys.quick_filters.inactive30d')}
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="mobile-key-tag-filter">Tag</Label>
+                <Label htmlFor="mobile-key-tag-filter">{t('keys.quick_filters.tag')}</Label>
                 <Input
                   id="mobile-key-tag-filter"
-                  placeholder="Filter by tag"
+                  placeholder={t('keys.quick_filters.tag_placeholder')}
                   value={filters.tagFilter || ''}
                   onChange={(e) => setTagFilter(e.target.value || undefined)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="mobile-key-owner-filter">Owner</Label>
+                <Label htmlFor="mobile-key-owner-filter">{t('keys.quick_filters.owner')}</Label>
                 <Input
                   id="mobile-key-owner-filter"
-                  placeholder="Filter by owner"
+                  placeholder={t('keys.quick_filters.owner_placeholder')}
                   value={filters.ownerFilter || ''}
                   onChange={(e) => setOwnerFilter(e.target.value || undefined)}
                 />
@@ -2659,17 +2708,17 @@ export default function KeysPage() {
                   ) : (
                     <Power className="w-4 h-4 mr-2" />
                   )}
-                  Enable/Disable
+                  {t('keys.bulk.enable_disable')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => handleBulkToggleStatus(true)}>
                   <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
-                  Enable All
+                  {t('keys.bulk.enable_all')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleBulkToggleStatus(false)}>
                   <XCircle className="w-4 h-4 mr-2 text-orange-500" />
-                  Disable All
+                  {t('keys.bulk.disable_all')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2686,7 +2735,7 @@ export default function KeysPage() {
               ) : (
                 <Clock className="w-4 h-4 mr-2" />
               )}
-              Extend Expiry
+              {t('keys.bulk.extend_expiry')}
             </Button>
 
             {/* Tags dropdown */}
@@ -2702,7 +2751,7 @@ export default function KeysPage() {
                   ) : (
                     <Tag className="w-4 h-4 mr-2" />
                   )}
-                  Tags
+                  {t('keys.bulk.tags')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -2711,14 +2760,14 @@ export default function KeysPage() {
                   setBulkTagsDialogOpen(true);
                 }}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Tags
+                  {t('keys.bulk.add_tags')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
                   setBulkTagsMode('remove');
                   setBulkTagsDialogOpen(true);
                 }}>
                   <X className="w-4 h-4 mr-2" />
-                  Remove Tags
+                  {t('keys.bulk.remove_tags')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2735,7 +2784,7 @@ export default function KeysPage() {
               ) : (
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
               )}
-              Move
+              {t('keys.bulk.move')}
             </Button>
 
             {/* Archive */}
@@ -2750,7 +2799,7 @@ export default function KeysPage() {
               ) : (
                 <Archive className="w-4 h-4 mr-2" />
               )}
-              {bulkArchiveMutation.isPending ? 'Archiving...' : 'Archive'}
+              {bulkArchiveMutation.isPending ? t('keys.bulk.archiving') : t('keys.bulk.archive')}
             </Button>
 
             {/* Delete */}
@@ -2795,9 +2844,9 @@ export default function KeysPage() {
           onDelete={(key) => handleDelete(key.id, key.name)}
           onCopy={(key) => {
             if (key.accessUrl) {
-              copyToClipboard(key.accessUrl);
+              copyToClipboard(key.accessUrl, t('keys.toast.copied'), t('keys.toast.copy_access_url'));
             } else {
-              toast({ title: 'Error', description: 'No access URL available', variant: 'destructive' });
+              toast({ title: t('keys.toast.error'), description: t('keys.toast.no_access_url'), variant: 'destructive' });
             }
           }}
           onQr={(key) => setQrDialogKey({ id: key.id, name: key.name })}
@@ -2870,10 +2919,10 @@ export default function KeysPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <Smartphone className="w-3 h-3" />
-                        {key.estimatedDevices || 0} devices
+                        {key.estimatedDevices || 0} {t('keys.devices_count')}
                       </span>
                       <span className={cn('text-muted-foreground', key.isExpiringSoon && 'text-red-500')}>
-                        {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+                        {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
                       </span>
                     </div>
 
@@ -2888,7 +2937,7 @@ export default function KeysPage() {
                           className="h-8 w-8"
                           onClick={() => {
                             const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
-                            copyToClipboard(url);
+                            copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                           }}
                         >
                           <Share2 className="w-4 h-4" />
@@ -2949,7 +2998,7 @@ export default function KeysPage() {
                   <button
                     onClick={handleSelectAll}
                     className="p-1 hover:bg-muted rounded"
-                    title={selectedKeys.size === (data?.items?.length || 0) ? 'Deselect all' : 'Select all'}
+                    title={selectedKeys.size === (data?.items?.length || 0) ? t('keys.deselect_all') : t('keys.select_all')}
                   >
                     {data?.items && selectedKeys.size === data.items.length && data.items.length > 0 ? (
                       <CheckSquare className="w-4 h-4 text-primary" />
@@ -2962,8 +3011,8 @@ export default function KeysPage() {
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.server')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.status')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.usage')}</th>
-                <th className="text-left px-2 py-3 text-sm font-medium text-muted-foreground hidden xl:table-cell">7-Day</th>
-                <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Devices</th>
+                <th className="text-left px-2 py-3 text-sm font-medium text-muted-foreground hidden xl:table-cell">{t('keys.table.traffic_7d')}</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.devices')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.expires')}</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('keys.table.actions')}</th>
               </tr>
@@ -2992,17 +3041,17 @@ export default function KeysPage() {
                     sparklineData={sparklineMap?.[key.id]}
                     onCopyAccessUrl={() => {
                       if (key.accessUrl) {
-                        copyToClipboard(key.accessUrl, 'Copied', 'Access URL copied to clipboard');
+                        copyToClipboard(key.accessUrl, t('keys.toast.copied'), t('keys.toast.copy_access_url'));
                       } else {
-                        toast({ title: 'Error', description: 'No access URL available', variant: 'destructive' });
+                        toast({ title: t('keys.toast.error'), description: t('keys.toast.no_access_url'), variant: 'destructive' });
                       }
                     }}
                     onCopySubscriptionUrl={() => {
                       if (key.subscriptionToken) {
                         const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
-                        copyToClipboard(url, 'Copied', 'Subscription URL copied to clipboard');
+                        copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                       } else {
-                        toast({ title: 'Error', description: 'No subscription URL available', variant: 'destructive' });
+                        toast({ title: t('keys.toast.error'), description: t('keys.toast.no_subscription_url'), variant: 'destructive' });
                       }
                     }}
                     onEdit={() => setEditingKey(key)}
@@ -3037,8 +3086,8 @@ export default function KeysPage() {
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
             <p className="text-sm text-muted-foreground">
-              Showing {(page - 1) * pageSize + 1} to{' '}
-              {Math.min(page * pageSize, data.total)} of {data.total}
+              {t('keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('keys.pagination.to')}{' '}
+              {Math.min(page * pageSize, data.total)} {t('keys.pagination.of')} {data.total}
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -3050,7 +3099,7 @@ export default function KeysPage() {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm">
-                Page {page} of {data.totalPages}
+                {t('keys.pagination.page')} {page} {t('keys.pagination.of_pages')} {data.totalPages}
               </span>
               <Button
                 variant="outline"
@@ -3120,17 +3169,21 @@ export default function KeysPage() {
       <Dialog open={bulkMoveDialogOpen} onOpenChange={setBulkMoveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Move Keys to Server</DialogTitle>
+            <DialogTitle>{t('keys.bulk.move_title')}</DialogTitle>
             <DialogDescription>
-              Move {selectedKeys.size} selected key{selectedKeys.size !== 1 ? 's' : ''} to a different server.
-              Keys will be recreated on the target server and removed from the current one.
+              {fillTemplate(t('keys.bulk.move_desc'), {
+                count: selectedKeys.size,
+                items: getSelectedLabel(selectedKeys.size),
+              })}
+              {' '}
+              {t('keys.bulk.move_desc_extra')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <Label>Target Server</Label>
+            <Label>{t('keys.bulk.move_target_server')}</Label>
             <Select value={bulkMoveTargetServerId} onValueChange={setBulkMoveTargetServerId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select target server..." />
+                <SelectValue placeholder={t('keys.bulk.move_target_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {(servers ?? []).map((s: { id: string; name: string; location?: string | null }) => (
@@ -3142,10 +3195,13 @@ export default function KeysPage() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkMoveDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setBulkMoveDialogOpen(false)}>{t('keys.cancel')}</Button>
             <Button onClick={handleBulkMove} disabled={!bulkMoveTargetServerId}>
               <ArrowRightLeft className="w-4 h-4 mr-2" />
-              Move {selectedKeys.size} Key{selectedKeys.size !== 1 ? 's' : ''}
+              {fillTemplate(t('keys.bulk.move_confirm'), {
+                count: selectedKeys.size,
+                items: getItemLabel(selectedKeys.size),
+              })}
             </Button>
           </DialogFooter>
         </DialogContent>

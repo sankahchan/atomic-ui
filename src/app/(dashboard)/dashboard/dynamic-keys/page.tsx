@@ -135,6 +135,13 @@ const statusConfig = {
   },
 };
 
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 /**
  * Auto-sync interval options
  */
@@ -607,7 +614,7 @@ function QRCodeDialog({
                 onClick={() => {
                   if (dak?.dynamicUrl) {
                     const ssconfUrl = getSsconfUrl(dak.dynamicUrl, dak.name);
-                    copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), 'ssconf URL copied for Outline app');
+                    copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), t('dynamic_keys.msg.ssconf_copied'));
                   }
                 }}
               >
@@ -633,10 +640,12 @@ function QRCodeDialog({
  * Online indicator component with blinking animation
  */
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
+  const { t } = useLocale();
+
   if (!isOnline) return null;
 
   return (
-    <span className="relative flex h-2 w-2 mr-2" title="Currently active">
+    <span className="relative flex h-2 w-2 mr-2" title={t('dynamic_keys.online_active')}>
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
     </span>
@@ -665,6 +674,7 @@ function BulkExtendDialog({
   const [customDays, setCustomDays] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const { t } = useLocale();
+  const selectedLabel = count === 1 ? t('dynamic_keys.bulk.selected_singular') : t('dynamic_keys.bulk.selected_plural');
 
   const quickOptions = [7, 14, 30, 60, 90];
 
@@ -674,10 +684,13 @@ function BulkExtendDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" />
-            Extend Expiration
+            {t('dynamic_keys.bulk.extend_title')}
           </DialogTitle>
           <DialogDescription>
-            Extend {count} selected key{count > 1 ? 's' : ''}. This will add days to their current expiration date and reactivate them if expired.
+            {fillTemplate(
+              t(count === 1 ? 'dynamic_keys.bulk.extend_desc_single' : 'dynamic_keys.bulk.extend_desc'),
+              { count, items: selectedLabel },
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -701,18 +714,18 @@ function BulkExtendDialog({
               size="sm"
               onClick={() => setUseCustom(true)}
             >
-              Custom
+              {t('dynamic_keys.bulk.custom')}
             </Button>
           </div>
 
           {useCustom && (
             <div className="space-y-2">
-              <Label htmlFor="customDays">Custom Days</Label>
+              <Label htmlFor="customDays">{t('dynamic_keys.bulk.custom_days')}</Label>
               <Input
                 id="customDays"
                 type="number"
                 min="1"
-                placeholder="Enter number of days"
+                placeholder={t('dynamic_keys.bulk.custom_days_placeholder')}
                 value={customDays}
                 onChange={(e) => setCustomDays(e.target.value)}
               />
@@ -729,7 +742,9 @@ function BulkExtendDialog({
             disabled={isPending || (useCustom && !customDays)}
           >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Extend +{useCustom ? (customDays || '0') : days} days
+            {fillTemplate(t('dynamic_keys.bulk.extend_confirm'), {
+              days: useCustom ? (customDays || '0') : days,
+            })}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -759,6 +774,7 @@ function BulkTagsDialog({
 }) {
   const [tags, setTags] = useState('');
   const { t } = useLocale();
+  const selectedLabel = count === 1 ? t('dynamic_keys.bulk.selected_singular') : t('dynamic_keys.bulk.selected_plural');
 
   const handleSubmit = () => {
     if (tags.trim()) {
@@ -772,27 +788,27 @@ function BulkTagsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary" />
-            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+            {mode === 'add' ? t('dynamic_keys.bulk.tags_add_title') : t('dynamic_keys.bulk.tags_remove_title')}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'add'
-              ? `Add tags to ${count} selected key${count > 1 ? 's' : ''}.`
-              : `Remove tags from ${count} selected key${count > 1 ? 's' : ''}.`
-            }
+            {fillTemplate(
+              t(mode === 'add' ? 'dynamic_keys.bulk.tags_add_desc' : 'dynamic_keys.bulk.tags_remove_desc'),
+              { count, items: selectedLabel },
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Label htmlFor="tags">{t('dynamic_keys.bulk.tags_label')}</Label>
             <Input
               id="tags"
-              placeholder="e.g., premium, vip, trial"
+              placeholder={t('dynamic_keys.bulk.tags_placeholder')}
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Enter tags separated by commas. Tags are case-insensitive.
+              {t('dynamic_keys.bulk.tags_help')}
             </p>
           </div>
         </div>
@@ -807,7 +823,7 @@ function BulkTagsDialog({
             variant={mode === 'remove' ? 'destructive' : 'default'}
           >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {mode === 'add' ? 'Add Tags' : 'Remove Tags'}
+            {mode === 'add' ? t('dynamic_keys.bulk.add_tags') : t('dynamic_keys.bulk.remove_tags')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -833,6 +849,7 @@ function BulkProgressDialog({
   results: { success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null;
   isPending: boolean;
 }) {
+  const { t } = useLocale();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -844,24 +861,24 @@ function BulkProgressDialog({
           {isPending ? (
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Processing...</p>
+              <p className="text-sm text-muted-foreground">{t('dynamic_keys.bulk.progress.processing')}</p>
             </div>
           ) : results ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                   <p className="text-2xl font-bold text-green-500">{results.success}</p>
-                  <p className="text-sm text-green-500">Successful</p>
+                  <p className="text-sm text-green-500">{t('dynamic_keys.bulk.progress.successful')}</p>
                 </div>
                 <div className="flex-1 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
                   <p className="text-2xl font-bold text-red-500">{results.failed}</p>
-                  <p className="text-sm text-red-500">Failed</p>
+                  <p className="text-sm text-red-500">{t('dynamic_keys.bulk.progress.failed')}</p>
                 </div>
               </div>
 
               {results.errors && results.errors.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Errors:</p>
+                  <p className="text-sm font-medium">{t('dynamic_keys.bulk.progress.errors')}</p>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {results.errors.map((err, i) => (
                       <div key={i} className="text-xs p-2 rounded bg-red-500/10 text-red-400">
@@ -877,7 +894,7 @@ function BulkProgressDialog({
 
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} disabled={isPending}>
-            {isPending ? 'Processing...' : 'Close'}
+            {isPending ? t('dynamic_keys.bulk.progress.processing') : t('dynamic_keys.bulk.progress.close')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1321,6 +1338,14 @@ export default function DynamicKeysPage() {
   const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
   const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | null>(null);
+  const getItemLabel = useCallback(
+    (count: number) => t(count === 1 ? 'dynamic_keys.bulk.item_singular' : 'dynamic_keys.bulk.item_plural'),
+    [t],
+  );
+  const getSelectedLabel = useCallback(
+    (count: number) => t(count === 1 ? 'dynamic_keys.bulk.selected_singular' : 'dynamic_keys.bulk.selected_plural'),
+    [t],
+  );
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('dynamic-keys');
 
@@ -1390,14 +1415,14 @@ export default function DynamicKeysPage() {
     onSuccess: () => {
       toast({
         title: t('dynamic_keys.msg.deleted'),
-        description: 'The dynamic key has been deleted successfully.',
+        description: t('dynamic_keys.msg.deleted_desc'),
       });
       refetch();
       refetchStats();
     },
     onError: (error) => {
       toast({
-        title: 'Error deleting dynamic key',
+        title: t('dynamic_keys.msg.delete_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1408,8 +1433,11 @@ export default function DynamicKeysPage() {
   const toggleStatusMutation = trpc.dynamicKeys.toggleStatus.useMutation({
     onSuccess: (result) => {
       toast({
-        title: result.status === 'DISABLED' ? 'Key disabled' : 'Key enabled',
-        description: `${result.name} is now ${result.status.toLowerCase()}.`,
+        title: result.status === 'DISABLED' ? t('dynamic_keys.msg.status_disabled') : t('dynamic_keys.msg.status_enabled'),
+        description: fillTemplate(t('dynamic_keys.msg.status_changed_desc'), {
+          name: result.name,
+          status: result.status.toLowerCase(),
+        }),
       });
       refetch();
       refetchStats();
@@ -1417,7 +1445,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Status change failed',
+        title: t('dynamic_keys.msg.status_change_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1429,8 +1457,11 @@ export default function DynamicKeysPage() {
   const bulkDeleteMutation = trpc.dynamicKeys.bulkDelete.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Bulk delete complete',
-        description: `Deleted ${result.success} keys. ${result.failed} failed.`,
+        title: t('dynamic_keys.msg.bulk_delete_complete'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'dynamic_keys.msg.bulk_delete_complete_desc_single' : 'dynamic_keys.msg.bulk_delete_complete_desc'),
+          { success: result.success, failed: result.failed },
+        ),
       });
       setSelectedKeys(new Set());
       refetch();
@@ -1438,7 +1469,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Bulk delete failed',
+        title: t('dynamic_keys.msg.bulk_delete_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1457,8 +1488,11 @@ export default function DynamicKeysPage() {
   const bulkExtendMutation = trpc.dynamicKeys.bulkExtend.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Extension complete',
-        description: `Extended ${result.success} keys.`,
+        title: t('dynamic_keys.msg.extension_complete'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'dynamic_keys.msg.extension_complete_desc_single' : 'dynamic_keys.msg.extension_complete_desc'),
+          { success: result.success },
+        ),
       });
       setBulkExtendDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1467,7 +1501,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Extension failed',
+        title: t('dynamic_keys.msg.extension_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1484,7 +1518,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Bulk status change failed',
+        title: t('dynamic_keys.msg.bulk_status_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1496,8 +1530,11 @@ export default function DynamicKeysPage() {
   const bulkAddTagsMutation = trpc.dynamicKeys.bulkAddTags.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Tags added',
-        description: `Added tags to ${result.success} keys.`,
+        title: t('dynamic_keys.msg.tags_added'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'dynamic_keys.msg.tags_added_desc_single' : 'dynamic_keys.msg.tags_added_desc'),
+          { success: result.success },
+        ),
       });
       setBulkTagsDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1505,7 +1542,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to add tags',
+        title: t('dynamic_keys.msg.add_tags_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1516,8 +1553,11 @@ export default function DynamicKeysPage() {
   const bulkRemoveTagsMutation = trpc.dynamicKeys.bulkRemoveTags.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Tags removed',
-        description: `Removed tags from ${result.success} keys.`,
+        title: t('dynamic_keys.msg.tags_removed'),
+        description: fillTemplate(
+          t(result.success === 1 ? 'dynamic_keys.msg.tags_removed_desc_single' : 'dynamic_keys.msg.tags_removed_desc'),
+          { success: result.success },
+        ),
       });
       setBulkTagsDialogOpen(false);
       setSelectedKeys(new Set());
@@ -1525,7 +1565,7 @@ export default function DynamicKeysPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to remove tags',
+        title: t('dynamic_keys.msg.remove_tags_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -1542,7 +1582,9 @@ export default function DynamicKeysPage() {
 
   const handleBulkToggleStatus = (enable: boolean) => {
     if (selectedKeys.size === 0) return;
-    setBulkProgressTitle(enable ? 'Enabling Keys' : 'Disabling Keys');
+    setBulkProgressTitle(
+      enable ? t('dynamic_keys.bulk.progress_title.enabling') : t('dynamic_keys.bulk.progress_title.disabling'),
+    );
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
     bulkToggleStatusMutation.mutate({
@@ -1571,7 +1613,7 @@ export default function DynamicKeysPage() {
   const handleCopyUrl = (dak: DAKData) => {
     if (dak.dynamicUrl) {
       const url = getSubscriptionUrl(dak.dynamicUrl);
-      copyToClipboard(url);
+      copyToClipboard(url, t('dynamic_keys.msg.copied'), t('dynamic_keys.msg.copy_url'));
     }
   };
 
@@ -1592,7 +1634,10 @@ export default function DynamicKeysPage() {
 
   const handleBulkDelete = () => {
     if (selectedKeys.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedKeys.size} keys?\n\nThis will also detach all associated access keys.`)) {
+    if (confirm(fillTemplate(t('dynamic_keys.bulk.delete_confirm'), {
+      count: selectedKeys.size,
+      items: getItemLabel(selectedKeys.size),
+    }))) {
       bulkDeleteMutation.mutate({ ids: Array.from(selectedKeys) });
     }
   };
@@ -1624,7 +1669,7 @@ export default function DynamicKeysPage() {
       params.set('format', format);
 
       const response = await fetch(`/api/export-dynamic-keys?${params.toString()}`);
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) throw new Error(t('dynamic_keys.msg.export_failed'));
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -1637,13 +1682,15 @@ export default function DynamicKeysPage() {
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: 'Export complete',
-        description: `Dynamic keys exported as ${format.toUpperCase()}.`,
+        title: t('dynamic_keys.msg.export_complete'),
+        description: fillTemplate(t('dynamic_keys.msg.export_complete_desc'), {
+          format: format.toUpperCase(),
+        }),
       });
     } catch {
       toast({
-        title: 'Export failed',
-        description: 'Failed to export dynamic keys.',
+        title: t('dynamic_keys.msg.export_failed'),
+        description: t('dynamic_keys.msg.export_failed'),
         variant: 'destructive',
       });
     } finally {
@@ -1747,7 +1794,7 @@ export default function DynamicKeysPage() {
                       <HelpCircle className="w-3 h-3 text-green-500/50" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Users active within the last 30 seconds</p>
+                      <p>{t('dynamic_keys.online_tooltip')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -1838,7 +1885,7 @@ export default function DynamicKeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? 'Syncing...' : t('dynamic_keys.sync_servers')}
+            {syncAllMutation.isPending ? t('dynamic_keys.syncing') : t('dynamic_keys.sync_servers')}
           </Button>
         </div>
 
@@ -1862,7 +1909,7 @@ export default function DynamicKeysPage() {
 
       {/* Quick Filter Pills */}
       <div className="hidden md:flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground mr-1">Quick filters:</span>
+        <span className="text-sm text-muted-foreground mr-1">{t('dynamic_keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
           size="sm"
@@ -1870,7 +1917,7 @@ export default function DynamicKeysPage() {
           onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
         >
           <Wifi className="w-3 h-3 mr-1" />
-          Online
+          {t('dynamic_keys.quick_filters.online')}
         </Button>
         <Button
           variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
@@ -1879,7 +1926,7 @@ export default function DynamicKeysPage() {
           onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
         >
           <Clock className="w-3 h-3 mr-1" />
-          Expiring &lt; 7d
+          {t('dynamic_keys.quick_filters.expiring7d')}
         </Button>
         <Button
           variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -1888,7 +1935,7 @@ export default function DynamicKeysPage() {
           onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
         >
           <AlertTriangle className="w-3 h-3 mr-1" />
-          Over 80% Quota
+          {t('dynamic_keys.quick_filters.over_quota')}
         </Button>
         <Button
           variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
@@ -1897,14 +1944,14 @@ export default function DynamicKeysPage() {
           onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
         >
           <EyeOff className="w-3 h-3 mr-1" />
-          Inactive 30d
+          {t('dynamic_keys.quick_filters.inactive30d')}
         </Button>
         
         {/* Tag filter */}
         <div className="flex items-center gap-1 ml-2">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Filter by tag"
+            placeholder={t('dynamic_keys.quick_filters.tag_placeholder')}
             value={filters.tagFilter || ''}
             onChange={(e) => setTagFilter(e.target.value || undefined)}
             className="h-7 w-28 text-xs"
@@ -1915,7 +1962,7 @@ export default function DynamicKeysPage() {
         <div className="flex items-center gap-1">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Filter by owner"
+            placeholder={t('dynamic_keys.quick_filters.owner_placeholder')}
             value={filters.ownerFilter || ''}
             onChange={(e) => setOwnerFilter(e.target.value || undefined)}
             className="h-7 w-28 text-xs"
@@ -1930,7 +1977,7 @@ export default function DynamicKeysPage() {
             onClick={clearPersistedFilters}
           >
             <X className="w-3 h-3 mr-1" />
-            Clear
+            {t('keys.clear_filters')}
           </Button>
         )}
       </div>
@@ -1994,7 +2041,7 @@ export default function DynamicKeysPage() {
             onClick={clearFilters}
           >
             <X className="w-4 h-4 mr-1" />
-            Clear
+            {t('keys.clear_filters')}
           </Button>
         )}
 
@@ -2007,17 +2054,19 @@ export default function DynamicKeysPage() {
               ) : (
                 <Download className="w-4 h-4 mr-2" />
               )}
-              {exportingFormat ? `Exporting ${exportingFormat.toUpperCase()}...` : 'Export'}
+              {exportingFormat
+                ? fillTemplate(t('dynamic_keys.exporting'), { format: exportingFormat.toUpperCase() })
+                : t('dynamic_keys.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleExport('json')} disabled={!!exportingFormat}>
               <FileJson className="w-4 h-4 mr-2" />
-              Export as JSON
+              {t('dynamic_keys.export_json')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport('csv')} disabled={!!exportingFormat}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export as CSV
+              {t('dynamic_keys.export_csv')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -2054,7 +2103,7 @@ export default function DynamicKeysPage() {
             disabled={syncAllMutation.isPending}
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? 'Syncing...' : t('dynamic_keys.sync_servers')}
+            {syncAllMutation.isPending ? t('dynamic_keys.syncing') : t('dynamic_keys.sync_servers')}
           </Button>
 
           {/* View mode toggle - visible on all screens */}
@@ -2141,7 +2190,7 @@ export default function DynamicKeysPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Quick filters</Label>
+              <Label>{t('dynamic_keys.quick_filters.label')}</Label>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -2150,7 +2199,7 @@ export default function DynamicKeysPage() {
                   onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
                 >
                   <Wifi className="w-3 h-3 mr-1" />
-                  Online
+                  {t('dynamic_keys.quick_filters.online')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
@@ -2159,7 +2208,7 @@ export default function DynamicKeysPage() {
                   onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
                 >
                   <Clock className="w-3 h-3 mr-1" />
-                  Expiring &lt; 7d
+                  {t('dynamic_keys.quick_filters.expiring7d')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -2168,7 +2217,7 @@ export default function DynamicKeysPage() {
                   onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
                 >
                   <AlertTriangle className="w-3 h-3 mr-1" />
-                  Over 80% Quota
+                  {t('dynamic_keys.quick_filters.over_quota')}
                 </Button>
                 <Button
                   variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
@@ -2177,26 +2226,26 @@ export default function DynamicKeysPage() {
                   onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
                 >
                   <EyeOff className="w-3 h-3 mr-1" />
-                  Inactive 30d
+                  {t('dynamic_keys.quick_filters.inactive30d')}
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="mobile-dak-tag-filter">Tag</Label>
+                <Label htmlFor="mobile-dak-tag-filter">{t('dynamic_keys.quick_filters.tag')}</Label>
                 <Input
                   id="mobile-dak-tag-filter"
-                  placeholder="Filter by tag"
+                  placeholder={t('dynamic_keys.quick_filters.tag_placeholder')}
                   value={filters.tagFilter || ''}
                   onChange={(e) => setTagFilter(e.target.value || undefined)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="mobile-dak-owner-filter">Owner</Label>
+                <Label htmlFor="mobile-dak-owner-filter">{t('dynamic_keys.quick_filters.owner')}</Label>
                 <Input
                   id="mobile-dak-owner-filter"
-                  placeholder="Filter by owner"
+                  placeholder={t('dynamic_keys.quick_filters.owner_placeholder')}
                   value={filters.ownerFilter || ''}
                   onChange={(e) => setOwnerFilter(e.target.value || undefined)}
                 />
@@ -2229,7 +2278,7 @@ export default function DynamicKeysPage() {
                 disabled={!!exportingFormat}
               >
                 <FileJson className="w-4 h-4 mr-2" />
-                Export as JSON
+                {t('dynamic_keys.export_json')}
               </Button>
               <Button
                 variant="outline"
@@ -2237,7 +2286,7 @@ export default function DynamicKeysPage() {
                 disabled={!!exportingFormat}
               >
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as CSV
+                {t('dynamic_keys.export_csv')}
               </Button>
             </div>
           </div>
@@ -2256,7 +2305,7 @@ export default function DynamicKeysPage() {
       {selectedKeys.size > 0 && (
         <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:gap-4">
           <span className="text-sm font-medium">
-            {selectedKeys.size} key{selectedKeys.size > 1 ? 's' : ''} selected
+            {selectedKeys.size} {getSelectedLabel(selectedKeys.size)}
           </span>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             {/* Enable/Disable dropdown */}
@@ -2272,17 +2321,17 @@ export default function DynamicKeysPage() {
                   ) : (
                     <Power className="w-4 h-4 mr-2" />
                   )}
-                  Enable/Disable
+                  {t('dynamic_keys.bulk.enable_disable')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => handleBulkToggleStatus(true)}>
                   <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
-                  Enable All
+                  {t('dynamic_keys.bulk.enable_all')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleBulkToggleStatus(false)}>
                   <XCircle className="w-4 h-4 mr-2 text-orange-500" />
-                  Disable All
+                  {t('dynamic_keys.bulk.disable_all')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2299,7 +2348,7 @@ export default function DynamicKeysPage() {
               ) : (
                 <Clock className="w-4 h-4 mr-2" />
               )}
-              Extend Expiry
+              {t('dynamic_keys.bulk.extend_expiry')}
             </Button>
 
             {/* Tags dropdown */}
@@ -2315,7 +2364,7 @@ export default function DynamicKeysPage() {
                   ) : (
                     <Tag className="w-4 h-4 mr-2" />
                   )}
-                  Tags
+                  {t('dynamic_keys.bulk.tags')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -2324,14 +2373,14 @@ export default function DynamicKeysPage() {
                   setBulkTagsDialogOpen(true);
                 }}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Tags
+                  {t('dynamic_keys.bulk.add_tags')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
                   setBulkTagsMode('remove');
                   setBulkTagsDialogOpen(true);
                 }}>
                   <X className="w-4 h-4 mr-2" />
-                  Remove Tags
+                  {t('dynamic_keys.bulk.remove_tags')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2348,7 +2397,7 @@ export default function DynamicKeysPage() {
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
-              Delete Selected
+              {t('dynamic_keys.bulk.delete_selected')}
             </Button>
           </div>
           <Button
@@ -2358,7 +2407,7 @@ export default function DynamicKeysPage() {
             className="w-full sm:ml-auto sm:w-auto"
             disabled={isBulkBusy}
           >
-            Clear selection
+            {t('dynamic_keys.clear_selection')}
           </Button>
         </div>
       )}
@@ -2426,9 +2475,9 @@ export default function DynamicKeysPage() {
                           <typeConfig.icon className={cn('w-4 h-4', typeConfig.color)} />
                           <span className="text-sm">{t(typeConfig.labelKey)}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Smartphone className="w-3.5 h-3.5" />
-                          <span>{0 || 0} devices</span>
+                          <span>{0 || 0} {t('dynamic_keys.devices_count')}</span>
                         </div>
                       </div>
 
@@ -2670,7 +2719,7 @@ export default function DynamicKeysPage() {
                   <button
                     onClick={handleSelectAll}
                     className="p-1 hover:bg-muted rounded"
-                    title={selectedKeys.size === dynamicKeys.length ? 'Deselect all' : 'Select all'}
+                    title={selectedKeys.size === dynamicKeys.length ? t('dynamic_keys.deselect_all') : t('dynamic_keys.select_all')}
                   >
                     {dynamicKeys.length > 0 && selectedKeys.size === dynamicKeys.length ? (
                       <CheckSquare className="w-4 h-4 text-primary" />
@@ -2686,7 +2735,7 @@ export default function DynamicKeysPage() {
                 <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
                   <div className="flex items-center justify-center gap-1">
                     <Smartphone className="w-3.5 h-3.5" />
-                    Devices
+                    {t('dynamic_keys.devices')}
                   </div>
                 </th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.attached')}</th>
@@ -2757,8 +2806,8 @@ export default function DynamicKeysPage() {
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
             <p className="text-sm text-muted-foreground">
-              Showing {(page - 1) * pageSize + 1} to{' '}
-              {Math.min(page * pageSize, data.total)} of {data.total}
+              {t('dynamic_keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('dynamic_keys.pagination.to')}{' '}
+              {Math.min(page * pageSize, data.total)} {t('dynamic_keys.pagination.of')} {data.total}
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -2770,7 +2819,7 @@ export default function DynamicKeysPage() {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm">
-                Page {page} of {data.totalPages}
+                {t('dynamic_keys.pagination.page')} {page} {t('dynamic_keys.pagination.of_pages')} {data.totalPages}
               </span>
               <Button
                 variant="outline"
