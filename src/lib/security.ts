@@ -1,6 +1,42 @@
 import { db } from './db';
 import geoip from 'geoip-lite';
 import ipRangeCheck from 'ip-range-check';
+import { isIP } from 'node:net';
+
+export function normalizeIpAddress(rawIp: string | null | undefined): string | null {
+    if (!rawIp) {
+        return null;
+    }
+
+    let ip = rawIp.trim();
+    if (!ip) {
+        return null;
+    }
+
+    if (ip.startsWith('[') && ip.includes(']')) {
+        ip = ip.slice(1, ip.indexOf(']'));
+    }
+
+    if (ip.startsWith('::ffff:')) {
+        ip = ip.slice(7);
+    }
+
+    const zoneIndex = ip.indexOf('%');
+    if (zoneIndex !== -1) {
+        ip = ip.slice(0, zoneIndex);
+    }
+
+    const ipv4WithPort = ip.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+    if (ipv4WithPort) {
+        ip = ipv4WithPort[1];
+    }
+
+    if (ip === '::1') {
+        return '127.0.0.1';
+    }
+
+    return isIP(ip) ? ip : null;
+}
 
 /**
  * Checks if an IP address is allowed based on the active Security Rules.
@@ -12,13 +48,17 @@ import ipRangeCheck from 'ip-range-check';
  * 4. Otherwise -> Allowed.
  */
 export async function checkIpAllowed(ip: string): Promise<{ allowed: boolean; reason?: string }> {
-    // Normalize IPv6 localhost
-    if (ip === '::1') ip = '127.0.0.1';
+    const normalizedIp = normalizeIpAddress(ip);
+    if (!normalizedIp) {
+        return { allowed: true };
+    }
+
+    ip = normalizedIp;
 
     // Allow localhost and private networks
-    // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    // IPv4 private ranges plus common IPv6 local/link-local ranges
     if (
-        ipRangeCheck(ip, ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'])
+        ipRangeCheck(ip, ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1', 'fc00::/7', 'fe80::/10'])
     ) {
         return { allowed: true };
     }

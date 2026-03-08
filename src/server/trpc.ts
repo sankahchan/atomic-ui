@@ -45,10 +45,11 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
 
   if (opts?.req) {
     const forwardedFor = opts.req.headers.get('x-forwarded-for');
+    const { normalizeIpAddress } = await import('@/lib/security');
     if (forwardedFor) {
-      clientIp = forwardedFor.split(',')[0].trim();
+      clientIp = normalizeIpAddress(forwardedFor.split(',')[0]) ?? null;
     } else {
-      clientIp = opts.req.headers.get('x-real-ip');
+      clientIp = normalizeIpAddress(opts.req.headers.get('x-real-ip')) ?? null;
     }
 
     if (clientIp) {
