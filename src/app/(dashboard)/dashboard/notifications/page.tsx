@@ -44,6 +44,7 @@ import {
   RefreshCw,
   History,
   RotateCcw,
+  Filter,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -843,11 +844,11 @@ function ChannelCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="min-w-[132px] flex-1"
             onClick={onTest}
           >
             <TestTube className="w-4 h-4 mr-2" />
@@ -996,7 +997,7 @@ function KeyAlertsCard() {
                   {alertsData.expiringKeys.slice(0, 5).map((key) => (
                     <div
                       key={key.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20"
+                      className="flex flex-col gap-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-3">
                         <KeyRound className="w-4 h-4 text-red-500" />
@@ -1005,7 +1006,7 @@ function KeyAlertsCard() {
                           <p className="text-xs text-muted-foreground">{key.serverName}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 self-end sm:self-auto">
                         <Badge variant="destructive" className="text-xs">
                           {key.daysRemaining === 0
                             ? t('notifications.key_alerts.expires_today')
@@ -1041,7 +1042,7 @@ function KeyAlertsCard() {
                   {alertsData.trafficWarningKeys.slice(0, 5).map((key) => (
                     <div
                       key={key.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 border border-orange-500/20"
+                      className="flex flex-col gap-3 rounded-lg border border-orange-500/20 bg-orange-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-3">
                         <KeyRound className="w-4 h-4 text-orange-500" />
@@ -1050,7 +1051,7 @@ function KeyAlertsCard() {
                           <p className="text-xs text-muted-foreground">{key.serverName}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 self-end sm:self-auto">
                         <div className="w-24">
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span>{formatBytes(BigInt(key.usedBytes))}</span>
@@ -1140,10 +1141,11 @@ function QueueStatusCard() {
             <CardTitle>{t('notifications.queue.title')}</CardTitle>
             <CardDescription>{t('notifications.queue.desc')}</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             {isFetching && !isLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : null}
             <Button
               variant="outline"
+              className="flex-1 sm:flex-none"
               onClick={() => processQueueMutation.mutate({ limit: 50 })}
               disabled={processQueueMutation.isPending || isLoading}
             >
@@ -1209,6 +1211,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
   const { t } = useLocale();
   const utils = trpc.useUtils();
   const [page, setPage] = useState(1);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [status, setStatus] = useState<DeliveryStatusFilter>('ALL');
   const [channelId, setChannelId] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -1256,6 +1259,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
 
   const logs: DeliveryLog[] = data?.items ?? [];
   const retryingLogId = retryLogMutation.isPending ? retryLogMutation.variables?.logId : null;
+  const hasActiveFilters = Boolean(deferredSearch || channelId !== 'ALL' || status !== 'ALL');
 
   return (
     <Card>
@@ -1272,7 +1276,51 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-3 md:hidden">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Input
+                id="delivery-search-mobile"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('notifications.delivery.search_placeholder')}
+              />
+            </div>
+            <Button
+              variant={hasActiveFilters ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMobileFilterOpen(true)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {t('notifications.delivery.filters')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <span>
+              {data?.total ?? 0} {t('notifications.delivery.results')}
+            </span>
+            {hasActiveFilters ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  setStatus('ALL');
+                  setChannelId('ALL');
+                  setSearch('');
+                }}
+              >
+                {t('notifications.delivery.clear_filters')}
+              </Button>
+            ) : (
+              <span>
+                {t('notifications.delivery.page')} {data?.page ?? 1} / {data?.totalPages ?? 1}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="hidden gap-3 md:grid md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="delivery-search">{t('notifications.delivery.search')}</Label>
             <Input
@@ -1313,6 +1361,60 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             </Select>
           </div>
         </div>
+
+        <Dialog open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{t('notifications.delivery.filters')}</DialogTitle>
+              <DialogDescription>{t('notifications.delivery.filters_desc')}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t('notifications.delivery.channel')}</Label>
+                <Select value={channelId} onValueChange={setChannelId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('notifications.delivery.all_channels')}</SelectItem>
+                    {channels.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('notifications.delivery.status')}</Label>
+                <Select value={status} onValueChange={(value) => setStatus(value as DeliveryStatusFilter)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('notifications.delivery.all_statuses')}</SelectItem>
+                    <SelectItem value="SUCCESS">{t('notifications.status.SUCCESS')}</SelectItem>
+                    <SelectItem value="FAILED">{t('notifications.status.FAILED')}</SelectItem>
+                    <SelectItem value="SKIPPED">{t('notifications.status.SKIPPED')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStatus('ALL');
+                  setChannelId('ALL');
+                  setSearch('');
+                }}
+              >
+                {t('notifications.delivery.clear_filters')}
+              </Button>
+              <Button onClick={() => setMobileFilterOpen(false)}>{t('notifications.dialog.cancel')}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
@@ -1601,7 +1703,7 @@ export default function NotificationsPage() {
             {t('notifications.subtitle')}
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>
+        <Button onClick={handleOpenCreate} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           {t('notifications.add_channel')}
         </Button>

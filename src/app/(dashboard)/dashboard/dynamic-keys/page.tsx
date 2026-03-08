@@ -46,6 +46,7 @@ import {
   Power,
   MoreVertical,
   Eye,
+  Filter,
   Download,
   FileJson,
   FileSpreadsheet,
@@ -1302,6 +1303,7 @@ export default function DynamicKeysPage() {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [qrDialogDak, setQrDialogDak] = useState<DAKData | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
@@ -1655,13 +1657,26 @@ export default function DynamicKeysPage() {
     setPage(1);
   };
 
-  const hasActiveFilters = searchQuery || statusFilter || typeFilter;
+  const hasPersistedFilters = Boolean(
+    filters.quickFilters.online ||
+    filters.quickFilters.expiring7d ||
+    filters.quickFilters.overQuota ||
+    filters.quickFilters.inactive30d ||
+    filters.tagFilter ||
+    filters.ownerFilter,
+  );
+  const hasActiveFilters = Boolean(searchQuery || statusFilter || typeFilter);
+  const hasAnyFilters = hasActiveFilters || hasPersistedFilters;
   const isBulkBusy =
     bulkDeleteMutation.isPending ||
     bulkExtendMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending;
+  const clearAllFilters = () => {
+    clearFilters();
+    clearPersistedFilters();
+  };
 
   return (
     <div className="space-y-6">
@@ -1673,18 +1688,31 @@ export default function DynamicKeysPage() {
             {t('dynamic_keys.desc')}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Link href="/dashboard/archived">
-            <Button variant="outline" size="sm" className="h-8">
+        <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
+          <Button variant="outline" size="sm" className="h-8" asChild>
+            <Link href="/dashboard/archived">
               <Archive className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-8">
             <Plus className="w-4 h-4 mr-2" />
             {t('dynamic_keys.create')}
           </Button>
         </div>
+      </div>
+
+      <div className="grid gap-2 sm:hidden">
+        <Button onClick={() => setCreateDialogOpen(true)} className="w-full justify-center">
+          <Plus className="w-4 h-4 mr-2" />
+          {t('dynamic_keys.create')}
+        </Button>
+        <Button variant="outline" className="w-full justify-center" asChild>
+          <Link href="/dashboard/archived">
+            <Archive className="w-4 h-4 mr-2" />
+            {t('nav.archived') || 'Archived'}
+          </Link>
+        </Button>
       </div>
 
       {/* Stats cards */}
@@ -1750,8 +1778,89 @@ export default function DynamicKeysPage() {
         </div>
       )}
 
+      <div className="space-y-3 md:hidden">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={t('dynamic_keys.search_placeholder')}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+            />
+          </div>
+          <Button
+            variant={hasAnyFilters ? 'default' : 'outline'}
+            size="sm"
+            className="shrink-0"
+            onClick={() => setMobileFiltersOpen(true)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            {t('dynamic_keys.mobile_filters')}
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center justify-center rounded-lg border bg-muted/50 p-0.5">
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-9 flex-1 px-2"
+              onClick={() => setViewMode('list')}
+            >
+              <LayoutList className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-9 flex-1 px-2"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'group' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-9 flex-1 px-2"
+              onClick={() => setViewMode('group')}
+            >
+              <ListTree className="w-4 h-4" />
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => syncAllMutation.mutate()}
+            disabled={syncAllMutation.isPending}
+          >
+            <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
+            {syncAllMutation.isPending ? 'Syncing...' : t('dynamic_keys.sync_servers')}
+          </Button>
+        </div>
+
+        {(autoRefresh.isActive || hasAnyFilters) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {autoRefresh.isActive ? (
+              <span className="inline-flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                {t('dynamic_keys.refresh_interval')}: {autoRefresh.countdown}s
+              </span>
+            ) : null}
+            {hasAnyFilters ? (
+              <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-xs" onClick={clearAllFilters}>
+                <X className="w-3 h-3 mr-1" />
+                {t('keys.clear_filters')}
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </div>
+
       {/* Quick Filter Pills */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hidden md:flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground mr-1">Quick filters:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -1826,7 +1935,7 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="hidden md:flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -1976,6 +2085,171 @@ export default function DynamicKeysPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('dynamic_keys.mobile_filters')}</DialogTitle>
+            <DialogDescription>{t('dynamic_keys.mobile_filters_desc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{t('dynamic_keys.filter_status')}</Label>
+                <Select
+                  value={statusFilter || 'all'}
+                  onValueChange={(value) => {
+                    setStatusFilter(value === 'all' ? '' : value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('dynamic_keys.filter_status')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('dynamic_keys.filter_status')}</SelectItem>
+                    <SelectItem value="ACTIVE">{t('dynamic_keys.status.active')}</SelectItem>
+                    <SelectItem value="PENDING">{t('dynamic_keys.status.pending')}</SelectItem>
+                    <SelectItem value="DEPLETED">{t('dynamic_keys.status.depleted')}</SelectItem>
+                    <SelectItem value="EXPIRED">{t('dynamic_keys.status.expired')}</SelectItem>
+                    <SelectItem value="DISABLED">{t('dynamic_keys.status.disabled')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('dynamic_keys.filter_type')}</Label>
+                <Select
+                  value={typeFilter || 'all'}
+                  onValueChange={(value) => {
+                    setTypeFilter(value === 'all' ? '' : value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('dynamic_keys.filter_type')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('dynamic_keys.filter_type')}</SelectItem>
+                    <SelectItem value="SELF_MANAGED">{t('dynamic_keys.type.self_managed')}</SelectItem>
+                    <SelectItem value="MANUAL">{t('dynamic_keys.type.manual')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Quick filters</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={filters.quickFilters.online ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
+                  onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
+                >
+                  <Wifi className="w-3 h-3 mr-1" />
+                  Online
+                </Button>
+                <Button
+                  variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+                  onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  Expiring &lt; 7d
+                </Button>
+                <Button
+                  variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
+                  onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
+                >
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Over 80% Quota
+                </Button>
+                <Button
+                  variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
+                  onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
+                >
+                  <EyeOff className="w-3 h-3 mr-1" />
+                  Inactive 30d
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="mobile-dak-tag-filter">Tag</Label>
+                <Input
+                  id="mobile-dak-tag-filter"
+                  placeholder="Filter by tag"
+                  value={filters.tagFilter || ''}
+                  onChange={(e) => setTagFilter(e.target.value || undefined)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mobile-dak-owner-filter">Owner</Label>
+                <Input
+                  id="mobile-dak-owner-filter"
+                  placeholder="Filter by owner"
+                  value={filters.ownerFilter || ''}
+                  onChange={(e) => setOwnerFilter(e.target.value || undefined)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('dynamic_keys.refresh_interval')}</Label>
+              <Select
+                value={autoRefresh.interval.toString()}
+                onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTO_SYNC_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value.toString()}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                variant="outline"
+                onClick={() => handleExport('json')}
+                disabled={!!exportingFormat}
+              >
+                <FileJson className="w-4 h-4 mr-2" />
+                Export as JSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleExport('csv')}
+                disabled={!!exportingFormat}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export as CSV
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={clearAllFilters}>
+              <X className="w-4 h-4 mr-2" />
+              {t('keys.clear_filters')}
+            </Button>
+            <Button onClick={() => setMobileFiltersOpen(false)}>{t('dynamic_keys.dialog.cancel')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
