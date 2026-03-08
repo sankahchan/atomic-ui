@@ -16,13 +16,16 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 export function BottomTabBar() {
   const pathname = usePathname();
   const { t } = useLocale();
+  const normalizedPathname =
+    basePath && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length) || '/'
+      : pathname;
 
   const isActive = (tab: (typeof primaryDashboardNavItems)[number]) => {
-    const fullHref = `${basePath}${tab.href}`;
     if (tab.href === '/dashboard') {
-      return pathname === fullHref;
+      return normalizedPathname === tab.href;
     }
-    return pathname.startsWith(fullHref);
+    return normalizedPathname.startsWith(tab.href);
   };
 
   return (
@@ -34,7 +37,7 @@ export function BottomTabBar() {
           return (
             <Link
               key={tab.href}
-              href={`${basePath}${tab.href}`}
+              href={tab.href}
               className={cn(
                 'flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition-all duration-200',
                 active

@@ -24,7 +24,11 @@ interface MoreMenuProps {
 export function MoreMenu({ open, onClose }: MoreMenuProps) {
   const pathname = usePathname();
   const { t } = useLocale();
-
+  const normalizedPathname =
+    basePath && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length) || '/'
+      : pathname;
+ 
   if (!open) return null;
 
   return (
@@ -63,13 +67,12 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
 
         <div className="space-y-3">
           {adminToolNavItems.map((item) => {
-            const fullHref = `${basePath}${item.href}`;
-            const active = pathname.startsWith(fullHref);
+            const active = normalizedPathname.startsWith(item.href);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
-                href={fullHref}
+                href={item.href}
                 onClick={onClose}
                 className={cn(
                   'flex items-center gap-4 rounded-2xl border p-4 transition-colors',
