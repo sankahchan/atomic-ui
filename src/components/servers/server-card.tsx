@@ -159,7 +159,7 @@ export function ServerCard({
 
     return (
         <Card className={cn(
-            'group hover:border-primary/30 transition-all duration-200 flex flex-col',
+            'group flex flex-col transition-all duration-200 hover:-translate-y-1 hover:border-primary/25',
             !server.isActive && 'opacity-60'
         )}>
             <CardContent className="p-5 flex-1">
@@ -198,7 +198,7 @@ export function ServerCard({
                 </div>
 
                 {/* Bandwidth metric - prominent display */}
-                <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                <div className="mb-4 rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                     <div className="flex items-center gap-2 mb-1">
                         <ArrowUpDown className="w-4 h-4 text-primary" />
                         <span className="text-xs text-muted-foreground">{t('servers.total_bandwidth')}</span>
@@ -211,8 +211,8 @@ export function ServerCard({
                 </div>
 
                 {/* Metrics grid */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center p-2 bg-muted/30 rounded-lg">
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Zap className="w-3 h-3 text-emerald-500" />
                         </div>
@@ -220,7 +220,7 @@ export function ServerCard({
                         <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="text-center p-2 bg-muted/30 rounded-lg">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Key className="w-3 h-3 text-primary" />
                         </div>
@@ -230,7 +230,7 @@ export function ServerCard({
                         </p>
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="text-center p-2 bg-muted/30 rounded-lg">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Activity className="w-3 h-3 text-muted-foreground" />
                         </div>
@@ -266,7 +266,7 @@ export function ServerCard({
             </CardContent>
 
             {/* Footer Actions */}
-            <div className="px-5 py-3 border-t border-border/50 bg-muted/10">
+            <div className="border-t border-border/50 bg-background/40 px-5 py-4 dark:bg-white/[0.02]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         {server.outlineVersion && `v${server.outlineVersion}`}
@@ -280,7 +280,7 @@ export function ServerCard({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-full sm:w-9"
+                            className="h-9 w-full rounded-2xl sm:w-9"
                             onClick={onSync}
                             disabled={isSyncing}
                             title={t('servers.actions.sync')}
@@ -288,7 +288,7 @@ export function ServerCard({
                         >
                             <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
                         </Button>
-                        <Button asChild variant="ghost" size="icon" className="h-9 w-full sm:w-9" title={t('servers.actions.view')}>
+                        <Button asChild variant="ghost" size="icon" className="h-9 w-full rounded-2xl sm:w-9" title={t('servers.actions.view')}>
                             <Link href={`/dashboard/servers/${server.id}`} aria-label={t('servers.actions.view')}>
                                 <ExternalLink className="w-4 h-4" />
                             </Link>
@@ -296,7 +296,7 @@ export function ServerCard({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-full text-destructive hover:text-destructive sm:w-9"
+                            className="h-9 w-full rounded-2xl text-destructive hover:text-destructive sm:w-9"
                             onClick={onDelete}
                             disabled={isDeleting}
                             title={t('servers.actions.delete')}

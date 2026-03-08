@@ -70,21 +70,26 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col glass-sidebar',
+        'fixed inset-y-0 left-0 z-50 flex flex-col px-3 py-4 text-slate-100 glass-sidebar',
         'transition-all duration-300 ease-in-out',
-        isCollapsed ? 'w-16' : 'w-64'
+        isCollapsed ? 'w-20' : 'w-72'
       )}
     >
       {/* Logo and brand */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--glass-border)]">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="relative w-8 h-8 flex items-center justify-center">
-            <Atom className="w-6 h-6 text-primary" />
+      <div className="flex items-center justify-between rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
+        <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10">
+            <Atom className="w-6 h-6 text-cyan-300" />
           </div>
           {!isCollapsed && (
-            <span className="text-lg font-bold text-gradient-atomic">
-              Atomic-UI
-            </span>
+            <div className="min-w-0">
+              <span className="block truncate text-lg font-bold text-white">
+                Atomic-UI
+              </span>
+              <span className="block text-[11px] uppercase tracking-[0.24em] text-slate-400">
+                Control Center
+              </span>
+            </div>
           )}
         </Link>
 
@@ -93,7 +98,7 @@ function Sidebar({
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="hidden lg:flex"
+          className="hidden rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white lg:flex"
         >
           <ChevronLeft className={cn(
             'h-4 w-4 transition-transform',
@@ -103,8 +108,8 @@ function Sidebar({
       </div>
 
       {/* Navigation links */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2">
-        <ul className="space-y-1">
+      <nav className="flex-1 overflow-y-auto px-2 py-5">
+        <ul className="space-y-1.5">
           {primaryDashboardNavItems.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
@@ -114,17 +119,17 @@ function Sidebar({
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg',
-                    'transition-all duration-200',
+                    'ops-sidebar-item',
+                    isCollapsed && 'justify-center px-0',
                     isActive
-                      ? 'bg-primary/15 text-primary shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-[var(--glass-bg)]'
+                      ? 'bg-gradient-to-r from-cyan-400/20 to-sky-400/10 text-cyan-200 shadow-[0_16px_30px_rgba(6,182,212,0.14)]'
+                      : 'text-slate-300 hover:bg-white/6 hover:text-white'
                   )}
                   title={isCollapsed ? t(item.labelKey) : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
-                    isActive && 'text-primary'
+                    isActive ? 'text-cyan-300' : 'text-slate-400'
                   )} />
                   {!isCollapsed && (
                     <span className="text-sm font-medium">{t(item.labelKey)}</span>
@@ -138,8 +143,8 @@ function Sidebar({
 
       {/* Sidebar footer */}
       {!isCollapsed && (
-        <div className="p-4 border-t border-[var(--glass-border)]">
-          <p className="text-xs text-muted-foreground text-center">
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_16px_40px_rgba(2,6,23,0.16)]">
+          <p className="text-center text-xs text-slate-400">
             v1.0.0 • sankahchan
           </p>
         </div>
@@ -172,21 +177,19 @@ function Header({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 h-14 lg:h-16 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))]">
-      <div className="flex items-center justify-between h-full px-4">
+    <header className="sticky top-0 z-40 px-4 pt-4 md:px-6 lg:px-8 lg:pt-6">
+      <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
         <div className="flex items-center gap-3 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Atom className="w-5 h-5 text-primary" />
-            <span className="text-base font-bold text-gradient-atomic">
-              Atomic-UI
-            </span>
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm">
+            <Atom className="h-5 w-5 text-primary" />
+            <span className="text-sm font-semibold">Atomic-UI</span>
           </Link>
         </div>
 
         {/* Left side: tools button on desktop */}
         <div className="hidden lg:flex items-center">
-          <Button variant="outline" size="sm" asChild className="glass border-[var(--glass-border)]">
+          <Button variant="outline" size="sm" asChild className="rounded-full border-border/70 bg-background/65 px-4 shadow-sm">
             <Link href="/dashboard/tools">
               <LayoutGrid className="h-4 w-4 mr-2" />
               {t('nav.tools')}
@@ -201,7 +204,7 @@ function Header({
             size="icon"
             onClick={onOpenTools}
             title={t('nav.tools')}
-            className="h-9 w-9 lg:hidden"
+            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm lg:hidden"
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
@@ -215,7 +218,7 @@ function Header({
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                className="h-9 w-9"
+                className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm"
               >
                 {theme === 'dark' ? (
                   <Sun className="h-4 w-4" />
@@ -228,10 +231,10 @@ function Header({
 
           {/* User info - desktop only */}
           {user && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{user.email}</span>
-              <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/20 text-primary font-medium">
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
                 {user.role}
               </span>
             </div>
@@ -243,7 +246,7 @@ function Header({
             size="icon"
             onClick={onLogout}
             title="Logout"
-            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -382,8 +385,8 @@ export default function DashboardLayout({
       {/* Main content area */}
       <div className={cn(
         'relative flex flex-col min-h-screen transition-all duration-300',
-        'lg:ml-64',
-        sidebarCollapsed && 'lg:ml-16'
+        'lg:ml-72',
+        sidebarCollapsed && 'lg:ml-20'
       )}>
         {/* Header */}
         <Header
@@ -393,8 +396,10 @@ export default function DashboardLayout({
         />
 
         {/* Page content — extra bottom padding on mobile for tab bar */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 pb-24 lg:pb-8">
-          {children}
+        <main className="flex-1 px-4 pb-24 pt-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
+          <div className="ops-page">
+            {children}
+          </div>
         </main>
       </div>
 

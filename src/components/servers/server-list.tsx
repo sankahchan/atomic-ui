@@ -174,7 +174,14 @@ export function ServerList() {
     return (
         <div className="space-y-6">
             {/* Search and filters */}
-            <div className="space-y-3 md:hidden">
+            <div className="ops-panel space-y-4 md:hidden">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="ops-section-heading">{t('servers.tab_overview')}</p>
+                        <h2 className="mt-2 text-xl font-semibold">{t('servers.title')}</h2>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -188,7 +195,7 @@ export function ServerList() {
                     <Button
                         variant="outline"
                         size="icon"
-                        className="h-10 w-10 shrink-0"
+                        className="h-11 w-11 shrink-0 rounded-2xl"
                         onClick={() => refetch()}
                         disabled={isLoading || syncMutation.isPending || deleteMutation.isPending}
                         aria-label={t('servers.refresh')}
@@ -198,28 +205,28 @@ export function ServerList() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" className="w-full justify-center" onClick={handleExport} disabled={exportQuery.isFetching}>
+                    <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={handleExport} disabled={exportQuery.isFetching}>
                         {exportQuery.isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                         Export
                     </Button>
-                    <Button variant="outline" className="w-full justify-center" onClick={() => setImportDialogOpen(true)}>
+                    <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={() => setImportDialogOpen(true)}>
                         <Upload className="w-4 h-4 mr-2" />
                         Import
                     </Button>
-                    <Button asChild variant="secondary" className="w-full justify-center">
+                    <Button asChild variant="secondary" className="w-full justify-center rounded-2xl">
                         <Link href="/dashboard/servers/deploy">
                             <Cloud className="mr-2 h-4 w-4" />
                             Deploy New
                         </Link>
                     </Button>
-                    <Button onClick={() => setAddDialogOpen(true)} className="w-full justify-center">
+                    <Button onClick={() => setAddDialogOpen(true)} className="w-full justify-center rounded-2xl">
                         <Plus className="w-4 h-4 mr-2" />
                         {t('servers.add')}
                     </Button>
                 </div>
             </div>
 
-            <div className="hidden md:flex md:flex-col lg:flex-row gap-4 justify-between">
+            <div className="ops-panel hidden md:flex md:flex-col lg:flex-row gap-4 justify-between">
                 <div className="flex items-center gap-4 flex-1">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -234,6 +241,7 @@ export function ServerList() {
                         variant="outline"
                         onClick={() => refetch()}
                         disabled={isLoading || syncMutation.isPending || deleteMutation.isPending}
+                        className="rounded-2xl"
                     >
                         <RefreshCw className={cn('w-4 h-4 mr-2', (isLoading || syncMutation.isPending || deleteMutation.isPending) && 'animate-spin')} />
                         {t('servers.refresh')}
@@ -241,21 +249,21 @@ export function ServerList() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleExport} disabled={exportQuery.isFetching}>
+                    <Button variant="outline" size="sm" onClick={handleExport} disabled={exportQuery.isFetching} className="rounded-2xl">
                         {exportQuery.isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                         Export
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)} className="rounded-2xl">
                         <Upload className="w-4 h-4 mr-2" />
                         Import
                     </Button>
-                    <Button asChild variant="secondary">
+                    <Button asChild variant="secondary" className="rounded-2xl">
                         <Link href="/dashboard/servers/deploy">
                             <Cloud className="mr-2 h-4 w-4" />
                             Deploy New
                         </Link>
                     </Button>
-                    <Button onClick={() => setAddDialogOpen(true)}>
+                    <Button onClick={() => setAddDialogOpen(true)} className="rounded-2xl">
                         <Plus className="w-4 h-4 mr-2" />
                         {t('servers.add')}
                     </Button>
@@ -266,7 +274,7 @@ export function ServerList() {
             {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(6)].map((_, i) => (
-                        <div key={i} className="h-52 bg-muted rounded-xl animate-pulse" />
+                        <div key={i} className="h-56 rounded-[1.75rem] bg-muted animate-pulse" />
                     ))}
                 </div>
             ) : filteredServers && filteredServers.length > 0 ? (

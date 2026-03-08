@@ -29,8 +29,9 @@ export function BottomTabBar() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass-bottom-bar h-[var(--bottom-bar-height)] border-t border-[var(--glass-border)]">
-      <div className="grid h-full grid-cols-5 px-2">
+    <nav className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[calc(var(--safe-area-bottom)+0.75rem)] pt-2 lg:hidden">
+      <div className="glass-bottom-bar mx-auto h-[var(--bottom-bar-height)] max-w-md rounded-[2rem] border border-white/10 px-2 shadow-[0_18px_50px_rgba(2,6,23,0.28)]">
+      <div className="grid h-full grid-cols-5 gap-1">
         {primaryDashboardNavItems.map((tab) => {
           const active = isActive(tab);
           const Icon = tab.icon;
@@ -39,24 +40,25 @@ export function BottomTabBar() {
               key={tab.href}
               href={tab.href}
               className={cn(
-                'flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition-all duration-200',
+                'flex min-w-0 flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1 py-2 text-[11px] transition-all duration-200',
                 active
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
+                  ? 'text-white'
+                  : 'text-slate-300'
               )}
             >
               <div
                 className={cn(
-                  'flex h-8 w-10 items-center justify-center rounded-xl transition-colors',
-                  active ? 'bg-primary/15 shadow-sm' : 'bg-transparent',
+                  'flex h-9 w-11 items-center justify-center rounded-2xl transition-colors',
+                  active ? 'bg-cyan-400/18 text-cyan-200 shadow-[0_12px_24px_rgba(6,182,212,0.18)]' : 'bg-transparent',
                 )}
               >
                 <Icon className="h-5 w-5" />
               </div>
-              <span className="line-clamp-1 text-[10px] leading-none">{t(tab.labelKey)}</span>
+              <span className="line-clamp-1 leading-none">{t(tab.labelKey)}</span>
             </Link>
           );
         })}
+      </div>
       </div>
     </nav>
   );

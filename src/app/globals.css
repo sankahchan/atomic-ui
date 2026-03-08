@@ -25,59 +25,59 @@
 @layer base {
   :root {
     /* Background and foreground - Light theme */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 33% 98%;
+    --foreground: 221 39% 15%;
 
     /* Card surfaces */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 221 39% 15%;
 
     /* Popover and dropdown surfaces */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 221 39% 15%;
 
     /* Primary brand color - Atomic Cyan */
     --primary: 187 94% 43%;
     --primary-foreground: 210 40% 98%;
 
     /* Secondary/muted elements */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 214 42% 95%;
+    --secondary-foreground: 221 39% 15%;
 
     /* Muted text and backgrounds */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 214 40% 95%;
+    --muted-foreground: 218 17% 42%;
 
     /* Accent color for highlights */
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 197 73% 94%;
+    --accent-foreground: 221 39% 15%;
 
     /* Destructive actions (delete, error) */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     /* Borders and inputs */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 216 28% 88%;
+    --input: 216 28% 88%;
     --ring: 187 94% 43%;
 
     /* Border radius */
-    --radius: 0.5rem;
+    --radius: 1rem;
 
     /* Glassmorphism tokens - Light mode */
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-bg-medium: rgba(255, 255, 255, 0.5);
-    --glass-bg-light: rgba(255, 255, 255, 0.3);
-    --glass-border: rgba(255, 255, 255, 0.2);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.78);
+    --glass-bg-medium: rgba(244, 248, 252, 0.82);
+    --glass-bg-light: rgba(255, 255, 255, 0.5);
+    --glass-border: rgba(255, 255, 255, 0.46);
+    --glass-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
     --glass-blur: 12px;
     --glass-blur-lg: 20px;
     --glass-blur-xl: 40px;
 
     /* Gradient mesh background colors */
-    --mesh-color-1: rgba(6, 182, 212, 0.08);
-    --mesh-color-2: rgba(139, 92, 246, 0.06);
-    --mesh-color-3: rgba(59, 130, 246, 0.05);
+    --mesh-color-1: rgba(14, 165, 233, 0.16);
+    --mesh-color-2: rgba(14, 116, 144, 0.1);
+    --mesh-color-3: rgba(59, 130, 246, 0.08);
 
     /* Bottom tab bar */
     --bottom-bar-height: 4.5rem;
@@ -92,15 +92,15 @@
    */
   .dark {
     /* Deep space background */
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
 
     /* Slightly elevated card surfaces */
-    --card: 222.2 84% 6%;
+    --card: 221 45% 9%;
     --card-foreground: 210 40% 98%;
 
     /* Popover surfaces with more elevation */
-    --popover: 222.2 84% 4.9%;
+    --popover: 221 43% 8%;
     --popover-foreground: 210 40% 98%;
 
     /* Atomic cyan primary */
@@ -108,15 +108,15 @@
     --primary-foreground: 222.2 47.4% 11.2%;
 
     /* Dark secondary elements */
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 221 27% 17%;
     --secondary-foreground: 210 40% 98%;
 
     /* Muted elements */
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 219 28% 17%;
+    --muted-foreground: 215 18% 72%;
 
     /* Accent highlights */
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 217 39% 16%;
     --accent-foreground: 210 40% 98%;
 
     /* Error/destructive */
@@ -124,21 +124,21 @@
     --destructive-foreground: 210 40% 98%;
 
     /* Subtle borders */
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 217 29% 19%;
+    --input: 217 29% 19%;
     --ring: 187 94% 43%;
 
     /* Glassmorphism tokens - Dark mode */
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-bg-medium: rgba(255, 255, 255, 0.08);
-    --glass-bg-light: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --glass-bg: rgba(10, 18, 30, 0.68);
+    --glass-bg-medium: rgba(9, 16, 29, 0.82);
+    --glass-bg-light: rgba(17, 25, 40, 0.5);
+    --glass-border: rgba(148, 163, 184, 0.14);
+    --glass-shadow: 0 28px 70px rgba(2, 6, 23, 0.5);
 
     /* Gradient mesh background colors - Dark mode */
-    --mesh-color-1: rgba(6, 182, 212, 0.12);
-    --mesh-color-2: rgba(139, 92, 246, 0.08);
-    --mesh-color-3: rgba(59, 130, 246, 0.06);
+    --mesh-color-1: rgba(14, 165, 233, 0.18);
+    --mesh-color-2: rgba(45, 212, 191, 0.1);
+    --mesh-color-3: rgba(56, 189, 248, 0.08);
   }
 }
 
@@ -156,6 +156,19 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 34%),
+      radial-gradient(circle at top right, rgba(8, 145, 178, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 245, 251, 0.92));
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 34%),
+      radial-gradient(circle at top right, rgba(45, 212, 191, 0.1), transparent 28%),
+      linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(8, 15, 27, 0.98));
   }
 
   /* Smooth scrolling with reduced motion support */
@@ -307,7 +320,7 @@
 @layer components {
   /* Glassmorphism utility classes */
   .glass {
-    background: var(--glass-bg);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--glass-bg) 82%, white 18%), color-mix(in srgb, var(--glass-bg-medium) 90%, transparent));
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--glass-border);
@@ -329,19 +342,102 @@
   }
 
   .glass-sidebar {
-    background: var(--glass-bg-medium);
+    background:
+      linear-gradient(180deg, rgba(7, 14, 26, 0.98), rgba(16, 24, 40, 0.96)),
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 40%);
     backdrop-filter: blur(var(--glass-blur-xl));
     -webkit-backdrop-filter: blur(var(--glass-blur-xl));
-    border-right: 1px solid var(--glass-border);
+    border-right: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: 18px 0 48px rgba(2, 6, 23, 0.2);
   }
 
   .glass-bottom-bar {
-    background: var(--glass-bg);
+    background: linear-gradient(180deg, rgba(7, 14, 26, 0.92), rgba(12, 20, 34, 0.98));
     backdrop-filter: blur(var(--glass-blur-xl));
     -webkit-backdrop-filter: blur(var(--glass-blur-xl));
-    border-top: 1px solid var(--glass-border);
-    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.1);
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    box-shadow: 0 -14px 40px rgba(2, 6, 23, 0.18);
     padding-bottom: var(--safe-area-bottom);
+  }
+
+  .ops-page {
+    @apply mx-auto w-full max-w-[1680px] space-y-6 md:space-y-8;
+  }
+
+  .ops-hero {
+    @apply relative overflow-hidden rounded-[2rem] border px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-6 sm:py-6 lg:px-8 lg:py-8;
+    border-color: rgba(255, 255, 255, 0.5);
+    background:
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 246, 252, 0.84));
+  }
+
+  .dark .ops-hero {
+    border-color: rgba(148, 163, 184, 0.14);
+    background:
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.18), transparent 30%),
+      radial-gradient(circle at bottom left, rgba(45, 212, 191, 0.08), transparent 22%),
+      linear-gradient(145deg, rgba(9, 16, 29, 0.94), rgba(15, 23, 42, 0.82));
+    box-shadow: 0 28px 80px rgba(2, 6, 23, 0.42);
+  }
+
+  .ops-panel {
+    @apply relative overflow-hidden rounded-[1.75rem] border px-5 py-5 sm:px-6 sm:py-6;
+    border-color: rgba(255, 255, 255, 0.46);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 248, 252, 0.82));
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
+  }
+
+  .dark .ops-panel {
+    border-color: rgba(148, 163, 184, 0.12);
+    background:
+      linear-gradient(180deg, rgba(9, 16, 29, 0.92), rgba(15, 23, 42, 0.74));
+    box-shadow: 0 24px 60px rgba(2, 6, 23, 0.36);
+  }
+
+  .ops-kpi-tile {
+    @apply relative overflow-hidden rounded-[1.5rem] border p-4 transition-all duration-200 sm:p-5;
+    border-color: rgba(255, 255, 255, 0.45);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 247, 252, 0.82));
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
+  }
+
+  .dark .ops-kpi-tile {
+    border-color: rgba(148, 163, 184, 0.12);
+    background:
+      linear-gradient(180deg, rgba(9, 16, 29, 0.9), rgba(15, 23, 42, 0.72));
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.32);
+  }
+
+  .ops-section-heading {
+    @apply text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase;
+  }
+
+  .ops-pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium;
+    border-color: hsl(var(--border));
+    background: hsl(var(--background) / 0.6);
+  }
+
+  .ops-sidebar-item {
+    @apply relative flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200;
+  }
+
+  .ops-topbar {
+    @apply flex h-14 items-center justify-between rounded-[1.75rem] border px-3 sm:h-16 sm:px-4 lg:px-6;
+    border-color: rgba(255, 255, 255, 0.46);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(245, 248, 252, 0.72));
+    box-shadow: 0 20px 55px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(var(--glass-blur-lg));
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+  }
+
+  .dark .ops-topbar {
+    border-color: rgba(148, 163, 184, 0.14);
+    background: linear-gradient(180deg, rgba(9, 16, 29, 0.88), rgba(15, 23, 42, 0.72));
+    box-shadow: 0 24px 60px rgba(2, 6, 23, 0.36);
   }
 
   /* Fallback for browsers without backdrop-filter */

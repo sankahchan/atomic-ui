@@ -91,8 +91,8 @@ export function ServerHealthCard({
 
     return (
         <Card className={cn(
-            'transition-all duration-200',
-            'hover:border-primary/30'
+            'transition-all duration-200 hover:-translate-y-1',
+            'hover:border-primary/25'
         )}>
             <CardContent className="p-5">
                 {/* Server header */}
@@ -127,8 +127,8 @@ export function ServerHealthCard({
                 </div>
 
                 {/* Health metrics */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-1">
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-[1.15rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.02]">
                         <p className="text-xs text-muted-foreground">{t('health.metrics.latency')}</p>
                         <p className="text-lg font-semibold">
                             {health?.lastLatencyMs !== null && health?.lastLatencyMs !== undefined
@@ -136,7 +136,7 @@ export function ServerHealthCard({
                                 : '-'}
                         </p>
                     </div>
-                    <div className="space-y-1">
+                    <div className="rounded-[1.15rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.02]">
                         <p className="text-xs text-muted-foreground">{t('health.metrics.last_check')}</p>
                         <p className="text-sm">
                             {health?.lastCheckedAt
@@ -147,7 +147,8 @@ export function ServerHealthCard({
                 </div>
 
                 {/* Uptime progress */}
-                <div className="space-y-2 mb-4">
+                <div className="mb-4 rounded-[1.15rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.02]">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">{t('health.metrics.uptime')}</span>
                         <span className="font-medium">
@@ -169,13 +170,14 @@ export function ServerHealthCard({
                             {health.successfulChecks} / {health.totalChecks} {t('health.metrics.checks_success')}
                         </p>
                     )}
+                  </div>
                 </div>
 
                 {/* Manual check button */}
                 <Button
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className="w-full rounded-2xl"
                     onClick={onManualCheck}
                     disabled={isChecking}
                 >

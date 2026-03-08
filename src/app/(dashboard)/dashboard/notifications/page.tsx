@@ -801,12 +801,12 @@ function ChannelCard({
   const Icon = config.icon;
 
   return (
-    <Card className="group hover:border-primary/30 transition-colors">
+    <Card className="group transition-all duration-200 hover:-translate-y-1 hover:border-primary/25">
       <CardContent className="p-5">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className={cn('p-2.5 rounded-lg', config.bgColor)}>
+            <div className={cn('rounded-2xl border p-2.5', config.bgColor)}>
               <Icon className={cn('w-5 h-5', config.color)} />
             </div>
             <div>
@@ -822,12 +822,12 @@ function ChannelCard({
         {/* Subscribed events */}
         <div className="mb-4">
           <p className="text-xs text-muted-foreground mb-2">{t('notifications.events.subscribed')}</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex min-h-[2rem] flex-wrap gap-1.5">
             {channel.events.length > 0 ? (
               channel.events.map((eventId) => {
                 const event = EVENT_TYPES.find((e) => e.id === eventId);
                 return (
-                  <Badge key={eventId} variant="outline" className="text-xs">
+                  <Badge key={eventId} variant="outline" className="rounded-full text-xs">
                     {event ? t(event.labelKey) : eventId}
                   </Badge>
                 );
@@ -848,7 +848,7 @@ function ChannelCard({
           <Button
             variant="outline"
             size="sm"
-            className="min-w-[132px] flex-1"
+            className="min-w-[132px] flex-1 rounded-2xl"
             onClick={onTest}
           >
             <TestTube className="w-4 h-4 mr-2" />
@@ -857,7 +857,7 @@ function ChannelCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9"
+            className="h-9 w-9 rounded-2xl"
             onClick={onEdit}
           >
             <Edit className="w-4 h-4" />
@@ -865,7 +865,7 @@ function ChannelCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-destructive hover:text-destructive"
+            className="h-9 w-9 rounded-2xl text-destructive hover:text-destructive"
             onClick={onDelete}
           >
             <Trash2 className="w-4 h-4" />
@@ -909,7 +909,7 @@ function KeyAlertsCard() {
 
   return (
     <Card className={cn(
-      hasAlerts && 'border-orange-500/30 bg-orange-500/5'
+      hasAlerts ? 'border-orange-500/25 bg-orange-500/[0.06]' : 'border-border/60'
     )}>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -920,7 +920,7 @@ function KeyAlertsCard() {
             )} />
             {t('notifications.key_alerts.title')}
           </CardTitle>
-          <Button variant="ghost" size="icon" onClick={() => refetch()}>
+          <Button variant="ghost" size="icon" className="rounded-2xl" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
@@ -942,7 +942,7 @@ function KeyAlertsCard() {
             {/* Summary stats */}
             <div className="grid grid-cols-2 gap-4">
               <div className={cn(
-                'p-4 rounded-lg border',
+                'rounded-[1.35rem] border p-4',
                 alertsData.expiringCount > 0
                   ? 'bg-red-500/10 border-red-500/30'
                   : 'bg-muted/50 border-border'
@@ -964,7 +964,7 @@ function KeyAlertsCard() {
               </div>
 
               <div className={cn(
-                'p-4 rounded-lg border',
+                'rounded-[1.35rem] border p-4',
                 alertsData.trafficWarningCount > 0
                   ? 'bg-orange-500/10 border-orange-500/30'
                   : 'bg-muted/50 border-border'
@@ -998,6 +998,7 @@ function KeyAlertsCard() {
                     <div
                       key={key.id}
                       className="flex flex-col gap-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      
                     >
                       <div className="flex items-center gap-3">
                         <KeyRound className="w-4 h-4 text-red-500" />
@@ -1015,7 +1016,7 @@ function KeyAlertsCard() {
                               : `${key.daysRemaining} ${t('notifications.key_alerts.days_left')}`}
                         </Badge>
                         <Link href={`/dashboard/keys/${key.id}`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-2xl">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
                         </Link>
@@ -1078,7 +1079,7 @@ function KeyAlertsCard() {
                           {key.usagePercent}%
                         </Badge>
                         <Link href={`/dashboard/keys/${key.id}`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-2xl">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
                         </Link>
@@ -1134,7 +1135,7 @@ function QueueStatusCard() {
   });
 
   return (
-    <Card>
+    <Card className="border-border/60">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1145,7 +1146,7 @@ function QueueStatusCard() {
             {isFetching && !isLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : null}
             <Button
               variant="outline"
-              className="flex-1 sm:flex-none"
+              className="flex-1 rounded-2xl sm:flex-none"
               onClick={() => processQueueMutation.mutate({ limit: 50 })}
               disabled={processQueueMutation.isPending || isLoading}
             >
@@ -1167,23 +1168,23 @@ function QueueStatusCard() {
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-lg border p-4">
+              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.due_now')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.dueNowCount ?? 0}</p>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.pending')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.pendingCount ?? 0}</p>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.retrying')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.retryingCount ?? 0}</p>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.processing')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.processingCount ?? 0}</p>
               </div>
-              <div className="rounded-lg border p-4">
+              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.failed')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.failedCount ?? 0}</p>
               </div>
@@ -1262,7 +1263,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
   const hasActiveFilters = Boolean(deferredSearch || channelId !== 'ALL' || status !== 'ALL');
 
   return (
-    <Card>
+    <Card className="border-border/60">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1289,13 +1290,14 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             <Button
               variant={hasActiveFilters ? 'default' : 'outline'}
               size="sm"
+              className="rounded-2xl"
               onClick={() => setMobileFilterOpen(true)}
             >
               <Filter className="w-4 h-4 mr-2" />
               {t('notifications.delivery.filters')}
             </Button>
           </div>
-          <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between rounded-[1.15rem] border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             <span>
               {data?.total ?? 0} {t('notifications.delivery.results')}
             </span>
@@ -1303,7 +1305,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs"
+                className="h-7 rounded-full px-2 text-xs"
                 onClick={() => {
                   setStatus('ALL');
                   setChannelId('ALL');
@@ -1363,7 +1365,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
         </div>
 
         <Dialog open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
-          <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg rounded-[1.75rem]">
             <DialogHeader>
               <DialogTitle>{t('notifications.delivery.filters')}</DialogTitle>
               <DialogDescription>{t('notifications.delivery.filters_desc')}</DialogDescription>
@@ -1403,6 +1405,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 variant="outline"
+                className="rounded-2xl"
                 onClick={() => {
                   setStatus('ALL');
                   setChannelId('ALL');
@@ -1411,7 +1414,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
               >
                 {t('notifications.delivery.clear_filters')}
               </Button>
-              <Button onClick={() => setMobileFilterOpen(false)}>{t('notifications.dialog.cancel')}</Button>
+              <Button className="rounded-2xl" onClick={() => setMobileFilterOpen(false)}>{t('notifications.dialog.cancel')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1436,7 +1439,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             </div>
           ) : (
             logs.map((log) => (
-              <div key={log.id} className="rounded-lg border p-4 space-y-4">
+              <div key={log.id} className="rounded-[1.35rem] border border-border/60 p-4 space-y-4 bg-background/55 dark:bg-white/[0.02]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium break-words">{getEventLabel(log.event, t)}</p>
@@ -1453,7 +1456,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-muted/40 p-3">
+                  <div className="rounded-[1rem] bg-muted/40 p-3">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.channel')}
                     </p>
@@ -1461,7 +1464,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                       {getChannelLabel(log, t)}
                     </p>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-3">
+                  <div className="rounded-[1rem] bg-muted/40 p-3">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.key')}
                     </p>
@@ -1471,7 +1474,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-muted/30 p-3">
+                <div className="rounded-[1rem] bg-muted/30 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {t('notifications.delivery.message')}
                   </p>
@@ -1494,7 +1497,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                 {(log.accessKeyId || log.canRetry || log.retryQueued) ? (
                   <div className="grid gap-2 sm:grid-cols-2">
                     {log.accessKeyId ? (
-                      <Button asChild variant="outline" size="sm" className="w-full justify-center">
+                      <Button asChild variant="outline" size="sm" className="w-full justify-center rounded-2xl">
                         <Link href={`/dashboard/keys/${log.accessKeyId}`}>
                           <ExternalLink className="w-4 h-4 mr-2" />
                           {t('notifications.delivery.open_key')}
@@ -1505,7 +1508,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-center"
+                        className="w-full justify-center rounded-2xl"
                         onClick={() => retryLogMutation.mutate({ logId: log.id })}
                         disabled={retryingLogId === log.id}
                       >
@@ -1723,31 +1726,68 @@ export default function NotificationsPage() {
     setDialogOpen(true);
   };
 
+  const activeChannels = channels.filter((channel) => channel.isActive).length;
+  const subscribedEventCount = new Set(channels.flatMap((channel) => channel.events)).size;
+
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <BackButton href="/dashboard" label={t('nav.dashboard')} />
-          <h1 className="text-2xl font-bold">{t('notifications.title')}</h1>
-          <p className="text-muted-foreground">
-            {t('notifications.subtitle')}
-          </p>
+      <section className="ops-hero">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+          <div className="space-y-4">
+            <BackButton href="/dashboard" label={t('nav.dashboard')} />
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <Bell className="h-3.5 w-3.5" />
+              {t('notifications.title')}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('notifications.title')}</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('notifications.subtitle')}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleOpenCreate} className="h-11 rounded-full px-5">
+                <Plus className="w-4 h-4 mr-2" />
+                {t('notifications.add_channel')}
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('notifications.summary.channels')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.channels_desc')}</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('notifications.summary.active_channels')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.channel_inactive')}: {Math.max(0, channels.length - activeChannels)}</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('notifications.summary.coverage')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{subscribedEventCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.coverage_desc')}</p>
+            </div>
+          </div>
         </div>
-        <Button onClick={handleOpenCreate} className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          {t('notifications.add_channel')}
-        </Button>
-      </div>
+      </section>
 
       {/* Key Alerts Card - Primary feature */}
       <KeyAlertsCard />
 
       <QueueStatusCard />
 
+      <div className="grid gap-4 xl:grid-cols-2">
       {/* Info card */}
-      <Card className="bg-muted/50 border-dashed">
-        <CardContent className="p-4">
+      <Card className="border-dashed bg-background/55 dark:bg-white/[0.02]">
+        <CardContent className="p-5">
           <div className="flex gap-3">
             <Bell className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
@@ -1761,8 +1801,8 @@ export default function NotificationsPage() {
       </Card>
 
       {/* Telegram bot setup note */}
-      <Card className="border-blue-500/30 bg-blue-500/5">
-        <CardContent className="p-4">
+      <Card className="border-blue-500/20 bg-blue-500/[0.06]">
+        <CardContent className="p-5">
           <div className="flex gap-3">
             <MessageSquare className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
@@ -1775,6 +1815,7 @@ export default function NotificationsPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Channels grid */}
       {isChannelsLoading ? (

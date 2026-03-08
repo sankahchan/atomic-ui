@@ -1728,103 +1728,121 @@ export default function DynamicKeysPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t('dynamic_keys.title')}</h1>
-          <p className="text-muted-foreground">
-            {t('dynamic_keys.desc')}
-          </p>
+      <section className="ops-hero space-y-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-4">
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <KeyRound className="h-3.5 w-3.5" />
+              {t('dynamic_keys.title')}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('dynamic_keys.title')}</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('dynamic_keys.desc')}
+              </p>
+            </div>
+          </div>
+          <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
+            <Button variant="outline" size="sm" className="h-11 rounded-full border-border/70 bg-background/70 px-5" asChild>
+              <Link href="/dashboard/archived">
+                <Archive className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
+              </Link>
+            </Button>
+            <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-11 rounded-full px-5">
+              <Plus className="w-4 h-4 mr-2" />
+              {t('dynamic_keys.create')}
+            </Button>
+          </div>
         </div>
-        <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
-          <Button variant="outline" size="sm" className="h-8" asChild>
-            <Link href="/dashboard/archived">
-              <Archive className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
-            </Link>
-          </Button>
-          <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-8">
+
+        <div className="grid gap-2 sm:hidden">
+          <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
             <Plus className="w-4 h-4 mr-2" />
             {t('dynamic_keys.create')}
           </Button>
+          <Button variant="outline" className="h-11 w-full justify-center rounded-full" asChild>
+            <Link href="/dashboard/archived">
+              <Archive className="w-4 h-4 mr-2" />
+              {t('nav.archived') || 'Archived'}
+            </Link>
+          </Button>
         </div>
-      </div>
 
-      <div className="grid gap-2 sm:hidden">
-        <Button onClick={() => setCreateDialogOpen(true)} className="w-full justify-center">
-          <Plus className="w-4 h-4 mr-2" />
-          {t('dynamic_keys.create')}
-        </Button>
-        <Button variant="outline" className="w-full justify-center" asChild>
-          <Link href="/dashboard/archived">
-            <Archive className="w-4 h-4 mr-2" />
-            {t('nav.archived') || 'Archived'}
-          </Link>
-        </Button>
-      </div>
-
-      {/* Stats cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">{t('dynamic_keys.total_keys')}</p>
-            </div>
-            <p className="text-2xl font-bold">{stats.total}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <p className="text-sm text-green-500">{t('dynamic_keys.active_keys')}</p>
-            </div>
-            <p className="text-2xl font-bold">{stats.active}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              <div className="flex items-center gap-1">
-                <p className="text-sm text-green-500">{t('dynamic_keys.online_users')}</p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="w-3 h-3 text-green-500/50" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('dynamic_keys.online_tooltip')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+        {stats && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:bg-white/[0.02]">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">{t('dynamic_keys.total_keys')}</p>
               </div>
+              <p className="mt-4 text-2xl font-semibold">{stats.total}</p>
             </div>
-            <p className="text-2xl font-bold">{onlineCount}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <Shuffle className="w-4 h-4 text-purple-500" />
-              <p className="text-sm text-purple-500">{t('dynamic_keys.type.self_managed')}</p>
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                </div>
+                <p className="text-sm font-medium text-green-500">{t('dynamic_keys.active_keys')}</p>
+              </div>
+              <p className="mt-4 text-2xl font-semibold">{stats.active}</p>
             </div>
-            <p className="text-2xl font-bold">{stats.selfManaged}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-blue-500" />
-              <p className="text-sm text-blue-500">{t('dynamic_keys.type.manual')}</p>
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <p className="text-sm font-medium text-green-500">{t('dynamic_keys.online_users')}</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <HelpCircle className="h-3 w-3 text-green-500/50" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('dynamic_keys.online_tooltip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+              <p className="mt-4 text-2xl font-semibold">{onlineCount}</p>
             </div>
-            <p className="text-2xl font-bold">{stats.manual}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-primary" />
-              <p className="text-sm text-muted-foreground">{t('dynamic_keys.total_usage')}</p>
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-purple-500/20 bg-purple-500/10">
+                  <Shuffle className="h-4 w-4 text-purple-500" />
+                </div>
+                <p className="text-sm font-medium text-purple-500">{t('dynamic_keys.type.self_managed')}</p>
+              </div>
+              <p className="mt-4 text-2xl font-semibold">{stats.selfManaged}</p>
             </div>
-            <p className="text-2xl font-bold">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
-          </Card>
-        </div>
-      )}
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
+                  <Settings className="h-4 w-4 text-blue-500" />
+                </div>
+                <p className="text-sm font-medium text-blue-500">{t('dynamic_keys.type.manual')}</p>
+              </div>
+              <p className="mt-4 text-2xl font-semibold">{stats.manual}</p>
+            </div>
+            <div className="ops-kpi-tile">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+                  <HardDrive className="h-4 w-4 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">{t('dynamic_keys.total_usage')}</p>
+              </div>
+              <p className="mt-4 text-2xl font-semibold">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
+            </div>
+          </div>
+        )}
+      </section>
 
       <div className="space-y-3 md:hidden">
         <div className="flex items-center gap-2">

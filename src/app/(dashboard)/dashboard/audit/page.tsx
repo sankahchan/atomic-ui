@@ -400,38 +400,40 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <BackButton href="/dashboard" label={t('nav.dashboard')} />
-          <h1 className="text-2xl font-bold tracking-tight">{t('nav.audit')}</h1>
-          <p className="text-muted-foreground">
-            {t('audit.subtitle')}
-          </p>
-        </div>
+      <section className="ops-hero">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+          <div className="space-y-4">
+            <BackButton href="/dashboard" label={t('nav.dashboard')} />
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <ScrollText className="h-3.5 w-3.5" />
+              {t('nav.audit')}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('nav.audit')}</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('audit.subtitle')}
+              </p>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:min-w-[360px]">
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">{t('audit.summary.total_entries')}</p>
-              <p className="text-2xl font-bold">{totalEntries}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">{t('audit.summary.current_page')}</p>
-              <p className="text-2xl font-bold">{page}</p>
-            </CardContent>
-          </Card>
-          <Card className="col-span-2 md:col-span-1">
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">{t('audit.summary.visible_rows')}</p>
-              <p className="text-2xl font-bold">{currentItems.length}</p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
+              <p className="mt-3 text-2xl font-semibold">{totalEntries}</p>
+            </div>
+            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.current_page')}</p>
+              <p className="mt-3 text-2xl font-semibold">{page}</p>
+            </div>
+            <div className="col-span-2 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 md:col-span-1 dark:bg-white/[0.02]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
+              <p className="mt-3 text-2xl font-semibold">{currentItems.length}</p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <Card>
+      <Card className="border-border/60">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="w-4 h-4 text-primary" />
@@ -456,7 +458,7 @@ export default function AuditPage() {
             <div className="space-y-2">
               <Label>{t('audit.filters.entity')}</Label>
               <Select value={entityFilter} onValueChange={handleEntityChange}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-2xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -472,7 +474,7 @@ export default function AuditPage() {
             <div className="space-y-2">
               <Label>{t('audit.filters.actor')}</Label>
               <Select value={userFilter} onValueChange={handleUserChange}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-2xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -509,7 +511,7 @@ export default function AuditPage() {
             <div className="space-y-2">
               <Label>{t('audit.filters.rows_per_page')}</Label>
               <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-2xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -537,7 +539,7 @@ export default function AuditPage() {
               <Button variant="outline" size="sm" onClick={clearFilters}>
                 {t('audit.filters.clear')}
               </Button>
-              <Button size="sm" onClick={handleExportCsv} disabled={hasInvalidDateRange || isExportingCsv}>
+              <Button size="sm" className="rounded-2xl" onClick={handleExportCsv} disabled={hasInvalidDateRange || isExportingCsv}>
                 {isExportingCsv ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -550,7 +552,7 @@ export default function AuditPage() {
         </CardContent>
       </Card>
 
-      <div className="hidden md:block rounded-md border bg-card overflow-hidden">
+      <div className="hidden overflow-hidden rounded-[1.75rem] border border-border/60 bg-card md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -664,7 +666,7 @@ export default function AuditPage() {
         )}
       />
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 rounded-[1.5rem] border border-border/60 bg-background/55 px-4 py-3 dark:bg-white/[0.02]">
         <p className="text-sm text-muted-foreground">
           {formatTemplate(t('audit.pagination.page_of'), { page, total: totalPages })}
         </p>
@@ -672,6 +674,7 @@ export default function AuditPage() {
           <Button
             variant="outline"
             size="sm"
+            className="rounded-2xl"
             onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             disabled={page <= 1}
           >
@@ -681,6 +684,7 @@ export default function AuditPage() {
           <Button
             variant="outline"
             size="sm"
+            className="rounded-2xl"
             onClick={() => setPage((prev) => prev + 1)}
             disabled={page >= totalPages}
           >

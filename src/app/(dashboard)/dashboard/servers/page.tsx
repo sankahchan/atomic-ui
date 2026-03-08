@@ -12,28 +12,70 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocale } from '@/hooks/use-locale';
 import { ServerList } from '@/components/servers/server-list';
 import { ServerHealthMonitor } from '@/components/servers/server-health-monitor';
+import { Activity, Server, ShieldCheck } from 'lucide-react';
 
 export default function ServersPage() {
   const { t } = useLocale();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t('servers.title')}</h1>
-          <p className="text-muted-foreground">
-            {t('servers.subtitle')}
-          </p>
+      <section className="ops-hero">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+          <div className="space-y-4">
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <Server className="h-3.5 w-3.5" />
+              {t('servers.hero_label')}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                {t('servers.title')}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('servers.subtitle')}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="rounded-[1.4rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                  <Server className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{t('servers.hero_overview_title')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('servers.hero_overview_desc')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.4rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{t('servers.hero_health_title')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('servers.hero_health_desc')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2">
-          <TabsTrigger value="overview" className="min-w-0 whitespace-normal px-3 py-2 text-xs sm:text-sm">
-            Overview
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-[1.6rem] border border-border/60 bg-background/55 p-1.5 dark:bg-white/[0.02]">
+          <TabsTrigger value="overview" className="min-w-0 rounded-[1.25rem] px-3 py-3 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:text-sm">
+            <span className="inline-flex items-center gap-2">
+              <Server className="h-4 w-4" />
+              {t('servers.tab_overview')}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="health" className="min-w-0 whitespace-normal px-3 py-2 text-xs sm:text-sm">
-            Health & Monitoring
+          <TabsTrigger value="health" className="min-w-0 rounded-[1.25rem] px-3 py-3 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:text-sm">
+            <span className="inline-flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              {t('servers.tab_health')}
+            </span>
           </TabsTrigger>
         </TabsList>
 

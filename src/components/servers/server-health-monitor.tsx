@@ -93,7 +93,7 @@ export function ServerHealthMonitor() {
             <div className="flex justify-stretch sm:justify-end">
                 <Button
                     variant="outline"
-                    className="w-full sm:w-auto"
+                    className="w-full rounded-2xl sm:w-auto"
                     onClick={() => refetch()}
                     disabled={isLoading}
                 >
@@ -143,7 +143,7 @@ export function ServerHealthMonitor() {
             </div>
 
             {/* Health status explanation */}
-            <Card className="bg-muted/50 border-dashed">
+            <Card className="border-dashed bg-background/55 dark:bg-white/[0.02]">
                 <CardContent className="p-4">
                     <div className="flex gap-3">
                         <Activity className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
@@ -169,7 +169,7 @@ export function ServerHealthMonitor() {
             {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(6)].map((_, i) => (
-                        <div key={i} className="h-64 bg-muted rounded-xl animate-pulse" />
+                        <div key={i} className="h-64 rounded-[1.75rem] bg-muted animate-pulse" />
                     ))}
                 </div>
             ) : serverStatus && serverStatus.length > 0 ? (
