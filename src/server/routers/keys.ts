@@ -20,6 +20,7 @@ import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
 import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
+import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 
 /**
  * Validation schema for creating a new access key.
@@ -42,7 +43,8 @@ const ONLINE_SESSION_WINDOW_MS = 60 * 1000;
 const MIN_LIVE_ACTIVITY_BYTES = BigInt(1024);
 
 const createKeySchema = z.object({
-  serverId: z.string(),
+  serverId: z.string().optional().nullable(),
+  assignmentMode: z.enum(['MANUAL', 'AUTO']).default('MANUAL'),
   name: z.string().min(1, 'Name is required').max(100),
   email: z.string().email().optional().nullable(),
   telegramId: z.string().optional().nullable(),
@@ -372,9 +374,30 @@ export const keysRouter = router({
   create: adminProcedure
     .input(createKeySchema)
     .mutation(async ({ input }) => {
+      let targetServerId = input.serverId ?? null;
+
+      if (input.assignmentMode === 'AUTO') {
+        const recommendedServer = await selectLeastLoadedServer();
+        if (!recommendedServer) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'No assignable server is available for automatic placement.',
+          });
+        }
+
+        targetServerId = recommendedServer.serverId;
+      }
+
+      if (!targetServerId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Please select a server or use automatic placement.',
+        });
+      }
+
       // Fetch the server
       const server = await db.server.findUnique({
-        where: { id: input.serverId },
+        where: { id: targetServerId },
       });
 
       if (!server) {
@@ -424,7 +447,7 @@ export const keysRouter = router({
             telegramId: input.telegramId,
             notes: input.notes,
             userId: input.userId, // Assign to user if provided
-            serverId: input.serverId,
+            serverId: targetServerId,
             accessUrl: outlineKey.accessUrl,
             password: outlineKey.password,
             port: outlineKey.port,

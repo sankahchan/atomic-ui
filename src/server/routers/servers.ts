@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger';
 import { acquireSyncLock, releaseSyncLock, getSyncLockStatus } from '@/lib/sync-lock';
 import { writeAuditLog } from '@/lib/audit';
 import { CONNECTION_SESSION_TIMEOUT_MS } from '@/lib/services/session-management';
-import { serverLifecycleModeSchema } from '@/lib/services/server-lifecycle';
+import { canAssignKeysToServer, serverLifecycleModeSchema } from '@/lib/services/server-lifecycle';
 
 /**
  * Input validation schema for creating a new server.
@@ -917,6 +917,117 @@ export const serversRouter = router({
     .query(async ({ input }) => {
       const { getServerLoadStats } = await import('@/lib/services/load-balancer');
       return getServerLoadStats(input?.serverTagIds);
+    }),
+
+  /**
+   * Recommend the best current target for new access keys.
+   */
+  recommendAssignmentTarget: adminProcedure
+    .input(z.object({
+      serverTagIds: z.array(z.string()).optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const { selectLeastLoadedServer } = await import('@/lib/services/load-balancer');
+      return selectLeastLoadedServer(input?.serverTagIds);
+    }),
+
+  /**
+   * Generate rebalance recommendations for overloaded servers.
+   */
+  rebalancePlan: adminProcedure
+    .input(z.object({
+      serverIds: z.array(z.string()).optional(),
+      maxMoves: z.number().int().min(1).max(10).default(3),
+    }).optional())
+    .query(async ({ input }) => {
+      const { getServerRebalancePlan } = await import('@/lib/services/load-balancer');
+      return getServerRebalancePlan({
+        serverIds: input?.serverIds,
+        maxMoves: input?.maxMoves,
+      });
+    }),
+
+  /**
+   * Apply one rebalance recommendation by moving selected keys.
+   */
+  applyRebalance: adminProcedure
+    .input(z.object({
+      sourceServerId: z.string(),
+      targetServerId: z.string(),
+      keyIds: z.array(z.string()).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceServerId === input.targetServerId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Source and target servers must be different.',
+        });
+      }
+
+      const targetServer = await db.server.findUnique({
+        where: { id: input.targetServerId },
+        include: {
+          _count: {
+            select: {
+              accessKeys: {
+                where: {
+                  status: { in: ['ACTIVE', 'PENDING'] },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!targetServer) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target server not found.',
+        });
+      }
+
+      const assignmentCheck = canAssignKeysToServer(targetServer);
+      if (!assignmentCheck.allowed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: assignmentCheck.reason,
+        });
+      }
+
+      if (
+        targetServer.maxKeys &&
+        targetServer._count.accessKeys + input.keyIds.length > targetServer.maxKeys
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Target server does not have enough free capacity for this rebalance.',
+        });
+      }
+
+      const { migrateKeys } = await import('@/lib/services/server-migration');
+      const result = await migrateKeys(
+        input.sourceServerId,
+        input.targetServerId,
+        input.keyIds,
+        true,
+      );
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'SERVER_REBALANCED',
+        entity: 'SERVER',
+        entityId: input.sourceServerId,
+        details: {
+          sourceServerId: input.sourceServerId,
+          targetServerId: input.targetServerId,
+          keyIds: input.keyIds,
+          migrated: result.migrated,
+          failed: result.failed,
+        },
+        ip: ctx.clientIp,
+      });
+
+      return result;
     }),
 
   /**

@@ -82,6 +82,7 @@ import {
   LinkIcon as LinkCopy,
   Pencil,
   ArrowRightLeft,
+  Sparkles,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { TrafficSparkline } from '@/components/ui/traffic-chart';
@@ -170,7 +171,7 @@ function CreateKeyDialog({
     userId: string;
     templateId: string;
   }>({
-    serverId: '',
+    serverId: 'auto',
     name: '',
     email: '',
     telegramId: '',
@@ -191,6 +192,9 @@ function CreateKeyDialog({
 
   // Fetch servers for selection
   const { data: servers } = trpc.servers.list.useQuery(undefined, {
+    enabled: open,
+  });
+  const smartAssignmentQuery = trpc.servers.recommendAssignmentTarget.useQuery(undefined, {
     enabled: open,
   });
   // Fetch users for assignment
@@ -227,7 +231,7 @@ function CreateKeyDialog({
 
   const resetForm = () => {
     setFormData({
-      serverId: '',
+      serverId: 'auto',
       name: '',
       email: '',
       telegramId: '',
@@ -301,7 +305,8 @@ function CreateKeyDialog({
     }
 
     createMutation.mutate({
-      serverId: formData.serverId,
+      serverId: formData.serverId === 'auto' ? undefined : formData.serverId,
+      assignmentMode: formData.serverId === 'auto' ? 'AUTO' : 'MANUAL',
       name: formData.name,
       email: formData.email || undefined,
       telegramId: formData.telegramId || undefined,
@@ -361,6 +366,7 @@ function CreateKeyDialog({
                 <SelectValue placeholder={t('keys.form.server_placeholder')} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="auto">{t('keys.form.server_auto')}</SelectItem>
                 {servers?.map((server) => (
                   <SelectItem key={server.id} value={server.id}>
                     {server.countryCode && getCountryFlag(server.countryCode)}{' '}
@@ -369,6 +375,34 @@ function CreateKeyDialog({
                 ))}
               </SelectContent>
             </Select>
+            {formData.serverId === 'auto' && (
+              <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="mt-0.5 h-4 w-4 text-cyan-500" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">
+                      {t('keys.form.server_auto_help')}
+                    </p>
+                    {smartAssignmentQuery.isLoading ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('keys.form.server_auto_loading')}
+                      </p>
+                    ) : smartAssignmentQuery.data ? (
+                      <p className="text-xs text-muted-foreground">
+                        {fillTemplate(t('keys.form.server_auto_recommended'), {
+                          server: `${smartAssignmentQuery.data.countryCode ? `${getCountryFlag(smartAssignmentQuery.data.countryCode)} ` : ''}${smartAssignmentQuery.data.serverName}`,
+                          score: smartAssignmentQuery.data.loadScore,
+                        })}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-600 dark:text-amber-300">
+                        {t('keys.form.server_auto_unavailable')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Key name */}

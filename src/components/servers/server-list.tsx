@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -21,9 +22,19 @@ import {
     Download,
     Upload,
     Loader2,
+    ArrowRightLeft,
+    Sparkles,
+    AlertTriangle,
 } from 'lucide-react';
 import { ServerCard } from './server-card';
 import { AddServerDialog } from './add-server-dialog';
+
+function formatTemplate(template: string, values: Record<string, string | number>) {
+    return Object.entries(values).reduce(
+        (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+        template,
+    );
+}
 
 /**
  * ServerList Component
@@ -46,6 +57,10 @@ export function ServerList() {
     const { data: servers, isLoading, refetch } = trpc.servers.list.useQuery({
         includeInactive: true,
     });
+    const rebalancePlanQuery = trpc.servers.rebalancePlan.useQuery({
+        maxMoves: 4,
+    });
+    const smartAssignmentQuery = trpc.servers.recommendAssignmentTarget.useQuery();
 
     // Sync server mutation
     const syncMutation = trpc.servers.sync.useMutation({
@@ -108,6 +123,28 @@ export function ServerList() {
         },
         onError: (error) => {
             toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const applyRebalanceMutation = trpc.servers.applyRebalance.useMutation({
+        onSuccess: (result) => {
+            toast({
+                title: t('servers.rebalance.applied_title'),
+                description: formatTemplate(t('servers.rebalance.applied_desc'), {
+                    migrated: result.migrated,
+                    failed: result.failed,
+                }),
+            });
+            void refetch();
+            void rebalancePlanQuery.refetch();
+            void smartAssignmentQuery.refetch();
+        },
+        onError: (error) => {
+            toast({
+                title: t('servers.rebalance.apply_failed'),
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
 
@@ -269,6 +306,148 @@ export function ServerList() {
                     </Button>
                 </div>
             </div>
+
+            {servers && servers.length > 1 && (
+                <div className="ops-panel space-y-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                            <p className="ops-section-heading">{t('servers.rebalance.heading')}</p>
+                            <div>
+                                <h3 className="text-lg font-semibold">{t('servers.rebalance.title')}</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {t('servers.rebalance.desc')}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="rounded-full border border-border/60 px-3 py-1">
+                                {formatTemplate(t('servers.rebalance.overloaded_badge'), {
+                                    count: rebalancePlanQuery.data?.summary.overloadedServers ?? 0,
+                                })}
+                            </Badge>
+                            <Button
+                                variant="outline"
+                                className="rounded-2xl"
+                                onClick={() => {
+                                    void rebalancePlanQuery.refetch();
+                                    void smartAssignmentQuery.refetch();
+                                }}
+                                disabled={rebalancePlanQuery.isFetching || smartAssignmentQuery.isFetching}
+                            >
+                                <RefreshCw className={cn('mr-2 h-4 w-4', (rebalancePlanQuery.isFetching || smartAssignmentQuery.isFetching) && 'animate-spin')} />
+                                {t('servers.rebalance.refresh')}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+                        <div className="rounded-[1.5rem] border border-cyan-500/15 bg-cyan-500/5 p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                                    <Sparkles className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 space-y-1">
+                                    <p className="text-sm font-semibold">{t('servers.rebalance.smart_assignment_title')}</p>
+                                    <p className="text-xs leading-6 text-muted-foreground">
+                                        {t('servers.rebalance.smart_assignment_desc')}
+                                    </p>
+                                    {smartAssignmentQuery.isLoading ? (
+                                        <p className="text-sm text-muted-foreground">{t('servers.rebalance.loading')}</p>
+                                    ) : smartAssignmentQuery.data ? (
+                                        <>
+                                            <p className="text-base font-semibold text-foreground">
+                                                {smartAssignmentQuery.data.countryCode && `${getCountryFlag(smartAssignmentQuery.data.countryCode)} `}
+                                                {smartAssignmentQuery.data.serverName}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatTemplate(t('servers.rebalance.smart_assignment_meta'), {
+                                                    score: smartAssignmentQuery.data.loadScore,
+                                                    active: smartAssignmentQuery.data.activeKeyCount,
+                                                })}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-sm text-amber-600 dark:text-amber-300">
+                                            {t('servers.rebalance.smart_assignment_empty')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {rebalancePlanQuery.isLoading ? (
+                                <div className="rounded-[1.5rem] border border-border/60 bg-background/50 p-4 text-sm text-muted-foreground">
+                                    {t('servers.rebalance.loading')}
+                                </div>
+                            ) : rebalancePlanQuery.data?.recommendations.length ? (
+                                rebalancePlanQuery.data.recommendations.map((recommendation) => {
+                                    const recommendationId = `${recommendation.sourceServerId}:${recommendation.targetServerId}`;
+
+                                    return (
+                                        <div key={recommendationId} className="rounded-[1.5rem] border border-border/60 bg-background/50 p-4">
+                                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                                <div className="min-w-0 space-y-2">
+                                                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                        <span>
+                                                            {recommendation.sourceServerCountryCode && `${getCountryFlag(recommendation.sourceServerCountryCode)} `}
+                                                            {recommendation.sourceServerName}
+                                                        </span>
+                                                        <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                                                        <span>
+                                                            {recommendation.targetServerCountryCode && `${getCountryFlag(recommendation.targetServerCountryCode)} `}
+                                                            {recommendation.targetServerName}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs leading-6 text-muted-foreground">
+                                                        {formatTemplate(t('servers.rebalance.recommendation_meta'), {
+                                                            count: recommendation.keyCount,
+                                                            sourceScore: recommendation.sourceLoadScore,
+                                                            targetScore: recommendation.targetLoadScore,
+                                                        })}
+                                                    </p>
+                                                    <p className="text-sm text-foreground/90">{recommendation.reason}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatTemplate(t('servers.rebalance.recommendation_keys'), {
+                                                            keys: recommendation.keyNames.join(', '),
+                                                        })}
+                                                    </p>
+                                                </div>
+
+                                                <Button
+                                                    className="rounded-2xl"
+                                                    onClick={() => applyRebalanceMutation.mutate({
+                                                        sourceServerId: recommendation.sourceServerId,
+                                                        targetServerId: recommendation.targetServerId,
+                                                        keyIds: recommendation.keyIds,
+                                                    })}
+                                                    disabled={applyRebalanceMutation.isPending}
+                                                >
+                                                    {applyRebalanceMutation.isPending ? (
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                    )}
+                                                    {t('servers.rebalance.apply')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="rounded-[1.5rem] border border-emerald-500/15 bg-emerald-500/5 p-4">
+                                    <p className="text-sm font-semibold text-foreground">{t('servers.rebalance.empty_title')}</p>
+                                    <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                                        {t('servers.rebalance.empty_desc')}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Server grid */}
             {isLoading ? (
