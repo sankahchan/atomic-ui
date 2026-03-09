@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "NODE_OPTIONS='--max-old-space-size=1024' next build",
+    "build:low-memory": "bash scripts/build-low-memory.sh",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
@@ -20,7 +21,10 @@
     "setup": "npx tsx scripts/setup.ts",
     "change-password": "npx tsx scripts/change-credentials.ts",
     "password:change": "tsx scripts/change-password.ts",
-    "test": "tsx --test src/lib/services/*.test.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "smoke": "tsx scripts/smoke-test.ts",
+    "env:check": "tsx scripts/validate-production.ts",
+    "deploy:vps": "bash scripts/deploy-vps.sh",
     "postinstall": "prisma generate"
   },
   "dependencies": {

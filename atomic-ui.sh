@@ -394,7 +394,7 @@ build_app() {
     cd "$INSTALL_DIR" || return 1
     rm -rf .next
     
-    if ! npm run build 2>&1; then
+    if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
         print_error "Build failed"
         print_info "Please check the build output above for errors"
         return 1
@@ -1158,7 +1158,7 @@ EOF
         print_success "APP_URL updated"
 
         print_step "Rebuilding application with new URL..."
-        npm run build
+        NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
         systemctl restart ${SERVICE_NAME}
         print_success "Application restarted with new domain"
     fi
@@ -1413,7 +1413,7 @@ update_service() {
     npx prisma db push
     
     print_step "Building application..."
-    npm run build
+    NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
     
     # Update management script
     cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui

@@ -88,6 +88,8 @@ Set these in `.env` before production use:
 | `SMTP_PASS` | Optional | SMTP password; pair with `SMTP_USER` if auth is required |
 | `SMTP_FROM` | Optional | Default sender address for `EMAIL` notification channels |
 | `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from UI |
+| `LOG_LEVEL` | Optional | `debug`, `info`, `warn`, or `error` (default: `info` in production) |
+| `LOG_VERBOSE_SCOPES` | Optional | Comma-separated debug scopes such as `sync,trpc` for temporary deep logs |
 
 ## Security checklist
 
@@ -97,13 +99,42 @@ Set these in `.env` before production use:
 - Restrict access to backup/export/admin routes to trusted users only.
 - Rotate credentials after initial setup.
 
+## Production readiness
+
+Run these before or after a production deploy:
+
+```bash
+npm run env:check -- --env-file=.env
+npm run build:low-memory
+npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
+```
+
+The live smoke test is intended for a running instance and verifies:
+- login mutation succeeds
+- dashboard routes respond
+- server/key/dynamic-key detail screens resolve when records exist
+
+## Backup and restore drill
+
+Use this short drill before major upgrades:
+
+1. Create a fresh backup from the dashboard.
+2. Copy the backup file off the VPS.
+3. Restore the backup into a staging or disposable instance.
+4. Run `npm run smoke` against that restored instance.
+5. Confirm you can log in and that keys/servers are visible before touching production.
+
 ## Useful scripts
 
 ```bash
 npm run dev
 npm run build
+npm run build:low-memory
 npm run start
 npm run lint
+npm run env:check -- --env-file=.env
+npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
+npm run deploy:vps
 npm run db:generate
 npm run db:push
 npm run db:migrate

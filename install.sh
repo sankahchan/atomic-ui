@@ -194,6 +194,26 @@ cp .env.example .env
 # Generate secure JWT secret
 JWT_SECRET=$(openssl rand -base64 32)
 sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
+TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
+CRON_SECRET=$(openssl rand -hex 24)
+
+if grep -q "^TOTP_ENCRYPTION_KEY=" .env; then
+    sed -i "s|^TOTP_ENCRYPTION_KEY=.*|TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}|g" .env
+else
+    echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
+fi
+
+if grep -q "^CRON_SECRET=" .env; then
+    sed -i "s|^CRON_SECRET=.*|CRON_SECRET=${CRON_SECRET}|g" .env
+else
+    echo "CRON_SECRET=${CRON_SECRET}" >> .env
+fi
+
+if grep -q "^LOG_LEVEL=" .env; then
+    sed -i "s|^LOG_LEVEL=.*|LOG_LEVEL=info|g" .env
+else
+    echo "LOG_LEVEL=info" >> .env
+fi
 
 # Get server IP
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
@@ -246,9 +266,16 @@ if ! npm run setup 2>&1; then
 fi
 echo -e "${GREEN}[✓]${NC} Database ready"
 
+# Validate generated production env before build
+echo -e "${BLUE}[*]${NC} Validating production environment..."
+if ! npm run env:check -- --env-file=.env 2>&1; then
+    echo -e "${RED}[✗]${NC} Environment validation failed"
+    exit 1
+fi
+
 # Build
 echo -e "${BLUE}[*]${NC} Building application..."
-if ! npm run build 2>&1; then
+if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
     echo -e "${RED}[✗]${NC} Build failed"
     echo -e "${YELLOW}[!]${NC} Please check the build output above for errors"
     exit 1
@@ -259,12 +286,6 @@ if [ ! -d "$INSTALL_DIR/.next" ]; then
     exit 1
 fi
 echo -e "${GREEN}[✓]${NC} Build complete"
-
-# Copy standalone files for production
-echo -e "${BLUE}[*]${NC} Setting up standalone production build..."
-cp -r .next/standalone/* ./
-cp -r .next/static .next/static 2>/dev/null || true
-cp -r public ./public 2>/dev/null || true
 
 # Create service with random port (using standalone for low memory)
 echo -e "${BLUE}[*]${NC} Creating systemd service..."

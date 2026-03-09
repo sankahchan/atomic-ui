@@ -6,6 +6,7 @@
  */
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { createOutlineClient } from '@/lib/outline-api';
 import { sendAdminAlert } from '@/lib/services/telegram-bot';
 
@@ -118,7 +119,7 @@ export async function runHealthChecks(): Promise<{
                 const statusText = isNowDown ? 'DOWN' : 'UP';
                 const statusMsg = `${statusEmoji} <b>Server Alert:</b> ${server.name} is now <b>${statusText}</b>`;
 
-                console.log(`🔔 ${statusMsg.replace(/<[^>]*>/g, '')}`);
+                logger.info(`Server alert state changed: ${server.name} is now ${statusText}`);
                 await sendAdminAlert(statusMsg);
             }
         }

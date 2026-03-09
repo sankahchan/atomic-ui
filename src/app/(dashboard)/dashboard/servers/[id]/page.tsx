@@ -349,6 +349,13 @@ export default function ServerDetailPage() {
   }
 
   const healthStatus = server.healthCheck?.lastStatus || 'UNKNOWN';
+  const activeKeyCount = server.accessKeys?.filter((key) => key.status === 'ACTIVE').length || 0;
+  const expiringSoonCount = server.accessKeys?.filter((key) => {
+    if (!key.expiresAt) return false;
+    const now = new Date();
+    const inSevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return key.expiresAt >= now && key.expiresAt <= inSevenDays;
+  }).length || 0;
   const statusConfig = {
     UP: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle2, labelKey: 'health.status.UP' },
     DOWN: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, labelKey: 'health.status.DOWN' },
@@ -360,123 +367,128 @@ export default function ServerDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with back button */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/servers">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            {server.countryCode && (
-              <span className="text-3xl">{getCountryFlag(server.countryCode)}</span>
-            )}
-            <div>
-              <h1 className="text-2xl font-bold">{server.name}</h1>
-              {server.location && (
-                <p className="text-muted-foreground">{server.location}</p>
-              )}
+      <section className="ops-hero">
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="ghost" size="icon" asChild className="rounded-full">
+                  <Link href="/dashboard/servers">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Link>
+                </Button>
+                <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                  <Server className="h-3.5 w-3.5" />
+                  Server Detail
+                </span>
+                {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'rounded-full px-3 py-1',
+                      server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
+                      server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
+                    )}
+                  >
+                    {server.lifecycleMode}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="flex items-start gap-4">
+                {server.countryCode ? (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-cyan-500/20 bg-cyan-500/10 text-3xl">
+                    {getCountryFlag(server.countryCode)}
+                  </div>
+                ) : null}
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{server.name}</h1>
+                  <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                    {server.location || 'Managed Outline server'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {server.tags.map((tag) => (
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        className="rounded-full"
+                        style={{ borderColor: tag.color, color: tag.color }}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <Button
+                variant="outline"
+                className="h-11 rounded-full px-5"
+                onClick={() => syncMutation.mutate({ id: serverId })}
+                disabled={syncMutation.isPending}
+              >
+                <RefreshCw className={cn('w-4 h-4 mr-2', syncMutation.isPending && 'animate-spin')} />
+                {t('server_details.sync')}
+              </Button>
+              <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+                <Edit2 className="w-4 h-4 mr-2" />
+                {t('server_details.edit')}
+              </Button>
+              <Button asChild className="h-11 rounded-full px-5">
+                <Link href={`/dashboard/keys?server=${serverId}`}>
+                  <Key className="w-4 h-4 mr-2" />
+                  {t('server_details.keys.view_all')}
+                </Link>
+              </Button>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
-            <Badge variant="outline" className={cn(
-              server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
-              server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
-            )}>
-              {server.lifecycleMode}
-            </Badge>
-          ) : null}
-          <Button
-            variant="outline"
-            onClick={() => syncMutation.mutate({ id: serverId })}
-            disabled={syncMutation.isPending}
-          >
-            <RefreshCw className={cn('w-4 h-4 mr-2', syncMutation.isPending && 'animate-spin')} />
-            {t('server_details.sync')}
-          </Button>
-          <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
-            <Edit2 className="w-4 h-4 mr-2" />
-            {t('server_details.edit')}
-          </Button>
-        </div>
-      </div>
 
-      {/* Tags */}
-      {server.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {server.tags.map((tag) => (
-            <Badge
-              key={tag.id}
-              variant="outline"
-              style={{ borderColor: tag.color, color: tag.color }}
-            >
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className={cn('p-2 rounded-lg', `${status.bg}/20`)}>
-              <StatusIcon className={cn('w-5 h-5', status.color)} />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.explanation.title')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{t(status.labelKey)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.healthCheck?.lastCheckedAt ? `Checked ${formatRelativeTime(server.healthCheck.lastCheckedAt)}` : 'No recent probe'}
+              </p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t('health.explanation.title')}</p>
-              <p className="text-lg font-semibold">{t(status.labelKey)}</p>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Active Keys
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{activeKeyCount}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.accessKeys?.length || 0} total assigned
+              </p>
             </div>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/20">
-              <Key className="w-5 h-5 text-primary" />
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.metrics.latency')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {server.healthCheck?.lastLatencyMs ? `${server.healthCheck.lastLatencyMs}ms` : '-'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {expiringSoonCount} keys expiring within 7 days
+              </p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t('server_details.keys.title')}</p>
-              <p className="text-lg font-semibold">{server.accessKeys?.length || 0}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20">
-              <Wifi className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t('health.metrics.latency')}</p>
-              <p className="text-lg font-semibold">
-                {server.healthCheck?.lastLatencyMs
-                  ? `${server.healthCheck.lastLatencyMs}ms`
-                  : '-'}
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.metrics.uptime')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {server.healthCheck?.uptimePercent ? `${server.healthCheck.uptimePercent.toFixed(1)}%` : '-'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.lastSyncAt ? `Synced ${formatRelativeTime(server.lastSyncAt)}` : 'Sync pending'}
               </p>
             </div>
           </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/20">
-              <BarChart3 className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t('health.metrics.uptime')}</p>
-              <p className="text-lg font-semibold">
-                {server.healthCheck?.uptimePercent
-                  ? `${server.healthCheck.uptimePercent.toFixed(1)}%`
-                  : '-'}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Server Info */}

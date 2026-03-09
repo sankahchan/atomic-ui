@@ -1,7 +1,7 @@
 # Atomic-UI Deployment Guide
 
-This guide describes how to deploy Atomic-UI for production use.
-The recommended deployment method is using **Docker** and **Docker Compose**, which ensures all dependencies (including the database) are handled correctly.
+This guide covers both Docker and direct VPS/systemd deployment.
+For low-memory VPS hosts, prefer the built-in low-memory build flow and smoke checks from this repository.
 
 ## Prerequisites
 
@@ -37,7 +37,15 @@ NODE_ENV=production
 HEALTH_CHECK_ENABLED=true
 ```
 
-### 3. Build and Start
+### 3. Validate Environment
+Before the first production build, validate the generated `.env`:
+
+```bash
+npm install
+npm run env:check -- --env-file=.env
+```
+
+### 4. Build and Start
 Run the following command to build and start the container:
 ```bash
 docker-compose up -d --build
@@ -45,17 +53,73 @@ docker-compose up -d --build
 
 Atomic-UI will be available at `http://your-server-ip:3000`.
 
-### 4. Initial Setup
+### 5. Initial Setup
 On the first run, the database will be initialized automatically.
 Check the logs to get the default admin credentials:
 ```bash
 docker-compose logs -f atomic-ui
 ```
-Look for:
+Look for the generated admin credentials in the install/setup output.
+
+## Direct VPS / systemd deployment
+
+This path matches the way the panel is running on your existing VPS.
+
+### 1. First-time install
+
+```bash
+git clone https://github.com/sankahchan/atomic-ui.git
+cd atomic-ui
+cp .env.example .env
+npm install
+npm run db:generate
+npm run db:push
+npm run setup
+npm run env:check -- --env-file=.env
+NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 ```
-Login Credentials:
-   Username: admin
-   Password: [random_password]
+
+### 2. systemd service
+
+Use a service file similar to:
+
+```ini
+[Unit]
+Description=Atomic-UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/atomic-ui
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PORT=2053
+Environment=NODE_OPTIONS=--max-old-space-size=384
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Low-memory deploy/update flow
+
+On small VPS instances, do not rebuild while the panel is still running if memory is tight.
+
+```bash
+cd /opt/atomic-ui
+git pull --ff-only origin main
+systemctl stop atomic-ui.service
+NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+systemctl start atomic-ui.service
+```
+
+Or run the scripted remote flow from your workstation:
+
+```bash
+DEPLOY_HOST=your-server-ip \
+DEPLOY_PASSWORD=your-password \
+bash scripts/deploy-vps.sh
 ```
 
 ## Configuring HTTPS (Recommended)
@@ -96,7 +160,34 @@ docker-compose up -d --build
 ```
 Your database (`data/atomic-ui.db`) is persisted in a Docker volume, so data is safe during updates.
 
+For direct VPS deployments:
+
+```bash
+git pull --ff-only origin main
+systemctl stop atomic-ui.service
+NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+systemctl start atomic-ui.service
+npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password='your-password'
+```
+
+## Backup drill and rollback
+
+Before major upgrades:
+
+1. Create a backup in the dashboard.
+2. Copy it off the server.
+3. Restore it in a staging/disposable instance.
+4. Run the smoke test against that restored instance.
+
+If a direct VPS deploy fails:
+
+1. `git reset --hard <previous-commit>` is not recommended on a shared working tree; instead checkout the last known good commit in a clean deploy directory or use `git checkout <commit>` on the VPS only if you control that host.
+2. Rebuild with `NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
+3. Restart `atomic-ui.service`.
+4. Re-run the smoke test and inspect `journalctl -u atomic-ui.service -n 50`.
+
 ## Troubleshooting
 - **Logs**: `docker-compose logs -f`
 - **Shell Access**: `docker-compose exec atomic-ui sh`
 - **Manual Setup**: If setup script fails, run inside container: `docker-compose exec atomic-ui npx tsx scripts/setup.ts`
+- **Verbose sync logs**: temporarily set `LOG_VERBOSE_SCOPES=sync,trpc` in `.env`, restart the service, and remove it after debugging

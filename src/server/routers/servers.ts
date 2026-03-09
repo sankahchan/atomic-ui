@@ -549,9 +549,12 @@ export const serversRouter = router({
         let metrics: { bytesTransferredByUserId: Record<string, number> } | null = null;
         try {
           metrics = await client.getMetrics();
-          console.log('📊 Metrics fetched:', JSON.stringify(metrics));
+          logger.verbose('sync', 'Metrics fetched for server sync', {
+            serverId: server.id,
+            keyCount: Object.keys(metrics?.bytesTransferredByUserId || {}).length,
+          });
         } catch (metricsError) {
-          console.log('⚠️ Could not fetch metrics:', (metricsError as Error).message);
+          logger.warn(`Could not fetch metrics for server ${server.name}`, (metricsError as Error).message);
         }
 
         // Update server info in database
@@ -600,7 +603,14 @@ export const serversRouter = router({
             const previousUsedBytes = Number(existingKey.usedBytes);
             const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
 
-            console.log(`🔑 Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, offset=${offset}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
+            logger.verbose('sync', `Key usage delta calculated for ${outlineKey.name || keyId}`, {
+              serverId: server.id,
+              outlineKeyId: keyId,
+              metricBytes,
+              offset,
+              effectiveUsedBytes,
+              bytesTransferred,
+            });
 
             // Prepare update data
             const updateData: Record<string, unknown> = {
@@ -654,7 +664,12 @@ export const serversRouter = router({
               // Outline Server doesn't have "DISABLED" state for depletion, it just drops packets.
               // But we mark it as DEPLETED in UI.
               updateData.status = 'DEPLETED';
-              console.log(`📉 Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dataLimit} bytes`);
+              logger.info(`Key ${outlineKey.name || keyId} depleted during server sync`, {
+                serverId: server.id,
+                outlineKeyId: keyId,
+                effectiveUsedBytes,
+                dataLimit,
+              });
             }
 
             // Ignore tiny probe traffic so it does not keep keys falsely "online".
@@ -752,7 +767,11 @@ export const serversRouter = router({
             // Create TrafficLog entry if there was meaningful traffic since last sync
             const MIN_TRAFFIC_THRESHOLD = 100 * 1024; // 100KB threshold for logging
             if (bytesTransferred >= MIN_TRAFFIC_THRESHOLD) {
-              console.log(`📊 [sync] Creating traffic log for Key ${keyId}: ${bytesTransferred} bytes`);
+              logger.verbose('sync', `Creating traffic log for ${outlineKey.name || keyId}`, {
+                serverId: server.id,
+                outlineKeyId: keyId,
+                bytesTransferred,
+              });
               await db.trafficLog.create({
                 data: {
                   accessKeyId: existingKey.id,
@@ -882,7 +901,7 @@ export const serversRouter = router({
           keyStats,
         };
       } catch (error) {
-        console.error('Failed to get live stats:', error);
+        logger.error('Failed to get live stats', error);
         return { activeConnections: 0, bandwidthBps: 0 };
       }
     }),
@@ -996,7 +1015,13 @@ export const serversRouter = router({
           const previousUsedBytes = Number(existingKey.usedBytes);
           const bytesTransferred = effectiveUsedBytes - previousUsedBytes;
 
-          console.log(`🔑 [syncAll] Key ${keyId} (${outlineKey.name}): metric=${metricBytes}, effective=${effectiveUsedBytes}, delta=${bytesTransferred}`);
+          logger.verbose('sync', `syncAll usage delta calculated for ${outlineKey.name || keyId}`, {
+            serverId: server.id,
+            outlineKeyId: keyId,
+            metricBytes,
+            effectiveUsedBytes,
+            bytesTransferred,
+          });
 
           const updateData: Record<string, unknown> = {
             accessUrl: outlineKey.accessUrl,
@@ -1032,7 +1057,10 @@ export const serversRouter = router({
           // Check if ACTIVE key is expired
           if (existingKey.status === 'ACTIVE' && existingKey.expiresAt && existingKey.expiresAt <= now) {
             updateData.status = 'EXPIRED';
-            console.log(`⏰ [syncAll] Key ${keyId} (${outlineKey.name}) expired`);
+            logger.info(`Key ${outlineKey.name || keyId} expired during syncAll`, {
+              serverId: server.id,
+              outlineKeyId: keyId,
+            });
           }
 
           // Check if ACTIVE key has exceeded data limit - mark as depleted

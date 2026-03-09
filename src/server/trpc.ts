@@ -13,6 +13,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
 import { getCurrentUser, type AuthUser } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 
 import { type FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 
@@ -71,7 +72,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
         // If it's already a TRPCError, rethrow
         if (error instanceof TRPCError) throw error;
 
-        console.error('Security check failed:', error);
+        logger.error('Security check failed', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Security check failed',
@@ -218,9 +219,7 @@ export const loggerMiddleware = t.middleware(async ({ path, type, next }) => {
   const result = await next();
   const duration = Date.now() - start;
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[tRPC] ${type} ${path} - ${duration}ms`);
-  }
+  logger.verbose('trpc', `${type} ${path} - ${duration}ms`);
 
   return result;
 });
