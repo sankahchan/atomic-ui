@@ -902,7 +902,115 @@ export default function KeyDetailPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero">
+      <section className="xl:hidden ops-hero">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="rounded-full">
+              <Link href="/dashboard/keys">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
+              <Key className="h-3.5 w-3.5" />
+              Access Key
+            </span>
+            <Badge className={cn('border rounded-full px-3 py-1', statusInfo.color)}>
+              <StatusIcon className="w-3 h-3 mr-1" />
+              {statusInfo.label}
+            </Badge>
+            {isOnline ? (
+              <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
+                <Wifi className="mr-1 h-3 w-3" />
+                Online
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
+                <WifiOff className="mr-1 h-3 w-3" />
+                Offline
+              </Badge>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight">{key.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              Created {formatRelativeTime(key.createdAt)}
+              {key.server ? ` on ${key.server.name}` : ''}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Total Usage
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{formatBytes(key.usedBytes)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Devices
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{estimatedDevices}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {activeSessions} active session{activeSessions === 1 ? '' : 's'}
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Expires
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {key.expirationType.replace(/_/g, ' ')}
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Last Seen
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {(key as any).lastUsedAt ? formatRelativeTime((key as any).lastUsedAt) : 'Never'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Outline ID {key.outlineKeyId}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button asChild variant="outline" className="h-11 rounded-full px-5">
+              <Link href={key.server ? `/dashboard/servers/${key.server.id}` : '/dashboard/servers'}>
+                <Server className="w-4 h-4 mr-2" />
+                View Server
+              </Link>
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-11 rounded-full px-5"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="hidden xl:block ops-hero">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
@@ -1028,7 +1136,7 @@ export default function KeyDetailPage() {
             <CardContent className="space-y-4">
               {/* Server info */}
               {key.server && (
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     {key.server.countryCode && (
                       <span className="text-xl">{getCountryFlag(key.server.countryCode)}</span>
@@ -1094,7 +1202,7 @@ export default function KeyDetailPage() {
               </div>
 
               {/* Technical Details */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-1 gap-4 border-t pt-4 sm:grid-cols-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Port</p>
                   <p className="font-mono">{key.port}</p>
@@ -1201,7 +1309,7 @@ export default function KeyDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Type</p>
                   <p className="font-medium">{key.expirationType.replace(/_/g, ' ')}</p>
@@ -1509,7 +1617,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="text-center p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
               {(data?.activeCount || 0) > 0 ? (

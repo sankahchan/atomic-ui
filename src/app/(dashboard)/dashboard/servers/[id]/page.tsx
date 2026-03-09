@@ -367,7 +367,130 @@ export default function ServerDetailPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero">
+      <section className="xl:hidden ops-hero">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="rounded-full">
+              <Link href="/dashboard/servers">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <Server className="h-3.5 w-3.5" />
+              Server Detail
+            </span>
+            <Badge variant="outline" className={cn('rounded-full px-3 py-1', status.color)}>
+              <StatusIcon className="mr-1 h-3 w-3" />
+              {t(status.labelKey)}
+            </Badge>
+            {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  'rounded-full px-3 py-1',
+                  server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
+                  server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
+                )}
+              >
+                {server.lifecycleMode}
+              </Badge>
+            ) : null}
+          </div>
+
+          <div className="flex items-start gap-4">
+            {server.countryCode ? (
+              <div className="flex h-14 w-14 items-center justify-center rounded-[1.35rem] border border-cyan-500/20 bg-cyan-500/10 text-3xl">
+                {getCountryFlag(server.countryCode)}
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight">{server.name}</h1>
+              <p className="text-sm text-muted-foreground">
+                {server.location || 'Managed Outline server'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {server.tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="rounded-full"
+                    style={{ borderColor: tag.color, color: tag.color }}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.explanation.title')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{t(status.labelKey)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.healthCheck?.lastCheckedAt ? `Checked ${formatRelativeTime(server.healthCheck.lastCheckedAt)}` : 'No recent probe'}
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Active Keys
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{activeKeyCount}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.accessKeys?.length || 0} total assigned
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.metrics.latency')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {server.healthCheck?.lastLatencyMs ? `${server.healthCheck.lastLatencyMs}ms` : '-'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {expiringSoonCount} keys expiring within 7 days
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('health.metrics.uptime')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {server.healthCheck?.uptimePercent ? `${server.healthCheck.uptimePercent.toFixed(1)}%` : '-'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {server.lastSyncAt ? `Synced ${formatRelativeTime(server.lastSyncAt)}` : 'Sync pending'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button
+              variant="outline"
+              className="h-11 rounded-full px-5"
+              onClick={() => syncMutation.mutate({ id: serverId })}
+              disabled={syncMutation.isPending}
+            >
+              <RefreshCw className={cn('w-4 h-4 mr-2', syncMutation.isPending && 'animate-spin')} />
+              {t('server_details.sync')}
+            </Button>
+            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+              <Edit2 className="w-4 h-4 mr-2" />
+              {t('server_details.edit')}
+            </Button>
+            <Button asChild className="h-11 rounded-full px-5 sm:col-span-1">
+              <Link href={`/dashboard/keys?server=${serverId}`}>
+                <Key className="w-4 h-4 mr-2" />
+                {t('server_details.keys.view_all')}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="hidden xl:block ops-hero">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
@@ -500,7 +623,7 @@ export default function ServerDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-sm text-muted-foreground">{t('server_details.info.id')}</p>
                 <p className="font-mono text-sm">{server.outlineServerId || '-'}</p>

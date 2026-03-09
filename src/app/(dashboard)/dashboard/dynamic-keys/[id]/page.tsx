@@ -1075,7 +1075,101 @@ export default function DynamicKeyDetailPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero">
+      <section className="xl:hidden ops-hero">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="rounded-full">
+              <Link href="/dashboard/dynamic-keys">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
+              <KeyRound className="h-3.5 w-3.5" />
+              Dynamic Key
+            </span>
+            <Badge variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
+              {dak.status}
+            </Badge>
+            <Badge variant="outline" className="rounded-full">
+              {t(typeConfig.labelKey)}
+            </Badge>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight">{dak.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {typeConfig.description}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('dynamic_keys.detail.attached_keys')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{dak.accessKeys.length}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {attachedActiveKeys} active attached keys
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Server Coverage
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{serverCoverage}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Distinct servers serving this subscription
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('dynamic_keys.detail.traffic_usage')}
+              </p>
+              <p className="mt-3 text-2xl font-semibold">{formatBytes(dak.usedBytes)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
+              </p>
+            </div>
+            <div className="ops-kpi-tile">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Rotation
+              </p>
+              <p className="mt-3 text-2xl font-semibold">
+                {dak.rotationEnabled ? dak.rotationInterval : 'Off'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {t('dynamic_keys.detail.refresh')}
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-11 rounded-full px-5"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              {t('dynamic_keys.detail.delete')}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="hidden xl:block ops-hero">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
@@ -1297,7 +1391,7 @@ export default function DynamicKeyDetailPage() {
                   {dak.accessKeys.map((key) => (
                     <div
                       key={key.id}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                      className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-background rounded-lg">
@@ -1707,7 +1801,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="text-center p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
               {(data?.activeCount || 0) > 0 ? (

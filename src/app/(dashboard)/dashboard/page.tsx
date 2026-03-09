@@ -312,7 +312,248 @@ export default function DashboardPage() {
   return (
     <TooltipProvider>
       <div className="space-y-6 lg:space-y-8">
-        <section className="ops-hero">
+        <section className="space-y-6 xl:hidden">
+          <div className="ops-hero">
+            <div className="space-y-5">
+              <div className="space-y-3">
+                <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  {t('dashboard.control_center')}
+                </span>
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                    {t('dashboard.title')}
+                  </h1>
+                  <p className="text-sm leading-7 text-muted-foreground">
+                    {t('dashboard.welcome')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild className="h-11 rounded-full px-5 shadow-sm">
+                  <Link href="/dashboard/servers">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('dashboard.add_server')}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                  <Link href="/dashboard/keys">
+                    <Key className="mr-2 h-4 w-4" />
+                    {t('dashboard.create_key')}
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ControlMetricTile
+                  title={t('dashboard.total_servers')}
+                  value={stats?.totalServers || 0}
+                  subtitle={`${stats?.activeServers || 0} ${t('dashboard.active')} • ${stats?.downServers || 0} ${t('dashboard.down')}`}
+                  icon={Server}
+                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+                  href="/dashboard/servers"
+                />
+                <ControlMetricTile
+                  title={t('dashboard.total_keys')}
+                  value={stats?.totalKeys || 0}
+                  subtitle={`${stats?.activeKeys || 0} ${t('dashboard.active')}`}
+                  icon={Key}
+                  iconClassName="border-violet-500/15 bg-violet-500/10 text-violet-500"
+                  href="/dashboard/keys"
+                />
+                <ControlMetricTile
+                  title={t('dashboard.total_traffic')}
+                  value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
+                  subtitle={t('dashboard.all_time')}
+                  icon={TrendingUp}
+                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+                />
+                <ControlMetricTile
+                  title={t('dashboard.alerts')}
+                  value={attentionCount}
+                  subtitle={t('dashboard.attention_queue_desc')}
+                  icon={AlertTriangle}
+                  iconClassName="border-rose-500/15 bg-rose-500/10 text-rose-500"
+                  href="/dashboard/notifications"
+                />
+              </div>
+
+              <div className="ops-panel space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="ops-section-heading">{t('dashboard.live_pulse')}</p>
+                    <h2 className="mt-2 text-xl font-semibold">{t('dashboard.system_status')}</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t('dashboard.live_pulse_desc')}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-semibold',
+                      attentionCount > 0
+                        ? 'border-amber-500/25 bg-amber-500/10 text-amber-500'
+                        : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
+                    )}
+                  >
+                    {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-3 grid-cols-3">
+                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {t('dashboard.health_score')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{healthyShare}%</p>
+                  </div>
+                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {t('dashboard.active')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
+                  </div>
+                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {t('dashboard.expiring_soon')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{stats?.expiringIn24h || 0}</p>
+                  </div>
+                </div>
+
+                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                  <Link href="/dashboard/notifications">
+                    {t('dashboard.alerts')}
+                  </Link>
+                </Button>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
+                        <Activity className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{t('dashboard.recent_keys_title')}</CardTitle>
+                        <CardDescription>{t('dashboard.recent_keys_desc')}</CardDescription>
+                      </div>
+                    </div>
+                    <Button asChild variant="ghost" className="rounded-full px-3">
+                      <Link href="/dashboard/keys">
+                        {t('dashboard.view_all')}
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {!activity ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
+                    ))
+                  ) : activity.recentKeys && activity.recentKeys.length > 0 ? (
+                    activity.recentKeys.slice(0, 3).map((key) => (
+                      <Link
+                        key={key.id}
+                        href={`/dashboard/keys/${key.id}`}
+                        className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+                      >
+                        <div className="min-w-0 flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
+                            <Key className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{key.name}</p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">{key.serverName}</p>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-medium text-muted-foreground">{formatRelativeTime(key.createdAt)}</p>
+                        </div>
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="flex min-h-[160px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
+                      <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                      <p className="text-sm font-semibold">{t('dashboard.no_recent_keys_title')}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_recent_keys_desc')}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-white/45 bg-white/65 dark:border-white/10 dark:bg-slate-950/30">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                          <TrendingUp className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{t('dashboard.traffic_overview')}</CardTitle>
+                          <CardDescription>
+                            {formatBytes(totalTraffic)} {tf('dashboard.traffic_last_days', { days: trafficDays.toString() })}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                    <Select value={trafficDays.toString()} onValueChange={(value) => setTrafficDays(parseInt(value, 10))}>
+                      <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">{t('dashboard.days_7')}</SelectItem>
+                        <SelectItem value="30">{t('dashboard.days_30')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {t('dashboard.total_traffic')}
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold">{formatBytes(totalTraffic)}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {t('dashboard.online_servers')}
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {t('dashboard.total_keys')}
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold">{totalServerKeys}</p>
+                    </div>
+                  </div>
+
+                  {trafficLoading ? (
+                    <div className="h-[240px] rounded-[1.6rem] bg-muted animate-pulse" />
+                  ) : trafficHistory && trafficHistory.length > 0 ? (
+                    <div className="h-[240px] rounded-[1.6rem] border border-border/60 bg-background/45 p-2 dark:bg-white/[0.02]">
+                      <TrafficChart data={trafficHistory} type="area" height="100%" />
+                    </div>
+                  ) : (
+                    <div className="flex h-[200px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
+                      <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                      <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_traffic_desc')}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        <section className="hidden xl:block ops-hero">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_400px]">
             <div className="space-y-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
