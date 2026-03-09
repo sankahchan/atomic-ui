@@ -343,10 +343,18 @@
 
   .glass-sidebar {
     background:
-      linear-gradient(180deg, rgba(7, 14, 26, 0.98), rgba(16, 24, 40, 0.96)),
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 40%);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 246, 252, 0.86)),
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.1), transparent 42%);
     backdrop-filter: blur(var(--glass-blur-xl));
     -webkit-backdrop-filter: blur(var(--glass-blur-xl));
+    border-right: 1px solid rgba(148, 163, 184, 0.16);
+    box-shadow: 18px 0 48px rgba(15, 23, 42, 0.08);
+  }
+
+  .dark .glass-sidebar {
+    background:
+      linear-gradient(180deg, rgba(7, 14, 26, 0.98), rgba(16, 24, 40, 0.96)),
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 40%);
     border-right: 1px solid rgba(148, 163, 184, 0.12);
     box-shadow: 18px 0 48px rgba(2, 6, 23, 0.2);
   }

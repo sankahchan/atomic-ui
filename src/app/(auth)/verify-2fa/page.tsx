@@ -23,6 +23,12 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Loader2, Shield, KeyRound, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+function redirectAfterLogin(target: string) {
+  if (typeof window !== 'undefined') {
+    window.location.assign(target);
+  }
+}
+
 function Verify2FAContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,11 +64,10 @@ function Verify2FAContent() {
       });
 
       if (data.role === 'ADMIN') {
-        router.push('/dashboard');
+        redirectAfterLogin('/dashboard');
       } else {
-        router.push('/portal');
+        redirectAfterLogin('/portal');
       }
-      router.refresh();
     },
     onError: (error) => {
       toast({

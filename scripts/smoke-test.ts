@@ -64,8 +64,19 @@ async function checkRoute(path: string, expectedStatuses: number[], label: strin
   );
 }
 
+async function checkStaticAsset(path: string) {
+  const url = new URL(path, baseUrl);
+  const response = await fetch(url, { redirect: 'manual' });
+
+  assert.equal(response.status, 200, `static asset ${path} expected 200 but got ${response.status}`);
+}
+
 async function main() {
   await checkRoute('/login', [200], 'login page');
+  const loginHtml = await fetch(new URL('/login', baseUrl)).then((response) => response.text());
+  const cssAssetMatch = loginHtml.match(/\/_next\/static\/css\/[^"' ]+\.css/);
+  assert(cssAssetMatch?.[0], 'login page is missing a CSS asset reference');
+  await checkStaticAsset(cssAssetMatch[0]);
   await checkRoute('/dashboard', [302, 307], 'dashboard redirect without session');
 
   const loginResult = await client.auth.login.mutate({

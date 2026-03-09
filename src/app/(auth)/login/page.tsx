@@ -27,6 +27,12 @@ import { LanguageSelector } from '@/components/ui/language-selector';
 import { Loader2, Eye, EyeOff, User, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+function redirectAfterLogin(target: string) {
+  if (typeof window !== 'undefined') {
+    window.location.assign(target);
+  }
+}
+
 /**
  * AtomicLogo Component
  *
@@ -155,11 +161,10 @@ export default function LoginPage() {
       });
 
       if (data.role === 'ADMIN') {
-        router.push('/dashboard');
+        redirectAfterLogin('/dashboard');
       } else {
-        router.push('/portal');
+        redirectAfterLogin('/portal');
       }
-      router.refresh();
     },
     onError: (error) => {
       toast({

@@ -70,23 +70,23 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col px-3 py-4 text-slate-100 glass-sidebar',
+        'glass-sidebar fixed inset-y-0 left-0 z-50 flex flex-col px-3 py-4 text-foreground',
         'transition-all duration-300 ease-in-out',
         isCollapsed ? 'w-20' : 'w-72'
       )}
     >
       {/* Logo and brand */}
-      <div className="flex items-center justify-between rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
+      <div className="flex items-center justify-between rounded-[1.5rem] border border-border/70 bg-background/65 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
         <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10">
-            <Atom className="w-6 h-6 text-cyan-300" />
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+            <Atom className="w-6 h-6 text-primary" />
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <span className="block truncate text-lg font-bold text-white">
+              <span className="block truncate text-lg font-bold text-foreground">
                 Atomic-UI
               </span>
-              <span className="block text-[11px] uppercase tracking-[0.24em] text-slate-400">
+              <span className="block text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
                 Control Center
               </span>
             </div>
@@ -98,7 +98,7 @@ function Sidebar({
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="hidden rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white lg:flex"
+          className="hidden rounded-2xl border border-border/70 bg-background/60 text-muted-foreground hover:bg-background/80 hover:text-foreground dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] lg:flex"
         >
           <ChevronLeft className={cn(
             'h-4 w-4 transition-transform',
@@ -122,14 +122,14 @@ function Sidebar({
                     'ops-sidebar-item',
                     isCollapsed && 'justify-center px-0',
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-400/20 to-sky-400/10 text-cyan-200 shadow-[0_16px_30px_rgba(6,182,212,0.14)]'
-                      : 'text-slate-300 hover:bg-white/6 hover:text-white'
+                      ? 'bg-gradient-to-r from-primary/18 to-primary/6 text-primary shadow-[0_16px_30px_rgba(14,165,233,0.14)]'
+                      : 'text-muted-foreground hover:bg-background/65 hover:text-foreground dark:hover:bg-white/[0.06]'
                   )}
                   title={isCollapsed ? t(item.labelKey) : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
-                    isActive ? 'text-cyan-300' : 'text-slate-400'
+                    isActive ? 'text-primary' : 'text-muted-foreground'
                   )} />
                   {!isCollapsed && (
                     <span className="text-sm font-medium">{t(item.labelKey)}</span>
@@ -143,8 +143,8 @@ function Sidebar({
 
       {/* Sidebar footer */}
       {!isCollapsed && (
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_16px_40px_rgba(2,6,23,0.16)]">
-          <p className="text-center text-xs text-slate-400">
+        <div className="rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(2,6,23,0.16)]">
+          <p className="text-center text-xs text-muted-foreground">
             v1.0.0 • sankahchan
           </p>
         </div>

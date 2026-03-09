@@ -18,6 +18,17 @@ npx next build
 
 if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   echo "[build-low-memory] publishing standalone server bundle"
+  mkdir -p .next/standalone/.next
+  cp -r .next/static .next/standalone/.next/
+  if [[ -d public ]]; then
+    cp -r public .next/standalone/
+  fi
+  if [[ -f .env ]]; then
+    cp .env .next/standalone/
+  fi
+  if [[ -d prisma ]]; then
+    cp -r prisma .next/standalone/
+  fi
   cp -r .next/standalone/* ./
 fi
 

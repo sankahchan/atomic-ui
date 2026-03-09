@@ -61,6 +61,26 @@ function getJwtSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+function buildRedirectUrl(
+  request: NextRequest,
+  pathname: string,
+  searchParams?: Record<string, string>
+): URL {
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = forwardedHost || request.headers.get('host') || request.nextUrl.host;
+  const protocol = forwardedProto || request.nextUrl.protocol.replace(':', '') || 'http';
+  const url = new URL(`${protocol}://${host}${pathname}`);
+
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  return url;
+}
+
 /**
  * Middleware function
  * 
@@ -91,10 +111,9 @@ export async function middleware(request: NextRequest) {
 
     // For page routes, redirect to login with return URL
     // For page routes, redirect to login with return URL
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.searchParams.set('from', pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(
+      buildRedirectUrl(request, '/login', { from: pathname })
+    );
   }
 
   // Verify the JWT token structure
@@ -108,30 +127,22 @@ export async function middleware(request: NextRequest) {
     // Role-based Access Control (RBAC)
     // Redirect USER/CLIENT role trying to access admin dashboard
     if ((role === 'USER' || role === 'CLIENT') && pathname.startsWith('/dashboard')) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/portal';
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
     }
 
     // Redirect ADMIN role trying to access user portal (optional, but keeps things clean)
     if (role === 'ADMIN' && pathname.startsWith('/portal')) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
     }
 
     // Redirect USER/CLIENT accessing root to portal
     if ((role === 'USER' || role === 'CLIENT') && pathname === '/') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/portal';
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
     }
 
     // Redirect ADMIN accessing root to dashboard
     if (role === 'ADMIN' && pathname === '/') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
     }
 
     // Token is valid, allow the request to proceed
@@ -147,9 +158,7 @@ export async function middleware(request: NextRequest) {
         { status: 401 }
       )
       : (() => {
-        const url = request.nextUrl.clone();
-        url.pathname = '/login';
-        return NextResponse.redirect(url);
+        return NextResponse.redirect(buildRedirectUrl(request, '/login'));
       })();
 
     response.cookies.delete('atomic-session');
