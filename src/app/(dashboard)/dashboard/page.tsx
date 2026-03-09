@@ -106,6 +106,57 @@ function QuickActionLink({
   );
 }
 
+function CompactActionLink({
+  href,
+  title,
+  description,
+}: {
+  href: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-4 rounded-[1.25rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
+function OpsMiniMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: 'violet' | 'amber' | 'rose' | 'cyan';
+}) {
+  const toneClass = {
+    violet: 'border-violet-500/15 bg-violet-500/10 text-violet-600 dark:text-violet-300',
+    amber: 'border-amber-500/15 bg-amber-500/10 text-amber-600 dark:text-amber-300',
+    rose: 'border-rose-500/15 bg-rose-500/10 text-rose-600 dark:text-rose-300',
+    cyan: 'border-cyan-500/15 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300',
+  }[tone];
+
+  return (
+    <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <div className={cn('mt-3 inline-flex rounded-full border px-3 py-1 text-sm font-semibold', toneClass)}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function FocusRow({
   title,
   description,
@@ -309,7 +360,6 @@ export default function DashboardPage() {
   const { data: serverStatus, isLoading: serversLoading } = trpc.dashboard.serverStatus.useQuery();
   const { data: activity } = trpc.dashboard.recentActivity.useQuery();
   const { data: trafficHistory, isLoading: trafficLoading } = trpc.dashboard.trafficHistory.useQuery({ days: trafficDays });
-  const { data: topUsers, isLoading: loadingTopUsers } = trpc.dashboard.topUsers.useQuery({ limit: 5 });
   const { data: topConsumers, isLoading: loadingTopConsumers } = trpc.analytics.topConsumers.useQuery({
     range: topConsumersRange,
     limit: 5,
@@ -747,44 +797,115 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        <section>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:items-start">
+          <Card className="self-start">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                    <Key className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">{t('dashboard.key_operations_title')}</CardTitle>
+                    <CardDescription>{t('dashboard.key_operations_desc')}</CardDescription>
+                  </div>
+                </div>
+                <Button asChild variant="ghost" className="rounded-full px-3">
+                  <Link href="/dashboard/keys">
+                    {t('dashboard.view_all')}
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <OpsMiniMetric
+                  label={t('dashboard.active_keys_label')}
+                  value={stats?.activeKeys || 0}
+                  tone="violet"
+                />
+                <OpsMiniMetric
+                  label={t('dashboard.expiring_soon')}
+                  value={stats?.expiringIn24h || 0}
+                  tone="amber"
+                />
+                <OpsMiniMetric
+                  label={t('dashboard.pending_keys_label')}
+                  value={stats?.pendingKeys || 0}
+                  tone="cyan"
+                />
+                <OpsMiniMetric
+                  label={t('dashboard.expired_keys_label')}
+                  value={stats?.expiredKeys || 0}
+                  tone="rose"
+                />
+              </div>
+
+              <div className="grid gap-3">
+                <CompactActionLink
+                  href="/dashboard/keys"
+                  title={t('dashboard.review_inventory')}
+                  description={t('dashboard.review_inventory_desc')}
+                />
+                <CompactActionLink
+                  href="/dashboard/keys?status=expiring"
+                  title={t('dashboard.open_expiring')}
+                  description={t('dashboard.open_expiring_desc')}
+                />
+                <CompactActionLink
+                  href="/dashboard/dynamic-keys"
+                  title={t('dashboard.manage_dynamic')}
+                  description={t('dashboard.manage_dynamic_desc')}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="self-start">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
-                  <Users className="h-5 w-5" />
+                  <Activity className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">{t('dashboard.top_users_title')}</CardTitle>
-                  <CardDescription>{t('dashboard.top_users_desc')}</CardDescription>
+                  <CardTitle className="text-xl">{t('dashboard.recent_keys_title')}</CardTitle>
+                  <CardDescription>{t('dashboard.recent_keys_desc')}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {loadingTopUsers ? (
+              {!activity ? (
                 Array.from({ length: 4 }).map((_, index) => (
                   <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
                 ))
-              ) : topUsers && topUsers.length > 0 ? (
-                topUsers.slice(0, 5).map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 dark:bg-white/[0.02]"
+              ) : activity.recentKeys && activity.recentKeys.length > 0 ? (
+                activity.recentKeys.slice(0, 5).map((key) => (
+                  <Link
+                    key={key.id}
+                    href={`/dashboard/keys/${key.id}`}
+                    className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{user.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {user.countryCode ? getCountryFlag(user.countryCode) : ''} {user.serverName}
-                      </p>
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
+                        <Key className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{key.name}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{key.serverName}</p>
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold">{formatBytes(user.usedBytes)}</p>
-                  </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-medium text-muted-foreground">{formatRelativeTime(key.createdAt)}</p>
+                      <p className="mt-1 text-xs text-cyan-600 dark:text-cyan-300">{t('dashboard.view_all')}</p>
+                    </div>
+                  </Link>
                 ))
               ) : (
                 <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                  <Users className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                  <p className="text-sm font-semibold">{t('dashboard.no_top_users_title')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_top_users_desc')}</p>
+                  <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                  <p className="text-sm font-semibold">{t('dashboard.no_recent_keys_title')}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_recent_keys_desc')}</p>
                 </div>
               )}
             </CardContent>
