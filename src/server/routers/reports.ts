@@ -11,8 +11,45 @@ import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { generateReportData } from '@/lib/services/report-generator';
 import { writeAuditLog } from '@/lib/audit';
+import {
+  getScheduledReportsConfig,
+  runScheduledReportsCycle,
+  saveScheduledReportsConfig,
+  scheduledReportsConfigSchema,
+} from '@/lib/services/scheduled-reports';
 
 export const reportsRouter = router({
+  scheduledConfig: adminProcedure.query(async () => getScheduledReportsConfig()),
+
+  saveScheduledConfig: adminProcedure
+    .input(scheduledReportsConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const config = await saveScheduledReportsConfig(input);
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'REPORT_SCHEDULE_UPDATE',
+        entity: 'REPORT',
+        details: {
+          enabled: config.enabled,
+          frequency: config.frequency,
+          channelCount: config.channelIds.length,
+        },
+      });
+
+      return config;
+    }),
+
+  runScheduledNow: adminProcedure.mutation(async ({ ctx }) => {
+    return runScheduledReportsCycle({
+      force: true,
+      triggeredBy: 'admin',
+      userId: ctx.user.id,
+      ip: ctx.clientIp,
+    });
+  }),
+
   /**
    * List all generated reports with pagination
    */

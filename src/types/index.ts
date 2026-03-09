@@ -385,12 +385,15 @@ export interface WebhookConfig {
 export type NotificationEvent =
   | 'SERVER_DOWN'
   | 'SERVER_UP'
+  | 'SERVER_SLOW'
   | 'KEY_EXPIRING'
   | 'KEY_EXPIRED'
   | 'TRAFFIC_WARNING'
   | 'TRAFFIC_DEPLETED'
+  | 'AUDIT_ALERT'
   | 'LOGIN_ALERT'
-  | 'DAILY_REPORT';
+  | 'DAILY_REPORT'
+  | 'SCHEDULED_REPORT';
 
 // ============================================
 // Dashboard Types

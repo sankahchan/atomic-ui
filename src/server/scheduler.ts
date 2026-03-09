@@ -11,6 +11,7 @@
  * - Audit log cleanup (Daily)
  * - Backup verification (Daily)
  * - Notification queue processing (Every minute)
+ * - Scheduled reports (Every 5 mins)
  */
 
 import cron from 'node-cron';
@@ -22,6 +23,7 @@ import { checkKeyRotations } from '@/lib/services/key-rotation';
 import { cleanupOldAuditLogs } from '@/lib/services/audit-log';
 import { verifyLatestBackups } from '@/lib/services/backup-verification';
 import { processNotificationQueue } from '@/lib/services/notification-queue';
+import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { logger } from '@/lib/logger';
 
 let isSchedulerRunning = false;
@@ -134,6 +136,19 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('❌ Backup verification failed:', error);
+        }
+    });
+
+    // 9. Scheduled report delivery (Every 5 minutes)
+    cron.schedule('*/5 * * * *', async () => {
+        logger.debug('🗓️ Running scheduled reports...');
+        try {
+            const result = await runScheduledReportsCycle();
+            if (!result.skipped) {
+                logger.info(`🗓️ Scheduled report generated: ${result.reportName}`);
+            }
+        } catch (error) {
+            logger.error('❌ Scheduled report cycle failed:', error);
         }
     });
 

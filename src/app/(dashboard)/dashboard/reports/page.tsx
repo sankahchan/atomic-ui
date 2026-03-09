@@ -7,17 +7,19 @@
  * Reports include per-server and per-key traffic data with CSV export.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
-import { formatBytes, cn } from '@/lib/utils';
+import { formatBytes, formatDateTime } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -34,6 +36,7 @@ import {
   Loader2,
   Calendar,
   BarChart3,
+  Clock3,
   Server,
   Key,
   TrendingUp,
@@ -41,7 +44,9 @@ import {
   FileJson,
   ChevronLeft,
   ChevronRight,
+  Send,
 } from 'lucide-react';
+import type { ScheduledReportsConfig } from '@/lib/services/scheduled-reports';
 
 /**
  * Format a date range nicely
@@ -250,6 +255,7 @@ export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState('0'); // Index into availableMonths
   const [viewReportId, setViewReportId] = useState<string | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState<ScheduledReportsConfig | null>(null);
 
   const availableMonths = getAvailableMonths();
 
@@ -258,6 +264,14 @@ export default function ReportsPage() {
     page,
     pageSize: 10,
   });
+  const scheduleQuery = trpc.reports.scheduledConfig.useQuery();
+  const channelsQuery = trpc.notifications.listChannels.useQuery();
+
+  useEffect(() => {
+    if (scheduleQuery.data) {
+      setScheduleForm(scheduleQuery.data);
+    }
+  }, [scheduleQuery.data]);
 
   // Generate mutation
   const generateMutation = trpc.reports.generate.useMutation({
@@ -296,6 +310,44 @@ export default function ReportsPage() {
     },
   });
 
+  const saveScheduleMutation = trpc.reports.saveScheduledConfig.useMutation({
+    onSuccess: (result) => {
+      setScheduleForm(result);
+      toast({
+        title: 'Schedule updated',
+        description: 'Scheduled report delivery settings have been saved.',
+      });
+      void scheduleQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Schedule update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const runScheduledNowMutation = trpc.reports.runScheduledNow.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: result.skipped ? 'Run skipped' : 'Scheduled summary queued',
+        description: result.skipped
+          ? `Reason: ${result.reason}`
+          : `${result.reportName} has been queued for delivery.`,
+      });
+      void refetch();
+      void scheduleQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Run failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleGenerate = () => {
     if (reportType === 'MONTHLY') {
       const month = availableMonths[parseInt(selectedMonth)];
@@ -309,6 +361,25 @@ export default function ReportsPage() {
         type: 'WEEKLY',
       });
     }
+  };
+
+  const availableChannels =
+    channelsQuery.data?.filter((channel) => channel.isActive && (channel.type === 'EMAIL' || channel.type === 'WEBHOOK' || channel.type === 'TELEGRAM')) ?? [];
+
+  const toggleChannel = (channelId: string, checked: boolean) => {
+    setScheduleForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        channelIds: checked
+          ? Array.from(new Set([...current.channelIds, channelId]))
+          : current.channelIds.filter((id) => id !== channelId),
+      };
+    });
+  };
+
+  const updateScheduleField = <K extends keyof ScheduledReportsConfig>(key: K, value: ScheduledReportsConfig[K]) => {
+    setScheduleForm((current) => (current ? { ...current, [key]: value } : current));
   };
 
   return (
@@ -329,6 +400,218 @@ export default function ReportsPage() {
           Generate Report
         </Button>
       </div>
+
+      {scheduleForm ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock3 className="w-5 h-5 text-primary" />
+              Scheduled Reports
+            </CardTitle>
+            <CardDescription>
+              Deliver daily or weekly report summaries to email or webhook channels without generating them manually.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4 rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label className="text-base">Enable automatic summaries</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Queue a summary report on the schedule below.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={scheduleForm.enabled}
+                    onCheckedChange={(checked) => updateScheduleField('enabled', checked)}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Frequency</Label>
+                    <Select
+                      value={scheduleForm.frequency}
+                      onValueChange={(value) => updateScheduleField('frequency', value as ScheduledReportsConfig['frequency'])}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DAILY">Daily</SelectItem>
+                        <SelectItem value="WEEKLY">Weekly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Lookback window (days)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={scheduleForm.lookbackDays}
+                      onChange={(event) => updateScheduleField('lookbackDays', Math.max(1, Math.min(31, Number(event.target.value) || 7)))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Hour</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={scheduleForm.hour}
+                      onChange={(event) => updateScheduleField('hour', Math.max(0, Math.min(23, Number(event.target.value) || 0)))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Minute</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={scheduleForm.minute}
+                      onChange={(event) => updateScheduleField('minute', Math.max(0, Math.min(59, Number(event.target.value) || 0)))}
+                    />
+                  </div>
+                </div>
+
+                {scheduleForm.frequency === 'WEEKLY' ? (
+                  <div className="space-y-2">
+                    <Label>Weekday</Label>
+                    <Select
+                      value={String(scheduleForm.weekday)}
+                      onValueChange={(value) => updateScheduleField('weekday', Number(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Sunday</SelectItem>
+                        <SelectItem value="1">Monday</SelectItem>
+                        <SelectItem value="2">Tuesday</SelectItem>
+                        <SelectItem value="3">Wednesday</SelectItem>
+                        <SelectItem value="4">Thursday</SelectItem>
+                        <SelectItem value="5">Friday</SelectItem>
+                        <SelectItem value="6">Saturday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-4 rounded-xl border p-4">
+                <div>
+                  <Label className="text-base">Delivery channels</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose where scheduled summaries should be sent.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {availableChannels.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                      Create an email or webhook channel in Notifications before enabling scheduled delivery.
+                    </p>
+                  ) : (
+                    availableChannels.map((channel) => (
+                      <label
+                        key={channel.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3"
+                      >
+                        <div>
+                          <p className="font-medium">{channel.name}</p>
+                          <p className="text-xs text-muted-foreground">{channel.type}</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={scheduleForm.channelIds.includes(channel.id)}
+                          onChange={(event) => toggleChannel(channel.id, event.target.checked)}
+                        />
+                      </label>
+                    ))
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Revenue amount (optional)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={scheduleForm.revenueAmount ?? ''}
+                      placeholder="Leave blank if billing is not tracked"
+                      onChange={(event) =>
+                        updateScheduleField(
+                          'revenueAmount',
+                          event.target.value === '' ? null : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Input
+                      value={scheduleForm.revenueCurrency}
+                      onChange={(event) => updateScheduleField('revenueCurrency', event.target.value.toUpperCase().slice(0, 8) || 'USD')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+                <span className="text-sm font-medium">Revenue</span>
+                <Switch checked={scheduleForm.includeRevenue} onCheckedChange={(checked) => updateScheduleField('includeRevenue', checked)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+                <span className="text-sm font-medium">Usage</span>
+                <Switch checked={scheduleForm.includeUsage} onCheckedChange={(checked) => updateScheduleField('includeUsage', checked)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+                <span className="text-sm font-medium">Expirations</span>
+                <Switch checked={scheduleForm.includeExpirations} onCheckedChange={(checked) => updateScheduleField('includeExpirations', checked)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+                <span className="text-sm font-medium">Failed logins</span>
+                <Switch checked={scheduleForm.includeFailedLogins} onCheckedChange={(checked) => updateScheduleField('includeFailedLogins', checked)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+                <span className="text-sm font-medium">Server health</span>
+                <Switch checked={scheduleForm.includeServerHealth} onCheckedChange={(checked) => updateScheduleField('includeServerHealth', checked)} />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-xl border border-dashed p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                <p>Last run: {scheduleForm.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : 'Never'}</p>
+                <p>Status: {scheduleForm.lastRunStatus}</p>
+                {scheduleForm.lastRunSummary ? <p>{scheduleForm.lastRunSummary}</p> : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => runScheduledNowMutation.mutate()}
+                  disabled={runScheduledNowMutation.isPending}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Run now
+                </Button>
+                <Button
+                  onClick={() => saveScheduleMutation.mutate(scheduleForm)}
+                  disabled={saveScheduleMutation.isPending}
+                >
+                  {saveScheduleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save schedule
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Summary Stats */}
       {data && data.reports.length > 0 && (

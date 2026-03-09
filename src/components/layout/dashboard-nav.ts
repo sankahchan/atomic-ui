@@ -1,10 +1,12 @@
 import {
   ArrowRightLeft,
   Bell,
+  Flame,
   FileText,
   Key,
   KeyRound,
   LayoutDashboard,
+  Rocket,
   ScrollText,
   Server,
   Settings,
@@ -22,10 +24,12 @@ export const primaryDashboardNavItems = [
 ] as const;
 
 export const adminToolNavItems = [
+  { href: '/dashboard/incidents', icon: Flame, labelKey: 'nav.incidents', descriptionKey: 'tools.incidents.desc' },
   { href: '/dashboard/reports', icon: FileText, labelKey: 'nav.reports', descriptionKey: 'tools.reports.desc' },
   { href: '/dashboard/audit', icon: ScrollText, labelKey: 'nav.audit', descriptionKey: 'tools.audit.desc' },
   { href: '/dashboard/sessions', icon: Smartphone, labelKey: 'nav.sessions', descriptionKey: 'tools.sessions.desc' },
   { href: '/dashboard/migration', icon: ArrowRightLeft, labelKey: 'nav.migration', descriptionKey: 'tools.migration.desc' },
+  { href: '/dashboard/onboarding', icon: Rocket, labelKey: 'nav.onboarding', descriptionKey: 'tools.onboarding.desc' },
 ] as const;
 
 export const settingsShortcutItems = [

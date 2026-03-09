@@ -32,6 +32,8 @@ import { usersRouter } from './users';
 import { reportsRouter } from './reports';
 import { notificationsRouter } from './notifications';
 import { sessionsRouter } from './sessions';
+import { incidentsRouter } from './incidents';
+import { onboardingRouter } from './onboarding';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
@@ -48,6 +50,7 @@ import {
   getSessionToken,
 } from '@/lib/auth';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
+import { writeAuditLog } from '@/lib/audit';
 
 /**
  * Auth Router
@@ -71,10 +74,19 @@ const authRouter = router({
         password: z.string().min(1),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const user = await authenticateUser(input.email, input.password);
 
       if (!user) {
+        await writeAuditLog({
+          ip: ctx.clientIp,
+          action: 'AUTH_LOGIN_FAILED',
+          entity: 'AUTH',
+          details: {
+            email: input.email,
+          },
+        });
+
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message: 'Invalid email or password',
@@ -104,6 +116,17 @@ const authRouter = router({
           create: { key: `temp_auth_${tempToken}`, value: JSON.stringify({ userId: user.id, email: user.email, role: user.role, timestamp: Date.now() }) },
         });
 
+        await writeAuditLog({
+          userId: user.id,
+          ip: ctx.clientIp,
+          action: 'AUTH_LOGIN_CHALLENGE',
+          entity: 'AUTH',
+          entityId: user.id,
+          details: {
+            email: user.email,
+          },
+        });
+
         return {
           requires2FA: true,
           tempToken,
@@ -118,6 +141,18 @@ const authRouter = router({
       // No 2FA - create session and set cookie
       const token = await createSession(user.id, user.email, user.role);
       await setSessionCookie(token);
+
+      await writeAuditLog({
+        userId: user.id,
+        ip: ctx.clientIp,
+        action: 'AUTH_LOGIN_SUCCESS',
+        entity: 'AUTH',
+        entityId: user.id,
+        details: {
+          email: user.email,
+          role: user.role,
+        },
+      });
 
       return {
         requires2FA: false,
@@ -138,7 +173,7 @@ const authRouter = router({
         recoveryCode: z.string().min(8).max(10).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // Get temp auth data
       const tempAuth = await db.settings.findUnique({
         where: { key: `temp_auth_${input.tempToken}` },
@@ -192,6 +227,18 @@ const authRouter = router({
         const isValid = otplib.verify({ token: input.totpCode, secret: decrypted });
 
         if (!isValid) {
+          await writeAuditLog({
+            userId,
+            ip: ctx.clientIp,
+            action: 'AUTH_2FA_FAILED',
+            entity: 'AUTH',
+            entityId: userId,
+            details: {
+              method: 'TOTP',
+              email,
+            },
+          });
+
           throw new TRPCError({
             code: 'UNAUTHORIZED',
             message: 'Invalid verification code.',
@@ -221,6 +268,18 @@ const authRouter = router({
         }
 
         if (!found) {
+          await writeAuditLog({
+            userId,
+            ip: ctx.clientIp,
+            action: 'AUTH_2FA_FAILED',
+            entity: 'AUTH',
+            entityId: userId,
+            details: {
+              method: 'RECOVERY_CODE',
+              email,
+            },
+          });
+
           throw new TRPCError({
             code: 'UNAUTHORIZED',
             message: 'Invalid recovery code.',
@@ -240,6 +299,19 @@ const authRouter = router({
       const token = await createSession(userId, email, role);
       await setSessionCookie(token);
 
+      await writeAuditLog({
+        userId,
+        ip: ctx.clientIp,
+        action: 'AUTH_LOGIN_SUCCESS',
+        entity: 'AUTH',
+        entityId: userId,
+        details: {
+          email,
+          role,
+          via2FA: true,
+        },
+      });
+
       return {
         id: userId,
         email,
@@ -252,12 +324,25 @@ const authRouter = router({
    * 
    * Clears the session cookie, effectively logging out the user.
    */
-  logout: publicProcedure.mutation(async () => {
+  logout: publicProcedure.mutation(async ({ ctx }) => {
     const token = await getSessionToken();
     if (token) {
       await invalidateSession(token);
     }
     await clearSessionCookie();
+
+    if (ctx.user) {
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'AUTH_LOGOUT',
+        entity: 'AUTH',
+        entityId: ctx.user.id,
+        details: {
+          email: ctx.user.email,
+        },
+      });
+    }
     return { success: true };
   }),
 
@@ -525,6 +610,8 @@ export const appRouter = router({
   provision: provisionRouter,
   users: usersRouter,
   reports: reportsRouter,
+  incidents: incidentsRouter,
+  onboarding: onboardingRouter,
 });
 
 /**
