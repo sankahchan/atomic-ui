@@ -64,7 +64,13 @@ systemctl is-active "${SERVICE_NAME}"
 systemctl show -p ActiveEnterTimestamp "${SERVICE_NAME}"
 
 PANEL_PORT="$(cat .panel_port 2>/dev/null || echo "${PORT_FALLBACK}")"
-PANEL_PATH="$(cat .panel_path 2>/dev/null || echo "${PANEL_PATH_FALLBACK}")"
+PANEL_PATH="$(cat .panel_path 2>/dev/null || true)"
+if [[ -z "${PANEL_PATH}" && -f .env ]]; then
+  PANEL_PATH="$(grep -E '^PANEL_PATH=' .env | tail -n 1 | cut -d '=' -f2- || true)"
+fi
+if [[ -z "${PANEL_PATH}" ]]; then
+  PANEL_PATH="${PANEL_PATH_FALLBACK}"
+fi
 
 journalctl -u "${SERVICE_NAME}" -n 20 --no-pager
 curl -I -s "http://127.0.0.1:${PANEL_PORT}${PANEL_PATH}/dashboard" | head -n 5
