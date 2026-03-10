@@ -29,7 +29,6 @@ if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   if [[ -d prisma ]]; then
     cp -r prisma .next/standalone/
   fi
-  cp -r .next/standalone/* ./
 fi
 
 echo "[build-low-memory] complete"

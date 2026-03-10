@@ -298,7 +298,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/node server.js
+ExecStart=/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production

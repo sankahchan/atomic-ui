@@ -91,7 +91,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/atomic-ui
-ExecStart=/usr/bin/node server.js
+ExecStart=/usr/bin/node /opt/atomic-ui/.next/standalone/server.js
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
