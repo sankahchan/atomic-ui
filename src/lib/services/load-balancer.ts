@@ -7,9 +7,11 @@
  * - Rebalance planning between servers
  */
 
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
+import { writeAuditLog } from '@/lib/audit';
 
 export type LoadBalancerAlgorithm = 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
 
@@ -18,6 +20,43 @@ const OVERLOAD_SCORE_THRESHOLD = 68;
 const OVERLOAD_CAPACITY_THRESHOLD = 85;
 const TARGET_CAPACITY_THRESHOLD = 72;
 const MIN_LOAD_GAP_FOR_MOVE = 12;
+const SERVER_BALANCER_POLICY_KEY = 'serverBalancerPolicy';
+const SERVER_BALANCER_PLAN_SIGNATURE_KEY = 'serverBalancerLastPlanSignature';
+
+export type RegionPreferenceMode = 'PREFER' | 'ONLY';
+
+export interface ServerBalancerPolicy {
+  scheduledRebalanceEnabled: boolean;
+  autoApplySafeMoves: boolean;
+  preferredCountryCodes: string[];
+  preferredCountryMode: RegionPreferenceMode;
+  autoApplySameCountryOnly: boolean;
+  maxRecommendationsPerRun: number;
+  maxAutoMoveKeysPerRun: number;
+  minAutoApplyLoadDelta: number;
+}
+
+const serverBalancerPolicySchema = z.object({
+  scheduledRebalanceEnabled: z.boolean().default(true),
+  autoApplySafeMoves: z.boolean().default(false),
+  preferredCountryCodes: z.array(z.string()).default([]),
+  preferredCountryMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
+  autoApplySameCountryOnly: z.boolean().default(true),
+  maxRecommendationsPerRun: z.number().int().min(1).max(10).default(3),
+  maxAutoMoveKeysPerRun: z.number().int().min(1).max(5).default(2),
+  minAutoApplyLoadDelta: z.number().int().min(5).max(50).default(18),
+});
+
+export const DEFAULT_SERVER_BALANCER_POLICY: ServerBalancerPolicy = {
+  scheduledRebalanceEnabled: true,
+  autoApplySafeMoves: false,
+  preferredCountryCodes: [],
+  preferredCountryMode: 'PREFER',
+  autoApplySameCountryOnly: true,
+  maxRecommendationsPerRun: 3,
+  maxAutoMoveKeysPerRun: 2,
+  minAutoApplyLoadDelta: 18,
+};
 
 export interface ServerLoadInfo {
   serverId: string;
@@ -36,6 +75,13 @@ export interface ServerLoadInfo {
 
 export interface SmartAssignmentTarget extends ServerLoadInfo {
   reasons: string[];
+}
+
+export interface SelectLeastLoadedServerOptions {
+  serverTagIds?: string[];
+  preferredCountryCodes?: string[];
+  preferredCountryMode?: RegionPreferenceMode;
+  usePolicy?: boolean;
 }
 
 export interface RebalanceRecommendation {
@@ -64,6 +110,16 @@ export interface RebalancePlan {
     movableKeys: number;
   };
   recommendations: RebalanceRecommendation[];
+}
+
+export interface ScheduledRebalanceResult {
+  skipped: boolean;
+  reason?: string;
+  policy: ServerBalancerPolicy;
+  recommendations: number;
+  autoApplied: number;
+  failedRecommendations: number;
+  summary: RebalancePlan['summary'];
 }
 
 interface ServerDatasetKey {
@@ -128,6 +184,95 @@ export interface RebalanceCandidateInput extends ServerRankingInput {
 
 function roundToSingleDecimal(value: number) {
   return Math.round(value * 10) / 10;
+}
+
+function normalizeCountryCode(countryCode: string | null | undefined) {
+  if (!countryCode) {
+    return null;
+  }
+
+  const normalized = countryCode.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
+
+function normalizeCountryCodes(countryCodes: string[]) {
+  return Array.from(
+    new Set(
+      countryCodes
+        .map((countryCode) => normalizeCountryCode(countryCode))
+        .filter((countryCode): countryCode is string => Boolean(countryCode)),
+    ),
+  );
+}
+
+function parseServerBalancerPolicy(value: unknown): ServerBalancerPolicy {
+  const parsed = serverBalancerPolicySchema.safeParse({
+    ...DEFAULT_SERVER_BALANCER_POLICY,
+    ...(value && typeof value === 'object' ? value as Record<string, unknown> : {}),
+  });
+
+  if (!parsed.success) {
+    return DEFAULT_SERVER_BALANCER_POLICY;
+  }
+
+  return {
+    ...parsed.data,
+    preferredCountryCodes: normalizeCountryCodes(parsed.data.preferredCountryCodes),
+  };
+}
+
+export async function getServerBalancerPolicy(): Promise<ServerBalancerPolicy> {
+  const setting = await db.settings.findUnique({
+    where: { key: SERVER_BALANCER_POLICY_KEY },
+  });
+
+  if (!setting) {
+    return DEFAULT_SERVER_BALANCER_POLICY;
+  }
+
+  try {
+    return parseServerBalancerPolicy(JSON.parse(setting.value));
+  } catch {
+    return DEFAULT_SERVER_BALANCER_POLICY;
+  }
+}
+
+function normalizeSelectionOptions(
+  options?: string[] | SelectLeastLoadedServerOptions,
+): SelectLeastLoadedServerOptions {
+  if (Array.isArray(options)) {
+    return {
+      serverTagIds: options,
+      usePolicy: true,
+    };
+  }
+
+  return {
+    usePolicy: true,
+    ...options,
+  };
+}
+
+function applyCountryPreference<T extends { countryCode?: string | null }>(
+  servers: T[],
+  preferredCountryCodes: string[],
+  preferredCountryMode: RegionPreferenceMode,
+) {
+  const normalizedCountries = normalizeCountryCodes(preferredCountryCodes);
+  if (normalizedCountries.length === 0) {
+    return servers;
+  }
+
+  const preferred = servers.filter((server) => {
+    const countryCode = normalizeCountryCode(server.countryCode);
+    return countryCode ? normalizedCountries.includes(countryCode) : false;
+  });
+
+  if (preferred.length > 0) {
+    return preferred;
+  }
+
+  return preferredCountryMode === 'ONLY' ? [] : servers;
 }
 
 function getCapacityPercent(activeKeyCount: number, maxKeys: number | null | undefined) {
@@ -522,10 +667,20 @@ export async function getServerLoadStats(serverTagIds?: string[]): Promise<Serve
  * Select the best target server for a new key.
  */
 export async function selectLeastLoadedServer(
-  serverTagIds?: string[],
+  options?: string[] | SelectLeastLoadedServerOptions,
 ): Promise<SmartAssignmentTarget | null> {
-  const loadStats = await getServerLoadStats(serverTagIds);
-  const selected = loadStats.find((server) => server.isAssignable);
+  const normalizedOptions = normalizeSelectionOptions(options);
+  const policy = normalizedOptions.usePolicy === false
+    ? DEFAULT_SERVER_BALANCER_POLICY
+    : await getServerBalancerPolicy();
+
+  const preferredCountryCodes = normalizedOptions.preferredCountryCodes ?? policy.preferredCountryCodes;
+  const preferredCountryMode = normalizedOptions.preferredCountryMode ?? policy.preferredCountryMode;
+
+  const loadStats = await getServerLoadStats(normalizedOptions.serverTagIds);
+  const assignable = loadStats.filter((server) => server.isAssignable);
+  const candidates = applyCountryPreference(assignable, preferredCountryCodes, preferredCountryMode);
+  const selected = candidates[0];
 
   if (!selected) {
     return null;
@@ -538,6 +693,14 @@ export async function selectLeastLoadedServer(
     `${selected.activeKeyCount} active keys`,
     `load score ${selected.loadScore}`,
   ];
+
+  if (preferredCountryCodes.length > 0) {
+    reasons.push(
+      preferredCountryMode === 'ONLY'
+        ? `restricted to preferred countries: ${preferredCountryCodes.join(', ')}`
+        : `preferred countries: ${preferredCountryCodes.join(', ')}`,
+    );
+  }
 
   logger.verbose(
     'smart-assignment',
@@ -554,6 +717,36 @@ export async function selectLeastLoadedServer(
     ...selected,
     reasons,
   };
+}
+
+export function isSafeAutoApplyRecommendation(
+  recommendation: RebalanceRecommendation,
+  policy: ServerBalancerPolicy,
+) {
+  if (recommendation.keyCount > policy.maxAutoMoveKeysPerRun) {
+    return false;
+  }
+
+  if (recommendation.estimatedLoadDelta < policy.minAutoApplyLoadDelta) {
+    return false;
+  }
+
+  if (policy.autoApplySameCountryOnly) {
+    const sourceCountry = normalizeCountryCode(recommendation.sourceServerCountryCode);
+    const targetCountry = normalizeCountryCode(recommendation.targetServerCountryCode);
+    if (!sourceCountry || !targetCountry || sourceCountry !== targetCountry) {
+      return false;
+    }
+  }
+
+  if (policy.preferredCountryCodes.length > 0 && policy.preferredCountryMode === 'ONLY') {
+    const targetCountry = normalizeCountryCode(recommendation.targetServerCountryCode);
+    if (!targetCountry || !normalizeCountryCodes(policy.preferredCountryCodes).includes(targetCountry)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -596,6 +789,166 @@ export async function getServerRebalancePlan(options?: {
   }
 
   return plan;
+}
+
+export async function runScheduledRebalanceCycle(): Promise<ScheduledRebalanceResult> {
+  const policy = await getServerBalancerPolicy();
+
+  if (!policy.scheduledRebalanceEnabled) {
+    return {
+      skipped: true,
+      reason: 'Scheduled rebalance is disabled.',
+      policy,
+      recommendations: 0,
+      autoApplied: 0,
+      failedRecommendations: 0,
+      summary: {
+        overloadedServers: 0,
+        targetServers: 0,
+        recommendedMoves: 0,
+        movableKeys: 0,
+      },
+    };
+  }
+
+  const plan = await getServerRebalancePlan({
+    maxMoves: policy.maxRecommendationsPerRun,
+  });
+  const planSignature = JSON.stringify(
+    plan.recommendations.map((recommendation) => ({
+      sourceServerId: recommendation.sourceServerId,
+      targetServerId: recommendation.targetServerId,
+      keyIds: recommendation.keyIds,
+      keyCount: recommendation.keyCount,
+      estimatedLoadDelta: recommendation.estimatedLoadDelta,
+    })),
+  );
+
+  if (plan.recommendations.length === 0) {
+    await db.settings.upsert({
+      where: { key: SERVER_BALANCER_PLAN_SIGNATURE_KEY },
+      create: {
+        key: SERVER_BALANCER_PLAN_SIGNATURE_KEY,
+        value: JSON.stringify(''),
+      },
+      update: {
+        value: JSON.stringify(''),
+      },
+    });
+
+    return {
+      skipped: false,
+      policy,
+      recommendations: 0,
+      autoApplied: 0,
+      failedRecommendations: 0,
+      summary: plan.summary,
+    };
+  }
+
+  const previousSignatureSetting = await db.settings.findUnique({
+    where: { key: SERVER_BALANCER_PLAN_SIGNATURE_KEY },
+  });
+  const previousSignature = previousSignatureSetting
+    ? (() => {
+        try {
+          return JSON.parse(previousSignatureSetting.value) as string;
+        } catch {
+          return '';
+        }
+      })()
+    : '';
+
+  const planChanged = planSignature !== previousSignature;
+
+  if (planChanged) {
+    await writeAuditLog({
+      action: 'SERVER_REBALANCE_PLANNED',
+      entity: 'SERVER',
+      details: {
+        triggeredBy: 'scheduler',
+        policy,
+        summary: plan.summary,
+        recommendations: plan.recommendations.map((recommendation) => ({
+          sourceServerId: recommendation.sourceServerId,
+          targetServerId: recommendation.targetServerId,
+          keyCount: recommendation.keyCount,
+          keyNames: recommendation.keyNames,
+          estimatedLoadDelta: recommendation.estimatedLoadDelta,
+        })),
+      },
+    });
+  }
+
+  await db.settings.upsert({
+    where: { key: SERVER_BALANCER_PLAN_SIGNATURE_KEY },
+    create: {
+      key: SERVER_BALANCER_PLAN_SIGNATURE_KEY,
+      value: JSON.stringify(planSignature),
+    },
+    update: {
+      value: JSON.stringify(planSignature),
+    },
+  });
+
+  if (!policy.autoApplySafeMoves) {
+    return {
+      skipped: false,
+      policy,
+      recommendations: plan.recommendations.length,
+      autoApplied: 0,
+      failedRecommendations: 0,
+      summary: plan.summary,
+    };
+  }
+
+  const { migrateKeys } = await import('@/lib/services/server-migration');
+  const safeRecommendations = plan.recommendations.filter((recommendation) =>
+    isSafeAutoApplyRecommendation(recommendation, policy),
+  );
+
+  let autoApplied = 0;
+  let failedRecommendations = 0;
+
+  for (const recommendation of safeRecommendations) {
+    const result = await migrateKeys(
+      recommendation.sourceServerId,
+      recommendation.targetServerId,
+      recommendation.keyIds,
+      true,
+    );
+
+    if (result.failed > 0) {
+      failedRecommendations += 1;
+    }
+
+    if (result.migrated > 0) {
+      autoApplied += 1;
+      await writeAuditLog({
+        action: 'SERVER_REBALANCE_AUTO_APPLIED',
+        entity: 'SERVER',
+        entityId: recommendation.sourceServerId,
+        details: {
+          triggeredBy: 'scheduler',
+          sourceServerId: recommendation.sourceServerId,
+          targetServerId: recommendation.targetServerId,
+          keyIds: recommendation.keyIds,
+          keyNames: recommendation.keyNames,
+          migrated: result.migrated,
+          failed: result.failed,
+        },
+      });
+    }
+  }
+
+  return {
+    skipped: false,
+    policy,
+    recommendations: plan.recommendations.length,
+    autoApplied,
+    failedRecommendations,
+    summary: plan.summary,
+  };
 }
 
 /**

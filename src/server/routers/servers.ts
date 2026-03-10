@@ -948,6 +948,15 @@ export const serversRouter = router({
     }),
 
   /**
+   * Trigger the scheduled rebalance cycle manually.
+   */
+  runScheduledRebalance: adminProcedure
+    .mutation(async () => {
+      const { runScheduledRebalanceCycle } = await import('@/lib/services/load-balancer');
+      return runScheduledRebalanceCycle();
+    }),
+
+  /**
    * Apply one rebalance recommendation by moving selected keys.
    */
   applyRebalance: adminProcedure

@@ -11,6 +11,7 @@
  * - Audit log cleanup (Daily)
  * - Backup verification (Daily)
  * - Notification queue processing (Every minute)
+ * - Smart rebalancer planning (Every 30 mins)
  * - Scheduled reports (Every 5 mins)
  */
 
@@ -23,6 +24,7 @@ import { checkKeyRotations } from '@/lib/services/key-rotation';
 import { cleanupOldAuditLogs } from '@/lib/services/audit-log';
 import { verifyLatestBackups } from '@/lib/services/backup-verification';
 import { processNotificationQueue } from '@/lib/services/notification-queue';
+import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { logger } from '@/lib/logger';
 
@@ -139,7 +141,27 @@ export function initScheduler() {
         }
     });
 
-    // 9. Scheduled report delivery (Every 5 minutes)
+    // 9. Smart Rebalance Planning (Every 30 minutes)
+    cron.schedule('*/30 * * * *', async () => {
+        logger.debug('⚖️ Running scheduled rebalance planner...');
+        try {
+            const result = await runScheduledRebalanceCycle();
+            if (result.skipped) {
+                logger.debug(`ℹ️ Rebalance planner skipped: ${result.reason}`);
+                return;
+            }
+
+            if (result.recommendations > 0 || result.autoApplied > 0) {
+                logger.info(
+                    `⚖️ Rebalance planner: ${result.recommendations} recommendations, ${result.autoApplied} auto-applied, ${result.failedRecommendations} partially failed`,
+                );
+            }
+        } catch (error) {
+            logger.error('❌ Scheduled rebalance planner failed:', error);
+        }
+    });
+
+    // 10. Scheduled report delivery (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         logger.debug('🗓️ Running scheduled reports...');
         try {

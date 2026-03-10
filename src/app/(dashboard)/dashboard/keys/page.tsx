@@ -2119,7 +2119,7 @@ export default function KeysPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_360px]">
           <div className="space-y-4">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Key className="h-3.5 w-3.5" />
@@ -2133,24 +2133,30 @@ export default function KeysPage() {
             </div>
           </div>
 
-          <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
-            <Button variant="outline" size="sm" className="h-11 rounded-full border-border/70 bg-background/70 px-5" asChild>
-              <Link href="/dashboard/templates">
-                <FileText className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">{t('nav.templates') || 'Templates'}</span>
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-11 rounded-full border-border/70 bg-background/70 px-5" asChild>
-              <Link href="/dashboard/archived">
-                <Archive className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
-              </Link>
-            </Button>
-            <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-11 rounded-full px-5">
-              <Plus className="w-4 h-4 mr-2" />
-              {t('keys.create')}
-            </Button>
-          </div>
+          <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t('dashboard.key_operations_title')}</CardTitle>
+              <CardDescription>{t('dashboard.key_operations_desc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
+                <Plus className="w-4 h-4 mr-2" />
+                {t('keys.create')}
+              </Button>
+              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70" asChild>
+                <Link href="/dashboard/templates">
+                  <FileText className="w-4 h-4 mr-2" />
+                  {t('nav.templates') || 'Templates'}
+                </Link>
+              </Button>
+              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70" asChild>
+                <Link href="/dashboard/archived">
+                  <Archive className="w-4 h-4 mr-2" />
+                  {t('nav.archived') || 'Archived'}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-2 sm:hidden">

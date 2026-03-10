@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  DEFAULT_SERVER_BALANCER_POLICY,
+  isSafeAutoApplyRecommendation,
   planRebalanceRecommendations,
   rankServersForAssignment,
 } from './load-balancer';
@@ -106,4 +108,64 @@ test('planRebalanceRecommendations moves offline standalone keys to lighter serv
   assert.equal(plan.recommendations[0].sourceServerId, 'busy');
   assert.equal(plan.recommendations[0].targetServerId, 'light');
   assert.deepEqual(plan.recommendations[0].keyNames, ['Dormant A', 'Dormant B']);
+});
+
+test('isSafeAutoApplyRecommendation enforces same-country and move-size rules', () => {
+  const recommendation = {
+    sourceServerId: 'busy',
+    sourceServerName: 'Busy',
+    sourceServerCountryCode: 'SG',
+    sourceLoadScore: 92,
+    sourceCapacityPercent: 94,
+    targetServerId: 'light',
+    targetServerName: 'Light',
+    targetServerCountryCode: 'SG',
+    targetLoadScore: 48,
+    targetCapacityPercent: 33,
+    keyIds: ['key-1', 'key-2'],
+    keyNames: ['Dormant A', 'Dormant B'],
+    keyCount: 2,
+    reason: 'Safe move',
+    estimatedLoadDelta: 24,
+  };
+
+  assert.equal(
+    isSafeAutoApplyRecommendation(recommendation, DEFAULT_SERVER_BALANCER_POLICY),
+    true,
+  );
+
+  assert.equal(
+    isSafeAutoApplyRecommendation(
+      {
+        ...recommendation,
+        targetServerCountryCode: 'JP',
+      },
+      DEFAULT_SERVER_BALANCER_POLICY,
+    ),
+    false,
+  );
+
+  assert.equal(
+    isSafeAutoApplyRecommendation(
+      recommendation,
+      {
+        ...DEFAULT_SERVER_BALANCER_POLICY,
+        autoApplySameCountryOnly: false,
+        preferredCountryCodes: ['JP'],
+        preferredCountryMode: 'ONLY',
+      },
+    ),
+    false,
+  );
+
+  assert.equal(
+    isSafeAutoApplyRecommendation(
+      {
+        ...recommendation,
+        keyCount: 3,
+      },
+      DEFAULT_SERVER_BALANCER_POLICY,
+    ),
+    false,
+  );
 });

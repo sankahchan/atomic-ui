@@ -34,6 +34,7 @@ import {
   Bell,
   Shield,
   Globe,
+  ArrowRightLeft,
   Plus,
   Save,
   Loader2,
@@ -55,7 +56,7 @@ import {
 import Link from 'next/link';
 
 // Section type for the collapsible cards
-type SectionId = 'general' | 'health' | 'backup' | 'audit' | 'notifications' | 'security' | 'about' | 'subscription' | null;
+type SectionId = 'general' | 'health' | 'balancer' | 'backup' | 'audit' | 'notifications' | 'security' | 'about' | 'subscription' | null;
 
 type AuditAlertRule = {
   id: string;
@@ -83,6 +84,17 @@ type AuditAlertRuleFormState = {
   throttleMinutes: string;
   matchWindowMinutes: string;
   minMatches: string;
+};
+
+type ServerBalancerPolicyFormState = {
+  scheduledRebalanceEnabled: boolean;
+  autoApplySafeMoves: boolean;
+  preferredCountryCodes: string;
+  preferredCountryMode: 'PREFER' | 'ONLY';
+  autoApplySameCountryOnly: boolean;
+  maxRecommendationsPerRun: string;
+  maxAutoMoveKeysPerRun: string;
+  minAutoApplyLoadDelta: string;
 };
 
 const AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES = 24 * 60;
@@ -113,6 +125,30 @@ function splitCommaSeparated(value: string) {
         .filter(Boolean),
     ),
   );
+}
+
+function formatTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+function buildServerBalancerPolicyForm(value?: unknown): ServerBalancerPolicyFormState {
+  const policy = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+
+  return {
+    scheduledRebalanceEnabled: policy.scheduledRebalanceEnabled !== false,
+    autoApplySafeMoves: policy.autoApplySafeMoves === true,
+    preferredCountryCodes: Array.isArray(policy.preferredCountryCodes)
+      ? policy.preferredCountryCodes.join(', ')
+      : '',
+    preferredCountryMode: policy.preferredCountryMode === 'ONLY' ? 'ONLY' : 'PREFER',
+    autoApplySameCountryOnly: policy.autoApplySameCountryOnly !== false,
+    maxRecommendationsPerRun: String(policy.maxRecommendationsPerRun ?? 3),
+    maxAutoMoveKeysPerRun: String(policy.maxAutoMoveKeysPerRun ?? 2),
+    minAutoApplyLoadDelta: String(policy.minAutoApplyLoadDelta ?? 18),
+  };
 }
 
 /**
@@ -175,6 +211,44 @@ function SectionCard({
   );
 }
 
+function SettingsShortcutGrid({
+  className,
+}: {
+  className?: string;
+}) {
+  const { t } = useLocale();
+
+  return (
+    <div className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-3', className)}>
+      {settingsShortcutItems.map((item) => {
+        const Icon = item.icon;
+
+        return (
+          <Link key={item.href} href={item.href} className="block">
+            <div className="h-full rounded-[1.35rem] border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:bg-white/[0.02]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="mt-4">
+                <p className="text-sm font-medium">{t(item.labelKey)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t(item.descriptionKey)}
+                </p>
+              </div>
+              <p className="mt-4 text-xs font-medium text-primary">
+                {t('settings.hub.open')}
+              </p>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -183,6 +257,10 @@ export default function SettingsPage() {
   const utils = trpc.useUtils();
   const isBackupSectionOpen = openSection === 'backup';
   const isAuditSectionOpen = openSection === 'audit';
+  const isBalancerSectionOpen = openSection === 'balancer';
+  const [balancerPolicyForm, setBalancerPolicyForm] = useState<ServerBalancerPolicyFormState>(
+    buildServerBalancerPolicyForm(),
+  );
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
@@ -195,6 +273,16 @@ export default function SettingsPage() {
     enabled: isAuditSectionOpen,
     refetchOnWindowFocus: false,
   });
+  const { data: balancerPlanPreview, isLoading: isBalancerPlanLoading, refetch: refetchBalancerPlan } = trpc.servers.rebalancePlan.useQuery({
+    maxMoves: 3,
+  }, {
+    enabled: isBalancerSectionOpen,
+    refetchOnWindowFocus: false,
+  });
+  const { data: balancerTargetPreview, isLoading: isBalancerTargetLoading, refetch: refetchBalancerTarget } = trpc.servers.recommendAssignmentTarget.useQuery(undefined, {
+    enabled: isBalancerSectionOpen,
+    refetchOnWindowFocus: false,
+  });
 
   // Update setting mutation
   const updateMutation = trpc.settings.update.useMutation({
@@ -204,6 +292,10 @@ export default function SettingsPage() {
         description: t('settings.toast.saved_desc'),
       });
       refetch();
+      if (isBalancerSectionOpen) {
+        void refetchBalancerPlan();
+        void refetchBalancerTarget();
+      }
     },
     onError: (error) => {
       toast({
@@ -213,6 +305,31 @@ export default function SettingsPage() {
       });
     },
   });
+
+  const runScheduledRebalanceMutation = trpc.servers.runScheduledRebalance.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: t('settings.balancer.run_now_done'),
+        description: formatTemplate(t('settings.balancer.run_now_done_desc'), {
+          recommendations: result.recommendations,
+          autoApplied: result.autoApplied,
+        }),
+      });
+      void refetchBalancerPlan();
+      void refetchBalancerTarget();
+    },
+    onError: (error) => {
+      toast({
+        title: t('settings.balancer.run_now_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    setBalancerPolicyForm(buildServerBalancerPolicyForm(settings?.serverBalancerPolicy));
+  }, [settings?.serverBalancerPolicy]);
 
   // Password change mutation
   const passwordMutation = trpc.auth.changePassword.useMutation({
@@ -477,6 +594,55 @@ export default function SettingsPage() {
     updateMutation.mutate({ key, value });
   };
 
+  const handleSaveBalancerPolicy = () => {
+    const preferredCountryCodes = splitCommaSeparated(balancerPolicyForm.preferredCountryCodes)
+      .map((countryCode) => countryCode.toUpperCase());
+
+    const hasInvalidCountryCode = preferredCountryCodes.some((countryCode) => !/^[A-Z]{2}$/.test(countryCode));
+    const maxRecommendationsPerRun = Number(balancerPolicyForm.maxRecommendationsPerRun);
+    const maxAutoMoveKeysPerRun = Number(balancerPolicyForm.maxAutoMoveKeysPerRun);
+    const minAutoApplyLoadDelta = Number(balancerPolicyForm.minAutoApplyLoadDelta);
+
+    if (hasInvalidCountryCode) {
+      toast({
+        title: t('settings.balancer.invalid_title'),
+        description: t('settings.balancer.invalid_country_codes'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      !Number.isInteger(maxRecommendationsPerRun) ||
+      maxRecommendationsPerRun < 1 ||
+      maxRecommendationsPerRun > 10 ||
+      !Number.isInteger(maxAutoMoveKeysPerRun) ||
+      maxAutoMoveKeysPerRun < 1 ||
+      maxAutoMoveKeysPerRun > 5 ||
+      !Number.isInteger(minAutoApplyLoadDelta) ||
+      minAutoApplyLoadDelta < 5 ||
+      minAutoApplyLoadDelta > 50
+    ) {
+      toast({
+        title: t('settings.balancer.invalid_title'),
+        description: t('settings.balancer.invalid_numeric_values'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    handleSaveSetting('serverBalancerPolicy', {
+      scheduledRebalanceEnabled: balancerPolicyForm.scheduledRebalanceEnabled,
+      autoApplySafeMoves: balancerPolicyForm.autoApplySafeMoves,
+      preferredCountryCodes,
+      preferredCountryMode: balancerPolicyForm.preferredCountryMode,
+      autoApplySameCountryOnly: balancerPolicyForm.autoApplySameCountryOnly,
+      maxRecommendationsPerRun,
+      maxAutoMoveKeysPerRun,
+      minAutoApplyLoadDelta,
+    });
+  };
+
   const parsedAuditRetentionDays = Number(auditRetentionDaysInput);
   const isAuditRetentionDaysValid =
     auditRetentionDaysInput.trim() !== '' &&
@@ -597,48 +763,28 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="max-w-4xl space-y-4">
-          <BackButton href="/dashboard" label={t('nav.dashboard')} />
-          <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-            <Globe className="h-3.5 w-3.5" />
-            {t('settings.hub.title')}
-          </span>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('settings.title')}</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-              {t('settings.subtitle')}
-            </p>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_380px]">
+          <div className="max-w-4xl space-y-4">
+            <BackButton href="/dashboard" label={t('nav.dashboard')} />
+            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+              <Globe className="h-3.5 w-3.5" />
+              {t('settings.hub.title')}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('settings.title')}</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('settings.subtitle')}
+              </p>
+            </div>
+          </div>
+
+          <div className="hidden xl:block">
+            <SettingsShortcutGrid className="grid-cols-1" />
           </div>
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {settingsShortcutItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <Link key={item.href} href={item.href} className="block">
-              <div className="h-full rounded-[1.35rem] border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:bg-white/[0.02]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm font-medium">{t(item.labelKey)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t(item.descriptionKey)}
-                  </p>
-                </div>
-                <p className="mt-4 text-xs font-medium text-primary">
-                  {t('settings.hub.open')}
-                </p>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      <SettingsShortcutGrid className="xl:hidden" />
 
       {/* Collapsible Sections */}
       <div className="space-y-3">
@@ -782,6 +928,187 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 {t('settings.health.traffic_desc')}
               </p>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Smart Assignment & Rebalancing */}
+        <SectionCard
+          id="balancer"
+          icon={ArrowRightLeft}
+          title={t('settings.balancer.title')}
+          description={t('settings.balancer.desc')}
+          isOpen={openSection === 'balancer'}
+          onToggle={setOpenSection}
+        >
+          <div className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  {t('settings.balancer.preview_best_target')}
+                </p>
+                <p className="mt-3 text-base font-semibold">
+                  {isBalancerTargetLoading
+                    ? '...'
+                    : balancerTargetPreview?.serverName ?? t('settings.balancer.no_target')}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isBalancerTargetLoading
+                    ? t('settings.balancer.loading')
+                    : balancerTargetPreview
+                      ? `${balancerTargetPreview.countryCode ?? 'Global'} • score ${balancerTargetPreview.loadScore}`
+                      : t('settings.balancer.no_target_desc')}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  {t('settings.balancer.preview_recommendations')}
+                </p>
+                <p className="mt-3 text-base font-semibold">
+                  {isBalancerPlanLoading ? '...' : balancerPlanPreview?.summary.recommendedMoves ?? 0}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('settings.balancer.preview_recommendations_desc')}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  {t('settings.balancer.preview_overloaded')}
+                </p>
+                <p className="mt-3 text-base font-semibold">
+                  {isBalancerPlanLoading ? '...' : balancerPlanPreview?.summary.overloadedServers ?? 0}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('settings.balancer.preview_overloaded_desc')}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-border/60 p-4 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{t('settings.balancer.scheduled_title')}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('settings.balancer.scheduled_desc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={balancerPolicyForm.scheduledRebalanceEnabled}
+                    onCheckedChange={(checked) => setBalancerPolicyForm((current) => ({ ...current, scheduledRebalanceEnabled: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{t('settings.balancer.auto_apply_title')}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('settings.balancer.auto_apply_desc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={balancerPolicyForm.autoApplySafeMoves}
+                    onCheckedChange={(checked) => setBalancerPolicyForm((current) => ({ ...current, autoApplySafeMoves: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{t('settings.balancer.same_country_title')}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('settings.balancer.same_country_desc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={balancerPolicyForm.autoApplySameCountryOnly}
+                    onCheckedChange={(checked) => setBalancerPolicyForm((current) => ({ ...current, autoApplySameCountryOnly: checked }))}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label>{t('settings.balancer.region_mode')}</Label>
+                  <Select
+                    value={balancerPolicyForm.preferredCountryMode}
+                    onValueChange={(value: 'PREFER' | 'ONLY') => setBalancerPolicyForm((current) => ({ ...current, preferredCountryMode: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PREFER">{t('settings.balancer.region_mode_prefer')}</SelectItem>
+                      <SelectItem value="ONLY">{t('settings.balancer.region_mode_only')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="preferredCountries">{t('settings.balancer.preferred_countries')}</Label>
+                  <Input
+                    id="preferredCountries"
+                    value={balancerPolicyForm.preferredCountryCodes}
+                    onChange={(e) => setBalancerPolicyForm((current) => ({ ...current, preferredCountryCodes: e.target.value }))}
+                    placeholder={t('settings.balancer.preferred_countries_placeholder')}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.balancer.preferred_countries_desc')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="maxRecommendationsPerRun">{t('settings.balancer.max_recommendations')}</Label>
+                <Input
+                  id="maxRecommendationsPerRun"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={balancerPolicyForm.maxRecommendationsPerRun}
+                  onChange={(e) => setBalancerPolicyForm((current) => ({ ...current, maxRecommendationsPerRun: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxAutoMoveKeysPerRun">{t('settings.balancer.max_auto_moves')}</Label>
+                <Input
+                  id="maxAutoMoveKeysPerRun"
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={balancerPolicyForm.maxAutoMoveKeysPerRun}
+                  onChange={(e) => setBalancerPolicyForm((current) => ({ ...current, maxAutoMoveKeysPerRun: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="minAutoApplyLoadDelta">{t('settings.balancer.min_gap')}</Label>
+                <Input
+                  id="minAutoApplyLoadDelta"
+                  type="number"
+                  min="5"
+                  max="50"
+                  value={balancerPolicyForm.minAutoApplyLoadDelta}
+                  onChange={(e) => setBalancerPolicyForm((current) => ({ ...current, minAutoApplyLoadDelta: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleSaveBalancerPolicy} disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Save className="mr-2 h-4 w-4" />
+                {t('settings.balancer.save')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => runScheduledRebalanceMutation.mutate()}
+                disabled={runScheduledRebalanceMutation.isPending}
+              >
+                {runScheduledRebalanceMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t('settings.balancer.run_now')}
+              </Button>
             </div>
           </div>
         </SectionCard>

@@ -1729,7 +1729,7 @@ export default function DynamicKeysPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_360px]">
           <div className="space-y-4">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <KeyRound className="h-3.5 w-3.5" />
@@ -1742,18 +1742,25 @@ export default function DynamicKeysPage() {
               </p>
             </div>
           </div>
-          <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
-            <Button variant="outline" size="sm" className="h-11 rounded-full border-border/70 bg-background/70 px-5" asChild>
-              <Link href="/dashboard/archived">
-                <Archive className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">{t('nav.archived') || 'Archived'}</span>
-              </Link>
-            </Button>
-            <Button onClick={() => setCreateDialogOpen(true)} size="sm" className="h-11 rounded-full px-5">
-              <Plus className="w-4 h-4 mr-2" />
-              {t('dynamic_keys.create')}
-            </Button>
-          </div>
+
+          <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+            <CardContent className="space-y-3 p-6">
+              <div>
+                <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('dynamic_keys.desc')}</p>
+              </div>
+              <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
+                <Plus className="w-4 h-4 mr-2" />
+                {t('dynamic_keys.create')}
+              </Button>
+              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70" asChild>
+                <Link href="/dashboard/archived">
+                  <Archive className="w-4 h-4 mr-2" />
+                  {t('nav.archived') || 'Archived'}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-2 sm:hidden">

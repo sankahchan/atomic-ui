@@ -416,19 +416,31 @@ export default function AuditPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
-              <p className="mt-3 text-2xl font-semibold">{totalEntries}</p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
+                <p className="mt-3 text-2xl font-semibold">{totalEntries}</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.current_page')}</p>
+                <p className="mt-3 text-2xl font-semibold">{page}</p>
+              </div>
+              <div className="col-span-2 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 md:col-span-1 dark:bg-white/[0.02]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
+                <p className="mt-3 text-2xl font-semibold">{currentItems.length}</p>
+              </div>
             </div>
-            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.current_page')}</p>
-              <p className="mt-3 text-2xl font-semibold">{page}</p>
-            </div>
-            <div className="col-span-2 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 md:col-span-1 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
-              <p className="mt-3 text-2xl font-semibold">{currentItems.length}</p>
-            </div>
+
+            <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+              <CardContent className="flex gap-3 p-4">
+                <Shield className="mt-0.5 h-5 w-5 text-primary" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{t('audit.filters.title')}</p>
+                  <p className="text-xs text-muted-foreground">{t('audit.filters.hint')}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

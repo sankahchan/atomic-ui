@@ -1745,7 +1745,7 @@ export default function NotificationsPage() {
                 {t('notifications.subtitle')}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 xl:hidden">
               <Button onClick={handleOpenCreate} className="h-11 rounded-full px-5">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('notifications.add_channel')}
@@ -1753,27 +1753,42 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+          <div className="space-y-3">
+            <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+              <CardContent className="space-y-3 p-5">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{t('notifications.add_channel')}</p>
+                  <p className="text-xs text-muted-foreground">{t('notifications.subtitle')}</p>
+                </div>
+                <Button onClick={handleOpenCreate} className="h-11 w-full rounded-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('notifications.add_channel')}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {t('notifications.summary.channels')}
               </p>
               <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.channels_desc')}</p>
-            </div>
-            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              </div>
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {t('notifications.summary.active_channels')}
               </p>
               <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t('notifications.channel_inactive')}: {Math.max(0, channels.length - activeChannels)}</p>
-            </div>
-            <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              </div>
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {t('notifications.summary.coverage')}
               </p>
               <p className="mt-3 text-2xl font-semibold">{subscribedEventCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.coverage_desc')}</p>
+              </div>
             </div>
           </div>
         </div>
