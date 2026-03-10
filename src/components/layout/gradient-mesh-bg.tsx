@@ -16,6 +16,15 @@ export function GradientMeshBackground() {
           animationDelay: '-5s',
         }}
       />
+      <div
+        className="absolute h-[24%] w-[24%] top-[14%] right-[14%] rounded-full"
+        style={{
+          background: 'var(--mesh-color-1)',
+          filter: 'blur(72px)',
+          animation: 'mesh-float 22s ease-in-out infinite',
+          animationDelay: '-9s',
+        }}
+      />
     </div>
   );
 }

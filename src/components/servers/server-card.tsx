@@ -198,7 +198,7 @@ export function ServerCard({
                 </div>
 
                 {/* Bandwidth metric - prominent display */}
-                <div className="mb-4 rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+                <div className="mb-4 rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.72))]">
                     <div className="flex items-center gap-2 mb-1">
                         <ArrowUpDown className="w-4 h-4 text-primary" />
                         <span className="text-xs text-muted-foreground">{t('servers.total_bandwidth')}</span>
@@ -212,7 +212,7 @@ export function ServerCard({
 
                 {/* Metrics grid */}
                 <div className="mb-4 grid grid-cols-3 gap-3">
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Zap className="w-3 h-3 text-emerald-500" />
                         </div>
@@ -220,7 +220,7 @@ export function ServerCard({
                         <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Key className="w-3 h-3 text-primary" />
                         </div>
@@ -230,7 +230,7 @@ export function ServerCard({
                         </p>
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:bg-white/[0.02]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Activity className="w-3 h-3 text-muted-foreground" />
                         </div>
@@ -266,7 +266,7 @@ export function ServerCard({
             </CardContent>
 
             {/* Footer Actions */}
-            <div className="border-t border-border/50 bg-background/40 px-5 py-4 dark:bg-white/[0.02]">
+            <div className="border-t border-border/50 bg-background/40 px-5 py-4 dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(5,12,24,0.88),rgba(4,10,22,0.78))]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         {server.outlineVersion && `v${server.outlineVersion}`}

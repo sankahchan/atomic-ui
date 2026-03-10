@@ -76,9 +76,9 @@ function Sidebar({
       )}
     >
       {/* Logo and brand */}
-      <div className="flex items-center justify-between rounded-[1.5rem] border border-border/70 bg-background/65 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
+      <div className="flex items-center justify-between rounded-[1.5rem] border border-border/70 bg-background/65 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,26,0.92),rgba(4,10,22,0.8))] dark:shadow-[0_18px_50px_rgba(1,6,20,0.34),inset_0_1px_0_rgba(125,211,252,0.05)]">
         <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:shadow-[0_0_22px_rgba(34,211,238,0.12)]">
             <Atom className="w-6 h-6 text-primary" />
           </div>
           {!isCollapsed && (
@@ -98,7 +98,7 @@ function Sidebar({
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="hidden rounded-2xl border border-border/70 bg-background/60 text-muted-foreground hover:bg-background/80 hover:text-foreground dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] lg:flex"
+          className="hidden rounded-2xl border border-border/70 bg-background/60 text-muted-foreground hover:bg-background/80 hover:text-foreground dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:bg-[rgba(34,211,238,0.08)] dark:hover:text-cyan-100 lg:flex"
         >
           <ChevronLeft className={cn(
             'h-4 w-4 transition-transform',
@@ -122,14 +122,14 @@ function Sidebar({
                     'ops-sidebar-item',
                     isCollapsed && 'justify-center px-0',
                     isActive
-                      ? 'bg-gradient-to-r from-primary/18 to-primary/6 text-primary shadow-[0_16px_30px_rgba(14,165,233,0.14)]'
-                      : 'text-muted-foreground hover:bg-background/65 hover:text-foreground dark:hover:bg-white/[0.06]'
+                      ? 'bg-gradient-to-r from-primary/18 to-primary/6 text-primary shadow-[0_16px_30px_rgba(14,165,233,0.14)] dark:before:absolute dark:before:inset-y-3 dark:before:left-0 dark:before:w-[3px] dark:before:rounded-full dark:before:bg-cyan-300 dark:before:shadow-[0_0_16px_rgba(34,211,238,0.55)] dark:bg-[linear-gradient(90deg,rgba(34,211,238,0.14),rgba(34,211,238,0.04))] dark:text-cyan-100 dark:shadow-[0_16px_32px_rgba(1,10,24,0.46),0_0_26px_rgba(34,211,238,0.08)]'
+                      : 'text-muted-foreground hover:bg-background/65 hover:text-foreground dark:text-slate-400 dark:hover:bg-[rgba(34,211,238,0.06)] dark:hover:text-slate-100'
                   )}
                   title={isCollapsed ? t(item.labelKey) : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
-                    isActive ? 'text-primary' : 'text-muted-foreground'
+                    isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
                   )} />
                   {!isCollapsed && (
                     <span className="text-sm font-medium">{t(item.labelKey)}</span>
@@ -143,7 +143,7 @@ function Sidebar({
 
       {/* Sidebar footer */}
       {!isCollapsed && (
-        <div className="rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(2,6,23,0.16)]">
+        <div className="rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,26,0.9),rgba(4,10,22,0.78))] dark:shadow-[0_16px_44px_rgba(1,6,20,0.3),inset_0_1px_0_rgba(125,211,252,0.04)]">
           <p className="text-center text-xs text-muted-foreground">
             v1.0.0 • sankahchan
           </p>
@@ -181,7 +181,7 @@ function Header({
       <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
         <div className="flex items-center gap-3 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm">
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
             <Atom className="h-5 w-5 text-primary" />
             <span className="text-sm font-semibold">Atomic-UI</span>
           </Link>
@@ -189,7 +189,7 @@ function Header({
 
         {/* Left side: tools button on desktop */}
         <div className="hidden lg:flex items-center">
-          <Button variant="outline" size="sm" asChild className="rounded-full border-border/70 bg-background/65 px-4 shadow-sm">
+          <Button variant="outline" size="sm" asChild className="rounded-full border-border/70 bg-background/65 px-4 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
             <Link href="/dashboard/tools">
               <LayoutGrid className="h-4 w-4 mr-2" />
               {t('nav.tools')}
@@ -218,7 +218,7 @@ function Header({
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm"
+                className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
               >
                 {theme === 'dark' ? (
                   <Sun className="h-4 w-4" />
@@ -231,10 +231,10 @@ function Header({
 
           {/* User info - desktop only */}
           {user && (
-            <div className="hidden sm:flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{user.email}</span>
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary dark:border dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-200">
                 {user.role}
               </span>
             </div>
@@ -246,7 +246,7 @@ function Header({
             size="icon"
             onClick={onLogout}
             title="Logout"
-            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground"
+            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
           >
             <LogOut className="h-4 w-4" />
           </Button>

@@ -25,7 +25,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'relative overflow-hidden rounded-[1.75rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(246,249,252,0.84))] text-card-foreground shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur-[var(--glass-blur-lg)] [-webkit-backdrop-filter:blur(var(--glass-blur-lg))] transition-all duration-200 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(10,16,27,0.88),rgba(15,23,42,0.76))] dark:shadow-[0_24px_60px_rgba(2,6,23,0.5)]',
+      'relative overflow-hidden rounded-[1.75rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(246,249,252,0.84))] text-card-foreground shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur-[var(--glass-blur-lg)] [-webkit-backdrop-filter:blur(var(--glass-blur-lg))] transition-all duration-200 dark:border-[rgba(34,211,238,0.18)] dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.11),transparent_24%),linear-gradient(180deg,rgba(4,10,23,0.94),rgba(6,14,28,0.82))] dark:shadow-[0_24px_70px_rgba(1,6,20,0.5),0_0_0_1px_rgba(34,211,238,0.04),inset_0_1px_0_rgba(125,211,252,0.06)]',
       className
     )}
     {...props}

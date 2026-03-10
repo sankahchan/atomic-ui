@@ -29,6 +29,13 @@ import {
   Zap,
 } from 'lucide-react';
 
+type DashboardStatsSummary = {
+  activeKeys?: number;
+  expiringIn24h?: number;
+  pendingKeys?: number;
+  expiredKeys?: number;
+};
+
 function ControlMetricTile({
   title,
   value,
@@ -78,10 +85,12 @@ function OpsMiniMetric({
   label,
   value,
   tone,
+  compact = false,
 }: {
   label: string;
   value: string | number;
   tone: 'violet' | 'amber' | 'rose' | 'cyan';
+  compact?: boolean;
 }) {
   const toneClass = {
     violet: 'border-violet-500/15 bg-violet-500/10 text-violet-600 dark:text-violet-300',
@@ -91,7 +100,12 @@ function OpsMiniMetric({
   }[tone];
 
   return (
-    <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+    <div
+      className={cn(
+        'rounded-[1.25rem] border border-border/60 bg-background/55 dark:bg-white/[0.02]',
+        compact ? 'px-3 py-3' : 'px-4 py-4'
+      )}
+    >
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
@@ -99,6 +113,231 @@ function OpsMiniMetric({
         {value}
       </div>
     </div>
+  );
+}
+
+function TrafficSnapshotStat({
+  label,
+  value,
+  helper,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string | number;
+  helper: string;
+  tone?: 'neutral' | 'cyan' | 'emerald' | 'violet' | 'amber';
+}) {
+  const toneClass = {
+    neutral: 'dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(5,13,26,0.82),rgba(4,10,22,0.72))]',
+    cyan: 'dark:border-cyan-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
+    emerald: 'dark:border-emerald-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
+    violet: 'dark:border-violet-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
+    amber: 'dark:border-amber-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
+  }[tone];
+
+  return (
+    <div className={cn(
+      'rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:shadow-[inset_0_1px_0_rgba(125,211,252,0.04)]',
+      toneClass
+    )}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-semibold">{value}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{helper}</p>
+    </div>
+  );
+}
+
+function KeyOperationsSummary({
+  stats,
+  t,
+  embedded = false,
+}: {
+  stats: DashboardStatsSummary | null | undefined;
+  t: (key: string) => string;
+  embedded?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        embedded
+          ? 'rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]'
+          : ''
+      )}
+    >
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+              <Key className="h-4 w-4" />
+            </div>
+            <div>
+              <p className={cn('font-semibold', embedded ? 'text-base' : 'text-xl')}>
+                {t('dashboard.key_operations_title')}
+              </p>
+              <p className={cn('mt-1 text-muted-foreground', embedded ? 'text-xs leading-5' : 'text-sm')}>
+                {t('dashboard.key_operations_desc')}
+              </p>
+            </div>
+          </div>
+          {!embedded ? (
+            <Button asChild variant="ghost" className="rounded-full px-3">
+              <Link href="/dashboard/keys">
+                {t('dashboard.view_all')}
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+
+        <div className={cn('grid gap-3', embedded ? 'grid-cols-2' : 'sm:grid-cols-2')}>
+          <OpsMiniMetric
+            label={t('dashboard.active_keys_label')}
+            value={stats?.activeKeys || 0}
+            tone="violet"
+            compact={embedded}
+          />
+          <OpsMiniMetric
+            label={t('dashboard.expiring_soon')}
+            value={stats?.expiringIn24h || 0}
+            tone="amber"
+            compact={embedded}
+          />
+          <OpsMiniMetric
+            label={t('dashboard.pending_keys_label')}
+            value={stats?.pendingKeys || 0}
+            tone="cyan"
+            compact={embedded}
+          />
+          <OpsMiniMetric
+            label={t('dashboard.expired_keys_label')}
+            value={stats?.expiredKeys || 0}
+            tone="rose"
+            compact={embedded}
+          />
+        </div>
+
+        <Link
+          href="/dashboard/keys"
+          className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{t('dashboard.review_inventory')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('dashboard.review_inventory_desc')}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TrafficOverviewPanel({
+  t,
+  tf,
+  trafficDays,
+  setTrafficDays,
+  totalTraffic,
+  activeServers,
+  totalKeys,
+  expiringSoon,
+  trafficLoading,
+  trafficHistory,
+  compact = false,
+}: {
+  t: (key: string) => string;
+  tf: (key: string, values: Record<string, string | number>) => string;
+  trafficDays: number;
+  setTrafficDays: (days: number) => void;
+  totalTraffic: bigint;
+  activeServers: number;
+  totalKeys: number;
+  expiringSoon: number;
+  trafficLoading: boolean;
+  trafficHistory: Array<{ date: string; bytes: number; label?: string }> | undefined;
+  compact?: boolean;
+}) {
+  return (
+    <Card className="border-white/45 bg-white/65 dark:border-cyan-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_30%),linear-gradient(180deg,rgba(3,10,22,0.92),rgba(5,12,24,0.82))] dark:shadow-[0_24px_70px_rgba(1,6,20,0.48),0_0_0_1px_rgba(34,211,238,0.05),inset_0_1px_0_rgba(125,211,252,0.05)]">
+      <CardHeader className={cn(compact ? 'pb-3' : 'pb-4')}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:shadow-[0_0_24px_rgba(34,211,238,0.12)]">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className={cn(compact ? 'text-lg' : 'text-xl')}>
+                  {t('dashboard.traffic_overview')}
+                </CardTitle>
+                <CardDescription>
+                  {formatBytes(totalTraffic)} {tf('dashboard.traffic_last_days', { days: trafficDays.toString() })}
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+          <Select value={trafficDays.toString()} onValueChange={(value) => setTrafficDays(parseInt(value, 10))}>
+            <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[160px] dark:border-cyan-400/18 dark:bg-[linear-gradient(180deg,rgba(7,17,32,0.92),rgba(5,12,24,0.82))]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">{t('dashboard.days_7')}</SelectItem>
+              <SelectItem value="30">{t('dashboard.days_30')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className={cn('grid gap-3', compact ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-2 xl:grid-cols-4')}>
+          <TrafficSnapshotStat
+            label={t('dashboard.total_traffic')}
+            value={formatBytes(totalTraffic)}
+            helper={t('dashboard.all_time')}
+            tone="cyan"
+          />
+          <TrafficSnapshotStat
+            label={t('dashboard.online_servers')}
+            value={activeServers}
+            helper={t('dashboard.online_servers_desc')}
+            tone="emerald"
+          />
+          <TrafficSnapshotStat
+            label={t('dashboard.total_keys')}
+            value={totalKeys}
+            helper={`${totalKeys} ${t('dashboard.active')}`}
+            tone="violet"
+          />
+          <TrafficSnapshotStat
+            label={t('dashboard.expiring_soon')}
+            value={expiringSoon}
+            helper={t('dashboard.expiring_24h')}
+            tone="amber"
+          />
+        </div>
+
+        {trafficLoading ? (
+          <div className={cn('rounded-[1.6rem] bg-muted animate-pulse', compact ? 'h-[210px]' : 'h-[220px]')} />
+        ) : trafficHistory && trafficHistory.length > 0 ? (
+          <div className="rounded-[1.6rem] border border-border/60 bg-background/45 p-3 dark:border-cyan-400/12 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(4,11,23,0.82),rgba(4,10,21,0.72))]">
+            <div className={cn(compact ? 'h-[210px]' : 'h-[220px]')}>
+              <TrafficChart data={trafficHistory} type="area" height="100%" color="rgba(34,211,238,0.95)" />
+            </div>
+          </div>
+        ) : (
+          <div className={cn(
+            'flex flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 px-6 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]',
+            compact ? 'h-[210px]' : 'h-[220px]'
+          )}>
+            <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
+            <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_traffic_desc')}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -293,17 +532,24 @@ export default function DashboardPage() {
                   <div key={index} className="h-28 rounded-[1.5rem] bg-muted" />
                 ))}
               </div>
-              <div className="h-[320px] rounded-[1.75rem] bg-muted" />
+              <div className="rounded-[1.75rem] bg-muted/80 p-5">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="h-24 rounded-[1.35rem] bg-background/70" />
+                  ))}
+                </div>
+                <div className="mt-4 h-[220px] rounded-[1.6rem] bg-background/70" />
+              </div>
             </div>
             <div className="space-y-4">
-              <div className="h-64 rounded-[1.75rem] bg-muted" />
-              <div className="h-64 rounded-[1.75rem] bg-muted" />
+              <div className="h-[420px] rounded-[1.75rem] bg-muted" />
             </div>
           </div>
         </div>
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div className="h-72 rounded-[1.75rem] bg-muted animate-pulse" />
-          <div className="h-72 rounded-[1.75rem] bg-muted animate-pulse" />
+        <div className="grid gap-6 xl:grid-cols-2 xl:auto-rows-fr">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-72 rounded-[1.75rem] bg-muted animate-pulse" />
+          ))}
         </div>
       </div>
     );
@@ -422,133 +668,37 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
-                  <Link href="/dashboard/notifications">
-                    {t('dashboard.alerts')}
-                  </Link>
-                </Button>
+                <Link
+                  href="/dashboard/notifications"
+                  className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border/60 bg-background/55 px-4 py-4 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('dashboard.review_alerts_desc')}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
+
+                <KeyOperationsSummary stats={stats} t={t} embedded />
               </div>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
-                        <Activity className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{t('dashboard.recent_keys_title')}</CardTitle>
-                        <CardDescription>{t('dashboard.recent_keys_desc')}</CardDescription>
-                      </div>
-                    </div>
-                    <Button asChild variant="ghost" className="rounded-full px-3">
-                      <Link href="/dashboard/keys">
-                        {t('dashboard.view_all')}
-                        <ChevronRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {!activity ? (
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                    ))
-                  ) : activity.recentKeys && activity.recentKeys.length > 0 ? (
-                    activity.recentKeys.slice(0, 3).map((key) => (
-                      <Link
-                        key={key.id}
-                        href={`/dashboard/keys/${key.id}`}
-                        className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-                      >
-                        <div className="min-w-0 flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
-                            <Key className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{key.name}</p>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">{key.serverName}</p>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-xs font-medium text-muted-foreground">{formatRelativeTime(key.createdAt)}</p>
-                        </div>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="flex min-h-[160px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                      <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                      <p className="text-sm font-semibold">{t('dashboard.no_recent_keys_title')}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_recent_keys_desc')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-white/45 bg-white/65 dark:border-white/10 dark:bg-slate-950/30">
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
-                          <TrendingUp className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{t('dashboard.traffic_overview')}</CardTitle>
-                          <CardDescription>
-                            {formatBytes(totalTraffic)} {tf('dashboard.traffic_last_days', { days: trafficDays.toString() })}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </div>
-                    <Select value={trafficDays.toString()} onValueChange={(value) => setTrafficDays(parseInt(value, 10))}>
-                      <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[160px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">{t('dashboard.days_7')}</SelectItem>
-                        <SelectItem value="30">{t('dashboard.days_30')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.total_traffic')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{formatBytes(totalTraffic)}</p>
-                    </div>
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.online_servers')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
-                    </div>
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.total_keys')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{totalServerKeys}</p>
-                    </div>
-                  </div>
-
-                  {trafficLoading ? (
-                    <div className="h-[240px] rounded-[1.6rem] bg-muted animate-pulse" />
-                  ) : trafficHistory && trafficHistory.length > 0 ? (
-                    <div className="h-[240px] rounded-[1.6rem] border border-border/60 bg-background/45 p-2 dark:bg-white/[0.02]">
-                      <TrafficChart data={trafficHistory} type="area" height="100%" />
-                    </div>
-                  ) : (
-                    <div className="flex h-[200px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                      <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                      <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_traffic_desc')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <TrafficOverviewPanel
+                t={t}
+                tf={tf}
+                trafficDays={trafficDays}
+                setTrafficDays={setTrafficDays}
+                totalTraffic={totalTraffic}
+                activeServers={stats?.activeServers || 0}
+                totalKeys={totalServerKeys}
+                expiringSoon={stats?.expiringIn24h || 0}
+                trafficLoading={trafficLoading}
+                trafficHistory={trafficHistory}
+                compact
+              />
             </div>
           </div>
         </section>
@@ -642,70 +792,19 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <Card className="border-white/45 bg-white/65 dark:border-white/10 dark:bg-slate-950/30">
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
-                          <TrendingUp className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-xl">{t('dashboard.traffic_overview')}</CardTitle>
-                          <CardDescription>
-                            {formatBytes(totalTraffic)} {tf('dashboard.traffic_last_days', { days: trafficDays.toString() })}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </div>
-                    <Select value={trafficDays.toString()} onValueChange={(value) => setTrafficDays(parseInt(value, 10))}>
-                      <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[160px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">{t('dashboard.days_7')}</SelectItem>
-                        <SelectItem value="30">{t('dashboard.days_30')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.total_traffic')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{formatBytes(totalTraffic)}</p>
-                    </div>
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.online_servers')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
-                    </div>
-                    <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t('dashboard.total_keys')}
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold">{totalServerKeys}</p>
-                    </div>
-                  </div>
-
-                  {trafficLoading ? (
-                    <div className="h-[300px] rounded-[1.6rem] bg-muted animate-pulse" />
-                  ) : trafficHistory && trafficHistory.length > 0 ? (
-                    <div className="h-[300px] rounded-[1.6rem] border border-border/60 bg-background/45 p-2 dark:bg-white/[0.02]">
-                      <TrafficChart data={trafficHistory} type="area" height="100%" />
-                    </div>
-                  ) : (
-                    <div className="flex h-[240px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                      <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                      <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_traffic_desc')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <TrafficOverviewPanel
+                t={t}
+                tf={tf}
+                trafficDays={trafficDays}
+                setTrafficDays={setTrafficDays}
+                totalTraffic={totalTraffic}
+                activeServers={stats?.activeServers || 0}
+                totalKeys={totalServerKeys}
+                expiringSoon={stats?.expiringIn24h || 0}
+                trafficLoading={trafficLoading}
+                trafficHistory={trafficHistory}
+                compact
+              />
             </div>
 
             <div className="space-y-4">
@@ -752,87 +851,29 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">
-                        {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t('dashboard.review_alerts_desc')}
-                      </p>
-                    </div>
-                    <Button asChild variant="outline" size="sm" className="rounded-full">
-                      <Link href="/dashboard/notifications">
-                        {t('dashboard.alerts')}
-                      </Link>
-                    </Button>
+                <Link
+                  href="/dashboard/notifications"
+                  className="flex items-center justify-between gap-3 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('dashboard.review_alerts_desc')}
+                    </p>
                   </div>
-                </div>
-              </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
 
-              <Card className="self-start">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
-                        <Activity className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">{t('dashboard.recent_keys_title')}</CardTitle>
-                        <CardDescription>{t('dashboard.recent_keys_desc')}</CardDescription>
-                      </div>
-                    </div>
-                    <Button asChild variant="ghost" className="rounded-full px-3">
-                      <Link href="/dashboard/keys">
-                        {t('dashboard.view_all')}
-                        <ChevronRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {!activity ? (
-                    Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                    ))
-                  ) : activity.recentKeys && activity.recentKeys.length > 0 ? (
-                    activity.recentKeys.slice(0, 4).map((key) => (
-                      <Link
-                        key={key.id}
-                        href={`/dashboard/keys/${key.id}`}
-                        className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-                      >
-                        <div className="min-w-0 flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500">
-                            <Key className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{key.name}</p>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">{key.serverName}</p>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-xs font-medium text-muted-foreground">{formatRelativeTime(key.createdAt)}</p>
-                          <p className="mt-1 text-xs text-cyan-600 dark:text-cyan-300">{t('dashboard.view_all')}</p>
-                        </div>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                      <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                      <p className="text-sm font-semibold">{t('dashboard.no_recent_keys_title')}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_recent_keys_desc')}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                <KeyOperationsSummary stats={stats} t={t} embedded />
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2 xl:items-start">
-          <Card className="self-start">
+        <section className="grid gap-6 xl:grid-cols-2 xl:auto-rows-fr">
+          <Card className="self-start xl:h-full">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -896,10 +937,10 @@ export default function DashboardPage() {
                       </Link>
                     </TooltipTrigger>
                     <ForecastTooltip keyId={consumer.id} keyType={consumer.type} />
-                  </Tooltip>
+                    </Tooltip>
                 ))
               ) : (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
+                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
                   <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
                   <p className="text-sm font-semibold">{t('dashboard.no_usage_title')}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_usage_desc')}</p>
@@ -908,7 +949,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="self-start">
+          <Card className="self-start xl:h-full">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
@@ -956,7 +997,7 @@ export default function DashboardPage() {
                   </Link>
                 ))
               ) : (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
+                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
                   <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
                   <p className="text-sm font-semibold">{t('dashboard.no_anomalies_title')}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_anomalies_desc')}</p>
@@ -964,163 +1005,97 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:items-start">
-          <Card className="self-start">
+          <Card className="self-start xl:h-full">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
-                    <Key className="h-5 w-5" />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                    <Server className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl">{t('dashboard.key_operations_title')}</CardTitle>
-                    <CardDescription>{t('dashboard.key_operations_desc')}</CardDescription>
+                    <CardTitle className="text-xl">{t('dashboard.server_status')}</CardTitle>
+                    <CardDescription>{t('dashboard.server_status_desc')}</CardDescription>
                   </div>
                 </div>
                 <Button asChild variant="ghost" className="rounded-full px-3">
-                  <Link href="/dashboard/keys">
+                  <Link href="/dashboard/servers">
                     {t('dashboard.view_all')}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <OpsMiniMetric
-                  label={t('dashboard.active_keys_label')}
-                  value={stats?.activeKeys || 0}
-                  tone="violet"
-                />
-                <OpsMiniMetric
-                  label={t('dashboard.expiring_soon')}
-                  value={stats?.expiringIn24h || 0}
-                  tone="amber"
-                />
-                <OpsMiniMetric
-                  label={t('dashboard.pending_keys_label')}
-                  value={stats?.pendingKeys || 0}
-                  tone="cyan"
-                />
-                <OpsMiniMetric
-                  label={t('dashboard.expired_keys_label')}
-                  value={stats?.expiredKeys || 0}
-                  tone="rose"
-                />
-              </div>
-
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{t('dashboard.review_inventory')}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t('dashboard.open_expiring_desc')}
-                    </p>
-                  </div>
-                  <Button asChild variant="outline" size="sm" className="rounded-full">
-                    <Link href="/dashboard/keys">
-                      {t('dashboard.view_all')}
-                    </Link>
-                  </Button>
+            <CardContent className="space-y-3">
+              {serversLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
+                ))
+              ) : serverStatus && serverStatus.length > 0 ? (
+                serverStatus.slice(0, 5).map((server) => (
+                  <ServerRow key={server.id} server={server} />
+                ))
+              ) : (
+                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
+                  <Server className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                  <p className="text-sm font-semibold">{t('dashboard.no_servers_title')}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_servers_desc')}</p>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
-            <Card className="self-start">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
-                      <Server className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{t('dashboard.server_status')}</CardTitle>
-                      <CardDescription>{t('dashboard.server_status_desc')}</CardDescription>
-                    </div>
-                  </div>
-                  <Button asChild variant="ghost" className="rounded-full px-3">
-                    <Link href="/dashboard/servers">
-                      {t('dashboard.view_all')}
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
+          <Card className="self-start xl:h-full">
+            <CardHeader className="pb-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+                  <RefreshCw className="h-5 w-5" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {serversLoading ? (
-                  Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                  ))
-                ) : serverStatus && serverStatus.length > 0 ? (
-                  serverStatus.slice(0, 5).map((server) => (
-                    <ServerRow key={server.id} server={server} />
-                  ))
-                ) : (
-                  <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                    <Server className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                    <p className="text-sm font-semibold">{t('dashboard.no_servers_title')}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_servers_desc')}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="self-start">
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
-                    <RefreshCw className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">{t('dashboard.alerts')}</CardTitle>
-                    <CardDescription>{t('dashboard.recent_activity_desc')}</CardDescription>
-                  </div>
+                <div>
+                  <CardTitle className="text-xl">{t('dashboard.alerts')}</CardTitle>
+                  <CardDescription>{t('dashboard.recent_activity_desc')}</CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(stats?.downServers || 0) > 0 ? (
-                  <ActivityItem
-                    type="error"
-                    title={t('dashboard.servers_offline_title')}
-                    description={tf('dashboard.servers_offline_desc', { count: String(stats?.downServers || 0) })}
-                    time={t('dashboard.now')}
-                  />
-                ) : null}
-                {(stats?.expiringIn24h || 0) > 0 ? (
-                  <ActivityItem
-                    type="warning"
-                    title={t('dashboard.keys_expiring_title')}
-                    description={tf('dashboard.keys_expiring_desc', { count: String(stats?.expiringIn24h || 0) })}
-                    time={t('dashboard.soon')}
-                  />
-                ) : null}
-                {activity?.recentKeys && activity.recentKeys.length > 0
-                  ? activity.recentKeys.slice(0, 4).map((key) => (
-                      <ActivityItem
-                        key={key.id}
-                        type="info"
-                        title={t('dashboard.key_created_title')}
-                        description={key.name}
-                        time={formatRelativeTime(key.createdAt)}
-                      />
-                    ))
-                  : null}
-                {!((stats?.downServers || 0) > 0) &&
-                !((stats?.expiringIn24h || 0) > 0) &&
-                (!activity?.recentKeys || activity.recentKeys.length === 0) ? (
-                  <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:bg-white/[0.02]">
-                    <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
-                    <p className="text-sm font-semibold">{t('dashboard.system_clear')}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_activity_desc')}</p>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(stats?.downServers || 0) > 0 ? (
+                <ActivityItem
+                  type="error"
+                  title={t('dashboard.servers_offline_title')}
+                  description={tf('dashboard.servers_offline_desc', { count: String(stats?.downServers || 0) })}
+                  time={t('dashboard.now')}
+                />
+              ) : null}
+              {(stats?.expiringIn24h || 0) > 0 ? (
+                <ActivityItem
+                  type="warning"
+                  title={t('dashboard.keys_expiring_title')}
+                  description={tf('dashboard.keys_expiring_desc', { count: String(stats?.expiringIn24h || 0) })}
+                  time={t('dashboard.soon')}
+                />
+              ) : null}
+              {activity?.recentKeys && activity.recentKeys.length > 0
+                ? activity.recentKeys.slice(0, 4).map((key) => (
+                    <ActivityItem
+                      key={key.id}
+                      type="info"
+                      title={t('dashboard.key_created_title')}
+                      description={key.name}
+                      time={formatRelativeTime(key.createdAt)}
+                    />
+                  ))
+                : null}
+              {!((stats?.downServers || 0) > 0) &&
+              !((stats?.expiringIn24h || 0) > 0) &&
+              (!activity?.recentKeys || activity.recentKeys.length === 0) ? (
+                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
+                  <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
+                  <p className="text-sm font-semibold">{t('dashboard.system_clear')}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_activity_desc')}</p>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </section>
       </div>
     </TooltipProvider>

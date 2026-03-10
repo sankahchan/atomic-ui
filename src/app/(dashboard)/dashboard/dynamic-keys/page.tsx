@@ -1743,7 +1743,7 @@ export default function DynamicKeysPage() {
             </div>
           </div>
 
-          <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+          <Card className="hidden xl:block border-border/60 bg-background/55 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.9),rgba(5,12,24,0.76))]">
             <CardContent className="space-y-3 p-6">
               <div>
                 <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
@@ -1780,7 +1780,7 @@ export default function DynamicKeysPage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:bg-white/[0.02]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
                   <KeyRound className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{t('dynamic_keys.total_keys')}</p>

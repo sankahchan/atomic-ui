@@ -16,15 +16,20 @@ const buttonVariants = cva(
     variants: {
       variant: {
         // Primary action button with atomic cyan
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default:
+          'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-[linear-gradient(135deg,rgba(6,182,212,0.98),rgba(34,211,238,0.88))] dark:text-slate-950 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.18),0_16px_34px_rgba(6,182,212,0.28),0_0_36px_rgba(34,211,238,0.14)] dark:hover:brightness-110',
         // Destructive actions like delete
-        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        destructive:
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:shadow-[0_0_0_1px_rgba(251,113,133,0.14),0_14px_30px_rgba(190,24,93,0.22)]',
         // Bordered button for secondary actions
-        outline: 'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border-[var(--glass-border)] hover:bg-[var(--glass-bg-medium)] hover:text-accent-foreground',
+        outline:
+          'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border-[var(--glass-border)] hover:bg-[var(--glass-bg-medium)] hover:text-accent-foreground dark:border-[rgba(34,211,238,0.16)] dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.9),rgba(5,12,24,0.8))] dark:text-slate-100 dark:shadow-[inset_0_1px_0_rgba(125,211,252,0.05)] dark:hover:border-[rgba(34,211,238,0.28)] dark:hover:bg-[linear-gradient(180deg,rgba(8,18,34,0.94),rgba(6,14,28,0.86))] dark:hover:shadow-[0_0_28px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(125,211,252,0.06)]',
         // Subtle background button
-        secondary: 'bg-[var(--glass-bg-medium)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] text-secondary-foreground hover:bg-[var(--glass-bg)]',
+        secondary:
+          'bg-[var(--glass-bg-medium)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] text-secondary-foreground hover:bg-[var(--glass-bg)] dark:bg-[linear-gradient(180deg,rgba(8,17,31,0.92),rgba(6,13,26,0.8))] dark:text-slate-100 dark:hover:bg-[linear-gradient(180deg,rgba(9,19,35,0.94),rgba(7,15,29,0.86))]',
         // Minimal button with no background
-        ghost: 'hover:bg-[var(--glass-bg-light)] hover:text-accent-foreground',
+        ghost:
+          'hover:bg-[var(--glass-bg-light)] hover:text-accent-foreground dark:text-slate-300 dark:hover:bg-[rgba(34,211,238,0.08)] dark:hover:text-cyan-100',
         // Text-only button that looks like a link
         link: 'text-primary underline-offset-4 hover:underline',
       },

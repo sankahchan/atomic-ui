@@ -46,8 +46,8 @@ export default function ServersPage() {
               className={cn(
                 'rounded-[1.4rem] border px-4 py-4 text-left transition-all duration-200',
                 activeTab === 'overview'
-                  ? 'border-cyan-500/25 bg-cyan-500/10 shadow-[0_16px_38px_rgba(14,165,233,0.10)]'
-                  : 'border-border/60 bg-background/55 hover:border-primary/20 dark:bg-white/[0.02]'
+                  ? 'border-cyan-500/25 bg-cyan-500/10 shadow-[0_16px_38px_rgba(14,165,233,0.10)] dark:border-cyan-300/26 dark:bg-cyan-400/10 dark:shadow-[0_16px_34px_rgba(34,211,238,0.12)]'
+                  : 'border-border/60 bg-background/55 hover:border-primary/20 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.72))]'
               )}
             >
               <div className="flex items-center gap-3">
@@ -66,8 +66,8 @@ export default function ServersPage() {
               className={cn(
                 'rounded-[1.4rem] border px-4 py-4 text-left transition-all duration-200',
                 activeTab === 'health'
-                  ? 'border-emerald-500/25 bg-emerald-500/10 shadow-[0_16px_38px_rgba(16,185,129,0.10)]'
-                  : 'border-border/60 bg-background/55 hover:border-primary/20 dark:bg-white/[0.02]'
+                  ? 'border-emerald-500/25 bg-emerald-500/10 shadow-[0_16px_38px_rgba(16,185,129,0.10)] dark:border-emerald-300/24 dark:bg-emerald-400/10 dark:shadow-[0_16px_34px_rgba(16,185,129,0.10)]'
+                  : 'border-border/60 bg-background/55 hover:border-primary/20 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.72))]'
               )}
             >
               <div className="flex items-center gap-3">
@@ -85,7 +85,7 @@ export default function ServersPage() {
       </section>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'health')} className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-[1.6rem] border border-border/60 bg-background/55 p-1.5 dark:bg-white/[0.02]">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-[1.6rem] border border-border/60 bg-background/55 p-1.5 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.9),rgba(5,12,24,0.76))]">
           <TabsTrigger value="overview" className="min-w-0 rounded-[1.25rem] px-3 py-3 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:text-sm">
             <span className="inline-flex items-center gap-2">
               <Server className="h-4 w-4" />
