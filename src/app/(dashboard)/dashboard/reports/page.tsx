@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { formatBytes, formatDateTime } from '@/lib/utils';
@@ -42,6 +43,7 @@ import {
   TrendingUp,
   Eye,
   FileJson,
+  FileDown,
   ChevronLeft,
   ChevronRight,
   Send,
@@ -95,6 +97,9 @@ function ReportDetailDialog({
 
   if (!reportId) return null;
 
+  const isScheduledSummary = report?.reportData?.kind === 'scheduled-summary';
+  const usageSummary = isScheduledSummary ? report?.reportData?.usage?.summary : report?.reportData?.summary;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -122,7 +127,7 @@ function ReportDetailDialog({
                     <Server className="w-4 h-4 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">Servers</p>
                   </div>
-                  <p className="text-xl font-bold">{report.reportData.summary.totalServers}</p>
+                  <p className="text-xl font-bold">{usageSummary?.totalServers ?? 0}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -131,9 +136,9 @@ function ReportDetailDialog({
                     <Key className="w-4 h-4 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">Total Keys</p>
                   </div>
-                  <p className="text-xl font-bold">{report.reportData.summary.totalKeys}</p>
+                  <p className="text-xl font-bold">{usageSummary?.totalKeys ?? 0}</p>
                   <p className="text-xs text-muted-foreground">
-                    {report.reportData.summary.activeKeys} active
+                    {usageSummary?.activeKeys ?? 0} active
                   </p>
                 </CardContent>
               </Card>
@@ -144,7 +149,7 @@ function ReportDetailDialog({
                     <p className="text-xs text-muted-foreground">Total Usage</p>
                   </div>
                   <p className="text-xl font-bold">
-                    {formatBytes(BigInt(report.reportData.summary.totalBytesUsed))}
+                    {formatBytes(BigInt(usageSummary?.totalBytesUsed ?? 0))}
                   </p>
                 </CardContent>
               </Card>
@@ -155,14 +160,46 @@ function ReportDetailDialog({
                     <p className="text-xs text-muted-foreground">Period Delta</p>
                   </div>
                   <p className="text-xl font-bold">
-                    {formatBytes(BigInt(report.reportData.summary.totalDeltaBytes))}
+                    {formatBytes(BigInt(usageSummary?.totalDeltaBytes ?? 0))}
                   </p>
                 </CardContent>
               </Card>
             </div>
 
+            {isScheduledSummary ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Scheduled summary snapshot</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {report.reportData.summary.revenueAmount != null
+                        ? `${report.reportData.summary.revenueAmount} ${report.reportData.summary.revenueCurrency ?? 'USD'}`
+                        : 'Not configured'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Failed logins</p>
+                    <p className="mt-2 text-lg font-semibold">{report.reportData.summary.failedLogins ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl border px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Expiring soon</p>
+                    <p className="mt-2 text-lg font-semibold">{report.reportData.summary.expiringSoon ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl border px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Server health</p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {(report.reportData.summary.serverHealth?.up ?? 0)} up / {(report.reportData.summary.serverHealth?.down ?? 0)} down
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             {/* Top Consumers */}
-            {report.reportData.topConsumers?.length > 0 && (
+            {!isScheduledSummary && report.reportData.topConsumers?.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">Top 10 Consumers</CardTitle>
@@ -195,7 +232,7 @@ function ReportDetailDialog({
             )}
 
             {/* Per-Server Breakdown */}
-            {report.reportData.servers?.map((server: { serverId: string; serverName: string; location: string | null; totalKeys: number; activeKeys: number; totalUsedBytes: string; deltaBytes: string }) => (
+            {(isScheduledSummary ? report.reportData.usage?.servers : report.reportData.servers)?.map((server: { serverId: string; serverName: string; location: string | null; totalKeys: number; activeKeys: number; totalUsedBytes: string; deltaBytes: string }) => (
               <Card key={server.serverId}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -233,6 +270,13 @@ function ReportDetailDialog({
                 <FileJson className="w-4 h-4 mr-2" />
                 Download JSON
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open(`/api/reports/download?id=${reportId}&format=pdf`, '_blank')}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                Download PDF
+              </Button>
             </div>
           </div>
         ) : (
@@ -265,6 +309,10 @@ export default function ReportsPage() {
     pageSize: 10,
   });
   const scheduleQuery = trpc.reports.scheduledConfig.useQuery();
+  const scheduledRunsQuery = trpc.reports.scheduledRuns.useQuery({
+    page: 1,
+    pageSize: 5,
+  });
   const channelsQuery = trpc.notifications.listChannels.useQuery();
 
   useEffect(() => {
@@ -338,6 +386,7 @@ export default function ReportsPage() {
       });
       void refetch();
       void scheduleQuery.refetch();
+      void scheduledRunsQuery.refetch();
     },
     onError: (error) => {
       toast({
@@ -559,6 +608,31 @@ export default function ReportsPage() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Subject template</Label>
+                  <Input
+                    value={scheduleForm.subjectTemplate}
+                    onChange={(event) => updateScheduleField('subjectTemplate', event.target.value)}
+                    placeholder="Atomic-UI {{frequency_label}} Summary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Available placeholders: {'{{frequency_label}}'}, {'{{generated_at}}'}, {'{{period_start}}'}, {'{{period_end}}'}.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Body template</Label>
+                  <Textarea
+                    value={scheduleForm.bodyTemplate}
+                    onChange={(event) => updateScheduleField('bodyTemplate', event.target.value)}
+                    className="min-h-[180px]"
+                    placeholder="Use placeholders like {{usage_line}} and {{server_health_line}}."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Line placeholders: {'{{revenue_line}}'}, {'{{usage_line}}'}, {'{{expirations_line}}'}, {'{{failed_logins_line}}'}, {'{{server_health_line}}'}.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -612,6 +686,119 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="w-5 h-5 text-primary" />
+            Scheduled Run History
+          </CardTitle>
+          <CardDescription>
+            Recent daily or weekly summary runs with per-channel delivery status.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scheduledRunsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : scheduledRunsQuery.data?.items.length ? (
+            <div className="space-y-4">
+              {scheduledRunsQuery.data.items.map((run) => (
+                <div key={run.id} className="rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{run.frequency}</Badge>
+                        <Badge
+                          variant={
+                            run.status === 'SUCCESS'
+                              ? 'default'
+                              : run.status === 'FAILED'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
+                          {run.status}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateTime(run.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatPeriod(run.periodStart, run.periodEnd)}
+                      </p>
+                      <p className="text-sm">{run.summaryMessage || 'No summary message stored.'}</p>
+                      {run.error ? <p className="text-sm text-destructive">{run.error}</p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {run.report ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/api/reports/download?id=${run.report?.id}&format=csv`, '_blank')}
+                          >
+                            CSV
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/api/reports/download?id=${run.report?.id}&format=pdf`, '_blank')}
+                          >
+                            PDF
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {run.deliveries.length === 0 ? (
+                      <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                        No channel deliveries were recorded for this run.
+                      </div>
+                    ) : (
+                      run.deliveries.map((delivery) => (
+                        <div key={delivery.id} className="rounded-lg border px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{delivery.channelName}</p>
+                              <p className="text-xs text-muted-foreground">{delivery.channelType}</p>
+                            </div>
+                            <Badge
+                              variant={
+                                delivery.status === 'SUCCESS'
+                                  ? 'default'
+                                  : delivery.status === 'FAILED'
+                                    ? 'destructive'
+                                    : 'secondary'
+                              }
+                            >
+                              {delivery.status}
+                            </Badge>
+                          </div>
+                          {delivery.lastError ? (
+                            <p className="mt-2 text-xs text-destructive">{delivery.lastError}</p>
+                          ) : null}
+                          {delivery.deliveredAt ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {formatDateTime(delivery.deliveredAt)}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+              No scheduled report runs recorded yet.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Summary Stats */}
       {data && data.reports.length > 0 && (
@@ -753,6 +940,19 @@ export default function ReportsPage() {
                             disabled={report.status !== 'READY'}
                           >
                             <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              window.open(
+                                `/api/reports/download?id=${report.id}&format=pdf`,
+                                '_blank'
+                              )
+                            }
+                            disabled={report.status !== 'READY'}
+                          >
+                            <FileDown className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"

@@ -13,6 +13,8 @@ import { generateReportData } from '@/lib/services/report-generator';
 import { writeAuditLog } from '@/lib/audit';
 import {
   getScheduledReportsConfig,
+  getScheduledReportRunById,
+  listScheduledReportRuns,
   runScheduledReportsCycle,
   saveScheduledReportsConfig,
   scheduledReportsConfigSchema,
@@ -20,6 +22,35 @@ import {
 
 export const reportsRouter = router({
   scheduledConfig: adminProcedure.query(async () => getScheduledReportsConfig()),
+
+  scheduledRuns: adminProcedure
+    .input(
+      z
+        .object({
+          page: z.number().int().min(1).default(1),
+          pageSize: z.number().int().min(1).max(50).default(10),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) =>
+      listScheduledReportRuns({
+        page: input?.page,
+        pageSize: input?.pageSize,
+      }),
+    ),
+
+  scheduledRunDetail: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const run = await getScheduledReportRunById(input.id);
+      if (!run) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Scheduled report run not found',
+        });
+      }
+      return run;
+    }),
 
   saveScheduledConfig: adminProcedure
     .input(scheduledReportsConfigSchema)

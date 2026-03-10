@@ -413,11 +413,17 @@ export async function enqueueNotificationsForChannels({
 }) {
   const uniqueChannelIds = Array.from(new Set(channelIds.filter(Boolean)));
   if (uniqueChannelIds.length === 0) {
-    return { count: 0, suppressedCount: 0 };
+    return { count: 0, suppressedCount: 0, deliveries: [] as Array<{ channelId: string; suppressed: boolean; notificationDeliveryId?: string; blockedUntil?: Date }> };
   }
 
   let count = 0;
   let suppressedCount = 0;
+  const deliveries: Array<{
+    channelId: string;
+    suppressed: boolean;
+    notificationDeliveryId?: string;
+    blockedUntil?: Date;
+  }> = [];
 
   for (const channelId of uniqueChannelIds) {
     const result = await enqueueNotificationDelivery({
@@ -434,12 +440,23 @@ export async function enqueueNotificationsForChannels({
 
     if ('suppressed' in result && result.suppressed) {
       suppressedCount += 1;
+      deliveries.push({
+        channelId,
+        suppressed: true,
+        notificationDeliveryId: result.id,
+        blockedUntil: result.blockedUntil,
+      });
     } else {
       count += 1;
+      deliveries.push({
+        channelId,
+        suppressed: false,
+        notificationDeliveryId: result.id,
+      });
     }
   }
 
-  return { count, suppressedCount };
+  return { count, suppressedCount, deliveries };
 }
 
 export async function getNotificationQueueStatus() {

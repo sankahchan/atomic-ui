@@ -1,12 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollText, AlertTriangle, ServerCrash, Users, KeyRound, Flame } from 'lucide-react';
+import { ScrollText, AlertTriangle, ServerCrash, Users, KeyRound, Flame, BellRing, CheckCircle2 } from 'lucide-react';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function SeverityBadge({ severity }: { severity: 'critical' | 'warning' | 'info' }) {
   const styles =
@@ -23,20 +27,145 @@ function SeverityBadge({ severity }: { severity: 'critical' | 'warning' | 'info'
   );
 }
 
+function WorkflowBadge({ status }: { status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' }) {
+  const styles =
+    status === 'RESOLVED'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+      : status === 'ACKNOWLEDGED'
+        ? 'border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-300'
+        : 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-300';
+
+  return (
+    <Badge variant="outline" className={styles}>
+      {status.toLowerCase()}
+    </Badge>
+  );
+}
+
 export default function IncidentCenterPage() {
-  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [noteInput, setNoteInput] = useState('');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('unassigned');
 
   const overviewQuery = trpc.incidents.overview.useQuery({ lookbackDays: 14 });
+  const assigneesQuery = trpc.incidents.assignees.useQuery();
   const detailQuery = trpc.incidents.detail.useQuery(
-    { serverId: selectedServerId ?? '', lookbackDays: 30 },
-    { enabled: !!selectedServerId },
+    { incidentId: selectedIncidentId ?? '', lookbackDays: 30 },
+    { enabled: !!selectedIncidentId },
   );
 
   useEffect(() => {
-    if (!selectedServerId && overviewQuery.data?.openIncidents?.[0]?.serverId) {
-      setSelectedServerId(overviewQuery.data.openIncidents[0].serverId);
+    if (!selectedIncidentId && overviewQuery.data?.openIncidents?.[0]?.id) {
+      setSelectedIncidentId(overviewQuery.data.openIncidents[0].id);
     }
-  }, [overviewQuery.data, selectedServerId]);
+  }, [overviewQuery.data, selectedIncidentId]);
+
+  useEffect(() => {
+    if (detailQuery.data?.incident.assignedUserId) {
+      setSelectedAssigneeId(detailQuery.data.incident.assignedUserId);
+    } else if (detailQuery.data) {
+      setSelectedAssigneeId('unassigned');
+    }
+  }, [detailQuery.data]);
+
+  const refetchAll = async () => {
+    await Promise.all([
+      overviewQuery.refetch(),
+      selectedIncidentId ? detailQuery.refetch() : Promise.resolve(),
+      assigneesQuery.refetch(),
+    ]);
+  };
+
+  const acknowledgeMutation = trpc.incidents.acknowledge.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Incident acknowledged',
+        description: 'The incident workflow status has been updated.',
+      });
+      setNoteInput('');
+      await refetchAll();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Acknowledge failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const assignMutation = trpc.incidents.assign.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Incident assignment updated',
+        description: 'Ownership has been updated.',
+      });
+      setNoteInput('');
+      await refetchAll();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Assignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const addNoteMutation = trpc.incidents.addNote.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Note added',
+        description: 'The note is now part of the incident timeline.',
+      });
+      setNoteInput('');
+      await refetchAll();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Note failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resolveMutation = trpc.incidents.resolve.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Incident resolved',
+        description: 'The incident has been closed.',
+      });
+      setNoteInput('');
+      await refetchAll();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Resolve failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const severityMutation = trpc.incidents.updateSeverity.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Severity updated',
+        description: 'Incident severity has been updated.',
+      });
+      await refetchAll();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Severity update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const selectedDetail = detailQuery.data;
   const alertHistory = useMemo(() => overviewQuery.data?.alertHistory ?? [], [overviewQuery.data]);
@@ -54,26 +183,17 @@ export default function IncidentCenterPage() {
               <div>
                 <CardTitle className="text-3xl font-semibold tracking-tight">Operational incidents</CardTitle>
                 <CardDescription className="mt-2 max-w-2xl text-base">
-                  Review live server incidents, alert history, affected keys and users, and the recent resolution timeline.
+                  Track live server incidents, assign owners, add notes, and preserve a real resolution history.
                 </CardDescription>
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              className="rounded-full"
-              onClick={() => {
-                void overviewQuery.refetch();
-                if (selectedServerId) {
-                  void detailQuery.refetch();
-                }
-              }}
-            >
+            <Button variant="outline" className="rounded-full" onClick={() => void refetchAll()}>
               Refresh
             </Button>
           </CardHeader>
 
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
               <CardContent className="p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Open</p>
@@ -84,6 +204,12 @@ export default function IncidentCenterPage() {
               <CardContent className="p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Critical</p>
                 <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.criticalOpen ?? 0}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+              <CardContent className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Acknowledged</p>
+                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.acknowledgedOpen ?? 0}</p>
               </CardContent>
             </Card>
             <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
@@ -102,9 +228,14 @@ export default function IncidentCenterPage() {
         </Card>
 
         <Card className="rounded-[2rem] border border-border/70 bg-background/75">
-          <CardHeader>
-            <CardTitle className="text-xl">Alert history</CardTitle>
-            <CardDescription>Latest delivery and incident notifications across the panel.</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl">Alert history</CardTitle>
+              <CardDescription>Latest notification events driving incident awareness.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/notifications">Open notifications</Link>
+            </Button>
           </CardHeader>
           <CardContent className="space-y-3">
             {alertHistory.length === 0 ? (
@@ -148,10 +279,10 @@ export default function IncidentCenterPage() {
                 <button
                   key={incident.id}
                   type="button"
-                  onClick={() => setSelectedServerId(incident.serverId)}
+                  onClick={() => setSelectedIncidentId(incident.id)}
                   className={cn(
                     'w-full rounded-[1.5rem] border px-4 py-4 text-left transition-colors',
-                    selectedServerId === incident.serverId
+                    selectedIncidentId === incident.id
                       ? 'border-primary/40 bg-primary/8'
                       : 'border-border/70 bg-background/65 hover:border-primary/25',
                   )}
@@ -160,8 +291,9 @@ export default function IncidentCenterPage() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <SeverityBadge severity={incident.severity} />
-                        <p className="font-semibold">{incident.serverName}</p>
+                        <WorkflowBadge status={incident.workflowStatus} />
                       </div>
+                      <p className="font-semibold">{incident.serverName}</p>
                       <p className="text-sm text-muted-foreground">{incident.summary}</p>
                     </div>
                     <p className="whitespace-nowrap text-xs text-muted-foreground">
@@ -177,7 +309,7 @@ export default function IncidentCenterPage() {
                       <Users className="h-3.5 w-3.5" />
                       {incident.affectedUserCount} user(s)
                     </span>
-                    {incident.latencyMs != null ? <span>{incident.latencyMs} ms</span> : null}
+                    {incident.assignedUserEmail ? <span>Assigned: {incident.assignedUserEmail}</span> : null}
                   </div>
                 </button>
               ))
@@ -194,20 +326,176 @@ export default function IncidentCenterPage() {
 
         <Card className="rounded-[2rem] border border-border/70 bg-background/75">
           <CardHeader>
-            <CardTitle className="text-xl">Affected inventory and resolution timeline</CardTitle>
+            <CardTitle className="text-xl">Incident workflow and impact</CardTitle>
             <CardDescription>
               {selectedDetail
-                ? `Detailed incident context for ${selectedDetail.server.name}.`
-                : 'Select an open incident to inspect keys, users, and the response timeline.'}
+                ? `Manage status, assignments, notes, and notification history for ${selectedDetail.server?.name ?? selectedDetail.incident.title}.`
+                : 'Select an open incident to inspect keys, users, notifications, and the resolution timeline.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedDetail ? (
               <div className="rounded-[1.5rem] border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-                Choose an incident from the left column to inspect the impact and timeline.
+                Choose an incident from the left column to inspect and manage it.
               </div>
             ) : (
               <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Workflow</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <SeverityBadge severity={selectedDetail.incident.severity} />
+                        <WorkflowBadge status={selectedDetail.incident.status} />
+                        {selectedDetail.incident.assignedUserEmail ? (
+                          <Badge variant="outline">Assigned to {selectedDetail.incident.assignedUserEmail}</Badge>
+                        ) : null}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Severity</p>
+                        <Select
+                          value={selectedDetail.incident.severity}
+                          onValueChange={(value) =>
+                            severityMutation.mutate({
+                              incidentId: selectedDetail.incident.id,
+                              severity: value as 'critical' | 'warning' | 'info',
+                            })
+                          }
+                        >
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="critical">critical</SelectItem>
+                            <SelectItem value="warning">warning</SelectItem>
+                            <SelectItem value="info">info</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Assign owner</p>
+                        <div className="flex gap-2">
+                          <Select value={selectedAssigneeId} onValueChange={setSelectedAssigneeId}>
+                            <SelectTrigger className="rounded-xl">
+                              <SelectValue placeholder="Select assignee" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {(assigneesQuery.data ?? []).map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() =>
+                              assignMutation.mutate({
+                                incidentId: selectedDetail.incident.id,
+                                assigneeUserId: selectedAssigneeId === 'unassigned' ? null : selectedAssigneeId,
+                                note: noteInput.trim() || undefined,
+                              })
+                            }
+                            disabled={assignMutation.isPending}
+                          >
+                            Assign
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() =>
+                            acknowledgeMutation.mutate({
+                              incidentId: selectedDetail.incident.id,
+                              note: noteInput.trim() || undefined,
+                            })
+                          }
+                          disabled={acknowledgeMutation.isPending || selectedDetail.incident.status === 'ACKNOWLEDGED'}
+                        >
+                          Acknowledge
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() =>
+                            addNoteMutation.mutate({
+                              incidentId: selectedDetail.incident.id,
+                              note: noteInput.trim(),
+                            })
+                          }
+                          disabled={addNoteMutation.isPending || !noteInput.trim()}
+                        >
+                          Add note
+                        </Button>
+                        <Button
+                          className="rounded-xl"
+                          onClick={() =>
+                            resolveMutation.mutate({
+                              incidentId: selectedDetail.incident.id,
+                              note: noteInput.trim() || undefined,
+                            })
+                          }
+                          disabled={resolveMutation.isPending || selectedDetail.incident.status === 'RESOLVED'}
+                        >
+                          Resolve
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={noteInput}
+                        onChange={(event) => setNoteInput(event.target.value)}
+                        placeholder="Add assignment context, acknowledgement note, or resolution notes…"
+                        className="min-h-[120px] rounded-2xl"
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">At-a-glance impact</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="rounded-2xl border border-border/60 px-3 py-3">
+                        <p className="font-medium">{selectedDetail.incident.title}</p>
+                        <p className="mt-1 text-muted-foreground">{selectedDetail.incident.summary}</p>
+                      </div>
+                      {selectedDetail.server ? (
+                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                          <p className="font-medium">{selectedDetail.server.name}</p>
+                          <p className="mt-1 text-muted-foreground">
+                            {selectedDetail.server.status} •{' '}
+                            {selectedDetail.server.latencyMs != null ? `${selectedDetail.server.latencyMs} ms` : 'No latency'}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Last checked {selectedDetail.server.lastCheckedAt ? formatDateTime(selectedDetail.server.lastCheckedAt) : 'Never'}
+                          </p>
+                        </div>
+                      ) : null}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Affected keys</p>
+                          <p className="mt-2 text-2xl font-semibold">{selectedDetail.incident.affectedKeyCount}</p>
+                        </div>
+                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Affected users</p>
+                          <p className="mt-2 text-2xl font-semibold">{selectedDetail.incident.affectedUserCount}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-border/60 px-3 py-3">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Notes</p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                          {selectedDetail.incident.notes || 'No operator notes yet.'}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
                     <CardHeader className="pb-3">
@@ -253,22 +541,59 @@ export default function IncidentCenterPage() {
                 </div>
 
                 <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                  <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+                    <div>
+                      <CardTitle className="text-base">Notification links</CardTitle>
+                      <CardDescription>Recent delivery history connected to this incident.</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/dashboard/notifications">Open delivery history</Link>
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedDetail.notifications.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No notification deliveries were linked to this incident yet.</p>
+                    ) : (
+                      selectedDetail.notifications.slice(0, 8).map((entry) => (
+                        <div key={entry.id} className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/60 px-3 py-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <BellRing className="h-4 w-4 text-primary" />
+                              <p className="font-medium">{entry.event.replace(/_/g, ' ')}</p>
+                              <Badge variant="outline">{entry.status}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{entry.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {entry.channelName ? `${entry.channelName} (${entry.channelType})` : 'System log'}
+                            </p>
+                            {entry.error ? <p className="text-xs text-red-500">{entry.error}</p> : null}
+                          </div>
+                          <p className="whitespace-nowrap text-xs text-muted-foreground">{formatRelativeTime(entry.sentAt)}</p>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Resolution timeline</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {selectedDetail.timeline.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No timeline entries were found for this server yet.</p>
+                      <p className="text-sm text-muted-foreground">No timeline entries were found for this incident yet.</p>
                     ) : (
-                      selectedDetail.timeline.slice(0, 12).map((entry) => (
+                      selectedDetail.timeline.slice(0, 16).map((entry) => (
                         <div key={entry.id} className="flex gap-3 rounded-2xl border border-border/60 px-3 py-3">
                           <div className="mt-0.5">
                             {entry.category === 'alert' ? (
                               <AlertTriangle className="h-4 w-4 text-amber-500" />
                             ) : entry.category === 'audit' ? (
                               <ScrollText className="h-4 w-4 text-sky-500" />
-                            ) : (
+                            ) : entry.category === 'state' ? (
                               <ServerCrash className="h-4 w-4 text-rose-500" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -277,6 +602,9 @@ export default function IncidentCenterPage() {
                               <SeverityBadge severity={entry.severity} />
                             </div>
                             <p className="mt-1 text-sm text-muted-foreground">{entry.description}</p>
+                            {entry.actorEmail ? (
+                              <p className="mt-1 text-xs text-muted-foreground">Actor: {entry.actorEmail}</p>
+                            ) : null}
                           </div>
                           <p className="whitespace-nowrap text-xs text-muted-foreground">
                             {formatRelativeTime(entry.timestamp)}

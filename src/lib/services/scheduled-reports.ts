@@ -23,6 +23,24 @@ export const scheduledReportsConfigSchema = z.object({
   includeServerHealth: z.boolean().default(true),
   revenueAmount: z.number().min(0).nullable().default(null),
   revenueCurrency: z.string().trim().min(3).max(8).default('USD'),
+  subjectTemplate: z.string().trim().max(200).default('Atomic-UI {{frequency_label}} Summary'),
+  bodyTemplate: z
+    .string()
+    .trim()
+    .max(8000)
+    .default(
+      [
+        '{{subject}}',
+        'Generated at: {{generated_at}}',
+        'Period: {{period_start}} to {{period_end}}',
+        '',
+        '{{revenue_line}}',
+        '{{usage_line}}',
+        '{{expirations_line}}',
+        '{{failed_logins_line}}',
+        '{{server_health_line}}',
+      ].join('\n'),
+    ),
   lastRunAt: z.string().datetime().nullable().default(null),
   lastRunStatus: z.enum(['IDLE', 'SUCCESS', 'FAILED']).default('IDLE'),
   lastRunSummary: z.string().nullable().default(null),
@@ -141,9 +159,15 @@ function buildReportWindow(config: ScheduledReportsConfig, now: Date) {
   return { periodStart, periodEnd };
 }
 
-function buildSummaryMessage({
+function renderTemplate(template: string, variables: Record<string, string>) {
+  return template.replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_, key: string) => variables[key] ?? '');
+}
+
+function buildTemplateVariables({
   config,
   generatedAt,
+  periodStart,
+  periodEnd,
   totalTrafficBytes,
   activeKeys,
   expiringSoon,
@@ -153,6 +177,8 @@ function buildSummaryMessage({
 }: {
   config: ScheduledReportsConfig;
   generatedAt: Date;
+  periodStart: Date;
+  periodEnd: Date;
   totalTrafficBytes: bigint;
   activeKeys: number;
   expiringSoon: number;
@@ -165,40 +191,44 @@ function buildSummaryMessage({
     unknown: number;
   };
 }) {
-  const lines = [
-    `Atomic-UI ${config.frequency === 'DAILY' ? 'Daily' : 'Weekly'} Summary`,
-    `Generated at: ${generatedAt.toISOString()}`,
-  ];
+  const frequencyLabel = config.frequency === 'DAILY' ? 'Daily' : 'Weekly';
+  const subject = renderTemplate(config.subjectTemplate, {
+    frequency_label: frequencyLabel,
+  }).trim();
 
-  if (config.includeRevenue) {
-    lines.push(
-      `Revenue: ${
-        config.revenueAmount != null
-          ? formatCurrency(config.revenueAmount, config.revenueCurrency)
-          : 'Not configured'
-      }`,
-    );
-  }
+  const variables = {
+    subject,
+    frequency_label: frequencyLabel,
+    generated_at: generatedAt.toISOString(),
+    period_start: periodStart.toISOString(),
+    period_end: periodEnd.toISOString(),
+    revenue_line:
+      config.includeRevenue && config.revenueAmount != null
+        ? `Revenue: ${formatCurrency(config.revenueAmount, config.revenueCurrency)}`
+        : config.includeRevenue
+          ? 'Revenue: Not configured'
+          : '',
+    usage_line: config.includeUsage
+      ? `Usage: ${formatBytes(totalTrafficBytes)} across ${activeKeys} active key(s)`
+      : '',
+    expirations_line: config.includeExpirations
+      ? `Expirations: ${expiringSoon} expiring soon, ${expiredKeys} already expired`
+      : '',
+    failed_logins_line: config.includeFailedLogins ? `Failed logins: ${failedLogins}` : '',
+    server_health_line: config.includeServerHealth
+      ? `Server health: ${serverHealth.up} up, ${serverHealth.slow} slow, ${serverHealth.down} down, ${serverHealth.unknown} unknown`
+      : '',
+  };
 
-  if (config.includeUsage) {
-    lines.push(`Usage: ${formatBytes(totalTrafficBytes)} across ${activeKeys} active key(s)`);
-  }
-
-  if (config.includeExpirations) {
-    lines.push(`Expirations: ${expiringSoon} expiring soon, ${expiredKeys} already expired`);
-  }
-
-  if (config.includeFailedLogins) {
-    lines.push(`Failed logins: ${failedLogins}`);
-  }
-
-  if (config.includeServerHealth) {
-    lines.push(
-      `Server health: ${serverHealth.up} up, ${serverHealth.slow} slow, ${serverHealth.down} down, ${serverHealth.unknown} unknown`,
-    );
-  }
-
-  return lines.join('\n');
+  return {
+    subject,
+    body: renderTemplate(config.bodyTemplate, variables)
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter((line, index, all) => line || (index > 0 && all[index - 1]))
+      .join('\n')
+      .trim(),
+  };
 }
 
 export async function getScheduledReportsConfig() {
@@ -292,9 +322,11 @@ export async function buildScheduledReportSnapshot(config: ScheduledReportsConfi
     }
   }
 
-  const summaryMessage = buildSummaryMessage({
+  const rendered = buildTemplateVariables({
     config,
     generatedAt: now,
+    periodStart,
+    periodEnd,
     totalTrafficBytes: reportData.totalDeltaBytes,
     activeKeys: reportData.reportData.summary.activeKeys,
     expiringSoon,
@@ -306,7 +338,8 @@ export async function buildScheduledReportSnapshot(config: ScheduledReportsConfi
   return {
     periodStart,
     periodEnd,
-    summaryMessage,
+    subject: rendered.subject,
+    summaryMessage: rendered.body,
     reportData,
     dashboardSummary: {
       revenueAmount: config.revenueAmount,
@@ -316,6 +349,176 @@ export async function buildScheduledReportSnapshot(config: ScheduledReportsConfi
       failedLogins,
       serverHealth,
     },
+  };
+}
+
+function mapDeliveryStatus(status: string) {
+  switch (status) {
+    case 'SUCCESS':
+      return 'SUCCESS';
+    case 'FAILED':
+      return 'FAILED';
+    case 'SKIPPED':
+      return 'SKIPPED';
+    default:
+      return 'QUEUED';
+  }
+}
+
+export async function listScheduledReportRuns(input?: {
+  page?: number;
+  pageSize?: number;
+}) {
+  const page = input?.page ?? 1;
+  const pageSize = input?.pageSize ?? 10;
+
+  const [runs, total] = await Promise.all([
+    db.scheduledReportRun.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        report: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            periodStart: true,
+            periodEnd: true,
+          },
+        },
+        deliveries: true,
+      },
+    }),
+    db.scheduledReportRun.count(),
+  ]);
+
+  const notificationDeliveryIds = Array.from(
+    new Set(
+      runs
+        .flatMap((run) => run.deliveries.map((delivery) => delivery.notificationDeliveryId))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  const queueDeliveries = notificationDeliveryIds.length
+    ? await db.notificationDelivery.findMany({
+        where: {
+          id: {
+            in: notificationDeliveryIds,
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          lastError: true,
+          processedAt: true,
+          updatedAt: true,
+        },
+      })
+    : [];
+
+  const queueById = new Map(queueDeliveries.map((delivery) => [delivery.id, delivery]));
+
+  return {
+    items: runs.map((run) => ({
+      id: run.id,
+      frequency: run.frequency,
+      status: run.status,
+      triggeredBy: run.triggeredBy,
+      periodStart: run.periodStart,
+      periodEnd: run.periodEnd,
+      summaryMessage: run.summaryMessage,
+      error: run.error,
+      createdAt: run.createdAt,
+      completedAt: run.completedAt,
+      report: run.report,
+      deliveries: run.deliveries.map((delivery) => {
+        const queueDelivery = delivery.notificationDeliveryId
+          ? queueById.get(delivery.notificationDeliveryId)
+          : null;
+
+        return {
+          id: delivery.id,
+          channelId: delivery.channelId,
+          channelName: delivery.channelName,
+          channelType: delivery.channelType,
+          status: queueDelivery ? mapDeliveryStatus(queueDelivery.status) : delivery.status,
+          lastError: queueDelivery?.lastError ?? delivery.lastError,
+          deliveredAt: queueDelivery?.processedAt ?? delivery.deliveredAt,
+          notificationDeliveryId: delivery.notificationDeliveryId,
+        };
+      }),
+    })),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export async function getScheduledReportRunById(runId: string) {
+  const run = await db.scheduledReportRun.findUnique({
+    where: { id: runId },
+    include: {
+      report: true,
+      deliveries: true,
+    },
+  });
+
+  if (!run) {
+    return null;
+  }
+
+  const queueDeliveries = run.deliveries.length
+    ? await db.notificationDelivery.findMany({
+        where: {
+          id: {
+            in: run.deliveries
+              .map((delivery) => delivery.notificationDeliveryId)
+              .filter((id): id is string => Boolean(id)),
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          lastError: true,
+          processedAt: true,
+          updatedAt: true,
+        },
+      })
+    : [];
+
+  const queueById = new Map(queueDeliveries.map((delivery) => [delivery.id, delivery]));
+
+  return {
+    id: run.id,
+    frequency: run.frequency,
+    status: run.status,
+    triggeredBy: run.triggeredBy,
+    periodStart: run.periodStart,
+    periodEnd: run.periodEnd,
+    summaryMessage: run.summaryMessage,
+    configSnapshot: run.configSnapshot ? (JSON.parse(run.configSnapshot) as Record<string, unknown>) : null,
+    error: run.error,
+    createdAt: run.createdAt,
+    completedAt: run.completedAt,
+    report: run.report,
+    deliveries: run.deliveries.map((delivery) => {
+      const queueDelivery = delivery.notificationDeliveryId
+        ? queueById.get(delivery.notificationDeliveryId)
+        : null;
+
+      return {
+        id: delivery.id,
+        channelId: delivery.channelId,
+        channelName: delivery.channelName,
+        channelType: delivery.channelType,
+        status: queueDelivery ? mapDeliveryStatus(queueDelivery.status) : delivery.status,
+        lastError: queueDelivery?.lastError ?? delivery.lastError,
+        deliveredAt: queueDelivery?.processedAt ?? delivery.deliveredAt,
+      };
+    }),
   };
 }
 
@@ -343,14 +546,26 @@ export async function runScheduledReportsCycle({
     };
   }
 
-  try {
-    const snapshot = await buildScheduledReportSnapshot(config, now);
-    const name = `${config.frequency === 'DAILY' ? 'Daily' : 'Weekly'} Summary - ${now.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })}`;
+  const snapshot = await buildScheduledReportSnapshot(config, now);
+  const name = `${config.frequency === 'DAILY' ? 'Daily' : 'Weekly'} Summary - ${now.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })}`;
 
+  const run = await db.scheduledReportRun.create({
+    data: {
+      frequency: config.frequency,
+      status: 'RUNNING',
+      triggeredBy,
+      periodStart: snapshot.periodStart,
+      periodEnd: snapshot.periodEnd,
+      summaryMessage: snapshot.summaryMessage,
+      configSnapshot: JSON.stringify(config),
+    },
+  });
+
+  try {
     const report = await db.report.create({
       data: {
         name,
@@ -361,6 +576,7 @@ export async function runScheduledReportsCycle({
         generatedBy: triggeredBy,
         reportData: JSON.stringify({
           kind: 'scheduled-summary',
+          subject: snapshot.subject,
           summary: snapshot.dashboardSummary,
           usage: snapshot.reportData.reportData,
         }),
@@ -371,10 +587,27 @@ export async function runScheduledReportsCycle({
       },
     });
 
+    const channelSnapshots = config.channelIds.length
+      ? await db.notificationChannel.findMany({
+          where: {
+            id: {
+              in: config.channelIds,
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        })
+      : [];
+
     const payload = {
       type: 'scheduled_report',
       reportId: report.id,
+      reportRunId: run.id,
       reportName: name,
+      subject: snapshot.subject,
       periodStart: snapshot.periodStart.toISOString(),
       periodEnd: snapshot.periodEnd.toISOString(),
       summary: snapshot.dashboardSummary,
@@ -389,6 +622,33 @@ export async function runScheduledReportsCycle({
       cooldownKey: `${config.frequency}:${snapshot.periodStart.toISOString()}`,
       bypassCooldown: force,
     });
+
+    await db.scheduledReportRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'SUCCESS',
+        reportId: report.id,
+        completedAt: now,
+      },
+    });
+
+    for (const item of delivery.deliveries) {
+      const snapshotChannel = channelSnapshots.find((channel) => channel.id === item.channelId);
+      await db.scheduledReportDelivery.create({
+        data: {
+          runId: run.id,
+          channelId: item.channelId,
+          channelName: snapshotChannel?.name ?? item.channelId,
+          channelType: snapshotChannel?.type ?? 'UNKNOWN',
+          status: item.suppressed ? 'SKIPPED' : 'QUEUED',
+          notificationDeliveryId: item.suppressed ? null : (item.notificationDeliveryId ?? null),
+          lastError: item.suppressed
+            ? `Suppressed until ${item.blockedUntil?.toISOString() ?? 'cooldown window'}`
+            : null,
+          deliveredAt: item.suppressed ? now : null,
+        },
+      });
+    }
 
     const nextConfig = await saveScheduledReportsConfig({
       ...config,
@@ -405,6 +665,7 @@ export async function runScheduledReportsCycle({
       entityId: report.id,
       details: {
         triggeredBy,
+        reportRunId: run.id,
         reportName: name,
         deliveryCount: delivery.count,
         suppressedCount: delivery.suppressedCount,
@@ -414,23 +675,36 @@ export async function runScheduledReportsCycle({
 
     logger.info(`Scheduled report generated: ${name}`, {
       reportId: report.id,
+      reportRunId: run.id,
       deliveryCount: delivery.count,
       suppressedCount: delivery.suppressedCount,
     });
 
     return {
       skipped: false as const,
+      runId: run.id,
       reportId: report.id,
       reportName: name,
       delivery,
       config: nextConfig,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+
+    await db.scheduledReportRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'FAILED',
+        error: message,
+        completedAt: now,
+      },
+    });
+
     await saveScheduledReportsConfig({
       ...config,
       lastRunAt: now.toISOString(),
       lastRunStatus: 'FAILED',
-      lastRunSummary: error instanceof Error ? error.message : 'Unknown error',
+      lastRunSummary: message,
     });
 
     throw error;

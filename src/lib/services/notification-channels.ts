@@ -29,6 +29,7 @@ export const notificationEventSchema = z.enum([
   'TRAFFIC_WARNING',
   'TRAFFIC_DEPLETED',
   'AUDIT_ALERT',
+  'SCHEDULED_REPORT',
 ]);
 
 export const notificationChannelSchema = z.object({

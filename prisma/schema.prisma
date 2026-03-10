@@ -519,6 +519,58 @@ model NotificationLog {
   accessKey   AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: SetNull)
 }
 
+model Incident {
+  id                    String   @id @default(cuid())
+  sourceType            String   @default("SERVER_HEALTH") // SERVER_HEALTH, MANUAL
+  serverId              String?
+  title                 String
+  summary               String
+  severity              String   @default("warning") // critical, warning, info
+  status                String   @default("OPEN") // OPEN, ACKNOWLEDGED, RESOLVED
+  healthStatus          String?
+  countryCode           String?
+  affectedKeyCount      Int      @default(0)
+  affectedUserCount     Int      @default(0)
+  assignedUserId        String?
+  assignedUserEmail     String?
+  acknowledgedByUserId  String?
+  acknowledgedByEmail   String?
+  resolvedByUserId      String?
+  resolvedByEmail       String?
+  notes                 String?
+  metadata              String?
+  openedAt              DateTime @default(now())
+  lastSeenAt            DateTime @default(now())
+  acknowledgedAt        DateTime?
+  resolvedAt            DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  events IncidentEvent[]
+
+  @@index([status, severity])
+  @@index([serverId, status])
+  @@index([openedAt])
+}
+
+model IncidentEvent {
+  id                String   @id @default(cuid())
+  incidentId        String
+  incident          Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  type              String   // OPENED, STATUS_CHANGED, ACKNOWLEDGED, ASSIGNED, NOTE, RESOLVED, NOTIFICATION
+  severity          String?
+  title             String
+  message           String?
+  details           String?
+  notificationLogId String?
+  actorUserId       String?
+  actorEmail        String?
+  createdAt         DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+  @@index([notificationLogId])
+}
+
 // ============================================
 // Settings & Misc
 // ============================================
@@ -837,6 +889,48 @@ model Report {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  scheduledRuns ScheduledReportRun[]
+
   @@index([periodStart, periodEnd])
   @@index([status])
+}
+
+model ScheduledReportRun {
+  id             String   @id @default(cuid())
+  reportId       String?
+  report         Report?  @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  frequency      String
+  status         String   @default("PENDING") // PENDING, RUNNING, SUCCESS, FAILED, SKIPPED
+  triggeredBy    String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  summaryMessage String?
+  configSnapshot String?
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  completedAt    DateTime?
+
+  deliveries ScheduledReportDelivery[]
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model ScheduledReportDelivery {
+  id                   String   @id @default(cuid())
+  runId                String
+  run                  ScheduledReportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  channelId            String?
+  channelName          String
+  channelType          String
+  status               String   @default("QUEUED") // QUEUED, SUCCESS, FAILED, SKIPPED
+  notificationDeliveryId String? @unique
+  lastError            String?
+  deliveredAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([runId, createdAt])
+  @@index([status, createdAt])
 }

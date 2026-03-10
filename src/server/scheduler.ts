@@ -25,6 +25,7 @@ import { cleanupOldAuditLogs } from '@/lib/services/audit-log';
 import { verifyLatestBackups } from '@/lib/services/backup-verification';
 import { processNotificationQueue } from '@/lib/services/notification-queue';
 import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
+import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { logger } from '@/lib/logger';
 
@@ -77,6 +78,7 @@ export function initScheduler() {
         logger.debug('🏥 Running health checks...');
         try {
             const result = await runHealthChecks();
+            await syncIncidentState('scheduler');
             logger.debug(`✅ Health check complete: ${result.up} up, ${result.down} down, ${result.slow} slow`);
         } catch (error) {
             logger.error('❌ Health check failed:', error);
