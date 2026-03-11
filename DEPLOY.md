@@ -79,6 +79,17 @@ npm run env:check -- --env-file=.env
 NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 ```
 
+Or use the one-command installer, which now prefers HTTPS by default:
+
+```bash
+sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+```
+
+Installer behavior:
+- `INSTALL_HTTPS=auto` (default): try HTTPS on the server IP, fall back to HTTP if certificate setup fails
+- `INSTALL_HTTPS=require`: fail the install if HTTPS cannot be enabled
+- `INSTALL_HTTPS=false`: skip HTTPS and keep nginx on plain HTTP
+
 ### 2. systemd service
 
 Use a service file similar to:
@@ -122,34 +133,25 @@ DEPLOY_PASSWORD=your-password \
 bash scripts/deploy-vps.sh
 ```
 
-## Configuring HTTPS (Recommended)
-To secure your dashboard with HTTPS, you can use a reverse proxy like Nginx or Caddy.
+## Configuring HTTPS
 
-### Example: Caddy (Easiest)
-Create a `Caddyfile` in the project root:
-```
-vpn.yourdomain.com {
-    reverse_proxy localhost:3000
-}
-```
-Run Caddy with Docker (add to docker-compose.yml or run separately).
+### Bare IP (default installer path)
 
-### Example: Nginx
-Configure a server block to proxy `localhost:3000`:
-```nginx
-server {
-    listen 80;
-    server_name vpn.yourdomain.com;
-    
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
+The repository includes a reusable IP-HTTPS setup script:
+
+```bash
+sudo APP_PORT=2053 ACME_EMAIL=you@example.com bash scripts/setup-nginx-https.sh
 ```
-Use Certbot (`sudo certbot --nginx`) to enable HTTPS.
+
+Notes:
+- This uses nginx in front of the app and keeps the Node server on `2053`.
+- It requests a Let's Encrypt IP certificate using the `shortlived` profile.
+- IP certificates are intentionally short-lived, usually around 7 days.
+- Auto-renew is installed as `atomic-ui-cert-renew.timer` and runs every 12 hours.
+
+### Domain-based HTTPS
+
+If you have a real domain, you can still use your own nginx/certbot or Caddy setup. Domain certificates are the better long-term production option because they use the standard longer-lived certificate flow.
 
 ## Updates
 To update the application:
@@ -168,6 +170,13 @@ systemctl stop atomic-ui.service
 NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password='your-password'
+```
+
+If nginx is fronting the app, test the public URL too:
+
+```bash
+curl -I http://your-server-ip/
+curl -I https://your-server-ip/
 ```
 
 ## Backup drill and rollback

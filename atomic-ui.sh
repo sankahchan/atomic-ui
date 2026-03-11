@@ -52,6 +52,41 @@ get_current_path() {
     fi
 }
 
+get_public_origin() {
+    if [ -f "$INSTALL_DIR/.public_origin" ]; then
+        cat "$INSTALL_DIR/.public_origin"
+        return
+    fi
+
+    if [ -f "$INSTALL_DIR/.env" ]; then
+        local env_origin
+        env_origin=$(grep -E '^(APP_URL|NEXT_PUBLIC_APP_URL)=' "$INSTALL_DIR/.env" | head -n 1 | cut -d'=' -f2- | tr -d '"' || true)
+        if [ -n "$env_origin" ]; then
+            echo "${env_origin%/}"
+            return
+        fi
+    fi
+
+    local fallback_port
+    fallback_port=$(get_current_port)
+    local fallback_ip
+    fallback_ip=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+    echo "http://${fallback_ip}:${fallback_port}"
+}
+
+get_public_panel_url() {
+    local origin
+    origin=$(get_public_origin)
+    local path
+    path=$(get_current_path)
+
+    if [ -n "$path" ]; then
+        echo "${origin%/}${path}/"
+    else
+        echo "${origin%/}/"
+    fi
+}
+
 CURRENT_PORT=$(get_current_port)
 CURRENT_PATH=$(get_current_path)
 
@@ -582,7 +617,8 @@ restart_service() {
 show_status() {
     CURRENT_PORT=$(get_current_port)
     CURRENT_PATH=$(get_current_path)
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "Unknown")
+    PUBLIC_ORIGIN=$(get_public_origin)
+    PANEL_URL=$(get_public_panel_url)
     
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
@@ -604,10 +640,9 @@ show_status() {
     echo -e "${CYAN}│${NC}  Port:       ${BLUE}${CURRENT_PORT}${NC}"
     if [ -n "$CURRENT_PATH" ]; then
         echo -e "${CYAN}│${NC}  Path:       ${BLUE}${CURRENT_PATH}${NC}"
-        echo -e "${CYAN}│${NC}  Panel URL:  ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${CURRENT_PATH}/${NC}"
-    else
-        echo -e "${CYAN}│${NC}  Panel URL:  ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
     fi
+    echo -e "${CYAN}│${NC}  Public URL: ${GREEN}${PANEL_URL}${NC}"
+    echo -e "${CYAN}│${NC}  Origin:     ${BLUE}${PUBLIC_ORIGIN}${NC}"
     
     if [ -d "$INSTALL_DIR" ]; then
         if [ -f "$INSTALL_DIR/package.json" ]; then
@@ -1155,7 +1190,13 @@ EOF
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         cd "$INSTALL_DIR"
         sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN_NAME}|g" .env
-        print_success "APP_URL updated"
+        if grep -q "^NEXT_PUBLIC_APP_URL=" .env; then
+            sed -i "s|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=https://${DOMAIN_NAME}|g" .env
+        else
+            echo "NEXT_PUBLIC_APP_URL=\"https://${DOMAIN_NAME}\"" >> .env
+        fi
+        echo "https://${DOMAIN_NAME}" > "$INSTALL_DIR/.public_origin"
+        print_success "APP_URL and NEXT_PUBLIC_APP_URL updated"
 
         print_step "Rebuilding application with new URL..."
         NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
@@ -1208,13 +1249,15 @@ remove_custom_domain() {
     fi
 
     rm -f "$INSTALL_DIR/.panel_domain"
+    SERVER_IP=$(curl -s ifconfig.me || echo "YOUR_SERVER_IP")
+    echo "http://${SERVER_IP}" > "$INSTALL_DIR/.public_origin"
 
     CURRENT_PORT=$(get_current_port)
-    SERVER_IP=$(curl -s ifconfig.me || echo "YOUR_SERVER_IP")
+    CURRENT_PATH=$(get_current_path)
 
     print_success "Custom domain removed"
     echo ""
-    echo -e "Panel is now accessible at: ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+    echo -e "Panel is now accessible at: ${GREEN}http://${SERVER_IP}${CURRENT_PATH}/${NC}"
 }
 
 # Show custom domain status
@@ -1339,7 +1382,8 @@ change_port() {
     if systemctl is-active --quiet ${SERVICE_NAME}; then
         print_success "Port changed successfully!"
         echo ""
-        echo -e "New panel URL: ${GREEN}http://${SERVER_IP}:${NEW_PORT}${NC}"
+        echo -e "Internal app port: ${GREEN}${NEW_PORT}${NC}"
+        echo -e "Public panel URL: ${GREEN}$(get_public_panel_url)${NC}"
         echo ""
     else
         print_error "Service failed to start with new port"
@@ -1350,14 +1394,16 @@ change_port() {
 # Show port info
 show_port() {
     CURRENT_PORT=$(get_current_port)
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+    PUBLIC_ORIGIN=$(get_public_origin)
+    PANEL_URL=$(get_public_panel_url)
     
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
     echo -e "${CYAN}│${NC}  ${YELLOW}Port Information${NC}"
     echo -e "${CYAN}├──────────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${CYAN}│${NC}  Current Port: ${GREEN}${CURRENT_PORT}${NC}"
-    echo -e "${CYAN}│${NC}  Panel URL:    ${GREEN}http://${SERVER_IP}:${CURRENT_PORT}${NC}"
+    echo -e "${CYAN}│${NC}  Internal Port: ${GREEN}${CURRENT_PORT}${NC}"
+    echo -e "${CYAN}│${NC}  Public URL:    ${GREEN}${PANEL_URL}${NC}"
+    echo -e "${CYAN}│${NC}  Origin:        ${BLUE}${PUBLIC_ORIGIN}${NC}"
     echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
     echo ""
     echo -e "To change port, run: ${BLUE}atomic-ui port <new-port>${NC}"

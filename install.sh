@@ -26,6 +26,19 @@ INSTALL_DIR="/opt/atomic-ui"
 GITHUB_REPO="sankahchan/atomic-ui"
 DEFAULT_PORT=2053  # Fixed port like 3x-ui
 CLEANUP_ON_FAILURE=true
+INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
+ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
+
+set_env_var() {
+    local key="$1"
+    local value="$2"
+
+    if grep -q "^${key}=" .env; then
+        sed -i "s|^${key}=.*|${key}=\"${value}\"|g" .env
+    else
+        echo "${key}=\"${value}\"" >> .env
+    fi
+}
 
 # Cleanup function for installation failure
 cleanup_installation() {
@@ -217,9 +230,14 @@ fi
 
 # Get server IP
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+PUBLIC_ORIGIN="http://${SERVER_IP}"
+PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
+HTTPS_ENABLED=false
+HTTPS_NOTE="HTTP reverse proxy enabled on port 80."
 
-# Set the random port in .env
-sed -i "s|http://localhost:3000|http://${SERVER_IP}:${PANEL_PORT}|g" .env
+# Set public application URL in .env
+set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
+set_env_var "NEXT_PUBLIC_APP_URL" "${PUBLIC_ORIGIN}"
 
 # Add PORT to .env if not exists
 if ! grep -q "^PORT=" .env; then
@@ -243,6 +261,30 @@ else
 fi
 
 echo -e "${GREEN}[✓]${NC} Environment configured"
+
+# Prefer HTTPS by default so fresh installs come up on the public origin.
+if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
+    echo -e "${BLUE}[*]${NC} Attempting HTTPS setup on public IP..."
+    chmod +x "$INSTALL_DIR/scripts/setup-nginx-https.sh"
+
+    if APP_PORT="${PANEL_PORT}" ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
+        HTTPS_ENABLED=true
+        PUBLIC_ORIGIN="https://${SERVER_IP}"
+        PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
+        HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
+        set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
+        set_env_var "NEXT_PUBLIC_APP_URL" "${PUBLIC_ORIGIN}"
+        echo -e "${GREEN}[✓]${NC} HTTPS enabled at ${CYAN}${PUBLIC_ORIGIN}${NC}"
+    else
+        if [ "${INSTALL_HTTPS_MODE}" = "require" ]; then
+            echo -e "${RED}[✗]${NC} HTTPS setup failed and INSTALL_HTTPS=require"
+            exit 1
+        fi
+
+        echo -e "${YELLOW}[!]${NC} HTTPS setup failed. Falling back to HTTP reverse proxy."
+        HTTPS_NOTE="HTTPS setup failed during install; panel is exposed on HTTP via nginx. Re-run scripts/setup-nginx-https.sh later."
+    fi
+fi
 
 # Setup database
 echo -e "${BLUE}[*]${NC} Setting up database..."
@@ -338,11 +380,12 @@ fi
 
 echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 
-# Configure nginx reverse proxy on port 80
-echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
-chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
-bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
-echo -e "${GREEN}[✓]${NC} nginx proxy is serving http://${SERVER_IP}/"
+if [ "$HTTPS_ENABLED" = false ]; then
+    echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
+    chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
+    bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
+    echo -e "${GREEN}[✓]${NC} nginx proxy is serving http://${SERVER_IP}/"
+fi
 
 # Disable cleanup after successful installation
 CLEANUP_ON_FAILURE=false
@@ -358,12 +401,12 @@ echo -e "${BLUE}[*]${NC} Configuring firewall..."
 # 1. Try UFW
 if command -v ufw &> /dev/null; then
     ufw allow 80/tcp > /dev/null 2>&1
-    # Enable UFW if not active (risky? 3x-ui doesn't force enable, but opens port)
-    # Just open the port
-    ufw allow ${PANEL_PORT}/tcp > /dev/null 2>&1
     ufw allow 22/tcp > /dev/null 2>&1 # Ensure SSH is safe
+    if [ "$HTTPS_ENABLED" = true ]; then
+        ufw allow 443/tcp > /dev/null 2>&1
+    fi
     ufw reload > /dev/null 2>&1
-    echo -e "${GREEN}[✓]${NC} UFW configured for port ${PANEL_PORT}"
+    echo -e "${GREEN}[✓]${NC} UFW configured for public access ports"
 fi
 
 # 2. Try iptables (common fallback)
@@ -371,23 +414,21 @@ if command -v iptables &> /dev/null; then
     if ! iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null; then
         iptables -I INPUT -p tcp --dport 80 -j ACCEPT
     fi
-    # Check if rule exists before adding
-    if ! iptables -C INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT 2>/dev/null; then
-        iptables -I INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT
-        echo -e "${GREEN}[✓]${NC} iptables rule added for port ${PANEL_PORT}"
-        
-        # Save rules if persistent package exists
-        if command -v netfilter-persistent &> /dev/null; then
-            netfilter-persistent save > /dev/null 2>&1
-        elif [ -d /etc/iptables ]; then
-            iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
-        fi
+    if [ "$HTTPS_ENABLED" = true ] && ! iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null; then
+        iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+    fi
+
+    if command -v netfilter-persistent &> /dev/null; then
+        netfilter-persistent save > /dev/null 2>&1
+    elif [ -d /etc/iptables ]; then
+        iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
     fi
 fi
 
 # Save port and path to config files for the management script
 echo "${PANEL_PORT}" > "$INSTALL_DIR/.panel_port"
 echo "/${PANEL_PATH}" > "$INSTALL_DIR/.panel_path"
+echo "${PUBLIC_ORIGIN}" > "$INSTALL_DIR/.public_origin"
 
 # Done!
 echo ""
@@ -397,9 +438,10 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
-echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}/${PANEL_PATH}/${NC}"
+echo -e "${CYAN}│${NC}  URL: ${GREEN}${PUBLIC_PANEL_URL}${NC}"
 echo -e "${CYAN}│${NC}"
-echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PANEL_PORT}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Public origin:${NC} ${GREEN}${PUBLIC_ORIGIN}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Default login credentials:${NC}"
@@ -408,7 +450,10 @@ echo -e "${CYAN}│${NC}  Password: ${GREEN}admin123${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${RED}⚠ IMPORTANT: Change the password after first login!${NC}"
 echo -e "${CYAN}│${NC}  ${RED}⚠ SAVE YOUR PANEL PATH - You need it to access the panel!${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}HTTPS:${NC} ${GREEN}${HTTPS_ENABLED}${NC}"
 echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
+echo ""
+echo -e "${YELLOW}  HTTPS note:${NC} ${HTTPS_NOTE}"
 echo ""
 echo -e "${YELLOW}  Management:${NC}"
 echo -e "  Run ${BLUE}atomic-ui${NC} to access the management menu"

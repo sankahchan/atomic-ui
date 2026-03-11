@@ -66,6 +66,16 @@ docker-compose up -d --build
 wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
+The installer now tries to enable HTTPS by default on the server IP using nginx plus a Let's Encrypt IP certificate. If HTTPS setup fails, it falls back to HTTP on port `80` and tells you how to enable HTTPS later.
+
+Useful install-time overrides:
+
+```bash
+sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_HTTPS=false bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+```
+
 For production deployment details, see [DEPLOY.md](DEPLOY.md).
 
 ## Environment variables
@@ -95,9 +105,18 @@ Set these in `.env` before production use:
 
 - Set `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, and `CRON_SECRET` before going live.
 - Use HTTPS in production.
+- If you are using the installer on a bare IP, expect a Let's Encrypt short-lived IP certificate. These typically last about 7 days and are renewed automatically by the installed `atomic-ui-cert-renew.timer`.
 - Set `NEXT_PUBLIC_APP_URL` to avoid host-header-derived callback URLs.
 - Restrict access to backup/export/admin routes to trusted users only.
 - Rotate credentials after initial setup.
+
+## HTTPS notes
+
+- Fresh VPS installs now prefer HTTPS by default.
+- The installer uses nginx in front of the app and keeps the internal Node process on port `2053`.
+- Bare-IP HTTPS uses Let's Encrypt's short-lived IP certificate profile, not a normal 90-day domain certificate.
+- Auto-renew is configured with `atomic-ui-cert-renew.timer` every 12 hours.
+- For long-term production use, a real domain is still recommended because standard domain certificates are longer-lived and easier to monitor.
 
 ## Production readiness
 
