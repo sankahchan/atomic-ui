@@ -61,16 +61,39 @@ function getJwtSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+function getBasePath(request: NextRequest): string {
+  return request.nextUrl.basePath || process.env.PANEL_PATH || '';
+}
+
+function normalizePathname(request: NextRequest, pathname: string): string {
+  const basePath = getBasePath(request);
+
+  if (!basePath) {
+    return pathname;
+  }
+
+  if (pathname === basePath) {
+    return '/';
+  }
+
+  return pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length) : pathname;
+}
+
 function buildRedirectUrl(
   request: NextRequest,
   pathname: string,
   searchParams?: Record<string, string>
 ): URL {
+  const basePath = getBasePath(request);
   const forwardedProto = request.headers.get('x-forwarded-proto');
   const forwardedHost = request.headers.get('x-forwarded-host');
   const host = forwardedHost || request.headers.get('host') || request.nextUrl.host;
   const protocol = forwardedProto || request.nextUrl.protocol.replace(':', '') || 'http';
-  const url = new URL(`${protocol}://${host}${pathname}`);
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const appPath = basePath && !normalizedPath.startsWith(`${basePath}/`) && normalizedPath !== basePath
+    ? `${basePath}${normalizedPath}`
+    : normalizedPath;
+  const url = new URL(`${protocol}://${host}${appPath}`);
 
   if (searchParams) {
     for (const [key, value] of Object.entries(searchParams)) {
@@ -90,9 +113,10 @@ function buildRedirectUrl(
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const normalizedPath = normalizePathname(request, pathname);
 
   // Allow public routes without authentication
-  if (isPublicRoute(pathname)) {
+  if (isPublicRoute(normalizedPath)) {
     return NextResponse.next();
   }
 
@@ -102,7 +126,7 @@ export async function middleware(request: NextRequest) {
   // If no session cookie, redirect to login
   if (!sessionToken) {
     // For API routes, return 401 instead of redirecting
-    if (pathname.startsWith('/api/')) {
+    if (normalizedPath.startsWith('/api/')) {
       return NextResponse.json(
         { error: 'Unauthorized', message: 'Please log in to continue.' },
         { status: 401 }
@@ -112,7 +136,7 @@ export async function middleware(request: NextRequest) {
     // For page routes, redirect to login with return URL
     // For page routes, redirect to login with return URL
     return NextResponse.redirect(
-      buildRedirectUrl(request, '/login', { from: pathname })
+      buildRedirectUrl(request, '/login', { from: normalizedPath })
     );
   }
 
@@ -126,22 +150,22 @@ export async function middleware(request: NextRequest) {
 
     // Role-based Access Control (RBAC)
     // Redirect USER/CLIENT role trying to access admin dashboard
-    if ((role === 'USER' || role === 'CLIENT') && pathname.startsWith('/dashboard')) {
+    if ((role === 'USER' || role === 'CLIENT') && normalizedPath.startsWith('/dashboard')) {
       return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
     }
 
     // Redirect ADMIN role trying to access user portal (optional, but keeps things clean)
-    if (role === 'ADMIN' && pathname.startsWith('/portal')) {
+    if (role === 'ADMIN' && normalizedPath.startsWith('/portal')) {
       return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
     }
 
     // Redirect USER/CLIENT accessing root to portal
-    if ((role === 'USER' || role === 'CLIENT') && pathname === '/') {
+    if ((role === 'USER' || role === 'CLIENT') && normalizedPath === '/') {
       return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
     }
 
     // Redirect ADMIN accessing root to dashboard
-    if (role === 'ADMIN' && pathname === '/') {
+    if (role === 'ADMIN' && normalizedPath === '/') {
       return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
     }
 
@@ -152,7 +176,7 @@ export async function middleware(request: NextRequest) {
     console.error('Middleware: Invalid session token');
 
     // Clear the invalid cookie
-    const response = pathname.startsWith('/api/')
+    const response = normalizedPath.startsWith('/api/')
       ? NextResponse.json(
         { error: 'Unauthorized', message: 'Session expired. Please log in again.' },
         { status: 401 }

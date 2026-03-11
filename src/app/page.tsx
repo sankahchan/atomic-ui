@@ -10,7 +10,9 @@ import { redirect } from 'next/navigation';
  * The redirect happens server-side for optimal performance and SEO.
  */
 export default function Home() {
+  const basePath = process.env.PANEL_PATH || '';
+
   // Redirect to login page
   // The login page will redirect to dashboard if already authenticated
-  redirect('/login');
+  redirect(`${basePath}/login`);
 }

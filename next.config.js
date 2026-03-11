@@ -4,6 +4,15 @@
 // Example: PANEL_PATH=/secret123 makes panel accessible at http://ip:port/secret123/
 const panelPath = process.env.PANEL_PATH || '';
 
+function withPanelPath(path) {
+  if (!panelPath) {
+    return path;
+  }
+
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${panelPath}${normalized}`;
+}
+
 const nextConfig = {
   // Enable standalone output for Docker deployment
   // This creates a minimal .next/standalone folder with all dependencies
@@ -40,9 +49,53 @@ const nextConfig = {
   poweredByHeader: false,
   // Enable React strict mode for better development experience
   reactStrictMode: true,
+
+  async redirects() {
+    if (!panelPath) {
+      return [];
+    }
+
+    return [
+      {
+        source: '/',
+        destination: withPanelPath('/login'),
+        permanent: false,
+        basePath: false,
+      },
+      {
+        source: '/login',
+        destination: withPanelPath('/login'),
+        permanent: false,
+        basePath: false,
+      },
+      {
+        source: '/verify-2fa',
+        destination: withPanelPath('/verify-2fa'),
+        permanent: false,
+        basePath: false,
+      },
+      {
+        source: '/dashboard/:path*',
+        destination: withPanelPath('/dashboard/:path*'),
+        permanent: false,
+        basePath: false,
+      },
+      {
+        source: '/portal/:path*',
+        destination: withPanelPath('/portal/:path*'),
+        permanent: false,
+        basePath: false,
+      },
+      {
+        source: '/sub/:path*',
+        destination: withPanelPath('/sub/:path*'),
+        permanent: false,
+        basePath: false,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
-
 
 
