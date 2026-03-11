@@ -1267,11 +1267,11 @@ export default function DynamicKeyDetailPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
         {/* Main content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="ops-detail-stack">
           {/* Type & Subscription Info */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TypeIcon className={cn('w-5 h-5', typeConfig.color)} />
@@ -1288,7 +1288,7 @@ export default function DynamicKeyDetailPage() {
                       Outline Client URL (ssconf://)
                     </Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-xs break-all">
+                      <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
                         {getSsconfUrl()}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyUrl}>
@@ -1304,7 +1304,7 @@ export default function DynamicKeyDetailPage() {
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">API Endpoint</Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-xs break-all">
+                      <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
                         {typeof window !== 'undefined' ? `${window.location.origin}/api/sub/${dak.dynamicUrl}` : ''}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyToken}>
@@ -1318,7 +1318,7 @@ export default function DynamicKeyDetailPage() {
           </Card>
 
           {/* Traffic Usage */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
@@ -1327,15 +1327,15 @@ export default function DynamicKeyDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-end justify-between">
-                  <div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <div className="ops-inline-stat">
                     <p className="text-3xl font-bold">{formatBytes(dak.usedBytes)}</p>
                     <p className="text-sm text-muted-foreground">
                       of {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : 'unlimited'}
                     </p>
                   </div>
                   {dak.dataLimitBytes && (
-                    <p className="text-2xl font-semibold text-muted-foreground">
+                    <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
                       {usagePercent.toFixed(1)}%
                     </p>
                   )}
@@ -1354,14 +1354,14 @@ export default function DynamicKeyDetailPage() {
               </div>
 
               {/* Real-time Graph */}
-              <div className="pt-4 border-t border-border/50">
+              <div className="border-t border-border/50 pt-4">
                 <p className="text-sm font-medium mb-2">Live Activity</p>
                 <AggregatedTrafficGraph accessKeys={dak.accessKeys} />
               </div>
 
               {/* Historical Chart - show for first attached key if available */}
               {dak.accessKeys.length > 0 && (
-                <div className="pt-4 border-t border-border/50">
+                <div className="border-t border-border/50 pt-4">
                   <TrafficHistoryChart accessKeyId={dak.accessKeys[0].id} />
                 </div>
               )}
@@ -1369,7 +1369,7 @@ export default function DynamicKeyDetailPage() {
           </Card>
 
           {/* Attached Keys */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -1391,10 +1391,10 @@ export default function DynamicKeyDetailPage() {
                   {dak.accessKeys.map((key) => (
                     <div
                       key={key.id}
-                      className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-3 rounded-[1.2rem] border border-border/60 bg-background/45 p-3 sm:flex-row sm:items-center sm:justify-between dark:bg-white/[0.02]"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-background rounded-lg">
+                          <div className="rounded-[1rem] border border-border/60 bg-background/55 p-2 dark:bg-white/[0.03]">
                           <Key className="w-4 h-4 text-muted-foreground" />
                         </div>
                         <div>
@@ -1430,18 +1430,18 @@ export default function DynamicKeyDetailPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>{t('dynamic_keys.detail.no_keys')}</p>
-                </div>
+            <div className="ops-chart-empty py-8 text-muted-foreground">
+              <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>{t('dynamic_keys.detail.no_keys')}</p>
+            </div>
               )}
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar - QR Code & Details */}
-        <div className="space-y-6">
-          <Card>
+        <div className="ops-detail-stack">
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-primary" />
@@ -1462,7 +1462,7 @@ export default function DynamicKeyDetailPage() {
                   unoptimized
                 />
               ) : (
-                <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                <div className="ops-chart-empty h-[200px] w-[200px]">
                   <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                 </div>
               )}
@@ -1477,7 +1477,7 @@ export default function DynamicKeyDetailPage() {
           </Card>
 
           {/* Quick Stats */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>{t('dynamic_keys.detail.details')}</CardTitle>
             </CardHeader>
@@ -1695,7 +1695,7 @@ function AggregatedTrafficGraph({
 
   if (accessKeys.length === 0) {
     return (
-      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+      <div className="ops-chart-empty h-[180px] text-muted-foreground">
         <p className="text-sm">No attached keys to monitor</p>
       </div>
     );
@@ -1703,7 +1703,7 @@ function AggregatedTrafficGraph({
 
   if (data.length < 2) {
     return (
-      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+      <div className="ops-chart-empty h-[180px] text-muted-foreground">
         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
         Initializing graph...
       </div>
@@ -1711,16 +1711,17 @@ function AggregatedTrafficGraph({
   }
 
   return (
-    <div className="h-[200px] w-full mt-4">
+    <div className="ops-chart-shell mt-4">
+      <div className="h-[180px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorBytesDAK" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+              <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.32} />
               <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <CartesianGrid strokeDasharray="2 10" vertical={false} stroke="rgba(125, 211, 252, 0.16)" />
           <XAxis dataKey="time" hide domain={['dataMin', 'dataMax']} />
           <YAxis hide domain={[0, 'auto']} />
           <Tooltip
@@ -1743,7 +1744,8 @@ function AggregatedTrafficGraph({
           />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+      </div>
+      <div className="mt-2 flex justify-between px-1 text-xs text-muted-foreground">
         <span>2 mins ago</span>
         <span>Aggregated Bandwidth: {formatBytes(data[data.length - 1]?.bytes || 0)}/s</span>
         <span>Live</span>
@@ -1774,7 +1776,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="ops-detail-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-primary" />
@@ -1782,14 +1784,14 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-24 bg-muted rounded animate-pulse" />
+          <div className="h-24 rounded-[1.2rem] border border-border/60 bg-background/45 animate-pulse dark:bg-white/[0.03]" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="ops-detail-card">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Smartphone className="w-5 h-5 text-primary" />
@@ -1802,7 +1804,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
       <CardContent className="space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
+          <div className="ops-inline-stat text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               {(data?.activeCount || 0) > 0 ? (
                 <Wifi className="w-4 h-4 text-green-500" />
@@ -1813,7 +1815,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
             </div>
             <p className="text-xs text-muted-foreground">Active Devices</p>
           </div>
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
+          <div className="ops-inline-stat text-center">
             <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
             <p className="text-xs text-muted-foreground">Peak Devices</p>
           </div>
@@ -1829,7 +1831,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
                   key={session.id}
                   className={cn(
                     'flex items-center justify-between p-2 rounded-lg text-sm',
-                    session.isActive ? 'bg-green-500/10' : 'bg-muted/50'
+                    session.isActive ? 'bg-green-500/10' : 'bg-background/45 dark:bg-white/[0.03]'
                   )}
                 >
                   <div className="flex items-center gap-2">

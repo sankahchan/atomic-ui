@@ -7,6 +7,7 @@
  */
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { createOutlineClient } from '@/lib/outline-api';
 
 interface TrafficSnapshot {
@@ -78,13 +79,13 @@ export async function snapshotTraffic(): Promise<TrafficSnapshot> {
                     result.success++;
                 }
             } catch (error) {
-                console.error(`Failed to snapshot server ${server.name}:`, error);
+                logger.warn(`Failed to snapshot traffic for server ${server.name}`, error);
                 result.failed++;
                 result.errors.push(`${server.name}: ${(error as Error).message}`);
             }
         }
     } catch (error) {
-        console.error('Snapshot failed:', error);
+        logger.error('Traffic snapshot failed', error);
         result.errors.push(`Global error: ${(error as Error).message}`);
     }
 

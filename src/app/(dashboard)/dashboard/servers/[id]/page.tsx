@@ -613,9 +613,9 @@ export default function ServerDetailPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
         {/* Server Info */}
-        <Card className="lg:col-span-2">
+        <Card className="ops-detail-card lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
@@ -623,20 +623,20 @@ export default function ServerDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="ops-inline-stat">
                 <p className="text-sm text-muted-foreground">{t('server_details.info.id')}</p>
                 <p className="font-mono text-sm">{server.outlineServerId || '-'}</p>
               </div>
-              <div>
+              <div className="ops-inline-stat">
                 <p className="text-sm text-muted-foreground">{t('server_details.info.version')}</p>
                 <p className="font-mono text-sm">{server.outlineVersion || '-'}</p>
               </div>
-              <div>
+              <div className="ops-inline-stat">
                 <p className="text-sm text-muted-foreground">{t('server_details.info.port')}</p>
                 <p className="font-mono text-sm">{server.portForNewAccessKeys || '-'}</p>
               </div>
-              <div>
+              <div className="ops-inline-stat">
                 <p className="text-sm text-muted-foreground">{t('server_details.info.hostname')}</p>
                 <p className="font-mono text-sm">{server.hostnameForAccessKeys || '-'}</p>
               </div>
@@ -645,7 +645,7 @@ export default function ServerDetailPage() {
             <div className="pt-4 border-t border-border">
               <p className="text-sm text-muted-foreground mb-2">{t('server_details.info.api_url')}</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-muted rounded text-xs font-mono truncate">
+                <code className="flex-1 rounded-2xl border border-border/60 bg-background/55 px-3 py-3 text-xs font-mono truncate dark:bg-white/[0.03]">
                   {server.apiUrl}
                 </code>
                 <Button
@@ -661,7 +661,7 @@ export default function ServerDetailPage() {
               </div>
             </div>
 
-            <div>
+            <div className="ops-inline-stat">
               <p className="text-sm text-muted-foreground mb-2">{t('server_details.info.last_synced')}</p>
               <p className="text-sm">
                 {server.lastSyncAt
@@ -673,8 +673,8 @@ export default function ServerDetailPage() {
         </Card>
 
         {/* Health Card */}
-        <div className="space-y-6">
-          <Card>
+        <div className="ops-detail-stack">
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
@@ -684,7 +684,7 @@ export default function ServerDetailPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-center py-4">
                 <div className={cn(
-                  'w-24 h-24 rounded-full flex items-center justify-center',
+                  'flex h-24 w-24 items-center justify-center rounded-full border',
                   `${status.bg}/20`
                 )}>
                   <StatusIcon className={cn('w-12 h-12', status.color)} />
@@ -701,7 +701,7 @@ export default function ServerDetailPage() {
               </div>
 
               {server.healthCheck && (
-                <div className="space-y-3 pt-4 border-t border-border">
+                <div className="space-y-3 border-t border-border/60 pt-4">
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-muted-foreground">{t('server_details.health.uptime')}</span>
@@ -726,7 +726,7 @@ export default function ServerDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>Assignment Mode</CardTitle>
               <CardDescription>
@@ -758,7 +758,7 @@ export default function ServerDetailPage() {
                 />
               </div>
 
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <div className="rounded-[1.2rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
                 <p>`Active` accepts new keys and migrations.</p>
                 <p>`Draining` keeps existing keys but blocks new assignments.</p>
                 <p>`Maintenance` blocks new assignments while the server is being worked on.</p>
@@ -780,7 +780,7 @@ export default function ServerDetailPage() {
       </div>
 
       {/* Access Keys Section */}
-      <Card>
+      <Card className="ops-detail-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -806,7 +806,7 @@ export default function ServerDetailPage() {
               {server.accessKeys.slice(0, 5).map((key) => (
                 <div
                   key={key.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between rounded-[1.2rem] border border-border/60 bg-background/45 p-3 transition-colors hover:bg-muted/35 dark:bg-white/[0.02] dark:hover:bg-cyan-400/[0.04]"
                 >
                   <div>
                     <Link
@@ -836,7 +836,7 @@ export default function ServerDetailPage() {
               )}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="ops-chart-empty py-8 text-muted-foreground">
               <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>{t('server_details.keys.empty')}</p>
               <Button className="mt-4" asChild>
@@ -851,7 +851,7 @@ export default function ServerDetailPage() {
       </Card>
 
       {/* Danger Zone */}
-      <Card className="border-destructive/50">
+      <Card className="ops-detail-card border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Shield className="w-5 h-5" />
@@ -862,7 +862,7 @@ export default function ServerDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+          <div className="flex items-center justify-between rounded-[1.2rem] border border-destructive/30 bg-destructive/5 p-4">
             <div>
               <p className="font-medium">{t('server_details.danger.remove_title')}</p>
               <p className="text-sm text-muted-foreground">

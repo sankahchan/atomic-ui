@@ -1135,7 +1135,12 @@ function DAKRow({
     : 0;
 
   return (
-    <tr className={cn('hover:bg-muted/50 transition-colors', isSelected && 'bg-primary/5')}>
+    <tr
+      className={cn(
+        'border-b border-border/50 transition-colors hover:bg-muted/35 dark:hover:bg-cyan-400/[0.04]',
+        isSelected && 'bg-primary/8 dark:bg-cyan-400/[0.07]',
+      )}
+    >
       {/* Selection checkbox */}
       <td className="px-2 py-3 w-10">
         <button
@@ -1170,7 +1175,10 @@ function DAKRow({
             {dak.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {dak.tags.split(',').filter(Boolean).map((tag) => (
-                  <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground">
+                  <span
+                    key={tag}
+                    className="rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] text-muted-foreground dark:bg-white/[0.03]"
+                  >
                     {tag.trim()}
                   </span>
                 ))}
@@ -1878,13 +1886,13 @@ export default function DynamicKeysPage() {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="pl-9"
+              className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 pl-9 shadow-none dark:bg-[rgba(4,10,20,0.72)]"
             />
           </div>
           <Button
             variant={hasAnyFilters ? 'default' : 'outline'}
             size="sm"
-            className="shrink-0"
+            className="h-11 shrink-0 rounded-[1.15rem] px-4"
             onClick={() => setMobileFiltersOpen(true)}
           >
             <Filter className="w-4 h-4 mr-2" />
@@ -1892,12 +1900,12 @@ export default function DynamicKeysPage() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center justify-center rounded-lg border bg-muted/50 p-0.5">
+        <div className="ops-command-bar flex items-center gap-2 p-2.5">
+          <div className="flex flex-1 items-center justify-center rounded-[1rem] border border-border/70 bg-background/55 p-0.5 dark:bg-[rgba(4,10,20,0.72)]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-9 flex-1 px-2"
+              className="h-10 flex-1 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('list')}
             >
               <LayoutList className="w-4 h-4" />
@@ -1905,7 +1913,7 @@ export default function DynamicKeysPage() {
             <Button
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-9 flex-1 px-2"
+              className="h-10 flex-1 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -1913,7 +1921,7 @@ export default function DynamicKeysPage() {
             <Button
               variant={viewMode === 'group' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-9 flex-1 px-2"
+              className="h-10 flex-1 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('group')}
             >
               <ListTree className="w-4 h-4" />
@@ -1921,7 +1929,7 @@ export default function DynamicKeysPage() {
           </div>
           <Button
             variant="outline"
-            className="flex-1"
+            className="h-10 flex-1 rounded-[1rem]"
             onClick={() => syncAllMutation.mutate()}
             disabled={syncAllMutation.isPending}
           >
@@ -1931,7 +1939,7 @@ export default function DynamicKeysPage() {
         </div>
 
         {(autoRefresh.isActive || hasAnyFilters) && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className="ops-filter-bar">
             {autoRefresh.isActive ? (
               <span className="inline-flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
@@ -1949,12 +1957,12 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="hidden md:flex flex-wrap items-center gap-2">
+      <div className="ops-filter-bar hidden md:flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground mr-1">{t('dynamic_keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-7 text-xs', filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
+          className={cn('h-8 rounded-full text-xs', filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
           onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
         >
           <Wifi className="w-3 h-3 mr-1" />
@@ -1963,7 +1971,7 @@ export default function DynamicKeysPage() {
         <Button
           variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-7 text-xs', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+          className={cn('h-8 rounded-full text-xs', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
           onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
         >
           <Clock className="w-3 h-3 mr-1" />
@@ -1972,7 +1980,7 @@ export default function DynamicKeysPage() {
         <Button
           variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-7 text-xs', filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
+          className={cn('h-8 rounded-full text-xs', filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
           onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
         >
           <AlertTriangle className="w-3 h-3 mr-1" />
@@ -1981,7 +1989,7 @@ export default function DynamicKeysPage() {
         <Button
           variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-7 text-xs', filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
+          className={cn('h-8 rounded-full text-xs', filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
           onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
         >
           <EyeOff className="w-3 h-3 mr-1" />
@@ -1989,24 +1997,24 @@ export default function DynamicKeysPage() {
         </Button>
         
         {/* Tag filter */}
-        <div className="flex items-center gap-1 ml-2">
+        <div className="ml-2 flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 dark:bg-white/[0.02]">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('dynamic_keys.quick_filters.tag_placeholder')}
             value={filters.tagFilter || ''}
             onChange={(e) => setTagFilter(e.target.value || undefined)}
-            className="h-7 w-28 text-xs"
+            className="h-6 w-28 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
           />
         </div>
         
         {/* Owner filter */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 dark:bg-white/[0.02]">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('dynamic_keys.quick_filters.owner_placeholder')}
             value={filters.ownerFilter || ''}
             onChange={(e) => setOwnerFilter(e.target.value || undefined)}
-            className="h-7 w-28 text-xs"
+            className="h-6 w-28 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
           />
         </div>
 
@@ -2014,7 +2022,7 @@ export default function DynamicKeysPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs"
+            className="h-8 rounded-full text-xs"
             onClick={clearPersistedFilters}
           >
             <X className="w-3 h-3 mr-1" />
@@ -2024,7 +2032,7 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Filters */}
-      <div className="hidden md:flex flex-wrap items-center gap-4">
+      <div className="ops-command-bar hidden md:flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -2034,7 +2042,7 @@ export default function DynamicKeysPage() {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            className="pl-9"
+            className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 pl-9 shadow-none dark:bg-[rgba(4,10,20,0.72)]"
           />
         </div>
 
@@ -2045,7 +2053,7 @@ export default function DynamicKeysPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="h-11 w-[140px] rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
             <SelectValue placeholder={t('dynamic_keys.filter_status')} />
           </SelectTrigger>
           <SelectContent>
@@ -2065,7 +2073,7 @@ export default function DynamicKeysPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="h-11 w-[150px] rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
             <SelectValue placeholder={t('dynamic_keys.filter_type')} />
           </SelectTrigger>
           <SelectContent>
@@ -2079,6 +2087,7 @@ export default function DynamicKeysPage() {
           <Button
             variant="ghost"
             size="sm"
+            className="rounded-full"
             onClick={clearFilters}
           >
             <X className="w-4 h-4 mr-1" />
@@ -2089,7 +2098,7 @@ export default function DynamicKeysPage() {
         {/* Export dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={!!exportingFormat}>
+            <Button variant="outline" size="sm" className="h-11 rounded-[1.15rem] px-4" disabled={!!exportingFormat}>
               {exportingFormat ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
@@ -2114,13 +2123,13 @@ export default function DynamicKeysPage() {
 
         <div className="ml-auto flex items-center gap-2">
           {/* Auto-sync selector */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-[1.05rem] border border-border/60 bg-background/60 px-2 py-1 dark:bg-white/[0.02]">
             <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
             <Select
               value={autoRefresh.interval.toString()}
               onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
             >
-              <SelectTrigger className="w-[80px] h-9">
+              <SelectTrigger className="h-9 w-[80px] border-0 bg-transparent shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -2140,6 +2149,7 @@ export default function DynamicKeysPage() {
 
           <Button
             variant="outline"
+            className="h-11 rounded-[1.15rem] px-4"
             onClick={() => syncAllMutation.mutate()}
             disabled={syncAllMutation.isPending}
           >
@@ -2148,11 +2158,11 @@ export default function DynamicKeysPage() {
           </Button>
 
           {/* View mode toggle - visible on all screens */}
-          <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
+          <div className="flex items-center rounded-[1rem] border border-border/70 bg-background/55 p-0.5 dark:bg-[rgba(4,10,20,0.72)]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-8 px-2"
+              className="h-10 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('list')}
             >
               <LayoutList className="w-4 h-4" />
@@ -2160,7 +2170,7 @@ export default function DynamicKeysPage() {
             <Button
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-8 px-2"
+              className="h-10 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -2168,7 +2178,7 @@ export default function DynamicKeysPage() {
             <Button
               variant={viewMode === 'group' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-8 px-2"
+              className="h-10 rounded-[0.85rem] px-2"
               onClick={() => setViewMode('group')}
             >
               <ListTree className="w-4 h-4" />
@@ -2344,7 +2354,7 @@ export default function DynamicKeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="ops-command-bar sticky bottom-4 z-20 flex flex-col gap-3 border-primary/20 bg-primary/6 p-3 shadow-[0_18px_36px_rgba(1,6,20,0.34)] sm:flex-row sm:items-center sm:gap-4">
           <span className="text-sm font-medium">
             {selectedKeys.size} {getSelectedLabel(selectedKeys.size)}
           </span>
@@ -2445,7 +2455,7 @@ export default function DynamicKeysPage() {
             variant="ghost"
             size="sm"
             onClick={() => setSelectedKeys(new Set())}
-            className="w-full sm:ml-auto sm:w-auto"
+            className="w-full rounded-full sm:ml-auto sm:w-auto"
             disabled={isBulkBusy}
           >
             {t('dynamic_keys.clear_selection')}
@@ -2751,11 +2761,11 @@ export default function DynamicKeysPage() {
       )}
 
 
-      <Card className={cn('mb-6', viewMode === 'list' ? 'hidden md:block' : 'hidden')}>
+      <Card className={cn('ops-data-shell mb-6 overflow-hidden', viewMode === 'list' ? 'hidden md:block' : 'hidden')}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border">
+              <tr className="border-b border-border/60 bg-background/55 text-left align-middle backdrop-blur-sm dark:bg-[rgba(4,10,21,0.72)]">
                 <th className="px-2 py-3 w-10">
                   <button
                     onClick={handleSelectAll}
@@ -2769,19 +2779,19 @@ export default function DynamicKeysPage() {
                     )}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.name')}</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.type')}</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.status')}</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.usage')}</th>
-                <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.name')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.type')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.status')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.usage')}</th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   <div className="flex items-center justify-center gap-1">
                     <Smartphone className="w-3.5 h-3.5" />
                     {t('dynamic_keys.devices')}
                   </div>
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.attached')}</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.expires')}</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">{t('dynamic_keys.table.actions')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.attached')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.expires')}</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -2789,7 +2799,7 @@ export default function DynamicKeysPage() {
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
                     <td colSpan={9} className="px-4 py-3">
-                      <div className="h-12 bg-muted rounded animate-pulse" />
+                      <div className="h-14 rounded-[1.1rem] bg-muted animate-pulse" />
                     </td>
                   </tr>
                 ))
@@ -2820,22 +2830,24 @@ export default function DynamicKeysPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center">
-                    <KeyRound className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">
-                      {hasActiveFilters
-                        ? t('dynamic_keys.empty_title')
-                        : t('dynamic_keys.empty_title')}
-                    </p>
-                    {!hasActiveFilters && (
-                      <Button
-                        className="mt-4"
-                        onClick={() => setCreateDialogOpen(true)}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {t('dynamic_keys.create_btn')}
-                      </Button>
-                    )}
+                  <td colSpan={9} className="px-4 py-10">
+                    <div className="ops-chart-empty">
+                      <KeyRound className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">
+                        {hasActiveFilters
+                          ? t('dynamic_keys.empty_title')
+                          : t('dynamic_keys.empty_title')}
+                      </p>
+                      {!hasActiveFilters && (
+                        <Button
+                          className="mt-4 rounded-full"
+                          onClick={() => setCreateDialogOpen(true)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          {t('dynamic_keys.create_btn')}
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )}
@@ -2845,7 +2857,7 @@ export default function DynamicKeysPage() {
 
         {/* Pagination (kept simplified) */}
         {data && data.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+          <div className="ops-command-bar rounded-none border-x-0 border-b-0 px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('dynamic_keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('dynamic_keys.pagination.to')}{' '}
               {Math.min(page * pageSize, data.total)} {t('dynamic_keys.pagination.of')} {data.total}
@@ -2854,6 +2866,7 @@ export default function DynamicKeysPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-full"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
@@ -2865,6 +2878,7 @@ export default function DynamicKeysPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-full"
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={page === data.totalPages}
               >

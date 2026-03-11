@@ -1122,11 +1122,11 @@ export default function KeyDetailPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
         {/* Main content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="ops-detail-stack">
           {/* Server & Access Info */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Server className="w-5 h-5 text-primary" />
@@ -1160,7 +1160,7 @@ export default function KeyDetailPage() {
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Access URL</Label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                    <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
                     {key.accessUrl}
                   </div>
                   <Button
@@ -1202,17 +1202,17 @@ export default function KeyDetailPage() {
               </div>
 
               {/* Technical Details */}
-              <div className="grid grid-cols-1 gap-4 border-t pt-4 sm:grid-cols-2">
-                <div>
+              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                <div className="ops-inline-stat">
                   <p className="text-sm text-muted-foreground">Port</p>
                   <p className="font-mono">{key.port}</p>
                 </div>
-                <div>
+                <div className="ops-inline-stat">
                   <p className="text-sm text-muted-foreground">Encryption</p>
                   <p className="font-mono">{key.method}</p>
                 </div>
                 {key.prefix && (
-                  <div className="col-span-2">
+                  <div className="ops-inline-stat col-span-2">
                     <p className="text-sm text-muted-foreground">Prefix (Obfuscation)</p>
                     <p className="font-mono">{key.prefix}</p>
                   </div>
@@ -1222,7 +1222,7 @@ export default function KeyDetailPage() {
           </Card>
 
           {/* Traffic Usage */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
@@ -1231,15 +1231,15 @@ export default function KeyDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-end justify-between">
-                  <div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <div className="ops-inline-stat">
                     <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
                     <p className="text-sm text-muted-foreground">
                       of {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}
                     </p>
                   </div>
                   {key.dataLimitBytes && (
-                    <p className="text-2xl font-semibold text-muted-foreground">
+                    <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
                       {usagePercent.toFixed(1)}%
                     </p>
                   )}
@@ -1288,20 +1288,20 @@ export default function KeyDetailPage() {
               </div>
 
               {/* Real-time Graph */}
-              <div className="pt-4 border-t border-border/50">
+              <div className="border-t border-border/50 pt-4">
                 <p className="text-sm font-medium mb-2">Live Activity</p>
                 <TrafficGraph serverId={key.server.id} outlineKeyId={key.outlineKeyId} />
               </div>
 
               {/* Historical Chart */}
-              <div className="pt-4 border-t border-border/50">
+              <div className="border-t border-border/50 pt-4">
                 <TrafficHistoryChart accessKeyId={key.id} />
               </div>
             </CardContent>
           </Card>
 
           {/* Expiration Info */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary" />
@@ -1309,19 +1309,19 @@ export default function KeyDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="ops-inline-stat">
                   <p className="text-sm text-muted-foreground">Type</p>
                   <p className="font-medium">{key.expirationType.replace(/_/g, ' ')}</p>
                 </div>
-                <div>
+                <div className="ops-inline-stat">
                   <p className="text-sm text-muted-foreground">Expires</p>
                   <p className="font-medium">
                     {key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}
                   </p>
                 </div>
                 {key.firstUsedAt && (
-                  <div>
+                  <div className="ops-inline-stat">
                     <p className="text-sm text-muted-foreground">First Used</p>
                     <p className="font-medium">{formatDateTime(key.firstUsedAt)}</p>
                   </div>
@@ -1331,27 +1331,27 @@ export default function KeyDetailPage() {
           </Card>
 
           {/* Contact & Notes */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>Contact Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="ops-inline-stat flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
                     <p className="font-medium">{key.email || '-'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="ops-inline-stat flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Telegram</p>
                     <p className="font-medium">{key.telegramId || '-'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="ops-inline-stat flex items-center gap-2">
                   <FileText className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Notes</p>
@@ -1364,8 +1364,8 @@ export default function KeyDetailPage() {
         </div>
 
         {/* Sidebar - QR Code */}
-        <div className="space-y-6">
-          <Card>
+        <div className="ops-detail-stack">
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-primary" />
@@ -1377,7 +1377,7 @@ export default function KeyDetailPage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               {qrLoading ? (
-                <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
+                <div className="h-[200px] w-[200px] rounded-[1.25rem] border border-border/60 bg-background/45 animate-pulse dark:bg-white/[0.03]" />
               ) : qrData?.qrCode ? (
                 <QRCodeWithLogo
                   dataUrl={qrData.qrCode}
@@ -1385,7 +1385,7 @@ export default function KeyDetailPage() {
                   className="bg-white p-2 rounded-lg"
                 />
               ) : (
-                <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                <div className="ops-chart-empty h-[200px] w-[200px]">
                   <p className="text-sm text-muted-foreground">Failed to generate</p>
                 </div>
               )}
@@ -1404,7 +1404,7 @@ export default function KeyDetailPage() {
           </Card>
 
           {/* Quick Stats */}
-          <Card>
+          <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>Details</CardTitle>
             </CardHeader>
@@ -1513,7 +1513,7 @@ function TrafficGraph({
 
   if (data.length < 2) {
     return (
-      <div className="h-[200px] flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
+      <div className="ops-chart-empty h-[180px] text-muted-foreground">
         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
         Initializing graph...
       </div>
@@ -1521,16 +1521,17 @@ function TrafficGraph({
   }
 
   return (
-    <div className="h-[200px] w-full mt-4">
+    <div className="ops-chart-shell mt-4">
+      <div className="h-[180px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorBytes" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+              <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.32} />
               <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <CartesianGrid strokeDasharray="2 10" vertical={false} stroke="rgba(125, 211, 252, 0.16)" />
           <XAxis
             dataKey="time"
             hide
@@ -1552,7 +1553,7 @@ function TrafficGraph({
           <Area
             type="monotone"
             dataKey="bytes"
-            stroke="#10b981"
+            stroke="#22d3ee"
             strokeWidth={2}
             fillOpacity={1}
             fill="url(#colorBytes)"
@@ -1560,7 +1561,8 @@ function TrafficGraph({
           />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+      </div>
+      <div className="mt-2 flex justify-between px-1 text-xs text-muted-foreground">
         <span>2 mins ago</span>
         <span>Reserved Bandwidth: {formatBytes(data[data.length - 1]?.bytes || 0)}/s</span>
         <span>Live</span>
@@ -1590,7 +1592,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="ops-detail-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-primary" />
@@ -1598,14 +1600,14 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-24 bg-muted rounded animate-pulse" />
+          <div className="h-24 rounded-[1.2rem] border border-border/60 bg-background/45 animate-pulse dark:bg-white/[0.03]" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="ops-detail-card">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Smartphone className="w-5 h-5 text-primary" />
@@ -1618,7 +1620,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
       <CardContent className="space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
+          <div className="ops-inline-stat text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               {(data?.activeCount || 0) > 0 ? (
                 <Wifi className="w-4 h-4 text-green-500" />
@@ -1629,7 +1631,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
             </div>
             <p className="text-xs text-muted-foreground">Active Devices</p>
           </div>
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
+          <div className="ops-inline-stat text-center">
             <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
             <p className="text-xs text-muted-foreground">Peak Devices</p>
           </div>
@@ -1645,7 +1647,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
                   key={session.id}
                   className={cn(
                     "flex items-center justify-between p-2 rounded-lg text-sm",
-                    session.isActive ? "bg-green-500/10" : "bg-muted/50"
+                    session.isActive ? "bg-green-500/10" : "bg-background/45 dark:bg-white/[0.03]"
                   )}
                 >
                   <div className="flex items-center gap-2">

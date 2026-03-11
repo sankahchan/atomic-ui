@@ -1136,7 +1136,7 @@ function QueueStatusCard() {
   });
 
   return (
-    <Card className="border-border/60">
+    <Card className="ops-detail-card">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1169,23 +1169,23 @@ function QueueStatusCard() {
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.due_now')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.dueNowCount ?? 0}</p>
               </div>
-              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.pending')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.pendingCount ?? 0}</p>
               </div>
-              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.retrying')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.retryingCount ?? 0}</p>
               </div>
-              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.processing')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.processingCount ?? 0}</p>
               </div>
-              <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('notifications.queue.failed')}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.failedCount ?? 0}</p>
               </div>
@@ -1264,7 +1264,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
   const hasActiveFilters = Boolean(deferredSearch || channelId !== 'ALL' || status !== 'ALL');
 
   return (
-    <Card className="border-border/60">
+    <Card className="ops-detail-card">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1286,19 +1286,20 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('notifications.delivery.search_placeholder')}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
               />
             </div>
             <Button
               variant={hasActiveFilters ? 'default' : 'outline'}
               size="sm"
-              className="rounded-2xl"
+              className="h-11 rounded-[1.15rem] px-4"
               onClick={() => setMobileFilterOpen(true)}
             >
               <Filter className="w-4 h-4 mr-2" />
               {t('notifications.delivery.filters')}
             </Button>
           </div>
-          <div className="flex items-center justify-between rounded-[1.15rem] border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className="ops-filter-bar">
             <span>
               {data?.total ?? 0} {t('notifications.delivery.results')}
             </span>
@@ -1323,7 +1324,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </div>
         </div>
 
-        <div className="hidden gap-3 md:grid md:grid-cols-3">
+        <div className="ops-command-bar hidden gap-3 md:grid md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="delivery-search">{t('notifications.delivery.search')}</Label>
             <Input
@@ -1331,12 +1332,13 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('notifications.delivery.search_placeholder')}
+              className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
             />
           </div>
           <div className="space-y-2">
             <Label>{t('notifications.delivery.channel')}</Label>
             <Select value={channelId} onValueChange={setChannelId}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1352,7 +1354,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           <div className="space-y-2">
             <Label>{t('notifications.delivery.status')}</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as DeliveryStatusFilter)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1366,7 +1368,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
         </div>
 
         <Dialog open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
-            <DialogContent className="max-w-lg rounded-[1.75rem]">
+          <DialogContent className="max-w-lg rounded-[1.75rem]">
             <DialogHeader>
               <DialogTitle>{t('notifications.delivery.filters')}</DialogTitle>
               <DialogDescription>{t('notifications.delivery.filters_desc')}</DialogDescription>
@@ -1420,7 +1422,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </DialogContent>
         </Dialog>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="ops-filter-bar hidden md:flex">
           <span>
             {data?.total ?? 0} {t('notifications.delivery.results')}
           </span>
@@ -1435,12 +1437,12 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : logs.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="ops-chart-empty">
               {t('notifications.delivery.empty')}
             </div>
           ) : (
             logs.map((log) => (
-              <div key={log.id} className="rounded-[1.35rem] border border-border/60 p-4 space-y-4 bg-background/55 dark:bg-white/[0.02]">
+              <div key={log.id} className="ops-mobile-card space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium break-words">{getEventLabel(log.event, t)}</p>
@@ -1457,7 +1459,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-[1rem] bg-muted/40 p-3">
+                  <div className="rounded-[1rem] border border-border/50 bg-background/60 p-3 dark:bg-white/[0.03]">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.channel')}
                     </p>
@@ -1465,7 +1467,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                       {getChannelLabel(log, t)}
                     </p>
                   </div>
-                  <div className="rounded-[1rem] bg-muted/40 p-3">
+                  <div className="rounded-[1rem] border border-border/50 bg-background/60 p-3 dark:bg-white/[0.03]">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.key')}
                     </p>
@@ -1475,7 +1477,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                   </div>
                 </div>
 
-                <div className="rounded-[1rem] bg-muted/30 p-3">
+                <div className="rounded-[1rem] border border-border/50 bg-background/55 p-3 dark:bg-white/[0.02]">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {t('notifications.delivery.message')}
                   </p>
@@ -1621,7 +1623,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </Table>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ops-command-bar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
             {logs.length > 0 ? `${logs.length} / ${data?.total ?? logs.length}` : `0 / ${data?.total ?? 0}`} {t('notifications.delivery.visible')}
           </div>
@@ -1629,6 +1631,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             <Button
               variant="outline"
               size="sm"
+              className="rounded-full"
               onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
               disabled={page <= 1 || isLoading}
             >
@@ -1638,6 +1641,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
             <Button
               variant="outline"
               size="sm"
+              className="rounded-full"
               onClick={() => setPage((currentPage) => currentPage + 1)}
               disabled={isLoading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
             >

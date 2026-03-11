@@ -7,7 +7,7 @@
  * Supports daily, weekly, and monthly views.
  */
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -49,9 +49,9 @@ function CustomTooltip({
 }) {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border border-[var(--glass-border)] rounded-lg shadow-lg p-3">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-lg font-bold text-primary">
+      <div className="min-w-[132px] rounded-2xl border border-cyan-400/18 bg-[rgba(5,12,26,0.94)] p-3 text-white shadow-[0_18px_36px_rgba(1,6,20,0.55)] backdrop-blur-xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/55">{label}</p>
+        <p className="mt-2 text-lg font-semibold text-cyan-200">
           {formatBytes(BigInt(payload[0].value))}
         </p>
       </div>
@@ -79,6 +79,9 @@ export function TrafficChart({
   showGrid = true,
   color = 'hsl(var(--primary))',
 }: TrafficChartProps) {
+  const chartId = useId().replace(/:/g, '');
+  const gradientId = `traffic-gradient-${chartId}`;
+
   // Process data for the chart
   const chartData = useMemo(() => {
     return data.map((point) => ({
@@ -93,21 +96,21 @@ export function TrafficChart({
         <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           {showGrid && (
             <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="hsl(var(--border))"
+              strokeDasharray="2 10"
+              stroke="rgba(125, 211, 252, 0.16)"
               vertical={false}
             />
           )}
           <XAxis
             dataKey="displayLabel"
-            stroke="hsl(var(--muted-foreground))"
-            fontSize={12}
+            stroke="rgba(186, 230, 253, 0.62)"
+            fontSize={11}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            stroke="hsl(var(--muted-foreground))"
-            fontSize={12}
+            stroke="rgba(186, 230, 253, 0.5)"
+            fontSize={11}
             tickLine={false}
             axisLine={false}
             tickFormatter={formatYAxis}
@@ -129,28 +132,29 @@ export function TrafficChart({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-            <stop offset="95%" stopColor={color} stopOpacity={0} />
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+            <stop offset="55%" stopColor={color} stopOpacity={0.14} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
         {showGrid && (
           <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
+            strokeDasharray="2 10"
+            stroke="rgba(125, 211, 252, 0.16)"
             vertical={false}
           />
         )}
         <XAxis
           dataKey="displayLabel"
-          stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
+          stroke="rgba(186, 230, 253, 0.62)"
+          fontSize={11}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
+          stroke="rgba(186, 230, 253, 0.5)"
+          fontSize={11}
           tickLine={false}
           axisLine={false}
           tickFormatter={formatYAxis}
@@ -161,9 +165,9 @@ export function TrafficChart({
           type="monotone"
           dataKey="bytes"
           stroke={color}
-          strokeWidth={2}
+          strokeWidth={2.25}
           fillOpacity={1}
-          fill="url(#colorTraffic)"
+          fill={`url(#${gradientId})`}
         />
       </AreaChart>
     </ResponsiveContainer>

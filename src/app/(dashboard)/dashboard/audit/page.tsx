@@ -418,21 +418,21 @@ export default function AuditPage() {
 
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
                 <p className="mt-3 text-2xl font-semibold">{totalEntries}</p>
               </div>
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.current_page')}</p>
                 <p className="mt-3 text-2xl font-semibold">{page}</p>
               </div>
-              <div className="col-span-2 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 md:col-span-1 dark:bg-white/[0.02]">
+              <div className="ops-inline-stat col-span-2 md:col-span-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
                 <p className="mt-3 text-2xl font-semibold">{currentItems.length}</p>
               </div>
             </div>
 
-            <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
+            <Card className="hidden xl:block ops-detail-card">
               <CardContent className="flex gap-3 p-4">
                 <Shield className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="space-y-1">
@@ -445,7 +445,7 @@ export default function AuditPage() {
         </div>
       </section>
 
-      <Card className="border-border/60">
+      <Card className="ops-detail-card">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="w-4 h-4 text-primary" />
@@ -456,7 +456,7 @@ export default function AuditPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="ops-command-bar grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="actionFilter">{t('audit.filters.action')}</Label>
               <Input
@@ -464,13 +464,14 @@ export default function AuditPage() {
                 placeholder={t('audit.filters.action_placeholder')}
                 value={actionFilter}
                 onChange={(e) => handleActionChange(e.target.value)}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
               />
             </div>
 
             <div className="space-y-2">
               <Label>{t('audit.filters.entity')}</Label>
               <Select value={entityFilter} onValueChange={handleEntityChange}>
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -486,7 +487,7 @@ export default function AuditPage() {
             <div className="space-y-2">
               <Label>{t('audit.filters.actor')}</Label>
               <Select value={userFilter} onValueChange={handleUserChange}>
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -507,6 +508,7 @@ export default function AuditPage() {
                 type="date"
                 value={dateFromFilter}
                 onChange={(e) => handleDateFromChange(e.target.value)}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
               />
             </div>
 
@@ -517,13 +519,14 @@ export default function AuditPage() {
                 type="date"
                 value={dateToFilter}
                 onChange={(e) => handleDateToChange(e.target.value)}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
               />
             </div>
 
             <div className="space-y-2">
               <Label>{t('audit.filters.rows_per_page')}</Label>
               <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-                <SelectTrigger className="rounded-2xl">
+                <SelectTrigger className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -537,7 +540,7 @@ export default function AuditPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="ops-filter-bar flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Shield className="w-4 h-4" />
@@ -548,10 +551,10 @@ export default function AuditPage() {
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={clearFilters}>
+              <Button variant="outline" size="sm" className="rounded-full" onClick={clearFilters}>
                 {t('audit.filters.clear')}
               </Button>
-              <Button size="sm" className="rounded-2xl" onClick={handleExportCsv} disabled={hasInvalidDateRange || isExportingCsv}>
+              <Button size="sm" className="rounded-full" onClick={handleExportCsv} disabled={hasInvalidDateRange || isExportingCsv}>
                 {isExportingCsv ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -564,7 +567,7 @@ export default function AuditPage() {
         </CardContent>
       </Card>
 
-      <div className="hidden overflow-hidden rounded-[1.75rem] border border-border/60 bg-card md:block">
+      <div className="ops-data-shell hidden overflow-hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -580,14 +583,14 @@ export default function AuditPage() {
           <TableBody>
             {hasInvalidDateRange ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  {t('audit.empty.invalid_range')}
+                <TableCell colSpan={7} className="px-4 py-10">
+                  <div className="ops-chart-empty">{t('audit.empty.invalid_range')}</div>
                 </TableCell>
               </TableRow>
             ) : isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
-                  <div className="inline-flex items-center gap-2 text-muted-foreground">
+                <TableCell colSpan={7} className="px-4 py-10">
+                  <div className="ops-chart-empty inline-flex min-h-[180px] items-center justify-center gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {t('audit.empty.loading')}
                   </div>
@@ -595,8 +598,8 @@ export default function AuditPage() {
               </TableRow>
             ) : currentItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  {t('audit.empty.no_match')}
+                <TableCell colSpan={7} className="px-4 py-10">
+                  <div className="ops-chart-empty">{t('audit.empty.no_match')}</div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -678,7 +681,7 @@ export default function AuditPage() {
         )}
       />
 
-      <div className="flex items-center justify-between gap-4 rounded-[1.5rem] border border-border/60 bg-background/55 px-4 py-3 dark:bg-white/[0.02]">
+      <div className="ops-command-bar flex items-center justify-between gap-4 px-4 py-3">
         <p className="text-sm text-muted-foreground">
           {formatTemplate(t('audit.pagination.page_of'), { page, total: totalPages })}
         </p>
