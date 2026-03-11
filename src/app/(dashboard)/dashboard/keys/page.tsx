@@ -1592,7 +1592,7 @@ export default function KeysPage() {
           </div>
         ) : null}
 
-        <div className="rounded-lg border bg-muted/25 p-3 space-y-2">
+        <div className="ops-row-card space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">{t('keys.table.usage')}</span>
             <span className="font-medium">
@@ -1607,14 +1607,14 @@ export default function KeysPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border bg-background p-3">
+          <div className="ops-row-card">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.devices')}</p>
             <p className="mt-1 flex items-center gap-1 text-sm font-medium">
               <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
               {key.estimatedDevices || 0}
             </p>
           </div>
-          <div className="rounded-lg border bg-background p-3">
+          <div className="ops-row-card">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.expires')}</p>
             <p className={cn('mt-1 text-sm font-medium', key.isExpiringSoon && 'text-red-500')}>
               {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
@@ -2313,7 +2313,7 @@ export default function KeysPage() {
           </Button>
         </div>
 
-        <div className="ops-command-bar flex items-center gap-2 p-2.5">
+        <div className="ops-table-toolbar md:hidden">
           <div className="flex flex-1 items-center justify-center rounded-[1rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -2354,7 +2354,7 @@ export default function KeysPage() {
         </div>
 
         {(autoRefresh.isActive || hasAnyFilters) && (
-          <div className="ops-filter-bar text-xs text-muted-foreground">
+          <div className="ops-table-meta text-xs text-muted-foreground">
             {autoRefresh.isActive ? (
               <span className="inline-flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
@@ -2372,7 +2372,7 @@ export default function KeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="ops-filter-bar hidden md:flex">
+      <div className="ops-table-meta hidden md:flex">
         <span className="mr-1 text-sm text-muted-foreground">{t('keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -2447,7 +2447,7 @@ export default function KeysPage() {
       </div>
 
       {/* Filters */}
-      <div className="ops-command-bar hidden md:flex">
+      <div className="ops-table-toolbar hidden md:flex">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -2777,7 +2777,7 @@ export default function KeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="ops-command-bar sticky bottom-4 z-20 border-primary/20 bg-primary/6 shadow-[0_18px_36px_rgba(1,6,20,0.34)]">
+        <div className="ops-mobile-action-bar sticky bottom-4 z-20 border-primary/20 bg-primary/6 shadow-[0_18px_36px_rgba(1,6,20,0.34)]">
           <span className="text-sm font-medium">
             {selectedKeys.size} {t('keys.selected_count')}
           </span>
@@ -3173,7 +3173,7 @@ export default function KeysPage() {
 
         {/* Pagination */}
         {data && data.totalPages > 1 && (
-          <div className="ops-command-bar rounded-none border-x-0 border-b-0 px-4 py-3">
+          <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('keys.pagination.to')}{' '}
               {Math.min(page * pageSize, data.total)} {t('keys.pagination.of')} {data.total}

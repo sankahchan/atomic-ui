@@ -41,7 +41,6 @@ export function initScheduler() {
 
     // 1. Hourly Traffic Snapshot (At minute 0 of every hour)
     cron.schedule('0 * * * *', async () => {
-        logger.verbose('scheduler', 'Running scheduled traffic snapshot');
         const result = await snapshotTraffic();
         if (result.success > 0 || result.failed > 0) {
             logger.info(`Traffic snapshot complete: ${result.success} success, ${result.failed} failed`);
@@ -53,7 +52,6 @@ export function initScheduler() {
 
     // 2. Expiration Check (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
-        logger.verbose('scheduler', 'Running expiration check');
         try {
             const result = await checkExpirations();
             if (result.expiredKeys > 0 || result.depletedKeys > 0 || result.archivedKeys > 0) {
@@ -66,7 +64,6 @@ export function initScheduler() {
 
     // 3. Bandwidth Alert Check (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
-        logger.verbose('scheduler', 'Running bandwidth alert check');
         try {
             const result = await checkBandwidthAlerts();
             if (result.alertsSent80 > 0 || result.alertsSent90 > 0 || result.autoDisabled > 0) {
@@ -79,7 +76,6 @@ export function initScheduler() {
 
     // 4. Health Check (Every 2 minutes)
     cron.schedule('*/2 * * * *', async () => {
-        logger.verbose('scheduler', 'Running health checks');
         try {
             const result = await runHealthChecks();
             await syncIncidentState('scheduler');
@@ -93,7 +89,6 @@ export function initScheduler() {
 
     // 5. Key Rotation Check (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
-        logger.verbose('scheduler', 'Running key rotation check');
         try {
             const result = await checkKeyRotations();
             if (result.rotated > 0 || result.errors.length > 0) {
@@ -106,11 +101,9 @@ export function initScheduler() {
 
     // 6. Audit Log Cleanup (Daily at 03:30)
     cron.schedule('30 3 * * *', async () => {
-        logger.verbose('scheduler', 'Running audit log cleanup');
         try {
             const result = await cleanupOldAuditLogs({ triggeredBy: 'scheduler' });
             if (!result.cleanupEnabled) {
-                logger.verbose('scheduler', 'Audit log cleanup skipped because retention is disabled');
                 return;
             }
 
@@ -124,7 +117,6 @@ export function initScheduler() {
 
     // 7. Notification Queue Processing (Every minute)
     cron.schedule('* * * * *', async () => {
-        logger.verbose('scheduler', 'Processing notification queue');
         try {
             const result = await processNotificationQueue({ limit: 50 });
             if (result.claimed > 0) {
@@ -137,7 +129,6 @@ export function initScheduler() {
 
     // 8. Backup Verification (Daily at 04:00)
     cron.schedule('0 4 * * *', async () => {
-        logger.verbose('scheduler', 'Running scheduled backup verification');
         try {
             const result = await verifyLatestBackups({ limit: 3, triggeredBy: 'scheduler' });
             if (result.length > 0) {
@@ -151,11 +142,9 @@ export function initScheduler() {
 
     // 9. Smart Rebalance Planning (Every 30 minutes)
     cron.schedule('*/30 * * * *', async () => {
-        logger.verbose('scheduler', 'Running scheduled rebalance planner');
         try {
             const result = await runScheduledRebalanceCycle();
             if (result.skipped) {
-                logger.verbose('scheduler', `Rebalance planner skipped: ${result.reason}`);
                 return;
             }
 
@@ -171,7 +160,6 @@ export function initScheduler() {
 
     // 10. Scheduled report delivery (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
-        logger.verbose('scheduler', 'Running scheduled reports');
         try {
             const result = await runScheduledReportsCycle();
             if (!result.skipped) {
@@ -184,7 +172,7 @@ export function initScheduler() {
 
     // Run initial checks on startup
     setTimeout(async () => {
-        logger.verbose('scheduler', 'Running initial expiration check on startup');
+        logger.info('Running scheduler startup maintenance');
         try {
             const result = await checkExpirations();
             if (result.expiredKeys > 0 || result.depletedKeys > 0 || result.archivedKeys > 0) {
@@ -194,7 +182,6 @@ export function initScheduler() {
             logger.error('Initial expiration check failed', error);
         }
 
-        logger.verbose('scheduler', 'Processing initial notification queue on startup');
         try {
             const result = await processNotificationQueue({ limit: 25 });
             if (result.claimed > 0) {
@@ -205,7 +192,6 @@ export function initScheduler() {
         }
 
         // Ensure health check records exist for all servers
-        logger.verbose('scheduler', 'Ensuring health check records exist');
         try {
             const created = await ensureHealthChecks();
             if (created > 0) {

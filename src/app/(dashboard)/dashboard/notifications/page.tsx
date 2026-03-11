@@ -1299,7 +1299,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
               {t('notifications.delivery.filters')}
             </Button>
           </div>
-          <div className="ops-filter-bar">
+          <div className="ops-table-meta">
             <span>
               {data?.total ?? 0} {t('notifications.delivery.results')}
             </span>
@@ -1324,7 +1324,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </div>
         </div>
 
-        <div className="ops-command-bar hidden gap-3 md:grid md:grid-cols-3">
+        <div className="ops-table-toolbar hidden gap-3 md:grid md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="delivery-search">{t('notifications.delivery.search')}</Label>
             <Input
@@ -1422,7 +1422,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </DialogContent>
         </Dialog>
 
-        <div className="ops-filter-bar hidden md:flex">
+        <div className="ops-table-meta hidden md:flex">
           <span>
             {data?.total ?? 0} {t('notifications.delivery.results')}
           </span>
@@ -1459,7 +1459,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-[1rem] border border-border/50 bg-background/60 p-3 dark:bg-white/[0.03]">
+                  <div className="ops-row-card">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.channel')}
                     </p>
@@ -1467,7 +1467,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                       {getChannelLabel(log, t)}
                     </p>
                   </div>
-                  <div className="rounded-[1rem] border border-border/50 bg-background/60 p-3 dark:bg-white/[0.03]">
+                  <div className="ops-row-card">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {t('notifications.delivery.key')}
                     </p>
@@ -1477,7 +1477,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
                   </div>
                 </div>
 
-                <div className="rounded-[1rem] border border-border/50 bg-background/55 p-3 dark:bg-white/[0.02]">
+                <div className="ops-row-card">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {t('notifications.delivery.message')}
                   </p>
@@ -1623,7 +1623,7 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
           </Table>
         </div>
 
-        <div className="ops-command-bar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ops-table-toolbar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
             {logs.length > 0 ? `${logs.length} / ${data?.total ?? logs.length}` : `0 / ${data?.total ?? 0}`} {t('notifications.delivery.visible')}
           </div>

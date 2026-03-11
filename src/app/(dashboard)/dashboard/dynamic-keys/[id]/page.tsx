@@ -1267,9 +1267,9 @@ export default function DynamicKeyDetailPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
+      <div className="ops-showcase-grid">
         {/* Main content */}
-        <div className="ops-detail-stack">
+        <div className="ops-detail-stack self-start">
           {/* Type & Subscription Info */}
           <Card className="ops-detail-card">
             <CardHeader>
@@ -1389,12 +1389,9 @@ export default function DynamicKeyDetailPage() {
               {dak.accessKeys.length > 0 ? (
                 <div className="space-y-3">
                   {dak.accessKeys.map((key) => (
-                    <div
-                      key={key.id}
-                      className="flex flex-col gap-3 rounded-[1.2rem] border border-border/60 bg-background/45 p-3 sm:flex-row sm:items-center sm:justify-between dark:bg-white/[0.02]"
-                    >
+                    <div key={key.id} className="ops-row-card">
                       <div className="flex items-center gap-3">
-                          <div className="rounded-[1rem] border border-border/60 bg-background/55 p-2 dark:bg-white/[0.03]">
+                        <div className="rounded-[1rem] border border-border/60 bg-background/55 p-2 dark:bg-white/[0.03]">
                           <Key className="w-4 h-4 text-muted-foreground" />
                         </div>
                         <div>
@@ -1440,7 +1437,7 @@ export default function DynamicKeyDetailPage() {
         </div>
 
         {/* Sidebar - QR Code & Details */}
-        <div className="ops-detail-stack">
+        <div className="ops-detail-rail">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1458,7 +1455,7 @@ export default function DynamicKeyDetailPage() {
                   alt="QR Code"
                   width={200}
                   height={200}
-                  className="rounded-lg bg-white p-2"
+                  className="rounded-[1.1rem] bg-white p-2"
                   unoptimized
                 />
               ) : (
@@ -1467,8 +1464,8 @@ export default function DynamicKeyDetailPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 mt-4 w-full">
-                <Button variant="outline" className="flex-1" onClick={handleCopyUrl}>
+              <div className="ops-mobile-action-bar mt-4 w-full md:grid-cols-1">
+                <Button variant="outline" className="w-full" onClick={handleCopyUrl}>
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL
                 </Button>

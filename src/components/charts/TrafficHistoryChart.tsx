@@ -39,7 +39,7 @@ export function TrafficHistoryChart({ accessKeyId }: TrafficHistoryChartProps) {
     if (isLoading) {
         return (
             <Card className="ops-detail-card border-border/60">
-                <CardContent className="flex h-[280px] items-center justify-center">
+                <CardContent className="flex h-[240px] items-center justify-center">
                     <div className="space-y-3 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
                         <p className="text-sm text-muted-foreground">Loading traffic history...</p>
@@ -85,7 +85,7 @@ export function TrafficHistoryChart({ accessKeyId }: TrafficHistoryChartProps) {
             <CardContent>
                 <div className="ops-chart-shell">
                     {chartData.length === 0 ? (
-                        <div className="ops-chart-empty">
+                        <div className="ops-chart-empty min-h-[220px]">
                             <div className="space-y-2">
                                 <p className="text-sm font-medium text-foreground">No traffic history yet</p>
                                 <p className="text-sm text-muted-foreground">
@@ -94,7 +94,7 @@ export function TrafficHistoryChart({ accessKeyId }: TrafficHistoryChartProps) {
                             </div>
                         </div>
                     ) : (
-                        <TrafficChart data={chartData} height={260} color="#22d3ee" />
+                        <TrafficChart data={chartData} height={220} color="#22d3ee" />
                     )}
                 </div>
             </CardContent>

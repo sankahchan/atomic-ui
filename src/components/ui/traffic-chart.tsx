@@ -35,6 +35,10 @@ interface TrafficChartProps {
   color?: string;
 }
 
+function glowShadow(color: string) {
+  return `0 0 16px ${color}55`;
+}
+
 /**
  * Custom tooltip for the chart
  */
@@ -81,6 +85,7 @@ export function TrafficChart({
 }: TrafficChartProps) {
   const chartId = useId().replace(/:/g, '');
   const gradientId = `traffic-gradient-${chartId}`;
+  const glowGradientId = `traffic-glow-${chartId}`;
 
   // Process data for the chart
   const chartData = useMemo(() => {
@@ -96,31 +101,33 @@ export function TrafficChart({
         <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           {showGrid && (
             <CartesianGrid
-              strokeDasharray="2 10"
-              stroke="rgba(125, 211, 252, 0.16)"
+              strokeDasharray="2 9"
+              stroke="rgba(125, 211, 252, 0.12)"
               vertical={false}
             />
           )}
           <XAxis
             dataKey="displayLabel"
-            stroke="rgba(186, 230, 253, 0.62)"
-            fontSize={11}
+            stroke="rgba(186, 230, 253, 0.58)"
+            fontSize={10}
             tickLine={false}
             axisLine={false}
+            tickMargin={10}
           />
           <YAxis
-            stroke="rgba(186, 230, 253, 0.5)"
-            fontSize={11}
+            stroke="rgba(186, 230, 253, 0.44)"
+            fontSize={10}
             tickLine={false}
             axisLine={false}
             tickFormatter={formatYAxis}
             width={60}
+            tickMargin={8}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar
             dataKey="bytes"
             fill={color}
-            radius={[4, 4, 0, 0]}
+            radius={[8, 8, 0, 0]}
             maxBarSize={50}
           />
         </BarChart>
@@ -132,42 +139,51 @@ export function TrafficChart({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
+          <linearGradient id={glowGradientId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={color} stopOpacity={0.08} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.4} />
-            <stop offset="55%" stopColor={color} stopOpacity={0.14} />
+            <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+            <stop offset="45%" stopColor={color} stopOpacity={0.18} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
+        <rect x="0" y="0" width="100%" height="100%" fill={`url(#${glowGradientId})`} />
         {showGrid && (
           <CartesianGrid
-            strokeDasharray="2 10"
-            stroke="rgba(125, 211, 252, 0.16)"
+            strokeDasharray="2 9"
+            stroke="rgba(125, 211, 252, 0.12)"
             vertical={false}
           />
         )}
         <XAxis
           dataKey="displayLabel"
-          stroke="rgba(186, 230, 253, 0.62)"
-          fontSize={11}
+          stroke="rgba(186, 230, 253, 0.58)"
+          fontSize={10}
           tickLine={false}
           axisLine={false}
+          tickMargin={10}
         />
         <YAxis
-          stroke="rgba(186, 230, 253, 0.5)"
-          fontSize={11}
+          stroke="rgba(186, 230, 253, 0.44)"
+          fontSize={10}
           tickLine={false}
           axisLine={false}
           tickFormatter={formatYAxis}
           width={60}
+          tickMargin={8}
         />
         <Tooltip content={<CustomTooltip />} />
         <Area
           type="monotone"
           dataKey="bytes"
           stroke={color}
-          strokeWidth={2.25}
+          strokeWidth={2.5}
           fillOpacity={1}
           fill={`url(#${gradientId})`}
+          activeDot={{ r: 4, strokeWidth: 0, fill: color, style: { filter: glowShadow(color) } }}
+          dot={false}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -202,9 +218,10 @@ export function TrafficSparkline({
           type="monotone"
           dataKey="bytes"
           stroke={color}
-          strokeWidth={1.5}
+          strokeWidth={1.65}
           fillOpacity={1}
           fill={`url(#${gradientId})`}
+          dot={false}
         />
       </AreaChart>
     </ResponsiveContainer>

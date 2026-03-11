@@ -29,12 +29,12 @@ export function MobileCardView<T>({
     }
 
     return (
-        <div className={cn("space-y-4 md:hidden", className)}>
+        <div className={cn("ops-mobile-card-grid md:hidden", className)}>
             {data.map((item) => (
                 <Card key={keyExtractor(item)} className="ops-mobile-card overflow-hidden">
                     <CardContent className="p-0">
-                        <div className="p-4">
-                        {renderCard(item)}
+                        <div className="p-4 sm:p-4">
+                            {renderCard(item)}
                         </div>
                     </CardContent>
                 </Card>

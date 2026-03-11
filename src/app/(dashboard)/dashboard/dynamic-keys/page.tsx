@@ -1900,7 +1900,7 @@ export default function DynamicKeysPage() {
           </Button>
         </div>
 
-        <div className="ops-command-bar flex items-center gap-2 p-2.5">
+        <div className="ops-table-toolbar md:hidden">
           <div className="flex flex-1 items-center justify-center rounded-[1rem] border border-border/70 bg-background/55 p-0.5 dark:bg-[rgba(4,10,20,0.72)]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -1939,7 +1939,7 @@ export default function DynamicKeysPage() {
         </div>
 
         {(autoRefresh.isActive || hasAnyFilters) && (
-          <div className="ops-filter-bar">
+          <div className="ops-table-meta">
             {autoRefresh.isActive ? (
               <span className="inline-flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
@@ -1957,7 +1957,7 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="ops-filter-bar hidden md:flex flex-wrap items-center gap-2">
+      <div className="ops-table-meta hidden md:flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground mr-1">{t('dynamic_keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -2032,7 +2032,7 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Filters */}
-      <div className="ops-command-bar hidden md:flex flex-wrap items-center gap-4">
+      <div className="ops-table-toolbar hidden md:flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -2354,7 +2354,7 @@ export default function DynamicKeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="ops-command-bar sticky bottom-4 z-20 flex flex-col gap-3 border-primary/20 bg-primary/6 p-3 shadow-[0_18px_36px_rgba(1,6,20,0.34)] sm:flex-row sm:items-center sm:gap-4">
+        <div className="ops-mobile-action-bar sticky bottom-4 z-20 flex flex-col gap-3 border-primary/20 bg-primary/6 p-3 shadow-[0_18px_36px_rgba(1,6,20,0.34)] sm:flex-row sm:items-center sm:gap-4">
           <span className="text-sm font-medium">
             {selectedKeys.size} {getSelectedLabel(selectedKeys.size)}
           </span>
@@ -2682,7 +2682,7 @@ export default function DynamicKeysPage() {
                   </div>
                 ) : null}
 
-                <div className="rounded-lg border bg-muted/25 p-3 space-y-2">
+                <div className="ops-row-card space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{t('dynamic_keys.total_usage')}</span>
                     <span className="font-medium">
@@ -2697,11 +2697,11 @@ export default function DynamicKeysPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border bg-background p-3">
+                  <div className="ops-row-card">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('dynamic_keys.mobile.attached_keys')}</p>
                     <p className="mt-1 text-sm font-medium">{dak.attachedKeysCount}</p>
                   </div>
-                  <div className="rounded-lg border bg-background p-3">
+                  <div className="ops-row-card">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('dynamic_keys.mobile.expires')}</p>
                     <p className={cn('mt-1 text-sm font-medium', dak.daysRemaining != null && dak.daysRemaining <= 3 && 'text-orange-500')}>
                       {dak.expiresAt ? formatRelativeTime(dak.expiresAt) : t('dynamic_keys.expires.never')}
@@ -2857,7 +2857,7 @@ export default function DynamicKeysPage() {
 
         {/* Pagination (kept simplified) */}
         {data && data.totalPages > 1 && (
-          <div className="ops-command-bar rounded-none border-x-0 border-b-0 px-4 py-3">
+          <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('dynamic_keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('dynamic_keys.pagination.to')}{' '}
               {Math.min(page * pageSize, data.total)} {t('dynamic_keys.pagination.of')} {data.total}

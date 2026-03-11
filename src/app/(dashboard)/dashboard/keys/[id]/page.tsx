@@ -1122,7 +1122,7 @@ export default function KeyDetailPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
+      <div className="ops-showcase-grid">
         {/* Main content */}
         <div className="ops-detail-stack">
           {/* Server & Access Info */}
@@ -1136,7 +1136,7 @@ export default function KeyDetailPage() {
             <CardContent className="space-y-4">
               {/* Server info */}
               {key.server && (
-                <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="ops-row-card">
                   <div className="flex items-center gap-3">
                     {key.server.countryCode && (
                       <span className="text-xl">{getCountryFlag(key.server.countryCode)}</span>
@@ -1149,7 +1149,7 @@ export default function KeyDetailPage() {
                     </div>
                   </div>
                   <Link href={`/dashboard/servers/${key.server.id}`}>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="rounded-full">
                       View Server
                     </Button>
                   </Link>
@@ -1180,7 +1180,7 @@ export default function KeyDetailPage() {
                   Share this URL with the user. Clients can fetch the latest config automatically.
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                  <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
                     {key.subscriptionToken
                       ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`
                       : 'Loading subscription token...'}
@@ -1232,8 +1232,8 @@ export default function KeyDetailPage() {
             <CardContent>
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <div className="ops-inline-stat">
-                    <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
+                <div className="ops-inline-stat">
+                  <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
                     <p className="text-sm text-muted-foreground">
                       of {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}
                     </p>
@@ -1364,7 +1364,7 @@ export default function KeyDetailPage() {
         </div>
 
         {/* Sidebar - QR Code */}
-        <div className="ops-detail-stack">
+        <div className="ops-detail-rail">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1382,7 +1382,7 @@ export default function KeyDetailPage() {
                 <QRCodeWithLogo
                   dataUrl={qrData.qrCode}
                   size={200}
-                  className="bg-white p-2 rounded-lg"
+                  className="rounded-[1.1rem] bg-white p-2"
                 />
               ) : (
                 <div className="ops-chart-empty h-[200px] w-[200px]">
@@ -1390,10 +1390,10 @@ export default function KeyDetailPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 mt-4 w-full">
+              <div className="ops-mobile-action-bar mt-4 w-full md:grid-cols-1">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => copyToClipboard(key.accessUrl || '', 'Copied!', 'Access URL copied to clipboard.')}
                 >
                   <Copy className="w-4 h-4 mr-2" />

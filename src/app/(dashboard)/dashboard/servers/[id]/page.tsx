@@ -613,9 +613,9 @@ export default function ServerDetailPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_360px]">
+      <div className="ops-showcase-grid">
         {/* Server Info */}
-        <Card className="ops-detail-card lg:col-span-1">
+        <Card className="ops-detail-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
@@ -673,7 +673,7 @@ export default function ServerDetailPage() {
         </Card>
 
         {/* Health Card */}
-        <div className="ops-detail-stack">
+        <div className="ops-detail-rail">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -806,7 +806,7 @@ export default function ServerDetailPage() {
               {server.accessKeys.slice(0, 5).map((key) => (
                 <div
                   key={key.id}
-                  className="flex items-center justify-between rounded-[1.2rem] border border-border/60 bg-background/45 p-3 transition-colors hover:bg-muted/35 dark:bg-white/[0.02] dark:hover:bg-cyan-400/[0.04]"
+                  className="ops-row-card"
                 >
                   <div>
                     <Link

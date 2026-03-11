@@ -456,7 +456,7 @@ export default function AuditPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="ops-command-bar grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="ops-table-toolbar grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="actionFilter">{t('audit.filters.action')}</Label>
               <Input
@@ -540,7 +540,7 @@ export default function AuditPage() {
             </div>
           </div>
 
-          <div className="ops-filter-bar flex flex-wrap items-center justify-between gap-3">
+          <div className="ops-table-meta flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Shield className="w-4 h-4" />
@@ -659,15 +659,15 @@ export default function AuditPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg bg-muted/30 p-3">
+              <div className="ops-row-card">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.time')}</p>
                 <p className="mt-1 text-xs">{formatDateTime(log.createdAt)}</p>
               </div>
-              <div className="rounded-lg bg-muted/30 p-3">
+              <div className="ops-row-card">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.actor')}</p>
                 <p className="mt-1 break-all text-xs">{log.userEmail || log.userId || t('audit.system')}</p>
               </div>
-              <div className="col-span-2 rounded-lg bg-muted/30 p-3">
+              <div className="ops-row-card col-span-2">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('audit.table.target')}</p>
                 <p className="mt-1 break-all font-mono text-xs">{log.entityId || '-'}</p>
               </div>
@@ -681,7 +681,7 @@ export default function AuditPage() {
         )}
       />
 
-      <div className="ops-command-bar flex items-center justify-between gap-4 px-4 py-3">
+      <div className="ops-table-toolbar flex items-center justify-between gap-4 px-4 py-3">
         <p className="text-sm text-muted-foreground">
           {formatTemplate(t('audit.pagination.page_of'), { page, total: totalPages })}
         </p>
