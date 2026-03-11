@@ -108,11 +108,27 @@ jobs:
 
     steps:
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          attempt=1
+          until [ "$attempt" -gt 5 ]; do
+            echo "Registry login attempt $attempt/5"
+            if printf '%s' "$REGISTRY_TOKEN" | docker login "${{ env.REGISTRY }}" -u "$REGISTRY_USERNAME" --password-stdin; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "Registry login failed after 5 attempts"
+              exit 1
+            fi
+
+            sleep $((attempt * 5))
+            attempt=$((attempt + 1))
+          done
 
       - name: Extract metadata
         id: meta
@@ -128,15 +144,36 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
+          set -euo pipefail
+
+          create_manifest() {
+            local tag="$1"
+            local attempt=1
+
+            until [ "$attempt" -gt 5 ]; do
+              echo "Creating manifest for $tag (attempt $attempt/5)"
+              if docker buildx imagetools create -t "$tag" \
+                "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }}" \
+                "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }}"; then
+                return 0
+              fi
+
+              if [ "$attempt" -eq 5 ]; then
+                echo "Manifest creation failed for $tag after 5 attempts"
+                return 1
+              fi
+
+              sleep $((attempt * 5))
+              attempt=$((attempt + 1))
+            done
+          }
+
           # Get all tags from metadata
           TAGS="${{ steps.meta.outputs.tags }}"
 
           # For each tag, create a manifest combining amd64 and arm64
           for TAG in $TAGS; do
-            echo "Creating manifest for $TAG"
-            docker buildx imagetools create -t "$TAG" \
-              "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }}" \
-              "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }}"
+            create_manifest "$TAG"
           done
 
       - name: Cleanup temp tags
