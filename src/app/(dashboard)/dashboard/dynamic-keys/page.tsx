@@ -1728,39 +1728,55 @@ export default function DynamicKeysPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-          <div className="space-y-4">
+      <section className="ops-showcase space-y-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+          <div className="space-y-5">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <KeyRound className="h-3.5 w-3.5" />
               {t('dynamic_keys.title')}
             </span>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('dynamic_keys.title')}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">{t('dynamic_keys.title')}</h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                 {t('dynamic_keys.desc')}
               </p>
             </div>
-          </div>
 
-          <Card className="hidden xl:block border-border/60 bg-background/55 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.9),rgba(5,12,24,0.76))]">
-            <CardContent className="space-y-3 p-6">
-              <div>
+            <div className="hidden sm:grid gap-3 lg:grid-cols-3 xl:max-w-3xl">
+              <div className="ops-support-card">
                 <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t('dynamic_keys.desc')}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">{t('dynamic_keys.type.self_managed')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('dynamic_keys.dialog.type.self_managed_desc')}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">{t('nav.archived') || 'Archived'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('dynamic_keys.desc')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden xl:block">
+            <div className="ops-panel space-y-3">
+              <div>
+                <p className="ops-section-heading">{t('dynamic_keys.title')}</p>
+                <h2 className="mt-2 text-xl font-semibold">{t('dynamic_keys.title')}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t('dynamic_keys.desc')}</p>
               </div>
               <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('dynamic_keys.create')}
               </Button>
-              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70" asChild>
+              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
                 <Link href="/dashboard/archived">
                   <Archive className="w-4 h-4 mr-2" />
                   {t('nav.archived') || 'Archived'}
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-2 sm:hidden">

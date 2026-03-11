@@ -1732,20 +1732,45 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-          <div className="space-y-4">
+      <section className="ops-showcase">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+          <div className="space-y-5">
             <BackButton href="/dashboard" label={t('nav.dashboard')} />
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Bell className="h-3.5 w-3.5" />
               {t('notifications.title')}
             </span>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('notifications.title')}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">{t('notifications.title')}</h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                 {t('notifications.subtitle')}
               </p>
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:max-w-3xl">
+              <div className="ops-support-card">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('notifications.summary.channels')}
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.channels_desc')}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('notifications.summary.active_channels')}
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('notifications.channel_inactive')}: {Math.max(0, channels.length - activeChannels)}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('notifications.summary.coverage')}
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{subscribedEventCount}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.coverage_desc')}</p>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2 xl:hidden">
               <Button onClick={handleOpenCreate} className="h-11 rounded-full px-5">
                 <Plus className="w-4 h-4 mr-2" />
@@ -1754,42 +1779,17 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Card className="hidden xl:block border-border/60 bg-background/55 dark:bg-white/[0.02]">
-              <CardContent className="space-y-3 p-5">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">{t('notifications.add_channel')}</p>
-                  <p className="text-xs text-muted-foreground">{t('notifications.subtitle')}</p>
-                </div>
-                <Button onClick={handleOpenCreate} className="h-11 w-full rounded-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('notifications.add_channel')}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('notifications.summary.channels')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.channels_desc')}</p>
+          <div className="hidden xl:block">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">{t('notifications.add_channel')}</p>
+                <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
+                <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
               </div>
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('notifications.summary.active_channels')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.channel_inactive')}: {Math.max(0, channels.length - activeChannels)}</p>
-              </div>
-              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('notifications.summary.coverage')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{subscribedEventCount}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.coverage_desc')}</p>
-              </div>
+              <Button onClick={handleOpenCreate} className="h-11 w-full rounded-full">
+                <Plus className="w-4 h-4 mr-2" />
+                {t('notifications.add_channel')}
+              </Button>
             </div>
           </div>
         </div>

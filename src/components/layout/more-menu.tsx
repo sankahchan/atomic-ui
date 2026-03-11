@@ -65,7 +65,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {adminToolNavItems.map((item) => {
             const active = normalizedPathname.startsWith(item.href);
             const Icon = item.icon;
@@ -75,7 +75,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center gap-4 rounded-[1.5rem] border p-4 transition-colors',
+                  'flex items-center gap-4 rounded-[1.6rem] border p-4 transition-colors',
                   active
                     ? 'border-cyan-400/26 bg-cyan-400/10 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_0_24px_rgba(34,211,238,0.08)]'
                     : 'border-cyan-400/10 bg-white/[0.03] text-white hover:border-cyan-400/18 hover:bg-white/[0.05]'

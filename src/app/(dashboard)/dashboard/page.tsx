@@ -121,30 +121,41 @@ function TrafficSnapshotStat({
   value,
   helper,
   tone = 'neutral',
+  compact = false,
 }: {
   label: string;
   value: string | number;
   helper: string;
   tone?: 'neutral' | 'cyan' | 'emerald' | 'violet' | 'amber';
+  compact?: boolean;
 }) {
   const toneClass = {
-    neutral: 'dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(5,13,26,0.82),rgba(4,10,22,0.72))]',
-    cyan: 'dark:border-cyan-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
-    emerald: 'dark:border-emerald-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
-    violet: 'dark:border-violet-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
-    amber: 'dark:border-amber-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_55%),linear-gradient(180deg,rgba(5,13,26,0.84),rgba(4,10,22,0.74))]',
+    neutral: 'dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+    cyan: 'dark:border-cyan-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+    emerald: 'dark:border-emerald-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+    violet: 'dark:border-violet-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.18),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+    amber: 'dark:border-amber-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
   }[tone];
 
   return (
     <div className={cn(
-      'rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 dark:shadow-[inset_0_1px_0_rgba(125,211,252,0.04)]',
+      compact
+        ? 'rounded-[1.35rem] border px-4 py-3.5 dark:shadow-[0_14px_34px_rgba(1,6,20,0.34),inset_0_1px_0_rgba(125,211,252,0.05)]'
+        : 'ops-stat-pod dark:shadow-[0_18px_42px_rgba(1,6,20,0.4),inset_0_1px_0_rgba(125,211,252,0.05)]',
       toneClass
     )}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <p className={cn(
+        'font-semibold uppercase text-muted-foreground',
+        compact ? 'text-[10px] tracking-[0.16em]' : 'text-[11px] tracking-[0.18em]'
+      )}>
         {label}
       </p>
-      <p className="mt-3 text-2xl font-semibold">{value}</p>
-      <p className="mt-2 text-xs text-muted-foreground">{helper}</p>
+      <p className={cn('font-semibold', compact ? 'mt-2 text-[1.9rem] leading-none' : 'mt-3 text-2xl')}>
+        {value}
+      </p>
+      <p className={cn('text-muted-foreground', compact ? 'mt-1.5 text-[11px] leading-5' : 'mt-2 text-xs')}>
+        {helper}
+      </p>
     </div>
   );
 }
@@ -247,6 +258,7 @@ function TrafficOverviewPanel({
   trafficLoading,
   trafficHistory,
   compact = false,
+  fillHeight = false,
 }: {
   t: (key: string) => string;
   tf: (key: string, values: Record<string, string | number>) => string;
@@ -259,14 +271,18 @@ function TrafficOverviewPanel({
   trafficLoading: boolean;
   trafficHistory: Array<{ date: string; bytes: number; label?: string }> | undefined;
   compact?: boolean;
+  fillHeight?: boolean;
 }) {
   return (
-    <Card className="border-white/45 bg-white/65 dark:border-cyan-400/16 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_30%),linear-gradient(180deg,rgba(3,10,22,0.92),rgba(5,12,24,0.82))] dark:shadow-[0_24px_70px_rgba(1,6,20,0.48),0_0_0_1px_rgba(34,211,238,0.05),inset_0_1px_0_rgba(125,211,252,0.05)]">
-      <CardHeader className={cn(compact ? 'pb-3' : 'pb-4')}>
+    <Card className={cn(
+      'overflow-hidden border-white/45 bg-white/65 dark:border-cyan-400/18 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.1),transparent_24%),linear-gradient(145deg,rgba(4,10,24,0.96),rgba(4,11,24,0.88))] dark:shadow-[0_28px_72px_rgba(1,6,20,0.56),0_0_0_1px_rgba(34,211,238,0.05),inset_0_1px_0_rgba(125,211,252,0.06)]',
+      compact && fillHeight && 'flex flex-1 flex-col'
+    )}>
+      <CardHeader className={cn(compact ? 'pb-2' : 'pb-4')}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
+          <div className={cn(compact ? 'space-y-1.5' : 'space-y-2')}>
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:shadow-[0_0_24px_rgba(34,211,238,0.12)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 dark:border-cyan-400/28 dark:bg-cyan-400/10 dark:shadow-[0_0_26px_rgba(34,211,238,0.14)]">
                 <TrendingUp className="h-5 w-5" />
               </div>
               <div>
@@ -280,7 +296,10 @@ function TrafficOverviewPanel({
             </div>
           </div>
           <Select value={trafficDays.toString()} onValueChange={(value) => setTrafficDays(parseInt(value, 10))}>
-            <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[160px] dark:border-cyan-400/18 dark:bg-[linear-gradient(180deg,rgba(7,17,32,0.92),rgba(5,12,24,0.82))]">
+            <SelectTrigger className={cn(
+              'w-full rounded-full border-border/70 bg-background/65 sm:w-[160px] dark:border-cyan-400/18 dark:bg-[linear-gradient(180deg,rgba(7,17,32,0.92),rgba(5,12,24,0.82))]',
+              compact ? 'h-10' : 'h-11'
+            )}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -290,46 +309,74 @@ function TrafficOverviewPanel({
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className={cn('grid gap-3', compact ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-2 xl:grid-cols-4')}>
+      <CardContent className={cn(
+        compact ? 'space-y-2.5' : 'space-y-4',
+        compact && fillHeight && 'flex flex-1 flex-col'
+      )}>
+        <div className={cn('grid', compact ? 'gap-2 sm:grid-cols-2 xl:grid-cols-4' : 'gap-3 sm:grid-cols-2 xl:grid-cols-4')}>
           <TrafficSnapshotStat
             label={t('dashboard.total_traffic')}
             value={formatBytes(totalTraffic)}
             helper={t('dashboard.all_time')}
             tone="cyan"
+            compact={compact}
           />
           <TrafficSnapshotStat
             label={t('dashboard.online_servers')}
             value={activeServers}
             helper={t('dashboard.online_servers_desc')}
             tone="emerald"
+            compact={compact}
           />
           <TrafficSnapshotStat
             label={t('dashboard.total_keys')}
             value={totalKeys}
             helper={`${totalKeys} ${t('dashboard.active')}`}
             tone="violet"
+            compact={compact}
           />
           <TrafficSnapshotStat
             label={t('dashboard.expiring_soon')}
             value={expiringSoon}
             helper={t('dashboard.expiring_24h')}
             tone="amber"
+            compact={compact}
           />
         </div>
 
         {trafficLoading ? (
-          <div className={cn('rounded-[1.6rem] bg-muted animate-pulse', compact ? 'h-[210px]' : 'h-[220px]')} />
+          <div className={cn(
+            'rounded-[1.6rem] bg-muted animate-pulse',
+            compact
+              ? fillHeight
+                ? 'min-h-[136px] flex-1'
+                : 'h-[136px]'
+              : 'h-[238px]'
+          )} />
         ) : trafficHistory && trafficHistory.length > 0 ? (
-          <div className="rounded-[1.6rem] border border-border/60 bg-background/45 p-3 dark:border-cyan-400/12 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(4,11,23,0.82),rgba(4,10,21,0.72))]">
-            <div className={cn(compact ? 'h-[210px]' : 'h-[220px]')}>
+          <div className={cn(
+            'rounded-[1.6rem] border border-border/60 bg-background/45 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_26%),linear-gradient(180deg,rgba(4,11,23,0.88),rgba(4,10,21,0.78))]',
+            compact ? 'p-2.5' : 'p-3',
+            compact && fillHeight && 'flex flex-1 flex-col'
+          )}>
+            <div className={cn(
+              compact
+                ? fillHeight
+                  ? 'min-h-[136px] flex-1'
+                  : 'h-[136px]'
+                : 'h-[238px]'
+            )}>
               <TrafficChart data={trafficHistory} type="area" height="100%" color="rgba(34,211,238,0.95)" />
             </div>
           </div>
         ) : (
           <div className={cn(
             'flex flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 px-6 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]',
-            compact ? 'h-[210px]' : 'h-[220px]'
+            compact
+              ? fillHeight
+                ? 'min-h-[136px] flex-1'
+                : 'h-[136px]'
+              : 'h-[238px]'
           )}>
             <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
@@ -559,72 +606,72 @@ export default function DashboardPage() {
     <TooltipProvider>
       <div className="space-y-6 lg:space-y-8">
         <section className="space-y-6 xl:hidden">
-          <div className="ops-hero">
-            <div className="space-y-5">
-              <div className="space-y-3">
-                <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  {t('dashboard.control_center')}
-                </span>
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                    {t('dashboard.title')}
-                  </h1>
-                  <p className="text-sm leading-7 text-muted-foreground">
-                    {t('dashboard.welcome')}
-                  </p>
-                </div>
+          <div className="ops-showcase space-y-5">
+            <div className="space-y-3">
+              <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                <BarChart3 className="h-3.5 w-3.5" />
+                {t('dashboard.control_center')}
+              </span>
+              <div className="space-y-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  {t('dashboard.title')}
+                </h1>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  {t('dashboard.welcome')}
+                </p>
               </div>
+            </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button asChild className="h-11 rounded-full px-5 shadow-sm">
-                  <Link href="/dashboard/servers">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('dashboard.add_server')}
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
-                  <Link href="/dashboard/keys">
-                    <Key className="mr-2 h-4 w-4" />
-                    {t('dashboard.create_key')}
-                  </Link>
-                </Button>
-              </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button asChild className="h-11 rounded-full px-5 shadow-sm">
+                <Link href="/dashboard/servers">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('dashboard.add_server')}
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                <Link href="/dashboard/keys">
+                  <Key className="mr-2 h-4 w-4" />
+                  {t('dashboard.create_key')}
+                </Link>
+              </Button>
+            </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <ControlMetricTile
-                  title={t('dashboard.total_servers')}
-                  value={stats?.totalServers || 0}
-                  subtitle={`${stats?.activeServers || 0} ${t('dashboard.active')} • ${stats?.downServers || 0} ${t('dashboard.down')}`}
-                  icon={Server}
-                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
-                  href="/dashboard/servers"
-                />
-                <ControlMetricTile
-                  title={t('dashboard.total_keys')}
-                  value={stats?.totalKeys || 0}
-                  subtitle={`${stats?.activeKeys || 0} ${t('dashboard.active')}`}
-                  icon={Key}
-                  iconClassName="border-violet-500/15 bg-violet-500/10 text-violet-500"
-                  href="/dashboard/keys"
-                />
-                <ControlMetricTile
-                  title={t('dashboard.total_traffic')}
-                  value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
-                  subtitle={t('dashboard.all_time')}
-                  icon={TrendingUp}
-                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
-                />
-                <ControlMetricTile
-                  title={t('dashboard.alerts')}
-                  value={attentionCount}
-                  subtitle={t('dashboard.attention_queue_desc')}
-                  icon={AlertTriangle}
-                  iconClassName="border-rose-500/15 bg-rose-500/10 text-rose-500"
-                  href="/dashboard/notifications"
-                />
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ControlMetricTile
+                title={t('dashboard.total_servers')}
+                value={stats?.totalServers || 0}
+                subtitle={`${stats?.activeServers || 0} ${t('dashboard.active')} • ${stats?.downServers || 0} ${t('dashboard.down')}`}
+                icon={Server}
+                iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+                href="/dashboard/servers"
+              />
+              <ControlMetricTile
+                title={t('dashboard.total_keys')}
+                value={stats?.totalKeys || 0}
+                subtitle={`${stats?.activeKeys || 0} ${t('dashboard.active')}`}
+                icon={Key}
+                iconClassName="border-violet-500/15 bg-violet-500/10 text-violet-500"
+                href="/dashboard/keys"
+              />
+              <ControlMetricTile
+                title={t('dashboard.total_traffic')}
+                value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
+                subtitle={t('dashboard.all_time')}
+                icon={TrendingUp}
+                iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+              />
+              <ControlMetricTile
+                title={t('dashboard.alerts')}
+                value={attentionCount}
+                subtitle={t('dashboard.attention_queue_desc')}
+                icon={AlertTriangle}
+                iconClassName="border-rose-500/15 bg-rose-500/10 text-rose-500"
+                href="/dashboard/notifications"
+              />
+            </div>
 
+            <div className="grid gap-4">
               <div className="ops-panel space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -647,20 +694,20 @@ export default function DashboardPage() {
                   </Badge>
                 </div>
 
-                <div className="grid gap-3 grid-cols-3">
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="ops-mini-tile text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {t('dashboard.health_score')}
                     </p>
                     <p className="mt-3 text-2xl font-semibold">{healthyShare}%</p>
                   </div>
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                  <div className="ops-mini-tile text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {t('dashboard.active')}
                     </p>
                     <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
                   </div>
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
+                  <div className="ops-mini-tile text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {t('dashboard.expiring_soon')}
                     </p>
@@ -668,10 +715,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <Link
-                  href="/dashboard/notifications"
-                  className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border/60 bg-background/55 px-4 py-4 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-                >
+                <Link href="/dashboard/notifications" className="ops-action-tile">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
                       {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
@@ -682,198 +726,228 @@ export default function DashboardPage() {
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </Link>
-
-                <KeyOperationsSummary stats={stats} t={t} embedded />
               </div>
 
-              <TrafficOverviewPanel
-                t={t}
-                tf={tf}
-                trafficDays={trafficDays}
-                setTrafficDays={setTrafficDays}
-                totalTraffic={totalTraffic}
-                activeServers={stats?.activeServers || 0}
-                totalKeys={totalServerKeys}
-                expiringSoon={stats?.expiringIn24h || 0}
-                trafficLoading={trafficLoading}
-                trafficHistory={trafficHistory}
-                compact
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="hidden xl:block ops-hero">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_400px]">
-            <div className="space-y-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-4">
-                  <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-                    <BarChart3 className="h-3.5 w-3.5" />
-                    {t('dashboard.control_center')}
-                  </span>
-                  <div className="space-y-3">
-                    <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl xl:text-[2.8rem]">
-                      {t('dashboard.title')}
-                    </h1>
-                    <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                      {t('dashboard.welcome')}
+              <div className="ops-panel space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="ops-section-heading">{t('dashboard.key_operations_title')}</p>
+                    <h2 className="mt-2 text-xl font-semibold">{t('dashboard.key_operations_title')}</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t('dashboard.key_operations_desc')}
                     </p>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Button asChild className="h-11 rounded-full px-5 shadow-sm">
-                    <Link href="/dashboard/servers">
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t('dashboard.add_server')}
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
                     <Link href="/dashboard/keys">
                       <Key className="mr-2 h-4 w-4" />
                       {t('dashboard.create_key')}
                     </Link>
                   </Button>
+                  <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                    <Link href="/dashboard/servers">
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('dashboard.add_server')}
+                    </Link>
+                  </Button>
+                </div>
+                <KeyOperationsSummary stats={stats} t={t} embedded />
+              </div>
+            </div>
+
+            <TrafficOverviewPanel
+              t={t}
+              tf={tf}
+              trafficDays={trafficDays}
+              setTrafficDays={setTrafficDays}
+              totalTraffic={totalTraffic}
+              activeServers={stats?.activeServers || 0}
+              totalKeys={totalServerKeys}
+              expiringSoon={stats?.expiringIn24h || 0}
+              trafficLoading={trafficLoading}
+              trafficHistory={trafficHistory}
+              compact
+            />
+          </div>
+        </section>
+
+        <section className="hidden xl:grid xl:gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
+          <div className="ops-showcase flex h-full flex-col gap-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-4">
+                <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  {t('dashboard.control_center')}
+                </span>
+                <div className="space-y-3">
+                  <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl xl:text-[2.8rem]">
+                    {t('dashboard.title')}
+                  </h1>
+                  <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                    {t('dashboard.welcome')}
+                  </p>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <ControlMetricTile
-                  title={t('dashboard.total_servers')}
-                  value={stats?.totalServers || 0}
-                  subtitle={`${stats?.activeServers || 0} ${t('dashboard.active')} • ${stats?.downServers || 0} ${t('dashboard.down')}`}
-                  icon={Server}
-                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
-                  href="/dashboard/servers"
-                />
-                <div className="hidden xl:block">
-                  <ControlMetricTile
-                    title={t('dashboard.online_servers')}
-                    value={stats?.activeServers || 0}
-                    subtitle={t('dashboard.online_servers_desc')}
-                    icon={Globe2}
-                    iconClassName="border-emerald-500/15 bg-emerald-500/10 text-emerald-500"
-                    href="/dashboard/servers"
-                  />
-                </div>
-                <ControlMetricTile
-                  title={t('dashboard.total_keys')}
-                  value={stats?.totalKeys || 0}
-                  subtitle={`${stats?.activeKeys || 0} ${t('dashboard.active')}`}
-                  icon={Key}
-                  iconClassName="border-violet-500/15 bg-violet-500/10 text-violet-500"
-                  href="/dashboard/keys"
-                />
-                <ControlMetricTile
-                  title={t('dashboard.total_traffic')}
-                  value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
-                  subtitle={t('dashboard.all_time')}
-                  icon={TrendingUp}
-                  iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
-                />
-                <div className="hidden xl:block">
-                  <ControlMetricTile
-                    title={t('dashboard.expiring_soon')}
-                    value={stats?.expiringIn24h || 0}
-                    subtitle={t('dashboard.expiring_24h')}
-                    icon={Clock}
-                    iconClassName="border-amber-500/15 bg-amber-500/10 text-amber-500"
-                    href="/dashboard/keys?status=expiring"
-                  />
-                </div>
-                <ControlMetricTile
-                  title={t('dashboard.alerts')}
-                  value={attentionCount}
-                  subtitle={t('dashboard.attention_queue_desc')}
-                  icon={AlertTriangle}
-                  iconClassName="border-rose-500/15 bg-rose-500/10 text-rose-500"
-                  href="/dashboard/notifications"
-                />
+              <div className="flex flex-wrap gap-2">
+                <Button asChild className="h-11 rounded-full px-5 shadow-sm">
+                  <Link href="/dashboard/servers">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('dashboard.add_server')}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                  <Link href="/dashboard/keys">
+                    <Key className="mr-2 h-4 w-4" />
+                    {t('dashboard.create_key')}
+                  </Link>
+                </Button>
               </div>
+            </div>
 
-              <TrafficOverviewPanel
-                t={t}
-                tf={tf}
-                trafficDays={trafficDays}
-                setTrafficDays={setTrafficDays}
-                totalTraffic={totalTraffic}
-                activeServers={stats?.activeServers || 0}
-                totalKeys={totalServerKeys}
-                expiringSoon={stats?.expiringIn24h || 0}
-                trafficLoading={trafficLoading}
-                trafficHistory={trafficHistory}
-                compact
+            <div className="ops-metric-strip">
+              <ControlMetricTile
+                title={t('dashboard.total_servers')}
+                value={stats?.totalServers || 0}
+                subtitle={`${stats?.activeServers || 0} ${t('dashboard.active')} • ${stats?.downServers || 0} ${t('dashboard.down')}`}
+                icon={Server}
+                iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+                href="/dashboard/servers"
+              />
+              <ControlMetricTile
+                title={t('dashboard.online_servers')}
+                value={stats?.activeServers || 0}
+                subtitle={t('dashboard.online_servers_desc')}
+                icon={Globe2}
+                iconClassName="border-emerald-500/15 bg-emerald-500/10 text-emerald-500"
+                href="/dashboard/servers"
+              />
+              <ControlMetricTile
+                title={t('dashboard.total_traffic')}
+                value={formatBytes(stats?.totalTrafficBytes || BigInt(0))}
+                subtitle={t('dashboard.all_time')}
+                icon={TrendingUp}
+                iconClassName="border-cyan-500/15 bg-cyan-500/10 text-cyan-500"
+              />
+              <ControlMetricTile
+                title={t('dashboard.alerts')}
+                value={attentionCount}
+                subtitle={t('dashboard.attention_queue_desc')}
+                icon={AlertTriangle}
+                iconClassName="border-rose-500/15 bg-rose-500/10 text-rose-500"
+                href="/dashboard/notifications"
               />
             </div>
 
-            <div className="space-y-4">
-              <div className="ops-panel space-y-5">
+            <TrafficOverviewPanel
+              t={t}
+              tf={tf}
+              trafficDays={trafficDays}
+              setTrafficDays={setTrafficDays}
+              totalTraffic={totalTraffic}
+              activeServers={stats?.activeServers || 0}
+              totalKeys={totalServerKeys}
+              expiringSoon={stats?.expiringIn24h || 0}
+              trafficLoading={trafficLoading}
+              trafficHistory={trafficHistory}
+              compact
+              fillHeight
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="ops-panel space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="ops-section-heading">{t('dashboard.live_pulse')}</p>
+                  <h2 className="mt-2 text-2xl font-semibold">{t('dashboard.system_status')}</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t('dashboard.live_pulse_desc')}
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-semibold',
+                    attentionCount > 0
+                      ? 'border-amber-500/25 bg-amber-500/10 text-amber-500'
+                      : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
+                  )}
+                >
+                  {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="ops-mini-tile text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {t('dashboard.health_score')}
+                  </p>
+                  <p className="mt-3 text-2xl font-semibold">{healthyShare}%</p>
+                </div>
+                <div className="ops-mini-tile text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {t('dashboard.active')}
+                  </p>
+                  <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
+                </div>
+                <div className="ops-mini-tile text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {t('dashboard.expiring_soon')}
+                  </p>
+                  <p className="mt-3 text-2xl font-semibold">{stats?.expiringIn24h || 0}</p>
+                </div>
+              </div>
+
+              <Link href="/dashboard/notifications" className="ops-action-tile">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">
+                    {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t('dashboard.review_alerts_desc')}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </div>
+
+            <div className="ops-panel space-y-4">
+              <div className="space-y-2">
+                <p className="ops-section-heading">{t('dashboard.key_operations_title')}</p>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="ops-section-heading">{t('dashboard.live_pulse')}</p>
-                    <h2 className="mt-2 text-2xl font-semibold">{t('dashboard.system_status')}</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {t('dashboard.live_pulse_desc')}
+                    <h2 className="text-xl font-semibold">{t('dashboard.key_operations_title')}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t('dashboard.key_operations_desc')}
                     </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'rounded-full px-3 py-1 text-xs font-semibold',
-                      attentionCount > 0
-                        ? 'border-amber-500/25 bg-amber-500/10 text-amber-500'
-                        : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
-                    )}
-                  >
-                    {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {t('dashboard.health_score')}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold">{healthyShare}%</p>
-                  </div>
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {t('dashboard.active')}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold">{stats?.activeServers || 0}</p>
-                  </div>
-                  <div className="rounded-[1.25rem] border border-border/60 bg-background/55 px-3 py-3 text-center dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {t('dashboard.expiring_soon')}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold">{stats?.expiringIn24h || 0}</p>
                   </div>
                 </div>
-
-                <Link
-                  href="/dashboard/notifications"
-                  className="flex items-center justify-between gap-3 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-4 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">
-                      {attentionCount > 0 ? t('dashboard.attention_needed') : t('dashboard.system_clear')}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t('dashboard.review_alerts_desc')}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </Link>
-
-                <KeyOperationsSummary stats={stats} t={t} embedded />
               </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild className="h-11 rounded-full px-5 shadow-sm">
+                  <Link href="/dashboard/keys">
+                    <Key className="mr-2 h-4 w-4" />
+                    {t('dashboard.create_key')}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-full border-border/70 bg-background/70 px-5 shadow-sm">
+                  <Link href="/dashboard/servers">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('dashboard.add_server')}
+                  </Link>
+                </Button>
+              </div>
+
+              <KeyOperationsSummary stats={stats} t={t} embedded />
             </div>
           </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2 xl:auto-rows-fr">
-          <Card className="self-start xl:h-full">
+          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -949,7 +1023,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="self-start xl:h-full">
+          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
@@ -1006,7 +1080,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="self-start xl:h-full">
+          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
@@ -1045,7 +1119,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="self-start xl:h-full">
+          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">

@@ -159,15 +159,15 @@ export function ServerCard({
 
     return (
         <Card className={cn(
-            'group flex flex-col transition-all duration-200 hover:-translate-y-1 hover:border-primary/25',
+            'group flex flex-col overflow-hidden border-border/60 bg-background/55 transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.94),rgba(5,12,25,0.84))] dark:shadow-[0_22px_56px_rgba(1,6,20,0.38)]',
             !server.isActive && 'opacity-60'
         )}>
-            <CardContent className="p-5 flex-1">
+            <CardContent className="flex-1 p-4 sm:p-5">
                 {/* Header */}
-                <div className="flex items-start justify-between mb-4">
+                <div className="mb-4 flex items-start justify-between">
                     <div className="flex items-center gap-3">
                         {server.countryCode && (
-                            <span className="text-2xl">{getCountryFlag(server.countryCode)}</span>
+                            <span className="text-xl">{getCountryFlag(server.countryCode)}</span>
                         )}
                         <div>
                             <Link
@@ -198,12 +198,12 @@ export function ServerCard({
                 </div>
 
                 {/* Bandwidth metric - prominent display */}
-                <div className="mb-4 rounded-[1.25rem] border border-border/60 bg-background/55 p-4 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.72))]">
+                <div className="mb-4 rounded-[1.2rem] border border-border/60 bg-background/55 p-3.5 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.72))]">
                     <div className="flex items-center gap-2 mb-1">
                         <ArrowUpDown className="w-4 h-4 text-primary" />
                         <span className="text-xs text-muted-foreground">{t('servers.total_bandwidth')}</span>
                     </div>
-                    <p className="text-2xl font-bold">
+                    <p className="text-[1.9rem] font-semibold tracking-tight">
                         {server.metrics?.totalBandwidth
                             ? formatBytes(server.metrics.totalBandwidth)
                             : '0 B'}
@@ -212,7 +212,7 @@ export function ServerCard({
 
                 {/* Metrics grid */}
                 <div className="mb-4 grid grid-cols-3 gap-3">
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-2.5 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Zap className="w-3 h-3 text-emerald-500" />
                         </div>
@@ -220,7 +220,7 @@ export function ServerCard({
                         <ServerLiveStats serverId={server.id} defaultActive={server.metrics?.activeKeys || 0} />
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-2.5 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Key className="w-3 h-3 text-primary" />
                         </div>
@@ -230,7 +230,7 @@ export function ServerCard({
                         </p>
                         <p className="text-xs text-muted-foreground">{t('servers.active')}</p>
                     </div>
-                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-3 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
+                    <div className="rounded-[1.1rem] border border-border/60 bg-background/50 p-2.5 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.74))]">
                         <div className="flex items-center justify-center gap-1 mb-1">
                             <Activity className="w-3 h-3 text-muted-foreground" />
                         </div>
@@ -266,7 +266,7 @@ export function ServerCard({
             </CardContent>
 
             {/* Footer Actions */}
-            <div className="border-t border-border/50 bg-background/40 px-5 py-4 dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(5,12,24,0.88),rgba(4,10,22,0.78))]">
+            <div className="border-t border-border/50 bg-background/40 px-4 py-3 dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(5,12,24,0.88),rgba(4,10,22,0.78))] sm:px-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         {server.outlineVersion && `v${server.outlineVersion}`}
@@ -280,7 +280,7 @@ export function ServerCard({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-full rounded-2xl sm:w-9"
+                            className="h-9 w-full rounded-2xl sm:w-9 dark:hover:bg-white/[0.05]"
                             onClick={onSync}
                             disabled={isSyncing}
                             title={t('servers.actions.sync')}
@@ -288,7 +288,7 @@ export function ServerCard({
                         >
                             <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
                         </Button>
-                        <Button asChild variant="ghost" size="icon" className="h-9 w-full rounded-2xl sm:w-9" title={t('servers.actions.view')}>
+                        <Button asChild variant="ghost" size="icon" className="h-9 w-full rounded-2xl sm:w-9 dark:hover:bg-white/[0.05]" title={t('servers.actions.view')}>
                             <Link href={`/dashboard/servers/${server.id}`} aria-label={t('servers.actions.view')}>
                                 <ExternalLink className="w-4 h-4" />
                             </Link>
@@ -296,7 +296,7 @@ export function ServerCard({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-full rounded-2xl text-destructive hover:text-destructive sm:w-9"
+                            className="h-9 w-full rounded-2xl text-destructive hover:text-destructive sm:w-9 dark:hover:bg-rose-500/10"
                             onClick={onDelete}
                             disabled={isDeleting}
                             title={t('servers.actions.delete')}

@@ -172,7 +172,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn('transition-all duration-200', isOpen ? 'border-primary/25 shadow-[0_18px_48px_rgba(6,182,212,0.08)]' : 'border-border/60')}>
+    <Card className={cn(
+      'transition-all duration-200 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_22%),linear-gradient(180deg,rgba(5,12,25,0.94),rgba(4,10,22,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.38)]',
+      isOpen ? 'border-primary/25 shadow-[0_18px_48px_rgba(6,182,212,0.08)] dark:border-cyan-300/24 dark:shadow-[0_26px_62px_rgba(1,6,20,0.5),0_0_28px_rgba(34,211,238,0.08)]' : 'border-border/60'
+    )}>
       <button
         type="button"
         className="w-full text-left"
@@ -184,7 +187,7 @@ function SectionCard({
             <div className="flex items-center gap-3">
               <div className={cn(
                 'rounded-2xl border p-2.5',
-                isOpen ? 'border-primary/20 bg-primary/10' : 'border-border/60 bg-muted'
+                isOpen ? 'border-primary/20 bg-primary/10 dark:border-cyan-300/24 dark:bg-cyan-400/10' : 'border-border/60 bg-muted dark:border-cyan-400/12 dark:bg-white/[0.03]'
               )}>
                 <Icon className={cn('w-5 h-5', isOpen ? 'text-primary' : 'text-muted-foreground')} />
               </div>
@@ -225,7 +228,7 @@ function SettingsShortcutGrid({
 
         return (
           <Link key={item.href} href={item.href} className="block">
-            <div className="h-full rounded-[1.35rem] border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:bg-white/[0.02]">
+            <div className="ops-support-card h-full p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 dark:hover:border-cyan-300/22">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
@@ -762,23 +765,38 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_380px]">
-          <div className="max-w-4xl space-y-4">
+      <section className="ops-showcase">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_380px]">
+          <div className="max-w-4xl space-y-5">
             <BackButton href="/dashboard" label={t('nav.dashboard')} />
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Globe className="h-3.5 w-3.5" />
               {t('settings.hub.title')}
             </span>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('settings.title')}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">{t('settings.title')}</h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                 {t('settings.subtitle')}
               </p>
             </div>
+
+            <div className="hidden sm:grid gap-3 lg:grid-cols-3 xl:max-w-3xl">
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">{t('nav.security')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.hub.security_desc')}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">{t('nav.users')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.hub.users_desc')}</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">{t('nav.notifications')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.hub.notifications_desc')}</p>
+              </div>
+            </div>
           </div>
 
-          <div className="hidden xl:block">
+          <div className="hidden xl:grid gap-3">
             <SettingsShortcutGrid className="grid-cols-1" />
           </div>
         </div>
