@@ -338,6 +338,12 @@ fi
 
 echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 
+# Configure nginx reverse proxy on port 80
+echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
+chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
+bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
+echo -e "${GREEN}[✓]${NC} nginx proxy is serving http://${SERVER_IP}/"
+
 # Disable cleanup after successful installation
 CLEANUP_ON_FAILURE=false
 
@@ -351,6 +357,7 @@ echo -e "${BLUE}[*]${NC} Configuring firewall..."
 
 # 1. Try UFW
 if command -v ufw &> /dev/null; then
+    ufw allow 80/tcp > /dev/null 2>&1
     # Enable UFW if not active (risky? 3x-ui doesn't force enable, but opens port)
     # Just open the port
     ufw allow ${PANEL_PORT}/tcp > /dev/null 2>&1
@@ -361,6 +368,9 @@ fi
 
 # 2. Try iptables (common fallback)
 if command -v iptables &> /dev/null; then
+    if ! iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null; then
+        iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+    fi
     # Check if rule exists before adding
     if ! iptables -C INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT 2>/dev/null; then
         iptables -I INPUT -p tcp --dport ${PANEL_PORT} -j ACCEPT
@@ -387,7 +397,7 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
-echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}/${PANEL_PATH}/${NC}"
+echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
