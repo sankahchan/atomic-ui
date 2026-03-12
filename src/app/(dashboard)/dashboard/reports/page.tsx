@@ -433,25 +433,97 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3">
-            <FileText className="w-7 h-7 text-primary" />
-            {t('nav.reports')}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Generate and download usage reports for your servers and keys.
-          </p>
+      <section className="ops-showcase">
+        <div className="ops-showcase-grid">
+          <div className="space-y-5 self-start">
+            <Badge variant="outline" className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
+              <FileText className="h-3.5 w-3.5" />
+              {t('nav.reports')}
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                {t('nav.reports')}
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Generate exportable usage snapshots, schedule daily or weekly operational summaries, and review delivery history from one reporting surface.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:max-w-4xl">
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">Total reports</p>
+                <p className="mt-2 text-2xl font-semibold">{data?.total ?? 0}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Stored report runs ready for export.</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">Latest period usage</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {data?.reports[0] ? formatBytes(BigInt(data.reports[0].totalDeltaBytes)) : '0 B'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Most recent generated period delta.</p>
+              </div>
+              <div className="ops-support-card">
+                <p className="text-sm font-semibold">Last summary run</p>
+                <p className="mt-2 text-sm font-semibold">
+                  {scheduleForm?.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : 'Never'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {scheduleForm?.lastRunStatus ?? 'No scheduled run recorded yet.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="ops-detail-rail">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Report actions</p>
+                <h2 className="text-xl font-semibold">Generate and deliver</h2>
+                <p className="text-sm text-muted-foreground">
+                  Create on-demand reports or hand scheduled summaries off to channels without leaving this page.
+                </p>
+              </div>
+              <Button className="h-12 w-full rounded-full" onClick={() => setGenerateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Generate Report
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 w-full rounded-full border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                onClick={() => runScheduledNowMutation.mutate()}
+                disabled={runScheduledNowMutation.isPending}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Run scheduled summary
+              </Button>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Delivery pulse</p>
+                <h2 className="text-xl font-semibold">Schedule state</h2>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="ops-row-card">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Enabled</p>
+                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.enabled ? 'Active' : 'Paused'}</p>
+                </div>
+                <div className="ops-row-card">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Configured channels</p>
+                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.channelIds.length ?? 0}</p>
+                </div>
+                <div className="ops-row-card">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Frequency</p>
+                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.frequency ?? 'DAILY'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <Button onClick={() => setGenerateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Generate Report
-        </Button>
-      </div>
+      </section>
 
       {scheduleForm ? (
-        <Card>
+        <Card className="ops-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock3 className="w-5 h-5 text-primary" />
@@ -463,7 +535,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-4 rounded-xl border p-4">
+              <div className="ops-detail-card space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <Label className="text-base">Enable automatic summaries</Label>
@@ -552,7 +624,7 @@ export default function ReportsPage() {
                 ) : null}
               </div>
 
-              <div className="space-y-4 rounded-xl border p-4">
+              <div className="ops-detail-card space-y-4">
                 <div>
                   <Label className="text-base">Delivery channels</Label>
                   <p className="text-sm text-muted-foreground">
@@ -568,7 +640,7 @@ export default function ReportsPage() {
                     availableChannels.map((channel) => (
                       <label
                         key={channel.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3"
+                        className="ops-row-card flex items-center justify-between gap-3"
                       >
                         <div>
                           <p className="font-medium">{channel.name}</p>
@@ -637,29 +709,29 @@ export default function ReportsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+              <label className="ops-row-card flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">Revenue</span>
                 <Switch checked={scheduleForm.includeRevenue} onCheckedChange={(checked) => updateScheduleField('includeRevenue', checked)} />
               </label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+              <label className="ops-row-card flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">Usage</span>
                 <Switch checked={scheduleForm.includeUsage} onCheckedChange={(checked) => updateScheduleField('includeUsage', checked)} />
               </label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+              <label className="ops-row-card flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">Expirations</span>
                 <Switch checked={scheduleForm.includeExpirations} onCheckedChange={(checked) => updateScheduleField('includeExpirations', checked)} />
               </label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+              <label className="ops-row-card flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">Failed logins</span>
                 <Switch checked={scheduleForm.includeFailedLogins} onCheckedChange={(checked) => updateScheduleField('includeFailedLogins', checked)} />
               </label>
-              <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3">
+              <label className="ops-row-card flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">Server health</span>
                 <Switch checked={scheduleForm.includeServerHealth} onCheckedChange={(checked) => updateScheduleField('includeServerHealth', checked)} />
               </label>
             </div>
 
-            <div className="flex flex-col gap-3 rounded-xl border border-dashed p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="ops-detail-card flex flex-col gap-3 border-dashed sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-muted-foreground">
                 <p>Last run: {scheduleForm.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : 'Never'}</p>
                 <p>Status: {scheduleForm.lastRunStatus}</p>
@@ -687,7 +759,7 @@ export default function ReportsPage() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="ops-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="w-5 h-5 text-primary" />
@@ -705,7 +777,7 @@ export default function ReportsPage() {
           ) : scheduledRunsQuery.data?.items.length ? (
             <div className="space-y-4">
               {scheduledRunsQuery.data.items.map((run) => (
-                <div key={run.id} className="rounded-xl border p-4">
+                <div key={run.id} className="ops-detail-card">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -754,12 +826,12 @@ export default function ReportsPage() {
                   </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {run.deliveries.length === 0 ? (
-                      <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                      <div className="ops-row-card border-dashed text-sm text-muted-foreground">
                         No channel deliveries were recorded for this run.
                       </div>
                     ) : (
                       run.deliveries.map((delivery) => (
-                        <div key={delivery.id} className="rounded-lg border px-3 py-3">
+                        <div key={delivery.id} className="ops-row-card">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="font-medium">{delivery.channelName}</p>
@@ -793,66 +865,14 @@ export default function ReportsPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+            <div className="ops-support-card border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
               No scheduled report runs recorded yet.
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Summary Stats */}
-      {data && data.reports.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <FileText className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Reports</p>
-                  <p className="text-2xl font-bold">{data.total}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <Calendar className="w-5 h-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Latest Report</p>
-                  <p className="text-lg font-semibold truncate max-w-[200px]">
-                    {data.reports[0]?.name || 'None'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Latest Period Usage</p>
-                  <p className="text-2xl font-bold">
-                    {data.reports[0]
-                      ? formatBytes(BigInt(data.reports[0].totalDeltaBytes))
-                      : '0 B'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Reports Table */}
-      <Card>
+      <Card className="ops-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
@@ -869,114 +889,199 @@ export default function ReportsPage() {
             </div>
           ) : data && data.reports.length > 0 ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Report Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-center">Servers</TableHead>
-                    <TableHead className="text-center">Keys</TableHead>
-                    <TableHead className="text-right">Total Usage</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.reports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium">
-                        {report.name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {report.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatPeriod(report.periodStart, report.periodEnd)}
-                      </TableCell>
-                      <TableCell className="text-center">{report.totalServers}</TableCell>
-                      <TableCell className="text-center">{report.totalKeys}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatBytes(BigInt(report.totalBytesUsed))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            report.status === 'READY'
-                              ? 'default'
-                              : report.status === 'GENERATING'
+              <div className="space-y-3 md:hidden">
+                {data.reports.map((report) => (
+                  <div key={report.id} className="ops-row-card space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="font-medium">{report.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPeriod(report.periodStart, report.periodEnd)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          report.status === 'READY'
+                            ? 'default'
+                            : report.status === 'GENERATING'
                               ? 'secondary'
                               : 'destructive'
+                        }
+                        className="text-xs"
+                      >
+                        {report.status === 'READY' ? 'READY' : report.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Type</p>
+                        <p className="mt-1 text-sm font-medium">{report.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Keys</p>
+                        <p className="mt-1 text-sm font-medium">{report.totalKeys}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Usage</p>
+                        <p className="mt-1 text-sm font-medium">{formatBytes(BigInt(report.totalBytesUsed))}</p>
+                      </div>
+                    </div>
+                    <div className="ops-mobile-action-bar grid-cols-2 sm:grid-cols-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setViewReportId(report.id);
+                          setViewDialogOpen(true);
+                        }}
+                        disabled={report.status !== 'READY'}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(`/api/reports/download?id=${report.id}&format=csv`, '_blank')}
+                        disabled={report.status !== 'READY'}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(`/api/reports/download?id=${report.id}&format=pdf`, '_blank')}
+                        disabled={report.status !== 'READY'}
+                      >
+                        <FileDown className="mr-2 h-4 w-4" />
+                        PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => {
+                          if (confirm('Delete this report?')) {
+                            deleteMutation.mutate({ id: report.id });
                           }
-                          className="text-xs"
-                        >
-                          {report.status === 'READY' ? '✓ Ready' : report.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setViewReportId(report.id);
-                              setViewDialogOpen(true);
-                            }}
-                            disabled={report.status !== 'READY'}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              window.open(
-                                `/api/reports/download?id=${report.id}&format=csv`,
-                                '_blank'
-                              )
-                            }
-                            disabled={report.status !== 'READY'}
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              window.open(
-                                `/api/reports/download?id=${report.id}&format=pdf`,
-                                '_blank'
-                              )
-                            }
-                            disabled={report.status !== 'READY'}
-                          >
-                            <FileDown className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (confirm('Delete this report?')) {
-                                deleteMutation.mutate({ id: report.id });
-                              }
-                            }}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                        }}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="ops-data-shell hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Report Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-center">Servers</TableHead>
+                      <TableHead className="text-center">Keys</TableHead>
+                      <TableHead className="text-right">Total Usage</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {data.reports.map((report) => (
+                      <TableRow key={report.id}>
+                        <TableCell className="font-medium">
+                          {report.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {report.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatPeriod(report.periodStart, report.periodEnd)}
+                        </TableCell>
+                        <TableCell className="text-center">{report.totalServers}</TableCell>
+                        <TableCell className="text-center">{report.totalKeys}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatBytes(BigInt(report.totalBytesUsed))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              report.status === 'READY'
+                                ? 'default'
+                                : report.status === 'GENERATING'
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            {report.status === 'READY' ? '✓ Ready' : report.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setViewReportId(report.id);
+                                setViewDialogOpen(true);
+                              }}
+                              disabled={report.status !== 'READY'}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                window.open(
+                                  `/api/reports/download?id=${report.id}&format=csv`,
+                                  '_blank'
+                                )
+                              }
+                              disabled={report.status !== 'READY'}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                window.open(
+                                  `/api/reports/download?id=${report.id}&format=pdf`,
+                                  '_blank'
+                                )
+                              }
+                              disabled={report.status !== 'READY'}
+                            >
+                              <FileDown className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Delete this report?')) {
+                                  deleteMutation.mutate({ id: report.id });
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               {/* Pagination */}
               {data.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="ops-table-toolbar mt-4 rounded-none border-x-0 border-b-0 px-0 pt-4">
                   <p className="text-sm text-muted-foreground">
                     Page {data.page} of {data.totalPages} ({data.total} reports)
                   </p>

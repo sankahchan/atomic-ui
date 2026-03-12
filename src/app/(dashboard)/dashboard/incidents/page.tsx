@@ -6,11 +6,48 @@ import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollText, AlertTriangle, ServerCrash, Users, KeyRound, Flame, BellRing, CheckCircle2 } from 'lucide-react';
+import { ScrollText, AlertTriangle, ServerCrash, Users, KeyRound, Flame, BellRing, CheckCircle2, RefreshCw } from 'lucide-react';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+function IncidentStatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: 'critical' | 'warning' | 'info' | 'success' | 'violet';
+}) {
+  const toneClass = {
+    critical:
+      'dark:border-rose-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+    warning:
+      'dark:border-amber-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+    info:
+      'dark:border-cyan-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+    success:
+      'dark:border-emerald-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.16),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+    violet:
+      'dark:border-violet-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.18),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.9),rgba(4,10,22,0.8))]',
+  }[tone];
+
+  return (
+    <div
+      className={cn(
+        'ops-stat-pod dark:shadow-[0_18px_42px_rgba(1,6,20,0.4),inset_0_1px_0_rgba(125,211,252,0.05)]',
+        toneClass,
+      )}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
+    </div>
+  );
+}
 
 function SeverityBadge({ severity }: { severity: 'critical' | 'warning' | 'info' }) {
   const styles =
@@ -172,103 +209,84 @@ export default function IncidentCenterPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
-        <Card className="overflow-hidden rounded-[2rem] border border-border/70 bg-background/75 shadow-[0_18px_60px_rgba(15,23,42,0.07)]">
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="ops-showcase">
+        <div className="ops-showcase-grid">
+          <div className="space-y-5 self-start">
+            <Badge variant="outline" className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
+              <Flame className="mr-2 h-3.5 w-3.5" />
+              Incident Center
+            </Badge>
+
             <div className="space-y-3">
-              <Badge variant="outline" className="w-fit rounded-full border-primary/25 bg-primary/10 px-3 py-1 text-primary">
-                <Flame className="mr-2 h-3.5 w-3.5" />
-                Incident Center
-              </Badge>
-              <div>
-                <CardTitle className="text-3xl font-semibold tracking-tight">Operational incidents</CardTitle>
-                <CardDescription className="mt-2 max-w-2xl text-base">
-                  Track live server incidents, assign owners, add notes, and preserve a real resolution history.
-                </CardDescription>
-              </div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                Operational incidents
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Track live server incidents, assign owners, add notes, and preserve a real resolution history with alert context and impact analysis.
+              </p>
             </div>
 
-            <Button variant="outline" className="rounded-full" onClick={() => void refetchAll()}>
-              Refresh
-            </Button>
-          </CardHeader>
-
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Open</p>
-                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.openIncidents ?? 0}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Critical</p>
-                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.criticalOpen ?? 0}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Acknowledged</p>
-                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.acknowledgedOpen ?? 0}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Affected keys</p>
-                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.affectedKeys ?? 0}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Recent alerts</p>
-                <p className="mt-3 text-3xl font-semibold">{overviewQuery.data?.summary.recentAlerts ?? 0}</p>
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[2rem] border border-border/70 bg-background/75">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle className="text-xl">Alert history</CardTitle>
-              <CardDescription>Latest notification events driving incident awareness.</CardDescription>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <IncidentStatCard label="Open" value={overviewQuery.data?.summary.openIncidents ?? 0} tone="critical" />
+              <IncidentStatCard label="Critical" value={overviewQuery.data?.summary.criticalOpen ?? 0} tone="warning" />
+              <IncidentStatCard label="Acknowledged" value={overviewQuery.data?.summary.acknowledgedOpen ?? 0} tone="info" />
+              <IncidentStatCard label="Affected keys" value={overviewQuery.data?.summary.affectedKeys ?? 0} tone="violet" />
+              <IncidentStatCard label="Recent alerts" value={overviewQuery.data?.summary.recentAlerts ?? 0} tone="success" />
             </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/notifications">Open notifications</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {alertHistory.length === 0 ? (
-              <div className="rounded-[1.5rem] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-                No recent alerts were recorded in the selected lookback window.
+          </div>
+
+          <div className="ops-detail-rail">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Command rail</p>
+                <h2 className="text-xl font-semibold">Response controls</h2>
+                <p className="text-sm text-muted-foreground">
+                  Keep the incident list fresh and jump into linked delivery history without leaving the response surface.
+                </p>
               </div>
-            ) : (
-              alertHistory.slice(0, 8).map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-[1.35rem] border border-border/70 bg-background/65 px-4 py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <SeverityBadge severity={entry.severity} />
-                        <p className="font-medium">{entry.event.replace(/_/g, ' ')}</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{entry.message}</p>
-                    </div>
-                    <p className="whitespace-nowrap text-xs text-muted-foreground">
-                      {formatRelativeTime(entry.sentAt)}
-                    </p>
-                  </div>
+              <Button className="h-12 w-full rounded-full" onClick={() => void refetchAll()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh incidents
+              </Button>
+              <Button variant="outline" asChild className="h-11 w-full rounded-full border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
+                <Link href="/dashboard/notifications">Open notifications</Link>
+              </Button>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Alert feed</p>
+                <h2 className="text-xl font-semibold">Linked alert history</h2>
+              </div>
+              {alertHistory.length === 0 ? (
+                <div className="ops-support-card text-sm text-muted-foreground">
+                  No recent alerts were recorded in the selected lookback window.
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                alertHistory.slice(0, 4).map((entry) => (
+                  <div key={entry.id} className="ops-row-card space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <SeverityBadge severity={entry.severity} />
+                          <p className="text-sm font-medium">{entry.event.replace(/_/g, ' ')}</p>
+                        </div>
+                        <p className="text-xs leading-5 text-muted-foreground">{entry.message}</p>
+                      </div>
+                      <p className="whitespace-nowrap text-[11px] text-muted-foreground">
+                        {formatRelativeTime(entry.sentAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="rounded-[2rem] border border-border/70 bg-background/75">
+        <Card className="ops-panel">
           <CardHeader>
             <CardTitle className="text-xl">Open incidents</CardTitle>
             <CardDescription>Current slow or down servers and the scope of impact.</CardDescription>
@@ -283,8 +301,8 @@ export default function IncidentCenterPage() {
                   className={cn(
                     'w-full rounded-[1.5rem] border px-4 py-4 text-left transition-colors',
                     selectedIncidentId === incident.id
-                      ? 'border-primary/40 bg-primary/8'
-                      : 'border-border/70 bg-background/65 hover:border-primary/25',
+                      ? 'border-primary/40 bg-primary/8 dark:border-cyan-300/30 dark:bg-cyan-400/[0.08]'
+                      : 'border-border/70 bg-background/65 hover:border-primary/25 dark:bg-white/[0.02] dark:hover:border-cyan-300/18',
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -324,7 +342,7 @@ export default function IncidentCenterPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[2rem] border border-border/70 bg-background/75">
+        <Card className="ops-panel">
           <CardHeader>
             <CardTitle className="text-xl">Incident workflow and impact</CardTitle>
             <CardDescription>
@@ -340,8 +358,8 @@ export default function IncidentCenterPage() {
               </div>
             ) : (
               <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                <div className="ops-section-grid">
+                  <Card className="ops-detail-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Workflow</CardTitle>
                     </CardHeader>
@@ -376,7 +394,7 @@ export default function IncidentCenterPage() {
                       </div>
                       <div className="space-y-2">
                         <p className="text-sm font-medium">Assign owner</p>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
                           <Select value={selectedAssigneeId} onValueChange={setSelectedAssigneeId}>
                             <SelectTrigger className="rounded-xl">
                               <SelectValue placeholder="Select assignee" />
@@ -406,7 +424,7 @@ export default function IncidentCenterPage() {
                           </Button>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="ops-mobile-action-bar grid-cols-1 sm:grid-cols-3">
                         <Button
                           variant="outline"
                           className="rounded-xl"
@@ -455,17 +473,17 @@ export default function IncidentCenterPage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                  <Card className="ops-detail-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">At-a-glance impact</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
-                      <div className="rounded-2xl border border-border/60 px-3 py-3">
+                      <div className="ops-row-card">
                         <p className="font-medium">{selectedDetail.incident.title}</p>
                         <p className="mt-1 text-muted-foreground">{selectedDetail.incident.summary}</p>
                       </div>
                       {selectedDetail.server ? (
-                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                        <div className="ops-row-card">
                           <p className="font-medium">{selectedDetail.server.name}</p>
                           <p className="mt-1 text-muted-foreground">
                             {selectedDetail.server.status} •{' '}
@@ -477,16 +495,16 @@ export default function IncidentCenterPage() {
                         </div>
                       ) : null}
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                        <div className="ops-row-card">
                           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Affected keys</p>
                           <p className="mt-2 text-2xl font-semibold">{selectedDetail.incident.affectedKeyCount}</p>
                         </div>
-                        <div className="rounded-2xl border border-border/60 px-3 py-3">
+                        <div className="ops-row-card">
                           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Affected users</p>
                           <p className="mt-2 text-2xl font-semibold">{selectedDetail.incident.affectedUserCount}</p>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-border/60 px-3 py-3">
+                      <div className="ops-row-card">
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Notes</p>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
                           {selectedDetail.incident.notes || 'No operator notes yet.'}
@@ -496,8 +514,8 @@ export default function IncidentCenterPage() {
                   </Card>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                <div className="ops-section-grid">
+                  <Card className="ops-detail-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Affected keys</CardTitle>
                     </CardHeader>
@@ -506,7 +524,7 @@ export default function IncidentCenterPage() {
                         <p className="text-sm text-muted-foreground">No keys are currently attached to this server.</p>
                       ) : (
                         selectedDetail.affectedKeys.slice(0, 8).map((key) => (
-                          <div key={key.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 px-3 py-3">
+                          <div key={key.id} className="ops-row-card flex items-center justify-between gap-3">
                             <div>
                               <p className="font-medium">{key.name}</p>
                               <p className="text-xs text-muted-foreground">{key.status}</p>
@@ -521,7 +539,7 @@ export default function IncidentCenterPage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                  <Card className="ops-detail-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Affected users</CardTitle>
                     </CardHeader>
@@ -530,7 +548,7 @@ export default function IncidentCenterPage() {
                         <p className="text-sm text-muted-foreground">No user ownership is attached to this server’s keys.</p>
                       ) : (
                         selectedDetail.affectedUsers.map((user) => (
-                          <div key={`${user.type}-${user.label}`} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 px-3 py-3">
+                          <div key={`${user.type}-${user.label}`} className="ops-row-card flex items-center justify-between gap-3">
                             <p className="font-medium">{user.label}</p>
                             <Badge variant="outline">{user.type}</Badge>
                           </div>
@@ -540,13 +558,13 @@ export default function IncidentCenterPage() {
                   </Card>
                 </div>
 
-                <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+                <Card className="ops-detail-card">
+                  <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <CardTitle className="text-base">Notification links</CardTitle>
                       <CardDescription>Recent delivery history connected to this incident.</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" asChild className="rounded-full">
                       <Link href="/dashboard/notifications">Open delivery history</Link>
                     </Button>
                   </CardHeader>
@@ -555,7 +573,7 @@ export default function IncidentCenterPage() {
                       <p className="text-sm text-muted-foreground">No notification deliveries were linked to this incident yet.</p>
                     ) : (
                       selectedDetail.notifications.slice(0, 8).map((entry) => (
-                        <div key={entry.id} className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/60 px-3 py-3">
+                        <div key={entry.id} className="ops-row-card flex flex-wrap items-start justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <BellRing className="h-4 w-4 text-primary" />
@@ -575,7 +593,7 @@ export default function IncidentCenterPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[1.5rem] border border-border/70 bg-background/65">
+                <Card className="ops-detail-card">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Resolution timeline</CardTitle>
                   </CardHeader>
@@ -584,7 +602,7 @@ export default function IncidentCenterPage() {
                       <p className="text-sm text-muted-foreground">No timeline entries were found for this incident yet.</p>
                     ) : (
                       selectedDetail.timeline.slice(0, 16).map((entry) => (
-                        <div key={entry.id} className="flex gap-3 rounded-2xl border border-border/60 px-3 py-3">
+                        <div key={entry.id} className="ops-row-card flex gap-3">
                           <div className="mt-0.5">
                             {entry.category === 'alert' ? (
                               <AlertTriangle className="h-4 w-4 text-amber-500" />
