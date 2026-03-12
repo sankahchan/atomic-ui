@@ -14,6 +14,7 @@
  *   5. View results summary
  */
 
+import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -45,6 +46,8 @@ import {
   ArrowRight,
   RefreshCw,
   MapPin,
+  Wand2,
+  CheckSquare,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -63,6 +66,26 @@ function StatusBadge({ status }: { status: string }) {
     <Badge variant="outline" className={cn('text-xs font-medium', variants[status] || '')}>
       {status}
     </Badge>
+  );
+}
+
+function MigrationStatCard({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string | number;
+  helper: string;
+}) {
+  return (
+    <div className="ops-kpi-tile">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{helper}</p>
+    </div>
   );
 }
 
@@ -241,6 +264,8 @@ export default function MigrationPage() {
   const allKeyIds = useMemo(() => new Set(previewKeys.map((k) => k.id)), [previewKeys]);
 
   const allSelected = selectedKeyIds.size > 0 && selectedKeyIds.size === allKeyIds.size;
+  const sourceServer = servers.find((server) => server.id === sourceServerId);
+  const targetServer = servers.find((server) => server.id === targetServerId);
 
   // ── Handlers ──
   function handleLoadPreview() {
@@ -308,30 +333,144 @@ export default function MigrationPage() {
   // ── Render ──
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ArrowRightLeft className="w-6 h-6 text-primary" />
-            Server Migration
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Migrate access keys between Outline servers
-          </p>
-        </div>
+      <section className="ops-showcase">
+        <div className="ops-showcase-grid">
+          <div className="space-y-5 self-start">
+            <Badge
+              variant="outline"
+              className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+            >
+              <ArrowRightLeft className="mr-2 h-3.5 w-3.5" />
+              Migration Control Center
+            </Badge>
 
-        {step !== 'select' && (
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Start Over
-          </Button>
-        )}
-      </div>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                Server migration
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Move access keys between Outline servers with a controlled preview, explicit selection, and live migration result tracking.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MigrationStatCard
+                label="Connected servers"
+                value={servers.length}
+                helper="Available for source and target selection."
+              />
+              <MigrationStatCard
+                label="Eligible keys"
+                value={previewKeys.length}
+                helper="Preview keys that can be moved."
+              />
+              <MigrationStatCard
+                label="Selected"
+                value={selectedKeyIds.size}
+                helper="Keys chosen for the next migration run."
+              />
+              <MigrationStatCard
+                label="Latest result"
+                value={migrationResult ? `${migrationResult.migrated}/${migrationResult.total}` : '—'}
+                helper={migrationResult ? `${migrationResult.failed} failed in the last run.` : 'No migration run yet.'}
+              />
+            </div>
+          </div>
+
+          <div className="ops-detail-rail">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Migration controls</p>
+                <h2 className="text-xl font-semibold">Command rail</h2>
+                <p className="text-sm text-muted-foreground">
+                  Start over, inspect server inventory, or open the dedicated deploy and key surfaces without leaving migration.
+                </p>
+              </div>
+
+              {step !== 'select' ? (
+                <Button variant="outline" className="h-11 w-full rounded-full" onClick={handleReset}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Start over
+                </Button>
+              ) : null}
+
+              <div className="space-y-2">
+                <Link href="/dashboard/servers" className="ops-action-tile">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Server className="h-4 w-4 text-primary" />
+                    Open server inventory
+                  </span>
+                  <span className="text-xs text-muted-foreground">Open</span>
+                </Link>
+                <Link href="/dashboard/keys" className="ops-action-tile">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Key className="h-4 w-4 text-primary" />
+                    Review access keys
+                  </span>
+                  <span className="text-xs text-muted-foreground">Open</span>
+                </Link>
+              </div>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Migration path</p>
+                <h2 className="text-xl font-semibold">Current route</h2>
+              </div>
+
+              <div className="ops-detail-card space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Source</p>
+                    <p className="text-sm text-muted-foreground">
+                      {sourceServer ? `${sourceServer.name}${sourceServer.location ? ` · ${sourceServer.location}` : ''}` : 'Not selected'}
+                    </p>
+                  </div>
+                  <MapPin className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ArrowRight className="h-4 w-4" />
+                  <span>to</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Target</p>
+                    <p className="text-sm text-muted-foreground">
+                      {targetServer ? `${targetServer.name}${targetServer.location ? ` · ${targetServer.location}` : ''}` : 'Not selected'}
+                    </p>
+                  </div>
+                  <Server className="h-4 w-4 text-primary" />
+                </div>
+              </div>
+
+              <div className="ops-detail-card space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Workflow
+                </p>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p className="inline-flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                    Select source and target
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 text-primary" />
+                    Preview eligible keys
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4 text-primary" />
+                    Run the migration and review results
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Step 1: Server Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+      <Card className="ops-panel">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle className="text-xl flex items-center gap-2">
             <Server className="w-5 h-5 text-primary" />
             1. Select Servers
           </CardTitle>
@@ -339,10 +478,10 @@ export default function MigrationPage() {
             Choose the source server to move keys from and the target server to move them to.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0 pb-0">
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
             {/* Source server */}
-            <div className="space-y-2">
+            <div className="ops-detail-card space-y-2">
               <Label>Source Server</Label>
               <Select
                 value={sourceServerId}
@@ -379,7 +518,7 @@ export default function MigrationPage() {
             </div>
 
             {/* Target server */}
-            <div className="space-y-2">
+            <div className="ops-detail-card space-y-2">
               <Label>Target Server</Label>
               <Select
                 value={targetServerId}
@@ -412,7 +551,7 @@ export default function MigrationPage() {
           </div>
 
           {/* Options row */}
-          <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border/50">
+          <div className="ops-mobile-action-bar mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Checkbox
                 id="deleteFromSource"
@@ -424,26 +563,24 @@ export default function MigrationPage() {
                 Delete old keys from source server after migration
               </Label>
             </div>
-
-            <div className="ml-auto">
-              <Button
-                onClick={handleLoadPreview}
-                disabled={!sourceServerId || !targetServerId || step === 'migrating'}
-              >
-                Load Keys
-              </Button>
-            </div>
+            <Button
+              className="sm:min-w-[160px]"
+              onClick={handleLoadPreview}
+              disabled={!sourceServerId || !targetServerId || step === 'migrating'}
+            >
+              Load Keys
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Step 2: Key Selection Preview */}
       {(step === 'preview' || step === 'migrating' || step === 'done') && (
-        <Card>
-          <CardHeader>
+        <Card className="ops-panel">
+          <CardHeader className="px-0 pt-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-xl flex items-center gap-2">
                   <Key className="w-5 h-5 text-primary" />
                   2. Select Keys to Migrate
                 </CardTitle>
@@ -475,22 +612,69 @@ export default function MigrationPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0 pb-0">
             {previewQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="ops-chart-empty">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 <span className="ml-2 text-muted-foreground">Loading keys...</span>
               </div>
             ) : previewKeys.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <div className="ops-chart-empty flex-col py-12 text-muted-foreground">
                 <Key className="w-10 h-10 mb-2 opacity-30" />
                 <p>No eligible keys found on the source server.</p>
                 <p className="text-xs mt-1">Only ACTIVE and PENDING keys can be migrated.</p>
               </div>
             ) : (
               <>
+                <div className="space-y-3 md:hidden">
+                  {previewKeys.map((key) => {
+                    const isSelected = selectedKeyIds.has(key.id);
+                    const keyResult = migrationResult?.results.find((r) => r.keyId === key.id);
+
+                    return (
+                      <div
+                        key={key.id}
+                        className={cn(
+                          'ops-mobile-card space-y-3',
+                          isSelected && 'ring-1 ring-primary/30',
+                          keyResult?.success && 'border-emerald-500/30',
+                          keyResult && !keyResult.success && 'border-red-500/30',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{key.name}</p>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                              <StatusBadge status={key.status} />
+                              {key.dynamicKeyName ? <span>{key.dynamicKeyName}</span> : null}
+                            </div>
+                          </div>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleKey(key.id)}
+                            disabled={step === 'migrating'}
+                          />
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Usage</p>
+                            <p className="mt-2 text-lg font-semibold">{formatBytes(BigInt(key.usedBytes))}</p>
+                          </div>
+                          <div className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Data limit</p>
+                            <p className="mt-2 text-lg font-semibold">
+                              {key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : 'None'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
                 {/* Key table */}
-                <div className="rounded-lg border border-border overflow-hidden">
+                <div className="ops-data-shell hidden md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -568,7 +752,7 @@ export default function MigrationPage() {
 
                 {/* Progress bar during migration */}
                 {step === 'migrating' && (
-                  <div className="mt-4 space-y-2">
+                  <div className="ops-detail-card mt-4 space-y-2">
                     <div className="flex items-center gap-2 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin text-primary" />
                       <span className="text-muted-foreground">
@@ -581,7 +765,7 @@ export default function MigrationPage() {
 
                 {/* Action buttons */}
                 {step === 'preview' && (
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+                  <div className="ops-mobile-action-bar mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                       {selectedKeyIds.size} of {previewKeys.length} keys selected
                     </p>
@@ -598,7 +782,7 @@ export default function MigrationPage() {
 
                 {/* Done state */}
                 {step === 'done' && migrationResult && (
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+                  <div className="ops-mobile-action-bar mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       <span>
@@ -619,11 +803,11 @@ export default function MigrationPage() {
 
       {/* How It Works card */}
       {step === 'select' && (
-        <Card className="bg-muted/30">
-          <CardHeader>
-            <CardTitle className="text-base">How Server Migration Works</CardTitle>
+        <Card className="ops-panel">
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-xl">How server migration works</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
+          <CardContent className="ops-detail-card px-5 py-5 text-sm text-muted-foreground space-y-2">
             <p>For each selected key, the migration tool will:</p>
             <ol className="list-decimal list-inside space-y-1 ml-2">
               <li>Create a new access key on the target Outline server</li>

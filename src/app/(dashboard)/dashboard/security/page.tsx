@@ -188,17 +188,17 @@ function DashboardSecurityCard() {
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader>
+            <Card className="ops-detail-card">
+                <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
                         Dashboard Security
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className="animate-pulse space-y-4">
-                        <div className="h-32 bg-muted rounded" />
-                        <div className="h-4 bg-muted rounded w-3/4" />
+                        <div className="h-32 rounded-[1.35rem] bg-muted/60" />
+                        <div className="h-4 w-3/4 rounded bg-muted/60" />
                     </div>
                 </CardContent>
             </Card>
@@ -207,14 +207,14 @@ function DashboardSecurityCard() {
 
     if (!dashboardStatus) {
         return (
-            <Card>
-                <CardHeader>
+            <Card className="ops-detail-card">
+                <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
                         Dashboard Security
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className="text-center py-8 text-muted-foreground">
                         <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p>Security probe has not run yet.</p>
@@ -226,8 +226,8 @@ function DashboardSecurityCard() {
     }
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="ops-detail-card">
+            <CardHeader className="px-0 pt-0">
                 <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5" />
                     Dashboard Security
@@ -236,7 +236,7 @@ function DashboardSecurityCard() {
                     Security assessment of this management panel
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 px-0 pb-0">
                 <div className="flex items-center gap-6">
                     <SecurityScoreRing score={dashboardStatus.securityScore} />
                     <div className="flex-1 space-y-4">
@@ -327,16 +327,16 @@ function ServerSecurityCard() {
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader>
+            <Card className="ops-detail-card">
+                <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Server className="h-5 w-5" />
                         Server Certificates
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className="animate-pulse space-y-3">
-                        {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted rounded" />)}
+                        {[1, 2, 3].map(i => <div key={i} className="h-16 rounded-[1.2rem] bg-muted/60" />)}
                     </div>
                 </CardContent>
             </Card>
@@ -344,8 +344,8 @@ function ServerSecurityCard() {
     }
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="ops-detail-card">
+            <CardHeader className="px-0 pt-0">
                 <CardTitle className="flex items-center gap-2">
                     <Server className="h-5 w-5" />
                     Server Certificates
@@ -354,7 +354,7 @@ function ServerSecurityCard() {
                     TLS certificate status for managed Outline servers
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0 pb-0">
                 {!serverProbes || serverProbes.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                         <Server className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -366,7 +366,7 @@ function ServerSecurityCard() {
                         {serverProbes.map((probe) => (
                             <div
                                 key={probe.id}
-                                className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                                className="ops-row-card flex items-center justify-between"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-full ${
@@ -426,12 +426,12 @@ function SecuritySummaryCards() {
     }
 
     return (
-        <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-                <CardHeader className="pb-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="ops-kpi-tile">
+                <CardHeader className="px-0 pb-2 pt-0">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Security Score</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className="flex items-center gap-2">
                         <span className={`text-2xl font-bold ${
                             summary.dashboardSecurityScore >= 80 ? 'text-green-500' :
@@ -446,11 +446,11 @@ function SecuritySummaryCards() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader className="pb-2">
+            <Card className="ops-kpi-tile">
+                <CardHeader className="px-0 pb-2 pt-0">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Server Status</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className="text-2xl font-bold">
                         {summary.healthyServers}/{summary.serverCount}
                     </div>
@@ -458,11 +458,11 @@ function SecuritySummaryCards() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader className="pb-2">
+            <Card className="ops-kpi-tile">
+                <CardHeader className="px-0 pb-2 pt-0">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Certificate Warnings</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className={`text-2xl font-bold ${summary.expiringCerts > 0 ? 'text-yellow-500' : ''}`}>
                         {summary.expiringCerts}
                     </div>
@@ -470,11 +470,11 @@ function SecuritySummaryCards() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader className="pb-2">
+            <Card className="ops-kpi-tile">
+                <CardHeader className="px-0 pb-2 pt-0">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Issues</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 pb-0">
                     <div className={`text-2xl font-bold ${(summary.expiredCerts + summary.tlsErrors + summary.connectionErrors) > 0 ? 'text-red-500' : 'text-green-500'}`}>
                         {summary.expiredCerts + summary.tlsErrors + summary.connectionErrors}
                     </div>
@@ -526,47 +526,88 @@ export default function SecurityPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <BackButton href="/dashboard" label="Dashboard" />
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <ShieldCheck className="w-8 h-8 text-primary" />
-                        Security & Access Control
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Monitor security status and manage access rules
-                    </p>
+            <section className="ops-showcase">
+                <div className="ops-showcase-grid">
+                    <div className="space-y-5 self-start">
+                        <Badge
+                            variant="outline"
+                            className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+                        >
+                            <ShieldCheck className="mr-2 h-3.5 w-3.5" />
+                            Security Command Center
+                        </Badge>
+
+                        <div className="space-y-3">
+                            <div className="text-sm text-muted-foreground">
+                                <BackButton href="/dashboard" label="Dashboard" />
+                            </div>
+                            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                                Security & access control
+                            </h1>
+                            <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                                Monitor dashboard and server security posture, trigger fresh probes, and control dashboard access with IP, CIDR, and country rules.
+                            </p>
+                        </div>
+
+                        <SecuritySummaryCards />
+                    </div>
+
+                    <div className="ops-detail-rail">
+                        <div className="ops-panel space-y-3">
+                            <div className="space-y-1">
+                                <p className="ops-section-heading">Security controls</p>
+                                <h2 className="text-xl font-semibold">Command rail</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Trigger a new probe or jump straight into the rule tab when you need to tighten panel access.
+                                </p>
+                            </div>
+
+                            <Button className="h-11 w-full rounded-full" onClick={() => triggerProbeMutation.mutate()} disabled={triggerProbeMutation.isPending}>
+                                <RefreshCw className={`mr-2 h-4 w-4 ${triggerProbeMutation.isPending ? 'animate-spin' : ''}`} />
+                                {triggerProbeMutation.isPending ? 'Running probe…' : 'Run security probe'}
+                            </Button>
+
+                            <Button variant="outline" className="h-11 w-full rounded-full" onClick={() => setActiveTab('rules')}>
+                                <Lock className="mr-2 h-4 w-4" />
+                                Open access rules
+                            </Button>
+                        </div>
+
+                        <div className="ops-panel space-y-3">
+                            <div className="space-y-1">
+                                <p className="ops-section-heading">Probe note</p>
+                                <h2 className="text-xl font-semibold">Worker status</h2>
+                            </div>
+                            <div className="ops-detail-card space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    Security probes run automatically via the security worker process. Use the probe action when you need a fresh certificate or header check immediately.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => triggerProbeMutation.mutate()} disabled={triggerProbeMutation.isPending}>
-                        <RefreshCw className={`w-4 h-4 mr-2 ${triggerProbeMutation.isPending ? 'animate-spin' : ''}`} />
-                        {triggerProbeMutation.isPending ? 'Running...' : 'Run Probe'}
-                    </Button>
-                </div>
-            </div>
+            </section>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
+                <TabsList className="ops-command-bar h-auto w-full justify-start gap-2 rounded-[1.5rem] border-0 bg-transparent p-0 md:w-fit">
                     <TabsTrigger value="status">Security Status</TabsTrigger>
                     <TabsTrigger value="rules">Access Rules</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="status" className="space-y-6 mt-6">
-                    <SecuritySummaryCards />
-
                     <div className="grid gap-6 lg:grid-cols-2">
                         <DashboardSecurityCard />
                         <ServerSecurityCard />
                     </div>
 
-                    <Card className="bg-blue-500/10 border-blue-500/20">
-                        <CardHeader className="pb-2">
+                    <Card className="ops-panel border-blue-500/20 bg-blue-500/10 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_24%),linear-gradient(180deg,rgba(4,11,23,0.95),rgba(5,12,25,0.84))]">
+                        <CardHeader className="px-0 pb-2 pt-0">
                             <CardTitle className="text-lg text-blue-500 flex items-center gap-2">
                                 <AlertCircle className="w-5 h-5" />
                                 Security Worker
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-0 pb-0">
                             <p className="text-sm text-blue-400">
                                 Security probes run automatically via the security worker process.
                                 See the worker setup documentation for deployment instructions.
@@ -576,7 +617,12 @@ export default function SecurityPage() {
                 </TabsContent>
 
                 <TabsContent value="rules" className="space-y-6 mt-6">
-                    <div className="flex justify-end">
+                    <div className="ops-table-toolbar">
+                        <div className="flex items-center gap-2">
+                            <div className="ops-table-meta">
+                                {rules?.length ?? 0} configured rules
+                            </div>
+                        </div>
                         <Button onClick={() => setCreateOpen(true)}>
                             <Plus className="w-4 h-4 mr-2" />
                             Add Rule
@@ -584,14 +630,14 @@ export default function SecurityPage() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-3">
-                        <Card className="bg-red-500/10 border-red-500/20">
-                            <CardHeader className="pb-2">
+                        <Card className="ops-panel bg-red-500/10 border-red-500/20 dark:border-red-500/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.16),transparent_24%),linear-gradient(180deg,rgba(4,11,23,0.95),rgba(5,12,25,0.84))]">
+                            <CardHeader className="px-0 pb-2 pt-0">
                                 <CardTitle className="text-lg text-red-500 flex items-center gap-2">
                                     <AlertTriangle className="w-5 h-5" />
                                     Warning
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="px-0 pb-0">
                                 <p className="text-sm text-red-400">
                                     Be careful when adding blocking rules. Ensure you do not block your own IP address. Localhost is always allowed.
                                 </p>
@@ -599,26 +645,26 @@ export default function SecurityPage() {
                         </Card>
                     </div>
 
-                    <Card>
-                        <CardHeader>
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
                             <CardTitle>Active Rules</CardTitle>
                             <CardDescription>
                                 Rules are evaluated in order: Allowed Localhost - Block Rules - Allow Rules.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-0 pb-0">
                             {isLoading ? (
                                 <div className="space-y-2">
-                                    {[1, 2, 3].map(i => <div key={i} className="h-12 bg-muted animate-pulse rounded" />)}
+                                    {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-[1.2rem] bg-muted/60 animate-pulse" />)}
                                 </div>
                             ) : rules?.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
+                                <div className="ops-chart-empty py-8 text-muted-foreground">
                                     No security rules defined. All traffic is allowed.
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     {rules?.map((rule) => (
-                                        <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                                        <div key={rule.id} className="ops-row-card flex items-center justify-between gap-4">
                                             <div className="flex items-start gap-4">
                                                 <div className={`p-2 rounded-full ${rule.type === 'BLOCK' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
                                                     {rule.type === 'BLOCK' ? <ShieldCheck className="w-5 h-5" /> : <Globe className="w-5 h-5" />}

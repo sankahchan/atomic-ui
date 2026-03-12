@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useDeferredValue, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,9 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BackButton } from '@/components/ui/back-button';
 import { useToast } from '@/hooks/use-toast';
-import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import {
@@ -22,6 +21,8 @@ import {
   Smartphone,
   Wifi,
   WifiOff,
+  ShieldCheck,
+  Users,
 } from 'lucide-react';
 
 type SessionStatusFilter = 'ALL' | 'ACTIVE' | 'STALE' | 'ENDED';
@@ -69,7 +70,6 @@ function formatDuration(minutes: number) {
 
 export default function SessionsPage() {
   const { toast } = useToast();
-  const { t } = useLocale();
   const utils = trpc.useUtils();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<SessionStatusFilter>('ALL');
@@ -143,94 +143,139 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <BackButton href="/dashboard" label={t('nav.dashboard')} />
-        <h1 className="text-2xl font-bold">Sessions</h1>
-        <p className="text-sm text-muted-foreground">
-          Review active device sessions, identify stale connections, and terminate them when needed.
-        </p>
-      </div>
+      <section className="ops-showcase">
+        <div className="ops-showcase-grid">
+          <div className="space-y-5 self-start">
+            <Badge
+              variant="outline"
+              className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+            >
+              <Smartphone className="mr-2 h-3.5 w-3.5" />
+              Device Sessions
+            </Badge>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active Sessions</CardDescription>
-            <CardTitle className="text-2xl">{summaryLoading ? '...' : summary?.activeCount ?? 0}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Sessions active within the last {summary?.staleThresholdMinutes ?? 5} minutes.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Stale Sessions</CardDescription>
-            <CardTitle className="text-2xl">{summaryLoading ? '...' : summary?.staleCount ?? 0}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Marked active, but older than the inactivity timeout.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active Keys</CardDescription>
-            <CardTitle className="text-2xl">{summaryLoading ? '...' : summary?.activeKeys ?? 0}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Keys with at least one live connection session.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active Owners</CardDescription>
-            <CardTitle className="text-2xl">{summaryLoading ? '...' : summary?.activeUsers ?? 0}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Distinct assigned users represented by active sessions.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active Traffic</CardDescription>
-            <CardTitle className="text-2xl">
-              {summaryLoading ? '...' : formatBytes(BigInt(summary?.totalActiveBytes ?? '0'))}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Total bytes accumulated by currently active sessions.
-          </CardContent>
-        </Card>
-      </div>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                Connection sessions
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Review active device sessions, identify stale connections, and terminate them when they no longer reflect real client activity.
+              </p>
+            </div>
 
-      <Card>
-        <CardHeader>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active sessions</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summaryLoading ? '…' : summary?.activeCount ?? 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Active within the last {summary?.staleThresholdMinutes ?? 5} minutes.
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Stale sessions</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summaryLoading ? '…' : summary?.staleCount ?? 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Marked active, but older than the timeout.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active keys</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summaryLoading ? '…' : summary?.activeKeys ?? 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Keys with at least one live connection session.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active owners</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summaryLoading ? '…' : summary?.activeUsers ?? 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Distinct users behind active sessions.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active traffic</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">
+                  {summaryLoading ? '…' : formatBytes(BigInt(summary?.totalActiveBytes ?? '0'))}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Bytes accumulated by current sessions.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="ops-detail-rail">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Session controls</p>
+                <h2 className="text-xl font-semibold">Command rail</h2>
+                <p className="text-sm text-muted-foreground">
+                  Clear stale devices, inspect active key inventory, or drill into server state while you review the session stream.
+                </p>
+              </div>
+
+              <Button
+                className="h-11 w-full rounded-full"
+                onClick={() => terminateStaleMutation.mutate()}
+                disabled={terminateStaleMutation.isPending}
+              >
+                {terminateStaleMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldAlert className="mr-2 h-4 w-4" />
+                )}
+                Close stale sessions
+              </Button>
+
+              <div className="space-y-2">
+                <Link href="/dashboard/keys" className="ops-action-tile">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Wifi className="h-4 w-4 text-primary" />
+                    Open access keys
+                  </span>
+                  <span className="text-xs text-muted-foreground">Open</span>
+                </Link>
+                <Link href="/dashboard/servers" className="ops-action-tile">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Users className="h-4 w-4 text-primary" />
+                    Review servers
+                  </span>
+                  <span className="text-xs text-muted-foreground">Open</span>
+                </Link>
+              </div>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Live status</p>
+                <h2 className="text-xl font-semibold">Session pulse</h2>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="ops-detail-card space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Timeout</p>
+                  <p className="text-2xl font-semibold tracking-tight">{summary?.staleThresholdMinutes ?? 5}m</p>
+                  <p className="text-sm text-muted-foreground">Threshold before a session is marked stale.</p>
+                </div>
+                <div className="ops-detail-card space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current page</p>
+                  <p className="text-2xl font-semibold tracking-tight">{data?.page ?? 1}/{data?.totalPages ?? 1}</p>
+                  <p className="text-sm text-muted-foreground">{data?.total ?? 0} sessions across the current filter set.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Card className="ops-panel">
+        <CardHeader className="px-0 pt-0">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl">
                 <Smartphone className="w-5 h-5 text-primary" />
-                Device Sessions
+                Device sessions
               </CardTitle>
               <CardDescription>
                 Filter by status or search by key, owner, or server name.
               </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => terminateStaleMutation.mutate()}
-                disabled={terminateStaleMutation.isPending}
-              >
-                {terminateStaleMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <ShieldAlert className="w-4 h-4 mr-2" />
-                )}
-                Close Stale
-              </Button>
-            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+        <CardContent className="space-y-4 px-0 pb-0">
+          <div className="ops-filter-bar grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
             <div className="space-y-2">
               <Label htmlFor="session-search">Search</Label>
               <div className="relative">
@@ -260,25 +305,31 @@ export default function SessionsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>{data?.total ?? 0} sessions</span>
-            <span>Page {data?.page ?? 1} / {data?.totalPages ?? 1}</span>
+          <div className="ops-table-toolbar">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="ops-table-meta">{data?.total ?? 0} sessions</div>
+              <div className="ops-table-meta">Page {data?.page ?? 1} / {data?.totalPages ?? 1}</div>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              <span>{isFetching ? 'Refreshing…' : 'Live session stream'}</span>
+            </div>
           </div>
 
           <div className="space-y-3 lg:hidden">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="ops-chart-empty py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : sessions.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              <div className="ops-chart-empty border-dashed p-8 text-center text-sm text-muted-foreground">
                 No sessions match the current filters.
               </div>
             ) : (
               sessions.map((session) => {
                 const sessionStatus = getSessionStatus(session);
                 return (
-                  <div key={session.id} className="rounded-lg border p-4 space-y-3">
+                  <div key={session.id} className="ops-mobile-card space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{session.accessKeyName}</p>
@@ -300,7 +351,7 @@ export default function SessionsPage() {
                       <p><span className="text-muted-foreground">Ended reason:</span> {session.endedReason ?? '-'}</p>
                     </div>
                     {session.isActive ? (
-                      <div className="flex justify-end">
+                      <div className="ops-mobile-action-bar flex justify-end">
                         <Button
                           variant="outline"
                           size="sm"
@@ -322,7 +373,7 @@ export default function SessionsPage() {
             )}
           </div>
 
-          <div className="hidden lg:block">
+          <div className="ops-data-shell hidden lg:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -420,7 +471,7 @@ export default function SessionsPage() {
             </Table>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="ops-table-toolbar">
             <Button
               variant="outline"
               size="sm"
