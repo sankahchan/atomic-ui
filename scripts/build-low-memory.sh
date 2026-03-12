@@ -28,6 +28,9 @@ if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   fi
   if [[ -d prisma ]]; then
     cp -r prisma .next/standalone/
+    # Keep Prisma schema/runtime assets, but never publish a copied live SQLite DB.
+    rm -rf .next/standalone/prisma/data .next/standalone/prisma/data.backup
+    find .next/standalone/prisma -maxdepth 1 -type f \( -name '*.db' -o -name '*.db-shm' -o -name '*.db-wal' \) -delete
   fi
 fi
 

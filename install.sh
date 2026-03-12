@@ -289,6 +289,8 @@ fi
 # Setup database
 echo -e "${BLUE}[*]${NC} Setting up database..."
 mkdir -p prisma/data
+DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
+set_env_var "DATABASE_URL" "file:${DB_PATH}"
 
 echo -e "${BLUE}[*]${NC} Generating Prisma client..."
 if ! npx prisma generate 2>&1; then
@@ -346,6 +348,7 @@ RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=${PANEL_PORT}
 Environment=PANEL_PATH=/${PANEL_PATH}
+Environment=DATABASE_URL=file:${DB_PATH}
 Environment=NODE_OPTIONS=--max-old-space-size=384
 
 [Install]

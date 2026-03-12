@@ -369,6 +369,7 @@ setup_environment() {
     fi
     
     SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+    DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
     
     # Update port in .env
     if grep -q "^PORT=" .env; then
@@ -383,6 +384,12 @@ setup_environment() {
 
     # Save port to file
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
+
+    if grep -q "^DATABASE_URL=" .env; then
+        sed -i "s|^DATABASE_URL=.*|DATABASE_URL=file:${DB_PATH}|g" .env
+    else
+        echo "DATABASE_URL=file:${DB_PATH}" >> .env
+    fi
 
     print_success "Environment configured with port ${NEW_PORT}"
 }
@@ -486,6 +493,7 @@ SyslogIdentifier=${SERVICE_NAME}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment=HOSTNAME=0.0.0.0
+Environment=DATABASE_URL=file:${INSTALL_DIR}/prisma/data/atomic-ui.db
 Environment=NODE_OPTIONS=--max-old-space-size=512
 
 [Install]
