@@ -40,7 +40,8 @@ const ENCRYPTION_METHODS = [
 ] as const;
 
 const ONLINE_SESSION_WINDOW_MS = 60 * 1000;
-const MIN_LIVE_ACTIVITY_BYTES = BigInt(1024);
+// Require at least 64 KB of fresh traffic before refreshing "last seen" from live polling.
+const MIN_LIVE_ACTIVITY_BYTES = BigInt(64 * 1024);
 
 const createKeySchema = z.object({
   serverId: z.string().optional().nullable(),

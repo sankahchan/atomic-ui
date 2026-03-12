@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 const ONLINE_WINDOW_MS = 30000; // 30 seconds
 
 // Minimum bytes increase to consider as real activity (not probe/heartbeat traffic)
-// 1KB threshold filters out small probe packets while detecting real usage
-const MIN_ACTIVITY_BYTES = BigInt(1024); // 1 KB
+// 64 KB filters out low-noise traffic that should not keep a key marked online.
+const MIN_ACTIVITY_BYTES = BigInt(64 * 1024);
 
 interface KeyUsage {
     id: string;

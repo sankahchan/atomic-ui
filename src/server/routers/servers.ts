@@ -66,7 +66,8 @@ const parseConfigSchema = z.object({
   config: z.string(),
 });
 
-const MIN_ONLINE_ACTIVITY_BYTES = 1024;
+// Require a meaningful traffic burst before keeping a key "online".
+const MIN_ONLINE_ACTIVITY_BYTES = 64 * 1024;
 
 export const serversRouter = router({
   /**
