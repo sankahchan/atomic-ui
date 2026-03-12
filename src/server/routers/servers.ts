@@ -66,8 +66,10 @@ const parseConfigSchema = z.object({
   config: z.string(),
 });
 
-// Require a meaningful traffic burst before keeping a key "online".
-const MIN_ONLINE_ACTIVITY_BYTES = 64 * 1024;
+// A small but real traffic delta is enough to keep a session alive.
+const MIN_SESSION_KEEPALIVE_BYTES = 16 * 1024;
+// Require a larger burst before refreshing "last seen".
+const MIN_MEANINGFUL_ACTIVITY_BYTES = 64 * 1024;
 
 export const serversRouter = router({
   /**
@@ -673,9 +675,9 @@ export const serversRouter = router({
               });
             }
 
-            // Ignore tiny probe traffic so it does not keep keys falsely "online".
-            const hasTraffic = bytesTransferred >= MIN_ONLINE_ACTIVITY_BYTES;
-            if (hasTraffic) {
+            const hasSessionTraffic = bytesTransferred >= MIN_SESSION_KEEPALIVE_BYTES;
+            const hasMeaningfulTraffic = bytesTransferred >= MIN_MEANINGFUL_ACTIVITY_BYTES;
+            if (hasMeaningfulTraffic) {
               updateData.lastUsedAt = new Date();
             }
 
@@ -688,7 +690,7 @@ export const serversRouter = router({
             // Session tracking for device estimation
             const now = new Date();
 
-            if (hasTraffic) {
+            if (hasSessionTraffic) {
               // Check for active session
               const activeSession = await db.connectionSession.findFirst({
                 where: {
@@ -1192,15 +1194,16 @@ export const serversRouter = router({
             logger.debug(`📉 [syncAll] Key ${keyId} (${outlineKey.name}) depleted - used ${effectiveUsedBytes} of ${dbLimit} bytes`);
           }
 
-          const hasTraffic = bytesTransferred >= MIN_ONLINE_ACTIVITY_BYTES;
-          if (hasTraffic) {
+          const hasSessionTraffic = bytesTransferred >= MIN_SESSION_KEEPALIVE_BYTES;
+          const hasMeaningfulTraffic = bytesTransferred >= MIN_MEANINGFUL_ACTIVITY_BYTES;
+          if (hasMeaningfulTraffic) {
             updateData.lastUsedAt = now;
           }
 
           dbOperations.push({ type: 'updateAccessKey', id: existingKey.id, data: updateData });
 
           // Track session updates for later processing
-          sessionUpdates.push({ keyId: existingKey.id, hasTraffic, bytesTransferred, existingKey });
+          sessionUpdates.push({ keyId: existingKey.id, hasTraffic: hasSessionTraffic, bytesTransferred, existingKey });
 
           // Create TrafficLog for significant traffic
           const MIN_TRAFFIC_THRESHOLD = 100 * 1024;

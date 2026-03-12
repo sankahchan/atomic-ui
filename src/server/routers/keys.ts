@@ -21,6 +21,11 @@ import { Prisma } from '@prisma/client';
 import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
+import {
+  CONNECTION_SESSION_TIMEOUT_MS,
+  ONLINE_ACTIVITY_WINDOW_MS,
+  refreshAccessKeySessionCounts,
+} from '@/lib/services/session-management';
 
 /**
  * Validation schema for creating a new access key.
@@ -39,7 +44,8 @@ const ENCRYPTION_METHODS = [
   'aes-256-gcm',
 ] as const;
 
-const ONLINE_SESSION_WINDOW_MS = 60 * 1000;
+// Require at least 16 KB of fresh traffic before extending a live session.
+const MIN_SESSION_KEEPALIVE_BYTES = BigInt(16 * 1024);
 // Require at least 64 KB of fresh traffic before refreshing "last seen" from live polling.
 const MIN_LIVE_ACTIVITY_BYTES = BigInt(64 * 1024);
 
@@ -207,7 +213,7 @@ export const keysRouter = router({
 
       // Quick filter: Online (recent active connection session)
       if (online) {
-        const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
+        const onlineThreshold = new Date(Date.now() - ONLINE_ACTIVITY_WINDOW_MS);
         where.status = 'ACTIVE';
         where.sessions = {
           some: {
@@ -1558,7 +1564,7 @@ export const keysRouter = router({
    * A key is considered "online" when it has a recent active connection session.
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
+    const onlineThreshold = new Date(Date.now() - ONLINE_ACTIVITY_WINDOW_MS);
 
     const activeKeys = await db.accessKey.findMany({
       where: {
@@ -1790,7 +1796,9 @@ export const keysRouter = router({
    * directly from Outline for responsive UI updates.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    const onlineThreshold = new Date(Date.now() - ONLINE_SESSION_WINDOW_MS);
+    const now = new Date();
+    const onlineThreshold = new Date(now.getTime() - ONLINE_ACTIVITY_WINDOW_MS);
+    const staleThreshold = new Date(now.getTime() - CONNECTION_SESSION_TIMEOUT_MS);
     const servers = await db.server.findMany({
       where: { isActive: true },
       select: {
@@ -1818,7 +1826,8 @@ export const keysRouter = router({
     });
 
     const resultsMap = new Map<string, { id: string; usedBytes: string; isOnline: boolean }>();
-    const keysWithNewTraffic: string[] = [];
+    const keysWithFreshTraffic = new Set<string>();
+    const keysWithMeaningfulTraffic = new Set<string>();
 
     // Build a map of key id -> current stored bytes for comparison
     const keyBytesMap = new Map<string, bigint>();
@@ -1847,18 +1856,24 @@ export const keysRouter = router({
 
               const offset = Number(key.usageOffset || 0);
               const effectiveBytes = rawBytes < offset ? rawBytes : rawBytes - offset;
+              const storedBytes = keyBytesMap.get(key.id) || BigInt(0);
+              const trafficDelta = BigInt(effectiveBytes) - storedBytes;
+
+              const hasFreshTraffic = trafficDelta >= MIN_SESSION_KEEPALIVE_BYTES;
+              const hasMeaningfulTraffic = trafficDelta >= MIN_LIVE_ACTIVITY_BYTES;
 
               resultsMap.set(key.id, {
                 id: key.id,
                 usedBytes: effectiveBytes.toString(),
-                isOnline: resultsMap.get(key.id)?.isOnline ?? false,
+                isOnline: (resultsMap.get(key.id)?.isOnline ?? false) || hasFreshTraffic,
               });
 
-              // Only treat meaningful traffic as fresh activity for "last seen".
-              const storedBytes = keyBytesMap.get(key.id) || BigInt(0);
-              const trafficDelta = BigInt(effectiveBytes) - storedBytes;
-              if (trafficDelta >= MIN_LIVE_ACTIVITY_BYTES) {
-                keysWithNewTraffic.push(key.id);
+              if (hasFreshTraffic) {
+                keysWithFreshTraffic.add(key.id);
+              }
+
+              if (hasMeaningfulTraffic) {
+                keysWithMeaningfulTraffic.add(key.id);
               }
             }
           }
@@ -1868,15 +1883,75 @@ export const keysRouter = router({
       })
     );
 
-    // Batch update lastUsedAt for keys with new traffic (non-blocking)
-    if (keysWithNewTraffic.length > 0) {
+    // Batch update lastUsedAt for keys with meaningful traffic (non-blocking)
+    if (keysWithMeaningfulTraffic.size > 0) {
       db.accessKey.updateMany({
-        where: { id: { in: keysWithNewTraffic } },
-        data: { lastUsedAt: new Date() },
+        where: { id: { in: Array.from(keysWithMeaningfulTraffic) } },
+        data: { lastUsedAt: now },
       }).catch(() => {
         // Silently ignore update errors - this is a best-effort optimization
       });
     }
+
+    if (keysWithFreshTraffic.size > 0) {
+      const liveKeyIds = Array.from(keysWithFreshTraffic);
+      db.connectionSession
+        .findMany({
+          where: {
+            accessKeyId: { in: liveKeyIds },
+            isActive: true,
+          },
+          select: {
+            id: true,
+            accessKeyId: true,
+          },
+        })
+        .then(async (activeSessions) => {
+          const activeSessionMap = new Map(
+            activeSessions.map((session) => [session.accessKeyId, session.id]),
+          );
+
+          await Promise.all(
+            liveKeyIds.map(async (keyId) => {
+              const sessionId = activeSessionMap.get(keyId);
+              if (sessionId) {
+                await db.connectionSession.update({
+                  where: { id: sessionId },
+                  data: { lastActiveAt: now },
+                });
+              } else {
+                await db.connectionSession.create({
+                  data: {
+                    accessKeyId: keyId,
+                    lastActiveAt: now,
+                  },
+                });
+              }
+
+              await refreshAccessKeySessionCounts(keyId);
+            }),
+          );
+        })
+        .catch(() => {
+          // Best-effort keepalive only.
+        });
+    }
+
+    db.connectionSession
+      .updateMany({
+        where: {
+          isActive: true,
+          lastActiveAt: { lt: staleThreshold },
+        },
+        data: {
+          isActive: false,
+          endedAt: now,
+          endedReason: 'INACTIVITY_TIMEOUT',
+        },
+      })
+      .catch(() => {
+        // Best-effort stale session cleanup.
+      });
 
     return Array.from(resultsMap.values());
   }),

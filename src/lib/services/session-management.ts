@@ -1,6 +1,13 @@
 import { db } from '@/lib/db';
 
-export const CONNECTION_SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+// A session should fall out quickly after traffic stops so the UI does not
+// keep keys "online" long after the client disconnects.
+export const CONNECTION_SESSION_TIMEOUT_MS = 60 * 1000;
+
+// The dashboard online pill is intentionally shorter-lived than the
+// underlying session timeout so presence clears fast without tearing down
+// device/session history immediately.
+export const ONLINE_ACTIVITY_WINDOW_MS = 20 * 1000;
 
 export function isConnectionSessionStale(lastActiveAt: Date, now = new Date()) {
   return now.getTime() - lastActiveAt.getTime() > CONNECTION_SESSION_TIMEOUT_MS;
