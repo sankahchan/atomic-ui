@@ -364,6 +364,86 @@ export const keysRouter = router({
     }),
 
   /**
+   * Get recent traffic diagnostics for a single access key.
+   *
+   * This powers the "Traffic Active" UI with a fresher server-side snapshot
+   * without forcing the detail page to infer presence from older page data.
+   */
+  getActivitySnapshot: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          lastTrafficAt: true,
+          lastUsedAt: true,
+          estimatedDevices: true,
+          peakDevices: true,
+          outlineKeyId: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      const [collectorResult, activeSessions] = await Promise.all([
+        collectTrafficActivity({ keyIds: [input.id] }),
+        db.connectionSession.count({
+          where: {
+            accessKeyId: input.id,
+            isActive: true,
+          },
+        }),
+      ]);
+
+      const observedKey = collectorResult.accessKeys.find((item) => item.id === input.id);
+      const refreshedKey = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          lastTrafficAt: true,
+          lastUsedAt: true,
+          estimatedDevices: true,
+          peakDevices: true,
+        },
+      });
+
+      const lastTrafficAt = observedKey?.lastTrafficAt ?? refreshedKey?.lastTrafficAt ?? key.lastTrafficAt;
+      const lastUsedAt = refreshedKey?.lastUsedAt ?? key.lastUsedAt;
+      const estimatedDevices = refreshedKey?.estimatedDevices ?? key.estimatedDevices;
+      const peakDevices = refreshedKey?.peakDevices ?? key.peakDevices;
+
+      return {
+        id: key.id,
+        status: key.status,
+        outlineKeyId: key.outlineKeyId,
+        lastTrafficAt: lastTrafficAt?.toISOString() ?? null,
+        lastUsedAt: lastUsedAt?.toISOString() ?? null,
+        isTrafficActive: observedKey
+          ? observedKey.isTrafficActive
+          : isTrafficActive(lastTrafficAt, collectorResult.now),
+        recentTrafficDeltaBytes: (observedKey?.recentTrafficDeltaBytes ?? BigInt(0)).toString(),
+        activeSessions,
+        estimatedDevices,
+        peakDevices,
+        activityWindowSeconds: Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000),
+      };
+    }),
+
+  /**
    * Create a new access key.
    * 
    * This creates the key on the Outline server first, then stores
@@ -1789,6 +1869,8 @@ export const keysRouter = router({
       id: key.id,
       usedBytes: key.usedBytes.toString(),
       isOnline: key.isTrafficActive,
+      lastTrafficAt: key.lastTrafficAt?.toISOString() ?? null,
+      recentTrafficDeltaBytes: key.recentTrafficDeltaBytes.toString(),
     }));
   }),
 

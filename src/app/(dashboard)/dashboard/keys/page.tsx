@@ -1242,6 +1242,8 @@ function KeyRow({
     isTrafficWarning?: boolean;
     estimatedDevices?: number;
     lastUsedAt?: Date | null;
+    lastTrafficAt?: Date | null;
+    recentTrafficDeltaBytes?: bigint;
     tags?: string | null;
     server?: {
       id: string;
@@ -1265,6 +1267,7 @@ function KeyRow({
   const { t } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
+  const showTrafficState = accessKey.status === 'ACTIVE';
 
   return (
     <tr
@@ -1304,6 +1307,10 @@ function KeyRow({
             <p className="text-xs text-muted-foreground">
               {t('keys.last_seen')} {accessKey.lastUsedAt ? formatRelativeTime(accessKey.lastUsedAt) : t('keys.never_seen')}
             </p>
+            <p className="text-xs text-muted-foreground">
+              {t('keys.activity.last_traffic_short')}{' '}
+              {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
+            </p>
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {accessKey.tags.split(',').filter(Boolean).map((tag) => (
@@ -1337,19 +1344,46 @@ function KeyRow({
 
       {/* Status */}
       <td className="px-4 py-3">
-        <Badge className={cn('border', config.color)}>
-          <StatusIcon className="w-3 h-3 mr-1" />
-          {t(config.labelKey)}
-        </Badge>
+        <div className="space-y-1.5">
+          <Badge className={cn('border', config.color)}>
+            <StatusIcon className="w-3 h-3 mr-1" />
+            {t(config.labelKey)}
+          </Badge>
+          {showTrafficState ? (
+            <Badge
+              variant="outline"
+              className={cn(
+                'border text-[11px]',
+                isOnline ? 'border-green-500/40 text-green-400' : 'border-border/60 text-muted-foreground',
+              )}
+            >
+              {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
+            </Badge>
+          ) : null}
+          {showTrafficState ? (
+            <p className="text-[11px] text-muted-foreground">
+              {t('keys.activity.last_traffic_short')}{' '}
+              {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
+            </p>
+          ) : null}
+        </div>
       </td>
 
       {/* Usage */}
       <td className="px-4 py-3">
-        <SegmentedUsageBarCompact
-          valueBytes={Number(accessKey.usedBytes)}
-          limitBytes={accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : undefined}
-          className="min-w-[140px]"
-        />
+        <div className="space-y-1.5">
+          <SegmentedUsageBarCompact
+            valueBytes={Number(accessKey.usedBytes)}
+            limitBytes={accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : undefined}
+            className="min-w-[140px]"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            {t('keys.activity.recent_delta')}{' '}
+            {accessKey.recentTrafficDeltaBytes && accessKey.recentTrafficDeltaBytes > BigInt(0)
+              ? `+${formatBytes(accessKey.recentTrafficDeltaBytes)}`
+              : t('keys.activity.no_recent_delta')}
+          </p>
+        </div>
       </td>
 
       {/* 7-Day Traffic Sparkline */}
@@ -1533,6 +1567,9 @@ export default function KeysPage() {
     const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
     const StatusIcon = config.icon;
     const isOnline = checkIsOnline(key.id, key.status);
+    const trafficMeta = liveMetricsById.get(key.id);
+    const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
+    const recentTrafficDeltaBytes = trafficMeta?.recentTrafficDeltaBytes ?? BigInt(0);
     const usedBytes = formatBytes(BigInt(key.usedBytes ?? 0));
     const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
     const tags = typeof key.tags === 'string'
@@ -1562,6 +1599,10 @@ export default function KeysPage() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {t('keys.last_seen')} {key.lastUsedAt ? formatRelativeTime(key.lastUsedAt) : t('keys.never_seen')}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('keys.activity.last_traffic_short')}{' '}
+                {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
+              </p>
             </div>
           </div>
           <div className="ml-3 flex flex-col items-end gap-2">
@@ -1569,9 +1610,14 @@ export default function KeysPage() {
               <StatusIcon className="w-3 h-3 mr-1" />
               {t(config.labelKey)}
             </Badge>
-            {isOnline ? (
-              <Badge variant="outline" className="border-green-500/40 text-green-500">
-                {t('keys.status.online')}
+            {key.status === 'ACTIVE' ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  isOnline ? 'border-green-500/40 text-green-500' : 'border-border/60 text-muted-foreground',
+                )}
+              >
+                {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
               </Badge>
             ) : null}
           </div>
@@ -1620,6 +1666,15 @@ export default function KeysPage() {
               {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
             </p>
           </div>
+        </div>
+
+        <div className="ops-row-card flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">{t('keys.activity.recent_delta')}</span>
+          <span className="font-medium">
+            {recentTrafficDeltaBytes > BigInt(0)
+              ? `+${formatBytes(recentTrafficDeltaBytes)}`
+              : t('keys.activity.no_recent_delta')}
+          </span>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-t border-border/50 pt-2">
@@ -1708,9 +1763,28 @@ export default function KeysPage() {
     { enabled: keyIdsForSparklines.length > 0, staleTime: 60_000 },
   );
 
-  const onlineKeyIds = useMemo(
-    () => new Set((liveMetrics ?? []).filter((metric) => metric.isOnline).map((metric) => metric.id)),
+  const liveMetricsById = useMemo(
+    () =>
+      new Map(
+        (liveMetrics ?? []).map((metric) => [
+          metric.id,
+          {
+            isOnline: metric.isOnline,
+            lastTrafficAt: metric.lastTrafficAt ? new Date(metric.lastTrafficAt) : null,
+            recentTrafficDeltaBytes: BigInt(metric.recentTrafficDeltaBytes),
+          },
+        ]),
+      ),
     [liveMetrics],
+  );
+  const onlineKeyIds = useMemo(
+    () =>
+      new Set(
+        Array.from(liveMetricsById.entries())
+          .filter(([, metric]) => metric.isOnline)
+          .map(([id]) => id),
+      ),
+    [liveMetricsById],
   );
   const onlineCount = onlineKeyIds.size;
 
@@ -2205,7 +2279,7 @@ export default function KeysPage() {
         </div>
 
         {stats && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
@@ -2223,30 +2297,6 @@ export default function KeysPage() {
                 <p className="text-sm font-medium text-green-500">{t('keys.active')}</p>
               </div>
               <p className="mt-4 text-2xl font-semibold">{stats.active}</p>
-            </div>
-            <div className="ops-kpi-tile">
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <p className="text-sm font-medium text-green-500">{t('keys.online')}</p>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <HelpCircle className="h-3 w-3 text-green-500/50" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{t('keys.online_tooltip')}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </div>
-              <p className="mt-4 text-2xl font-semibold">{onlineCount}</p>
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
@@ -2353,8 +2403,14 @@ export default function KeysPage() {
           </Button>
         </div>
 
-        {(autoRefresh.isActive || hasAnyFilters) && (
+        {(autoRefresh.isActive || hasAnyFilters || !!stats) && (
           <div className="ops-table-meta text-xs text-muted-foreground">
+            {stats ? (
+              <span className="inline-flex items-center gap-1">
+                <Activity className="w-3 h-3 text-cyan-500" />
+                {fillTemplate(t('keys.activity.summary'), { count: onlineCount })}
+              </span>
+            ) : null}
             {autoRefresh.isActive ? (
               <span className="inline-flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
@@ -2374,6 +2430,20 @@ export default function KeysPage() {
       {/* Quick Filter Pills */}
       <div className="ops-table-meta hidden md:flex">
         <span className="mr-1 text-sm text-muted-foreground">{t('keys.quick_filters.label')}:</span>
+        <div className="mr-2 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100">
+          <Activity className="h-3.5 w-3.5 text-cyan-300" />
+          <span>{fillTemplate(t('keys.activity.summary'), { count: onlineCount })}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <HelpCircle className="h-3 w-3 text-cyan-200/70" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t('keys.online_tooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
           size="sm"
@@ -2960,6 +3030,8 @@ export default function KeysPage() {
               const config = statusConfig[key.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
               const StatusIcon = config.icon;
               const isOnline = checkIsOnline(key.id, key.status);
+              const trafficMeta = liveMetricsById.get(key.id);
+              const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -2992,6 +3064,24 @@ export default function KeysPage() {
                         {t(config.labelKey)}
                       </Badge>
                     </div>
+
+                    {key.status === 'ACTIVE' ? (
+                      <div className="flex items-center justify-between text-xs">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'border',
+                            isOnline ? 'border-green-500/40 text-green-400' : 'border-border/60 text-muted-foreground',
+                          )}
+                        >
+                          {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {t('keys.activity.last_traffic_short')}{' '}
+                          {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
+                        </span>
+                      </div>
+                    ) : null}
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs mb-1">
@@ -3117,7 +3207,11 @@ export default function KeysPage() {
                 data.items.map((key) => (
                   <KeyRow
                     key={key.id}
-                    accessKey={key}
+                    accessKey={{
+                      ...key,
+                      lastTrafficAt: liveMetricsById.get(key.id)?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null),
+                      recentTrafficDeltaBytes: liveMetricsById.get(key.id)?.recentTrafficDeltaBytes ?? BigInt(0),
+                    }}
                     onDelete={() => handleDelete(key.id, key.name)}
                     onShowQR={() => setQrDialogKey({ id: key.id, name: key.name })}
                     onToggleStatus={() => handleToggleStatus(key.id)}

@@ -814,11 +814,23 @@ export default function KeyDetailPage() {
   const keyId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { data: currentUser } = trpc.auth.me.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Fetch key details
   const { data: key, isLoading, refetch } = trpc.keys.getById.useQuery(
     { id: keyId },
     { enabled: !!keyId }
+  );
+
+  const { data: activitySnapshot } = trpc.keys.getActivitySnapshot.useQuery(
+    { id: keyId },
+    {
+      enabled: !!keyId,
+      refetchInterval: 5000,
+      refetchIntervalInBackground: false,
+    },
   );
 
   // Fetch QR code
@@ -900,12 +912,26 @@ export default function KeyDetailPage() {
   const usagePercent = key.dataLimitBytes
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
     : 0;
-  const estimatedDevices = Number((key as any).estimatedDevices || 0);
-  const activeSessions = key.sessions?.filter((session) => session.isActive).length || 0;
-  const isOnline = Boolean(
-    key.lastTrafficAt &&
-      Date.now() - new Date(key.lastTrafficAt).getTime() <= TRAFFIC_ACTIVE_WINDOW_MS,
+  const estimatedDevices = activitySnapshot?.estimatedDevices ?? Number((key as any).estimatedDevices || 0);
+  const activeSessions = activitySnapshot?.activeSessions ?? (key.sessions?.filter((session) => session.isActive).length || 0);
+  const lastTrafficAt = activitySnapshot?.lastTrafficAt
+    ? new Date(activitySnapshot.lastTrafficAt)
+    : key.lastTrafficAt
+      ? new Date(key.lastTrafficAt)
+      : null;
+  const lastMeaningfulUsageAt = activitySnapshot?.lastUsedAt
+    ? new Date(activitySnapshot.lastUsedAt)
+    : (key as any).lastUsedAt
+      ? new Date((key as any).lastUsedAt)
+      : null;
+  const recentTrafficDeltaBytes = activitySnapshot?.recentTrafficDeltaBytes
+    ? BigInt(activitySnapshot.recentTrafficDeltaBytes)
+    : BigInt(0);
+  const isOnline = activitySnapshot?.isTrafficActive ?? Boolean(
+    lastTrafficAt &&
+      Date.now() - lastTrafficAt.getTime() <= TRAFFIC_ACTIVE_WINDOW_MS,
   );
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   return (
     <div className="space-y-6">
@@ -981,7 +1007,7 @@ export default function KeyDetailPage() {
                 Last Seen
               </p>
               <p className="mt-3 text-2xl font-semibold">
-                {(key as any).lastUsedAt ? formatRelativeTime((key as any).lastUsedAt) : 'Never'}
+                {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Outline ID {key.outlineKeyId}
@@ -1119,7 +1145,7 @@ export default function KeyDetailPage() {
                 Last Seen
               </p>
               <p className="mt-3 text-2xl font-semibold">
-                {(key as any).lastUsedAt ? formatRelativeTime((key as any).lastUsedAt) : 'Never'}
+                {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Outline ID {key.outlineKeyId}
@@ -1428,6 +1454,96 @@ export default function KeyDetailPage() {
                 <span className="text-muted-foreground">Updated</span>
                 <span>{formatDateTime(key.updatedAt)}</span>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                {t('keys.activity.title')}
+              </CardTitle>
+              <CardDescription>{t('keys.activity.description')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="ops-row-card">
+                <div>
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.state')}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
+                  </p>
+                </div>
+                {isOnline ? (
+                  <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
+                    <Wifi className="mr-1 h-3 w-3" />
+                    {t('keys.status.online')}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
+                    <WifiOff className="mr-1 h-3 w-3" />
+                    {t('keys.status.no_recent_traffic')}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.last_traffic')}</p>
+                  <p className="font-medium">
+                    {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
+                  </p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.last_meaningful_usage')}</p>
+                  <p className="font-medium">
+                    {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : t('keys.activity.none')}
+                  </p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.active_sessions')}</p>
+                  <p className="font-medium">{activeSessions}</p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.estimated_devices')}</p>
+                  <p className="font-medium">{estimatedDevices}</p>
+                </div>
+              </div>
+
+              <div className="ops-row-card">
+                <div>
+                  <p className="text-sm text-muted-foreground">{t('keys.activity.recent_delta')}</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {recentTrafficDeltaBytes > BigInt(0)
+                      ? `+${formatBytes(recentTrafficDeltaBytes)}`
+                      : t('keys.activity.no_recent_delta')}
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {t('keys.activity.window_label')} {activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s
+                </span>
+              </div>
+
+              {isAdmin ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {t('keys.activity.admin_debug')}
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{t('keys.activity.debug_outline_id')}</span>
+                      <span className="font-mono">{activitySnapshot?.outlineKeyId ?? key.outlineKeyId}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{t('keys.activity.debug_peak_devices')}</span>
+                      <span>{activitySnapshot?.peakDevices ?? (key as any).peakDevices ?? 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{t('keys.activity.debug_window')}</span>
+                      <span>{activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s</span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

@@ -47,6 +47,7 @@ export type CollectedAccessKeyTraffic = {
   usedBytes: bigint;
   lastTrafficAt: Date | null;
   isTrafficActive: boolean;
+  recentTrafficDeltaBytes: bigint;
 };
 
 export type CollectedDynamicKeyTraffic = {
@@ -106,6 +107,7 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
         usedBytes: key.usedBytes,
         lastTrafficAt: key.lastTrafficAt,
         isTrafficActive: isTrafficActive(key.lastTrafficAt, now),
+        recentTrafficDeltaBytes: BigInt(0),
       });
     }
   }
@@ -215,6 +217,7 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
             usedBytes: effectiveUsedBytes,
             lastTrafficAt: observedLastTrafficAt,
             isTrafficActive: isTrafficActive(observedLastTrafficAt, now),
+            recentTrafficDeltaBytes: bytesDelta > BigInt(0) ? bytesDelta : BigInt(0),
           });
 
           if (key.dynamicKeyId) {
