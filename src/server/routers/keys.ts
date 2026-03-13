@@ -22,10 +22,10 @@ import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import {
-  CONNECTION_SESSION_TIMEOUT_MS,
-  ONLINE_ACTIVITY_WINDOW_MS,
-  refreshAccessKeySessionCounts,
-} from '@/lib/services/session-management';
+  collectTrafficActivity,
+  isTrafficActive,
+  TRAFFIC_ACTIVE_WINDOW_MS,
+} from '@/lib/services/traffic-activity';
 
 /**
  * Validation schema for creating a new access key.
@@ -43,11 +43,6 @@ const ENCRYPTION_METHODS = [
   'aes-192-gcm',
   'aes-256-gcm',
 ] as const;
-
-// Require at least 16 KB of fresh traffic before extending a live session.
-const MIN_SESSION_KEEPALIVE_BYTES = BigInt(16 * 1024);
-// Require at least 64 KB of fresh traffic before refreshing "last seen" from live polling.
-const MIN_LIVE_ACTIVITY_BYTES = BigInt(64 * 1024);
 
 const createKeySchema = z.object({
   serverId: z.string().optional().nullable(),
@@ -211,15 +206,12 @@ export const keysRouter = router({
         where.dynamicKeyId = null;
       }
 
-      // Quick filter: Online (recent active connection session)
+      // Quick filter: Traffic Active (recent observed traffic)
       if (online) {
-        const onlineThreshold = new Date(Date.now() - ONLINE_ACTIVITY_WINDOW_MS);
+        const onlineThreshold = new Date(Date.now() - TRAFFIC_ACTIVE_WINDOW_MS);
         where.status = 'ACTIVE';
-        where.sessions = {
-          some: {
-            isActive: true,
-            lastActiveAt: { gte: onlineThreshold },
-          },
+        where.lastTrafficAt = {
+          gte: onlineThreshold,
         };
       }
 
@@ -1559,30 +1551,25 @@ export const keysRouter = router({
   }),
 
   /**
-   * Get online/active users (keys with active connection sessions).
-   *
-   * A key is considered "online" when it has a recent active connection session.
+   * Get traffic-active users (keys with recent observed traffic).
    */
   getOnlineUsers: protectedProcedure.query(async () => {
-    const onlineThreshold = new Date(Date.now() - ONLINE_ACTIVITY_WINDOW_MS);
+    const now = new Date();
+    const onlineThreshold = new Date(now.getTime() - TRAFFIC_ACTIVE_WINDOW_MS);
 
     const activeKeys = await db.accessKey.findMany({
       where: {
         status: 'ACTIVE',
+        lastTrafficAt: {
+          gte: onlineThreshold,
+        },
       },
       select: {
         id: true,
         usedBytes: true,
         lastUsedAt: true,
+        lastTrafficAt: true,
         estimatedDevices: true,
-        sessions: {
-          where: {
-            isActive: true,
-            lastActiveAt: { gte: onlineThreshold },
-          },
-          select: { id: true },
-          take: 1,
-        },
       },
     });
 
@@ -1590,7 +1577,7 @@ export const keysRouter = router({
       id: key.id,
       usedBytes: key.usedBytes.toString(),
       lastUsedAt: key.lastUsedAt?.toISOString() || null,
-      isOnline: key.sessions.length > 0,
+      isOnline: isTrafficActive(key.lastTrafficAt, now),
       estimatedDevices: key.estimatedDevices,
     }));
   }),
@@ -1792,168 +1779,17 @@ export const keysRouter = router({
 
   /**
    * Get live metrics directly from Outline servers.
-   * Online status comes from recent connection sessions, while usedBytes is refreshed
-   * directly from Outline for responsive UI updates.
+   * Traffic-active status comes from recent observed traffic, while usedBytes is
+   * refreshed directly from Outline for responsive UI updates.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    const now = new Date();
-    const onlineThreshold = new Date(now.getTime() - ONLINE_ACTIVITY_WINDOW_MS);
-    const staleThreshold = new Date(now.getTime() - CONNECTION_SESSION_TIMEOUT_MS);
-    const servers = await db.server.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        apiUrl: true,
-        apiCertSha256: true,
-        accessKeys: {
-          where: { status: 'ACTIVE' },
-          select: {
-            id: true,
-            outlineKeyId: true,
-            usageOffset: true,
-            usedBytes: true, // Need current bytes for comparison
-            sessions: {
-              where: {
-                isActive: true,
-                lastActiveAt: { gte: onlineThreshold },
-              },
-              select: { id: true },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const result = await collectTrafficActivity();
 
-    const resultsMap = new Map<string, { id: string; usedBytes: string; isOnline: boolean }>();
-    const keysWithFreshTraffic = new Set<string>();
-    const keysWithMeaningfulTraffic = new Set<string>();
-
-    // Build a map of key id -> current stored bytes for comparison
-    const keyBytesMap = new Map<string, bigint>();
-    for (const server of servers) {
-      for (const key of server.accessKeys) {
-        keyBytesMap.set(key.id, key.usedBytes);
-        resultsMap.set(key.id, {
-          id: key.id,
-          usedBytes: key.usedBytes.toString(),
-          isOnline: key.sessions.length > 0,
-        });
-      }
-    }
-
-    await Promise.all(
-      servers.map(async (server) => {
-        try {
-          const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
-          const metrics = await client.getMetrics();
-
-          if (metrics?.bytesTransferredByUserId) {
-            for (const key of server.accessKeys) {
-              const keyId = key.outlineKeyId;
-              const rawBytes = metrics.bytesTransferredByUserId[keyId] ??
-                metrics.bytesTransferredByUserId[String(keyId)] ?? 0;
-
-              const offset = Number(key.usageOffset || 0);
-              const effectiveBytes = rawBytes < offset ? rawBytes : rawBytes - offset;
-              const storedBytes = keyBytesMap.get(key.id) || BigInt(0);
-              const trafficDelta = BigInt(effectiveBytes) - storedBytes;
-
-              const hasFreshTraffic = trafficDelta >= MIN_SESSION_KEEPALIVE_BYTES;
-              const hasMeaningfulTraffic = trafficDelta >= MIN_LIVE_ACTIVITY_BYTES;
-
-              resultsMap.set(key.id, {
-                id: key.id,
-                usedBytes: effectiveBytes.toString(),
-                isOnline: (resultsMap.get(key.id)?.isOnline ?? false) || hasFreshTraffic,
-              });
-
-              if (hasFreshTraffic) {
-                keysWithFreshTraffic.add(key.id);
-              }
-
-              if (hasMeaningfulTraffic) {
-                keysWithMeaningfulTraffic.add(key.id);
-              }
-            }
-          }
-        } catch {
-          // Server unreachable - skip silently for live metrics
-        }
-      })
-    );
-
-    // Batch update lastUsedAt for keys with meaningful traffic (non-blocking)
-    if (keysWithMeaningfulTraffic.size > 0) {
-      db.accessKey.updateMany({
-        where: { id: { in: Array.from(keysWithMeaningfulTraffic) } },
-        data: { lastUsedAt: now },
-      }).catch(() => {
-        // Silently ignore update errors - this is a best-effort optimization
-      });
-    }
-
-    if (keysWithFreshTraffic.size > 0) {
-      const liveKeyIds = Array.from(keysWithFreshTraffic);
-      db.connectionSession
-        .findMany({
-          where: {
-            accessKeyId: { in: liveKeyIds },
-            isActive: true,
-          },
-          select: {
-            id: true,
-            accessKeyId: true,
-          },
-        })
-        .then(async (activeSessions) => {
-          const activeSessionMap = new Map(
-            activeSessions.map((session) => [session.accessKeyId, session.id]),
-          );
-
-          await Promise.all(
-            liveKeyIds.map(async (keyId) => {
-              const sessionId = activeSessionMap.get(keyId);
-              if (sessionId) {
-                await db.connectionSession.update({
-                  where: { id: sessionId },
-                  data: { lastActiveAt: now },
-                });
-              } else {
-                await db.connectionSession.create({
-                  data: {
-                    accessKeyId: keyId,
-                    lastActiveAt: now,
-                  },
-                });
-              }
-
-              await refreshAccessKeySessionCounts(keyId);
-            }),
-          );
-        })
-        .catch(() => {
-          // Best-effort keepalive only.
-        });
-    }
-
-    db.connectionSession
-      .updateMany({
-        where: {
-          isActive: true,
-          lastActiveAt: { lt: staleThreshold },
-        },
-        data: {
-          isActive: false,
-          endedAt: now,
-          endedReason: 'INACTIVITY_TIMEOUT',
-        },
-      })
-      .catch(() => {
-        // Best-effort stale session cleanup.
-      });
-
-    return Array.from(resultsMap.values());
+    return result.accessKeys.map((key) => ({
+      id: key.id,
+      usedBytes: key.usedBytes.toString(),
+      isOnline: key.isTrafficActive,
+    }));
   }),
 
   /**

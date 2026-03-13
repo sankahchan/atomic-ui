@@ -18,6 +18,10 @@ import { generateRandomString } from '@/lib/utils';
 import { createOutlineClient } from '@/lib/outline-api';
 import { logger } from '@/lib/logger';
 import { formatTagsForStorage } from '@/lib/tags';
+import {
+  collectTrafficActivity,
+  TRAFFIC_ACTIVE_WINDOW_MS,
+} from '@/lib/services/traffic-activity';
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -167,11 +171,11 @@ export const dynamicKeysRouter = router({
         where.userId = (input as Record<string, unknown>).userId;
       }
 
-      // Quick filter: Online (firstUsedAt within 90s AND not disabled)
+      // Quick filter: Traffic Active (recent observed traffic)
       if (online) {
-        const onlineThreshold = new Date(Date.now() - 90 * 1000);
-        where.firstUsedAt = { gte: onlineThreshold };
-        where.status = { not: 'DISABLED' };
+        const onlineThreshold = new Date(Date.now() - TRAFFIC_ACTIVE_WINDOW_MS);
+        where.status = 'ACTIVE';
+        where.lastTrafficAt = { gte: onlineThreshold };
       }
 
       // Quick filter: Expiring within 7 days
@@ -188,8 +192,8 @@ export const dynamicKeysRouter = router({
       if (inactive30d) {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         where.OR = [
-          { firstUsedAt: null },
-          { firstUsedAt: { lt: thirtyDaysAgo } },
+          { lastTrafficAt: null },
+          { lastTrafficAt: { lt: thirtyDaysAgo } },
         ];
       }
 
@@ -258,6 +262,7 @@ export const dynamicKeysRouter = router({
           owner: dak.owner,
           tags: dak.tags,
           firstUsedAt: dak.firstUsedAt,
+          lastTrafficAt: dak.lastTrafficAt,
         };
       });
 
@@ -332,6 +337,7 @@ export const dynamicKeysRouter = router({
         expirationType: dak.expirationType,
         durationDays: dak.durationDays,
         firstUsedAt: dak.firstUsedAt,
+        lastTrafficAt: dak.lastTrafficAt,
         prefix: dak.prefix,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
@@ -1277,115 +1283,15 @@ export const dynamicKeysRouter = router({
     }),
 
   /**
-   * Get live metrics for dynamic keys by fetching from Outline servers directly.
-   * Aggregates traffic from all attached access keys and updates firstUsedAt for keys with new traffic.
+   * Get live metrics for dynamic keys by refreshing recent observed traffic.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    // Get all active dynamic keys with their attached access keys and current usage
-    const activeDaks = await db.dynamicAccessKey.findMany({
-      where: { status: 'ACTIVE' },
-      select: {
-        id: true,
-        usedBytes: true, // Need current bytes for comparison
-        accessKeys: {
-          select: {
-            id: true,
-            outlineKeyId: true,
-            usageOffset: true,
-            server: {
-              select: {
-                id: true,
-                apiUrl: true,
-                apiCertSha256: true,
-                isActive: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const result = await collectTrafficActivity();
 
-    // Build a map of DAK id -> current stored bytes for comparison
-    const dakStoredBytesMap = new Map<string, bigint>();
-    for (const dak of activeDaks) {
-      dakStoredBytesMap.set(dak.id, dak.usedBytes);
-    }
-
-    // Collect unique servers and their keys
-    const serverKeysMap = new Map<string, {
-      apiUrl: string;
-      apiCertSha256: string;
-      keys: Array<{ id: string; outlineKeyId: string; usageOffset: bigint | null; dakId: string }>;
-    }>();
-
-    for (const dak of activeDaks) {
-      for (const key of dak.accessKeys) {
-        if (!key.server.isActive) continue;
-
-        if (!serverKeysMap.has(key.server.id)) {
-          serverKeysMap.set(key.server.id, {
-            apiUrl: key.server.apiUrl,
-            apiCertSha256: key.server.apiCertSha256,
-            keys: [],
-          });
-        }
-        serverKeysMap.get(key.server.id)!.keys.push({
-          id: key.id,
-          outlineKeyId: key.outlineKeyId,
-          usageOffset: key.usageOffset,
-          dakId: dak.id,
-        });
-      }
-    }
-
-    // Fetch metrics from each server
-    const dakUsageMap = new Map<string, bigint>();
-
-    await Promise.all(
-      Array.from(serverKeysMap.entries()).map(async ([, serverData]) => {
-        try {
-          const client = createOutlineClient(serverData.apiUrl, serverData.apiCertSha256);
-          const metrics = await client.getMetrics();
-
-          if (metrics?.bytesTransferredByUserId) {
-            for (const key of serverData.keys) {
-              const rawBytes = metrics.bytesTransferredByUserId[key.outlineKeyId] ??
-                metrics.bytesTransferredByUserId[String(key.outlineKeyId)] ?? 0;
-
-              const offset = Number(key.usageOffset || 0);
-              const effectiveBytes = BigInt(rawBytes < offset ? rawBytes : rawBytes - offset);
-
-              const currentTotal = dakUsageMap.get(key.dakId) || BigInt(0);
-              dakUsageMap.set(key.dakId, currentTotal + effectiveBytes);
-            }
-          }
-        } catch {
-          // Server unreachable - skip silently for live metrics
-        }
-      })
-    );
-
-    // Find DAKs with new traffic and update firstUsedAt (non-blocking)
-    const daksWithNewTraffic: string[] = [];
-    Array.from(dakUsageMap.entries()).forEach(([dakId, newUsedBytes]) => {
-      const storedBytes = dakStoredBytesMap.get(dakId) || BigInt(0);
-      if (newUsedBytes > storedBytes) {
-        daksWithNewTraffic.push(dakId);
-      }
-    });
-
-    if (daksWithNewTraffic.length > 0) {
-      db.dynamicAccessKey.updateMany({
-        where: { id: { in: daksWithNewTraffic } },
-        data: { firstUsedAt: new Date() },
-      }).catch(() => {
-        // Silently ignore update errors - this is a best-effort optimization
-      });
-    }
-
-    return Array.from(dakUsageMap.entries()).map(([id, usedBytes]) => ({
-      id,
-      usedBytes: usedBytes.toString(),
+    return result.dynamicKeys.map((dak) => ({
+      id: dak.id,
+      usedBytes: dak.usedBytes.toString(),
+      isOnline: dak.isTrafficActive,
     }));
   }),
 

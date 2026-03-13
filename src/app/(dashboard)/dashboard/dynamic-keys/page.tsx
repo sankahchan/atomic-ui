@@ -9,7 +9,7 @@
  * layer of abstraction that enables several advanced use cases.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,6 @@ import {
   ListTree,
   Pencil,
 } from 'lucide-react';
-import { useKeyActivity } from '@/hooks/use-key-activity';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
@@ -1395,13 +1394,16 @@ export default function DynamicKeysPage() {
     refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
   });
 
-  // Track online status via activity hook (delta-based)
-  const { onlineCount, isOnline } = useKeyActivity(liveMetrics);
+  const onlineKeyIds = useMemo(
+    () => new Set((liveMetrics ?? []).filter((metric) => metric.isOnline).map((metric) => metric.id)),
+    [liveMetrics],
+  );
+  const onlineCount = onlineKeyIds.size;
 
   // Helper to check if a DAK is online (disabled keys are never online)
   const checkIsOnline = (dakId: string, status?: string) => {
     if (status === 'DISABLED') return false;
-    return isOnline(dakId);
+    return onlineKeyIds.has(dakId);
   };
 
   // Sync all servers mutation

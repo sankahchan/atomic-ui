@@ -116,6 +116,8 @@ const statusConfig = {
   },
 };
 
+const TRAFFIC_ACTIVE_WINDOW_MS = 60 * 1000;
+
 /**
  * EditKeyDialog Component
  * 
@@ -900,7 +902,10 @@ export default function KeyDetailPage() {
     : 0;
   const estimatedDevices = Number((key as any).estimatedDevices || 0);
   const activeSessions = key.sessions?.filter((session) => session.isActive).length || 0;
-  const isOnline = activeSessions > 0;
+  const isOnline = Boolean(
+    key.lastTrafficAt &&
+      Date.now() - new Date(key.lastTrafficAt).getTime() <= TRAFFIC_ACTIVE_WINDOW_MS,
+  );
 
   return (
     <div className="space-y-6">

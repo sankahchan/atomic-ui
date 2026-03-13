@@ -7,6 +7,7 @@
  * - Traffic usage snapshots (Hourly)
  * - Expiration checks (Every 5 mins)
  * - Health checks (Every 2 mins)
+ * - Traffic activity collection (Every minute)
  * - Key rotation checks (Every 15 mins)
  * - Audit log cleanup (Daily)
  * - Backup verification (Daily)
@@ -27,6 +28,7 @@ import { processNotificationQueue } from '@/lib/services/notification-queue';
 import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
+import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 
 let isSchedulerRunning = false;
@@ -87,7 +89,16 @@ export function initScheduler() {
         }
     });
 
-    // 5. Key Rotation Check (Every 15 minutes)
+    // 5. Traffic activity collection (Every minute)
+    cron.schedule('* * * * *', async () => {
+        try {
+            await collectTrafficActivity();
+        } catch (error) {
+            logger.error('Traffic activity collection failed', error);
+        }
+    });
+
+    // 6. Key Rotation Check (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
             const result = await checkKeyRotations();
@@ -99,7 +110,7 @@ export function initScheduler() {
         }
     });
 
-    // 6. Audit Log Cleanup (Daily at 03:30)
+    // 7. Audit Log Cleanup (Daily at 03:30)
     cron.schedule('30 3 * * *', async () => {
         try {
             const result = await cleanupOldAuditLogs({ triggeredBy: 'scheduler' });
@@ -115,7 +126,7 @@ export function initScheduler() {
         }
     });
 
-    // 7. Notification Queue Processing (Every minute)
+    // 8. Notification Queue Processing (Every minute)
     cron.schedule('* * * * *', async () => {
         try {
             const result = await processNotificationQueue({ limit: 50 });
@@ -127,7 +138,7 @@ export function initScheduler() {
         }
     });
 
-    // 8. Backup Verification (Daily at 04:00)
+    // 9. Backup Verification (Daily at 04:00)
     cron.schedule('0 4 * * *', async () => {
         try {
             const result = await verifyLatestBackups({ limit: 3, triggeredBy: 'scheduler' });
@@ -140,7 +151,7 @@ export function initScheduler() {
         }
     });
 
-    // 9. Smart Rebalance Planning (Every 30 minutes)
+    // 10. Smart Rebalance Planning (Every 30 minutes)
     cron.schedule('*/30 * * * *', async () => {
         try {
             const result = await runScheduledRebalanceCycle();
@@ -158,7 +169,7 @@ export function initScheduler() {
         }
     });
 
-    // 10. Scheduled report delivery (Every 5 minutes)
+    // 11. Scheduled report delivery (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
             const result = await runScheduledReportsCycle();
@@ -189,6 +200,12 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Initial notification queue processing failed', error);
+        }
+
+        try {
+            await collectTrafficActivity();
+        } catch (error) {
+            logger.error('Initial traffic activity collection failed', error);
         }
 
         // Ensure health check records exist for all servers

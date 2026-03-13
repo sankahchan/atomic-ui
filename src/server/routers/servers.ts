@@ -677,6 +677,9 @@ export const serversRouter = router({
 
             const hasSessionTraffic = bytesTransferred >= MIN_SESSION_KEEPALIVE_BYTES;
             const hasMeaningfulTraffic = bytesTransferred >= MIN_MEANINGFUL_ACTIVITY_BYTES;
+            if (hasSessionTraffic) {
+              updateData.lastTrafficAt = new Date();
+            }
             if (hasMeaningfulTraffic) {
               updateData.lastUsedAt = new Date();
             }
@@ -1196,6 +1199,9 @@ export const serversRouter = router({
 
           const hasSessionTraffic = bytesTransferred >= MIN_SESSION_KEEPALIVE_BYTES;
           const hasMeaningfulTraffic = bytesTransferred >= MIN_MEANINGFUL_ACTIVITY_BYTES;
+          if (hasSessionTraffic) {
+            updateData.lastTrafficAt = now;
+          }
           if (hasMeaningfulTraffic) {
             updateData.lastUsedAt = now;
           }
