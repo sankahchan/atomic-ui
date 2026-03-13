@@ -82,6 +82,7 @@ import {
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
+import { useLocale } from '@/hooks/use-locale';
 
 /**
  * Status badge configuration
@@ -804,6 +805,7 @@ function SubscriptionShareCard({
  * buttons for common management tasks.
  */
 export default function KeyDetailPage() {
+  const { t } = useLocale();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -921,12 +923,12 @@ export default function KeyDetailPage() {
             {isOnline ? (
               <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
                 <Wifi className="mr-1 h-3 w-3" />
-                Online
+                {t('keys.status.online')}
               </Badge>
             ) : (
               <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
                 <WifiOff className="mr-1 h-3 w-3" />
-                Offline
+                {t('keys.status.no_recent_traffic')}
               </Badge>
             )}
           </div>
@@ -1031,12 +1033,12 @@ export default function KeyDetailPage() {
                 {isOnline ? (
                   <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
                     <Wifi className="mr-1 h-3 w-3" />
-                    Online
+                    {t('keys.status.online')}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
                     <WifiOff className="mr-1 h-3 w-3" />
-                    Offline
+                    {t('keys.status.no_recent_traffic')}
                   </Badge>
                 )}
               </div>
