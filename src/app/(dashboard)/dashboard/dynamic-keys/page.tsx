@@ -1342,7 +1342,7 @@ export default function DynamicKeysPage() {
     durationDays: number | null;
     expiresAt: Date | null;
   } | null>(null);
-  const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
+  const autoRefreshRef = useRef<(() => void) | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
   const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | null>(null);
   const getItemLabel = useCallback(
@@ -1361,9 +1361,7 @@ export default function DynamicKeysPage() {
   // Auto-refresh hook with localStorage persistence and tab visibility handling
   const autoRefresh = useAutoRefresh({
     onRefresh: useCallback(() => {
-      if (syncAllRef.current && !syncAllRef.current.isPending) {
-        syncAllRef.current.mutate();
-      }
+      autoRefreshRef.current?.();
     }, []),
   });
 
@@ -1382,10 +1380,8 @@ export default function DynamicKeysPage() {
     owner: filters.ownerFilter || undefined,
   });
 
-  // Fetch stats with polling when auto-refresh is active
-  const { data: stats, refetch: refetchStats } = trpc.dynamicKeys.stats.useQuery(undefined, {
-    refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
-  });
+  // Fetch stats; interval refresh is handled by the shared read-only page refresher.
+  const { data: stats, refetch: refetchStats } = trpc.dynamicKeys.stats.useQuery();
 
   // Fetch live metrics directly from Outline servers - always poll every 3 seconds
   // This provides real-time online detection independent of auto-sync setting
@@ -1393,6 +1389,12 @@ export default function DynamicKeysPage() {
     refetchInterval: 3000, // Always poll for responsive online detection
     refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
   });
+
+  autoRefreshRef.current = () => {
+    void refetch();
+    void refetchStats();
+    void refetchOnline();
+  };
 
   const onlineKeyIds = useMemo(
     () => new Set((liveMetrics ?? []).filter((metric) => metric.isOnline).map((metric) => metric.id)),
@@ -1415,10 +1417,8 @@ export default function DynamicKeysPage() {
     },
   });
 
-  // Store mutation in ref for auto-refresh callback
-  syncAllRef.current = syncAllMutation;
-
-  // Note: Auto-sync is now handled by the useAutoRefresh hook above
+  // Note: Auto-refresh now refetches read-only queries above; the Sync button
+  // below remains the explicit server-write path.
 
   // Delete mutation
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({

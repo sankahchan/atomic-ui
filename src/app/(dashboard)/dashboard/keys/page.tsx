@@ -1546,7 +1546,7 @@ export default function KeysPage() {
     expiresAt: Date | null;
     expirationType: string | null;
   } | null>(null);
-  const syncAllRef = useRef<ReturnType<typeof trpc.servers.syncAll.useMutation> | null>(null);
+  const autoRefreshRef = useRef<(() => void) | null>(null);
   const { t } = useLocale();
   const router = useRouter();
   const getItemLabel = useCallback(
@@ -1716,9 +1716,7 @@ export default function KeysPage() {
   // Auto-refresh hook with localStorage persistence and tab visibility handling
   const autoRefresh = useAutoRefresh({
     onRefresh: useCallback(() => {
-      if (syncAllRef.current && !syncAllRef.current.isPending) {
-        syncAllRef.current.mutate();
-      }
+      autoRefreshRef.current?.();
     }, []),
   });
 
@@ -1742,10 +1740,8 @@ export default function KeysPage() {
   // Fetch servers for filter
   const { data: servers } = trpc.servers.list.useQuery();
 
-  // Fetch key stats with polling when auto-refresh is active
-  const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery(undefined, {
-    refetchInterval: autoRefresh.isActive ? autoRefresh.interval * 1000 : false,
-  });
+  // Fetch key stats; interval refresh is handled by the shared read-only page refresher.
+  const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery();
 
   // Fetch live usage plus recent server-side session state every 3 seconds.
   const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
@@ -1758,10 +1754,18 @@ export default function KeysPage() {
     () => data?.items?.map((k) => k.id) ?? [],
     [data?.items],
   );
-  const { data: sparklineMap } = trpc.keys.getSparklines.useQuery(
+  const { data: sparklineMap, refetch: refetchSparklines } = trpc.keys.getSparklines.useQuery(
     { keyIds: keyIdsForSparklines },
     { enabled: keyIdsForSparklines.length > 0, staleTime: 60_000 },
   );
+
+  autoRefreshRef.current = () => {
+    void refetch();
+    void refetchStats();
+    if (keyIdsForSparklines.length > 0) {
+      void refetchSparklines();
+    }
+  };
 
   const liveMetricsById = useMemo(
     () =>
@@ -1804,9 +1808,6 @@ export default function KeysPage() {
     },
   });
 
-  // Store mutation in ref for auto-refresh callback
-  syncAllRef.current = syncAllMutation;
-
   // Auto-open create dialog if query param present
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1815,7 +1816,8 @@ export default function KeysPage() {
     }
   }, []);
 
-  // Note: Auto-sync is now handled by the useAutoRefresh hook above
+  // Note: Auto-refresh now refetches read-only queries above; the Sync button
+  // below remains the explicit server-write path.
 
   // Delete mutation
   const deleteMutation = trpc.keys.delete.useMutation({
