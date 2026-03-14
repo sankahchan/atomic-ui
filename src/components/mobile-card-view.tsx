@@ -1,5 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { Inbox } from "lucide-react";
 import React from "react";
 
 interface MobileCardViewProps<T> {
@@ -19,11 +21,13 @@ export function MobileCardView<T>({
 }: MobileCardViewProps<T>) {
     if (!data || data.length === 0) {
         return (
-            <div className="ops-chart-empty px-6 py-8 text-sm text-muted-foreground md:hidden">
-                <div className="space-y-1">
-                    <p className="font-medium text-foreground">Nothing to show</p>
-                    <p>{emptyMessage}</p>
-                </div>
+            <div className="md:hidden">
+                <EmptyState
+                    icon={Inbox}
+                    title="Nothing to show"
+                    description={emptyMessage}
+                    className="min-h-[180px]"
+                />
             </div>
         );
     }

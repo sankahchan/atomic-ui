@@ -821,6 +821,105 @@
       rgba(4, 10, 21, 0.6);
   }
 
+  .ops-empty-state {
+    @apply flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-[1.4rem] border border-dashed px-6 py-8 text-center;
+    border-color: rgba(255, 255, 255, 0.42);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(245, 248, 252, 0.56));
+  }
+
+  .dark .ops-empty-state {
+    border-color: rgba(34, 211, 238, 0.16);
+    background:
+      radial-gradient(circle at center, rgba(34, 211, 238, 0.05), transparent 38%),
+      linear-gradient(180deg, rgba(6, 13, 27, 0.88), rgba(4, 10, 22, 0.78));
+    box-shadow:
+      inset 0 1px 0 rgba(125, 211, 252, 0.04),
+      0 0 22px rgba(34, 211, 238, 0.04);
+  }
+
+  .ops-surface-skeleton {
+    @apply relative overflow-hidden rounded-[1.35rem] border;
+    border-color: rgba(255, 255, 255, 0.42);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(244, 248, 252, 0.66));
+  }
+
+  .ops-surface-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background:
+      linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    animation: ops-skeleton-slide 2.2s ease-in-out infinite;
+  }
+
+  .dark .ops-surface-skeleton {
+    border-color: rgba(34, 211, 238, 0.12);
+    background:
+      linear-gradient(180deg, rgba(6, 13, 27, 0.92), rgba(4, 10, 22, 0.82));
+    box-shadow: inset 0 1px 0 rgba(125, 211, 252, 0.04);
+  }
+
+  .dark .ops-surface-skeleton::after {
+    background:
+      linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.12), transparent);
+  }
+
+  .ops-skeleton-line {
+    @apply rounded-full;
+    background: rgba(148, 163, 184, 0.22);
+  }
+
+  .dark .ops-skeleton-line {
+    background: rgba(125, 211, 252, 0.12);
+  }
+
+  .ops-modal-overlay {
+    background:
+      radial-gradient(circle at top, rgba(34, 211, 238, 0.14), transparent 32%),
+      rgba(2, 7, 18, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .ops-modal-shell {
+    border-color: rgba(34, 211, 238, 0.18);
+    background:
+      radial-gradient(circle at top right, rgba(34, 211, 238, 0.14), transparent 22%),
+      radial-gradient(circle at bottom left, rgba(167, 139, 250, 0.08), transparent 18%),
+      linear-gradient(180deg, rgba(6, 13, 27, 0.98), rgba(4, 10, 22, 0.92));
+    box-shadow:
+      0 30px 80px rgba(1, 6, 20, 0.62),
+      0 0 36px rgba(34, 211, 238, 0.08),
+      inset 0 1px 0 rgba(125, 211, 252, 0.08);
+  }
+
+  .ops-modal-divider {
+    border-color: rgba(34, 211, 238, 0.1);
+  }
+
+  .ops-chart-legend {
+    @apply flex flex-wrap items-center gap-2 text-xs text-muted-foreground;
+  }
+
+  .ops-chart-legend-chip {
+    @apply inline-flex items-center gap-2 rounded-full border px-2.5 py-1;
+    border-color: rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .ops-chart-legend-chip {
+    border-color: rgba(34, 211, 238, 0.12);
+    background:
+      linear-gradient(180deg, rgba(7, 16, 30, 0.82), rgba(5, 12, 24, 0.72));
+  }
+
+  .ops-chart-dot {
+    @apply h-2 w-2 rounded-full;
+  }
+
   .ops-row-card {
     @apply rounded-[1.2rem] border px-4 py-3 transition-all duration-200;
     border-color: rgba(255, 255, 255, 0.38);
@@ -894,6 +993,12 @@
     background:
       linear-gradient(180deg, rgba(6, 13, 27, 0.92), rgba(4, 10, 22, 0.82));
     box-shadow: inset 0 1px 0 rgba(125, 211, 252, 0.04);
+  }
+
+  @keyframes ops-skeleton-slide {
+    100% {
+      transform: translateX(100%);
+    }
   }
 
   /* Fallback for browsers without backdrop-filter */

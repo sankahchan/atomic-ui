@@ -73,5 +73,22 @@ if [[ -z "${PANEL_PATH}" ]]; then
 fi
 
 journalctl -u "${SERVICE_NAME}" -n 20 --no-pager
-curl -I -s "http://127.0.0.1:${PANEL_PORT}${PANEL_PATH}/dashboard" | head -n 5
+PROBE_URL="http://127.0.0.1:${PANEL_PORT}${PANEL_PATH}/dashboard"
+PROBE_OK=0
+
+for ATTEMPT in $(seq 1 15); do
+  if PROBE_OUTPUT="$(curl -I -s --max-time 5 "${PROBE_URL}")"; then
+    printf '%s\n' "${PROBE_OUTPUT}" | head -n 5
+    PROBE_OK=1
+    break
+  fi
+
+  echo "Waiting for service to answer (${ATTEMPT}/15)..."
+  sleep 2
+done
+
+if [[ "${PROBE_OK}" -ne 1 ]]; then
+  echo "Final health probe failed after retries: ${PROBE_URL}" >&2
+  exit 1
+fi
 REMOTE

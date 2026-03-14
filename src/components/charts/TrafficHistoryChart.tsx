@@ -6,9 +6,11 @@ import { formatBytes } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
-import { Activity, Loader2 } from 'lucide-react';
+import { Activity, BarChart3, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { TrafficChart } from '@/components/ui/traffic-chart';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 
 interface TrafficHistoryChartProps {
     accessKeyId: string;
@@ -39,11 +41,8 @@ export function TrafficHistoryChart({ accessKeyId }: TrafficHistoryChartProps) {
     if (isLoading) {
         return (
             <Card className="ops-detail-card border-border/60">
-                <CardContent className="flex h-[240px] items-center justify-center">
-                    <div className="space-y-3 text-center">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
-                        <p className="text-sm text-muted-foreground">Loading traffic history...</p>
-                    </div>
+                <CardContent className="p-5">
+                    <SurfaceSkeleton className="min-h-[240px]" lines={4} />
                 </CardContent>
             </Card>
         );
@@ -85,16 +84,20 @@ export function TrafficHistoryChart({ accessKeyId }: TrafficHistoryChartProps) {
             <CardContent>
                 <div className="ops-chart-shell">
                     {chartData.length === 0 ? (
-                        <div className="ops-chart-empty min-h-[220px]">
-                            <div className="space-y-2">
-                                <p className="text-sm font-medium text-foreground">No traffic history yet</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Historical usage will appear after the next analytics snapshots.
-                                </p>
-                            </div>
-                        </div>
+                        <EmptyState
+                            icon={BarChart3}
+                            title="No traffic history yet"
+                            description="Historical usage will appear after the next analytics snapshots."
+                            className="min-h-[220px]"
+                        />
                     ) : (
-                        <TrafficChart data={chartData} height={220} color="#22d3ee" />
+                        <TrafficChart
+                            data={chartData}
+                            height={220}
+                            color="#22d3ee"
+                            legendLabel="Traffic history"
+                            accentLabel={range === '24h' ? '24h samples' : range === '7d' ? '7 day range' : '30 day range'}
+                        />
                     )}
                 </div>
             </CardContent>

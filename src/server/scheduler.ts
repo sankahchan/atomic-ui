@@ -35,11 +35,11 @@ let isSchedulerRunning = false;
 
 export function initScheduler() {
     if (isSchedulerRunning) {
-        logger.info('Scheduler is already running');
+        logger.verbose('scheduler', 'Scheduler init requested while already running');
         return;
     }
 
-    logger.info('Initializing scheduler');
+    logger.verbose('scheduler', 'Initializing scheduler');
 
     // 1. Hourly Traffic Snapshot (At minute 0 of every hour)
     cron.schedule('0 * * * *', async () => {
@@ -183,7 +183,7 @@ export function initScheduler() {
 
     // Run initial checks on startup
     setTimeout(async () => {
-        logger.info('Running scheduler startup maintenance');
+        logger.verbose('scheduler', 'Running scheduler startup maintenance');
         try {
             const result = await checkExpirations();
             if (result.expiredKeys > 0 || result.depletedKeys > 0 || result.archivedKeys > 0) {
@@ -226,5 +226,5 @@ export function initScheduler() {
     }, 5000); // Wait 5 seconds for DB to be ready
 
     isSchedulerRunning = true;
-    logger.info('Scheduler started successfully');
+    logger.verbose('scheduler', 'Scheduler started successfully');
 }

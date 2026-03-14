@@ -33,6 +33,8 @@ interface TrafficChartProps {
   height?: number | string;
   showGrid?: boolean;
   color?: string;
+  legendLabel?: string;
+  accentLabel?: string;
 }
 
 function glowShadow(color: string) {
@@ -82,6 +84,8 @@ export function TrafficChart({
   height = 300,
   showGrid = true,
   color = 'hsl(var(--primary))',
+  legendLabel = 'Traffic',
+  accentLabel = 'Recent usage',
 }: TrafficChartProps) {
   const chartId = useId().replace(/:/g, '');
   const gradientId = `traffic-gradient-${chartId}`;
@@ -97,11 +101,19 @@ export function TrafficChart({
 
   if (type === 'bar') {
     return (
-      <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <div className="space-y-3">
+        <div className="ops-chart-legend">
+          <span className="ops-chart-legend-chip">
+            <span className="ops-chart-dot" style={{ backgroundColor: color }} />
+            {legendLabel}
+          </span>
+          <span className="ops-chart-legend-chip">{accentLabel}</span>
+        </div>
+        <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
           {showGrid && (
             <CartesianGrid
-              strokeDasharray="2 9"
+              strokeDasharray="2 10"
               stroke="rgba(125, 211, 252, 0.12)"
               vertical={false}
             />
@@ -112,7 +124,9 @@ export function TrafficChart({
             fontSize={10}
             tickLine={false}
             axisLine={false}
-            tickMargin={10}
+            tickMargin={8}
+            interval="preserveStartEnd"
+            minTickGap={18}
           />
           <YAxis
             stroke="rgba(186, 230, 253, 0.44)"
@@ -120,8 +134,9 @@ export function TrafficChart({
             tickLine={false}
             axisLine={false}
             tickFormatter={formatYAxis}
-            width={60}
-            tickMargin={8}
+            width={48}
+            tickMargin={6}
+            tickCount={4}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar
@@ -132,27 +147,36 @@ export function TrafficChart({
           />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     );
   }
 
   return (
+    <div className="space-y-3">
+      <div className="ops-chart-legend">
+        <span className="ops-chart-legend-chip">
+          <span className="ops-chart-dot" style={{ backgroundColor: color }} />
+          {legendLabel}
+        </span>
+        <span className="ops-chart-legend-chip">{accentLabel}</span>
+      </div>
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <AreaChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id={glowGradientId} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor={color} stopOpacity={0.08} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.5} />
-            <stop offset="45%" stopColor={color} stopOpacity={0.18} />
+            <stop offset="0%" stopColor={color} stopOpacity={0.44} />
+            <stop offset="35%" stopColor={color} stopOpacity={0.2} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
         <rect x="0" y="0" width="100%" height="100%" fill={`url(#${glowGradientId})`} />
         {showGrid && (
           <CartesianGrid
-            strokeDasharray="2 9"
+            strokeDasharray="2 10"
             stroke="rgba(125, 211, 252, 0.12)"
             vertical={false}
           />
@@ -163,7 +187,9 @@ export function TrafficChart({
           fontSize={10}
           tickLine={false}
           axisLine={false}
-          tickMargin={10}
+          tickMargin={8}
+          interval="preserveStartEnd"
+          minTickGap={18}
         />
         <YAxis
           stroke="rgba(186, 230, 253, 0.44)"
@@ -171,8 +197,9 @@ export function TrafficChart({
           tickLine={false}
           axisLine={false}
           tickFormatter={formatYAxis}
-          width={60}
-          tickMargin={8}
+          width={48}
+          tickMargin={6}
+          tickCount={4}
         />
         <Tooltip content={<CustomTooltip />} />
         <Area
@@ -187,6 +214,7 @@ export function TrafficChart({
         />
       </AreaChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 

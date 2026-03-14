@@ -45,8 +45,7 @@ const DialogOverlay = React.forwardRef<
     className={cn(
       // Fixed positioning to cover the viewport
       'fixed inset-0 z-50',
-      // Semi-transparent black background
-      'bg-black/40 backdrop-blur-sm',
+      'ops-modal-overlay',
       // Fade in/out animations
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -79,7 +78,7 @@ const DialogContent = React.forwardRef<
         // Grid layout for consistent structure
         'grid w-full max-w-lg gap-4 max-h-[85dvh] overflow-y-auto',
         // Card-like appearance
-        'p-6 rounded-2xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur-xl)] [-webkit-backdrop-filter:blur(var(--glass-blur-xl))] border border-[var(--glass-border)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]',
+        'ops-modal-shell p-6 rounded-[1.75rem] backdrop-blur-[var(--glass-blur-xl)] [-webkit-backdrop-filter:blur(var(--glass-blur-xl))] border',
         // Duration for animations
         'duration-200',
         // Open/close animations
@@ -94,7 +93,7 @@ const DialogContent = React.forwardRef<
     >
       {children}
       {/* Close button in the top-right corner */}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/12 bg-background/70 text-muted-foreground opacity-90 ring-offset-background transition-all hover:border-cyan-400/24 hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dark:bg-[rgba(5,12,24,0.82)]">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

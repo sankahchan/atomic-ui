@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
@@ -220,6 +223,7 @@ export default function TemplatesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [search, setSearch] = useState('');
 
   const { data: templates, isLoading, refetch } = trpc.templates.list.useQuery();
@@ -252,10 +256,8 @@ export default function TemplatesPage() {
   });
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this template?')) {
-      setDeletingTemplateId(id);
-      deleteMutation.mutate({ id });
-    }
+    const template = templateList.find((item) => item.id === id);
+    setTemplateToDelete({ id, name: template?.name || 'this template' });
   };
 
   return (
@@ -393,29 +395,28 @@ export default function TemplatesPage() {
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-56 animate-pulse rounded-[1.5rem] bg-muted/40 dark:bg-white/[0.04]" />
+                <SurfaceSkeleton key={i} className="min-h-[224px]" lines={5} />
               ))}
             </div>
           ) : filteredTemplates.length === 0 ? (
-            <div className="ops-chart-empty py-12">
-              <div className="space-y-2 text-center">
-                <FileText className="mx-auto h-10 w-10 text-muted-foreground/55" />
-                <p className="font-medium text-foreground">
-                  {templateList.length === 0 ? 'No templates found' : 'No templates match the current search'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {templateList.length === 0
-                    ? 'Create a template to standardize your key creation process.'
-                    : 'Try a different name, description, or server query.'}
-                </p>
-                {templateList.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title={templateList.length === 0 ? 'No templates found' : 'No templates match the current search'}
+              description={
+                templateList.length === 0
+                  ? 'Create a template to standardize your key creation process.'
+                  : 'Try a different name, description, or server query.'
+              }
+              action={
+                templateList.length === 0 ? (
                   <Button onClick={() => setCreateOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create first template
                   </Button>
-                ) : null}
-              </div>
-            </div>
+                ) : null
+              }
+              className="min-h-[240px]"
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredTemplates.map((template) => (
@@ -517,6 +518,29 @@ export default function TemplatesPage() {
           onSuccess={() => refetch()}
         />
       ) : null}
+
+      <ConfirmationDialog
+        open={!!templateToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTemplateToDelete(null);
+          }
+        }}
+        title="Delete template"
+        description={
+          templateToDelete
+            ? `Are you sure you want to delete "${templateToDelete.name}"?`
+            : ''
+        }
+        confirmLabel="Delete template"
+        destructive
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!templateToDelete) return;
+          setDeletingTemplateId(templateToDelete.id);
+          deleteMutation.mutate({ id: templateToDelete.id });
+        }}
+      />
     </div>
   );
 }

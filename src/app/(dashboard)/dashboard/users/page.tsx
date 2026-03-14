@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +52,7 @@ export default function UsersPage() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<{ id: string; email: string } | null>(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
 
@@ -121,10 +123,7 @@ export default function UsersPage() {
   };
 
   const handleDelete = (id: string, email: string) => {
-    if (confirm(`Are you sure you want to delete user ${email}?`)) {
-      setDeletingUserId(id);
-      deleteMutation.mutate({ id });
-    }
+    setUserToDelete({ id, email });
   };
 
   return (
@@ -460,6 +459,25 @@ export default function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      <ConfirmationDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUserToDelete(null);
+          }
+        }}
+        title="Delete user"
+        description={userToDelete ? `Are you sure you want to delete user ${userToDelete.email}?` : ''}
+        confirmLabel="Delete user"
+        destructive
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!userToDelete) return;
+          setDeletingUserId(userToDelete.id);
+          deleteMutation.mutate({ id: userToDelete.id });
+        }}
+      />
     </div>
   );
 }

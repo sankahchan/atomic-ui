@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Label } from '@/components/ui/label';
 import {
     Plus,
@@ -49,6 +50,7 @@ export function ServerList() {
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [syncingServerId, setSyncingServerId] = useState<string | null>(null);
     const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
+    const [serverToDelete, setServerToDelete] = useState<{ id: string; name: string } | null>(null);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [importJson, setImportJson] = useState('');
     const router = useRouter();
@@ -202,10 +204,7 @@ export function ServerList() {
     };
 
     const handleDelete = (serverId: string, serverName: string) => {
-        if (confirm(`${t('servers.confirm_delete')} "${serverName}"?\n\n${t('servers.confirm_delete_desc')}`)) {
-            setDeletingServerId(serverId);
-            deleteMutation.mutate({ id: serverId });
-        }
+        setServerToDelete({ id: serverId, name: serverName });
     };
 
     return (
@@ -524,6 +523,29 @@ export function ServerList() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmationDialog
+                open={!!serverToDelete}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setServerToDelete(null);
+                    }
+                }}
+                title={t('servers.confirm_delete')}
+                description={
+                    serverToDelete
+                        ? `${t('servers.confirm_delete')} "${serverToDelete.name}"?\n\n${t('servers.confirm_delete_desc')}`
+                        : ''
+                }
+                confirmLabel="Delete server"
+                destructive
+                loading={deleteMutation.isPending}
+                onConfirm={() => {
+                    if (!serverToDelete) return;
+                    setDeletingServerId(serverToDelete.id);
+                    deleteMutation.mutate({ id: serverToDelete.id });
+                }}
+            />
         </div>
     );
 }

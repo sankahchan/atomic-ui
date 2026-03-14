@@ -16,7 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CodePromptDialog } from '@/components/ui/code-prompt-dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -303,6 +306,7 @@ function WebAuthnSection() {
     const { toast } = useToast();
     const utils = trpc.useUtils();
     const [deletingCredentialId, setDeletingCredentialId] = useState<string | null>(null);
+    const [credentialToDelete, setCredentialToDelete] = useState<{ id: string; name: string } | null>(null);
 
     const { data: status, refetch } = trpc.security.get2FAStatus.useQuery();
 
@@ -376,12 +380,7 @@ function WebAuthnSection() {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => {
-                                        if (confirm('Remove this passkey?')) {
-                                            setDeletingCredentialId(cred.id);
-                                            deleteCredMutation.mutate({ credentialId: cred.id });
-                                        }
-                                    }}
+                                    onClick={() => setCredentialToDelete({ id: cred.id, name: cred.name })}
                                     disabled={deleteCredMutation.isPending && deletingCredentialId === cred.id}
                                 >
                                     {deleteCredMutation.isPending && deletingCredentialId === cred.id ? (
@@ -417,6 +416,29 @@ function WebAuthnSection() {
                     )}
                 </Button>
             </CardContent>
+
+            <ConfirmationDialog
+                open={!!credentialToDelete}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setCredentialToDelete(null);
+                    }
+                }}
+                title="Remove passkey"
+                description={
+                    credentialToDelete
+                        ? `Remove "${credentialToDelete.name}" from this account?`
+                        : ''
+                }
+                confirmLabel="Remove passkey"
+                destructive
+                loading={deleteCredMutation.isPending}
+                onConfirm={() => {
+                    if (!credentialToDelete) return;
+                    setDeletingCredentialId(credentialToDelete.id);
+                    deleteCredMutation.mutate({ credentialId: credentialToDelete.id });
+                }}
+            />
         </Card>
     );
 }
@@ -427,6 +449,7 @@ export default function AccountSecurityPage() {
     const [setupDialogOpen, setSetupDialogOpen] = useState(false);
     const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
     const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+    const [recoveryPromptOpen, setRecoveryPromptOpen] = useState(false);
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 
     const { data: status, isLoading, refetch } = trpc.security.get2FAStatus.useQuery();
@@ -448,70 +471,119 @@ export default function AccountSecurityPage() {
 
     if (isLoading) {
         return (
-            <div className="space-y-6 animate-pulse">
-                <div className="h-8 bg-muted rounded w-48" />
-                <div className="h-64 bg-muted rounded" />
+            <div className="space-y-6">
+                <SurfaceSkeleton className="min-h-[240px]" lines={4} />
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                    <SurfaceSkeleton className="min-h-[260px]" lines={5} />
+                    <SurfaceSkeleton className="min-h-[260px]" lines={5} />
+                </div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/dashboard/settings">
-                        <ArrowLeft className="h-5 w-5" />
-                    </Link>
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Shield className="h-7 w-7 text-primary" />
-                        Account Security
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Manage two-factor authentication and account security settings
-                    </p>
+            <section className="ops-showcase">
+                <div className="ops-showcase-grid">
+                    <div className="space-y-5 self-start">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button variant="ghost" size="icon" asChild className="h-10 w-10 rounded-full border border-border/60">
+                                <Link href="/dashboard/settings">
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                            <Badge
+                                variant="outline"
+                                className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+                            >
+                                <Shield className="mr-2 h-3.5 w-3.5" />
+                                Account Security
+                            </Badge>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                                Security controls
+                            </h1>
+                            <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                                Protect dashboard access with authenticator codes, recovery workflows, and hardware-backed passkeys.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="ops-kpi-tile">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Authenticator</p>
+                                <p className="mt-3 text-3xl font-semibold tracking-tight">{status?.totpEnabled ? 'On' : 'Off'}</p>
+                                <p className="mt-2 text-sm text-muted-foreground">App-based verification for every login.</p>
+                            </div>
+                            <div className="ops-kpi-tile">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery codes</p>
+                                <p className="mt-3 text-3xl font-semibold tracking-tight">{status?.recoveryCodesRemaining ?? 0}</p>
+                                <p className="mt-2 text-sm text-muted-foreground">Fallback access codes still available.</p>
+                            </div>
+                            <div className="ops-kpi-tile">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Passkeys</p>
+                                <p className="mt-3 text-3xl font-semibold tracking-tight">{status?.webAuthnCredentials?.length ?? 0}</p>
+                                <p className="mt-2 text-sm text-muted-foreground">Hardware or biometric sign-in methods.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="ops-detail-rail">
+                        <Card className={status?.has2FA ? 'ops-panel border-emerald-500/25 bg-emerald-500/10' : 'ops-panel border-amber-500/25 bg-amber-500/10'}>
+                            <CardContent className="px-0 py-0">
+                                <div className="flex items-start gap-4">
+                                    <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${status?.has2FA ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                        {status?.has2FA ? (
+                                            <CheckCircle className="h-6 w-6" />
+                                        ) : (
+                                            <AlertTriangle className="h-6 w-6" />
+                                        )}
+                                    </span>
+                                    <div className="space-y-2">
+                                        <p className="ops-section-heading">Protection status</p>
+                                        <h2 className="text-xl font-semibold">
+                                            {status?.has2FA ? 'Protected' : 'Needs attention'}
+                                        </h2>
+                                        <p className="text-sm leading-6 text-muted-foreground">
+                                            {status?.has2FA
+                                                ? 'Two-factor authentication is enabled for this account.'
+                                                : 'Add at least one second factor to improve dashboard security.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="ops-panel">
+                            <CardContent className="space-y-3 px-0 py-0">
+                                <div className="space-y-1">
+                                    <p className="ops-section-heading">Quick actions</p>
+                                    <h2 className="text-xl font-semibold">Command rail</h2>
+                                </div>
+                                {status?.totpEnabled ? (
+                                    <Button variant="outline" className="w-full rounded-full" onClick={() => setDisableDialogOpen(true)}>
+                                        Disable authenticator
+                                    </Button>
+                                ) : (
+                                    <Button className="w-full rounded-full" onClick={() => setSetupDialogOpen(true)}>
+                                        <QrCode className="mr-2 h-4 w-4" />
+                                        Set up authenticator
+                                    </Button>
+                                )}
+                                <Button variant="secondary" className="w-full rounded-full" onClick={() => setRecoveryPromptOpen(true)} disabled={!status?.totpEnabled}>
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Regenerate recovery codes
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            {/* 2FA Status Overview */}
-            <Card className={status?.has2FA ? 'border-green-500/50 bg-green-500/5' : 'border-yellow-500/50 bg-yellow-500/5'}>
-                <CardContent className="flex items-center gap-4 py-4">
-                    {status?.has2FA ? (
-                        <>
-                            <div className="p-3 rounded-full bg-green-500/20">
-                                <CheckCircle className="h-6 w-6 text-green-500" />
-                            </div>
-                            <div>
-                                <p className="font-semibold text-green-700 dark:text-green-400">
-                                    Two-factor authentication is enabled
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Your account is protected with additional security
-                                </p>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="p-3 rounded-full bg-yellow-500/20">
-                                <AlertTriangle className="h-6 w-6 text-yellow-500" />
-                            </div>
-                            <div>
-                                <p className="font-semibold text-yellow-700 dark:text-yellow-400">
-                                    Two-factor authentication is not enabled
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Enable 2FA to add an extra layer of security to your account
-                                </p>
-                            </div>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* TOTP Section */}
-            <Card>
-                <CardHeader>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                <Card className="ops-panel">
+                <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Smartphone className="h-5 w-5" />
                         Authenticator App
@@ -520,14 +592,25 @@ export default function AccountSecurityPage() {
                         Use an authenticator app like Google Authenticator, Authy, or 1Password to generate verification codes.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-5 px-0 pb-0">
                     {status?.totpEnabled ? (
                         <>
-                            <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                            <div className="flex items-center gap-3 rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
                                 <CheckCircle className="h-5 w-5 text-green-500" />
                                 <span className="text-sm font-medium text-green-700 dark:text-green-400">
                                     Authenticator app is configured
                                 </span>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="ops-mini-tile">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery codes</p>
+                                    <p className="mt-2 text-sm font-medium">{status.recoveryCodesRemaining} remaining</p>
+                                </div>
+                                <div className="ops-mini-tile">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Mode</p>
+                                    <p className="mt-2 text-sm font-medium">Code verification required</p>
+                                </div>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
@@ -540,18 +623,23 @@ export default function AccountSecurityPage() {
                             </div>
                         </>
                     ) : (
-                        <Button onClick={() => setSetupDialogOpen(true)}>
+                        <div className="space-y-4">
+                            <div className="rounded-[1.25rem] border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-muted-foreground">
+                                This account is currently protected only by password-based login.
+                            </div>
+                            <Button onClick={() => setSetupDialogOpen(true)}>
                             <QrCode className="h-4 w-4 mr-2" />
                             Set Up Authenticator App
                         </Button>
+                        </div>
                     )}
                 </CardContent>
-            </Card>
+                </Card>
 
-            {/* Recovery Codes Section */}
-            {status?.totpEnabled && (
-                <Card>
-                    <CardHeader>
+                <div className="space-y-6">
+                {status?.totpEnabled && (
+                <Card className="ops-panel">
+                    <CardHeader className="px-0 pt-0">
                         <CardTitle className="flex items-center gap-2">
                             <Key className="h-5 w-5" />
                             Recovery Codes
@@ -560,8 +648,8 @@ export default function AccountSecurityPage() {
                             Recovery codes can be used to access your account if you lose access to your authenticator app.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    <CardContent className="space-y-4 px-0 pb-0">
+                        <div className="flex items-center gap-3 rounded-[1.25rem] border border-border/60 bg-background/55 p-4">
                             <Badge variant={status.recoveryCodesRemaining > 3 ? 'default' : 'destructive'}>
                                 {status.recoveryCodesRemaining} remaining
                             </Badge>
@@ -576,12 +664,7 @@ export default function AccountSecurityPage() {
 
                         <Button
                             variant="outline"
-                            onClick={() => {
-                                const code = prompt('Enter your authenticator code to regenerate recovery codes:');
-                                if (code && code.length === 6) {
-                                    regenerateCodesMutation.mutate({ code });
-                                }
-                            }}
+                            onClick={() => setRecoveryPromptOpen(true)}
                             disabled={regenerateCodesMutation.isPending}
                         >
                             {regenerateCodesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -594,6 +677,8 @@ export default function AccountSecurityPage() {
 
             {/* WebAuthn Section */}
             <WebAuthnSection />
+                </div>
+            </div>
 
             {/* Dialogs */}
             <TotpSetupDialog
@@ -612,6 +697,16 @@ export default function AccountSecurityPage() {
                 open={disableDialogOpen}
                 onOpenChange={setDisableDialogOpen}
                 onSuccess={() => refetch()}
+            />
+
+            <CodePromptDialog
+                open={recoveryPromptOpen}
+                onOpenChange={setRecoveryPromptOpen}
+                title="Regenerate recovery codes"
+                description="Enter your current authenticator code to generate a fresh set of recovery codes."
+                confirmLabel="Generate new codes"
+                loading={regenerateCodesMutation.isPending}
+                onSubmit={(code) => regenerateCodesMutation.mutate({ code })}
             />
         </div>
     );

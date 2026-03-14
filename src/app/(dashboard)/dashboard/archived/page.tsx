@@ -11,7 +11,11 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MobileCardView } from '@/components/mobile-card-view';
 import {
   Select,
   SelectContent,
@@ -37,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { formatBytes } from '@/lib/utils';
@@ -316,233 +321,351 @@ export default function ArchivedKeysPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Archive className="w-6 h-6 text-primary" />
-            {t('archived.title')}
-          </h1>
-          <p className="text-muted-foreground">
-            {t('archived.subtitle')}
-          </p>
-        </div>
+      <section className="ops-showcase">
+        <div className="ops-showcase-grid">
+          <div className="space-y-5 self-start">
+            <Badge
+              variant="outline"
+              className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+            >
+              <Archive className="mr-2 h-3.5 w-3.5" />
+              Archive vault
+            </Badge>
 
-        {/* Export buttons */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <FileText className="w-4 h-4 mr-2" />
-            {t('archived.export_csv')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportToExcel}>
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            {t('archived.export_excel')}
-          </Button>
-        </div>
-      </div>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
+                {t('archived.title')}
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                {t('archived.subtitle')}
+              </p>
+            </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">{t('archived.stats.total')}</div>
-          <div className="text-2xl font-bold">{stats?.total || 0}</div>
-        </div>
-        <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-amber-500 flex items-center gap-1">
-            <Clock className="w-4 h-4" /> {t('archived.stats.expired')}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.stats.total')}</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.total || 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Archived keys retained before permanent purge.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400">
+                  <Clock className="h-3.5 w-3.5" />
+                  {t('archived.stats.expired')}
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.expired || 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Keys archived because their term ended.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {t('archived.stats.depleted')}
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.depleted || 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Quota-depleted keys stored for investigation.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                  <XCircle className="h-3.5 w-3.5" />
+                  {t('archived.stats.deleted')}
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.deleted || 0}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Keys removed manually and kept for audit history.</p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.stats.total_usage')}</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{formatBytes(Number(stats?.totalUsedBytes || 0))}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Total traffic retained across archived inventory.</p>
+              </div>
+            </div>
           </div>
-          <div className="text-2xl font-bold">{stats?.expired || 0}</div>
-        </div>
-        <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-red-500 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" /> {t('archived.stats.depleted')}
+
+          <div className="ops-detail-rail">
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Archive actions</p>
+                <h2 className="text-xl font-semibold">Command rail</h2>
+                <p className="text-sm text-muted-foreground">
+                  Export the archive for reporting or permanently purge selected records when retention is no longer required.
+                </p>
+              </div>
+
+              <Button variant="secondary" className="w-full rounded-full" onClick={exportToCSV}>
+                <FileText className="mr-2 h-4 w-4" />
+                {t('archived.export_csv')}
+              </Button>
+              <Button variant="outline" className="w-full rounded-full" onClick={exportToExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {t('archived.export_excel')}
+              </Button>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Retention note</p>
+                <h2 className="text-xl font-semibold">Auto-purge window</h2>
+              </div>
+              <div className="ops-detail-card space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Archived keys remain available for audit, export, and forensic review until their configured delete-after date is reached.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Bulk actions</p>
+                    <p className="mt-2 text-sm font-medium">{selectedIds.length} currently selected</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Scope</p>
+                    <p className="mt-2 text-sm font-medium">{reason === 'ALL' ? 'All archive reasons' : reason.toLowerCase()}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="text-2xl font-bold">{stats?.depleted || 0}</div>
         </div>
-        <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-gray-400 flex items-center gap-1">
-            <XCircle className="w-4 h-4" /> {t('archived.stats.deleted')}
+      </section>
+
+      <div className="ops-panel space-y-4">
+        <div className="ops-filter-bar grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-end">
+          <div className="space-y-2">
+            <Label htmlFor="archived-search">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="archived-search"
+                placeholder={t('archived.search_placeholder')}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="pl-10"
+              />
+            </div>
           </div>
-          <div className="text-2xl font-bold">{stats?.deleted || 0}</div>
-        </div>
-        <div className="bg-card rounded-lg border p-4">
-          <div className="text-sm text-muted-foreground">{t('archived.stats.total_usage')}</div>
-          <div className="text-2xl font-bold">
-            {formatBytes(Number(stats?.totalUsedBytes || 0))}
+
+          <div className="space-y-2">
+            <Label htmlFor="archived-reason-filter">{t('archived.filter.reason')}</Label>
+            <Select
+              value={reason}
+              onValueChange={(v) => {
+                setReason(v as ArchiveReason);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger id="archived-reason-filter">
+                <SelectValue placeholder={t('archived.filter.reason')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('archived.filter.all')}</SelectItem>
+                <SelectItem value="EXPIRED">{t('archived.filter.expired')}</SelectItem>
+                <SelectItem value="DEPLETED">{t('archived.filter.depleted')}</SelectItem>
+                <SelectItem value="DELETED">{t('archived.filter.deleted')}</SelectItem>
+                <SelectItem value="DISABLED">{t('archived.filter.disabled')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="ops-table-meta">
+            {data ? `${data.total} archived keys` : 'Archive inventory'}
           </div>
         </div>
-      </div>
 
-      {/* Filters and actions */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder={t('archived.search_placeholder')}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="pl-10"
-          />
-        </div>
+        {selectedIds.length > 0 ? (
+          <div className="ops-mobile-action-bar lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="text-sm text-muted-foreground">
+              {selectedIds.length} selected for permanent deletion.
+            </div>
+            <Button variant="destructive" onClick={handleBulkDelete} className="rounded-full">
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('archived.delete_selected')} ({selectedIds.length})
+            </Button>
+          </div>
+        ) : null}
 
-        <Select
-          value={reason}
-          onValueChange={(v) => {
-            setReason(v as ArchiveReason);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder={t('archived.filter.reason')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">{t('archived.filter.all')}</SelectItem>
-            <SelectItem value="EXPIRED">{t('archived.filter.expired')}</SelectItem>
-            <SelectItem value="DEPLETED">{t('archived.filter.depleted')}</SelectItem>
-            <SelectItem value="DELETED">{t('archived.filter.deleted')}</SelectItem>
-            <SelectItem value="DISABLED">{t('archived.filter.disabled')}</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {selectedIds.length > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            {t('archived.delete_selected')} ({selectedIds.length})
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-card rounded-lg border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.length === data?.keys.length && data?.keys.length > 0}
-                  onChange={handleSelectAll}
-                  className="rounded"
-                />
-              </TableHead>
-              <TableHead>{t('archived.table.name')}</TableHead>
-              <TableHead>{t('archived.table.server')}</TableHead>
-              <TableHead>{t('archived.table.usage')}</TableHead>
-              <TableHead>{t('archived.table.reason')}</TableHead>
-              <TableHead>{t('archived.table.archived_at')}</TableHead>
-              <TableHead>{t('archived.table.delete_after')}</TableHead>
-              <TableHead className="w-20">{t('archived.table.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </TableCell>
-              </TableRow>
-            ) : data?.keys.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  {t('archived.empty')}
-                </TableCell>
-              </TableRow>
-            ) : (
-              data?.keys.map((key) => (
-                <TableRow key={key.id}>
-                  <TableCell>
+        <div className="hidden md:block">
+          <div className="ops-data-shell">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
                     <input
                       type="checkbox"
-                      checked={selectedIds.includes(key.id)}
-                      onChange={() => handleSelect(key.id)}
+                      checked={selectedIds.length === data?.keys.length && (data?.keys.length || 0) > 0}
+                      onChange={handleSelectAll}
                       className="rounded"
                     />
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{key.name}</div>
-                      {key.email && (
-                        <div className="text-xs text-muted-foreground">{key.email}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm">{key.serverName}</div>
-                      {key.serverLocation && (
-                        <div className="text-xs text-muted-foreground">{key.serverLocation}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {formatBytes(Number(key.usedBytes))}
-                      {key.dataLimitBytes && (
-                        <span className="text-muted-foreground">
-                          {' / '}
-                          {formatBytes(Number(key.dataLimitBytes))}
+                  </TableHead>
+                  <TableHead>{t('archived.table.name')}</TableHead>
+                  <TableHead>{t('archived.table.server')}</TableHead>
+                  <TableHead>{t('archived.table.usage')}</TableHead>
+                  <TableHead>{t('archived.table.reason')}</TableHead>
+                  <TableHead>{t('archived.table.archived_at')}</TableHead>
+                  <TableHead>{t('archived.table.delete_after')}</TableHead>
+                  <TableHead className="text-right">{t('archived.table.actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-6">
+                      <SurfaceSkeleton className="min-h-[220px]" lines={5} />
+                    </TableCell>
+                  </TableRow>
+                ) : data?.keys.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-6">
+                      <EmptyState
+                        icon={Archive}
+                        title="Archive is empty"
+                        description={t('archived.empty')}
+                        className="min-h-[220px]"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data?.keys.map((key) => (
+                    <TableRow key={key.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(key.id)}
+                          onChange={() => handleSelect(key.id)}
+                          className="rounded"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{key.name}</p>
+                          {key.email ? <p className="text-xs text-muted-foreground">{key.email}</p> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">{key.serverName}</p>
+                          {key.serverLocation ? <p className="text-xs text-muted-foreground">{key.serverLocation}</p> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatBytes(Number(key.usedBytes))}
+                        {key.dataLimitBytes ? (
+                          <span className="text-muted-foreground">
+                            {' / '}
+                            {formatBytes(Number(key.dataLimitBytes))}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${getReasonBadgeClass(key.archiveReason)}`}
+                        >
+                          {getReasonIcon(key.archiveReason)}
+                          {t(`archived.filter.${key.archiveReason.toLowerCase()}`)}
                         </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
+                      </TableCell>
+                      <TableCell className="text-sm">{formatDateTime(key.archivedAt)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(key.deleteAfter)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(key.id)}
+                          title="Permanently delete"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <MobileCardView
+          data={data?.keys || []}
+          emptyMessage={t('archived.empty')}
+          keyExtractor={(key) => key.id}
+          renderCard={(key) => (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-medium">{key.name}</p>
+                  {key.email ? <p className="text-xs text-muted-foreground">{key.email}</p> : null}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => handleDeleteClick(key.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.table.server')}</p>
+                  <p className="mt-2 text-sm font-medium">{key.serverName}</p>
+                  {key.serverLocation ? <p className="mt-1 text-xs text-muted-foreground">{key.serverLocation}</p> : null}
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.table.usage')}</p>
+                  <p className="mt-2 text-sm font-medium">
+                    {formatBytes(Number(key.usedBytes))}
+                    {key.dataLimitBytes ? ` / ${formatBytes(Number(key.dataLimitBytes))}` : ''}
+                  </p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.table.reason')}</p>
+                  <div className="mt-2">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getReasonBadgeClass(key.archiveReason)}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${getReasonBadgeClass(key.archiveReason)}`}
                     >
                       {getReasonIcon(key.archiveReason)}
                       {t(`archived.filter.${key.archiveReason.toLowerCase()}`)}
                     </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{formatDateTime(key.archivedAt)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(key.deleteAfter)}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteClick(key.id)}
-                      title="Permanently delete"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  </div>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.table.delete_after')}</p>
+                  <p className="mt-2 text-sm font-medium">{formatDate(key.deleteAfter)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(key.archivedAt)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        />
 
-      {/* Pagination */}
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Page {data.page} of {data.totalPages} ({data.total} total)
+        {data && data.totalPages > 1 ? (
+          <div className="ops-mobile-action-bar lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="text-sm text-muted-foreground">
+              Page {data.page} of {data.totalPages} ({data.total} total)
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-full"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={page === data.totalPages}
+                className="rounded-full"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={page === data.totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+        ) : null}
+      </div>
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
