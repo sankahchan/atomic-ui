@@ -66,9 +66,10 @@ const parseConfigSchema = z.object({
   config: z.string(),
 });
 
-// A small but real traffic delta is enough to keep a session alive.
-const MIN_SESSION_KEEPALIVE_BYTES = 16 * 1024;
-// Require a larger burst before refreshing "last seen".
+// Ignore tiny Outline counter drift and only treat a more meaningful burst as
+// real recent activity for sessions and user-facing traffic presence.
+const MIN_SESSION_KEEPALIVE_BYTES = 64 * 1024;
+// Require the same stronger burst before refreshing "last seen".
 const MIN_MEANINGFUL_ACTIVITY_BYTES = 64 * 1024;
 
 export const serversRouter = router({

@@ -6,9 +6,10 @@ import {
   refreshAccessKeySessionCounts,
 } from '@/lib/services/session-management';
 
-// A smaller delta is enough to prove fresh traffic for the "Traffic Active" badge.
-export const MIN_TRAFFIC_ACTIVITY_BYTES = BigInt(16 * 1024);
-// A larger delta is used for the human-facing "last seen" timestamp.
+// Ignore tiny Outline counter drift and only treat a more meaningful burst as
+// real recent activity for the user-facing "Traffic Active" badge.
+export const MIN_TRAFFIC_ACTIVITY_BYTES = BigInt(64 * 1024);
+// The human-facing "last seen" timestamp follows the same stronger threshold.
 export const MIN_MEANINGFUL_TRAFFIC_BYTES = BigInt(64 * 1024);
 // Recent traffic badge window. Longer than the UI poll interval, but short enough
 // that the badge drops quickly after traffic stops.
