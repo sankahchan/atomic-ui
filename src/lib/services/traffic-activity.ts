@@ -219,7 +219,8 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
             usedBytes: effectiveUsedBytes,
             lastTrafficAt: observedLastTrafficAt,
             isTrafficActive: isTrafficActive(observedLastTrafficAt, now),
-            recentTrafficDeltaBytes: bytesDelta > BigInt(0) ? bytesDelta : BigInt(0),
+            recentTrafficDeltaBytes:
+              hasFreshTraffic && bytesDelta > BigInt(0) ? bytesDelta : BigInt(0),
           });
 
           if (key.dynamicKeyId) {
