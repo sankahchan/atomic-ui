@@ -1286,7 +1286,7 @@ export const dynamicKeysRouter = router({
    * Get live metrics for dynamic keys by refreshing recent observed traffic.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    const result = await collectTrafficActivity();
+    const result = await collectTrafficActivity({ persist: false });
 
     return result.dynamicKeys.map((dak) => ({
       id: dak.id,

@@ -273,6 +273,8 @@ function TrafficOverviewPanel({
   compact?: boolean;
   fillHeight?: boolean;
 }) {
+  const chartHeight = compact ? (fillHeight ? 220 : 152) : 238;
+
   return (
     <Card className={cn(
       'overflow-hidden border-white/45 bg-white/65 dark:border-cyan-400/18 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.1),transparent_24%),linear-gradient(145deg,rgba(4,10,24,0.96),rgba(4,11,24,0.88))] dark:shadow-[0_28px_72px_rgba(1,6,20,0.56),0_0_0_1px_rgba(34,211,238,0.05),inset_0_1px_0_rgba(125,211,252,0.06)]',
@@ -315,9 +317,9 @@ function TrafficOverviewPanel({
       )}>
         <div className={cn('grid', compact ? 'gap-2 sm:grid-cols-2 xl:grid-cols-4' : 'gap-3 sm:grid-cols-2 xl:grid-cols-4')}>
           <TrafficSnapshotStat
-            label={t('dashboard.total_traffic')}
+            label={t('dashboard.period_usage')}
             value={formatBytes(totalTraffic)}
-            helper={t('dashboard.all_time')}
+            helper={tf('dashboard.traffic_last_days', { days: trafficDays.toString() })}
             tone="cyan"
             compact={compact}
           />
@@ -345,39 +347,25 @@ function TrafficOverviewPanel({
         </div>
 
         {trafficLoading ? (
-          <div className={cn(
-            'rounded-[1.6rem] bg-muted animate-pulse',
-            compact
-              ? fillHeight
-                ? 'min-h-[136px] flex-1'
-                : 'h-[136px]'
-              : 'h-[238px]'
-          )} />
+          <div
+            className="rounded-[1.6rem] bg-muted animate-pulse"
+            style={{ height: chartHeight }}
+          />
         ) : trafficHistory && trafficHistory.length > 0 ? (
           <div className={cn(
             'rounded-[1.6rem] border border-border/60 bg-background/45 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_26%),linear-gradient(180deg,rgba(4,11,23,0.88),rgba(4,10,21,0.78))]',
             compact ? 'p-2.5' : 'p-3',
             compact && fillHeight && 'flex flex-1 flex-col'
           )}>
-            <div className={cn(
-              compact
-                ? fillHeight
-                  ? 'min-h-[136px] flex-1'
-                  : 'h-[136px]'
-                : 'h-[238px]'
-            )}>
-              <TrafficChart data={trafficHistory} type="area" height="100%" color="rgba(34,211,238,0.95)" />
+            <div style={{ height: chartHeight }}>
+              <TrafficChart data={trafficHistory} type="area" height={chartHeight} color="rgba(34,211,238,0.95)" />
             </div>
           </div>
         ) : (
-          <div className={cn(
-            'flex flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 px-6 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]',
-            compact
-              ? fillHeight
-                ? 'min-h-[136px] flex-1'
-                : 'h-[136px]'
-              : 'h-[238px]'
-          )}>
+          <div
+            className="flex flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 px-6 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]"
+            style={{ height: chartHeight }}
+          >
             <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm font-semibold">{t('dashboard.no_traffic_title')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_traffic_desc')}</p>

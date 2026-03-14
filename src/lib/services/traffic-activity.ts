@@ -40,6 +40,7 @@ type ObservedAccessKey = {
 type CollectorOptions = {
   serverId?: string;
   keyIds?: string[];
+  persist?: boolean;
 };
 
 export type CollectedAccessKeyTraffic = {
@@ -59,6 +60,7 @@ export type CollectedDynamicKeyTraffic = {
 
 export async function collectTrafficActivity(options: CollectorOptions = {}) {
   const now = new Date();
+  const persist = options.persist !== false;
   const staleThreshold = new Date(now.getTime() - CONNECTION_SESSION_TIMEOUT_MS);
 
   const servers = await db.server.findMany({
@@ -174,14 +176,14 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
             updateData.lastUsedAt = now;
           }
 
-          if (Object.keys(updateData).length > 0) {
+          if (persist && Object.keys(updateData).length > 0) {
             await db.accessKey.update({
               where: { id: key.id },
               data: updateData,
             });
           }
 
-          if (hasFreshTraffic) {
+          if (persist && hasFreshTraffic) {
             const activeSession = await db.connectionSession.findFirst({
               where: {
                 accessKeyId: key.id,
@@ -243,36 +245,38 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
     }),
   );
 
-  const staleSessions = await db.connectionSession.findMany({
-    where: {
-      accessKeyId: { in: activeKeyIds },
-      isActive: true,
-      lastActiveAt: { lt: staleThreshold },
-    },
-    select: {
-      id: true,
-      accessKeyId: true,
-    },
-  });
-
-  if (staleSessions.length > 0) {
-    await db.connectionSession.updateMany({
-      where: { id: { in: staleSessions.map((session) => session.id) } },
-      data: {
-        isActive: false,
-        endedAt: now,
-        endedReason: 'INACTIVITY_TIMEOUT',
+  if (persist) {
+    const staleSessions = await db.connectionSession.findMany({
+      where: {
+        accessKeyId: { in: activeKeyIds },
+        isActive: true,
+        lastActiveAt: { lt: staleThreshold },
+      },
+      select: {
+        id: true,
+        accessKeyId: true,
       },
     });
 
-    for (const session of staleSessions) {
-      touchedSessionKeyIds.add(session.accessKeyId);
-    }
-  }
+    if (staleSessions.length > 0) {
+      await db.connectionSession.updateMany({
+        where: { id: { in: staleSessions.map((session) => session.id) } },
+        data: {
+          isActive: false,
+          endedAt: now,
+          endedReason: 'INACTIVITY_TIMEOUT',
+        },
+      });
 
-  await Promise.all(
-    Array.from(touchedSessionKeyIds).map((accessKeyId) => refreshAccessKeySessionCounts(accessKeyId)),
-  );
+      for (const session of staleSessions) {
+        touchedSessionKeyIds.add(session.accessKeyId);
+      }
+    }
+
+    await Promise.all(
+      Array.from(touchedSessionKeyIds).map((accessKeyId) => refreshAccessKeySessionCounts(accessKeyId)),
+    );
+  }
 
   const dynamicIds = Array.from(dynamicUsageMap.keys());
   const dynamicCurrentState = dynamicIds.length
@@ -308,7 +312,7 @@ export async function collectTrafficActivity(options: CollectorOptions = {}) {
       updateData.firstUsedAt = now;
     }
 
-    if (Object.keys(updateData).length > 0) {
+    if (persist && Object.keys(updateData).length > 0) {
       await db.dynamicAccessKey.update({
         where: { id: dynamicId },
         data: updateData,

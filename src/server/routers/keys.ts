@@ -401,7 +401,7 @@ export const keysRouter = router({
       }
 
       const [collectorResult, activeSessions] = await Promise.all([
-        collectTrafficActivity({ keyIds: [input.id] }),
+        collectTrafficActivity({ keyIds: [input.id], persist: false }),
         db.connectionSession.count({
           where: {
             accessKeyId: input.id,
@@ -1863,7 +1863,7 @@ export const keysRouter = router({
    * refreshed directly from Outline for responsive UI updates.
    */
   getLiveMetrics: protectedProcedure.query(async () => {
-    const result = await collectTrafficActivity();
+    const result = await collectTrafficActivity({ persist: false });
 
     return result.accessKeys.map((key) => ({
       id: key.id,
