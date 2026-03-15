@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { SubscriptionPageLivePreview } from "@/components/subscription/subscription-page-live-preview";
 import { useToast } from "@/hooks/use-toast";
 import {
     Loader2,
@@ -30,7 +31,7 @@ import {
     Code,
     FileText,
 } from "lucide-react";
-import { themeList, getTheme, clientApps, SubscriptionBranding, defaultBranding } from "@/lib/subscription-themes";
+import { themeList, clientApps, SubscriptionBranding, defaultBranding } from "@/lib/subscription-themes";
 
 interface BrandingState extends SubscriptionBranding {
     // All fields from SubscriptionBranding
@@ -149,8 +150,6 @@ export function SubscriptionSettings() {
         }
     };
 
-    const theme = getTheme(defaultTheme);
-
     if (loading) {
         return (
             <Card>
@@ -163,6 +162,23 @@ export function SubscriptionSettings() {
 
     return (
         <div className="space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Live Preview</CardTitle>
+                    <CardDescription>
+                        Review the actual subscription page structure while you adjust theme, branding,
+                        support, layout, and app settings.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <SubscriptionPageLivePreview
+                        themeId={defaultTheme}
+                        branding={branding}
+                        supportLink={supportLink}
+                    />
+                </CardContent>
+            </Card>
+
             {/* Support Link Settings */}
             <Collapsible open={openSections.basic} onOpenChange={() => toggleSection("basic")}>
                 <Card>
@@ -257,55 +273,9 @@ export function SubscriptionSettings() {
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {/* Theme Preview */}
-                            <div className="space-y-2">
-                                <Label className="text-sm text-muted-foreground">Preview</Label>
-                                <div
-                                    className="rounded-lg p-4 border transition-colors"
-                                    style={{
-                                        backgroundColor: theme.bgPrimary,
-                                        borderColor: theme.border,
-                                    }}
-                                >
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div
-                                            className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                                            style={{ backgroundColor: theme.bgCard }}
-                                        >
-                                            📊
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium" style={{ color: theme.textPrimary }}>
-                                                Data Usage
-                                            </div>
-                                            <div className="text-xs" style={{ color: theme.textMuted }}>
-                                                400.51 GB
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 mb-3">
-                                        <div
-                                            className="flex-1 h-2 rounded-full"
-                                            style={{ backgroundColor: theme.progressBg }}
-                                        >
-                                            <div
-                                                className="h-full rounded-full w-2/3"
-                                                style={{ backgroundColor: theme.progressFill }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div
-                                        className="py-2 px-3 rounded-lg text-center text-xs font-medium"
-                                        style={{
-                                            background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                                            color: "#fff",
-                                        }}
-                                    >
-                                        Add to Outline
-                                    </div>
-                                </div>
-                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                The live preview above updates instantly as you switch themes.
+                            </p>
                         </CardContent>
                     </CollapsibleContent>
                 </Card>
