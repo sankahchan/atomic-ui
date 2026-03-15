@@ -2407,11 +2407,11 @@ export default function KeysPage() {
         </div>
 
         <div className="ops-table-toolbar md:hidden">
-          <div className="flex flex-1 items-center justify-center rounded-[1rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
+          <div className="flex flex-1 items-center justify-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 flex-1 rounded-[0.85rem] px-2"
+              className="h-9 flex-1 rounded-[0.8rem] px-2"
               onClick={() => setViewMode('list')}
             >
               <LayoutList className="w-4 h-4" />
@@ -2419,7 +2419,7 @@ export default function KeysPage() {
             <Button
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 flex-1 rounded-[0.85rem] px-2"
+              className="h-9 flex-1 rounded-[0.8rem] px-2"
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -2427,7 +2427,7 @@ export default function KeysPage() {
             <Button
               variant={viewMode === 'group' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 flex-1 rounded-[0.85rem] px-2"
+              className="h-9 flex-1 rounded-[0.8rem] px-2"
               onClick={() => setViewMode('group')}
               title={t('keys.view.group_by_server')}
             >
@@ -2437,7 +2437,7 @@ export default function KeysPage() {
 
           <Button
             variant="outline"
-            className="h-10 flex-1 rounded-[1rem]"
+            className="h-9 flex-1 rounded-[0.95rem] text-xs font-medium"
             onClick={() => syncAllMutation.mutate()}
             disabled={syncAllMutation.isPending}
           >
@@ -2461,7 +2461,7 @@ export default function KeysPage() {
               </span>
             ) : null}
             {hasAnyFilters ? (
-              <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-xs" onClick={clearAllFilters}>
+              <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]" onClick={clearAllFilters}>
                 <X className="w-3 h-3 mr-1" />
                 {t('keys.clear_filters')}
               </Button>
@@ -2472,8 +2472,8 @@ export default function KeysPage() {
 
       {/* Quick Filter Pills */}
       <div className="ops-table-meta hidden md:flex">
-        <span className="mr-1 text-sm text-muted-foreground">{t('keys.quick_filters.label')}:</span>
-        <div className="mr-2 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100">
+        <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t('keys.quick_filters.label')}:</span>
+        <div className="mr-1.5 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
           <Activity className="h-3.5 w-3.5 text-cyan-300" />
           <span>{fillTemplate(t('keys.activity.summary'), { count: onlineCount })}</span>
           <TooltipProvider>
@@ -2490,7 +2490,7 @@ export default function KeysPage() {
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-8 rounded-full text-xs', filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
           onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
         >
           <Wifi className="w-3 h-3 mr-1" />
@@ -2499,7 +2499,7 @@ export default function KeysPage() {
         <Button
           variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-8 rounded-full text-xs', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
           onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
         >
           <Clock className="w-3 h-3 mr-1" />
@@ -2508,7 +2508,7 @@ export default function KeysPage() {
         <Button
           variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-8 rounded-full text-xs', filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
           onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
         >
           <AlertTriangle className="w-3 h-3 mr-1" />
@@ -2517,7 +2517,7 @@ export default function KeysPage() {
         <Button
           variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
           size="sm"
-          className={cn('h-8 rounded-full text-xs', filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
           onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
         >
           <EyeOff className="w-3 h-3 mr-1" />
@@ -2525,24 +2525,24 @@ export default function KeysPage() {
         </Button>
         
         {/* Tag filter */}
-        <div className="ml-2 flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2.5 py-1.5 dark:bg-white/[0.02]">
+        <div className="ml-1.5 flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('keys.quick_filters.tag_placeholder')}
             value={filters.tagFilter || ''}
             onChange={(e) => setTagFilter(e.target.value || undefined)}
-            className="h-auto w-28 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+            className="h-auto w-24 border-0 bg-transparent p-0 text-[11px] shadow-none focus-visible:ring-0"
           />
         </div>
         
         {/* Owner filter */}
-        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2.5 py-1.5 dark:bg-white/[0.02]">
+        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('keys.quick_filters.owner_placeholder')}
             value={filters.ownerFilter || ''}
             onChange={(e) => setOwnerFilter(e.target.value || undefined)}
-            className="h-auto w-28 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+            className="h-auto w-24 border-0 bg-transparent p-0 text-[11px] shadow-none focus-visible:ring-0"
           />
         </div>
 
@@ -2550,7 +2550,7 @@ export default function KeysPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 rounded-full text-xs"
+            className="h-8 rounded-full px-2.5 text-[11px]"
             onClick={clearPersistedFilters}
           >
             <X className="w-3 h-3 mr-1" />
@@ -2560,7 +2560,7 @@ export default function KeysPage() {
       </div>
 
       {/* Filters */}
-      <div className="ops-table-toolbar hidden md:flex">
+      <div className="ops-table-toolbar hidden md:flex md:gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -2570,7 +2570,7 @@ export default function KeysPage() {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 pl-9 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]"
+            className="h-10 rounded-[1rem] border-border/70 bg-background/70 pl-9 text-sm dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]"
           />
         </div>
 
@@ -2581,7 +2581,7 @@ export default function KeysPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-11 w-[148px] rounded-[1.15rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
+          <SelectTrigger className="h-10 w-[140px] rounded-[1rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
             <SelectValue placeholder={t('keys.status_filter')} />
           </SelectTrigger>
           <SelectContent>
@@ -2601,7 +2601,7 @@ export default function KeysPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-11 w-[190px] rounded-[1.15rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
+          <SelectTrigger className="h-10 w-[176px] rounded-[1rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
             <SelectValue placeholder={t('keys.server_filter')} />
           </SelectTrigger>
           <SelectContent>
@@ -2619,7 +2619,7 @@ export default function KeysPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full"
+            className="h-8 rounded-full px-3 text-xs"
             onClick={clearFilters}
           >
             <X className="w-4 h-4 mr-1" />
@@ -2630,7 +2630,7 @@ export default function KeysPage() {
         {/* Export dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-11 rounded-[1.15rem] px-4" disabled={!!exportingFormat}>
+            <Button variant="outline" size="sm" className="h-10 rounded-[1rem] px-3.5 text-xs font-medium" disabled={!!exportingFormat}>
               {exportingFormat ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
@@ -2653,13 +2653,13 @@ export default function KeysPage() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
           {/* View mode toggle - visible on all screens */}
-          <div className="flex items-center rounded-[1rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
+          <div className="flex items-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 rounded-[0.85rem] px-2.5"
+              className="h-9 rounded-[0.75rem] px-2.5"
               onClick={() => setViewMode('list')}
             >
               <LayoutList className="w-4 h-4" />
@@ -2667,7 +2667,7 @@ export default function KeysPage() {
             <Button
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 rounded-[0.85rem] px-2.5"
+              className="h-9 rounded-[0.75rem] px-2.5"
               onClick={() => setViewMode('grid')}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -2675,7 +2675,7 @@ export default function KeysPage() {
             <Button
               variant={viewMode === 'group' ? 'secondary' : 'ghost'}
               size="sm"
-              className="h-10 rounded-[0.85rem] px-2.5"
+              className="h-9 rounded-[0.75rem] px-2.5"
               onClick={() => setViewMode('group')}
               title={t('keys.view.group_by_server')}
             >
@@ -2684,13 +2684,13 @@ export default function KeysPage() {
           </div>
 
           {/* Auto-sync selector */}
-          <div className="flex items-center gap-1 rounded-[1rem] border border-border/60 bg-background/55 px-2.5 py-1.5 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 rounded-[0.95rem] border border-border/60 bg-background/55 px-2 py-1 dark:bg-white/[0.02]">
             <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
             <Select
               value={autoRefresh.interval.toString()}
               onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
             >
-              <SelectTrigger className="h-9 w-[84px] rounded-[0.9rem] border-0 bg-transparent shadow-none focus:ring-0">
+              <SelectTrigger className="h-8 w-[78px] rounded-[0.8rem] border-0 bg-transparent shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -2702,7 +2702,7 @@ export default function KeysPage() {
               </SelectContent>
             </Select>
             {autoRefresh.isActive && (
-              <span className="text-xs text-muted-foreground min-w-[24px]">
+              <span className="min-w-[24px] text-[11px] text-muted-foreground">
                 {autoRefresh.countdown}s
               </span>
             )}
@@ -2710,7 +2710,7 @@ export default function KeysPage() {
 
           <Button
             variant="outline"
-            className="h-11 rounded-[1.15rem] px-4"
+            className="h-10 rounded-[1rem] px-3.5 text-xs font-medium"
             onClick={() => syncAllMutation.mutate()}
             disabled={syncAllMutation.isPending}
           >
@@ -2890,17 +2890,18 @@ export default function KeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="ops-mobile-action-bar sticky bottom-4 z-20 border-primary/20 bg-primary/6 shadow-[0_18px_36px_rgba(1,6,20,0.34)]">
-          <span className="text-sm font-medium">
+        <div className="ops-mobile-action-bar sticky bottom-4 z-20 flex flex-col gap-2.5 border-primary/20 bg-primary/6 shadow-[0_18px_36px_rgba(1,6,20,0.34)] sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs font-medium sm:text-sm">
             {selectedKeys.size} {t('keys.selected_count')}
           </span>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center">
             {/* Enable/Disable dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 rounded-full px-3 text-xs"
                   disabled={bulkToggleStatusMutation.isPending}
                 >
                   {bulkToggleStatusMutation.isPending ? (
@@ -2927,6 +2928,7 @@ export default function KeysPage() {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 rounded-full px-3 text-xs"
               onClick={() => setBulkExtendDialogOpen(true)}
               disabled={isBulkBusy}
             >
@@ -2944,6 +2946,7 @@ export default function KeysPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 rounded-full px-3 text-xs"
                   disabled={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
                 >
                   {bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending ? (
@@ -2976,6 +2979,7 @@ export default function KeysPage() {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 rounded-full px-3 text-xs"
               onClick={() => setBulkMoveDialogOpen(true)}
               disabled={isBulkBusy}
             >
@@ -2991,6 +2995,7 @@ export default function KeysPage() {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 rounded-full px-3 text-xs"
               onClick={handleBulkArchive}
               disabled={bulkArchiveMutation.isPending}
             >
@@ -3006,6 +3011,7 @@ export default function KeysPage() {
             <Button
               variant="destructive"
               size="sm"
+              className="h-8 rounded-full px-3 text-xs"
               onClick={handleBulkDelete}
               disabled={bulkDeleteMutation.isPending}
             >
@@ -3021,7 +3027,7 @@ export default function KeysPage() {
             variant="ghost"
             size="sm"
             onClick={() => setSelectedKeys(new Set())}
-            className="w-full rounded-full sm:ml-auto sm:w-auto"
+            className="h-8 w-full rounded-full px-3 text-xs sm:ml-auto sm:w-auto"
             disabled={isBulkBusy}
           >
             {t('keys.clear_selection')}
@@ -3310,28 +3316,28 @@ export default function KeysPage() {
 
         {/* Pagination */}
         {data && data.totalPages > 1 && (
-          <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-4 py-3">
-            <p className="text-sm text-muted-foreground">
+          <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-3 py-2.5">
+            <p className="text-xs text-muted-foreground sm:text-sm">
               {t('keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('keys.pagination.to')}{' '}
               {Math.min(page * pageSize, data.total)} {t('keys.pagination.of')} {data.total}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="h-8 w-8 rounded-full p-0"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-sm">
+              <span className="text-xs sm:text-sm">
                 {t('keys.pagination.page')} {page} {t('keys.pagination.of_pages')} {data.totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="h-8 w-8 rounded-full p-0"
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={page === data.totalPages}
               >

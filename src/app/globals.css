@@ -711,7 +711,7 @@
   }
 
   .ops-table-toolbar {
-    @apply flex flex-col gap-2.5 rounded-[1.2rem] border px-3 py-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-3.5;
+    @apply flex flex-col gap-2 rounded-[1.1rem] border px-3 py-2.5 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-3;
     border-color: rgba(214, 225, 239, 0.92);
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(246, 249, 253, 0.8));
@@ -729,7 +729,7 @@
   }
 
   .ops-table-meta {
-    @apply flex flex-wrap items-center gap-2 rounded-[1.15rem] border px-3 py-2 text-xs font-medium text-muted-foreground;
+    @apply flex flex-wrap items-center gap-1.5 rounded-[1rem] border px-2.5 py-1.5 text-xs font-medium text-muted-foreground;
     border-color: rgba(255, 255, 255, 0.38);
     background: rgba(255, 255, 255, 0.58);
   }
@@ -742,7 +742,7 @@
   }
 
   .ops-filter-bar {
-    @apply flex flex-col gap-2.5 rounded-[1.15rem] border px-3 py-3 md:flex-row md:flex-wrap md:items-center md:px-3.5;
+    @apply flex flex-col gap-2 rounded-[1.1rem] border px-3 py-2.5 md:flex-row md:flex-wrap md:items-center md:px-3;
     border-color: rgba(214, 225, 239, 0.92);
     background: rgba(255, 255, 255, 0.8);
   }
@@ -1025,7 +1025,7 @@
   }
 
   .ops-row-card {
-    @apply rounded-[1.2rem] border px-4 py-3 transition-all duration-200;
+    @apply rounded-[1.1rem] border px-3.5 py-2.5 transition-all duration-200;
     border-color: rgba(255, 255, 255, 0.38);
     background: rgba(255, 255, 255, 0.62);
   }
@@ -1047,7 +1047,7 @@
   }
 
   .ops-mobile-action-bar {
-    @apply sticky bottom-4 z-20 rounded-[1.35rem] border px-3 py-3 backdrop-blur-xl;
+    @apply sticky bottom-4 z-20 rounded-[1.2rem] border px-3 py-2.5 backdrop-blur-xl;
     border-color: rgba(255, 255, 255, 0.42);
     background: rgba(255, 255, 255, 0.84);
     box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
@@ -1078,7 +1078,7 @@
     .ops-filter-bar,
     .ops-command-bar,
     .ops-table-toolbar {
-      @apply rounded-[1.2rem] px-3 py-3;
+      @apply rounded-[1.15rem] px-3 py-2.5;
     }
 
     .ops-chart-shell {
