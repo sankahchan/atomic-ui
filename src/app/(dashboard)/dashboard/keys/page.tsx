@@ -133,11 +133,37 @@ const statusConfig = {
   },
 };
 
+type CreatedKeySummary = {
+  id: string;
+  name: string;
+  accessUrl: string | null;
+  subscriptionToken: string | null;
+  method: string | null;
+  port: number | null;
+  password: string | null;
+  expiresAt: Date | string | null;
+  dataLimitBytes: bigint | null;
+  server: {
+    id: string;
+    name: string;
+    countryCode: string | null;
+  } | null;
+};
+
 function fillTemplate(template: string, values: Record<string, string | number>) {
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
     template,
   );
+}
+
+function getKeySubscriptionPageUrl(subscriptionToken?: string | null): string {
+  if (typeof window === 'undefined' || !subscriptionToken) {
+    return '';
+  }
+
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `${window.location.origin}${basePath}/sub/${subscriptionToken}`;
 }
 
 /**
@@ -154,7 +180,7 @@ function CreateKeyDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (createdKey: CreatedKeySummary) => void;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<{
@@ -207,12 +233,12 @@ function CreateKeyDialog({
 
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (createdKey) => {
       toast({
         title: t('keys.toast.created'),
         description: t('keys.toast.created_desc'),
       });
-      onSuccess();
+      onSuccess(createdKey);
       onOpenChange(false);
       resetForm();
     },
@@ -605,6 +631,165 @@ function CreateKeyDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreatedKeySummaryDialog({
+  createdKey,
+  open,
+  onOpenChange,
+}: {
+  createdKey: CreatedKeySummary | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useLocale();
+  const subscriptionPageUrl = getKeySubscriptionPageUrl(createdKey?.subscriptionToken);
+  const { data: qrData, isLoading } = trpc.keys.generateQRCode.useQuery(
+    { id: createdKey?.id ?? '' },
+    { enabled: open && !!createdKey?.id },
+  );
+
+  if (!createdKey) {
+    return null;
+  }
+
+  const expirationLabel = createdKey.expiresAt
+    ? formatDateTime(createdKey.expiresAt)
+    : t('keys.never_expires');
+  const dataLimitLabel = createdKey.dataLimitBytes
+    ? formatBytes(createdKey.dataLimitBytes)
+    : t('keys.form.data_limit_placeholder');
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl overflow-hidden p-0">
+        <div className="grid lg:grid-cols-[minmax(0,1.2fr)_240px]">
+          <div className="space-y-5 p-6">
+            <DialogHeader className="space-y-2 text-left">
+              <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/8 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-primary">
+                {t('keys.toast.created')}
+              </Badge>
+              <DialogTitle className="text-2xl font-semibold tracking-tight">
+                {createdKey.name}
+              </DialogTitle>
+              <DialogDescription className="max-w-2xl text-sm text-muted-foreground">
+                {t('keys.dialog.created_desc')}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.dialog.created_server')}
+                </p>
+                <p className="mt-2 flex items-center gap-2 text-sm font-medium">
+                  {createdKey.server?.countryCode ? <span>{getCountryFlag(createdKey.server.countryCode)}</span> : null}
+                  <span className="truncate">{createdKey.server?.name ?? '-'}</span>
+                </p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.dialog.created_encryption')}
+                </p>
+                <p className="mt-2 break-all font-mono text-sm">{createdKey.method ?? '-'}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.dialog.created_port')}
+                </p>
+                <p className="mt-2 font-mono text-sm">{createdKey.port ?? '-'}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.dialog.created_password')}
+                </p>
+                <p className="mt-2 break-all font-mono text-sm">{createdKey.password ?? '-'}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.dialog.created_expiration')}
+                </p>
+                <p className="mt-2 text-sm font-medium">{expirationLabel}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.form.data_limit')}
+                </p>
+                <p className="mt-2 text-sm font-medium">{dataLimitLabel}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">{t('keys.dialog.created_access_url')}</Label>
+                <p className="text-xs text-muted-foreground">{t('keys.dialog.qr_desc')}</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-border/60 bg-background/70 p-3 font-mono text-xs leading-6 break-all dark:bg-[rgba(4,10,20,0.72)]">
+                {createdKey.accessUrl ?? '-'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="rounded-full"
+                  onClick={() => copyToClipboard(createdKey.accessUrl || '', t('keys.toast.copied'), t('keys.toast.copy_access_url'))}
+                  disabled={!createdKey.accessUrl}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {t('keys.actions.copy_access_url')}
+                </Button>
+                <Button asChild type="button" variant="outline" className="rounded-full">
+                  <Link href={`/dashboard/keys/${createdKey.id}`}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    {t('keys.actions.view_details')}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">{t('keys.dialog.created_subscription_page')}</Label>
+                <p className="text-xs text-muted-foreground">{t('keys.dialog.created_subscription_help')}</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-border/60 bg-background/70 p-3 font-mono text-xs leading-6 break-all dark:bg-[rgba(4,10,20,0.72)]">
+                {subscriptionPageUrl || '-'}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => copyToClipboard(subscriptionPageUrl, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'))}
+                disabled={!subscriptionPageUrl}
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                {t('keys.actions.copy_subscription_url')}
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t border-border/60 bg-muted/25 p-6 lg:border-l lg:border-t-0">
+            <div className="flex h-full flex-col rounded-[1.5rem] border border-border/60 bg-background/80 p-4 dark:bg-[rgba(4,10,20,0.82)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {t('keys.actions.show_qr')}
+              </p>
+              <div className="mt-4 flex flex-1 items-center justify-center rounded-[1.2rem] border border-dashed border-border/60 bg-background/60 p-4 dark:bg-[rgba(255,255,255,0.02)]">
+                {isLoading ? (
+                  <div className="h-[180px] w-[180px] animate-pulse rounded-[1rem] bg-muted" />
+                ) : qrData?.qrCode ? (
+                  <QRCodeWithLogo dataUrl={qrData.qrCode} size={180} />
+                ) : (
+                  <p className="text-center text-sm text-muted-foreground">{t('keys.dialog.qr_failed')}</p>
+                )}
+              </div>
+              <p className="mt-4 text-xs leading-5 text-muted-foreground">
+                {t('keys.dialog.created_qr_help')}
+              </p>
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -1547,6 +1732,7 @@ export default function KeysPage() {
   const [serverFilter, setServerFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createdKey, setCreatedKey] = useState<CreatedKeySummary | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [qrDialogKey, setQrDialogKey] = useState<{ id: string; name: string } | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -3162,7 +3348,7 @@ export default function KeysPage() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => {
-                            const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
+                            const url = getKeySubscriptionPageUrl(key.subscriptionToken);
                             copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                           }}
                         >
@@ -3278,7 +3464,7 @@ export default function KeysPage() {
                     }}
                     onCopySubscriptionUrl={() => {
                       if (key.subscriptionToken) {
-                        const url = `${window.location.origin}/sub/${key.subscriptionToken}`;
+                        const url = getKeySubscriptionPageUrl(key.subscriptionToken);
                         copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                       } else {
                         toast({ title: t('keys.toast.error'), description: t('keys.toast.no_subscription_url'), variant: 'destructive' });
@@ -3352,7 +3538,21 @@ export default function KeysPage() {
       <CreateKeyDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onSuccess={() => refetch()}
+        onSuccess={(newKey) => {
+          setCreatedKey(newKey);
+          refetch();
+          refetchStats();
+        }}
+      />
+
+      <CreatedKeySummaryDialog
+        createdKey={createdKey}
+        open={!!createdKey}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedKey(null);
+          }
+        }}
       />
 
       {qrDialogKey && (
