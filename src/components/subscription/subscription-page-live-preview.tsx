@@ -126,7 +126,6 @@ export function SubscriptionPageLivePreview({
   const showCompatibleApps = mergedBranding.showCompatibleApps ?? true;
   const showHelpContact = mergedBranding.showHelpContact ?? true;
   const showManualSetupButton = mergedBranding.showManualSetupButton ?? true;
-  const showUsageChips = mergedBranding.showUsageChips ?? true;
   const hasHelpContactContent = showHelpContact;
   const usageHeadline = "176 GB / 200 GB";
   const usageDetail = "88% of quota used";
@@ -364,29 +363,6 @@ export function SubscriptionPageLivePreview({
                       <span className="text-sm" style={{ color: textPrimary }}>
                         88% of the included data has already been used. Users should expect a prominent warning here.
                       </span>
-                    </div>
-                  )}
-
-                  {showUsageChips && (
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { label: "Server", value: serverLabel, icon: MapPin },
-                        { label: "Usage", value: "88% used", icon: HardDrive },
-                        { label: "Time left", value: "12 days", icon: Clock3 },
-                      ].map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <div
-                            key={item.label}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
-                            style={pillStyle}
-                          >
-                            <Icon className="h-4 w-4" style={{ color: theme.accent }} />
-                            <span className="font-medium">{item.label}</span>
-                            <span style={{ color: textSecondary }}>{item.value}</span>
-                          </div>
-                        );
-                      })}
                     </div>
                   )}
 

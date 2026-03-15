@@ -252,11 +252,6 @@ export function SubscriptionSettings() {
             label: "Manual Setup Button",
             description: "Keep the QR/manual setup trigger visible in the hero actions.",
         },
-        {
-            key: "showUsageChips",
-            label: "Usage Chips",
-            description: "Show the compact Server, Usage, and Expires pills under the hero.",
-        },
     ];
 
     if (loading) {

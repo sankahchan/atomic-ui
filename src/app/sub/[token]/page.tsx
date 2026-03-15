@@ -670,7 +670,6 @@ export default function SubscriptionPage() {
   const showCompatibleApps = branding.showCompatibleApps ?? true;
   const showHelpContact = branding.showHelpContact ?? true;
   const showManualSetupButton = branding.showManualSetupButton ?? true;
-  const showUsageChips = branding.showUsageChips ?? true;
   const statusTone = keyData.status === 'ACTIVE'
     ? { bg: `${theme.success}18`, color: theme.success, label: 'Active' }
     : keyData.status === 'PENDING'
@@ -689,25 +688,6 @@ export default function SubscriptionPage() {
     : `${formatBytes(keyData.usedBytes)} used with no quota limit`;
   const footerText = branding.footerText?.trim()
     || (branding.showPoweredBy !== false ? `Powered by ${branding.brandName || 'Atomic-UI'}` : '');
-  const topInfoChips = showUsageChips
-    ? [
-        {
-          label: 'Server',
-          value: serverLabel,
-          icon: MapPin,
-        },
-        {
-          label: 'Usage',
-          value: keyData.dataLimitBytes ? `${usagePercent}% used` : 'Unlimited',
-          icon: HardDrive,
-        },
-        {
-          label: 'Time left',
-          value: timeRemaining,
-          icon: Clock3,
-        },
-      ]
-    : [];
 
   const getCardStyle = () => {
     if (hasImageBackground) {
@@ -1004,28 +984,6 @@ export default function SubscriptionPage() {
                         ? 'Data is almost depleted. Reconnect may stop soon if the limit is reached.'
                         : `${usageAlert}% of your available data has already been used.`}
                     </span>
-                  </div>
-                )}
-
-                {topInfoChips.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {topInfoChips.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <div
-                          key={item.label}
-                          className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.1)' : theme.bgSecondary,
-                            color: primaryTextColor,
-                          }}
-                        >
-                          <Icon className="h-4 w-4" style={{ color: hasImageBackground ? '#ffffff' : theme.accent }} />
-                          <span className="font-medium">{item.label}</span>
-                          <span style={{ color: mutedTextColor }}>{item.value}</span>
-                        </div>
-                      );
-                    })}
                   </div>
                 )}
 
