@@ -11,8 +11,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
+  AlertTriangle,
   ChevronRight,
-  CircleAlert,
   Clock3,
   Copy,
   Download,
@@ -797,7 +797,7 @@ export default function SubscriptionPage() {
                         border: `1px solid ${usageAlert >= 95 ? `${theme.danger}44` : `${theme.warning}44`}`,
                       }}
                     >
-                      <CircleAlert
+                      <AlertTriangle
                         className="mt-0.5 h-4 w-4 shrink-0"
                         style={{ color: usageAlert >= 95 ? theme.danger : theme.warning }}
                       />
