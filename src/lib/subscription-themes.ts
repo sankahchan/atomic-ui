@@ -80,7 +80,16 @@ export interface SubscriptionBranding {
 
   // App Buttons
   enabledApps?: string[];     // List of enabled app IDs
+  primaryAppId?: string;      // Preferred primary app CTA
   customApps?: CustomApp[];   // User-defined apps
+}
+
+export interface SubscriptionPreset {
+  id: string;
+  name: string;
+  description: string;
+  themeId: string;
+  branding: Partial<SubscriptionBranding>;
 }
 
 export interface CustomApp {
@@ -104,6 +113,7 @@ export const defaultBranding: SubscriptionBranding = {
   showUsageAlerts: true,
   usageAlertThresholds: [80, 90, 95],
   enabledApps: ['outline', 'hiddify', 'v2box', 'v2rayng', 'v2rayn'],
+  primaryAppId: 'outline',
 };
 
 export const subscriptionThemes: Record<string, SubscriptionTheme> = {
@@ -517,8 +527,90 @@ export const subscriptionThemes: Record<string, SubscriptionTheme> = {
 
 export const themeList = Object.values(subscriptionThemes);
 
+export const subscriptionPagePresets: SubscriptionPreset[] = [
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    description: 'Quiet, clean, and stripped back for fast installs.',
+    themeId: 'light',
+    branding: {
+      layout: 'minimal',
+      cardStyle: 'sharp',
+      enableAnimations: false,
+      animatedBackground: 'none',
+      showUsageAlerts: false,
+      showWelcome: false,
+    },
+  },
+  {
+    id: 'glass',
+    name: 'Glass',
+    description: 'Layered glass panels with a richer ambient background.',
+    themeId: 'glassBlue',
+    branding: {
+      layout: 'default',
+      cardStyle: 'rounded',
+      enableAnimations: true,
+      animatedBackground: 'gradient',
+      showUsageAlerts: true,
+    },
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    description: 'Bright, restrained, and practical for support-heavy panels.',
+    themeId: 'light',
+    branding: {
+      layout: 'compact',
+      cardStyle: 'rounded',
+      enableAnimations: false,
+      animatedBackground: 'none',
+      showUsageAlerts: true,
+    },
+  },
+  {
+    id: 'bold',
+    name: 'Bold',
+    description: 'High contrast visuals with stronger emphasis on the install CTA.',
+    themeId: 'blue',
+    branding: {
+      layout: 'detailed',
+      cardStyle: 'pill',
+      enableAnimations: true,
+      animatedBackground: 'particles',
+      showUsageAlerts: true,
+    },
+  },
+];
+
 export function getTheme(themeId: string | null | undefined): SubscriptionTheme {
   return subscriptionThemes[themeId || 'dark'] || subscriptionThemes.dark;
+}
+
+export function prioritizeSubscriptionApps<T extends { id: string }>(
+  apps: T[],
+  orderedIds: string[] = [],
+  primaryAppId?: string | null,
+): T[] {
+  const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
+
+  return [...apps].sort((left, right) => {
+    const leftPrimary = !!primaryAppId && left.id === primaryAppId;
+    const rightPrimary = !!primaryAppId && right.id === primaryAppId;
+
+    if (leftPrimary !== rightPrimary) {
+      return leftPrimary ? -1 : 1;
+    }
+
+    const leftOrder = orderIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = orderIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+
+    return 0;
+  });
 }
 
 /**

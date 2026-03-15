@@ -51,6 +51,7 @@ import {
   getTheme,
   clientApps,
   defaultBranding,
+  prioritizeSubscriptionApps,
   type SubscriptionTheme,
   type SubscriptionBranding,
   type CustomApp,
@@ -449,7 +450,11 @@ export default function SubscriptionPage() {
         urlScheme: (accessUrl: string) => app.urlScheme.replace('{url}', encodeURIComponent(accessUrl)),
       }));
 
-    return [...builtInApps, ...customApps];
+    return prioritizeSubscriptionApps(
+      [...builtInApps, ...customApps],
+      enabledIds,
+      branding.primaryAppId,
+    );
   };
 
   const handleAddToApp = (appId: string) => {

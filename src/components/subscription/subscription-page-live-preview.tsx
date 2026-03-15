@@ -20,6 +20,7 @@ import {
   clientApps,
   defaultBranding,
   getTheme,
+  prioritizeSubscriptionApps,
   type SubscriptionBranding,
 } from "@/lib/subscription-themes";
 
@@ -89,10 +90,12 @@ export function SubscriptionPageLivePreview({
   const isGlassTheme = theme.id.startsWith("glass");
   const radiusClass = radiusClasses[mergedBranding.cardStyle || "rounded"];
   const logoUrl = mergedBranding.logoUrl || ATOMIC_LOGO_SVG;
-  const enabledAppIds = mergedBranding.enabledApps?.length
-    ? mergedBranding.enabledApps
-    : defaultBranding.enabledApps || [];
-  const apps = clientApps.filter((app) => enabledAppIds.includes(app.id));
+  const enabledAppIds = mergedBranding.enabledApps ?? defaultBranding.enabledApps ?? [];
+  const apps = prioritizeSubscriptionApps(
+    clientApps.filter((app) => enabledAppIds.includes(app.id)),
+    enabledAppIds,
+    mergedBranding.primaryAppId,
+  );
   const primaryApp = apps[0] || null;
   const visibleApps = apps.slice(0, isMobile ? 2 : 4);
   const usagePercent = 88;

@@ -61,6 +61,7 @@ export async function GET(
       'subscriptionShowUsageAlerts',
       'subscriptionUsageAlertThresholds',
       'subscriptionEnabledApps',
+      'subscriptionPrimaryAppId',
       'subscriptionCustomApps',
     ];
 
@@ -116,6 +117,7 @@ export async function GET(
         settingsMap.get('subscriptionEnabledApps'),
         defaultBranding.enabledApps!
       ),
+      primaryAppId: settingsMap.get('subscriptionPrimaryAppId') || defaultBranding.primaryAppId,
       customApps: parseJson(
         settingsMap.get('subscriptionCustomApps'),
         defaultBranding.customApps || []

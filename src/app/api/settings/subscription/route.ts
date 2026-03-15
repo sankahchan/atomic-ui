@@ -29,6 +29,7 @@ const brandingKeys = [
   'subscriptionShowUsageAlerts',
   'subscriptionUsageAlertThresholds',
   'subscriptionEnabledApps',
+  'subscriptionPrimaryAppId',
   'subscriptionCustomApps',
 ];
 
@@ -96,6 +97,7 @@ export async function GET() {
         settingsMap.get('subscriptionEnabledApps'),
         defaultBranding.enabledApps!
       ),
+      primaryAppId: settingsMap.get('subscriptionPrimaryAppId') || defaultBranding.primaryAppId,
       customApps: parseJson(
         settingsMap.get('subscriptionCustomApps'),
         []
@@ -171,6 +173,7 @@ export async function POST(request: NextRequest) {
         subscriptionLayout: branding.layout,
         subscriptionCardStyle: branding.cardStyle,
         subscriptionAnimatedBackground: branding.animatedBackground,
+        subscriptionPrimaryAppId: branding.primaryAppId,
       };
 
       // Number settings

@@ -14,6 +14,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { SubscriptionPageLivePreview } from "@/components/subscription/subscription-page-live-preview";
 import { useToast } from "@/hooks/use-toast";
 import {
+    ArrowDown,
+    ArrowUp,
     Loader2,
     Save,
     Palette,
@@ -30,8 +32,15 @@ import {
     Smartphone,
     Code,
     FileText,
+    WandSparkles,
 } from "lucide-react";
-import { themeList, clientApps, SubscriptionBranding, defaultBranding } from "@/lib/subscription-themes";
+import {
+    themeList,
+    clientApps,
+    SubscriptionBranding,
+    defaultBranding,
+    subscriptionPagePresets,
+} from "@/lib/subscription-themes";
 
 interface BrandingState extends SubscriptionBranding {
     // All fields from SubscriptionBranding
@@ -55,6 +64,7 @@ export function SubscriptionSettings() {
 
     // Collapsible sections
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        presets: true,
         basic: true,
         theme: true,
         branding: false,
@@ -139,16 +149,84 @@ export function SubscriptionSettings() {
     };
 
     const toggleApp = (appId: string) => {
-        const current = branding.enabledApps || [];
-        if (current.includes(appId)) {
-            updateBranding(
-                "enabledApps",
-                current.filter((id) => id !== appId)
-            );
-        } else {
-            updateBranding("enabledApps", [...current, appId]);
-        }
+        setBranding((prev) => {
+            const current = prev.enabledApps ?? [];
+            if (current.includes(appId)) {
+                const nextEnabledApps = current.filter((id) => id !== appId);
+                return {
+                    ...prev,
+                    enabledApps: nextEnabledApps,
+                    primaryAppId:
+                        prev.primaryAppId === appId
+                            ? nextEnabledApps[0] || ""
+                            : prev.primaryAppId,
+                };
+            }
+
+            return {
+                ...prev,
+                enabledApps: [...current, appId],
+                primaryAppId: prev.primaryAppId || appId,
+            };
+        });
     };
+
+    const applyPreset = (presetId: string) => {
+        const preset = subscriptionPagePresets.find((item) => item.id === presetId);
+        if (!preset) return;
+
+        setDefaultTheme(preset.themeId);
+        setBranding((prev) => {
+            const enabledApps = prev.enabledApps ?? defaultBranding.enabledApps ?? [];
+            const nextPrimaryAppId =
+                prev.primaryAppId && enabledApps.includes(prev.primaryAppId)
+                    ? prev.primaryAppId
+                    : enabledApps[0] || "";
+
+            return {
+                ...prev,
+                ...preset.branding,
+                enabledApps,
+                primaryAppId: nextPrimaryAppId,
+            };
+        });
+    };
+
+    const moveEnabledApp = (appId: string, direction: "up" | "down") => {
+        setBranding((prev) => {
+            const current = [...(prev.enabledApps ?? [])];
+            const index = current.indexOf(appId);
+            if (index === -1) return prev;
+
+            const targetIndex = direction === "up" ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= current.length) {
+                return prev;
+            }
+
+            const [moved] = current.splice(index, 1);
+            current.splice(targetIndex, 0, moved);
+
+            return {
+                ...prev,
+                enabledApps: current,
+            };
+        });
+    };
+
+    const activePresetId =
+        subscriptionPagePresets.find((preset) => (
+            defaultTheme === preset.themeId
+            && Object.entries(preset.branding).every(([key, value]) => branding[key as keyof BrandingState] === value)
+        ))?.id || null;
+
+    const enabledAppIds = branding.enabledApps ?? defaultBranding.enabledApps ?? [];
+    const enabledApps = enabledAppIds
+        .map((id) => clientApps.find((app) => app.id === id))
+        .filter((app): app is (typeof clientApps)[number] => Boolean(app));
+    const resolvedPrimaryAppId =
+        (branding.primaryAppId && enabledAppIds.includes(branding.primaryAppId))
+            ? branding.primaryAppId
+            : enabledAppIds[0] || "";
 
     if (loading) {
         return (
@@ -178,6 +256,69 @@ export function SubscriptionSettings() {
                     />
                 </CardContent>
             </Card>
+
+            <Collapsible open={openSections.presets} onOpenChange={() => toggleSection("presets")}>
+                <Card>
+                    <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <WandSparkles className="w-5 h-5" />
+                                    <CardTitle className="text-base">Presets</CardTitle>
+                                </div>
+                                <ChevronDown
+                                    className={`w-5 h-5 transition-transform ${openSections.presets ? "rotate-180" : ""}`}
+                                />
+                            </div>
+                            <CardDescription>
+                                Apply a curated starting point for theme, layout, card shape, and motion.
+                            </CardDescription>
+                        </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <CardContent className="space-y-4 pt-0">
+                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                                {subscriptionPagePresets.map((preset) => {
+                                    const isActive = activePresetId === preset.id;
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            type="button"
+                                            onClick={() => applyPreset(preset.id)}
+                                            className="rounded-2xl border p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-semibold">{preset.name}</span>
+                                                        {isActive && (
+                                                            <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                                                Active
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {preset.description}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="h-3.5 w-3.5 rounded-full border" style={{ backgroundColor: themeList.find((theme) => theme.id === preset.themeId)?.bgPrimary }} />
+                                                    <div className="h-3.5 w-3.5 rounded-full border" style={{ backgroundColor: themeList.find((theme) => theme.id === preset.themeId)?.accent }} />
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                <span className="rounded-full bg-muted px-2.5 py-1">{preset.branding.layout || "default"} layout</span>
+                                                <span className="rounded-full bg-muted px-2.5 py-1">{preset.branding.cardStyle || "rounded"} cards</span>
+                                                <span className="rounded-full bg-muted px-2.5 py-1">{preset.themeId}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </CollapsibleContent>
+                </Card>
+            </Collapsible>
 
             {/* Support Link Settings */}
             <Collapsible open={openSections.basic} onOpenChange={() => toggleSection("basic")}>
@@ -711,6 +852,10 @@ export function SubscriptionSettings() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
+                            <div className="rounded-xl border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                                The first install button on the public page comes from your selected primary app.
+                                The remaining enabled apps appear below it in the order shown here.
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {clientApps.map((app) => (
                                     <div
@@ -729,6 +874,11 @@ export function SubscriptionSettings() {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-lg">{app.icon}</span>
                                                 <span className="font-medium">{app.name}</span>
+                                                {resolvedPrimaryAppId === app.id && (
+                                                    <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                                        Primary
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">
                                                 {app.platforms.join(", ")}
@@ -737,6 +887,86 @@ export function SubscriptionSettings() {
                                     </div>
                                 ))}
                             </div>
+
+                            {enabledApps.length > 0 ? (
+                                <div className="space-y-4 rounded-2xl border border-border/60 p-4">
+                                    <div className="space-y-2">
+                                        <Label>Primary App CTA</Label>
+                                        <Select
+                                            value={resolvedPrimaryAppId}
+                                            onValueChange={(value) => updateBranding("primaryAppId", value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select primary app" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {enabledApps.map((app) => (
+                                                    <SelectItem key={app.id} value={app.id}>
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{app.icon}</span>
+                                                            <span>{app.name}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            This app becomes the main install button in the hero section.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Secondary App Order</Label>
+                                        <div className="space-y-2">
+                                            {enabledApps.map((app, index) => (
+                                                <div
+                                                    key={app.id}
+                                                    className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-lg">{app.icon}</span>
+                                                            <span className="font-medium">{app.name}</span>
+                                                            {resolvedPrimaryAppId === app.id && (
+                                                                <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                                                    Primary CTA
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            Order position {index + 1}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={index === 0}
+                                                            onClick={() => moveEnabledApp(app.id, "up")}
+                                                        >
+                                                            <ArrowUp className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={index === enabledApps.length - 1}
+                                                            onClick={() => moveEnabledApp(app.id, "down")}
+                                                        >
+                                                            <ArrowDown className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+                                    Enable at least one app to show install buttons on the subscription page.
+                                </div>
+                            )}
                         </CardContent>
                     </CollapsibleContent>
                 </Card>
