@@ -286,31 +286,59 @@ export function SubscriptionPageLivePreview({
                 <div className="flex flex-col gap-5">
                   <div className={`flex flex-col gap-5 ${isMobile ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
                     <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-start gap-4">
-                        <div
-                          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-                          style={{ ...pillStyle, backgroundColor: softSurface }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={logoUrl} alt={mergedBranding.brandName || "Brand logo"} className="h-10 w-10 object-contain" />
-                        </div>
+                      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
                         <div className="min-w-0">
-                          <div
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
-                            style={{
-                              backgroundColor: `${theme.accent}18`,
-                              color: theme.accent,
-                            }}
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {mergedBranding.brandName || "Atomic-UI"}
+                          <div className="flex min-w-0 items-start gap-4">
+                            <div
+                              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
+                              style={{ ...pillStyle, backgroundColor: softSurface }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={logoUrl} alt={mergedBranding.brandName || "Brand logo"} className="h-10 w-10 object-contain" />
+                            </div>
+                            <div className="min-w-0">
+                              <div
+                                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                                style={{
+                                  backgroundColor: `${theme.accent}18`,
+                                  color: theme.accent,
+                                }}
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                {mergedBranding.brandName || "Atomic-UI"}
+                              </div>
+                              <h3 className={`mt-3 font-semibold tracking-tight ${titleSizeClass}`} style={{ color: textPrimary }}>
+                                Singapore Premium
+                              </h3>
+                              <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: textMuted }}>
+                                Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
+                              </p>
+                            </div>
                           </div>
-                          <h3 className={`mt-3 font-semibold tracking-tight ${titleSizeClass}`} style={{ color: textPrimary }}>
-                            Singapore Premium
-                          </h3>
-                          <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: textMuted }}>
-                            Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
+                        </div>
+
+                        <div className="rounded-[24px] border p-4" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
+                            Quick Scan
                           </p>
+                          <div className="mt-3 flex aspect-square items-center justify-center rounded-[18px] border p-4" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <div className="flex h-full w-full max-h-[160px] max-w-[160px] items-center justify-center rounded-[14px] border border-dashed" style={{ borderColor: controlBorder }}>
+                              <QrCode className="h-14 w-14" style={{ color: theme.buttonGradientFrom }} />
+                            </div>
+                          </div>
+                          <p className="mt-3 text-sm font-medium" style={{ color: controlText }}>
+                            Scan with {primaryApp?.name || "your VPN app"}
+                          </p>
+                          <p className="mt-1 text-sm" style={{ color: controlMuted }}>
+                            Fastest on mobile. If scan fails, open manual setup for the same connection URL.
+                          </p>
+                          <div
+                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[18px] border px-4 py-3 text-sm font-medium"
+                            style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
+                          >
+                            <QrCode className="h-4 w-4" />
+                            Show Large QR
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -536,22 +564,54 @@ export function SubscriptionPageLivePreview({
 
                   <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
                     {visibleApps.map((app) => (
-                      <div key={app.id} className="rounded-[22px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                        <div className="text-2xl">{app.icon}</div>
-                        <p className="mt-3 text-base font-semibold" style={{ color: textPrimary }}>{app.name}</p>
-                        <p className="mt-1 text-sm" style={{ color: textMuted }}>
-                          Secondary install option for users who prefer {app.name}.
-                        </p>
-                        <div className="mt-4 flex gap-2">
-                          <div
-                            className="inline-flex flex-1 items-center justify-center rounded-full px-3 py-2.5 text-sm font-medium"
-                            style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                          >
-                            Open
+                      <div key={app.id} className="rounded-[22px] border p-4" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border text-xl"
+                              style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder, color: controlText }}
+                            >
+                              {app.icon}
+                            </div>
+                            <p className="mt-3 text-base font-semibold" style={{ color: controlText }}>{app.name}</p>
+                            <p className="mt-1 text-sm" style={{ color: controlMuted }}>
+                              Manual alternative for this device if you prefer {app.name}.
+                            </p>
                           </div>
-                          <div className="inline-flex items-center justify-center rounded-full px-3 py-2.5 text-sm font-medium" style={pillStyle}>
+                          <div
+                            className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                            style={{ backgroundColor: controlButtonSurface, color: controlMuted, border: `1px solid ${controlBorder}` }}
+                          >
+                            Client
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_48px]">
+                          <div
+                            className="inline-flex items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                              color: "#ffffff",
+                            }}
+                          >
+                            Open in {app.name}
+                          </div>
+                          <div
+                            className="inline-flex items-center justify-center rounded-[18px] border"
+                            style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </div>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                          <span style={{ color: controlMuted }}>
+                            Uses the same URL and import flow.
+                          </span>
+                          <span
+                            className="inline-flex rounded-full px-2.5 py-1 font-medium"
+                            style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}
+                          >
+                            iPhone / iPad
+                          </span>
                         </div>
                       </div>
                     ))}

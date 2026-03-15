@@ -895,34 +895,82 @@ export default function SubscriptionPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-start gap-4">
+                    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:items-start">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-start gap-4">
+                          <div
+                            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border"
+                            style={{
+                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.bgSecondary,
+                              borderColor: hasImageBackground ? 'rgba(255,255,255,0.18)' : theme.border,
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={logoUrl} alt={branding.brandName || 'Logo'} className="h-10 w-10 object-contain" />
+                          </div>
+                          <div className="min-w-0">
+                            <div
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                              style={{
+                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${theme.accent}14`,
+                                color: hasImageBackground ? '#ffffff' : theme.accent,
+                              }}
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              {branding.brandName || 'Atomic-UI'}
+                            </div>
+                            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-[2.3rem]" style={{ color: primaryTextColor }}>
+                              {keyData.name}
+                            </h1>
+                            <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: mutedTextColor }}>
+                              Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div
-                        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border"
+                        className="rounded-[1.5rem] border p-4"
                         style={{
-                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.bgSecondary,
-                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.18)' : theme.border,
+                          backgroundColor: controlSurface,
+                          borderColor: controlBorder,
                         }}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={logoUrl} alt={branding.brandName || 'Logo'} className="h-10 w-10 object-contain" />
-                      </div>
-                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
+                          Quick Scan
+                        </p>
                         <div
-                          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                          className="mt-3 flex aspect-square items-center justify-center rounded-[1.25rem] border p-4"
                           style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${theme.accent}14`,
-                            color: hasImageBackground ? '#ffffff' : theme.accent,
+                            backgroundColor: controlButtonSurface,
+                            borderColor: controlBorder,
                           }}
                         >
-                          <Sparkles className="h-3.5 w-3.5" />
-                          {branding.brandName || 'Atomic-UI'}
+                          {qrCode ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={qrCode} alt="Connection QR Code" className="h-full w-full max-h-[180px] max-w-[180px] rounded-[1rem]" />
+                          ) : (
+                            <div className="h-[180px] w-[180px] animate-pulse rounded-[1rem]" style={{ backgroundColor: theme.bgSecondary }} />
+                          )}
                         </div>
-                        <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-[2.3rem]" style={{ color: primaryTextColor }}>
-                          {keyData.name}
-                        </h1>
-                        <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: mutedTextColor }}>
-                          Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
+                        <p className="mt-3 text-sm font-medium" style={{ color: controlTextColor }}>
+                          Scan with {primaryApp?.name || 'your VPN app'}
                         </p>
+                        <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
+                          Fastest on mobile. If scan fails, open manual setup for the same connection URL.
+                        </p>
+                        <button
+                          onClick={() => setShowManualSetup(true)}
+                          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] border px-4 py-3 text-sm font-medium"
+                          style={{
+                            backgroundColor: controlButtonSurface,
+                            color: controlTextColor,
+                            borderColor: controlBorder,
+                          }}
+                        >
+                          <QrCode className="h-4 w-4" />
+                          Show Large QR
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1313,44 +1361,85 @@ export default function SubscriptionPage() {
                   {visibleApps.map((app) => (
                     <div
                       key={app.id}
-                      className="rounded-[1.4rem] border p-4"
+                      className="rounded-[1.45rem] border p-4"
                       style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        backgroundColor: controlSurface,
+                        borderColor: controlBorder,
                       }}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-2xl">{app.icon}</div>
-                          <p className="mt-3 text-base font-semibold" style={{ color: primaryTextColor }}>{app.name}</p>
-                          <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                            Import this same connection in {app.name}.
+                        <div className="min-w-0">
+                          <div
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border text-xl"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                              color: controlTextColor,
+                            }}
+                          >
+                            {app.icon}
+                          </div>
+                          <p className="mt-3 text-base font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
+                          <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
+                            Manual alternative for {getPlatformLabel(platform)} if you prefer {app.name}.
                           </p>
+                        </div>
+
+                        <div
+                          className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                          style={{
+                            backgroundColor: controlButtonSurface,
+                            color: controlMutedColor,
+                            border: `1px solid ${controlBorder}`,
+                          }}
+                        >
+                          Client
                         </div>
                       </div>
 
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_48px]">
                         <button
                           onClick={() => handleAddToApp(app.id)}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-medium"
-                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                          className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-semibold"
+                          style={{
+                            background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                            color: '#ffffff',
+                          }}
                         >
-                          Open
+                          Open in {app.name}
                         </button>
                         {getPlatformStoreUrl(app, platform) && (
                           <a
                             href={getPlatformStoreUrl(app, platform) || undefined}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center rounded-full px-3 py-2.5 text-sm font-medium"
+                            className="inline-flex items-center justify-center rounded-[1.1rem] border"
                             style={{
-                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCardHover,
-                              color: primaryTextColor,
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                              color: controlTextColor,
                             }}
+                            aria-label={`Get ${app.name}`}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         )}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                        <span style={{ color: controlMutedColor }}>
+                          Uses the same URL and import flow.
+                        </span>
+                        <span
+                          className="inline-flex rounded-full px-2.5 py-1 font-medium"
+                          style={{
+                            backgroundColor: controlButtonSurface,
+                            color: controlTextColor,
+                            border: `1px solid ${controlBorder}`,
+                          }}
+                        >
+                          {getPlatformLabel(platform)}
+                        </span>
                       </div>
                     </div>
                   ))}
