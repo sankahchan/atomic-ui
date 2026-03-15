@@ -22,6 +22,7 @@ import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { subscriptionThemeIds } from '@/lib/subscription-themes';
 import {
   collectTrafficActivity,
   isTrafficActive,
@@ -68,6 +69,10 @@ const createKeySchema = z.object({
 
   // Optional features
   prefix: z.string().max(16).optional().nullable(),
+  subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
+  coverImage: z.string().url().optional().nullable(),
+  coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
+  contactLinks: z.string().optional().nullable(),
 });
 
 /**
@@ -87,10 +92,7 @@ const updateKeySchema = z.object({
   durationDays: z.number().int().positive().optional().nullable(),
   status: z.enum(['ACTIVE', 'DISABLED', 'EXPIRED', 'DEPLETED', 'PENDING']).optional(),
   prefix: z.string().max(16).optional().nullable(),
-  subscriptionTheme: z.enum([
-    'dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red',
-    'glassPurple', 'glassBlue', 'glassCyan', 'glassGreen', 'glassPink', 'glassOrange', 'glassNeutral'
-  ]).optional().nullable(),
+  subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
@@ -539,6 +541,10 @@ export const keysRouter = router({
             durationDays: input.durationDays,
             status,
             prefix: input.prefix,
+            subscriptionTheme: input.subscriptionTheme,
+            coverImage: input.coverImage,
+            coverImageType: input.coverImageType,
+            contactLinks: input.contactLinks,
             subscriptionToken: generateRandomString(32),
           },
           include: {

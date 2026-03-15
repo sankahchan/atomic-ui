@@ -19,6 +19,7 @@ import { createOutlineClient } from '@/lib/outline-api';
 import { logger } from '@/lib/logger';
 import { formatTagsForStorage } from '@/lib/tags';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { subscriptionThemeIds } from '@/lib/subscription-themes';
 import {
   collectTrafficActivity,
   TRAFFIC_ACTIVE_WINDOW_MS,
@@ -51,12 +52,6 @@ const createDAKSchema = z.object({
 /**
  * Schema for updating a Dynamic Access Key
  */
-// Valid themes for subscription pages
-const SUBSCRIPTION_THEMES = [
-  'dark', 'light', 'purple', 'blue', 'green', 'orange', 'pink', 'red',
-  'glassPurple', 'glassBlue', 'glassCyan', 'glassGreen', 'glassPink', 'glassOrange', 'glassNeutral'
-] as const;
-
 const updateDAKSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(100).optional(),
@@ -77,7 +72,7 @@ const updateDAKSchema = z.object({
   // Load balancer algorithm
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).optional(),
   // Subscription page customization
-  subscriptionTheme: z.enum(SUBSCRIPTION_THEMES).optional().nullable(),
+  subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links

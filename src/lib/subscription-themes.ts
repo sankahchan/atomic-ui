@@ -620,6 +620,27 @@ export const subscriptionThemes: Record<string, SubscriptionTheme> = {
   },
 };
 
+export const subscriptionThemeIds = [
+  'dark',
+  'light',
+  'purple',
+  'blue',
+  'green',
+  'orange',
+  'pink',
+  'red',
+  'glassPurple',
+  'glassBlue',
+  'glassCyan',
+  'glassGreen',
+  'glassPink',
+  'glassOrange',
+  'glassNeutral',
+  'neonCyan',
+  'neonMagenta',
+  'neonLime',
+] as const;
+
 export const themeList = Object.values(subscriptionThemes);
 
 export const subscriptionPagePresets: SubscriptionPreset[] = [

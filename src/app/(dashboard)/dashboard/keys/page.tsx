@@ -90,6 +90,7 @@ import { ServerGroupList } from '@/components/keys/server-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
+import { getTheme, subscriptionThemeIds, themeList } from '@/lib/subscription-themes';
 
 /**
  * Status badge configuration for visual consistency
@@ -104,6 +105,21 @@ const ENCRYPTION_METHODS = [
   { value: 'aes-192-gcm', label: 'AES-192-GCM' },
   { value: 'aes-256-gcm', label: 'AES-256-GCM' },
 ] as const;
+
+const CREATE_CONTACT_TYPES = [
+  { value: 'telegram', label: 'Telegram', icon: '📱' },
+  { value: 'discord', label: 'Discord', icon: '🎮' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
+  { value: 'phone', label: 'Phone', icon: '📞' },
+  { value: 'email', label: 'Email', icon: '📧' },
+  { value: 'website', label: 'Website', icon: '🌐' },
+  { value: 'facebook', label: 'Facebook', icon: '👤' },
+] as const;
+
+type CreateContactLink = {
+  type: typeof CREATE_CONTACT_TYPES[number]['value'];
+  value: string;
+};
 
 const statusConfig = {
   ACTIVE: {
@@ -197,6 +213,8 @@ function CreateKeyDialog({
     method: string;
     userId: string;
     templateId: string;
+    subscriptionTheme: string;
+    coverImageUrl: string;
   }>({
     serverId: 'auto',
     name: '',
@@ -211,7 +229,13 @@ function CreateKeyDialog({
     method: 'chacha20-ietf-poly1305',
     userId: 'unassigned', // Use 'unassigned' to represent null/undefined in Select
     templateId: 'none',
+    subscriptionTheme: 'default',
+    coverImageUrl: '',
   });
+  const [shareContacts, setShareContacts] = useState<CreateContactLink[]>([]);
+  const [newContactType, setNewContactType] = useState<CreateContactLink['type']>('telegram');
+  const [newContactValue, setNewContactValue] = useState('');
+  const [globalSubscriptionTheme, setGlobalSubscriptionTheme] = useState('dark');
 
   // Fetch templates
   const { data: templates } = trpc.templates.list.useQuery(undefined, {
@@ -230,6 +254,10 @@ function CreateKeyDialog({
     enabled: open,
   });
   const { t } = useLocale();
+  const globalShareThemeName = themeList.find((theme) => theme.id === globalSubscriptionTheme)?.name || globalSubscriptionTheme;
+  const selectedShareTheme = getTheme(
+    formData.subscriptionTheme === 'default' ? globalSubscriptionTheme : formData.subscriptionTheme,
+  );
 
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
@@ -272,7 +300,12 @@ function CreateKeyDialog({
       method: 'chacha20-ietf-poly1305',
       userId: 'unassigned',
       templateId: 'none',
+      subscriptionTheme: 'default',
+      coverImageUrl: '',
     });
+    setShareContacts([]);
+    setNewContactType('telegram');
+    setNewContactValue('');
   };
 
   // Handle URL params for template pre-selection
@@ -288,6 +321,33 @@ function CreateKeyDialog({
       }
     }
   }, [open, templates]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    async function fetchSubscriptionDefaults() {
+      try {
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+        const response = await fetch(`${basePath}/api/settings/subscription`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!cancelled && typeof data.defaultSubscriptionTheme === 'string' && data.defaultSubscriptionTheme) {
+          setGlobalSubscriptionTheme(data.defaultSubscriptionTheme);
+        }
+      } catch {
+        // Keep the local fallback if settings are unavailable.
+      }
+    }
+
+    fetchSubscriptionDefaults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const applyTemplate = (template: any) => {
     setFormData(prev => ({
@@ -322,6 +382,20 @@ function CreateKeyDialog({
     }
   };
 
+  const handleAddShareContact = () => {
+    const value = newContactValue.trim();
+    if (!value || shareContacts.length >= 3) {
+      return;
+    }
+
+    setShareContacts((prev) => [...prev, { type: newContactType, value }]);
+    setNewContactValue('');
+  };
+
+  const handleRemoveShareContact = (index: number) => {
+    setShareContacts((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -348,12 +422,18 @@ function CreateKeyDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
       userId: formData.userId !== 'unassigned' ? formData.userId : undefined,
+      subscriptionTheme: formData.subscriptionTheme !== 'default'
+        ? (formData.subscriptionTheme as typeof subscriptionThemeIds[number])
+        : undefined,
+      coverImage: formData.coverImageUrl.trim() || undefined,
+      coverImageType: formData.coverImageUrl.trim() ? 'url' : undefined,
+      contactLinks: shareContacts.length > 0 ? JSON.stringify(shareContacts) : undefined,
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="w-5 h-5 text-primary" />
@@ -613,6 +693,210 @@ function CreateKeyDialog({
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
+          </div>
+
+          <div className="border-t border-border pt-4" />
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Share2 className="h-4 w-4 text-primary" />
+                Share Page
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These settings apply to the subscription page generated with this key right after creation.
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Page Theme</Label>
+                  <Select
+                    value={formData.subscriptionTheme}
+                    onValueChange={(value) => setFormData({ ...formData, subscriptionTheme: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        Use global default ({globalShareThemeName})
+                      </SelectItem>
+                      {themeList.map((themeOption) => (
+                        <SelectItem key={themeOption.id} value={themeOption.id}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border"
+                              style={{ backgroundColor: themeOption.bgPrimary, borderColor: themeOption.accent }}
+                            />
+                            {themeOption.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="shareBackground">Background Image (Optional)</Label>
+                  <Input
+                    id="shareBackground"
+                    placeholder="https://example.com/image.jpg"
+                    value={formData.coverImageUrl}
+                    onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    If set, the share page uses this full-page background image.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contact Links ({shareContacts.length}/3)</Label>
+
+                  {shareContacts.length > 0 && (
+                    <div className="space-y-2">
+                      {shareContacts.map((contact, index) => {
+                        const type = CREATE_CONTACT_TYPES.find((item) => item.value === contact.type);
+                        return (
+                          <div key={`${contact.type}-${index}`} className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
+                            <span>{type?.icon}</span>
+                            <span className="text-sm font-medium">{type?.label}</span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{contact.value}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleRemoveShareContact(index)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {shareContacts.length < 3 && (
+                    <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_40px]">
+                      <Select
+                        value={newContactType}
+                        onValueChange={(value: CreateContactLink['type']) => setNewContactType(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CREATE_CONTACT_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              <span className="flex items-center gap-2">
+                                <span>{type.icon}</span>
+                                {type.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder="Enter link or ID"
+                        value={newContactValue}
+                        onChange={(e) => setNewContactValue(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleAddShareContact}
+                        disabled={!newContactValue.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="rounded-[1.4rem] border p-4"
+                style={{
+                  backgroundColor: formData.coverImageUrl ? 'transparent' : selectedShareTheme.bgPrimary,
+                  borderColor: selectedShareTheme.border,
+                }}
+              >
+                <div className="relative overflow-hidden rounded-[1.1rem]">
+                  {formData.coverImageUrl && (
+                    <>
+                      <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${formData.coverImageUrl})` }}
+                      />
+                      <div className="absolute inset-0 bg-black/55" />
+                    </>
+                  )}
+
+                  <div
+                    className="relative space-y-3 rounded-[1.1rem] p-4"
+                    style={{
+                      backgroundColor: formData.coverImageUrl ? 'rgba(0,0,0,0.42)' : selectedShareTheme.bgCard,
+                      backdropFilter: formData.coverImageUrl ? 'blur(8px)' : undefined,
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg"
+                        style={{ backgroundColor: formData.coverImageUrl ? 'rgba(255,255,255,0.18)' : selectedShareTheme.bgSecondary }}
+                      >
+                        🔗
+                      </div>
+                      <div>
+                        <p
+                          className="text-sm font-medium"
+                          style={{ color: formData.coverImageUrl ? '#ffffff' : selectedShareTheme.textPrimary }}
+                        >
+                          Preview
+                        </p>
+                        <p
+                          className="text-xs"
+                          style={{ color: formData.coverImageUrl ? 'rgba(255,255,255,0.72)' : selectedShareTheme.textMuted }}
+                        >
+                          {formData.subscriptionTheme === 'default'
+                            ? `${selectedShareTheme.name} via global default`
+                            : selectedShareTheme.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ backgroundColor: formData.coverImageUrl ? 'rgba(255,255,255,0.22)' : selectedShareTheme.progressBg }}
+                    >
+                      <div
+                        className="h-full w-2/3 rounded-full"
+                        style={{
+                          background: `linear-gradient(90deg, ${selectedShareTheme.progressFill}, ${selectedShareTheme.buttonGradientTo})`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-1 text-xs" style={{ color: formData.coverImageUrl ? 'rgba(255,255,255,0.78)' : selectedShareTheme.textMuted }}>
+                      <p>Contact shortcuts: {shareContacts.length}</p>
+                      <p>{formData.coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
+                    </div>
+
+                    <div
+                      className="rounded-full px-3 py-2 text-center text-xs font-medium"
+                      style={{
+                        background: `linear-gradient(135deg, ${selectedShareTheme.buttonGradientFrom}, ${selectedShareTheme.buttonGradientTo})`,
+                        color: '#fff',
+                      }}
+                    >
+                      Subscription page ready
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

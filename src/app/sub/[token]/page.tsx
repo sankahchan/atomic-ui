@@ -150,6 +150,21 @@ function getManualSetupGuide(platform: Platform, appName?: string | null): Manua
   }
 }
 
+function getPlatformStoreUrl(
+  app: { storeUrl?: string | { android?: string; ios?: string; windows?: string; macos?: string } } | null | undefined,
+  platform: Platform,
+): string | null {
+  if (!app?.storeUrl) {
+    return null;
+  }
+
+  if (typeof app.storeUrl === 'string') {
+    return app.storeUrl;
+  }
+
+  return app.storeUrl[platform] || null;
+}
+
 // Animated background components
 function GradientBackground({ theme }: { theme: SubscriptionTheme }) {
   return (
@@ -677,7 +692,7 @@ export default function SubscriptionPage() {
       : { bg: `${theme.warning}18`, color: theme.warning, label: keyData.status };
   const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
   const hasHelpContactContent = showHelpContact && Boolean(supportLink || keyData.contactLinks?.length);
-  const installAppUrl = primaryApp?.storeUrl?.[platform] || null;
+  const installAppUrl = getPlatformStoreUrl(primaryApp, platform);
   const manualSetupGuide = getManualSetupGuide(platform, primaryApp?.name);
   const serverLabel = keyData.server.location || keyData.server.name;
   const usageHeadline = keyData.dataLimitBytes
@@ -936,9 +951,9 @@ export default function SubscriptionPage() {
                       </div>
                     </div>
 
-                    {primaryApp?.storeUrl?.[platform] && (
+                    {installAppUrl && (
                       <a
-                        href={primaryApp.storeUrl[platform]}
+                        href={installAppUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
@@ -1217,9 +1232,9 @@ export default function SubscriptionPage() {
                         >
                           Open
                         </button>
-                        {app.storeUrl?.[platform] && (
+                        {getPlatformStoreUrl(app, platform) && (
                           <a
-                            href={app.storeUrl[platform]}
+                            href={getPlatformStoreUrl(app, platform) || undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-full px-3 py-2.5 text-sm font-medium"
