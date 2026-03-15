@@ -78,7 +78,7 @@ const DialogContent = React.forwardRef<
         // Grid layout for consistent structure
         'grid w-full max-w-lg gap-4 max-h-[85dvh] overflow-y-auto',
         // Card-like appearance
-        'ops-modal-shell p-6 rounded-[1.75rem] backdrop-blur-[var(--glass-blur-xl)] [-webkit-backdrop-filter:blur(var(--glass-blur-xl))] border',
+        'ops-modal-shell text-card-foreground p-6 rounded-[1.75rem] backdrop-blur-[var(--glass-blur-xl)] [-webkit-backdrop-filter:blur(var(--glass-blur-xl))] border',
         // Duration for animations
         'duration-200',
         // Open/close animations
@@ -93,7 +93,7 @@ const DialogContent = React.forwardRef<
     >
       {children}
       {/* Close button in the top-right corner */}
-      <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/12 bg-background/70 text-muted-foreground opacity-90 ring-offset-background transition-all hover:border-cyan-400/24 hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dark:bg-[rgba(5,12,24,0.82)]">
+      <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/85 text-muted-foreground opacity-95 shadow-sm ring-offset-background transition-all hover:border-primary/25 hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dark:border-cyan-400/12 dark:bg-[rgba(5,12,24,0.82)] dark:hover:border-cyan-400/24 dark:hover:bg-[rgba(8,18,34,0.92)]">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

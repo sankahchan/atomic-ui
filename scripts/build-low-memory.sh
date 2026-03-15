@@ -19,6 +19,7 @@ npx next build
 if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   echo "[build-low-memory] publishing standalone server bundle"
   mkdir -p .next/standalone/.next
+  rm -rf .next/standalone/.next/static .next/standalone/public
   cp -r .next/static .next/standalone/.next/
   if [[ -d public ]]; then
     cp -r public .next/standalone/
@@ -31,6 +32,10 @@ if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
     # Keep Prisma schema/runtime assets, but never publish a copied live SQLite DB.
     rm -rf .next/standalone/prisma/data .next/standalone/prisma/data.backup
     find .next/standalone/prisma -maxdepth 1 -type f \( -name '*.db' -o -name '*.db-shm' -o -name '*.db-wal' \) -delete
+  fi
+  if [[ ! -d .next/standalone/.next/static ]]; then
+    echo "[build-low-memory] standalone static assets missing after publish" >&2
+    exit 1
   fi
 fi
 
