@@ -192,6 +192,7 @@ model AccessKey {
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
   // Valid types: telegram, discord, whatsapp, phone, email, website, facebook
   contactLinks   String?
+  subscriptionWelcomeMessage String?
 
   // Connection/device tracking
   estimatedDevices Int @default(0)

@@ -73,6 +73,7 @@ const createKeySchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(),
+  subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
 });
 
 /**
@@ -96,6 +97,7 @@ const updateKeySchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
+  subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
@@ -545,6 +547,7 @@ export const keysRouter = router({
             coverImage: input.coverImage,
             coverImageType: input.coverImageType,
             contactLinks: input.contactLinks,
+            subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
             subscriptionToken: generateRandomString(32),
           },
           include: {
@@ -678,6 +681,10 @@ export const keysRouter = router({
 
         if (data.contactLinks !== undefined) {
           updateData.contactLinks = data.contactLinks;
+        }
+
+        if (data.subscriptionWelcomeMessage !== undefined) {
+          updateData.subscriptionWelcomeMessage = data.subscriptionWelcomeMessage;
         }
 
         // Handle owner field
@@ -1506,6 +1513,44 @@ export const keysRouter = router({
         subscriptionUrl,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
         token,
+      };
+    }),
+
+  /**
+   * Regenerate the public subscription/share page token for a key.
+   *
+   * This immediately invalidates the previous shared link.
+   */
+  regenerateSubscriptionToken: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          subscriptionToken: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const token = generateRandomString(32);
+      await db.accessKey.update({
+        where: { id: input.id },
+        data: { subscriptionToken: token },
+      });
+
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const basePath = process.env.PANEL_PATH || '';
+
+      return {
+        token,
+        sharePageUrl: `${baseUrl}${basePath}/sub/${token}`,
       };
     }),
 

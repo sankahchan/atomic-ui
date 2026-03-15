@@ -84,6 +84,7 @@ interface KeyData {
   method: string | null;
   port: number | null;
   contactLinks: ContactLink[] | null;
+  subscriptionWelcomeMessage: string | null;
 }
 
 interface SettingsData {
@@ -701,6 +702,9 @@ export default function SubscriptionPage() {
   const usageDetail = keyData.dataLimitBytes
     ? `${usagePercent}% of quota used`
     : `${formatBytes(keyData.usedBytes)} used with no quota limit`;
+  const keyWelcomeMessage = keyData.subscriptionWelcomeMessage?.trim() || '';
+  const effectiveWelcomeMessage = keyWelcomeMessage || branding.welcomeMessage?.trim() || '';
+  const shouldShowWelcome = Boolean(keyWelcomeMessage || (branding.showWelcome && branding.welcomeMessage?.trim()));
   const footerText = branding.footerText?.trim()
     || (branding.showPoweredBy !== false ? `Powered by ${branding.brandName || 'Atomic-UI'}` : '');
 
@@ -970,7 +974,7 @@ export default function SubscriptionPage() {
                   </div>
                 </div>
 
-                {branding.showWelcome && branding.welcomeMessage && (
+                {shouldShowWelcome && effectiveWelcomeMessage && (
                   <div
                     className="rounded-2xl px-4 py-3 text-sm"
                     style={{
@@ -978,7 +982,7 @@ export default function SubscriptionPage() {
                       color: primaryTextColor,
                     }}
                   >
-                    {branding.welcomeMessage}
+                    {effectiveWelcomeMessage}
                   </div>
                 )}
 

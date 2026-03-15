@@ -31,6 +31,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
@@ -215,6 +217,7 @@ function CreateKeyDialog({
     templateId: string;
     subscriptionTheme: string;
     coverImageUrl: string;
+    subscriptionWelcomeMessage: string;
   }>({
     serverId: 'auto',
     name: '',
@@ -231,11 +234,15 @@ function CreateKeyDialog({
     templateId: 'none',
     subscriptionTheme: 'default',
     coverImageUrl: '',
+    subscriptionWelcomeMessage: '',
   });
   const [shareContacts, setShareContacts] = useState<CreateContactLink[]>([]);
   const [newContactType, setNewContactType] = useState<CreateContactLink['type']>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
   const [globalSubscriptionTheme, setGlobalSubscriptionTheme] = useState('dark');
+  const [openPreviewAfterCreate, setOpenPreviewAfterCreate] = useState(false);
+  const [copyShareLinkAfterCreate, setCopyShareLinkAfterCreate] = useState(false);
+  const previewWindowRef = useRef<Window | null>(null);
 
   // Fetch templates
   const { data: templates } = trpc.templates.list.useQuery(undefined, {
@@ -262,6 +269,24 @@ function CreateKeyDialog({
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
     onSuccess: (createdKey) => {
+      const sharePageUrl = getKeySubscriptionPageUrl(createdKey.subscriptionToken);
+
+      if (sharePageUrl && copyShareLinkAfterCreate) {
+        void copyToClipboard(sharePageUrl, 'Copied!', 'Share page link copied to clipboard.');
+      }
+
+      if (sharePageUrl && openPreviewAfterCreate) {
+        if (previewWindowRef.current && !previewWindowRef.current.closed) {
+          previewWindowRef.current.location.href = sharePageUrl;
+          previewWindowRef.current.focus();
+        } else {
+          window.open(sharePageUrl, '_blank');
+        }
+      } else if (previewWindowRef.current && !previewWindowRef.current.closed) {
+        previewWindowRef.current.close();
+      }
+
+      previewWindowRef.current = null;
       toast({
         title: t('keys.toast.created'),
         description: t('keys.toast.created_desc'),
@@ -271,6 +296,10 @@ function CreateKeyDialog({
       resetForm();
     },
     onError: (error) => {
+      if (previewWindowRef.current && !previewWindowRef.current.closed) {
+        previewWindowRef.current.close();
+      }
+      previewWindowRef.current = null;
       toast({
         title: t('keys.toast.create_failed'),
         description: error.message,
@@ -302,10 +331,14 @@ function CreateKeyDialog({
       templateId: 'none',
       subscriptionTheme: 'default',
       coverImageUrl: '',
+      subscriptionWelcomeMessage: '',
     });
     setShareContacts([]);
     setNewContactType('telegram');
     setNewContactValue('');
+    setOpenPreviewAfterCreate(false);
+    setCopyShareLinkAfterCreate(false);
+    previewWindowRef.current = null;
   };
 
   // Handle URL params for template pre-selection
@@ -408,6 +441,12 @@ function CreateKeyDialog({
       return;
     }
 
+    if (openPreviewAfterCreate && typeof window !== 'undefined') {
+      previewWindowRef.current = window.open('about:blank', '_blank');
+    } else {
+      previewWindowRef.current = null;
+    }
+
     createMutation.mutate({
       serverId: formData.serverId === 'auto' ? undefined : formData.serverId,
       assignmentMode: formData.serverId === 'auto' ? 'AUTO' : 'MANUAL',
@@ -428,6 +467,7 @@ function CreateKeyDialog({
       coverImage: formData.coverImageUrl.trim() || undefined,
       coverImageType: formData.coverImageUrl.trim() ? 'url' : undefined,
       contactLinks: shareContacts.length > 0 ? JSON.stringify(shareContacts) : undefined,
+      subscriptionWelcomeMessage: formData.subscriptionWelcomeMessage.trim() || undefined,
     });
   };
 
@@ -752,6 +792,20 @@ function CreateKeyDialog({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="shareWelcomeMessage">Welcome Message (Optional)</Label>
+                  <Textarea
+                    id="shareWelcomeMessage"
+                    placeholder="Add a short note or setup hint for this specific user."
+                    value={formData.subscriptionWelcomeMessage}
+                    onChange={(e) => setFormData({ ...formData, subscriptionWelcomeMessage: e.target.value })}
+                    className="min-h-[96px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Overrides the global subscription page welcome message for this key only.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Contact Links ({shareContacts.length}/3)</Label>
 
                   {shareContacts.length > 0 && (
@@ -814,6 +868,43 @@ function CreateKeyDialog({
                       </Button>
                     </div>
                   )}
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">After create</p>
+                    <p className="text-xs text-muted-foreground">
+                      The share page link is generated with the key. Choose what should happen as soon as creation finishes.
+                    </p>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                      <Checkbox
+                        checked={openPreviewAfterCreate}
+                        onCheckedChange={(checked) => setOpenPreviewAfterCreate(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">Open preview after create</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Opens the new share page in a separate tab right after the key is created.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                      <Checkbox
+                        checked={copyShareLinkAfterCreate}
+                        onCheckedChange={(checked) => setCopyShareLinkAfterCreate(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">Copy share page link after create</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Copies the generated share page link immediately instead of waiting for the result dialog.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -882,6 +973,7 @@ function CreateKeyDialog({
                     <div className="space-y-1 text-xs" style={{ color: formData.coverImageUrl ? 'rgba(255,255,255,0.78)' : selectedShareTheme.textMuted }}>
                       <p>Contact shortcuts: {shareContacts.length}</p>
                       <p>{formData.coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
+                      <p>{formData.subscriptionWelcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
                     </div>
 
                     <div
@@ -1050,6 +1142,20 @@ function CreatedKeySummaryDialog({
               >
                 <Share2 className="mr-2 h-4 w-4" />
                 {t('keys.actions.copy_subscription_url')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => {
+                  if (subscriptionPageUrl) {
+                    window.open(subscriptionPageUrl, '_blank');
+                  }
+                }}
+                disabled={!subscriptionPageUrl}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Open Share Page
               </Button>
             </div>
           </div>

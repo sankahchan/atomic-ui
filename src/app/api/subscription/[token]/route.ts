@@ -118,6 +118,7 @@ export async function GET(
           method: dak.method || null,
           port: null,
           contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
+          subscriptionWelcomeMessage: null,
           isDynamic: true,
         });
       }
@@ -189,6 +190,7 @@ export async function GET(
         method: key.method || null,
         port: key.port || null,
         contactLinks: (key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null,
+        subscriptionWelcomeMessage: (key as any).subscriptionWelcomeMessage || null,
       });
     }
 

@@ -38,6 +38,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -423,6 +424,7 @@ function SubscriptionShareCard({
   currentCoverImage,
   currentCoverImageType,
   currentContactLinks,
+  currentWelcomeMessage,
   onThemeChange,
 }: {
   keyId: string;
@@ -431,6 +433,7 @@ function SubscriptionShareCard({
   currentCoverImage: string | null;
   currentCoverImageType: string | null;
   currentContactLinks: ContactLink[] | null;
+  currentWelcomeMessage: string | null;
   onThemeChange: () => void;
 }) {
   const { toast } = useToast();
@@ -439,6 +442,7 @@ function SubscriptionShareCard({
     currentCoverImageType === 'url' ? currentCoverImage || '' : ''
   );
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
+  const [welcomeMessage, setWelcomeMessage] = useState(currentWelcomeMessage || '');
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
 
@@ -487,6 +491,41 @@ function SubscriptionShareCard({
     onError: (error) => {
       toast({
         title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateWelcomeMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Welcome message updated',
+        description: 'The share page welcome message has been updated.',
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const regenerateTokenMutation = trpc.keys.regenerateSubscriptionToken.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Share link regenerated',
+        description: 'The old shared link is no longer valid.',
+      });
+      onThemeChange();
+      void copyToClipboard(result.sharePageUrl, 'Copied!', 'New share page link copied to clipboard.');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Regeneration failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -550,6 +589,13 @@ function SubscriptionShareCard({
     updateContactsMutation.mutate({
       id: keyId,
       contactLinks: newContacts.length > 0 ? JSON.stringify(newContacts) : null,
+    } as any);
+  };
+
+  const handleWelcomeMessageSave = () => {
+    updateWelcomeMutation.mutate({
+      id: keyId,
+      subscriptionWelcomeMessage: welcomeMessage.trim() || null,
     } as any);
   };
 
@@ -705,6 +751,36 @@ function SubscriptionShareCard({
           )}
         </div>
 
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Welcome Message Override
+          </Label>
+          <Textarea
+            value={welcomeMessage}
+            onChange={(e) => setWelcomeMessage(e.target.value)}
+            placeholder="Shown near the top of this key's share page. Leave empty to use the global message."
+            className="min-h-[96px]"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              This overrides the global subscription page welcome message for this key only.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWelcomeMessageSave}
+              disabled={updateWelcomeMutation.isPending}
+            >
+              {updateWelcomeMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+        </div>
+
         {/* Theme Preview */}
         <div
           className="rounded-lg p-4 border transition-colors relative overflow-hidden"
@@ -754,6 +830,11 @@ function SubscriptionShareCard({
                 />
               </div>
             </div>
+            <div className="mt-3 space-y-1 text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.76)' : theme.textMuted }}>
+              <p>Contact shortcuts: {contacts.length}</p>
+              <p>{coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
+              <p>{welcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
+            </div>
             <div
               className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
               style={{
@@ -767,10 +848,10 @@ function SubscriptionShareCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
-            className="flex-1"
+            className="w-full"
             disabled={!subscriptionToken}
             onClick={() => {
               const url = getSubscriptionPageUrl();
@@ -781,18 +862,35 @@ function SubscriptionShareCard({
             Preview
           </Button>
           <Button
-            className="flex-1"
+            className="w-full"
             onClick={copySubscriptionPageUrl}
             disabled={!subscriptionToken}
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy Link
           </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => regenerateTokenMutation.mutate({ id: keyId })}
+            disabled={regenerateTokenMutation.isPending}
+          >
+            {regenerateTokenMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Regenerate Link
+          </Button>
         </div>
 
         {/* URL Display */}
         <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
-          {subscriptionToken ? getSubscriptionPageUrl() : 'Generating subscription token...'}
+          {subscriptionToken
+            ? getSubscriptionPageUrl()
+            : regenerateTokenMutation.isPending
+              ? 'Generating new subscription token...'
+              : 'Generating subscription token...'}
         </div>
       </CardContent>
     </Card>
@@ -1558,6 +1656,7 @@ export default function KeyDetailPage() {
             currentCoverImage={(key as any).coverImage}
             currentCoverImageType={(key as any).coverImageType}
             currentContactLinks={(key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null}
+            currentWelcomeMessage={(key as any).subscriptionWelcomeMessage}
             onThemeChange={() => refetch()}
           />
         </div>
