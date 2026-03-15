@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronRight,
   Clock3,
   Copy,
@@ -91,6 +92,13 @@ interface SettingsData {
   branding?: SubscriptionBranding;
 }
 
+interface ManualSetupGuide {
+  title: string;
+  summary: string;
+  steps: string[];
+  tip: string;
+}
+
 // Contact type icons and colors
 const contactConfig: Record<string, { icon: string; color: string; label: string }> = {
   telegram: { icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2s-.18-.05-.26-.03c-.11.02-1.93 1.23-5.46 3.62-.52.36-.99.53-1.41.52-.46-.01-1.35-.26-2.01-.48-.81-.27-1.45-.42-1.4-.88.03-.24.37-.49 1.02-.75 4.02-1.75 6.7-2.91 8.03-3.46 3.83-1.6 4.62-1.88 5.14-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.01.06.01.24 0 .38z', color: '#0088cc', label: 'Telegram' },
@@ -101,6 +109,46 @@ const contactConfig: Record<string, { icon: string; color: string; label: string
   website: { icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z', color: '#3b82f6', label: 'Website' },
   facebook: { icon: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z', color: '#1877F2', label: 'Facebook' },
 };
+
+function getManualSetupGuide(platform: Platform, appName?: string | null): ManualSetupGuide {
+  const clientName = appName || 'your VPN client';
+
+  switch (platform) {
+    case 'ios':
+      return {
+        title: `Use ${clientName} on iPhone / iPad`,
+        summary: `Install ${clientName} first, then import the connection directly or scan the QR code if Safari does not hand off automatically.`,
+        steps: [
+          `Install ${clientName} from the App Store if it is not already on this device.`,
+          `Tap "Open in ${clientName}" below. If iOS stays in Safari, copy the connection URL and import it from inside ${clientName}.`,
+          'If direct import still fails, scan the QR code or paste the connection URL manually in the app.',
+        ],
+        tip: 'On iOS, app handoff usually works only after the client is already installed.',
+      };
+    case 'windows':
+      return {
+        title: `Import into ${clientName} on Windows`,
+        summary: `Desktop clients are usually more reliable with paste/import than with QR. Use the connection URL first, then fall back to the subscription page link if the client supports it.`,
+        steps: [
+          `Install ${clientName} on this computer if you have not already.`,
+          `Use "Copy URL" below and paste it into ${clientName} using its import or add-server action.`,
+          'If the client supports subscription pages, use the subscription page link as the long-term update source.',
+        ],
+        tip: 'QR import is mainly useful on mobile. On Windows, manual paste is the dependable fallback.',
+      };
+    default:
+      return {
+        title: `Use ${clientName} on Android`,
+        summary: `Android usually supports direct app handoff. If the app is missing, install it first, then retry the open button or use the QR code.`,
+        steps: [
+          `Install ${clientName} from Google Play if it is not already on this device.`,
+          `Tap "Open in ${clientName}" below. If the app does not open, copy the connection URL and import it from inside ${clientName}.`,
+          'If import still fails, scan the QR code or paste the connection URL manually.',
+        ],
+        tip: 'Most Android clients can import either from the deep link, clipboard, or QR code.',
+      };
+  }
+}
 
 // Animated background components
 function GradientBackground({ theme }: { theme: SubscriptionTheme }) {
@@ -198,6 +246,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showManualSetup, setShowManualSetup] = useState(false);
+  const [showAdvancedManualSetup, setShowAdvancedManualSetup] = useState(false);
   const [showAllApps, setShowAllApps] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState<ContactLink | null>(null);
   const [usageAlert, setUsageAlert] = useState<number | null>(null);
@@ -361,6 +410,12 @@ export default function SubscriptionPage() {
     const timeoutId = window.setTimeout(() => setFeedback(null), 2200);
     return () => window.clearTimeout(timeoutId);
   }, [feedback]);
+
+  useEffect(() => {
+    if (!showManualSetup) {
+      setShowAdvancedManualSetup(false);
+    }
+  }, [showManualSetup]);
 
   const copyToClipboard = async (text: string, successMessage = 'Copied to clipboard') => {
     if (!text) return;
@@ -565,6 +620,7 @@ export default function SubscriptionPage() {
   const remainingApps = Math.max(apps.length - 4, 0);
   const hasImageBackground = keyData.coverImage && keyData.coverImageType === 'url';
   const isGlassTheme = theme.id.startsWith('glass');
+  const isNeonTheme = theme.id.startsWith('neon');
   const usagePercent = getUsagePercent();
   const timeRemaining = getTimeRemaining(keyData.expiresAt);
   const subscriptionPageUrl = getSubscriptionPageUrl();
@@ -583,6 +639,8 @@ export default function SubscriptionPage() {
   const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
   const hasHelpContactContent = showHelpContact && Boolean(supportLink || keyData.contactLinks?.length);
   const hasAsideColumn = showConnectionSummary || hasHelpContactContent;
+  const installAppUrl = primaryApp?.storeUrl?.[platform] || null;
+  const manualSetupGuide = getManualSetupGuide(platform, primaryApp?.name);
   const statusItems = [
     {
       label: 'Server',
@@ -618,6 +676,13 @@ export default function SubscriptionPage() {
         WebkitBackdropFilter: 'blur(12px)',
       };
     }
+    if (isNeonTheme) {
+      return {
+        backgroundColor: theme.bgCard,
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+      };
+    }
     return { backgroundColor: theme.bgCard };
   };
 
@@ -625,7 +690,11 @@ export default function SubscriptionPage() {
   const outlinedCardStyle = {
     ...getCardStyle(),
     border: hasImageBackground ? '1px solid rgba(255,255,255,0.16)' : `1px solid ${theme.border}`,
-    boxShadow: hasImageBackground ? '0 18px 48px rgba(0,0,0,0.24)' : '0 18px 40px rgba(15,23,42,0.08)',
+    boxShadow: hasImageBackground
+      ? '0 18px 48px rgba(0,0,0,0.24)'
+      : isNeonTheme
+        ? `0 0 0 1px ${theme.border}, 0 20px 60px ${theme.accent}1f, inset 0 1px 0 rgba(255,255,255,0.05)`
+        : '0 18px 40px rgba(15,23,42,0.08)',
   };
   const primaryTextColor = hasImageBackground ? '#ffffff' : theme.textPrimary;
   const mutedTextColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : theme.textMuted;
@@ -701,6 +770,28 @@ export default function SubscriptionPage() {
       >
         {/* Animated backgrounds */}
         {renderAnimatedBackground()}
+
+        {isNeonTheme && !hasImageBackground && (
+          <>
+            <div
+              className="fixed inset-0"
+              style={{
+                background: [
+                  `radial-gradient(circle at 16% 18%, ${theme.accent}22, transparent 24%)`,
+                  `radial-gradient(circle at 82% 16%, ${theme.buttonGradientTo}20, transparent 20%)`,
+                  `radial-gradient(circle at 52% 82%, ${theme.accent}14, transparent 22%)`,
+                ].join(', '),
+              }}
+            />
+            <div
+              className="fixed inset-0 opacity-20"
+              style={{
+                backgroundImage: `linear-gradient(${theme.border} 1px, transparent 1px), linear-gradient(90deg, ${theme.border} 1px, transparent 1px)`,
+                backgroundSize: '44px 44px',
+              }}
+            />
+          </>
+        )}
 
         {/* Full-page background image */}
         {hasImageBackground && (
@@ -1298,29 +1389,159 @@ export default function SubscriptionPage() {
                 </button>
               </div>
 
-              <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_300px]">
                 <div className="space-y-4">
                   <div
-                    className="rounded-[1.35rem] border p-4"
+                    className="rounded-[1.45rem] border p-5"
                     style={{
                       backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                       borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                     }}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
-                        <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
-                          {keyData.accessUrl}
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
+                          Quick Start
+                        </p>
+                        <h3 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
+                          {manualSetupGuide.title}
+                        </h3>
+                        <p className="mt-2 text-sm leading-6" style={{ color: mutedTextColor }}>
+                          {manualSetupGuide.summary}
                         </p>
                       </div>
+                      <div
+                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
+                        style={{
+                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCardHover,
+                          color: primaryTextColor,
+                        }}
+                      >
+                        {getPlatformLabel(platform)}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      {manualSetupGuide.steps.map((step, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                          <div
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                            style={{
+                              backgroundColor: theme.accent,
+                              color: theme.accentText,
+                            }}
+                          >
+                            {index + 1}
+                          </div>
+                          <p className="pt-0.5 text-sm leading-6" style={{ color: primaryTextColor }}>
+                            {step}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div
+                      className="mt-5 rounded-[1.1rem] border px-4 py-3 text-sm"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        color: primaryTextColor,
+                      }}
+                    >
+                      <span className="font-medium">Tip:</span>{' '}
+                      <span style={{ color: mutedTextColor }}>{manualSetupGuide.tip}</span>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {installAppUrl && (
+                        <a
+                          href={installAppUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCardHover,
+                            color: primaryTextColor,
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Get {primaryApp?.name || 'App'}
+                        </a>
+                      )}
+                      {primaryApp && (
+                        <button
+                          onClick={() => handleAddToApp(primaryApp.id)}
+                          className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium"
+                          style={{
+                            background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                            color: '#ffffff',
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open in {primaryApp.name}
+                        </button>
+                      )}
                       <button
                         onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                        className="rounded-full p-2"
-                        style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                        className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium"
+                        style={{
+                          backgroundColor: theme.accent,
+                          color: theme.accentText,
+                        }}
                       >
                         <Copy className="h-4 w-4" />
+                        Copy URL
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div
+                      className="rounded-[1.35rem] border p-4"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
+                          <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
+                            {keyData.accessUrl}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                          className="rounded-full p-2"
+                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-[1.35rem] border p-4"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Subscription page URL</p>
+                          <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
+                            {subscriptionPageUrl}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(subscriptionPageUrl, 'Subscription page copied')}
+                          className="rounded-full p-2"
+                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1331,82 +1552,114 @@ export default function SubscriptionPage() {
                       borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                     }}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedManualSetup((prev) => !prev)}
+                      className="flex w-full items-center justify-between gap-4 text-left"
+                    >
                       <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Subscription page URL</p>
-                        <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
-                          {subscriptionPageUrl}
+                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Advanced connection details</p>
+                        <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
+                          Show encryption, server, port, and the current key status.
                         </p>
                       </div>
-                      <button
-                        onClick={() => copyToClipboard(subscriptionPageUrl, 'Subscription page copied')}
-                        className="rounded-full p-2"
-                        style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition-transform ${showAdvancedManualSetup ? 'rotate-180' : ''}`}
+                        style={{ color: primaryTextColor }}
+                      />
+                    </button>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div
-                      className="rounded-[1.2rem] border p-4"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                      }}
-                    >
-                      <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Method</p>
-                      <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>{keyData.method || '-'}</p>
-                    </div>
-                    <div
-                      className="rounded-[1.2rem] border p-4"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                      }}
-                    >
-                      <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Port</p>
-                      <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{keyData.port || '-'}</p>
-                    </div>
-                    <div
-                      className="rounded-[1.2rem] border p-4"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                      }}
-                    >
-                      <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Status</p>
-                      <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{statusTone.label}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-[1.5rem] border p-4 text-center"
-                  style={{
-                    backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                    borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                  }}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                    QR Code
-                  </p>
-                  <div className={`mx-auto mt-4 inline-block p-2 bg-white ${getCardRadius()}`}>
-                    {qrCode ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={qrCode} alt="QR Code" className="h-44 w-44" />
-                      </>
-                    ) : (
-                      <div className="flex h-44 w-44 items-center justify-center text-sm text-slate-500">
-                        QR unavailable
+                    {showAdvancedManualSetup && (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div
+                          className="rounded-[1.1rem] border p-4"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                          }}
+                        >
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Server</p>
+                          <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>
+                            {`${getCountryFlag(keyData.server.countryCode)} ${keyData.server.name}`.trim() || '-'}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-[1.1rem] border p-4"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                          }}
+                        >
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Method</p>
+                          <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>{keyData.method || '-'}</p>
+                        </div>
+                        <div
+                          className="rounded-[1.1rem] border p-4"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                          }}
+                        >
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Port</p>
+                          <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{keyData.port || '-'}</p>
+                        </div>
+                        <div
+                          className="rounded-[1.1rem] border p-4"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                          }}
+                        >
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Status</p>
+                          <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{statusTone.label}</p>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <p className="mt-4 text-sm" style={{ color: mutedTextColor }}>
-                    Scan this with your VPN app if it supports QR import.
-                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div
+                    className="rounded-[1.5rem] border p-4 text-center"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
+                      QR Code
+                    </p>
+                    <div className={`mx-auto mt-4 inline-block bg-white p-2 ${getCardRadius()}`}>
+                      {qrCode ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={qrCode} alt="QR Code" className="h-44 w-44" />
+                        </>
+                      ) : (
+                        <div className="flex h-44 w-44 items-center justify-center text-sm text-slate-500">
+                          QR unavailable
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-4 text-sm" style={{ color: mutedTextColor }}>
+                      Scan this with your VPN app if it supports QR import.
+                    </p>
+                  </div>
+
+                  <div
+                    className="rounded-[1.35rem] border p-4"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
+                      Manual fallback
+                    </p>
+                    <p className="mt-3 text-sm leading-6" style={{ color: primaryTextColor }}>
+                      If this device uses another client, switch the platform tabs on the main page first, then reopen manual setup for a better recommended app and install link.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

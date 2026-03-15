@@ -88,6 +88,7 @@ export function SubscriptionPageLivePreview({
   const theme = getTheme(themeId);
   const isMobile = viewport === "mobile";
   const isGlassTheme = theme.id.startsWith("glass");
+  const isNeonTheme = theme.id.startsWith("neon");
   const radiusClass = radiusClasses[mergedBranding.cardStyle || "rounded"];
   const logoUrl = mergedBranding.logoUrl || ATOMIC_LOGO_SVG;
   const enabledAppIds = mergedBranding.enabledApps ?? defaultBranding.enabledApps ?? [];
@@ -143,6 +144,27 @@ export function SubscriptionPageLivePreview({
           ].join(", "),
         }}
       />
+      {isNeonTheme && (
+        <>
+          <div
+            className="absolute inset-0 opacity-45"
+            style={{
+              background: [
+                `radial-gradient(circle at 16% 22%, ${theme.accent}22, transparent 24%)`,
+                `radial-gradient(circle at 84% 18%, ${theme.buttonGradientTo}1f, transparent 20%)`,
+                `radial-gradient(circle at 54% 84%, ${theme.accent}16, transparent 24%)`,
+              ].join(", "),
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `linear-gradient(${theme.border} 1px, transparent 1px), linear-gradient(90deg, ${theme.border} 1px, transparent 1px)`,
+              backgroundSize: "42px 42px",
+            }}
+          />
+        </>
+      )}
       {mergedBranding.enableAnimations && mergedBranding.animatedBackground === "particles" && (
         <div className="absolute inset-0">
           {particles.map((particle, index) => (
@@ -193,6 +215,8 @@ export function SubscriptionPageLivePreview({
     border: `1px solid ${borderColor}`,
     boxShadow: isGlassTheme
       ? "0 28px 80px rgba(15, 23, 42, 0.44)"
+      : isNeonTheme
+        ? `0 0 0 1px ${theme.border}, 0 24px 70px ${theme.accent}22, inset 0 1px 0 rgba(255,255,255,0.05)`
       : "0 26px 70px rgba(15, 23, 42, 0.12)",
     backdropFilter: "blur(16px)",
     WebkitBackdropFilter: "blur(16px)",
