@@ -12,7 +12,7 @@ import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   ChevronRight,
-  CircleHelp,
+  CircleAlert,
   Clock3,
   Copy,
   Download,
@@ -797,7 +797,7 @@ export default function SubscriptionPage() {
                         border: `1px solid ${usageAlert >= 95 ? `${theme.danger}44` : `${theme.warning}44`}`,
                       }}
                     >
-                      <CircleHelp
+                      <CircleAlert
                         className="mt-0.5 h-4 w-4 shrink-0"
                         style={{ color: usageAlert >= 95 ? theme.danger : theme.warning }}
                       />
