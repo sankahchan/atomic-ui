@@ -202,7 +202,8 @@ function CreateDAKDialog({
     notes: string;
     dataLimitGB: string;
     dataLimitResetStrategy: 'NEVER' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
-    expirationType: 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
+    expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
+    expiresAt: string;
     durationDays: string;
     method: string;
     loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
@@ -215,6 +216,7 @@ function CreateDAKDialog({
     dataLimitGB: '',
     dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
+    expiresAt: '',
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
     loadBalancerAlgorithm: 'IP_HASH',
@@ -230,6 +232,7 @@ function CreateDAKDialog({
       dataLimitGB: '',
       dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
+      expiresAt: '',
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
       loadBalancerAlgorithm: 'IP_HASH',
@@ -276,6 +279,7 @@ function CreateDAKDialog({
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
+      expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
@@ -452,7 +456,7 @@ function CreateDAKDialog({
             <Label>{t('dynamic_keys.dialog.expiration')}</Label>
             <Select
               value={formData.expirationType}
-              onValueChange={(value: 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') =>
+              onValueChange={(value: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE') =>
                 setFormData({ ...formData, expirationType: value })
               }
             >
@@ -461,11 +465,25 @@ function CreateDAKDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NEVER">{t('dynamic_keys.expires.never')}</SelectItem>
+                <SelectItem value="FIXED_DATE">{t('dynamic_keys.dialog.expiration.fixed_date')}</SelectItem>
                 <SelectItem value="DURATION_FROM_CREATION">{t('dynamic_keys.dialog.expiration.duration_from_creation')}</SelectItem>
                 <SelectItem value="START_ON_FIRST_USE">{t('dynamic_keys.dialog.expiration.start_on_first_use')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {formData.expirationType === 'FIXED_DATE' && (
+            <div className="space-y-2">
+              <Label htmlFor="dakExpirationDate">{t('dynamic_keys.dialog.expiration_date')}</Label>
+              <Input
+                id="dakExpirationDate"
+                type="date"
+                value={formData.expiresAt}
+                onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.dialog.expiration_date_help')}</p>
+            </div>
+          )}
 
           {/* Duration days (conditional) */}
           {(formData.expirationType === 'DURATION_FROM_CREATION' ||
@@ -1738,9 +1756,9 @@ export default function DynamicKeysPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-showcase space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-          <div className="space-y-5">
+      <section className="ops-showcase space-y-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_296px]">
+          <div className="space-y-4">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <KeyRound className="h-3.5 w-3.5" />
               {t('dynamic_keys.title')}
@@ -1752,7 +1770,7 @@ export default function DynamicKeysPage() {
               </p>
             </div>
 
-            <div className="hidden sm:grid gap-3 lg:grid-cols-3 xl:max-w-3xl">
+            <div className="hidden gap-2.5 sm:grid lg:grid-cols-3 xl:max-w-[44rem]">
               <div className="ops-support-card">
                 <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t('dynamic_keys.desc')}</p>
@@ -1769,7 +1787,7 @@ export default function DynamicKeysPage() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-3">
+            <div className="ops-panel space-y-2.5">
               <div>
                 <p className="ops-section-heading">{t('dynamic_keys.title')}</p>
                 <h2 className="mt-2 text-xl font-semibold">{t('dynamic_keys.title')}</h2>
@@ -1803,10 +1821,10 @@ export default function DynamicKeysPage() {
         </div>
 
         {stats && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-6">
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
                   <KeyRound className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{t('dynamic_keys.total_keys')}</p>
@@ -1815,7 +1833,7 @@ export default function DynamicKeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-green-500/20 bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 </div>
                 <p className="text-sm font-medium text-green-500">{t('dynamic_keys.active_keys')}</p>
@@ -1824,7 +1842,7 @@ export default function DynamicKeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-green-500/20 bg-green-500/10">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
@@ -1848,7 +1866,7 @@ export default function DynamicKeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-purple-500/20 bg-purple-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-purple-500/20 bg-purple-500/10">
                   <Shuffle className="h-4 w-4 text-purple-500" />
                 </div>
                 <p className="text-sm font-medium text-purple-500">{t('dynamic_keys.type.self_managed')}</p>
@@ -1857,7 +1875,7 @@ export default function DynamicKeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-blue-500/20 bg-blue-500/10">
                   <Settings className="h-4 w-4 text-blue-500" />
                 </div>
                 <p className="text-sm font-medium text-blue-500">{t('dynamic_keys.type.manual')}</p>
@@ -1866,7 +1884,7 @@ export default function DynamicKeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-primary/20 bg-primary/10">
                   <HardDrive className="h-4 w-4 text-primary" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{t('dynamic_keys.total_usage')}</p>

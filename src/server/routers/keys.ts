@@ -21,6 +21,7 @@ import { Prisma } from '@prisma/client';
 import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import {
   collectTrafficActivity,
   isTrafficActive,
@@ -527,7 +528,7 @@ export const keysRouter = router({
             notes: input.notes,
             userId: input.userId, // Assign to user if provided
             serverId: targetServerId,
-            accessUrl: outlineKey.accessUrl,
+            accessUrl: decorateOutlineAccessUrl(outlineKey.accessUrl, input.name),
             password: outlineKey.password,
             port: outlineKey.port,
             method: outlineKey.method,
@@ -766,7 +767,7 @@ export const keysRouter = router({
           notes: key.notes,
           serverName: key.server.name,
           serverLocation: key.server.location,
-          accessUrl: key.accessUrl,
+          accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
           dataLimitBytes: key.dataLimitBytes,
           usedBytes: key.usedBytes,
           expirationType: key.expirationType,
@@ -802,7 +803,9 @@ export const keysRouter = router({
         where: { id: input.id },
       });
 
-      if (!key || !key.accessUrl) {
+      const accessUrl = decorateOutlineAccessUrl(key?.accessUrl, key?.name);
+
+      if (!key || !accessUrl) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found or has no access URL',
@@ -811,7 +814,7 @@ export const keysRouter = router({
 
       try {
         // Generate QR code as base64 PNG
-        const qrCode = await QRCode.toDataURL(key.accessUrl, {
+        const qrCode = await QRCode.toDataURL(accessUrl, {
           width: 300,
           margin: 2,
           color: {
@@ -893,7 +896,7 @@ export const keysRouter = router({
                 outlineKeyId: outlineKey.id,
                 name: keyName,
                 serverId: server.id,
-                accessUrl: outlineKey.accessUrl,
+                accessUrl: decorateOutlineAccessUrl(outlineKey.accessUrl, keyName),
                 password: outlineKey.password,
                 port: outlineKey.port,
                 method: outlineKey.method,
@@ -1021,7 +1024,7 @@ export const keysRouter = router({
               data: {
                 status: 'ACTIVE',
                 outlineKeyId: newOutlineKey.id,
-                accessUrl: newOutlineKey.accessUrl,
+                accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
                 password: newOutlineKey.password,
                 port: newOutlineKey.port,
                 method: newOutlineKey.method,
@@ -1229,7 +1232,7 @@ export const keysRouter = router({
               notes: key.notes,
               serverName: key.server.name,
               serverLocation: key.server.location,
-              accessUrl: key.accessUrl,
+              accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
               dataLimitBytes: key.dataLimitBytes,
               usedBytes: key.usedBytes,
               expirationType: key.expirationType,
@@ -1378,7 +1381,7 @@ export const keysRouter = router({
             data: {
               status: 'ACTIVE',
               outlineKeyId: newOutlineKey.id,
-              accessUrl: newOutlineKey.accessUrl,
+              accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
               password: newOutlineKey.password,
               port: newOutlineKey.port,
               method: newOutlineKey.method,
@@ -1495,7 +1498,7 @@ export const keysRouter = router({
 
       return {
         subscriptionUrl,
-        accessUrl: key.accessUrl,
+        accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
         token,
       };
     }),
@@ -1543,7 +1546,7 @@ export const keysRouter = router({
           key.email || '',
           key.server.name,
           key.status,
-          key.accessUrl || '',
+          decorateOutlineAccessUrl(key.accessUrl, key.name) || '',
           key.usedBytes.toString(),
           key.dataLimitBytes?.toString() || 'Unlimited',
           key.expiresAt?.toISOString() || 'Never',
@@ -1561,7 +1564,7 @@ export const keysRouter = router({
           email: key.email,
           server: key.server.name,
           status: key.status,
-          accessUrl: key.accessUrl,
+          accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
           usedBytes: key.usedBytes.toString(),
           dataLimitBytes: key.dataLimitBytes?.toString() || null,
           expiresAt: key.expiresAt?.toISOString() || null,
@@ -1947,7 +1950,7 @@ export const keysRouter = router({
             data: {
               serverId: input.targetServerId,
               outlineKeyId: newKey.id,
-              accessUrl: newKey.accessUrl,
+              accessUrl: decorateOutlineAccessUrl(newKey.accessUrl, key.name),
               password: newKey.password,
               port: newKey.port,
               method: newKey.method,

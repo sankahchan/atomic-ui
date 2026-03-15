@@ -18,6 +18,7 @@ import { generateRandomString } from '@/lib/utils';
 import { createOutlineClient } from '@/lib/outline-api';
 import { logger } from '@/lib/logger';
 import { formatTagsForStorage } from '@/lib/tags';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import {
   collectTrafficActivity,
   TRAFFIC_ACTIVE_WINDOW_MS,
@@ -341,7 +342,10 @@ export const dynamicKeysRouter = router({
         prefix: dak.prefix,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
-        accessKeys: dak.accessKeys,
+        accessKeys: dak.accessKeys.map((key) => ({
+          ...key,
+          accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+        })),
         // Subscription page customization
         subscriptionTheme: dak.subscriptionTheme,
         coverImage: dak.coverImage,
@@ -639,7 +643,7 @@ export const dynamicKeysRouter = router({
               data: {
                 status: 'ACTIVE',
                 outlineKeyId: newOutlineKey.id,
-                accessUrl: newOutlineKey.accessUrl,
+                accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
                 password: newOutlineKey.password,
                 port: newOutlineKey.port,
                 method: newOutlineKey.method,
@@ -792,7 +796,7 @@ export const dynamicKeysRouter = router({
                   data: {
                     status: 'ACTIVE',
                     outlineKeyId: newOutlineKey.id,
-                    accessUrl: newOutlineKey.accessUrl,
+                    accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
                     password: newOutlineKey.password,
                     port: newOutlineKey.port,
                     method: newOutlineKey.method,

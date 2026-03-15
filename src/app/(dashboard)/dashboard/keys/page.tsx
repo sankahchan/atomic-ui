@@ -166,6 +166,7 @@ function CreateKeyDialog({
     dataLimitGB: string;
     dataLimitResetStrategy: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER';
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
+    expiresAt: string;
     durationDays: string;
     method: string;
     userId: string;
@@ -179,6 +180,7 @@ function CreateKeyDialog({
     dataLimitGB: '',
     dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
+    expiresAt: '',
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
     userId: 'unassigned', // Use 'unassigned' to represent null/undefined in Select
@@ -239,6 +241,7 @@ function CreateKeyDialog({
       dataLimitGB: '',
       dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
+      expiresAt: '',
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
       userId: 'unassigned',
@@ -268,6 +271,7 @@ function CreateKeyDialog({
       dataLimitGB: template.dataLimitGB ? (Number(template.dataLimitBytes) / (1024 * 1024 * 1024)).toString() : '',
       dataLimitResetStrategy: template.dataLimitResetStrategy as any,
       expirationType: template.expirationType as any,
+      expiresAt: template.expiresAt ? new Date(template.expiresAt).toISOString().split('T')[0] : '',
       durationDays: template.durationDays?.toString() || '',
       method: template.method,
       notes: template.notes || '',
@@ -314,6 +318,7 @@ function CreateKeyDialog({
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
+      expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
       userId: formData.userId !== 'unassigned' ? formData.userId : undefined,
@@ -537,11 +542,25 @@ function CreateKeyDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NEVER">{t('keys.never_expires')}</SelectItem>
+                <SelectItem value="FIXED_DATE">{t('keys.form.expiration.fixed_date')}</SelectItem>
                 <SelectItem value="DURATION_FROM_CREATION">{t('keys.form.expiration.duration_from_creation')}</SelectItem>
                 <SelectItem value="START_ON_FIRST_USE">{t('keys.form.expiration.start_on_first_use')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {formData.expirationType === 'FIXED_DATE' && (
+            <div className="space-y-2">
+              <Label htmlFor="expirationDate">{t('keys.form.expiration_date')}</Label>
+              <Input
+                id="expirationDate"
+                type="date"
+                value={formData.expiresAt}
+                onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">{t('keys.form.expiration_date_help')}</p>
+            </div>
+          )}
 
           {/* Duration days (conditional) */}
           {(formData.expirationType === 'DURATION_FROM_CREATION' ||
@@ -2202,9 +2221,9 @@ export default function KeysPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-showcase space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-          <div className="space-y-5">
+      <section className="ops-showcase space-y-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_296px]">
+          <div className="space-y-4">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Key className="h-3.5 w-3.5" />
               {t('keys.title')}
@@ -2216,7 +2235,7 @@ export default function KeysPage() {
               </p>
             </div>
 
-            <div className="hidden sm:grid gap-3 lg:grid-cols-3 xl:max-w-3xl">
+            <div className="hidden gap-2.5 sm:grid lg:grid-cols-3 xl:max-w-[44rem]">
               <div className="ops-support-card">
                 <p className="text-sm font-semibold">{t('dashboard.key_operations_title')}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
@@ -2233,7 +2252,7 @@ export default function KeysPage() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-3">
+            <div className="ops-panel space-y-2.5">
               <div className="space-y-1">
                 <p className="ops-section-heading">{t('dashboard.key_operations_title')}</p>
                 <h2 className="text-xl font-semibold">{t('dashboard.key_operations_title')}</h2>
@@ -2281,10 +2300,10 @@ export default function KeysPage() {
         </div>
 
         {stats && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
                   <Key className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{t('keys.total')}</p>
@@ -2293,7 +2312,7 @@ export default function KeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-green-500/20 bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 </div>
                 <p className="text-sm font-medium text-green-500">{t('keys.active')}</p>
@@ -2302,7 +2321,7 @@ export default function KeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-blue-500/20 bg-blue-500/10">
                   <Clock className="h-4 w-4 text-blue-500" />
                 </div>
                 <p className="text-sm font-medium text-blue-500">{t('keys.pending')}</p>
@@ -2311,7 +2330,7 @@ export default function KeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-orange-500/20 bg-orange-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-orange-500/20 bg-orange-500/10">
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
                 </div>
                 <p className="text-sm font-medium text-orange-500">{t('keys.depleted')}</p>
@@ -2320,7 +2339,7 @@ export default function KeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-red-500/20 bg-red-500/10">
                   <XCircle className="h-4 w-4 text-red-500" />
                 </div>
                 <p className="text-sm font-medium text-red-500">{t('keys.expired')}</p>
@@ -2329,7 +2348,7 @@ export default function KeysPage() {
             </div>
             <div className="ops-kpi-tile">
               <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-primary/20 bg-primary/10">
                   <HardDrive className="h-4 w-4 text-primary" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{t('keys.total_usage')}</p>

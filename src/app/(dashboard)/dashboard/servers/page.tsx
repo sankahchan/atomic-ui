@@ -22,9 +22,9 @@ export default function ServersPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-showcase">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_320px]">
-          <div className="space-y-5">
+      <section className="ops-showcase space-y-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.22fr)_296px]">
+          <div className="space-y-4">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Server className="h-3.5 w-3.5" />
               {t('servers.hero_label')}
@@ -38,7 +38,7 @@ export default function ServersPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setActiveTab('overview')}
@@ -50,7 +50,7 @@ export default function ServersPage() {
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-cyan-500/10 text-cyan-500">
                     <Server className="h-4 w-4" />
                   </div>
                   <div>
@@ -71,7 +71,7 @@ export default function ServersPage() {
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-emerald-500/10 text-emerald-500">
                     <ShieldCheck className="h-4 w-4" />
                   </div>
                   <div>
@@ -83,10 +83,10 @@ export default function ServersPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1">
             <div className="ops-support-card">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-cyan-500/10 text-cyan-500">
                   <Server className="h-4 w-4" />
                 </div>
                 <div>
@@ -98,7 +98,7 @@ export default function ServersPage() {
 
             <div className="ops-support-card">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-emerald-500/10 text-emerald-500">
                   <Activity className="h-4 w-4" />
                 </div>
                 <div>
