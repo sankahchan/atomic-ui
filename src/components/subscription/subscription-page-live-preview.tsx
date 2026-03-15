@@ -107,7 +107,11 @@ export function SubscriptionPageLivePreview({
   const textPrimary = theme.textPrimary;
   const textMuted = theme.textMuted;
   const textSecondary = theme.textSecondary;
-  const controlButtonSurface = isGlassTheme ? "rgba(15, 23, 42, 0.9)" : theme.bgCard;
+  const controlSurface = "rgba(248,250,252,0.96)";
+  const controlBorder = "rgba(148,163,184,0.24)";
+  const controlButtonSurface = "#ffffff";
+  const controlText = "#0f172a";
+  const controlMuted = "#64748b";
   const actionFieldText = "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNT...@sg.example.com:1158/#Singapore";
   const previewPaddingClass =
     mergedBranding.layout === "compact"
@@ -328,8 +332,11 @@ export function SubscriptionPageLivePreview({
                               key={label}
                               className="flex-1 rounded-[16px] px-3 py-2 text-center text-sm font-medium"
                               style={{
-                                backgroundColor: index === 0 ? theme.tabActive : "transparent",
-                                color: index === 0 ? theme.tabActiveText : theme.tabInactiveText,
+                                background: index === 0
+                                  ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
+                                  : "transparent",
+                                color: index === 0 ? "#ffffff" : controlMuted,
+                                boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
                               }}
                             >
                               {label}
@@ -338,23 +345,23 @@ export function SubscriptionPageLivePreview({
                         </div>
                       </div>
 
-                      <div className="rounded-[24px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="rounded-[24px] border p-4" style={{ ...pillStyle, backgroundColor: controlSurface, borderColor: controlBorder }}>
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 Connection URL
                               </p>
                               <div
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border"
-                                style={{ backgroundColor: controlButtonSurface, color: textPrimary, borderColor }}
+                                style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                               >
                                 <Copy className="h-4 w-4" />
                               </div>
                             </div>
                             <div
                               className="rounded-[18px] border px-4 py-3"
-                              style={{ backgroundColor: controlButtonSurface, color: textPrimary, borderColor }}
+                              style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                             >
                               <p className="truncate font-mono text-[12px] leading-6">
                                 {actionFieldText}
@@ -375,37 +382,53 @@ export function SubscriptionPageLivePreview({
                           </div>
 
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                            <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                               <Copy className="h-4 w-4" />
                               Copy URL
                             </div>
                             {showManualSetupButton && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <QrCode className="h-4 w-4" />
                                 Manual Setup
                               </div>
                             )}
                             {primaryApp && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <ExternalLink className="h-4 w-4" />
                                 Get {primaryApp.name}
                               </div>
                             )}
                             {showHelpContact && supportLink?.trim() && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <MessageCircle className="h-4 w-4" />
                                 Get Support
                               </div>
                             )}
                           </div>
 
-                          <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor }}>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                          <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                               Quick Tip
                             </p>
-                            <p className="mt-2 text-sm leading-6" style={{ color: textPrimary }}>
+                            <p className="mt-2 text-sm leading-6" style={{ color: controlText }}>
                               If the app does not open, copy the URL above and import it from inside the client, or use manual setup for the QR code.
                             </p>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
+                                Last Updated
+                              </p>
+                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>Updated just now</p>
+                            </div>
+                            <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
+                                Endpoint
+                              </p>
+                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>{serverLabel}</p>
+                              <p className="mt-1 text-xs" style={{ color: controlMuted }}>Port 1158</p>
+                            </div>
                           </div>
                         </div>
                       </div>

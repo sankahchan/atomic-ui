@@ -745,9 +745,11 @@ export default function SubscriptionPage() {
   };
   const primaryTextColor = hasImageBackground ? '#ffffff' : theme.textPrimary;
   const mutedTextColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : theme.textMuted;
-  const controlSurface = hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary;
-  const controlBorder = hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border;
-  const controlButtonSurface = hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCard;
+  const controlSurface = hasImageBackground ? 'rgba(255,255,255,0.08)' : 'rgba(248,250,252,0.96)';
+  const controlBorder = hasImageBackground ? 'rgba(255,255,255,0.14)' : 'rgba(148,163,184,0.24)';
+  const controlButtonSurface = hasImageBackground ? 'rgba(255,255,255,0.1)' : '#ffffff';
+  const controlTextColor = hasImageBackground ? '#ffffff' : '#0f172a';
+  const controlMutedColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : '#64748b';
   const actionFieldText = keyData.accessUrl;
 
   // Render animated background
@@ -938,8 +940,8 @@ export default function SubscriptionPage() {
                     <div
                       className="rounded-[1.25rem] border p-1"
                       style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        backgroundColor: controlSurface,
+                        borderColor: controlBorder,
                       }}
                     >
                       <div className="flex flex-wrap gap-1">
@@ -949,8 +951,11 @@ export default function SubscriptionPage() {
                             onClick={() => setPlatform(p)}
                             className="flex-1 rounded-[1rem] px-3 py-2.5 text-sm font-medium transition-all"
                             style={{
-                              backgroundColor: platform === p ? theme.tabActive : 'transparent',
-                              color: platform === p ? theme.tabActiveText : theme.tabInactiveText,
+                              background: platform === p
+                                ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
+                                : 'transparent',
+                              color: platform === p ? '#ffffff' : controlMutedColor,
+                              boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
                             }}
                           >
                             {getPlatformLabel(p)}
@@ -969,7 +974,7 @@ export default function SubscriptionPage() {
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
                               Connection URL
                             </p>
                             <button
@@ -977,7 +982,7 @@ export default function SubscriptionPage() {
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors"
                               style={{
                                 backgroundColor: controlButtonSurface,
-                                color: primaryTextColor,
+                                color: controlTextColor,
                                 borderColor: controlBorder,
                               }}
                               aria-label="Copy connection URL"
@@ -990,7 +995,7 @@ export default function SubscriptionPage() {
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
-                              color: primaryTextColor,
+                              color: controlTextColor,
                             }}
                           >
                             <p className="truncate font-mono text-[12px] leading-6">
@@ -1032,7 +1037,7 @@ export default function SubscriptionPage() {
                             className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
-                              color: primaryTextColor,
+                              color: controlTextColor,
                               border: `1px solid ${controlBorder}`,
                             }}
                           >
@@ -1046,7 +1051,7 @@ export default function SubscriptionPage() {
                               className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
-                                color: primaryTextColor,
+                                color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
                             >
@@ -1063,7 +1068,7 @@ export default function SubscriptionPage() {
                               className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
-                                color: primaryTextColor,
+                                color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
                             >
@@ -1080,7 +1085,7 @@ export default function SubscriptionPage() {
                               className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
-                                color: primaryTextColor,
+                                color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
                             >
@@ -1097,12 +1102,46 @@ export default function SubscriptionPage() {
                             borderColor: controlBorder,
                           }}
                         >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
                             Quick Tip
                           </p>
-                          <p className="mt-2 text-sm leading-6" style={{ color: primaryTextColor }}>
+                          <p className="mt-2 text-sm leading-6" style={{ color: controlTextColor }}>
                             If the app does not open from the main button, copy the URL above and import it from inside the client, or use manual setup for the QR code.
                           </p>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div
+                            className="rounded-[1.1rem] border px-4 py-3"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                            }}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
+                              Last Updated
+                            </p>
+                            <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
+                              {getLastUpdatedLabel()}
+                            </p>
+                          </div>
+                          <div
+                            className="rounded-[1.1rem] border px-4 py-3"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                            }}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
+                              Endpoint
+                            </p>
+                            <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
+                              {serverLabel}
+                            </p>
+                            <p className="mt-1 text-xs" style={{ color: controlMutedColor }}>
+                              {keyData.port ? `Port ${keyData.port}` : 'Ready to connect'}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
