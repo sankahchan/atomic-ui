@@ -2221,59 +2221,81 @@ export default function KeysPage() {
 
   return (
     <div className="space-y-6">
-      <section className="ops-showcase space-y-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_296px]">
-          <div className="space-y-4">
+      <section className="ops-showcase space-y-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+          <div className="space-y-3">
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Key className="h-3.5 w-3.5" />
               {t('keys.title')}
             </span>
-            <div className="space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">{t('keys.title')}</h1>
-              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('keys.title')}</h1>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                 {t('keys.subtitle')}
               </p>
             </div>
 
-            <div className="hidden gap-2.5 sm:grid lg:grid-cols-3 xl:max-w-[44rem]">
-              <div className="ops-support-card">
-                <p className="text-sm font-semibold">{t('dashboard.key_operations_title')}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
+            <div className="hidden gap-2.5 md:grid lg:grid-cols-3 xl:max-w-[48rem]">
+              <div className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
+                <div className="space-y-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
+                    <Activity className="h-4 w-4" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">{t('dashboard.key_operations_title')}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
+                  </div>
+                </div>
               </div>
-              <div className="ops-support-card">
-                <p className="text-sm font-semibold">{t('nav.templates') || 'Templates'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.review_inventory_desc')}</p>
-              </div>
-              <div className="ops-support-card">
-                <p className="text-sm font-semibold">{t('nav.archived') || 'Archived'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('keys.subtitle')}</p>
-              </div>
+              <Link href="/dashboard/templates" className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
+                <div className="space-y-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
+                    <FileText className="h-4 w-4" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">{t('nav.templates') || 'Templates'}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{t('dashboard.review_inventory_desc')}</p>
+                  </div>
+                </div>
+              </Link>
+              <Link href="/dashboard/archived" className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
+                <div className="space-y-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
+                    <Archive className="h-4 w-4" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">{t('nav.archived') || 'Archived'}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{t('keys.subtitle')}</p>
+                  </div>
+                </div>
+              </Link>
             </div>
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-2.5">
+            <div className="ops-panel space-y-3 p-4">
               <div className="space-y-1">
                 <p className="ops-section-heading">{t('dashboard.key_operations_title')}</p>
-                <h2 className="text-xl font-semibold">{t('dashboard.key_operations_title')}</h2>
                 <p className="text-sm text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
               </div>
-              <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
-                <Plus className="w-4 h-4 mr-2" />
-                {t('keys.create')}
-              </Button>
-              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                <Link href="/dashboard/templates">
-                  <FileText className="w-4 h-4 mr-2" />
-                  {t('nav.templates') || 'Templates'}
-                </Link>
-              </Button>
-              <Button variant="outline" className="h-11 w-full justify-center rounded-full border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                <Link href="/dashboard/archived">
-                  <Archive className="w-4 h-4 mr-2" />
-                  {t('nav.archived') || 'Archived'}
-                </Link>
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                <Button onClick={() => setCreateDialogOpen(true)} className="h-10 w-full justify-center rounded-2xl sm:col-span-3 xl:col-span-1">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('keys.create')}
+                </Button>
+                <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
+                  <Link href="/dashboard/templates">
+                    <FileText className="mr-2 h-4 w-4" />
+                    {t('nav.templates') || 'Templates'}
+                  </Link>
+                </Button>
+                <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
+                  <Link href="/dashboard/archived">
+                    <Archive className="mr-2 h-4 w-4" />
+                    {t('nav.archived') || 'Archived'}
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -2301,59 +2323,59 @@ export default function KeysPage() {
 
         {stats && (
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-border/60 bg-background/50 dark:border-cyan-400/12 dark:bg-[linear-gradient(180deg,rgba(7,15,29,0.88),rgba(6,13,26,0.76))]">
                   <Key className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium text-muted-foreground">{t('keys.total')}</p>
+                <p className="text-xs font-medium text-muted-foreground">{t('keys.total')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{stats.total}</p>
+              <p className="mt-3 text-[1.65rem] font-semibold leading-none">{stats.total}</p>
             </div>
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-green-500/20 bg-green-500/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-green-500/20 bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 </div>
-                <p className="text-sm font-medium text-green-500">{t('keys.active')}</p>
+                <p className="text-xs font-medium text-green-500">{t('keys.active')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{stats.active}</p>
+              <p className="mt-3 text-[1.65rem] font-semibold leading-none">{stats.active}</p>
             </div>
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-blue-500/20 bg-blue-500/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-blue-500/20 bg-blue-500/10">
                   <Clock className="h-4 w-4 text-blue-500" />
                 </div>
-                <p className="text-sm font-medium text-blue-500">{t('keys.pending')}</p>
+                <p className="text-xs font-medium text-blue-500">{t('keys.pending')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{stats.pending}</p>
+              <p className="mt-3 text-[1.65rem] font-semibold leading-none">{stats.pending}</p>
             </div>
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-orange-500/20 bg-orange-500/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-orange-500/20 bg-orange-500/10">
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
                 </div>
-                <p className="text-sm font-medium text-orange-500">{t('keys.depleted')}</p>
+                <p className="text-xs font-medium text-orange-500">{t('keys.depleted')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{stats.depleted}</p>
+              <p className="mt-3 text-[1.65rem] font-semibold leading-none">{stats.depleted}</p>
             </div>
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-red-500/20 bg-red-500/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-red-500/20 bg-red-500/10">
                   <XCircle className="h-4 w-4 text-red-500" />
                 </div>
-                <p className="text-sm font-medium text-red-500">{t('keys.expired')}</p>
+                <p className="text-xs font-medium text-red-500">{t('keys.expired')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{stats.expired}</p>
+              <p className="mt-3 text-[1.65rem] font-semibold leading-none">{stats.expired}</p>
             </div>
-            <div className="ops-kpi-tile">
+            <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[1rem] border border-primary/20 bg-primary/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-primary/20 bg-primary/10">
                   <HardDrive className="h-4 w-4 text-primary" />
                 </div>
-                <p className="text-sm font-medium text-muted-foreground">{t('keys.total_usage')}</p>
+                <p className="text-xs font-medium text-muted-foreground">{t('keys.total_usage')}</p>
               </div>
-              <p className="mt-4 text-2xl font-semibold">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
+              <p className="mt-3 text-xl font-semibold leading-none xl:text-[1.65rem]">{formatBytes(BigInt(stats.totalUsedBytes))}</p>
             </div>
           </div>
         )}
