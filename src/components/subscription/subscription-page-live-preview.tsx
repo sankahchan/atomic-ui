@@ -115,16 +115,16 @@ export function SubscriptionPageLivePreview({
   const actionFieldText = "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNT...@sg.example.com:1158/#Singapore";
   const previewPaddingClass =
     mergedBranding.layout === "compact"
-      ? "p-4 md:p-5"
+      ? "p-4"
       : mergedBranding.layout === "detailed"
-        ? "p-6 md:p-7"
-        : "p-5 md:p-6";
+        ? "p-5 md:p-6"
+        : "p-4 md:p-5";
   const titleSizeClass =
     mergedBranding.layout === "compact"
-      ? "text-2xl md:text-[2rem]"
+      ? "text-[1.85rem] md:text-[1.95rem]"
       : mergedBranding.layout === "detailed"
-        ? "text-3xl md:text-[2.55rem]"
-        : "text-3xl md:text-[2.25rem]";
+        ? "text-[2.2rem] md:text-[2.35rem]"
+        : "text-[2rem] md:text-[2.1rem]";
   const footerText =
     mergedBranding.footerText?.trim() ||
     (mergedBranding.showPoweredBy === false ? "" : defaultBranding.footerText);
@@ -269,7 +269,7 @@ export function SubscriptionPageLivePreview({
 
       <div className="rounded-[28px] border border-border/60 bg-muted/20 p-3 md:p-4">
         <div
-          className={`mx-auto transition-all ${isMobile ? "max-w-[390px]" : "max-w-[1180px]"}`}
+          className={`mx-auto transition-all ${isMobile ? "max-w-[390px]" : "max-w-[1120px]"}`}
           style={{ fontFamily: mergedBranding.fontFamily || "inherit" }}
         >
           <div
@@ -284,66 +284,38 @@ export function SubscriptionPageLivePreview({
             <div className="relative z-10 space-y-4">
               <section className={`${radiusClass} ${previewPaddingClass}`} style={shellStyle}>
                 <div className="flex flex-col gap-5">
-                  <div className={`flex flex-col gap-5 ${isMobile ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-start gap-4">
-                            <div
-                              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-                              style={{ ...pillStyle, backgroundColor: softSurface }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={logoUrl} alt={mergedBranding.brandName || "Brand logo"} className="h-10 w-10 object-contain" />
-                            </div>
-                            <div className="min-w-0">
-                              <div
-                                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
-                                style={{
-                                  backgroundColor: `${theme.accent}18`,
-                                  color: theme.accent,
-                                }}
-                              >
-                                <Sparkles className="h-3.5 w-3.5" />
-                                {mergedBranding.brandName || "Atomic-UI"}
-                              </div>
-                              <h3 className={`mt-3 font-semibold tracking-tight ${titleSizeClass}`} style={{ color: textPrimary }}>
-                                Singapore Premium
-                              </h3>
-                              <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: textMuted }}>
-                                Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-[24px] border p-4" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                            Quick Scan
-                          </p>
-                          <div className="mt-3 flex aspect-square items-center justify-center rounded-[18px] border p-4" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
-                            <div className="flex h-full w-full max-h-[160px] max-w-[160px] items-center justify-center rounded-[14px] border border-dashed" style={{ borderColor: controlBorder }}>
-                              <QrCode className="h-14 w-14" style={{ color: theme.buttonGradientFrom }} />
-                            </div>
-                          </div>
-                          <p className="mt-3 text-sm font-medium" style={{ color: controlText }}>
-                            Scan with {primaryApp?.name || "your VPN app"}
-                          </p>
-                          <p className="mt-1 text-sm" style={{ color: controlMuted }}>
-                            Fastest on mobile. If scan fails, open manual setup for the same connection URL.
-                          </p>
+                  <div className="flex flex-col gap-5">
+                    <div className={`flex flex-col gap-4 ${isMobile ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-start gap-4">
                           <div
-                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[18px] border px-4 py-3 text-sm font-medium"
-                            style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
+                            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
+                            style={{ ...pillStyle, backgroundColor: softSurface }}
                           >
-                            <QrCode className="h-4 w-4" />
-                            Show Large QR
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={logoUrl} alt={mergedBranding.brandName || "Brand logo"} className="h-10 w-10 object-contain" />
+                          </div>
+                          <div className="min-w-0">
+                            <div
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                              style={{
+                                backgroundColor: `${theme.accent}18`,
+                                color: theme.accent,
+                              }}
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              {mergedBranding.brandName || "Atomic-UI"}
+                            </div>
+                            <h3 className={`mt-3 font-semibold tracking-tight ${titleSizeClass}`} style={{ color: textPrimary }}>
+                              Singapore Premium
+                            </h3>
+                            <p className="mt-2 max-w-3xl text-sm md:text-base" style={{ color: textMuted }}>
+                              Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
+                            </p>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className={`flex flex-col gap-3 ${isMobile ? "" : "lg:w-[320px]"}`}>
                       <div className={`flex ${isMobile ? "justify-start" : "justify-end"}`}>
                         <div
                           className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
@@ -352,43 +324,70 @@ export function SubscriptionPageLivePreview({
                           Active
                         </div>
                       </div>
+                    </div>
+                  </div>
 
-                      <div className="rounded-[20px] border p-1" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                        <div className="flex gap-1">
-                          {["Android", "iPhone", "Windows"].map((label, index) => (
-                            <div
-                              key={label}
-                              className="flex-1 rounded-[16px] px-3 py-2 text-center text-sm font-medium"
-                              style={{
-                                background: index === 0
-                                  ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
-                                  : "transparent",
-                                color: index === 0 ? "#ffffff" : controlMuted,
-                                boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
-                              }}
-                            >
-                              {label}
-                            </div>
-                          ))}
+                  {mergedBranding.showWelcome && mergedBranding.welcomeMessage && (
+                    <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      {mergedBranding.welcomeMessage}
+                    </div>
+                  )}
+
+                  <div className={`grid gap-3.5 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch"}`}>
+                    <div className={`order-2 flex h-full flex-col rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-1 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
+                        Quick Scan
+                      </p>
+                      <div className="mt-3 flex flex-1 items-center justify-center rounded-[16px] border p-3.5" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                        <div className="flex h-full w-full max-h-[148px] max-w-[148px] items-center justify-center rounded-[12px] border border-dashed" style={{ borderColor: controlBorder }}>
+                          <QrCode className="h-14 w-14" style={{ color: theme.buttonGradientFrom }} />
                         </div>
                       </div>
+                      <p className="mt-3 text-sm font-medium" style={{ color: controlText }}>
+                        Scan with {primaryApp?.name || "your VPN app"}
+                      </p>
+                      <p className="mt-1 text-sm" style={{ color: controlMuted }}>
+                        Fastest on mobile. If scanning fails, use the connection tools in the install card for the same URL.
+                      </p>
+                    </div>
 
-                      <div className="rounded-[24px] border p-4" style={{ ...pillStyle, backgroundColor: controlSurface, borderColor: controlBorder }}>
-                        <div className="space-y-4">
+                    <div className={`order-1 h-full rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-2 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                      <div className="space-y-3.5">
+                        <div className="rounded-[18px] border p-1" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                          <div className="flex gap-1">
+                            {["Android", "iPhone", "Windows"].map((label, index) => (
+                              <div
+                                key={label}
+                                className="flex-1 rounded-[14px] px-3 py-2 text-center text-[13px] font-medium"
+                                style={{
+                                  background: index === 0
+                                    ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
+                                    : "transparent",
+                                  color: index === 0 ? "#ffffff" : controlMuted,
+                                  boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
+                                }}
+                              >
+                                {label}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3.5">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 Connection URL
                               </p>
                               <div
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-[14px] border"
                                 style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                               >
                                 <Copy className="h-4 w-4" />
                               </div>
                             </div>
                             <div
-                              className="rounded-[18px] border px-4 py-3"
+                              className="rounded-[16px] border px-3.5 py-2.5"
                               style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                             >
                               <p className="truncate font-mono text-[12px] leading-6">
@@ -398,7 +397,7 @@ export function SubscriptionPageLivePreview({
                           </div>
 
                           <div
-                            className="inline-flex items-center justify-center gap-2 rounded-[18px] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            className="inline-flex items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: "#ffffff",
@@ -409,48 +408,47 @@ export function SubscriptionPageLivePreview({
                             <ChevronRight className="h-4 w-4" />
                           </div>
 
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                          <div className={`grid gap-2 ${isMobile ? "grid-cols-2" : "xl:grid-cols-4 sm:grid-cols-2"}`}>
+                            <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                               <Copy className="h-4 w-4" />
                               Copy URL
                             </div>
                             {showManualSetupButton && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <QrCode className="h-4 w-4" />
                                 Manual Setup
                               </div>
                             )}
                             {primaryApp && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <ExternalLink className="h-4 w-4" />
                                 Get {primaryApp.name}
                               </div>
                             )}
                             {showHelpContact && supportLink?.trim() && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <MessageCircle className="h-4 w-4" />
                                 Get Support
                               </div>
                             )}
                           </div>
 
-                          <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                              Quick Tip
-                            </p>
-                            <p className="mt-2 text-sm leading-6" style={{ color: controlText }}>
-                              If the app does not open, copy the URL above and import it from inside the client, or use manual setup for the QR code.
-                            </p>
-                          </div>
-
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                          <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]"}`}>
+                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
+                                Quick Tip
+                              </p>
+                              <p className="mt-2 text-sm leading-6" style={{ color: controlText }}>
+                                If the app does not open, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                              </p>
+                            </div>
+                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 Last Updated
                               </p>
                               <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>Updated just now</p>
                             </div>
-                            <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 Endpoint
                               </p>
@@ -462,12 +460,6 @@ export function SubscriptionPageLivePreview({
                       </div>
                     </div>
                   </div>
-
-                  {mergedBranding.showWelcome && mergedBranding.welcomeMessage && (
-                    <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                      {mergedBranding.welcomeMessage}
-                    </div>
-                  )}
 
                   {mergedBranding.showUsageAlerts && (
                     <div
@@ -486,13 +478,13 @@ export function SubscriptionPageLivePreview({
 
                   {showConnectionSummary && (
                     <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.75fr))]"}`}>
-                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                               Data Usage
                             </p>
-                            <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
+                            <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
                             <p className="mt-2 text-sm" style={{ color: textMuted }}>{usageDetail}</p>
                           </div>
                           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -520,19 +512,19 @@ export function SubscriptionPageLivePreview({
                         </p>
                       </div>
 
-                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           Time Left
                         </p>
-                        <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>12 days</p>
+                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>12 days</p>
                         <p className="mt-2 text-sm" style={{ color: textMuted }}>Expires on June 30, 2026</p>
                       </div>
 
-                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           Server
                         </p>
-                        <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>Singapore</p>
+                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>Singapore</p>
                         <p className="mt-2 text-sm" style={{ color: textMuted }}>Port 1158</p>
                       </div>
                     </div>
@@ -562,18 +554,18 @@ export function SubscriptionPageLivePreview({
                     )}
                   </div>
 
-                  <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
+                  <div className={`mt-4 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
                     {visibleApps.map((app) => (
-                      <div key={app.id} className="rounded-[22px] border p-4" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                      <div key={app.id} className="rounded-[20px] border p-3.5" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div
-                              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border text-xl"
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border text-lg"
                               style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder, color: controlText }}
                             >
                               {app.icon}
                             </div>
-                            <p className="mt-3 text-base font-semibold" style={{ color: controlText }}>{app.name}</p>
+                            <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlText }}>{app.name}</p>
                             <p className="mt-1 text-sm" style={{ color: controlMuted }}>
                               Manual alternative for this device if you prefer {app.name}.
                             </p>
@@ -585,9 +577,9 @@ export function SubscriptionPageLivePreview({
                             Client
                           </div>
                         </div>
-                        <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_48px]">
+                        <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
                           <div
-                            className="inline-flex items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold"
+                            className="inline-flex items-center justify-center rounded-[16px] px-4 py-2.5 text-sm font-semibold"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: "#ffffff",
@@ -596,7 +588,7 @@ export function SubscriptionPageLivePreview({
                             Open in {app.name}
                           </div>
                           <div
-                            className="inline-flex items-center justify-center rounded-[18px] border"
+                            className="inline-flex items-center justify-center rounded-[16px] border"
                             style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                           >
                             <ExternalLink className="h-4 w-4" />

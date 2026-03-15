@@ -890,92 +890,44 @@ export default function SubscriptionPage() {
             </div>
           )}
 
-          <div className="mx-auto max-w-5xl space-y-5 md:px-2">
-            <section className={`${getCardRadius()} p-5 md:p-6 lg:p-7`} style={outlinedCardStyle}>
+          <div className="mx-auto max-w-[68rem] space-y-4 md:px-2">
+            <section className={`${getCardRadius()} p-4 md:p-5 lg:p-6`} style={outlinedCardStyle}>
               <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:items-start">
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-start gap-4">
+                <div className="flex flex-col gap-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-start gap-4">
+                        <div
+                          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.bgSecondary,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.18)' : theme.border,
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={logoUrl} alt={branding.brandName || 'Logo'} className="h-10 w-10 object-contain" />
+                        </div>
+                        <div className="min-w-0">
                           <div
-                            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border"
+                            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
                             style={{
-                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.bgSecondary,
-                              borderColor: hasImageBackground ? 'rgba(255,255,255,0.18)' : theme.border,
+                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${theme.accent}14`,
+                              color: hasImageBackground ? '#ffffff' : theme.accent,
                             }}
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={logoUrl} alt={branding.brandName || 'Logo'} className="h-10 w-10 object-contain" />
+                            <Sparkles className="h-3.5 w-3.5" />
+                            {branding.brandName || 'Atomic-UI'}
                           </div>
-                          <div className="min-w-0">
-                            <div
-                              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
-                              style={{
-                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${theme.accent}14`,
-                                color: hasImageBackground ? '#ffffff' : theme.accent,
-                              }}
-                            >
-                              <Sparkles className="h-3.5 w-3.5" />
-                              {branding.brandName || 'Atomic-UI'}
-                            </div>
-                            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-[2.3rem]" style={{ color: primaryTextColor }}>
-                              {keyData.name}
-                            </h1>
-                            <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: mutedTextColor }}>
-                              Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
-                            </p>
-                          </div>
+                          <h1 className="mt-3 text-[2rem] font-semibold tracking-tight md:text-[2.15rem]" style={{ color: primaryTextColor }}>
+                            {keyData.name}
+                          </h1>
+                          <p className="mt-2 max-w-3xl text-sm leading-6 md:text-[15px]" style={{ color: mutedTextColor }}>
+                            Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
+                          </p>
                         </div>
-                      </div>
-
-                      <div
-                        className="rounded-[1.5rem] border p-4"
-                        style={{
-                          backgroundColor: controlSurface,
-                          borderColor: controlBorder,
-                        }}
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                          Quick Scan
-                        </p>
-                        <div
-                          className="mt-3 flex aspect-square items-center justify-center rounded-[1.25rem] border p-4"
-                          style={{
-                            backgroundColor: controlButtonSurface,
-                            borderColor: controlBorder,
-                          }}
-                        >
-                          {qrCode ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={qrCode} alt="Connection QR Code" className="h-full w-full max-h-[180px] max-w-[180px] rounded-[1rem]" />
-                          ) : (
-                            <div className="h-[180px] w-[180px] animate-pulse rounded-[1rem]" style={{ backgroundColor: theme.bgSecondary }} />
-                          )}
-                        </div>
-                        <p className="mt-3 text-sm font-medium" style={{ color: controlTextColor }}>
-                          Scan with {primaryApp?.name || 'your VPN app'}
-                        </p>
-                        <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
-                          Fastest on mobile. If scan fails, open manual setup for the same connection URL.
-                        </p>
-                        <button
-                          onClick={() => setShowManualSetup(true)}
-                          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] border px-4 py-3 text-sm font-medium"
-                          style={{
-                            backgroundColor: controlButtonSurface,
-                            color: controlTextColor,
-                            borderColor: controlBorder,
-                          }}
-                        >
-                          <QrCode className="h-4 w-4" />
-                          Show Large QR
-                        </button>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex w-full flex-col gap-3 lg:max-w-[340px]">
                     <div className="flex justify-start lg:justify-end">
                       <div
                         className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
@@ -984,42 +936,92 @@ export default function SubscriptionPage() {
                         {statusTone.label}
                       </div>
                     </div>
+                  </div>
+                </div>
 
+                {shouldShowWelcome && effectiveWelcomeMessage && (
+                  <div
+                    className="rounded-2xl px-4 py-3 text-sm"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
+                      color: primaryTextColor,
+                    }}
+                  >
+                    {effectiveWelcomeMessage}
+                  </div>
+                )}
+
+                <div className="grid gap-3.5 lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch">
+                  <div
+                    className="order-2 flex h-full flex-col rounded-[1.35rem] border p-3.5 lg:order-1 lg:p-4"
+                    style={{
+                      backgroundColor: controlSurface,
+                      borderColor: controlBorder,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
+                      Quick Scan
+                    </p>
                     <div
-                      className="rounded-[1.25rem] border p-1"
+                      className="mt-3 flex flex-1 items-center justify-center rounded-[1.15rem] border p-3.5"
                       style={{
-                        backgroundColor: controlSurface,
+                        backgroundColor: controlButtonSurface,
                         borderColor: controlBorder,
                       }}
                     >
-                      <div className="flex flex-wrap gap-1">
-                        {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
-                          <button
-                            key={p}
-                            onClick={() => setPlatform(p)}
-                            className="flex-1 rounded-[1rem] px-3 py-2.5 text-sm font-medium transition-all"
-                            style={{
-                              background: platform === p
-                                ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
-                                : 'transparent',
-                              color: platform === p ? '#ffffff' : controlMutedColor,
-                              boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
-                            }}
-                          >
-                            {getPlatformLabel(p)}
-                          </button>
-                        ))}
-                      </div>
+                      {qrCode ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={qrCode} alt="Connection QR Code" className="h-full w-full max-h-[156px] max-w-[156px] rounded-[0.9rem]" />
+                      ) : (
+                        <div className="h-[156px] w-[156px] animate-pulse rounded-[0.9rem]" style={{ backgroundColor: theme.bgSecondary }} />
+                      )}
                     </div>
+                    <p className="mt-3 text-sm font-medium" style={{ color: controlTextColor }}>
+                      Scan with {primaryApp?.name || 'your VPN app'}
+                    </p>
+                    <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
+                      Fastest on mobile. If scanning fails, use the connection tools in the install card for the same URL.
+                    </p>
+                  </div>
 
+                  <div
+                    className="order-1 h-full rounded-[1.35rem] border p-3.5 lg:order-2 lg:p-4"
+                    style={{
+                      backgroundColor: controlSurface,
+                      borderColor: controlBorder,
+                    }}
+                  >
                     <div
-                      className="rounded-[1.5rem] border p-4"
-                      style={{
-                        backgroundColor: controlSurface,
-                        borderColor: controlBorder,
-                      }}
+                      className="space-y-3.5"
                     >
-                      <div className="space-y-4">
+                      <div
+                        className="rounded-[1.1rem] border p-1"
+                        style={{
+                          backgroundColor: controlButtonSurface,
+                          borderColor: controlBorder,
+                        }}
+                      >
+                        <div className="flex flex-wrap gap-1">
+                          {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => setPlatform(p)}
+                              className="flex-1 rounded-[0.9rem] px-3 py-2 text-[13px] font-medium transition-all"
+                              style={{
+                                background: platform === p
+                                  ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
+                                  : 'transparent',
+                                color: platform === p ? '#ffffff' : controlMutedColor,
+                                boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
+                              }}
+                            >
+                              {getPlatformLabel(p)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3.5">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
@@ -1027,7 +1029,7 @@ export default function SubscriptionPage() {
                             </p>
                             <button
                               onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-[0.9rem] border transition-colors"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1039,7 +1041,7 @@ export default function SubscriptionPage() {
                             </button>
                           </div>
                           <div
-                            className="rounded-[1.1rem] border px-4 py-3 text-sm font-medium"
+                            className="rounded-[1rem] border px-3.5 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1055,7 +1057,7 @@ export default function SubscriptionPage() {
                         {primaryApp ? (
                           <button
                             onClick={() => handleAddToApp(primaryApp.id)}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
@@ -1068,7 +1070,7 @@ export default function SubscriptionPage() {
                         ) : (
                           <button
                             onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
@@ -1079,10 +1081,10 @@ export default function SubscriptionPage() {
                           </button>
                         )}
 
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                           <button
                             onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
-                            className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                            className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               color: controlTextColor,
@@ -1096,7 +1098,7 @@ export default function SubscriptionPage() {
                           {showManualSetupButton ? (
                             <button
                               onClick={() => setShowManualSetup(true)}
-                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1113,7 +1115,7 @@ export default function SubscriptionPage() {
                               href={installAppUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1130,7 +1132,7 @@ export default function SubscriptionPage() {
                               href={supportLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1143,24 +1145,24 @@ export default function SubscriptionPage() {
                           ) : null}
                         </div>
 
-                        <div
-                          className="rounded-[1.1rem] border px-4 py-3"
-                          style={{
-                            backgroundColor: controlButtonSurface,
-                            borderColor: controlBorder,
-                          }}
-                        >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                            Quick Tip
-                          </p>
-                          <p className="mt-2 text-sm leading-6" style={{ color: controlTextColor }}>
-                            If the app does not open from the main button, copy the URL above and import it from inside the client, or use manual setup for the QR code.
-                          </p>
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]">
                           <div
-                            className="rounded-[1.1rem] border px-4 py-3"
+                            className="rounded-[1rem] border px-3.5 py-3"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                            }}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
+                              Quick Tip
+                            </p>
+                            <p className="mt-2 text-sm leading-6" style={{ color: controlTextColor }}>
+                              If the app does not open from the main button, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                            </p>
+                          </div>
+
+                          <div
+                            className="rounded-[1rem] border px-3.5 py-3"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1173,8 +1175,9 @@ export default function SubscriptionPage() {
                               {getLastUpdatedLabel()}
                             </p>
                           </div>
+
                           <div
-                            className="rounded-[1.1rem] border px-4 py-3"
+                            className="rounded-[1rem] border px-3.5 py-3"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1195,18 +1198,6 @@ export default function SubscriptionPage() {
                     </div>
                   </div>
                 </div>
-
-                {shouldShowWelcome && effectiveWelcomeMessage && (
-                  <div
-                    className="rounded-2xl px-4 py-3 text-sm"
-                    style={{
-                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                      color: primaryTextColor,
-                    }}
-                  >
-                    {effectiveWelcomeMessage}
-                  </div>
-                )}
 
                 {usageAlert && branding.showUsageAlerts && (
                   <div
@@ -1229,9 +1220,9 @@ export default function SubscriptionPage() {
                 )}
 
                 {showConnectionSummary && (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.75fr))]">
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]">
                     <div
-                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      className="rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1242,7 +1233,7 @@ export default function SubscriptionPage() {
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                             Data Usage
                           </p>
-                          <h2 className="mt-2 text-2xl font-semibold md:text-[2rem]" style={{ color: primaryTextColor }}>
+                          <h2 className="mt-2 text-[1.7rem] font-semibold md:text-[1.85rem]" style={{ color: primaryTextColor }}>
                             {usageHeadline}
                           </h2>
                           <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1289,7 +1280,7 @@ export default function SubscriptionPage() {
                     </div>
 
                     <div
-                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      className="rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1298,7 +1289,7 @@ export default function SubscriptionPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                         Time Left
                       </p>
-                      <p className="mt-2 text-2xl font-semibold" style={{ color: primaryTextColor }}>
+                      <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {timeRemaining}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1309,7 +1300,7 @@ export default function SubscriptionPage() {
                     </div>
 
                     <div
-                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      className="rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1318,7 +1309,7 @@ export default function SubscriptionPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                         Server
                       </p>
-                      <p className="mt-2 text-2xl font-semibold" style={{ color: primaryTextColor }}>
+                      <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1357,11 +1348,11 @@ export default function SubscriptionPage() {
                   )}
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {visibleApps.map((app) => (
                     <div
                       key={app.id}
-                      className="rounded-[1.45rem] border p-4"
+                      className="rounded-[1.25rem] border p-3.5"
                       style={{
                         backgroundColor: controlSurface,
                         borderColor: controlBorder,
@@ -1370,7 +1361,7 @@ export default function SubscriptionPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border text-xl"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border text-lg"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1379,7 +1370,7 @@ export default function SubscriptionPage() {
                           >
                             {app.icon}
                           </div>
-                          <p className="mt-3 text-base font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
+                          <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
                           <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
                             Manual alternative for {getPlatformLabel(platform)} if you prefer {app.name}.
                           </p>
@@ -1397,10 +1388,10 @@ export default function SubscriptionPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_48px]">
+                      <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
                         <button
                           onClick={() => handleAddToApp(app.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-semibold"
+                          className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-4 py-2.5 text-sm font-semibold"
                           style={{
                             background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                             color: '#ffffff',
@@ -1413,7 +1404,7 @@ export default function SubscriptionPage() {
                             href={getPlatformStoreUrl(app, platform) || undefined}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center rounded-[1.1rem] border"
+                            className="inline-flex items-center justify-center rounded-[1rem] border"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
