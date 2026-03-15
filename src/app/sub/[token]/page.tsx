@@ -856,7 +856,7 @@ export default function SubscriptionPage() {
           </>
         )}
 
-        <div className="relative z-10 mx-auto w-full space-y-4 px-4 py-8 pb-safe md:px-6 lg:py-10">
+        <div className="relative z-10 mx-auto w-full space-y-4 px-3 py-8 pb-safe sm:px-4 md:px-6 lg:py-10">
 
           {/* Dark/Light Theme Toggle */}
           {(themeId === 'dark' || themeId === 'light') && (
@@ -891,7 +891,7 @@ export default function SubscriptionPage() {
           )}
 
           <div className="mx-auto max-w-[68rem] space-y-4 md:px-2">
-            <section className={`${getCardRadius()} p-4 md:p-5 lg:p-6`} style={outlinedCardStyle}>
+            <section className={`${getCardRadius()} w-full overflow-hidden p-4 md:p-5 lg:p-6`} style={outlinedCardStyle}>
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -951,9 +951,9 @@ export default function SubscriptionPage() {
                   </div>
                 )}
 
-                <div className="grid gap-3.5 lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch">
+                <div className="grid min-w-0 gap-3.5 lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch">
                   <div
-                    className="order-2 flex h-full flex-col rounded-[1.35rem] border p-3.5 lg:order-1 lg:p-4"
+                    className="order-2 flex min-w-0 w-full overflow-hidden h-full flex-col rounded-[1.35rem] border p-3.5 lg:order-1 lg:p-4"
                     style={{
                       backgroundColor: controlSurface,
                       borderColor: controlBorder,
@@ -985,7 +985,7 @@ export default function SubscriptionPage() {
                   </div>
 
                   <div
-                    className="order-1 h-full rounded-[1.35rem] border p-3.5 lg:order-2 lg:p-4"
+                    className="order-1 min-w-0 w-full overflow-hidden h-full rounded-[1.35rem] border p-3.5 lg:order-2 lg:p-4"
                     style={{
                       backgroundColor: controlSurface,
                       borderColor: controlBorder,
@@ -1001,12 +1001,12 @@ export default function SubscriptionPage() {
                           borderColor: controlBorder,
                         }}
                       >
-                        <div className="flex flex-wrap gap-1">
+                        <div className="grid min-w-0 grid-cols-3 gap-1">
                           {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
                             <button
                               key={p}
                               onClick={() => setPlatform(p)}
-                              className="flex-1 rounded-[0.9rem] px-3 py-2 text-[13px] font-medium transition-all"
+                              className="min-w-0 w-full rounded-[0.9rem] px-2.5 py-2 text-[12px] font-medium leading-tight transition-all sm:px-3 sm:text-[13px]"
                               style={{
                                 background: platform === p
                                   ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
@@ -1015,21 +1015,22 @@ export default function SubscriptionPage() {
                                 boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
                               }}
                             >
-                              {getPlatformLabel(p)}
+                              <span className="sm:hidden">{p === 'ios' ? 'iOS' : p === 'windows' ? 'Windows' : 'Android'}</span>
+                              <span className="hidden sm:inline">{getPlatformLabel(p)}</span>
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="space-y-3.5">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 space-y-3.5">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex min-w-0 items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
                               Connection URL
                             </p>
                             <button
                               onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-[0.9rem] border transition-colors"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.9rem] border transition-colors"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1041,14 +1042,14 @@ export default function SubscriptionPage() {
                             </button>
                           </div>
                           <div
-                            className="rounded-[1rem] border px-3.5 py-2.5 text-sm font-medium"
+                            className="min-w-0 rounded-[1rem] border px-3.5 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
                               color: controlTextColor,
                             }}
                           >
-                            <p className="truncate font-mono text-[12px] leading-6">
+                            <p className="w-full truncate font-mono text-[12px] leading-6">
                               {actionFieldText}
                             </p>
                           </div>
@@ -1081,10 +1082,10 @@ export default function SubscriptionPage() {
                           </button>
                         )}
 
-                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                           <button
                             onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
-                            className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               color: controlTextColor,
@@ -1098,7 +1099,7 @@ export default function SubscriptionPage() {
                           {showManualSetupButton ? (
                             <button
                               onClick={() => setShowManualSetup(true)}
-                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1115,7 +1116,7 @@ export default function SubscriptionPage() {
                               href={installAppUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1132,7 +1133,7 @@ export default function SubscriptionPage() {
                               href={supportLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,

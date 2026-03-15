@@ -333,8 +333,8 @@ export function SubscriptionPageLivePreview({
                     </div>
                   )}
 
-                  <div className={`grid gap-3.5 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch"}`}>
-                    <div className={`order-2 flex h-full flex-col rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-1 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                  <div className={`grid min-w-0 gap-3.5 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch"}`}>
+                    <div className={`order-2 flex min-w-0 w-full overflow-hidden h-full flex-col rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-1 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                         Quick Scan
                       </p>
@@ -351,14 +351,14 @@ export function SubscriptionPageLivePreview({
                       </p>
                     </div>
 
-                    <div className={`order-1 h-full rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-2 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                    <div className={`order-1 min-w-0 w-full overflow-hidden h-full rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-2 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
                       <div className="space-y-3.5">
                         <div className="rounded-[18px] border p-1" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
-                          <div className="flex gap-1">
+                          <div className="grid min-w-0 grid-cols-3 gap-1">
                             {["Android", "iPhone", "Windows"].map((label, index) => (
                               <div
                                 key={label}
-                                className="flex-1 rounded-[14px] px-3 py-2 text-center text-[13px] font-medium"
+                                className="min-w-0 w-full rounded-[14px] px-2.5 py-2 text-center text-[12px] font-medium leading-tight sm:px-3 sm:text-[13px]"
                                 style={{
                                   background: index === 0
                                     ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
@@ -367,30 +367,31 @@ export function SubscriptionPageLivePreview({
                                   boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
                                 }}
                               >
-                                {label}
+                                <span className="sm:hidden">{label === "iPhone / iPad" ? "iOS" : label}</span>
+                                <span className="hidden sm:inline">{label}</span>
                               </div>
                             ))}
                           </div>
                         </div>
 
-                        <div className="space-y-3.5">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 space-y-3.5">
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex min-w-0 items-center justify-between gap-3">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 Connection URL
                               </p>
                               <div
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-[14px] border"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] border"
                                 style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                               >
                                 <Copy className="h-4 w-4" />
                               </div>
                             </div>
                             <div
-                              className="rounded-[16px] border px-3.5 py-2.5"
+                              className="min-w-0 rounded-[16px] border px-3.5 py-2.5"
                               style={{ backgroundColor: controlButtonSurface, color: controlText, borderColor: controlBorder }}
                             >
-                              <p className="truncate font-mono text-[12px] leading-6">
+                              <p className="w-full truncate font-mono text-[12px] leading-6">
                                 {actionFieldText}
                               </p>
                             </div>
@@ -408,25 +409,25 @@ export function SubscriptionPageLivePreview({
                             <ChevronRight className="h-4 w-4" />
                           </div>
 
-                          <div className={`grid gap-2 ${isMobile ? "grid-cols-2" : "xl:grid-cols-4 sm:grid-cols-2"}`}>
-                            <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                          <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "xl:grid-cols-4 sm:grid-cols-2"}`}>
+                            <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                               <Copy className="h-4 w-4" />
                               Copy URL
                             </div>
                             {showManualSetupButton && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <QrCode className="h-4 w-4" />
                                 Manual Setup
                               </div>
                             )}
                             {primaryApp && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <ExternalLink className="h-4 w-4" />
                                 Get {primaryApp.name}
                               </div>
                             )}
                             {showHelpContact && supportLink?.trim() && (
-                              <div className="inline-flex items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <MessageCircle className="h-4 w-4" />
                                 Get Support
                               </div>
