@@ -32,7 +32,6 @@ import {
     Smartphone,
     Code,
     FileText,
-    WandSparkles,
 } from "lucide-react";
 import {
     themeList,
@@ -263,7 +262,7 @@ export function SubscriptionSettings() {
                         <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <WandSparkles className="w-5 h-5" />
+                                    <Sparkles className="w-5 h-5" />
                                     <CardTitle className="text-base">Presets</CardTitle>
                                 </div>
                                 <ChevronDown
