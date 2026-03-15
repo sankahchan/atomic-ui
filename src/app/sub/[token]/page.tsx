@@ -745,6 +745,10 @@ export default function SubscriptionPage() {
   };
   const primaryTextColor = hasImageBackground ? '#ffffff' : theme.textPrimary;
   const mutedTextColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : theme.textMuted;
+  const controlSurface = hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary;
+  const controlBorder = hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border;
+  const controlButtonSurface = hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCard;
+  const actionFieldText = keyData.accessUrl;
 
   // Render animated background
   const renderAnimatedBackground = () => {
@@ -921,7 +925,7 @@ export default function SubscriptionPage() {
                     </div>
                   </div>
 
-                  <div className="flex w-full flex-col gap-3 lg:max-w-[280px]">
+                  <div className="flex w-full flex-col gap-3 lg:max-w-[340px]">
                     <div className="flex justify-start lg:justify-end">
                       <div
                         className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
@@ -955,22 +959,153 @@ export default function SubscriptionPage() {
                       </div>
                     </div>
 
-                    {installAppUrl && (
-                      <a
-                        href={installAppUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                        style={{
-                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                          color: primaryTextColor,
-                          border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                        Get {primaryApp.name}
-                      </a>
-                    )}
+                    <div
+                      className="rounded-[1.5rem] border p-4"
+                      style={{
+                        backgroundColor: controlSurface,
+                        borderColor: controlBorder,
+                      }}
+                    >
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                              Connection URL
+                            </p>
+                            <button
+                              onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors"
+                              style={{
+                                backgroundColor: controlButtonSurface,
+                                color: primaryTextColor,
+                                borderColor: controlBorder,
+                              }}
+                              aria-label="Copy connection URL"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div
+                            className="rounded-[1.1rem] border px-4 py-3 text-sm font-medium"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              borderColor: controlBorder,
+                              color: primaryTextColor,
+                            }}
+                          >
+                            <p className="truncate font-mono text-[12px] leading-6">
+                              {actionFieldText}
+                            </p>
+                          </div>
+                        </div>
+
+                        {primaryApp ? (
+                          <button
+                            onClick={() => handleAddToApp(primaryApp.id)}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                              color: '#ffffff',
+                            }}
+                          >
+                            <span className="text-base">{primaryApp.icon}</span>
+                            Open in {primaryApp.name}
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                              color: '#ffffff',
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copy Connection URL
+                          </button>
+                        )}
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <button
+                            onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                            className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              color: primaryTextColor,
+                              border: `1px solid ${controlBorder}`,
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copy URL
+                          </button>
+
+                          {showManualSetupButton ? (
+                            <button
+                              onClick={() => setShowManualSetup(true)}
+                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              style={{
+                                backgroundColor: controlButtonSurface,
+                                color: primaryTextColor,
+                                border: `1px solid ${controlBorder}`,
+                              }}
+                            >
+                              <QrCode className="h-4 w-4" />
+                              Manual Setup
+                            </button>
+                          ) : null}
+
+                          {installAppUrl ? (
+                            <a
+                              href={installAppUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              style={{
+                                backgroundColor: controlButtonSurface,
+                                color: primaryTextColor,
+                                border: `1px solid ${controlBorder}`,
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                              Get {primaryApp?.name ?? 'App'}
+                            </a>
+                          ) : null}
+
+                          {showHelpContact && supportLink ? (
+                            <a
+                              href={supportLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] px-4 py-3 text-sm font-medium"
+                              style={{
+                                backgroundColor: controlButtonSurface,
+                                color: primaryTextColor,
+                                border: `1px solid ${controlBorder}`,
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                              Get Support
+                            </a>
+                          ) : null}
+                        </div>
+
+                        <div
+                          className="rounded-[1.1rem] border px-4 py-3"
+                          style={{
+                            backgroundColor: controlButtonSurface,
+                            borderColor: controlBorder,
+                          }}
+                        >
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                            Quick Tip
+                          </p>
+                          <p className="mt-2 text-sm leading-6" style={{ color: primaryTextColor }}>
+                            If the app does not open from the main button, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1106,79 +1241,6 @@ export default function SubscriptionPage() {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  {primaryApp ? (
-                    <button
-                      onClick={() => handleAddToApp(primaryApp.id)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                        color: '#ffffff',
-                      }}
-                    >
-                      <span className="text-base">{primaryApp.icon}</span>
-                      Open in {primaryApp.name}
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                        color: '#ffffff',
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copy Connection URL
-                    </button>
-                  )}
-
-                  {showManualSetupButton && (
-                    <button
-                      onClick={() => setShowManualSetup(true)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                        color: primaryTextColor,
-                        border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
-                      }}
-                    >
-                      <QrCode className="h-4 w-4" />
-                      Manual Setup
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                    style={{
-                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                      color: primaryTextColor,
-                      border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                    Copy URL
-                  </button>
-
-                  {showHelpContact && supportLink && (
-                    <a
-                      href={supportLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                        color: primaryTextColor,
-                        border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Get Support
-                    </a>
-                  )}
-                </div>
               </div>
             </section>
 

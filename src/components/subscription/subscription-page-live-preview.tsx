@@ -107,6 +107,8 @@ export function SubscriptionPageLivePreview({
   const textPrimary = theme.textPrimary;
   const textMuted = theme.textMuted;
   const textSecondary = theme.textSecondary;
+  const controlButtonSurface = isGlassTheme ? "rgba(15, 23, 42, 0.9)" : theme.bgCard;
+  const actionFieldText = "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNT...@sg.example.com:1158/#Singapore";
   const previewPaddingClass =
     mergedBranding.layout === "compact"
       ? "p-4 md:p-5"
@@ -309,7 +311,7 @@ export function SubscriptionPageLivePreview({
                       </div>
                     </div>
 
-                    <div className={`flex flex-col gap-3 ${isMobile ? "" : "lg:w-[240px]"}`}>
+                    <div className={`flex flex-col gap-3 ${isMobile ? "" : "lg:w-[320px]"}`}>
                       <div className={`flex ${isMobile ? "justify-start" : "justify-end"}`}>
                         <div
                           className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
@@ -336,12 +338,77 @@ export function SubscriptionPageLivePreview({
                         </div>
                       </div>
 
-                      {primaryApp && (
-                        <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                          <ExternalLink className="h-4 w-4" />
-                          Get {primaryApp.name}
+                      <div className="rounded-[24px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                                Connection URL
+                              </p>
+                              <div
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border"
+                                style={{ backgroundColor: controlButtonSurface, color: textPrimary, borderColor }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </div>
+                            </div>
+                            <div
+                              className="rounded-[18px] border px-4 py-3"
+                              style={{ backgroundColor: controlButtonSurface, color: textPrimary, borderColor }}
+                            >
+                              <p className="truncate font-mono text-[12px] leading-6">
+                                {actionFieldText}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div
+                            className="inline-flex items-center justify-center gap-2 rounded-[18px] px-5 py-3.5 text-sm font-semibold shadow-lg"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                              color: "#ffffff",
+                            }}
+                          >
+                            <span className="text-base">{primaryApp?.icon || "🔑"}</span>
+                            Open in {primaryApp?.name || "Outline"}
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                              <Copy className="h-4 w-4" />
+                              Copy URL
+                            </div>
+                            {showManualSetupButton && (
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                                <QrCode className="h-4 w-4" />
+                                Manual Setup
+                              </div>
+                            )}
+                            {primaryApp && (
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                                <ExternalLink className="h-4 w-4" />
+                                Get {primaryApp.name}
+                              </div>
+                            )}
+                            {showHelpContact && supportLink?.trim() && (
+                              <div className="inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: textPrimary, border: `1px solid ${borderColor}` }}>
+                                <MessageCircle className="h-4 w-4" />
+                                Get Support
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="rounded-[18px] border px-4 py-3" style={{ backgroundColor: controlButtonSurface, borderColor }}>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                              Quick Tip
+                            </p>
+                            <p className="mt-2 text-sm leading-6" style={{ color: textPrimary }}>
+                              If the app does not open, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                            </p>
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
 
@@ -420,35 +487,6 @@ export function SubscriptionPageLivePreview({
                     </div>
                   )}
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                    <div
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                        color: "#ffffff",
-                      }}
-                    >
-                      <span className="text-base">{primaryApp?.icon || "🔑"}</span>
-                      Open in {primaryApp?.name || "Outline"}
-                      <ChevronRight className="h-4 w-4" />
-                    </div>
-                    {showManualSetupButton && (
-                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                        <QrCode className="h-4 w-4" />
-                        Manual Setup
-                      </div>
-                    )}
-                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                      <Copy className="h-4 w-4" />
-                      Copy URL
-                    </div>
-                    {showHelpContact && supportLink?.trim() && (
-                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                        <MessageCircle className="h-4 w-4" />
-                        Get Support
-                      </div>
-                    )}
-                  </div>
                 </div>
               </section>
 
