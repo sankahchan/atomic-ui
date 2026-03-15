@@ -19,10 +19,10 @@ import {
   Download,
   ExternalLink,
   HardDrive,
-  Link2,
   MapPin,
   MessageCircle,
   QrCode,
+  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -250,6 +250,8 @@ export default function SubscriptionPage() {
   const [showAllApps, setShowAllApps] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState<ContactLink | null>(null);
   const [usageAlert, setUsageAlert] = useState<number | null>(null);
+  const [refreshingUsage, setRefreshingUsage] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   // Listen for system color scheme changes
   useEffect(() => {
@@ -352,6 +354,7 @@ export default function SubscriptionPage() {
           await generateQRCode(data.accessUrl, logoUrl, logoSize);
         }
 
+        setLastUpdatedAt(Date.now());
         setLoading(false);
       } catch (err) {
         setError('Failed to load subscription');
@@ -482,6 +485,20 @@ export default function SubscriptionPage() {
     return Math.min(Math.round((used / limit) * 100), 100);
   };
 
+  const getLastUpdatedLabel = (): string => {
+    if (!lastUpdatedAt) return 'Not checked yet';
+
+    const diffSeconds = Math.floor((Date.now() - lastUpdatedAt) / 1000);
+    if (diffSeconds < 10) return 'Updated just now';
+    if (diffSeconds < 60) return `Updated ${diffSeconds}s ago`;
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    return `Updated ${diffHours}h ago`;
+  };
+
   const getCountryFlag = (countryCode: string | null): string => {
     if (!countryCode) return '';
     const codePoints = countryCode
@@ -528,16 +545,41 @@ export default function SubscriptionPage() {
     window.location.href = url;
   };
 
+  const refreshUsage = async () => {
+    try {
+      setRefreshingUsage(true);
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/subscription/${token}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh subscription');
+      }
+
+      const data = await response.json();
+      setKeyData(data);
+
+      if (data.accessUrl && data.accessUrl !== keyData?.accessUrl) {
+        const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
+        const logoSize = branding.logoSize || 25;
+        await generateQRCode(data.accessUrl, logoUrl, logoSize);
+      }
+
+      setLastUpdatedAt(Date.now());
+      setFeedback('Usage refreshed');
+    } catch {
+      setFeedback('Refresh failed');
+    } finally {
+      setRefreshingUsage(false);
+    }
+  };
+
   const getPlatformLabel = (value: Platform): string => {
     if (value === 'ios') return 'iPhone / iPad';
     if (value === 'windows') return 'Windows';
     return 'Android';
-  };
-
-  const getSubscriptionPageUrl = () => {
-    if (typeof window === 'undefined') return '';
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    return `${window.location.origin}${basePath}/sub/${token}`;
   };
 
   const handleContactClick = (contact: ContactLink) => {
@@ -623,11 +665,9 @@ export default function SubscriptionPage() {
   const isNeonTheme = theme.id.startsWith('neon');
   const usagePercent = getUsagePercent();
   const timeRemaining = getTimeRemaining(keyData.expiresAt);
-  const subscriptionPageUrl = getSubscriptionPageUrl();
   const supportLink = settings.supportLink || null;
   const showConnectionSummary = branding.showConnectionSummary ?? true;
   const showCompatibleApps = branding.showCompatibleApps ?? true;
-  const showShareLinks = branding.showShareLinks ?? true;
   const showHelpContact = branding.showHelpContact ?? true;
   const showManualSetupButton = branding.showManualSetupButton ?? true;
   const showUsageChips = branding.showUsageChips ?? true;
@@ -638,28 +678,36 @@ export default function SubscriptionPage() {
       : { bg: `${theme.warning}18`, color: theme.warning, label: keyData.status };
   const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
   const hasHelpContactContent = showHelpContact && Boolean(supportLink || keyData.contactLinks?.length);
-  const hasAsideColumn = showConnectionSummary || hasHelpContactContent;
   const installAppUrl = primaryApp?.storeUrl?.[platform] || null;
   const manualSetupGuide = getManualSetupGuide(platform, primaryApp?.name);
-  const statusItems = [
-    {
-      label: 'Server',
-      value: `${getCountryFlag(keyData.server.countryCode)} ${keyData.server.name}`.trim(),
-      icon: MapPin,
-    },
-    {
-      label: 'Usage',
-      value: keyData.dataLimitBytes
-        ? `${formatBytes(keyData.usedBytes)} / ${formatBytes(keyData.dataLimitBytes)}`
-        : `${formatBytes(keyData.usedBytes)} used`,
-      icon: HardDrive,
-    },
-    {
-      label: 'Expires',
-      value: timeRemaining,
-      icon: Clock3,
-    },
-  ];
+  const serverLabel = keyData.server.location || keyData.server.name;
+  const usageHeadline = keyData.dataLimitBytes
+    ? `${formatBytes(keyData.usedBytes)} / ${formatBytes(keyData.dataLimitBytes)}`
+    : 'Unlimited data';
+  const usageDetail = keyData.dataLimitBytes
+    ? `${usagePercent}% of quota used`
+    : `${formatBytes(keyData.usedBytes)} used with no quota limit`;
+  const footerText = branding.footerText?.trim()
+    || (branding.showPoweredBy !== false ? `Powered by ${branding.brandName || 'Atomic-UI'}` : '');
+  const topInfoChips = showUsageChips
+    ? [
+        {
+          label: 'Server',
+          value: serverLabel,
+          icon: MapPin,
+        },
+        {
+          label: 'Usage',
+          value: keyData.dataLimitBytes ? `${usagePercent}% used` : 'Unlimited',
+          icon: HardDrive,
+        },
+        {
+          label: 'Time left',
+          value: timeRemaining,
+          icon: Clock3,
+        },
+      ]
+    : [];
 
   const getCardStyle = () => {
     if (hasImageBackground) {
@@ -698,7 +746,6 @@ export default function SubscriptionPage() {
   };
   const primaryTextColor = hasImageBackground ? '#ffffff' : theme.textPrimary;
   const mutedTextColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : theme.textMuted;
-  const subtleTextColor = hasImageBackground ? 'rgba(255,255,255,0.56)' : theme.textSecondary;
 
   // Render animated background
   const renderAnimatedBackground = () => {
@@ -838,11 +885,11 @@ export default function SubscriptionPage() {
             </div>
           )}
 
-          <div className="mx-auto max-w-6xl space-y-5 md:px-2">
-            <div className={`grid gap-5 ${hasAsideColumn ? 'lg:grid-cols-[minmax(0,1.35fr)_320px]' : ''}`}>
-              <section className={`${getCardRadius()} p-5 md:p-6`} style={outlinedCardStyle}>
-                <div className="flex flex-col gap-5">
-                  <div className="flex items-start justify-between gap-4">
+          <div className="mx-auto max-w-5xl space-y-5 md:px-2">
+            <section className={`${getCardRadius()} p-5 md:p-6 lg:p-7`} style={outlinedCardStyle}>
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-start gap-4">
                       <div
                         className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border"
@@ -869,102 +916,51 @@ export default function SubscriptionPage() {
                           {keyData.name}
                         </h1>
                         <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: mutedTextColor }}>
-                          Ready to connect on {keyData.server.location || keyData.server.name}. Start with the app button below, or open manual setup if you want the raw URL and QR.
+                          Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
                         </p>
                       </div>
                     </div>
-                    <div
-                      className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
-                      style={{ backgroundColor: statusTone.bg, color: statusTone.color }}
-                    >
-                      {statusTone.label}
-                    </div>
                   </div>
 
-                  {branding.showWelcome && branding.welcomeMessage && (
+                  <div className="flex w-full flex-col gap-3 lg:max-w-[280px]">
+                    <div className="flex justify-start lg:justify-end">
+                      <div
+                        className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
+                        style={{ backgroundColor: statusTone.bg, color: statusTone.color }}
+                      >
+                        {statusTone.label}
+                      </div>
+                    </div>
+
                     <div
-                      className="rounded-2xl px-4 py-3 text-sm"
+                      className="rounded-[1.25rem] border p-1"
                       style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                        color: primaryTextColor,
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                       }}
                     >
-                      {branding.welcomeMessage}
-                    </div>
-                  )}
-
-                  {usageAlert && branding.showUsageAlerts && (
-                    <div
-                      className="flex items-start gap-3 rounded-2xl px-4 py-3"
-                      style={{
-                        backgroundColor: usageAlert >= 95 ? `${theme.danger}18` : `${theme.warning}18`,
-                        border: `1px solid ${usageAlert >= 95 ? `${theme.danger}44` : `${theme.warning}44`}`,
-                      }}
-                    >
-                      <AlertTriangle
-                        className="mt-0.5 h-4 w-4 shrink-0"
-                        style={{ color: usageAlert >= 95 ? theme.danger : theme.warning }}
-                      />
-                      <span className="text-sm" style={{ color: primaryTextColor }}>
-                        {usageAlert >= 95
-                          ? 'Data is almost depleted. Reconnect may stop soon if the limit is reached.'
-                          : `${usageAlert}% of your available data has already been used.`}
-                      </span>
-                    </div>
-                  )}
-
-                  {showUsageChips && (
-                    <div className="flex flex-wrap gap-2">
-                      {statusItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <div
-                            key={item.label}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
+                      <div className="flex flex-wrap gap-1">
+                        {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setPlatform(p)}
+                            className="flex-1 rounded-[1rem] px-3 py-2.5 text-sm font-medium transition-all"
                             style={{
-                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.1)' : theme.bgSecondary,
-                              color: primaryTextColor,
+                              backgroundColor: platform === p ? theme.tabActive : 'transparent',
+                              color: platform === p ? theme.tabActiveText : theme.tabInactiveText,
                             }}
                           >
-                            <Icon className="h-4 w-4" style={{ color: hasImageBackground ? '#ffffff' : theme.accent }} />
-                            <span className="font-medium">{item.label}:</span>
-                            <span style={{ color: subtleTextColor }}>{item.value}</span>
-                          </div>
-                        );
-                      })}
+                            {getPlatformLabel(p)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  )}
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                    {primaryApp ? (
-                      <button
-                        onClick={() => handleAddToApp(primaryApp.id)}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                        style={{
-                          background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                          color: '#ffffff',
-                        }}
-                      >
-                        <span className="text-base">{primaryApp.icon}</span>
-                        Open in {primaryApp.name}
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                        style={{
-                          background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                          color: '#ffffff',
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy Connection URL
-                      </button>
-                    )}
-                    {showManualSetupButton && (
-                      <button
-                        onClick={() => setShowManualSetup(true)}
+                    {primaryApp?.storeUrl?.[platform] && (
+                      <a
+                        href={primaryApp.storeUrl[platform]}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
                         style={{
                           backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
@@ -972,12 +968,198 @@ export default function SubscriptionPage() {
                           border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
                         }}
                       >
-                        <QrCode className="h-4 w-4" />
-                        Manual Setup
-                      </button>
+                        <Download className="h-4 w-4" />
+                        Get {primaryApp.name}
+                      </a>
                     )}
+                  </div>
+                </div>
+
+                {branding.showWelcome && branding.welcomeMessage && (
+                  <div
+                    className="rounded-2xl px-4 py-3 text-sm"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
+                      color: primaryTextColor,
+                    }}
+                  >
+                    {branding.welcomeMessage}
+                  </div>
+                )}
+
+                {usageAlert && branding.showUsageAlerts && (
+                  <div
+                    className="flex items-start gap-3 rounded-2xl px-4 py-3"
+                    style={{
+                      backgroundColor: usageAlert >= 95 ? `${theme.danger}18` : `${theme.warning}18`,
+                      border: `1px solid ${usageAlert >= 95 ? `${theme.danger}44` : `${theme.warning}44`}`,
+                    }}
+                  >
+                    <AlertTriangle
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                      style={{ color: usageAlert >= 95 ? theme.danger : theme.warning }}
+                    />
+                    <span className="text-sm" style={{ color: primaryTextColor }}>
+                      {usageAlert >= 95
+                        ? 'Data is almost depleted. Reconnect may stop soon if the limit is reached.'
+                        : `${usageAlert}% of your available data has already been used.`}
+                    </span>
+                  </div>
+                )}
+
+                {topInfoChips.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {topInfoChips.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={item.label}
+                          className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.1)' : theme.bgSecondary,
+                            color: primaryTextColor,
+                          }}
+                        >
+                          <Icon className="h-4 w-4" style={{ color: hasImageBackground ? '#ffffff' : theme.accent }} />
+                          <span className="font-medium">{item.label}</span>
+                          <span style={{ color: mutedTextColor }}>{item.value}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {showConnectionSummary && (
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.75fr))]">
+                    <div
+                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      }}
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                            Data Usage
+                          </p>
+                          <h2 className="mt-2 text-2xl font-semibold md:text-[2rem]" style={{ color: primaryTextColor }}>
+                            {usageHeadline}
+                          </h2>
+                          <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
+                            {usageDetail}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                          <button
+                            onClick={refreshUsage}
+                            disabled={refreshingUsage}
+                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
+                            style={{
+                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCard,
+                              color: primaryTextColor,
+                              border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
+                              opacity: refreshingUsage ? 0.75 : 1,
+                            }}
+                          >
+                            <RefreshCw className={`h-4 w-4 ${refreshingUsage ? 'animate-spin' : ''}`} />
+                            {refreshingUsage ? 'Checking...' : 'Refresh usage'}
+                          </button>
+                          <span className="text-xs" style={{ color: mutedTextColor }}>
+                            {getLastUpdatedLabel()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
+                        <div
+                          className={`h-full rounded-full ${branding.enableAnimations ? 'transition-all duration-500' : ''}`}
+                          style={{
+                            width: keyData.dataLimitBytes ? `${usagePercent}%` : '100%',
+                            background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
+                          }}
+                        />
+                      </div>
+
+                      <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
+                        {keyData.dataLimitBytes
+                          ? `${formatBytes(keyData.usedBytes)} used of ${formatBytes(keyData.dataLimitBytes)} total`
+                          : `${formatBytes(keyData.usedBytes)} used with no quota limit`}
+                      </p>
+                    </div>
+
+                    <div
+                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      }}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                        Time Left
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold" style={{ color: primaryTextColor }}>
+                        {timeRemaining}
+                      </p>
+                      <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
+                        {keyData.expiresAt
+                          ? `Expires on ${new Date(keyData.expiresAt).toLocaleDateString()}`
+                          : 'No expiry date is set for this key.'}
+                      </p>
+                    </div>
+
+                    <div
+                      className="rounded-[1.45rem] border p-4 md:p-5"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      }}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                        Server
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold" style={{ color: primaryTextColor }}>
+                        {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
+                      </p>
+                      <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
+                        {keyData.port ? `Port ${keyData.port}` : 'Server is ready for connection.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  {primaryApp ? (
+                    <button
+                      onClick={() => handleAddToApp(primaryApp.id)}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                        color: '#ffffff',
+                      }}
+                    >
+                      <span className="text-base">{primaryApp.icon}</span>
+                      Open in {primaryApp.name}
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  ) : (
                     <button
                       onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                        color: '#ffffff',
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy Connection URL
+                    </button>
+                  )}
+
+                  {showManualSetupButton && (
+                    <button
+                      onClick={() => setShowManualSetup(true)}
                       className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
@@ -985,205 +1167,43 @@ export default function SubscriptionPage() {
                         border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
                       }}
                     >
-                      <Copy className="h-4 w-4" />
-                      Copy URL
+                      <QrCode className="h-4 w-4" />
+                      Manual Setup
                     </button>
-                    {showHelpContact && supportLink && (
-                      <a
-                        href={supportLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                        style={{
-                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                          color: primaryTextColor,
-                          border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
-                        }}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        Get Support
-                      </a>
-                    )}
-                  </div>
+                  )}
 
-                  <div
-                    className="rounded-[1.4rem] border p-1"
+                  <button
+                    onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
                     style={{
-                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
+                      color: primaryTextColor,
+                      border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
                     }}
                   >
-                    <div className="flex flex-wrap gap-1">
-                      {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => setPlatform(p)}
-                          className="flex-1 rounded-[1.1rem] px-3 py-2.5 text-sm font-medium transition-all"
-                          style={{
-                            backgroundColor: platform === p ? theme.tabActive : 'transparent',
-                            color: platform === p ? theme.tabActiveText : theme.tabInactiveText,
-                          }}
-                        >
-                          {getPlatformLabel(p)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <Copy className="h-4 w-4" />
+                    Copy URL
+                  </button>
 
-                  {primaryApp?.storeUrl?.[platform] && (
-                    <div
-                      className="flex flex-col gap-3 rounded-2xl border px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  {showHelpContact && supportLink && (
+                    <a
+                      href={supportLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
                       style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
+                        color: primaryTextColor,
+                        border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.16)' : theme.border}`,
                       }}
                     >
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>
-                          Best app for {getPlatformLabel(platform)}
-                        </p>
-                        <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                          {primaryApp.name} works best with this connection. If it is not installed yet, grab it first.
-                        </p>
-                      </div>
-                      <a
-                        href={primaryApp.storeUrl[platform]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
-                        style={{
-                          backgroundColor: theme.accent,
-                          color: theme.accentText,
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                        Get {primaryApp.name}
-                      </a>
-                    </div>
+                      <MessageCircle className="h-4 w-4" />
+                      Get Support
+                    </a>
                   )}
                 </div>
-              </section>
-
-              {hasAsideColumn && (
-                <aside className="space-y-4">
-                  {showConnectionSummary && (
-                    <div className={`${getCardRadius()} p-5`} style={outlinedCardStyle}>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                        Connection Summary
-                      </p>
-                      <div className="mt-4 space-y-4">
-                        <div>
-                          <div className="flex items-end justify-between gap-3">
-                            <div>
-                              <p className="text-sm" style={{ color: mutedTextColor }}>Usage</p>
-                              <p className="mt-1 text-2xl font-semibold" style={{ color: primaryTextColor }}>
-                                {keyData.dataLimitBytes ? `${usagePercent}%` : 'Unlimited'}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm" style={{ color: mutedTextColor }}>Time left</p>
-                              <p className="mt-1 text-lg font-semibold" style={{ color: primaryTextColor }}>{timeRemaining}</p>
-                            </div>
-                          </div>
-                          <div
-                            className="mt-4 h-2 overflow-hidden rounded-full"
-                            style={{ backgroundColor: theme.progressBg }}
-                          >
-                            <div
-                              className={`h-full rounded-full ${branding.enableAnimations ? 'transition-all duration-500' : ''}`}
-                              style={{
-                                width: keyData.dataLimitBytes ? `${usagePercent}%` : '100%',
-                                background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
-                              }}
-                            />
-                          </div>
-                          <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
-                            {keyData.dataLimitBytes
-                              ? `${formatBytes(keyData.usedBytes)} used of ${formatBytes(keyData.dataLimitBytes)}`
-                              : `${formatBytes(keyData.usedBytes)} used with no quota limit`}
-                          </p>
-                        </div>
-
-                        {showShareLinks && (
-                          <div
-                            className="rounded-2xl border px-4 py-3"
-                            style={{
-                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                              borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                            }}
-                          >
-                            <p className="text-sm font-medium" style={{ color: primaryTextColor }}>
-                              Share this page
-                            </p>
-                            <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                              The page URL is easier for most users than the raw connection string.
-                            </p>
-                            <button
-                              onClick={() => copyToClipboard(subscriptionPageUrl, 'Subscription page copied')}
-                              className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                              style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                            >
-                              <Link2 className="h-4 w-4" />
-                              Copy Page URL
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasHelpContactContent && (
-                    <div className={`${getCardRadius()} p-5`} style={outlinedCardStyle}>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                        Help & Contact
-                      </p>
-                      <p className="mt-3 text-sm" style={{ color: primaryTextColor }}>
-                        Need help importing or your app is missing? Use one of the support options below.
-                      </p>
-                      {supportLink && (
-                        <a
-                          href={supportLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
-                            color: primaryTextColor,
-                            border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.border}`,
-                          }}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                          Open Support
-                        </a>
-                      )}
-                      {keyData.contactLinks && keyData.contactLinks.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {keyData.contactLinks.map((contact, index) => {
-                            const config = contactConfig[contact.type];
-                            if (!config) return null;
-                            return (
-                              <button
-                                key={index}
-                                onClick={() => handleContactClick(contact)}
-                                className="flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105"
-                                style={{
-                                  backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${config.color}18`,
-                                }}
-                                title={config.label}
-                              >
-                                <svg viewBox="0 0 24 24" className="h-5 w-5" fill={hasImageBackground ? '#ffffff' : config.color}>
-                                  <path d={config.icon} />
-                                </svg>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </aside>
-              )}
-            </div>
+              </div>
+            </section>
 
             {showCompatibleApps && apps.length > 0 && (
               <section className={`${getCardRadius()} p-5 md:p-6`} style={outlinedCardStyle}>
@@ -1193,10 +1213,10 @@ export default function SubscriptionPage() {
                       Compatible Apps
                     </p>
                     <h2 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
-                      Choose another app for {getPlatformLabel(platform)}
+                      Other apps for {getPlatformLabel(platform)}
                     </h2>
                     <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                      Use the best app above, or pick another supported client below.
+                      The main button above is the fastest option. Use another client below if you prefer it.
                     </p>
                   </div>
                   {remainingApps > 0 && (
@@ -1211,7 +1231,7 @@ export default function SubscriptionPage() {
                   )}
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {visibleApps.map((app) => (
                     <div
                       key={app.id}
@@ -1226,10 +1246,11 @@ export default function SubscriptionPage() {
                           <div className="text-2xl">{app.icon}</div>
                           <p className="mt-3 text-base font-semibold" style={{ color: primaryTextColor }}>{app.name}</p>
                           <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                            Import this connection directly into {app.name}.
+                            Import this same connection in {app.name}.
                           </p>
                         </div>
                       </div>
+
                       <div className="mt-4 flex gap-2">
                         <button
                           onClick={() => handleAddToApp(app.id)}
@@ -1259,95 +1280,85 @@ export default function SubscriptionPage() {
               </section>
             )}
 
-            {showShareLinks && (
+            {hasHelpContactContent && (
               <section className={`${getCardRadius()} p-5 md:p-6`} style={outlinedCardStyle}>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-2xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                      Share Links
+                      Help & Contact
                     </p>
                     <h2 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
-                      Keep the shareable links close
+                      Need help connecting?
                     </h2>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div
-                        className="rounded-[1.35rem] border p-4"
-                        style={{
-                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                        }}
-                      >
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Subscription page</p>
-                        <p className="mt-1 text-sm leading-6 break-all" style={{ color: mutedTextColor }}>
-                          {subscriptionPageUrl}
-                        </p>
-                        <button
-                          onClick={() => copyToClipboard(subscriptionPageUrl, 'Subscription page copied')}
-                          className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                        >
-                          <Copy className="h-4 w-4" />
-                          Copy page URL
-                        </button>
-                      </div>
-                      <div
-                        className="rounded-[1.35rem] border p-4"
-                        style={{
-                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                        }}
-                      >
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
-                        <p className="mt-1 text-sm leading-6 break-all" style={{ color: mutedTextColor }}>
-                          {keyData.accessUrl}
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                            style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                          >
-                            <Copy className="h-4 w-4" />
-                            Copy URL
-                          </button>
-                          {showManualSetupButton && (
-                            <button
-                              onClick={() => setShowManualSetup(true)}
-                              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                              style={{
-                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCardHover,
-                                color: primaryTextColor,
-                              }}
-                            >
-                              <QrCode className="h-4 w-4" />
-                              Open QR
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <p className="mt-2 text-sm leading-6" style={{ color: mutedTextColor }}>
+                      If the import button does nothing, install the recommended app first and then retry. If that still fails, use manual setup or contact support below.
+                    </p>
                   </div>
 
-                  <div className="flex flex-col justify-between gap-4 rounded-[1.4rem] border p-5" style={{
-                    backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                    borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                  }}>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                        Notes
-                      </p>
-                      <p className="mt-3 text-sm leading-6" style={{ color: primaryTextColor }}>
-                        If the import button does nothing, install the recommended app first or use manual setup to scan the QR code.
-                      </p>
-                    </div>
-                    <div className="text-xs" style={{ color: mutedTextColor }}>
-                      {branding.showPoweredBy !== false && (
-                        <p>{branding.footerText || `Powered by ${branding.brandName || 'Atomic-UI'}`}</p>
-                      )}
-                    </div>
-                  </div>
+                  {supportLink && (
+                    <a
+                      href={supportLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgSecondary,
+                        color: primaryTextColor,
+                        border: `1px solid ${hasImageBackground ? 'rgba(255,255,255,0.14)' : theme.border}`,
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open Support
+                    </a>
+                  )}
                 </div>
+
+                {keyData.contactLinks && keyData.contactLinks.length > 0 && (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {keyData.contactLinks.map((contact, index) => {
+                      const config = contactConfig[contact.type];
+                      if (!config) return null;
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleContactClick(contact)}
+                          className="flex items-center gap-3 rounded-[1.25rem] border px-4 py-3 text-left transition-transform hover:scale-[1.01]"
+                          style={{
+                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                          }}
+                        >
+                          <span
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                            style={{
+                              backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : `${config.color}18`,
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" className="h-5 w-5" fill={hasImageBackground ? '#ffffff' : config.color}>
+                              <path d={config.icon} />
+                            </svg>
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium" style={{ color: primaryTextColor }}>
+                              {config.label}
+                            </span>
+                            <span className="block truncate text-sm" style={{ color: mutedTextColor }}>
+                              {contact.value}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
+            )}
+
+            {footerText && (
+              <div className="px-2 text-center text-xs" style={{ color: mutedTextColor }}>
+                {footerText}
+              </div>
             )}
           </div>
         </div>
@@ -1358,7 +1369,7 @@ export default function SubscriptionPage() {
             onClick={() => setShowManualSetup(false)}
           >
             <div
-              className={`max-h-[90vh] w-full max-w-4xl overflow-y-auto ${getCardRadius()} p-5 md:p-6`}
+              className={`max-h-[90vh] w-full max-w-3xl overflow-y-auto ${getCardRadius()} p-5 md:p-6`}
               style={{
                 ...outlinedCardStyle,
                 backgroundColor: hasImageBackground ? 'rgba(15,23,42,0.92)' : theme.bgCard,
@@ -1374,7 +1385,7 @@ export default function SubscriptionPage() {
                     Import this connection yourself
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm" style={{ color: mutedTextColor }}>
-                    Use the QR code for fast setup or copy the URLs below into your client manually.
+                    Scan the QR code or copy the connection URL below into your client manually.
                   </p>
                 </div>
                 <button
@@ -1389,7 +1400,7 @@ export default function SubscriptionPage() {
                 </button>
               </div>
 
-              <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_300px]">
+              <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="space-y-4">
                   <div
                     className="rounded-[1.45rem] border p-5"
@@ -1495,53 +1506,30 @@ export default function SubscriptionPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div
-                      className="rounded-[1.35rem] border p-4"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
-                          <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
-                            {keyData.accessUrl}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
-                          className="rounded-full p-2"
-                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
+                  <div
+                    className="rounded-[1.35rem] border p-4"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
+                        <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
+                          {keyData.accessUrl}
+                        </p>
+                        <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
+                          Paste this directly into the client if the app does not open automatically.
+                        </p>
                       </div>
-                    </div>
-
-                    <div
-                      className="rounded-[1.35rem] border p-4"
-                      style={{
-                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                        borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Subscription page URL</p>
-                          <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
-                            {subscriptionPageUrl}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(subscriptionPageUrl, 'Subscription page copied')}
-                          className="rounded-full p-2"
-                          style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                        className="rounded-full p-2"
+                        style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
 
@@ -1654,11 +1642,37 @@ export default function SubscriptionPage() {
                     }}
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                      Manual fallback
+                      Live Status
                     </p>
-                    <p className="mt-3 text-sm leading-6" style={{ color: primaryTextColor }}>
-                      If this device uses another client, switch the platform tabs on the main page first, then reopen manual setup for a better recommended app and install link.
-                    </p>
+                    <div className="mt-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span style={{ color: mutedTextColor }}>Usage</span>
+                        <span className="font-medium" style={{ color: primaryTextColor }}>{usageHeadline}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span style={{ color: mutedTextColor }}>Time left</span>
+                        <span className="font-medium" style={{ color: primaryTextColor }}>{timeRemaining}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span style={{ color: mutedTextColor }}>Server</span>
+                        <span className="font-medium text-right" style={{ color: primaryTextColor }}>
+                          {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={refreshUsage}
+                      disabled={refreshingUsage}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.08)' : theme.bgCardHover,
+                        color: primaryTextColor,
+                        opacity: refreshingUsage ? 0.75 : 1,
+                      }}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${refreshingUsage ? 'animate-spin' : ''}`} />
+                      {refreshingUsage ? 'Checking...' : 'Refresh usage'}
+                    </button>
                   </div>
                 </div>
               </div>

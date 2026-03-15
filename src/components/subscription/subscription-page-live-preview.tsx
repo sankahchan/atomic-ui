@@ -8,11 +8,11 @@ import {
   Copy,
   ExternalLink,
   HardDrive,
-  Link2,
   MapPin,
   MessageCircle,
   Monitor,
   QrCode,
+  RefreshCw,
   Smartphone,
   Sparkles,
 } from "lucide-react";
@@ -119,18 +119,18 @@ export function SubscriptionPageLivePreview({
       : mergedBranding.layout === "detailed"
         ? "text-3xl md:text-[2.55rem]"
         : "text-3xl md:text-[2.25rem]";
-  const summaryColumnsClass = isMobile ? "grid-cols-1" : "grid-cols-2";
   const footerText =
     mergedBranding.footerText?.trim() ||
     (mergedBranding.showPoweredBy === false ? "" : defaultBranding.footerText);
   const showConnectionSummary = mergedBranding.showConnectionSummary ?? true;
   const showCompatibleApps = mergedBranding.showCompatibleApps ?? true;
-  const showShareLinks = mergedBranding.showShareLinks ?? true;
   const showHelpContact = mergedBranding.showHelpContact ?? true;
   const showManualSetupButton = mergedBranding.showManualSetupButton ?? true;
   const showUsageChips = mergedBranding.showUsageChips ?? true;
   const hasHelpContactContent = showHelpContact;
-  const hasAsideColumn = !isMobile && (showConnectionSummary || hasHelpContactContent);
+  const usageHeadline = "176 GB / 200 GB";
+  const usageDetail = "88% of quota used";
+  const serverLabel = "Singapore";
 
   const renderBackdrop = () => (
     <>
@@ -277,10 +277,10 @@ export function SubscriptionPageLivePreview({
             {renderBackdrop()}
 
             <div className="relative z-10 space-y-4">
-              <div className={`grid gap-4 ${hasAsideColumn ? "xl:grid-cols-[minmax(0,1.35fr)_300px]" : ""}`}>
-                <section className={`${radiusClass} ${previewPaddingClass}`} style={shellStyle}>
-                  <div className="flex flex-col gap-5">
-                    <div className="flex items-start justify-between gap-4">
+              <section className={`${radiusClass} ${previewPaddingClass}`} style={shellStyle}>
+                <div className="flex flex-col gap-5">
+                  <div className={`flex flex-col gap-5 ${isMobile ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
+                    <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-start gap-4">
                         <div
                           className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
@@ -304,184 +304,177 @@ export function SubscriptionPageLivePreview({
                             Singapore Premium
                           </h3>
                           <p className="mt-2 max-w-2xl text-sm md:text-base" style={{ color: textMuted }}>
-                            Ready to connect on Singapore. Start with the app button below, or open manual setup for the QR and raw link.
+                            Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
                           </p>
                         </div>
                       </div>
-                      <div
-                        className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
-                        style={{ backgroundColor: `${theme.success}18`, color: theme.success }}
-                      >
-                        Active
-                      </div>
                     </div>
 
-                    {mergedBranding.showWelcome && mergedBranding.welcomeMessage && (
-                      <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                        {mergedBranding.welcomeMessage}
-                      </div>
-                    )}
-
-                    {mergedBranding.showUsageAlerts && (
-                      <div
-                        className="flex items-start gap-3 rounded-2xl px-4 py-3"
-                        style={{
-                          backgroundColor: `${theme.warning}14`,
-                          border: `1px solid ${theme.warning}33`,
-                        }}
-                      >
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.warning }} />
-                        <span className="text-sm" style={{ color: textPrimary }}>
-                          88% of the included data has already been used. Users should expect a prominent warning here.
-                        </span>
-                      </div>
-                    )}
-
-                    {showUsageChips && (
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { label: "Server", value: "Singapore", icon: MapPin },
-                          { label: "Usage", value: "176 GB / 200 GB", icon: HardDrive },
-                          { label: "Expires", value: "12 days left", icon: Clock3 },
-                        ].map((item) => {
-                          const Icon = item.icon;
-                          return (
-                            <div
-                              key={item.label}
-                              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
-                              style={pillStyle}
-                            >
-                              <Icon className="h-4 w-4" style={{ color: theme.accent }} />
-                              <span className="font-medium">{item.label}:</span>
-                              <span style={{ color: textSecondary }}>{item.value}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                      <div
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
-                        style={{
-                          background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
-                          color: "#ffffff",
-                        }}
-                      >
-                        <span className="text-base">{primaryApp?.icon || "🔑"}</span>
-                        Open in {primaryApp?.name || "Outline"}
-                        <ChevronRight className="h-4 w-4" />
-                      </div>
-                      {showManualSetupButton && (
-                        <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                          <QrCode className="h-4 w-4" />
-                          Manual Setup
+                    <div className={`flex flex-col gap-3 ${isMobile ? "" : "lg:w-[240px]"}`}>
+                      <div className={`flex ${isMobile ? "justify-start" : "justify-end"}`}>
+                        <div
+                          className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
+                          style={{ backgroundColor: `${theme.success}18`, color: theme.success }}
+                        >
+                          Active
                         </div>
-                      )}
-                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                        <Copy className="h-4 w-4" />
-                        Copy URL
                       </div>
-                      {showHelpContact && supportLink?.trim() && (
+
+                      <div className="rounded-[20px] border p-1" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                        <div className="flex gap-1">
+                          {["Android", "iPhone", "Windows"].map((label, index) => (
+                            <div
+                              key={label}
+                              className="flex-1 rounded-[16px] px-3 py-2 text-center text-sm font-medium"
+                              style={{
+                                backgroundColor: index === 0 ? theme.tabActive : "transparent",
+                                color: index === 0 ? theme.tabActiveText : theme.tabInactiveText,
+                              }}
+                            >
+                              {label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {primaryApp && (
                         <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                          <MessageCircle className="h-4 w-4" />
-                          Get Support
+                          <ExternalLink className="h-4 w-4" />
+                          Get {primaryApp.name}
                         </div>
                       )}
                     </div>
                   </div>
-                </section>
 
-                {hasAsideColumn && (
-                  <aside className="space-y-4">
-                    {showConnectionSummary && (
-                      <div className={`${radiusClass} p-5`} style={shellStyle}>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          Connection Summary
-                        </p>
-                        <div className="mt-4 space-y-4">
-                          <div>
-                            <div className="flex items-end justify-between gap-3">
-                              <div>
-                                <p className="text-sm" style={{ color: textMuted }}>Usage</p>
-                                <p className="mt-1 text-2xl font-semibold" style={{ color: textPrimary }}>88%</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm" style={{ color: textMuted }}>Time left</p>
-                                <p className="mt-1 text-lg font-semibold" style={{ color: textPrimary }}>12 days</p>
-                              </div>
-                            </div>
-                            <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${usagePercent}%`,
-                                  background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
-                                }}
-                              />
-                            </div>
-                            <p className="mt-2 text-sm" style={{ color: textMuted }}>
-                              176 GB used of 200 GB available.
-                            </p>
+                  {mergedBranding.showWelcome && mergedBranding.welcomeMessage && (
+                    <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      {mergedBranding.welcomeMessage}
+                    </div>
+                  )}
+
+                  {mergedBranding.showUsageAlerts && (
+                    <div
+                      className="flex items-start gap-3 rounded-2xl px-4 py-3"
+                      style={{
+                        backgroundColor: `${theme.warning}14`,
+                        border: `1px solid ${theme.warning}33`,
+                      }}
+                    >
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.warning }} />
+                      <span className="text-sm" style={{ color: textPrimary }}>
+                        88% of the included data has already been used. Users should expect a prominent warning here.
+                      </span>
+                    </div>
+                  )}
+
+                  {showUsageChips && (
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Server", value: serverLabel, icon: MapPin },
+                        { label: "Usage", value: "88% used", icon: HardDrive },
+                        { label: "Time left", value: "12 days", icon: Clock3 },
+                      ].map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={item.label}
+                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
+                            style={pillStyle}
+                          >
+                            <Icon className="h-4 w-4" style={{ color: theme.accent }} />
+                            <span className="font-medium">{item.label}</span>
+                            <span style={{ color: textSecondary }}>{item.value}</span>
                           </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
-                          {showShareLinks && (
-                            <div className="rounded-2xl border px-4 py-3" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                              <p className="text-sm font-medium">Share this page</p>
-                              <p className="mt-1 text-sm" style={{ color: textMuted }}>
-                                Users copy the page link more often than the raw connection string.
-                              </p>
-                              <div
-                                className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                              >
-                                <Link2 className="h-4 w-4" />
-                                Copy Page URL
-                              </div>
+                  {showConnectionSummary && (
+                    <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.75fr))]"}`}>
+                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                              Data Usage
+                            </p>
+                            <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
+                            <p className="mt-2 text-sm" style={{ color: textMuted }}>{usageDetail}</p>
+                          </div>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <div
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
+                              style={{ backgroundColor: theme.bgCard, color: textPrimary, border: `1px solid ${borderColor}` }}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                              Refresh usage
                             </div>
-                          )}
+                            <span className="text-xs" style={{ color: textMuted }}>Updated just now</span>
+                          </div>
                         </div>
+                        <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${usagePercent}%`,
+                              background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
+                            }}
+                          />
+                        </div>
+                        <p className="mt-3 text-sm" style={{ color: textMuted }}>
+                          176 GB used of 200 GB total.
+                        </p>
                       </div>
-                    )}
 
-                    {hasHelpContactContent && (
-                      <div className={`${radiusClass} p-5`} style={shellStyle}>
+                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          Help & Contact
+                          Time Left
                         </p>
-                        <p className="mt-3 text-sm" style={{ color: textPrimary }}>
-                          {supportLink?.trim()
-                            ? "A support shortcut is visible so users can get help without leaving the page."
-                            : "No support link is configured. The support action stays hidden until you add one."}
-                        </p>
-                        <div className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                          {supportLink?.trim() ? <ExternalLink className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
-                          {supportLink?.trim() ? "Open Support" : "Support Hidden"}
-                        </div>
+                        <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>12 days</p>
+                        <p className="mt-2 text-sm" style={{ color: textMuted }}>Expires on June 30, 2026</p>
                       </div>
-                    )}
-                  </aside>
-                )}
-              </div>
 
-              {isMobile && (showConnectionSummary || showShareLinks) && (
-                <div className={`${radiusClass} mt-4 p-4`} style={shellStyle}>
-                  <div className={`grid gap-3 ${summaryColumnsClass}`}>
-                    {showConnectionSummary && (
-                      <div className="rounded-2xl px-4 py-3" style={pillStyle}>
-                        <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Usage</p>
-                        <p className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>176 / 200 GB</p>
+                      <div className="rounded-[22px] border p-4 md:p-5" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                          Server
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold" style={{ color: textPrimary }}>Singapore</p>
+                        <p className="mt-2 text-sm" style={{ color: textMuted }}>Port 1158</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <div
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                        color: "#ffffff",
+                      }}
+                    >
+                      <span className="text-base">{primaryApp?.icon || "🔑"}</span>
+                      Open in {primaryApp?.name || "Outline"}
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
+                    {showManualSetupButton && (
+                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                        <QrCode className="h-4 w-4" />
+                        Manual Setup
                       </div>
                     )}
-                    {showShareLinks && (
-                      <div className="rounded-2xl px-4 py-3" style={pillStyle}>
-                        <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Share Link</p>
-                        <p className="mt-2 text-sm font-medium" style={{ color: textPrimary }}>Subscription page URL</p>
+                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                      <Copy className="h-4 w-4" />
+                      Copy URL
+                    </div>
+                    {showHelpContact && supportLink?.trim() && (
+                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                        <MessageCircle className="h-4 w-4" />
+                        Get Support
                       </div>
                     )}
                   </div>
                 </div>
-              )}
+              </section>
 
               {showCompatibleApps && visibleApps.length > 0 && mergedBranding.layout !== "minimal" && (
                 <section className={`${radiusClass} mt-4 ${previewPaddingClass}`} style={shellStyle}>
@@ -491,7 +484,7 @@ export function SubscriptionPageLivePreview({
                         Compatible Apps
                       </p>
                       <h4 className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>
-                        Alternate client options
+                        Other apps for this device
                       </h4>
                       <p className="mt-1 text-sm" style={{ color: textMuted }}>
                         Enabled apps appear here as secondary install choices.
@@ -504,7 +497,7 @@ export function SubscriptionPageLivePreview({
                     )}
                   </div>
 
-                  <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4"}`}>
+                  <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
                     {visibleApps.map((app) => (
                       <div key={app.id} className="rounded-[22px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <div className="text-2xl">{app.icon}</div>
@@ -529,43 +522,45 @@ export function SubscriptionPageLivePreview({
                 </section>
               )}
 
-              {showShareLinks && mergedBranding.layout !== "minimal" && (
+              {hasHelpContactContent && (
                 <section className={`${radiusClass} mt-4 ${previewPaddingClass}`} style={shellStyle}>
-                  <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_300px]"}`}>
-                    <div>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-2xl">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        Share Links
+                        Help & Contact
                       </p>
                       <h4 className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>
-                        Keep the important links close
+                        Need help connecting?
                       </h4>
-                      <div className={`mt-4 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2"}`}>
-                        <div className="rounded-[22px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                          <p className="text-sm font-medium" style={{ color: textPrimary }}>Subscription page</p>
-                          <p className="mt-1 text-sm leading-6 break-all" style={{ color: textMuted }}>
-                            https://panel.example.com/sub/sg-premium
-                          </p>
-                        </div>
-                        <div className="rounded-[22px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                          <p className="text-sm font-medium" style={{ color: textPrimary }}>Connection URL</p>
-                          <p className="mt-1 text-sm leading-6 break-all" style={{ color: textMuted }}>
-                            ss://base64@143.198.197.158:1158/#Singapore%20Premium
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[22px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                      <p className="text-sm font-medium" style={{ color: textPrimary }}>Footer</p>
                       <p className="mt-2 text-sm" style={{ color: textMuted }}>
-                        {footerText || "Footer text hidden"}
+                        {supportLink?.trim()
+                          ? "Support stays available as a secondary action without adding another large card."
+                          : "No support link is configured. The support action stays hidden until you add one."}
                       </p>
-                      <p className="mt-4 text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        {mergedBranding.showPoweredBy === false ? "Powered by label hidden" : "Powered by label visible"}
-                      </p>
+                    </div>
+                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                      {supportLink?.trim() ? <ExternalLink className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
+                      {supportLink?.trim() ? "Open Support" : "Support Hidden"}
                     </div>
                   </div>
+
+                  <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+                    {["Telegram", "Discord", "WhatsApp", "Email"].map((label) => (
+                      <div key={label} className="rounded-[22px] border px-4 py-3" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                        <p className="text-sm font-medium" style={{ color: textPrimary }}>{label}</p>
+                        <p className="mt-1 text-sm" style={{ color: textMuted }}>
+                          Support shortcut
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </section>
+              )}
+
+              {footerText && (
+                <div className="px-2 pt-1 text-center text-xs" style={{ color: textMuted }}>
+                  {footerText}
+                </div>
               )}
             </div>
           </div>

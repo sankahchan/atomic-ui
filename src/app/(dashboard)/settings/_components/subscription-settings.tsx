@@ -243,11 +243,6 @@ export function SubscriptionSettings() {
             description: "Show the secondary app grid below the hero area.",
         },
         {
-            key: "showShareLinks",
-            label: "Share Links",
-            description: "Show subscription page and connection-link sharing blocks.",
-        },
-        {
             key: "showHelpContact",
             label: "Help & Contact",
             description: "Show support shortcuts and contact actions.",
