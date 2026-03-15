@@ -122,6 +122,14 @@ export function SubscriptionPageLivePreview({
   const footerText =
     mergedBranding.footerText?.trim() ||
     (mergedBranding.showPoweredBy === false ? "" : defaultBranding.footerText);
+  const showConnectionSummary = mergedBranding.showConnectionSummary ?? true;
+  const showCompatibleApps = mergedBranding.showCompatibleApps ?? true;
+  const showShareLinks = mergedBranding.showShareLinks ?? true;
+  const showHelpContact = mergedBranding.showHelpContact ?? true;
+  const showManualSetupButton = mergedBranding.showManualSetupButton ?? true;
+  const showUsageChips = mergedBranding.showUsageChips ?? true;
+  const hasHelpContactContent = showHelpContact;
+  const hasAsideColumn = !isMobile && (showConnectionSummary || hasHelpContactContent);
 
   const renderBackdrop = () => (
     <>
@@ -245,7 +253,7 @@ export function SubscriptionPageLivePreview({
             {renderBackdrop()}
 
             <div className="relative z-10 space-y-4">
-              <div className={`grid gap-4 ${isMobile ? "" : "xl:grid-cols-[minmax(0,1.35fr)_300px]"}`}>
+              <div className={`grid gap-4 ${hasAsideColumn ? "xl:grid-cols-[minmax(0,1.35fr)_300px]" : ""}`}>
                 <section className={`${radiusClass} ${previewPaddingClass}`} style={shellStyle}>
                   <div className="flex flex-col gap-5">
                     <div className="flex items-start justify-between gap-4">
@@ -305,26 +313,28 @@ export function SubscriptionPageLivePreview({
                       </div>
                     )}
 
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { label: "Server", value: "Singapore", icon: MapPin },
-                        { label: "Usage", value: "176 GB / 200 GB", icon: HardDrive },
-                        { label: "Expires", value: "12 days left", icon: Clock3 },
-                      ].map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <div
-                            key={item.label}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
-                            style={pillStyle}
-                          >
-                            <Icon className="h-4 w-4" style={{ color: theme.accent }} />
-                            <span className="font-medium">{item.label}:</span>
-                            <span style={{ color: textSecondary }}>{item.value}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {showUsageChips && (
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: "Server", value: "Singapore", icon: MapPin },
+                          { label: "Usage", value: "176 GB / 200 GB", icon: HardDrive },
+                          { label: "Expires", value: "12 days left", icon: Clock3 },
+                        ].map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <div
+                              key={item.label}
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm"
+                              style={pillStyle}
+                            >
+                              <Icon className="h-4 w-4" style={{ color: theme.accent }} />
+                              <span className="font-medium">{item.label}:</span>
+                              <span style={{ color: textSecondary }}>{item.value}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                       <div
@@ -338,15 +348,17 @@ export function SubscriptionPageLivePreview({
                         Open in {primaryApp?.name || "Outline"}
                         <ChevronRight className="h-4 w-4" />
                       </div>
-                      <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                        <QrCode className="h-4 w-4" />
-                        Manual Setup
-                      </div>
+                      {showManualSetupButton && (
+                        <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                          <QrCode className="h-4 w-4" />
+                          Manual Setup
+                        </div>
+                      )}
                       <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
                         <Copy className="h-4 w-4" />
                         Copy URL
                       </div>
-                      {supportLink?.trim() && (
+                      {showHelpContact && supportLink?.trim() && (
                         <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
                           <MessageCircle className="h-4 w-4" />
                           Get Support
@@ -356,88 +368,98 @@ export function SubscriptionPageLivePreview({
                   </div>
                 </section>
 
-                {!isMobile && (
+                {hasAsideColumn && (
                   <aside className="space-y-4">
-                    <div className={`${radiusClass} p-5`} style={shellStyle}>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        Connection Summary
-                      </p>
-                      <div className="mt-4 space-y-4">
-                        <div>
-                          <div className="flex items-end justify-between gap-3">
-                            <div>
-                              <p className="text-sm" style={{ color: textMuted }}>Usage</p>
-                              <p className="mt-1 text-2xl font-semibold" style={{ color: textPrimary }}>88%</p>
+                    {showConnectionSummary && (
+                      <div className={`${radiusClass} p-5`} style={shellStyle}>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                          Connection Summary
+                        </p>
+                        <div className="mt-4 space-y-4">
+                          <div>
+                            <div className="flex items-end justify-between gap-3">
+                              <div>
+                                <p className="text-sm" style={{ color: textMuted }}>Usage</p>
+                                <p className="mt-1 text-2xl font-semibold" style={{ color: textPrimary }}>88%</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm" style={{ color: textMuted }}>Time left</p>
+                                <p className="mt-1 text-lg font-semibold" style={{ color: textPrimary }}>12 days</p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm" style={{ color: textMuted }}>Time left</p>
-                              <p className="mt-1 text-lg font-semibold" style={{ color: textPrimary }}>12 days</p>
+                            <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${usagePercent}%`,
+                                  background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
+                                }}
+                              />
                             </div>
+                            <p className="mt-2 text-sm" style={{ color: textMuted }}>
+                              176 GB used of 200 GB available.
+                            </p>
                           </div>
-                          <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${usagePercent}%`,
-                                background: `linear-gradient(90deg, ${theme.progressFill}, ${theme.buttonGradientTo})`,
-                              }}
-                            />
-                          </div>
-                          <p className="mt-2 text-sm" style={{ color: textMuted }}>
-                            176 GB used of 200 GB available.
-                          </p>
-                        </div>
 
-                        <div className="rounded-2xl border px-4 py-3" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                          <p className="text-sm font-medium">Share this page</p>
-                          <p className="mt-1 text-sm" style={{ color: textMuted }}>
-                            Users copy the page link more often than the raw connection string.
-                          </p>
-                          <div
-                            className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
-                            style={{ backgroundColor: theme.accent, color: theme.accentText }}
-                          >
-                            <Link2 className="h-4 w-4" />
-                            Copy Page URL
-                          </div>
+                          {showShareLinks && (
+                            <div className="rounded-2xl border px-4 py-3" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                              <p className="text-sm font-medium">Share this page</p>
+                              <p className="mt-1 text-sm" style={{ color: textMuted }}>
+                                Users copy the page link more often than the raw connection string.
+                              </p>
+                              <div
+                                className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
+                                style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                              >
+                                <Link2 className="h-4 w-4" />
+                                Copy Page URL
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className={`${radiusClass} p-5`} style={shellStyle}>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        Help & Contact
-                      </p>
-                      <p className="mt-3 text-sm" style={{ color: textPrimary }}>
-                        {supportLink?.trim()
-                          ? "A support shortcut is visible so users can get help without leaving the page."
-                          : "No support link is configured. The support action stays hidden until you add one."}
-                      </p>
-                      <div className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
-                        {supportLink?.trim() ? <ExternalLink className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
-                        {supportLink?.trim() ? "Open Support" : "Support Hidden"}
+                    {hasHelpContactContent && (
+                      <div className={`${radiusClass} p-5`} style={shellStyle}>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                          Help & Contact
+                        </p>
+                        <p className="mt-3 text-sm" style={{ color: textPrimary }}>
+                          {supportLink?.trim()
+                            ? "A support shortcut is visible so users can get help without leaving the page."
+                            : "No support link is configured. The support action stays hidden until you add one."}
+                        </p>
+                        <div className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
+                          {supportLink?.trim() ? <ExternalLink className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
+                          {supportLink?.trim() ? "Open Support" : "Support Hidden"}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </aside>
                 )}
               </div>
 
-              {isMobile && (
+              {isMobile && (showConnectionSummary || showShareLinks) && (
                 <div className={`${radiusClass} mt-4 p-4`} style={shellStyle}>
                   <div className={`grid gap-3 ${summaryColumnsClass}`}>
-                    <div className="rounded-2xl px-4 py-3" style={pillStyle}>
-                      <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Usage</p>
-                      <p className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>176 / 200 GB</p>
-                    </div>
-                    <div className="rounded-2xl px-4 py-3" style={pillStyle}>
-                      <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Share Link</p>
-                      <p className="mt-2 text-sm font-medium" style={{ color: textPrimary }}>Subscription page URL</p>
-                    </div>
+                    {showConnectionSummary && (
+                      <div className="rounded-2xl px-4 py-3" style={pillStyle}>
+                        <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Usage</p>
+                        <p className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>176 / 200 GB</p>
+                      </div>
+                    )}
+                    {showShareLinks && (
+                      <div className="rounded-2xl px-4 py-3" style={pillStyle}>
+                        <p className="text-xs uppercase tracking-[0.18em]" style={{ color: textMuted }}>Share Link</p>
+                        <p className="mt-2 text-sm font-medium" style={{ color: textPrimary }}>Subscription page URL</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {visibleApps.length > 0 && mergedBranding.layout !== "minimal" && (
+              {showCompatibleApps && visibleApps.length > 0 && mergedBranding.layout !== "minimal" && (
                 <section className={`${radiusClass} mt-4 ${previewPaddingClass}`} style={shellStyle}>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -483,7 +505,7 @@ export function SubscriptionPageLivePreview({
                 </section>
               )}
 
-              {mergedBranding.layout !== "minimal" && (
+              {showShareLinks && mergedBranding.layout !== "minimal" && (
                 <section className={`${radiusClass} mt-4 ${previewPaddingClass}`} style={shellStyle}>
                   <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_300px]"}`}>
                     <div>

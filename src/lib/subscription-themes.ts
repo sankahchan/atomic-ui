@@ -78,6 +78,14 @@ export interface SubscriptionBranding {
   showUsageAlerts?: boolean;
   usageAlertThresholds?: number[]; // e.g., [80, 90, 95]
 
+  // Section visibility
+  showConnectionSummary?: boolean;
+  showCompatibleApps?: boolean;
+  showShareLinks?: boolean;
+  showHelpContact?: boolean;
+  showManualSetupButton?: boolean;
+  showUsageChips?: boolean;
+
   // App Buttons
   enabledApps?: string[];     // List of enabled app IDs
   primaryAppId?: string;      // Preferred primary app CTA
@@ -112,6 +120,12 @@ export const defaultBranding: SubscriptionBranding = {
   animatedBackground: 'none',
   showUsageAlerts: true,
   usageAlertThresholds: [80, 90, 95],
+  showConnectionSummary: true,
+  showCompatibleApps: true,
+  showShareLinks: true,
+  showHelpContact: true,
+  showManualSetupButton: true,
+  showUsageChips: true,
   enabledApps: ['outline', 'hiddify', 'v2box', 'v2rayng', 'v2rayn'],
   primaryAppId: 'outline',
 };
@@ -540,6 +554,11 @@ export const subscriptionPagePresets: SubscriptionPreset[] = [
       animatedBackground: 'none',
       showUsageAlerts: false,
       showWelcome: false,
+      showConnectionSummary: false,
+      showCompatibleApps: false,
+      showShareLinks: false,
+      showHelpContact: false,
+      showUsageChips: false,
     },
   },
   {
@@ -553,6 +572,12 @@ export const subscriptionPagePresets: SubscriptionPreset[] = [
       enableAnimations: true,
       animatedBackground: 'gradient',
       showUsageAlerts: true,
+      showConnectionSummary: true,
+      showCompatibleApps: true,
+      showShareLinks: true,
+      showHelpContact: true,
+      showManualSetupButton: true,
+      showUsageChips: true,
     },
   },
   {
@@ -566,6 +591,12 @@ export const subscriptionPagePresets: SubscriptionPreset[] = [
       enableAnimations: false,
       animatedBackground: 'none',
       showUsageAlerts: true,
+      showConnectionSummary: true,
+      showCompatibleApps: false,
+      showShareLinks: true,
+      showHelpContact: true,
+      showManualSetupButton: true,
+      showUsageChips: true,
     },
   },
   {
@@ -579,6 +610,12 @@ export const subscriptionPagePresets: SubscriptionPreset[] = [
       enableAnimations: true,
       animatedBackground: 'particles',
       showUsageAlerts: true,
+      showConnectionSummary: true,
+      showCompatibleApps: true,
+      showShareLinks: true,
+      showHelpContact: true,
+      showManualSetupButton: true,
+      showUsageChips: true,
     },
   },
 ];

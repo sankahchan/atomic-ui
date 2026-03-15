@@ -60,6 +60,12 @@ export async function GET(
       'subscriptionAnimatedBackground',
       'subscriptionShowUsageAlerts',
       'subscriptionUsageAlertThresholds',
+      'subscriptionShowConnectionSummary',
+      'subscriptionShowCompatibleApps',
+      'subscriptionShowShareLinks',
+      'subscriptionShowHelpContact',
+      'subscriptionShowManualSetupButton',
+      'subscriptionShowUsageChips',
       'subscriptionEnabledApps',
       'subscriptionPrimaryAppId',
       'subscriptionCustomApps',
@@ -109,6 +115,24 @@ export async function GET(
       showUsageAlerts: settingsMap.get('subscriptionShowUsageAlerts')
         ? settingsMap.get('subscriptionShowUsageAlerts') === 'true'
         : defaultBranding.showUsageAlerts,
+      showConnectionSummary: settingsMap.get('subscriptionShowConnectionSummary')
+        ? settingsMap.get('subscriptionShowConnectionSummary') === 'true'
+        : defaultBranding.showConnectionSummary,
+      showCompatibleApps: settingsMap.get('subscriptionShowCompatibleApps')
+        ? settingsMap.get('subscriptionShowCompatibleApps') === 'true'
+        : defaultBranding.showCompatibleApps,
+      showShareLinks: settingsMap.get('subscriptionShowShareLinks')
+        ? settingsMap.get('subscriptionShowShareLinks') === 'true'
+        : defaultBranding.showShareLinks,
+      showHelpContact: settingsMap.get('subscriptionShowHelpContact')
+        ? settingsMap.get('subscriptionShowHelpContact') === 'true'
+        : defaultBranding.showHelpContact,
+      showManualSetupButton: settingsMap.get('subscriptionShowManualSetupButton')
+        ? settingsMap.get('subscriptionShowManualSetupButton') === 'true'
+        : defaultBranding.showManualSetupButton,
+      showUsageChips: settingsMap.get('subscriptionShowUsageChips')
+        ? settingsMap.get('subscriptionShowUsageChips') === 'true'
+        : defaultBranding.showUsageChips,
       usageAlertThresholds: parseJson(
         settingsMap.get('subscriptionUsageAlertThresholds'),
         defaultBranding.usageAlertThresholds!

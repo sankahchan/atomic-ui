@@ -70,6 +70,7 @@ export function SubscriptionSettings() {
         footer: false,
         welcome: false,
         layout: false,
+        visibility: false,
         animations: false,
         alerts: false,
         apps: false,
@@ -226,6 +227,42 @@ export function SubscriptionSettings() {
         (branding.primaryAppId && enabledAppIds.includes(branding.primaryAppId))
             ? branding.primaryAppId
             : enabledAppIds[0] || "";
+    const visibilityOptions: Array<{
+        key: keyof BrandingState;
+        label: string;
+        description: string;
+    }> = [
+        {
+            key: "showConnectionSummary",
+            label: "Connection Summary",
+            description: "Show the right-side or mobile summary card with usage and expiry.",
+        },
+        {
+            key: "showCompatibleApps",
+            label: "Compatible Apps",
+            description: "Show the secondary app grid below the hero area.",
+        },
+        {
+            key: "showShareLinks",
+            label: "Share Links",
+            description: "Show subscription page and connection-link sharing blocks.",
+        },
+        {
+            key: "showHelpContact",
+            label: "Help & Contact",
+            description: "Show support shortcuts and contact actions.",
+        },
+        {
+            key: "showManualSetupButton",
+            label: "Manual Setup Button",
+            description: "Keep the QR/manual setup trigger visible in the hero actions.",
+        },
+        {
+            key: "showUsageChips",
+            label: "Usage Chips",
+            description: "Show the compact Server, Usage, and Expires pills under the hero.",
+        },
+    ];
 
     if (loading) {
         return (
@@ -698,6 +735,48 @@ export function SubscriptionSettings() {
                                     </p>
                                 </div>
                             )}
+                        </CardContent>
+                    </CollapsibleContent>
+                </Card>
+            </Collapsible>
+
+            <Collapsible open={openSections.visibility} onOpenChange={() => toggleSection("visibility")}>
+                <Card>
+                    <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Layout className="w-5 h-5" />
+                                    <CardTitle className="text-base">Section Visibility</CardTitle>
+                                </div>
+                                <ChevronDown
+                                    className={`w-5 h-5 transition-transform ${openSections.visibility ? "rotate-180" : ""}`}
+                                />
+                            </div>
+                            <CardDescription>
+                                Choose which subscription page sections stay visible to end users.
+                            </CardDescription>
+                        </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <CardContent className="space-y-3 pt-0">
+                            {visibilityOptions.map((option) => (
+                                <div
+                                    key={option.key}
+                                    className="flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3"
+                                >
+                                    <div className="space-y-0.5">
+                                        <Label>{option.label}</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            {option.description}
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={Boolean(branding[option.key] ?? defaultBranding[option.key])}
+                                        onCheckedChange={(checked) => updateBranding(option.key, checked as BrandingState[typeof option.key])}
+                                    />
+                                </div>
+                            ))}
                         </CardContent>
                     </CollapsibleContent>
                 </Card>
