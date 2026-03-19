@@ -267,7 +267,7 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
     echo -e "${BLUE}[*]${NC} Attempting HTTPS setup on public IP..."
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-https.sh"
 
-    if APP_PORT="${PANEL_PORT}" ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
+    if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
         HTTPS_ENABLED=true
         PUBLIC_ORIGIN="https://${SERVER_IP}"
         PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
@@ -386,7 +386,7 @@ echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 if [ "$HTTPS_ENABLED" = false ]; then
     echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
-    bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
+    PANEL_PATH="/${PANEL_PATH}" ENABLE_FAIL2BAN=true bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
     echo -e "${GREEN}[✓]${NC} nginx proxy is serving http://${SERVER_IP}/"
 fi
 
