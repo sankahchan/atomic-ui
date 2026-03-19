@@ -47,6 +47,8 @@ import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { buildSharePageUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
 import {
   ArrowLeft,
   Key,
@@ -635,8 +637,7 @@ function SubscriptionShareCard({
 
   const getSubscriptionPageUrl = () => {
     if (typeof window === 'undefined' || !subscriptionToken) return '';
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    return `${window.location.origin}${basePath}/sub/${subscriptionToken}`;
+    return buildSharePageUrl(subscriptionToken, { origin: window.location.origin });
   };
 
   const copySubscriptionPageUrl = async () => {
@@ -882,10 +883,10 @@ function SubscriptionShareCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full min-w-0 text-xs sm:text-sm"
             disabled={!subscriptionToken}
             onClick={() => {
               const url = getSubscriptionPageUrl();
@@ -896,7 +897,7 @@ function SubscriptionShareCard({
             Preview
           </Button>
           <Button
-            className="w-full"
+            className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copySubscriptionPageUrl}
             disabled={!subscriptionToken}
           >
@@ -905,7 +906,7 @@ function SubscriptionShareCard({
           </Button>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full min-w-0 text-xs sm:text-sm"
             onClick={() => connectLinkMutation.mutate({ id: keyId })}
             disabled={connectLinkMutation.isPending}
           >
@@ -917,7 +918,7 @@ function SubscriptionShareCard({
             Connect Telegram
           </Button>
           <Button
-            className="w-full"
+            className="w-full min-w-0 text-xs sm:text-sm"
             onClick={() => sendSharePageMutation.mutate({ id: keyId, reason: 'RESENT' })}
             disabled={sendSharePageMutation.isPending}
           >
@@ -930,7 +931,7 @@ function SubscriptionShareCard({
           </Button>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full min-w-0 text-xs sm:col-span-2 sm:text-sm"
             onClick={() => regenerateTokenMutation.mutate({ id: keyId })}
             disabled={regenerateTokenMutation.isPending}
           >
@@ -1086,6 +1087,12 @@ export default function KeyDetailPage() {
   const status = key.status as keyof typeof statusConfig;
   const statusInfo = statusConfig[status] || statusConfig.ACTIVE;
   const StatusIcon = statusInfo.icon;
+  const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl || '';
+  const subscriptionApiUrl = key.subscriptionToken
+    ? buildSubscriptionApiUrl(key.subscriptionToken, {
+        origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+      })
+    : '';
 
   const usagePercent = key.dataLimitBytes
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
@@ -1371,13 +1378,13 @@ export default function KeyDetailPage() {
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Access URL</Label>
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                    {key.accessUrl}
+                  <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
+                    {decoratedAccessUrl}
                   </div>
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => copyToClipboard(key.accessUrl || '', 'Copied!', 'Access URL copied to clipboard.')}
+                    onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -1392,20 +1399,17 @@ export default function KeyDetailPage() {
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                    {key.subscriptionToken
-                      ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`
-                      : 'Loading subscription token...'}
+                    {subscriptionApiUrl || 'Loading subscription token...'}
                   </div>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      if (key.subscriptionToken) {
-                        const url = `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/subscription/${key.subscriptionToken}`;
-                        copyToClipboard(url, 'Copied!', 'Subscription URL copied to clipboard.');
+                      if (subscriptionApiUrl) {
+                        copyToClipboard(subscriptionApiUrl, 'Copied!', 'Subscription URL copied to clipboard.');
                       }
                     }}
-                    disabled={!key.subscriptionToken}
+                    disabled={!subscriptionApiUrl}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -1605,7 +1609,7 @@ export default function KeyDetailPage() {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => copyToClipboard(key.accessUrl || '', 'Copied!', 'Access URL copied to clipboard.')}
+                  onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL

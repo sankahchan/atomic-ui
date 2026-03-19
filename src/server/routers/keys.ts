@@ -369,10 +369,17 @@ export const keysRouter = router({
           data: { subscriptionToken: newToken },
         });
         // Return updated key with the new token
-        return { ...key, subscriptionToken: newToken };
+        return {
+          ...key,
+          subscriptionToken: newToken,
+          accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+        };
       }
 
-      return key;
+      return {
+        ...key,
+        accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+      };
     }),
 
   /**

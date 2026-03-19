@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 
 export async function GET(
   request: NextRequest,
@@ -128,7 +129,9 @@ export async function GET(
       // Many clients support base64 encoded list.
 
       const validKeys = dak.accessKeys.filter(k => k.accessUrl);
-      const links = validKeys.map(k => k.accessUrl).join('\n');
+      const links = validKeys
+        .map((k) => decorateOutlineAccessUrl(k.accessUrl, k.name) || k.accessUrl)
+        .join('\n');
 
       // Base64 encode the list for better compatibility with some clients
       const b64Links = Buffer.from(links).toString('base64');
@@ -166,6 +169,8 @@ export async function GET(
       );
     }
 
+    const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
+
     // Check Accept header to determine response format
     const acceptHeader = request.headers.get('accept') || '';
 
@@ -174,7 +179,7 @@ export async function GET(
       return NextResponse.json({
         id: key.id,
         name: key.name,
-        accessUrl: key.accessUrl,
+        accessUrl: decoratedAccessUrl,
         status: key.status,
         server: {
           name: key.server.name,
@@ -195,7 +200,7 @@ export async function GET(
     }
 
     // Return plain text access URL (for Shadowsocks clients)
-    return new NextResponse(key.accessUrl, {
+    return new NextResponse(decoratedAccessUrl, {
       status: 200,
       headers: {
         'Content-Type': 'text/plain',
