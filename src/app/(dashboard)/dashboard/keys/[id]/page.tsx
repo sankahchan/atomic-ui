@@ -48,7 +48,14 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { buildSharePageUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
+import {
+  buildSharePageUrl,
+  buildShortClientUrl,
+  buildShortShareUrl,
+  buildSubscriptionApiUrl,
+  buildSubscriptionClientUrl,
+} from '@/lib/subscription-links';
+import { normalizePublicSlug } from '@/lib/public-slug';
 import {
   ArrowLeft,
   Key,
@@ -82,6 +89,7 @@ import {
   Image as ImageIcon,
   Phone,
   Globe,
+  RotateCw,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -422,6 +430,8 @@ interface ContactLink {
 function SubscriptionShareCard({
   keyId,
   subscriptionToken,
+  publicSlug,
+  keyName,
   currentTheme,
   currentCoverImage,
   currentCoverImageType,
@@ -431,6 +441,8 @@ function SubscriptionShareCard({
 }: {
   keyId: string;
   subscriptionToken: string | null;
+  publicSlug: string | null;
+  keyName: string;
   currentTheme: string | null;
   currentCoverImage: string | null;
   currentCoverImageType: string | null;
@@ -443,6 +455,7 @@ function SubscriptionShareCard({
   const [coverImageUrl, setCoverImageUrl] = useState(
     currentCoverImageType === 'url' ? currentCoverImage || '' : ''
   );
+  const [slugInput, setSlugInput] = useState(publicSlug || '');
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
   const [welcomeMessage, setWelcomeMessage] = useState(currentWelcomeMessage || '');
   const [newContactType, setNewContactType] = useState<string>('telegram');
@@ -453,6 +466,22 @@ function SubscriptionShareCard({
       toast({
         title: 'Theme updated',
         description: 'The subscription page theme has been updated.',
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const updateSlugMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Short link updated',
+        description: 'The short share link has been updated.',
       });
       onThemeChange();
     },
@@ -528,6 +557,24 @@ function SubscriptionShareCard({
     onError: (error) => {
       toast({
         title: 'Regeneration failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const regenerateSlugMutation = trpc.keys.regeneratePublicSlug.useMutation({
+    onSuccess: (result) => {
+      setSlugInput(result.publicSlug || '');
+      toast({
+        title: 'Short link regenerated',
+        description: 'The new short share link is ready to use.',
+      });
+      onThemeChange();
+      void copyToClipboard(result.sharePageUrl, 'Copied!', 'New short share link copied to clipboard.');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Slug regeneration failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -636,13 +683,54 @@ function SubscriptionShareCard({
   };
 
   const getSubscriptionPageUrl = () => {
-    if (typeof window === 'undefined' || !subscriptionToken) return '';
+    if (typeof window === 'undefined') return '';
+    if (slugInput.trim()) {
+      return buildShortShareUrl(slugInput.trim(), { origin: window.location.origin });
+    }
+    if (!subscriptionToken) return '';
     return buildSharePageUrl(subscriptionToken, { origin: window.location.origin });
+  };
+
+  const getClientUrl = () => {
+    if (typeof window === 'undefined') return '';
+    if (slugInput.trim()) {
+      return buildSubscriptionClientUrl(slugInput.trim(), keyName, {
+        origin: window.location.origin,
+        shortPath: true,
+      });
+    }
+    if (!subscriptionToken) return '';
+    return buildSubscriptionClientUrl(subscriptionToken, keyName, {
+      origin: window.location.origin,
+    });
   };
 
   const copySubscriptionPageUrl = async () => {
     const url = getSubscriptionPageUrl();
     await copyToClipboard(url, 'Copied!', 'Subscription page URL copied to clipboard.');
+  };
+
+  const copyClientUrl = async () => {
+    const url = getClientUrl();
+    await copyToClipboard(url, 'Copied!', 'Client URL copied to clipboard.');
+  };
+
+  const saveSlug = () => {
+    const normalizedSlug = normalizePublicSlug(slugInput);
+    if (!normalizedSlug || normalizedSlug.length < 3) {
+      toast({
+        title: 'Missing slug',
+        description: 'Enter at least 3 valid characters before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSlugInput(normalizedSlug);
+    updateSlugMutation.mutate({
+      id: keyId,
+      publicSlug: normalizedSlug,
+    } as any);
   };
 
   const theme = getTheme(selectedTheme);
@@ -683,6 +771,40 @@ function SubscriptionShareCard({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            Short Link Slug
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="my-access-key"
+              value={slugInput}
+              onChange={(e) => setSlugInput(normalizePublicSlug(e.target.value))}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveSlug}
+              disabled={updateSlugMutation.isPending}
+            >
+              {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => regenerateSlugMutation.mutate({ id: keyId })}
+              disabled={regenerateSlugMutation.isPending}
+              title="Regenerate short slug"
+            >
+              {regenerateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Used for the short share page and short Outline client URL.
+          </p>
         </div>
 
         {/* Background Image URL */}
@@ -887,7 +1009,7 @@ function SubscriptionShareCard({
           <Button
             variant="outline"
             className="w-full min-w-0 text-xs sm:text-sm"
-            disabled={!subscriptionToken}
+            disabled={!subscriptionToken && !slugInput.trim()}
             onClick={() => {
               const url = getSubscriptionPageUrl();
               if (url) window.open(url, '_blank');
@@ -899,10 +1021,19 @@ function SubscriptionShareCard({
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copySubscriptionPageUrl}
-            disabled={!subscriptionToken}
+            disabled={!subscriptionToken && !slugInput.trim()}
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy Link
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full min-w-0 text-xs sm:text-sm"
+            onClick={copyClientUrl}
+            disabled={!subscriptionToken && !slugInput.trim()}
+          >
+            <Link2 className="w-4 h-4 mr-2" />
+            Copy Client URL
           </Button>
           <Button
             variant="outline"
@@ -945,12 +1076,21 @@ function SubscriptionShareCard({
         </div>
 
         {/* URL Display */}
-        <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
-          {subscriptionToken
-            ? getSubscriptionPageUrl()
-            : regenerateTokenMutation.isPending
-              ? 'Generating new subscription token...'
-              : 'Generating subscription token...'}
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
+            <p className="mb-1 font-medium text-foreground">Share Page URL</p>
+            {subscriptionToken || slugInput.trim()
+              ? getSubscriptionPageUrl()
+              : regenerateTokenMutation.isPending
+                ? 'Generating new subscription token...'
+                : 'Generating subscription token...'}
+          </div>
+          <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
+            <p className="mb-1 font-medium text-foreground">Client URL</p>
+            {subscriptionToken || slugInput.trim()
+              ? getClientUrl()
+              : 'Generating client URL...'}
+          </div>
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -1088,11 +1228,15 @@ export default function KeyDetailPage() {
   const statusInfo = statusConfig[status] || statusConfig.ACTIVE;
   const StatusIcon = statusInfo.icon;
   const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl || '';
-  const subscriptionApiUrl = key.subscriptionToken
-    ? buildSubscriptionApiUrl(key.subscriptionToken, {
+  const subscriptionApiUrl = key.publicSlug
+    ? buildShortClientUrl(key.publicSlug, {
         origin: typeof window !== 'undefined' ? window.location.origin : undefined,
       })
-    : '';
+    : key.subscriptionToken
+      ? buildSubscriptionApiUrl(key.subscriptionToken, {
+          origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+        })
+      : '';
 
   const usagePercent = key.dataLimitBytes
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
@@ -1736,6 +1880,8 @@ export default function KeyDetailPage() {
           <SubscriptionShareCard
             keyId={key.id}
             subscriptionToken={key.subscriptionToken}
+            publicSlug={key.publicSlug}
+            keyName={key.name}
             currentTheme={(key as any).subscriptionTheme}
             currentCoverImage={(key as any).coverImage}
             currentCoverImageType={(key as any).coverImageType}

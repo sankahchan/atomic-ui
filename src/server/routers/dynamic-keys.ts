@@ -147,30 +147,46 @@ async function generateUniqueDynamicKeySlug(name: string, excludeId?: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const suffix = attempt === 0 ? '' : String(attempt);
     const candidate = buildCandidate(suffix || undefined);
-    const existing = await db.dynamicAccessKey.findFirst({
-      where: {
-        publicSlug: candidate,
-        ...(excludeId ? { NOT: { id: excludeId } } : {}),
-      },
-      select: { id: true },
-    });
+    const [dynamicExisting, accessExisting] = await Promise.all([
+      db.dynamicAccessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true },
+      }),
+      db.accessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: { id: true },
+      }),
+    ]);
 
-    if (!existing) {
+    if (!dynamicExisting && !accessExisting) {
       return candidate;
     }
   }
 
   while (true) {
     const candidate = buildCandidate(generateRandomString(6).toLowerCase());
-    const existing = await db.dynamicAccessKey.findFirst({
-      where: {
-        publicSlug: candidate,
-        ...(excludeId ? { NOT: { id: excludeId } } : {}),
-      },
-      select: { id: true },
-    });
+    const [dynamicExisting, accessExisting] = await Promise.all([
+      db.dynamicAccessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true },
+      }),
+      db.accessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: { id: true },
+      }),
+    ]);
 
-    if (!existing) {
+    if (!dynamicExisting && !accessExisting) {
       return candidate;
     }
   }
@@ -189,15 +205,23 @@ async function resolveDynamicKeySlug(requestedSlug: string | null | undefined, n
     });
   }
 
-  const existing = await db.dynamicAccessKey.findFirst({
-    where: {
-      publicSlug: normalizedSlug,
-      ...(excludeId ? { NOT: { id: excludeId } } : {}),
-    },
-    select: { id: true },
-  });
+  const [dynamicExisting, accessExisting] = await Promise.all([
+    db.dynamicAccessKey.findFirst({
+      where: {
+        publicSlug: normalizedSlug,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    }),
+    db.accessKey.findFirst({
+      where: {
+        publicSlug: normalizedSlug,
+      },
+      select: { id: true },
+    }),
+  ]);
 
-  if (existing) {
+  if (dynamicExisting || accessExisting) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'That short link is already in use.',
@@ -227,19 +251,27 @@ export const dynamicKeysRouter = router({
         };
       }
 
-      const existing = await db.dynamicAccessKey.findFirst({
-        where: {
-          publicSlug: normalizedSlug,
-          ...(input.excludeId ? { NOT: { id: input.excludeId } } : {}),
-        },
-        select: { id: true },
-      });
+      const [dynamicExisting, accessExisting] = await Promise.all([
+        db.dynamicAccessKey.findFirst({
+          where: {
+            publicSlug: normalizedSlug,
+            ...(input.excludeId ? { NOT: { id: input.excludeId } } : {}),
+          },
+          select: { id: true },
+        }),
+        db.accessKey.findFirst({
+          where: {
+            publicSlug: normalizedSlug,
+          },
+          select: { id: true },
+        }),
+      ]);
 
       return {
         normalizedSlug,
-        available: !existing,
+        available: !dynamicExisting && !accessExisting,
         valid: true,
-        message: existing ? 'That short link is already in use.' : 'This short link is available.',
+        message: dynamicExisting || accessExisting ? 'That short link is already in use.' : 'This short link is available.',
       };
     }),
 

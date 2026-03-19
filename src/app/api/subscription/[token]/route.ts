@@ -25,8 +25,13 @@ export async function GET(
 
   try {
     // Find the key by subscription token
-    const key = await db.accessKey.findUnique({
-      where: { subscriptionToken: token },
+    const key = await db.accessKey.findFirst({
+      where: {
+        OR: [
+          { subscriptionToken: token },
+          { publicSlug: token },
+        ],
+      },
       include: {
         server: {
           select: {
@@ -173,8 +178,10 @@ export async function GET(
     }
 
     const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
-    const outlineClientUrl = buildSubscriptionClientUrl(token, key.name, {
+    const outlineIdentifier = key.publicSlug || token;
+    const outlineClientUrl = buildSubscriptionClientUrl(outlineIdentifier, key.name, {
       origin: request.nextUrl.origin,
+      shortPath: Boolean(key.publicSlug),
     });
 
     // Check Accept header to determine response format

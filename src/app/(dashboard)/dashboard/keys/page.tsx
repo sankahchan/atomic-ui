@@ -94,6 +94,12 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 import { getTheme, subscriptionThemeIds, themeList } from '@/lib/subscription-themes';
+import {
+  buildSharePageUrl,
+  buildShortShareUrl,
+  buildSubscriptionClientUrl,
+} from '@/lib/subscription-links';
+import { normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
 
 /**
  * Status badge configuration for visual consistency
@@ -157,6 +163,7 @@ type CreatedKeySummary = {
   name: string;
   accessUrl: string | null;
   subscriptionToken: string | null;
+  publicSlug?: string | null;
   method: string | null;
   port: number | null;
   password: string | null;
@@ -176,13 +183,20 @@ function fillTemplate(template: string, values: Record<string, string | number>)
   );
 }
 
-function getKeySubscriptionPageUrl(subscriptionToken?: string | null): string {
-  if (typeof window === 'undefined' || !subscriptionToken) {
+function getKeySubscriptionPageUrl(subscriptionToken?: string | null, publicSlug?: string | null): string {
+  if (typeof window === 'undefined') {
     return '';
   }
 
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${window.location.origin}${basePath}/sub/${subscriptionToken}`;
+  if (publicSlug) {
+    return buildShortShareUrl(publicSlug, { origin: window.location.origin });
+  }
+
+  if (!subscriptionToken) {
+    return '';
+  }
+
+  return buildSharePageUrl(subscriptionToken, { origin: window.location.origin });
 }
 
 /**
@@ -202,9 +216,11 @@ function CreateKeyDialog({
   onSuccess: (createdKey: CreatedKeySummary) => void;
 }) {
   const { toast } = useToast();
+  const utils = trpc.useUtils();
   const [formData, setFormData] = useState<{
     serverId: string;
     name: string;
+    publicSlug: string;
     email: string;
     telegramId: string;
     notes: string;
@@ -222,6 +238,7 @@ function CreateKeyDialog({
   }>({
     serverId: 'auto',
     name: '',
+    publicSlug: '',
     email: '',
     telegramId: '',
     notes: '',
@@ -237,6 +254,7 @@ function CreateKeyDialog({
     coverImageUrl: '',
     subscriptionWelcomeMessage: '',
   });
+  const [slugTouched, setSlugTouched] = useState(false);
   const [shareContacts, setShareContacts] = useState<CreateContactLink[]>([]);
   const [newContactType, setNewContactType] = useState<CreateContactLink['type']>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
@@ -267,6 +285,43 @@ function CreateKeyDialog({
   const selectedShareTheme = getTheme(
     formData.subscriptionTheme === 'default' ? globalSubscriptionTheme : formData.subscriptionTheme,
   );
+  const previewSlug = formData.publicSlug.trim();
+  const normalizedPreviewSlug = normalizePublicSlug(previewSlug);
+  const hasPreviewSlug = normalizedPreviewSlug.length >= 3;
+  const slugAvailabilityQuery = trpc.keys.checkPublicSlugAvailability.useQuery(
+    { slug: normalizedPreviewSlug },
+    {
+      enabled: open && hasPreviewSlug,
+      retry: false,
+      staleTime: 5_000,
+    },
+  );
+
+  useEffect(() => {
+    if (slugTouched) {
+      return;
+    }
+
+    const nextSlug = formData.name.trim() ? slugifyPublicName(formData.name) : '';
+    setFormData((current) => (
+      current.publicSlug === nextSlug
+        ? current
+        : { ...current, publicSlug: nextSlug }
+    ));
+  }, [formData.name, slugTouched]);
+
+  const previewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const previewClientUrl = hasPreviewSlug
+    ? buildSubscriptionClientUrl(normalizedPreviewSlug, formData.name || 'Access Key', {
+        origin: previewOrigin,
+        shortPath: true,
+      })
+    : '';
+  const previewShareUrl = hasPreviewSlug
+    ? buildShortShareUrl(normalizedPreviewSlug, {
+        origin: previewOrigin,
+      })
+    : '';
 
   const sendSharePageMutation = trpc.keys.sendSharePageViaTelegram.useMutation({
     onError: (error) => {
@@ -281,7 +336,7 @@ function CreateKeyDialog({
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
     onSuccess: async (createdKey) => {
-      const sharePageUrl = getKeySubscriptionPageUrl(createdKey.subscriptionToken);
+      const sharePageUrl = getKeySubscriptionPageUrl(createdKey.subscriptionToken, createdKey.publicSlug);
 
       if (sharePageUrl && copyShareLinkAfterCreate) {
         void copyToClipboard(sharePageUrl, 'Copied!', 'Share page link copied to clipboard.');
@@ -346,6 +401,7 @@ function CreateKeyDialog({
     setFormData({
       serverId: 'auto',
       name: '',
+      publicSlug: '',
       email: '',
       telegramId: '',
       notes: '',
@@ -361,6 +417,7 @@ function CreateKeyDialog({
       coverImageUrl: '',
       subscriptionWelcomeMessage: '',
     });
+    setSlugTouched(false);
     setShareContacts([]);
     setNewContactType('telegram');
     setNewContactValue('');
@@ -458,13 +515,36 @@ function CreateKeyDialog({
     setShareContacts((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.serverId || !formData.name) {
       toast({
         title: t('keys.toast.validation'),
         description: t('keys.toast.validation_create_desc'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const slugToCreate = normalizePublicSlug(formData.publicSlug || formData.name);
+    if (!slugToCreate || slugToCreate.length < 3) {
+      toast({
+        title: 'Short link is invalid',
+        description: 'Use at least 3 characters for the short link slug.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const slugCheck = await utils.keys.checkPublicSlugAvailability.fetch({
+      slug: slugToCreate,
+    });
+
+    if (!slugCheck.valid || !slugCheck.available) {
+      toast({
+        title: 'Short link unavailable',
+        description: slugCheck.message,
         variant: 'destructive',
       });
       return;
@@ -480,6 +560,7 @@ function CreateKeyDialog({
       serverId: formData.serverId === 'auto' ? undefined : formData.serverId,
       assignmentMode: formData.serverId === 'auto' ? 'AUTO' : 'MANUAL',
       name: formData.name,
+      publicSlug: slugToCreate,
       email: formData.email || undefined,
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
@@ -594,6 +675,71 @@ function CreateKeyDialog({
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="publicSlug">Short Link Slug</Label>
+              <Input
+                id="publicSlug"
+                placeholder="premium-access"
+                value={formData.publicSlug}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setFormData({ ...formData, publicSlug: normalizePublicSlug(e.target.value) });
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {slugTouched
+                  ? 'Used for the short client URL and short share page URL.'
+                  : 'Auto-generated from the name until you edit it.'}
+              </p>
+            </div>
+
+            {previewSlug ? (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-medium text-foreground">Slug status:</span>
+                  {slugAvailabilityQuery.isFetching ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking availability
+                    </span>
+                  ) : hasPreviewSlug && slugAvailabilityQuery.data?.available ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {slugAvailabilityQuery.data.message}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                      <XCircle className="h-3.5 w-3.5" />
+                      {hasPreviewSlug
+                        ? (slugAvailabilityQuery.data?.message || 'This short link is unavailable.')
+                        : 'Enter at least 3 characters.'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                      Short Client URL
+                    </Label>
+                    <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
+                      {previewClientUrl || 'Enter a valid slug to preview the client URL.'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                      Short Share Page
+                    </Label>
+                    <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
+                      {previewShareUrl || 'Enter a valid slug to preview the share page.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* User Assignment */}
@@ -1065,7 +1211,7 @@ function CreatedKeySummaryDialog({
 }) {
   const { t } = useLocale();
   const { toast } = useToast();
-  const subscriptionPageUrl = getKeySubscriptionPageUrl(createdKey?.subscriptionToken);
+  const subscriptionPageUrl = getKeySubscriptionPageUrl(createdKey?.subscriptionToken, createdKey?.publicSlug);
   const { data: qrData, isLoading } = trpc.keys.generateQRCode.useQuery(
     { id: createdKey?.id ?? '' },
     { enabled: open && !!createdKey?.id },
@@ -3840,7 +3986,7 @@ export default function KeysPage() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => {
-                            const url = getKeySubscriptionPageUrl(key.subscriptionToken);
+                            const url = getKeySubscriptionPageUrl(key.subscriptionToken, (key as any).publicSlug);
                             copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                           }}
                         >
@@ -3956,7 +4102,7 @@ export default function KeysPage() {
                     }}
                     onCopySubscriptionUrl={() => {
                       if (key.subscriptionToken) {
-                        const url = getKeySubscriptionPageUrl(key.subscriptionToken);
+                        const url = getKeySubscriptionPageUrl(key.subscriptionToken, (key as any).publicSlug);
                         copyToClipboard(url, t('keys.toast.copied'), t('keys.toast.copy_subscription_url'));
                       } else {
                         toast({ title: t('keys.toast.error'), description: t('keys.toast.no_subscription_url'), variant: 'destructive' });

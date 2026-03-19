@@ -48,6 +48,22 @@ export function buildSharePageUrl(
   return url.toString();
 }
 
+export function buildShortShareUrl(
+  slug: string,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+  },
+) {
+  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/s/${slug}`);
+
+  if (options?.source) {
+    url.searchParams.set('source', options.source);
+  }
+
+  return url.toString();
+}
+
 export function buildSubscriptionApiUrl(
   token: string,
   options?: {
@@ -65,20 +81,39 @@ export function buildSubscriptionApiUrl(
 }
 
 export function buildSubscriptionClientUrl(
-  token: string,
+  tokenOrSlug: string,
   name?: string | null,
   options?: {
     origin?: string | null;
     source?: string | null;
+    shortPath?: boolean;
   },
 ) {
-  const subscriptionUrl = buildSubscriptionApiUrl(token, options);
+  const subscriptionUrl = options?.shortPath
+    ? buildShortClientUrl(tokenOrSlug, options)
+    : buildSubscriptionApiUrl(tokenOrSlug, options);
   const normalizedUrl = subscriptionUrl
     .replace(/^ssconf:\/\//, '')
     .replace(/^https?:\/\//, '');
   const suffix = (name || 'Access Key').trim();
 
   return `ssconf://${normalizedUrl}#${encodeURIComponent(suffix)}`;
+}
+
+export function buildShortClientUrl(
+  slug: string,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+  },
+) {
+  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/c/${slug}`);
+
+  if (options?.source) {
+    url.searchParams.set('source', options.source);
+  }
+
+  return url.toString();
 }
 
 export function buildDynamicSubscriptionApiUrl(
@@ -140,13 +175,7 @@ export function buildDynamicShortShareUrl(
     source?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/s/${slug}`);
-
-  if (options?.source) {
-    url.searchParams.set('source', options.source);
-  }
-
-  return url.toString();
+  return buildShortShareUrl(slug, options);
 }
 
 export function buildDynamicShortClientUrl(
@@ -156,11 +185,5 @@ export function buildDynamicShortClientUrl(
     source?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/c/${slug}`);
-
-  if (options?.source) {
-    url.searchParams.set('source', options.source);
-  }
-
-  return url.toString();
+  return buildShortClientUrl(slug, options);
 }

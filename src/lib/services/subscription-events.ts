@@ -50,8 +50,13 @@ export async function recordSubscriptionPageEventByToken(input: {
   userAgent?: string | null;
 }) {
   const [accessKey, dynamicKey] = await Promise.all([
-    db.accessKey.findUnique({
-      where: { subscriptionToken: input.token },
+    db.accessKey.findFirst({
+      where: {
+        OR: [
+          { subscriptionToken: input.token },
+          { publicSlug: input.token },
+        ],
+      },
       select: { id: true },
     }),
     db.dynamicAccessKey.findUnique({

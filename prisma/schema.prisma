@@ -180,6 +180,7 @@ model AccessKey {
 
   // Subscription
   subscriptionToken String? @unique
+  publicSlug        String? @unique
 
   // Subscription page theme (overrides global default)
   // Valid themes: dark, light, purple, blue, green, orange, pink, red

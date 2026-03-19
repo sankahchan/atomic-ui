@@ -519,9 +519,14 @@ export async function handleSubscriptionRequest(
       });
     }
 
-    // Fall back to regular access key lookup by subscriptionToken
-    const accessKey = await db.accessKey.findUnique({
-      where: { subscriptionToken: token },
+    // Fall back to regular access key lookup by subscriptionToken or short slug
+    const accessKey = await db.accessKey.findFirst({
+      where: {
+        OR: [
+          { subscriptionToken: token },
+          { publicSlug: token },
+        ],
+      },
       include: {
         server: true,
       },

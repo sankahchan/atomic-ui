@@ -20,8 +20,13 @@ export async function GET(
 
   try {
     // Verify the token exists (don't expose settings if token is invalid)
-    const key = await db.accessKey.findUnique({
-      where: { subscriptionToken: token },
+    const key = await db.accessKey.findFirst({
+      where: {
+        OR: [
+          { subscriptionToken: token },
+          { publicSlug: token },
+        ],
+      },
       select: { id: true },
     });
 

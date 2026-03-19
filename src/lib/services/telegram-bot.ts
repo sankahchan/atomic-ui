@@ -18,7 +18,7 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { createOutlineClient } from '@/lib/outline-api';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { buildSharePageUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
+import { buildSharePageUrl, buildShortShareUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
 import {
   recordSubscriptionPageEvent,
   SUBSCRIPTION_EVENT_TYPES,
@@ -537,7 +537,9 @@ export async function sendAccessKeySharePageToTelegram(input: {
   }
 
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-  const sharePageUrl = buildSharePageUrl(token, { source: input.source || 'telegram' });
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram' })
+    : buildSharePageUrl(token, { source: input.source || 'telegram' });
   const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'telegram' });
   const defaults = await getSubscriptionDefaults();
   const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
@@ -669,7 +671,11 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     ? await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken)
     : null;
   const sharePageUrl = token
-    ? buildSharePageUrl(token, { source: 'telegram_notification' })
+    ? (
+        key.publicSlug
+          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_notification' })
+          : buildSharePageUrl(token, { source: 'telegram_notification' })
+      )
     : null;
 
   const lines =
@@ -763,7 +769,9 @@ export async function sendRenewalRequestToAdmins(input: {
   }
 
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-  const sharePageUrl = buildSharePageUrl(token, { source: 'telegram_renew_request' });
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: 'telegram_renew_request' })
+    : buildSharePageUrl(token, { source: 'telegram_renew_request' });
   const message = [
     '🔁 <b>Renewal requested from Telegram</b>',
     '',
@@ -1252,7 +1260,9 @@ async function handleMyKeysCommand(chatId: number, telegramUserId: number): Prom
 
   for (const key of keys) {
     const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-    const sharePageUrl = buildSharePageUrl(token, { source: 'telegram_mykeys' });
+    const sharePageUrl = key.publicSlug
+      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys' })
+      : buildSharePageUrl(token, { source: 'telegram_mykeys' });
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
       `  ID: <code>${key.id}</code>`,

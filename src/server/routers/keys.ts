@@ -22,8 +22,14 @@ import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { buildSharePageUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
+import {
+  buildSharePageUrl,
+  buildShortClientUrl,
+  buildShortShareUrl,
+  buildSubscriptionApiUrl,
+} from '@/lib/subscription-links';
 import { subscriptionThemeIds } from '@/lib/subscription-themes';
+import { isValidPublicSlug, normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
 import {
   collectTrafficActivity,
   isTrafficActive,
@@ -81,6 +87,7 @@ const createKeySchema = z.object({
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(),
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
+  publicSlug: z.string().min(3).max(32).optional().nullable(),
 });
 
 /**
@@ -105,6 +112,7 @@ const updateKeySchema = z.object({
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
+  publicSlug: z.string().min(3).max(32).optional().nullable(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
@@ -174,7 +182,149 @@ const calculateExpiration = (
   }
 };
 
+async function generateUniqueAccessKeySlug(name: string, excludeId?: string) {
+  const baseSlug = slugifyPublicName(name);
+
+  const buildCandidate = (suffix?: string) => {
+    if (!suffix) {
+      return baseSlug;
+    }
+
+    const maxBaseLength = Math.max(3, 32 - suffix.length - 1);
+    return `${baseSlug.slice(0, maxBaseLength).replace(/-+$/g, '')}-${suffix}`;
+  };
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const suffix = attempt === 0 ? '' : String(attempt);
+    const candidate = buildCandidate(suffix || undefined);
+    const [accessExisting, dynamicExisting] = await Promise.all([
+      db.accessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true },
+      }),
+      db.dynamicAccessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!accessExisting && !dynamicExisting) {
+      return candidate;
+    }
+  }
+
+  while (true) {
+    const candidate = buildCandidate(generateRandomString(6).toLowerCase());
+    const [accessExisting, dynamicExisting] = await Promise.all([
+      db.accessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true },
+      }),
+      db.dynamicAccessKey.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!accessExisting && !dynamicExisting) {
+      return candidate;
+    }
+  }
+}
+
+async function resolveAccessKeySlug(requestedSlug: string | null | undefined, name: string, excludeId?: string) {
+  if (!requestedSlug) {
+    return generateUniqueAccessKeySlug(name, excludeId);
+  }
+
+  const normalizedSlug = normalizePublicSlug(requestedSlug);
+  if (!normalizedSlug || !isValidPublicSlug(normalizedSlug)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Slug must use only lowercase letters, numbers, and hyphens.',
+    });
+  }
+
+  const [accessExisting, dynamicExisting] = await Promise.all([
+    db.accessKey.findFirst({
+      where: {
+        publicSlug: normalizedSlug,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    }),
+    db.dynamicAccessKey.findFirst({
+      where: {
+        publicSlug: normalizedSlug,
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (accessExisting || dynamicExisting) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'That short link is already in use.',
+    });
+  }
+
+  return normalizedSlug;
+}
+
 export const keysRouter = router({
+  checkPublicSlugAvailability: adminProcedure
+    .input(
+      z.object({
+        slug: z.string().min(1),
+        excludeId: z.string().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const normalizedSlug = normalizePublicSlug(input.slug);
+
+      if (!normalizedSlug || normalizedSlug.length < 3 || !isValidPublicSlug(normalizedSlug)) {
+        return {
+          normalizedSlug,
+          available: false,
+          valid: false,
+          message: 'Slug must be 3-32 characters and use only lowercase letters, numbers, and hyphens.',
+        };
+      }
+
+      const [accessExisting, dynamicExisting] = await Promise.all([
+        db.accessKey.findFirst({
+          where: {
+            publicSlug: normalizedSlug,
+            ...(input.excludeId ? { NOT: { id: input.excludeId } } : {}),
+          },
+          select: { id: true },
+        }),
+        db.dynamicAccessKey.findFirst({
+          where: {
+            publicSlug: normalizedSlug,
+          },
+          select: { id: true },
+        }),
+      ]);
+
+      return {
+        normalizedSlug,
+        available: !accessExisting && !dynamicExisting,
+        valid: true,
+        message: accessExisting || dynamicExisting ? 'That short link is already in use.' : 'This short link is available.',
+      };
+    }),
+
   /**
    * List access keys with filtering and pagination.
    * 
@@ -361,23 +511,23 @@ export const keysRouter = router({
         });
       }
 
-      // Auto-generate subscriptionToken if missing (for older keys)
-      if (!key.subscriptionToken) {
-        const newToken = generateRandomString(32);
+      const nextToken = key.subscriptionToken || generateRandomString(32);
+      const nextPublicSlug = key.publicSlug || await generateUniqueAccessKeySlug(key.name, key.id);
+
+      if (!key.subscriptionToken || !key.publicSlug) {
         await db.accessKey.update({
           where: { id: input.id },
-          data: { subscriptionToken: newToken },
+          data: {
+            subscriptionToken: nextToken,
+            publicSlug: nextPublicSlug,
+          },
         });
-        // Return updated key with the new token
-        return {
-          ...key,
-          subscriptionToken: newToken,
-          accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
-        };
       }
 
       return {
         ...key,
+        subscriptionToken: nextToken,
+        publicSlug: nextPublicSlug,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
       };
     }),
@@ -516,6 +666,8 @@ export const keysRouter = router({
       // Create Outline client
       const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
 
+      const publicSlug = await resolveAccessKeySlug(input.publicSlug, input.name);
+
       try {
         // Create the key on Outline server
         const outlineKey = await client.createAccessKey({
@@ -563,6 +715,7 @@ export const keysRouter = router({
             contactLinks: input.contactLinks,
             subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
             subscriptionToken: generateRandomString(32),
+            publicSlug,
           },
           include: {
             server: {
@@ -600,7 +753,7 @@ export const keysRouter = router({
   update: adminProcedure
     .input(updateKeySchema)
     .mutation(async ({ input }) => {
-      const { id, ...data } = input;
+      const { id, publicSlug, ...data } = input;
 
       // Fetch the key with server info
       const existingKey = await db.accessKey.findUnique({
@@ -715,6 +868,10 @@ export const keysRouter = router({
 
         if (data.subscriptionWelcomeMessage !== undefined) {
           updateData.subscriptionWelcomeMessage = data.subscriptionWelcomeMessage;
+        }
+
+        if (publicSlug !== undefined) {
+          updateData.publicSlug = await resolveAccessKeySlug(publicSlug, data.name || existingKey.name, id);
         }
 
         // Handle owner field
@@ -1547,6 +1704,7 @@ export const keysRouter = router({
           subscriptionToken: true,
           accessUrl: true,
           name: true,
+          publicSlug: true,
         },
       });
 
@@ -1557,24 +1715,28 @@ export const keysRouter = router({
         });
       }
 
-      // Generate subscription token if it doesn't exist
       let token = key.subscriptionToken;
-      if (!token) {
-        token = generateRandomString(32);
+      let publicSlug = key.publicSlug;
+      if (!token || !publicSlug) {
+        token = token || generateRandomString(32);
+        publicSlug = publicSlug || await generateUniqueAccessKeySlug(key.name, key.id);
         await db.accessKey.update({
           where: { id: input.id },
-          data: { subscriptionToken: token },
+          data: {
+            subscriptionToken: token,
+            publicSlug,
+          },
         });
       }
 
-      // The subscription URL format - clients can fetch this to get the access URL
-      // This will be handled by a public API endpoint
-      const subscriptionUrl = buildSubscriptionApiUrl(token);
-
       return {
-        subscriptionUrl,
+        subscriptionUrl: buildSubscriptionApiUrl(token),
+        sharePageUrl: publicSlug ? buildShortShareUrl(publicSlug) : buildSharePageUrl(token),
+        shortSharePageUrl: publicSlug ? buildShortShareUrl(publicSlug) : null,
+        shortClientUrl: publicSlug ? buildShortClientUrl(publicSlug) : null,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
         token,
+        publicSlug,
       };
     }),
 
@@ -1610,6 +1772,43 @@ export const keysRouter = router({
       return {
         token,
         sharePageUrl: buildSharePageUrl(token),
+      };
+    }),
+
+  regeneratePublicSlug: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const existing = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          subscriptionToken: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const publicSlug = await generateUniqueAccessKeySlug(existing.name, existing.id);
+      const key = await db.accessKey.update({
+        where: { id: input.id },
+        data: { publicSlug },
+        select: {
+          id: true,
+          publicSlug: true,
+          subscriptionToken: true,
+        },
+      });
+
+      return {
+        ...key,
+        sharePageUrl: buildShortShareUrl(publicSlug),
+        shortClientUrl: buildShortClientUrl(publicSlug),
       };
     }),
 
