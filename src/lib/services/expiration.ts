@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
+import { sendAccessKeyLifecycleTelegramNotification } from '@/lib/services/telegram-bot';
 
 interface ExpirationResult {
     expiredKeys: number;
@@ -39,6 +40,74 @@ export async function checkExpirations(): Promise<ExpirationResult> {
     const now = new Date();
 
     try {
+        const warningCandidates = await db.accessKey.findMany({
+            where: {
+                status: { in: ['ACTIVE', 'PENDING'] },
+                expiresAt: {
+                    not: null,
+                    gt: now,
+                    lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+                },
+            },
+            select: {
+                id: true,
+                expiresAt: true,
+                expirationWarningStage: true,
+            },
+        });
+
+        for (const key of warningCandidates) {
+            if (!key.expiresAt) continue;
+
+            const remainingMs = key.expiresAt.getTime() - now.getTime();
+            const daysLeft = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+            const nextStage = daysLeft <= 1 ? '1D' : '7D';
+
+            if (key.expirationWarningStage === nextStage) {
+                continue;
+            }
+
+            try {
+                await sendAccessKeyLifecycleTelegramNotification({
+                    accessKeyId: key.id,
+                    type: nextStage === '1D' ? 'EXPIRING_1D' : 'EXPIRING_7D',
+                    daysLeft,
+                });
+
+                await db.accessKey.update({
+                    where: { id: key.id },
+                    data: {
+                        expirationWarningStage: nextStage,
+                        lastWarningSentAt: now,
+                    },
+                });
+
+                await db.notificationLog.create({
+                    data: {
+                        event: 'KEY_EXPIRING',
+                        message: `Sent expiration warning (${nextStage})`,
+                        status: 'SUCCESS',
+                        accessKeyId: key.id,
+                    },
+                });
+            } catch (warningError) {
+                result.errors.push(`Warning ${key.id}: ${(warningError as Error).message}`);
+            }
+        }
+
+        const keysAboutToExpire = await db.accessKey.findMany({
+            where: {
+                status: { in: ['ACTIVE', 'PENDING'] },
+                expiresAt: {
+                    not: null,
+                    lte: now,
+                },
+            },
+            select: {
+                id: true,
+            },
+        });
+
         // Step 1: Find and mark expired keys (expiresAt has passed)
         const expiredResult = await db.accessKey.updateMany({
             where: {
@@ -53,6 +122,26 @@ export async function checkExpirations(): Promise<ExpirationResult> {
             },
         });
         result.expiredKeys = expiredResult.count;
+
+        for (const key of keysAboutToExpire) {
+            try {
+                await sendAccessKeyLifecycleTelegramNotification({
+                    accessKeyId: key.id,
+                    type: 'EXPIRED',
+                });
+
+                await db.notificationLog.create({
+                    data: {
+                        event: 'KEY_EXPIRED',
+                        message: 'Sent expiration notice',
+                        status: 'SUCCESS',
+                        accessKeyId: key.id,
+                    },
+                });
+            } catch (error) {
+                result.errors.push(`Expired notice ${key.id}: ${(error as Error).message}`);
+            }
+        }
 
         // Step 2: Find and mark depleted keys (usage >= limit)
         const keysToCheckDepletion = await db.accessKey.findMany({

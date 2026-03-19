@@ -75,6 +75,7 @@ import {
   LayoutGrid,
   LayoutList,
   Share2,
+  MessageSquare,
   Calendar,
   FileText,
   Archive,
@@ -242,6 +243,7 @@ function CreateKeyDialog({
   const [globalSubscriptionTheme, setGlobalSubscriptionTheme] = useState('dark');
   const [openPreviewAfterCreate, setOpenPreviewAfterCreate] = useState(false);
   const [copyShareLinkAfterCreate, setCopyShareLinkAfterCreate] = useState(false);
+  const [sendSharePageViaTelegramAfterCreate, setSendSharePageViaTelegramAfterCreate] = useState(false);
   const previewWindowRef = useRef<Window | null>(null);
 
   // Fetch templates
@@ -266,9 +268,19 @@ function CreateKeyDialog({
     formData.subscriptionTheme === 'default' ? globalSubscriptionTheme : formData.subscriptionTheme,
   );
 
+  const sendSharePageMutation = trpc.keys.sendSharePageViaTelegram.useMutation({
+    onError: (error) => {
+      toast({
+        title: 'Telegram send failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
-    onSuccess: (createdKey) => {
+    onSuccess: async (createdKey) => {
       const sharePageUrl = getKeySubscriptionPageUrl(createdKey.subscriptionToken);
 
       if (sharePageUrl && copyShareLinkAfterCreate) {
@@ -287,6 +299,22 @@ function CreateKeyDialog({
       }
 
       previewWindowRef.current = null;
+
+      if (sendSharePageViaTelegramAfterCreate) {
+        try {
+          await sendSharePageMutation.mutateAsync({
+            id: createdKey.id,
+            reason: 'CREATED',
+          });
+          toast({
+            title: 'Share page sent',
+            description: 'The new key has been sent through Telegram.',
+          });
+        } catch {
+          // Error handled by the mutation toast.
+        }
+      }
+
       toast({
         title: t('keys.toast.created'),
         description: t('keys.toast.created_desc'),
@@ -338,6 +366,7 @@ function CreateKeyDialog({
     setNewContactValue('');
     setOpenPreviewAfterCreate(false);
     setCopyShareLinkAfterCreate(false);
+    setSendSharePageViaTelegramAfterCreate(false);
     previewWindowRef.current = null;
   };
 
@@ -904,6 +933,19 @@ function CreateKeyDialog({
                         </span>
                       </span>
                     </label>
+                    <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                      <Checkbox
+                        checked={sendSharePageViaTelegramAfterCreate}
+                        onCheckedChange={(checked) => setSendSharePageViaTelegramAfterCreate(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">Send share page via Telegram after create</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Uses the key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -1022,11 +1064,43 @@ function CreatedKeySummaryDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLocale();
+  const { toast } = useToast();
   const subscriptionPageUrl = getKeySubscriptionPageUrl(createdKey?.subscriptionToken);
   const { data: qrData, isLoading } = trpc.keys.generateQRCode.useQuery(
     { id: createdKey?.id ?? '' },
     { enabled: open && !!createdKey?.id },
   );
+  const sendSharePageMutation = trpc.keys.sendSharePageViaTelegram.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Share page sent',
+        description: 'The key has been sent through Telegram.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram send failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const connectLinkMutation = trpc.keys.generateTelegramConnectLink.useMutation({
+    onSuccess: async (result) => {
+      await copyToClipboard(
+        result.url,
+        'Copied!',
+        'Telegram connect link copied to clipboard.',
+      );
+    },
+    onError: (error) => {
+      toast({
+        title: 'Connect link failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   if (!createdKey) {
     return null;
@@ -1156,6 +1230,34 @@ function CreatedKeySummaryDialog({
               >
                 <Eye className="mr-2 h-4 w-4" />
                 Open Share Page
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => connectLinkMutation.mutate({ id: createdKey.id })}
+                disabled={connectLinkMutation.isPending}
+              >
+                {connectLinkMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <LinkCopy className="mr-2 h-4 w-4" />
+                )}
+                Copy Telegram Connect Link
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => sendSharePageMutation.mutate({ id: createdKey.id, reason: 'CREATED' })}
+                disabled={sendSharePageMutation.isPending}
+              >
+                {sendSharePageMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                )}
+                Send via Telegram
               </Button>
             </div>
           </div>

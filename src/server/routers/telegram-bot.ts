@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { router, adminProcedure, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
+import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 
 /**
  * Telegram Bot Settings Schema
@@ -20,6 +21,10 @@ const telegramSettingsSchema = z.object({
   keyNotFoundMessage: z.string().optional(),
   isEnabled: z.boolean().default(true),
   adminChatIds: z.array(z.string()).optional().default([]),
+  dailyDigestEnabled: z.boolean().default(false),
+  dailyDigestHour: z.number().int().min(0).max(23).default(9),
+  dailyDigestMinute: z.number().int().min(0).max(59).default(0),
+  digestLookbackHours: z.number().int().min(1).max(168).default(24),
 });
 
 export const telegramBotRouter = router({
@@ -38,6 +43,11 @@ export const telegramBotRouter = router({
         welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
         isEnabled: false,
+        adminChatIds: [],
+        dailyDigestEnabled: false,
+        dailyDigestHour: 9,
+        dailyDigestMinute: 0,
+        digestLookbackHours: 24,
       };
     }
 
@@ -50,6 +60,10 @@ export const telegramBotRouter = router({
         keyNotFoundMessage: parsed.keyNotFoundMessage || 'No key found for your account. Please contact the administrator.',
         isEnabled: parsed.isEnabled ?? false,
         adminChatIds: parsed.adminChatIds || [],
+        dailyDigestEnabled: parsed.dailyDigestEnabled ?? false,
+        dailyDigestHour: parsed.dailyDigestHour ?? 9,
+        dailyDigestMinute: parsed.dailyDigestMinute ?? 0,
+        digestLookbackHours: parsed.digestLookbackHours ?? 24,
       };
     } catch {
       return {
@@ -58,6 +72,11 @@ export const telegramBotRouter = router({
         welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
         isEnabled: false,
+        adminChatIds: [],
+        dailyDigestEnabled: false,
+        dailyDigestHour: 9,
+        dailyDigestMinute: 0,
+        digestLookbackHours: 24,
       };
     }
   }),
@@ -207,5 +226,18 @@ export const telegramBotRouter = router({
     const data = await response.json();
 
     return { success: data.ok };
+  }),
+
+  runDigestNow: adminProcedure.mutation(async () => {
+    const result = await runTelegramDigestCycle({ force: true });
+
+    if (result.skipped) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Telegram digest skipped: ${result.reason}`,
+      });
+    }
+
+    return result;
   }),
 });

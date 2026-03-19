@@ -22,12 +22,19 @@ import { formatTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { buildSharePageUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
 import { subscriptionThemeIds } from '@/lib/subscription-themes';
 import {
   collectTrafficActivity,
   isTrafficActive,
   TRAFFIC_ACTIVE_WINDOW_MS,
 } from '@/lib/services/traffic-activity';
+import {
+  createAccessKeyTelegramConnectLink,
+  sendAccessKeyLifecycleTelegramNotification,
+  sendAccessKeySharePageToTelegram,
+} from '@/lib/services/telegram-bot';
+import { getAccessKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
 
 /**
  * Validation schema for creating a new access key.
@@ -561,6 +568,13 @@ export const keysRouter = router({
           },
         });
 
+        void sendAccessKeyLifecycleTelegramNotification({
+          accessKeyId: accessKey.id,
+          type: 'CREATED',
+        }).catch((notificationError) => {
+          logger.warn('Failed to send Telegram create notification', notificationError);
+        });
+
         return accessKey;
       } catch (error) {
         throw new TRPCError({
@@ -667,6 +681,15 @@ export const keysRouter = router({
           updateData.durationDays = data.durationDays;
         }
 
+        if (
+          data.expirationType !== undefined ||
+          data.expiresAt !== undefined ||
+          data.durationDays !== undefined
+        ) {
+          updateData.expirationWarningStage = null;
+          updateData.lastWarningSentAt = null;
+        }
+
         if (data.subscriptionTheme !== undefined) {
           updateData.subscriptionTheme = data.subscriptionTheme;
         }
@@ -722,6 +745,26 @@ export const keysRouter = router({
             },
           },
         });
+
+        if (data.status && data.status !== existingKey.status) {
+          if (data.status === 'DISABLED') {
+            void sendAccessKeyLifecycleTelegramNotification({
+              accessKeyId: accessKey.id,
+              type: 'DISABLED',
+            }).catch((notificationError) => {
+              logger.warn('Failed to send Telegram disabled notification', notificationError);
+            });
+          }
+
+          if (data.status === 'ACTIVE' && existingKey.status === 'DISABLED') {
+            void sendAccessKeyLifecycleTelegramNotification({
+              accessKeyId: accessKey.id,
+              type: 'ENABLED',
+            }).catch((notificationError) => {
+              logger.warn('Failed to send Telegram enabled notification', notificationError);
+            });
+          }
+        }
 
         return accessKey;
       } catch (error) {
@@ -1414,6 +1457,13 @@ export const keysRouter = router({
             },
           });
 
+          void sendAccessKeyLifecycleTelegramNotification({
+            accessKeyId: updatedKey.id,
+            type: 'ENABLED',
+          }).catch((notificationError) => {
+            logger.warn('Failed to send Telegram enabled notification', notificationError);
+          });
+
           return updatedKey;
         } catch (error) {
           throw new TRPCError({
@@ -1449,6 +1499,13 @@ export const keysRouter = router({
               },
             },
           },
+        });
+
+        void sendAccessKeyLifecycleTelegramNotification({
+          accessKeyId: updatedKey.id,
+          type: 'DISABLED',
+        }).catch((notificationError) => {
+          logger.warn('Failed to send Telegram disabled notification', notificationError);
         });
 
         // Close any active sessions for this key
@@ -1505,9 +1562,7 @@ export const keysRouter = router({
 
       // The subscription URL format - clients can fetch this to get the access URL
       // This will be handled by a public API endpoint
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const basePath = process.env.PANEL_PATH || '';
-      const subscriptionUrl = `${baseUrl}${basePath}/api/subscription/${token}`;
+      const subscriptionUrl = buildSubscriptionApiUrl(token);
 
       return {
         subscriptionUrl,
@@ -1545,13 +1600,94 @@ export const keysRouter = router({
         data: { subscriptionToken: token },
       });
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const basePath = process.env.PANEL_PATH || '';
-
       return {
         token,
-        sharePageUrl: `${baseUrl}${basePath}/sub/${token}`,
+        sharePageUrl: buildSharePageUrl(token),
       };
+    }),
+
+  generateTelegramConnectLink: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      try {
+        return await createAccessKeyTelegramConnectLink({
+          accessKeyId: input.id,
+          createdByUserId: ctx.user.id,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  sendSharePageViaTelegram: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        reason: z
+          .enum(['CREATED', 'RESENT', 'LINKED', 'KEY_ENABLED', 'USAGE_REQUEST', 'SUBSCRIPTION_REQUEST'])
+          .optional(),
+        chatId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await sendAccessKeySharePageToTelegram({
+          accessKeyId: input.id,
+          chatId: input.chatId,
+          reason: input.reason,
+          source: 'dashboard',
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  getSharePageAnalytics: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          userId: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      return getAccessKeySubscriptionAnalytics(input.id);
     }),
 
   /**

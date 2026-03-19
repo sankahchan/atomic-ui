@@ -26,18 +26,19 @@ datasource db {
 // ============================================
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  passwordHash   String?   // Nullable for passwordless/magic link flow if we go that route
-  role           String    @default("USER") // Valid: ADMIN, USER
-  telegramChatId String?   // Telegram chat ID for bot notifications
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String? // Nullable for passwordless/magic link flow if we go that route
+  role           String   @default("USER") // Valid: ADMIN, USER
+  telegramChatId String? // Telegram chat ID for bot notifications
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  accessKeys      AccessKey[]
-  dynamicAccessKeys DynamicAccessKey[]
-  sessions        Session[]
+  accessKeys         AccessKey[]
+  dynamicAccessKeys  DynamicAccessKey[]
+  telegramLinkTokens TelegramLinkToken[]
+  sessions           Session[]
 }
 
 model Session {
@@ -58,27 +59,27 @@ model Session {
 // ============================================
 
 model Server {
-  id            String   @id @default(cuid())
-  name          String
-  apiUrl        String
-  apiCertSha256 String
-  location      String?
-  countryCode   String?
-  isDefault     Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  maxKeys       Int?
-  lifecycleMode String   @default("ACTIVE") // ACTIVE, DRAINING, MAINTENANCE
-  lifecycleNote String?
+  id                 String    @id @default(cuid())
+  name               String
+  apiUrl             String
+  apiCertSha256      String
+  location           String?
+  countryCode        String?
+  isDefault          Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  maxKeys            Int?
+  lifecycleMode      String    @default("ACTIVE") // ACTIVE, DRAINING, MAINTENANCE
+  lifecycleNote      String?
   lifecycleChangedAt DateTime?
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // Relations
-  tags        ServerTag[]
-  accessKeys  AccessKey[]
-  healthCheck HealthCheck?
-  metrics     ServerMetric[]
+  tags         ServerTag[]
+  accessKeys   AccessKey[]
+  healthCheck  HealthCheck?
+  metrics      ServerMetric[]
   keyTemplates KeyTemplate[]
 
   // Cached server info from Outline API
@@ -122,8 +123,8 @@ model AccessKey {
   notes        String?
 
   // User Ownership
-  userId       String?
-  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Server relation
   serverId String
@@ -138,7 +139,7 @@ model AccessKey {
   // Traffic limits (in bytes)
   dataLimitBytes BigInt?
   usedBytes      BigInt  @default(0)
-  
+
   // Periodic Data Limits
   // Strategy: DAILY, WEEKLY, MONTHLY, NEVER
   dataLimitResetStrategy String    @default("NEVER")
@@ -153,21 +154,22 @@ model AccessKey {
 
   // Status tracking
   // Valid status: ACTIVE, DISABLED, EXPIRED, DEPLETED, PENDING
-  status      String    @default("ACTIVE")
-  firstUsedAt DateTime?
-  lastTrafficAt DateTime?
-  lastUsedAt  DateTime?
-  lastWarningSentAt DateTime?
+  status                 String    @default("ACTIVE")
+  firstUsedAt            DateTime?
+  lastTrafficAt          DateTime?
+  lastUsedAt             DateTime?
+  lastWarningSentAt      DateTime?
+  expirationWarningStage String?
 
   // Bandwidth alerts & auto-disable
-  bandwidthAlertAt80 Boolean   @default(false) // true if 80% alert already sent
-  bandwidthAlertAt90 Boolean   @default(false) // true if 90% alert already sent
-  autoDisableOnLimit Boolean   @default(true)  // auto-disable when 100% reached
-  
+  bandwidthAlertAt80 Boolean @default(false) // true if 80% alert already sent
+  bandwidthAlertAt90 Boolean @default(false) // true if 90% alert already sent
+  autoDisableOnLimit Boolean @default(true) // auto-disable when 100% reached
+
   // Disable tracking - when DISABLED, key is deleted from Outline server
   // but kept in DB for potential re-enabling
-  disabledAt          DateTime?
-  disabledOutlineKeyId String?   // Original Outline key ID when disabled (for reference)
+  disabledAt           DateTime?
+  disabledOutlineKeyId String? // Original Outline key ID when disabled (for reference)
 
   // Dynamic key association
   dynamicKeyId String?
@@ -191,7 +193,7 @@ model AccessKey {
   // Contact links for subscription page (JSON array of up to 3 contacts)
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
   // Valid types: telegram, discord, whatsapp, phone, email, website, facebook
-  contactLinks   String?
+  contactLinks               String?
   subscriptionWelcomeMessage String?
 
   // Connection/device tracking
@@ -199,15 +201,17 @@ model AccessKey {
   peakDevices      Int @default(0)
 
   // Ownership and tagging
-  owner String?              // Owner/email for this key
-  tags  String @default("")  // Comma-separated tags
+  owner String? // Owner/email for this key
+  tags  String  @default("") // Comma-separated tags
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  trafficLogs TrafficLog[]
-  notifications NotificationLog[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  trafficLogs            TrafficLog[]
+  notifications          NotificationLog[]
   notificationDeliveries NotificationDelivery[]
-  sessions    ConnectionSession[]
+  sessions               ConnectionSession[]
+  telegramLinkTokens     TelegramLinkToken[]
+  subscriptionEvents     SubscriptionPageEvent[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -228,16 +232,15 @@ model DynamicAccessKey {
   notes      String?
 
   // User Ownership
-  userId     String?
-  user       User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // For tag-based server selection (stored as JSON string)
   serverTagsJson String @default("[]")
 
   // Limits
   dataLimitBytes BigInt?
-  usedBytes      BigInt    @default(0)
+  usedBytes      BigInt  @default(0)
 
   // Periodic Limits
   dataLimitResetStrategy String    @default("NEVER")
@@ -249,8 +252,8 @@ model DynamicAccessKey {
   expirationType String    @default("NEVER") // Same values as AccessKey
 
   // Status
-  status      String    @default("ACTIVE") // Same values as AccessKey
-  firstUsedAt DateTime?
+  status        String    @default("ACTIVE") // Same values as AccessKey
+  firstUsedAt   DateTime?
   lastTrafficAt DateTime?
 
   // Dynamic URL
@@ -263,11 +266,8 @@ model DynamicAccessKey {
   method String @default("chacha20-ietf-poly1305")
 
   // Ownership and tagging
-  owner String?              // Owner/email for this key
-  tags  String @default("")  // Comma-separated tags
-
-  @@index([userId])
-  @@index([status, lastTrafficAt])
+  owner String? // Owner/email for this key
+  tags  String  @default("") // Comma-separated tags
 
   // Load balancer algorithm for selecting access keys
   // Valid: IP_HASH, RANDOM, ROUND_ROBIN
@@ -287,21 +287,64 @@ model DynamicAccessKey {
 
   // Contact links for subscription page (JSON array of up to 3 contacts)
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
-  contactLinks   String?
+  contactLinks String?
 
   // Key Auto-Rotation
   // When enabled, underlying access keys are periodically replaced
   // while keeping the subscription URL stable
-  rotationEnabled   Boolean   @default(false)
-  rotationInterval  String    @default("NEVER") // NEVER, DAILY, WEEKLY, BIWEEKLY, MONTHLY
-  lastRotatedAt     DateTime?
-  nextRotationAt    DateTime?
-  rotationCount     Int       @default(0) // Total rotations performed
+  rotationEnabled  Boolean   @default(false)
+  rotationInterval String    @default("NEVER") // NEVER, DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  lastRotatedAt    DateTime?
+  nextRotationAt   DateTime?
+  rotationCount    Int       @default(0) // Total rotations performed
 
-  accessKeys AccessKey[]
+  accessKeys         AccessKey[]
+  subscriptionEvents SubscriptionPageEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status, lastTrafficAt])
+}
+
+model TelegramLinkToken {
+  id               String     @id @default(cuid())
+  token            String     @unique
+  kind             String     @default("ACCESS_KEY_CONNECT")
+  accessKeyId      String?
+  accessKey        AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  userId           String?
+  user             User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUserId  String?
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  consumedByChatId String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([accessKeyId, expiresAt])
+  @@index([userId, expiresAt])
+  @@index([token, expiresAt])
+}
+
+model SubscriptionPageEvent {
+  id                 String            @id @default(cuid())
+  accessKeyId        String?
+  accessKey          AccessKey?        @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  dynamicAccessKeyId String?
+  dynamicAccessKey   DynamicAccessKey? @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  eventType          String
+  source             String?
+  platform           String?
+  metadata           String?
+  ip                 String?
+  userAgent          String?
+  createdAt          DateTime          @default(now())
+
+  @@index([accessKeyId, createdAt])
+  @@index([dynamicAccessKeyId, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model TrafficLog {
@@ -310,8 +353,8 @@ model TrafficLog {
   accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
 
   // Historical Analytics (Phase 8)
-  bytesUsed   BigInt   // Cumulative at time of log
-  deltaBytes  BigInt   @default(0) // Usage since last log
+  bytesUsed  BigInt // Cumulative at time of log
+  deltaBytes BigInt @default(0) // Usage since last log
 
   recordedAt DateTime @default(now())
 
@@ -328,15 +371,15 @@ model ConnectionSession {
   accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
 
   // Session timing
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  lastActiveAt DateTime @default(now())
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  lastActiveAt DateTime  @default(now())
 
   // Traffic during this session
-  bytesUsed   BigInt    @default(0)
+  bytesUsed BigInt @default(0)
 
   // Is this session currently active?
-  isActive    Boolean   @default(true)
+  isActive    Boolean @default(true)
   endedReason String?
 
   @@index([accessKeyId, isActive])
@@ -349,24 +392,24 @@ model ConnectionSession {
 // ============================================
 
 model ArchivedKey {
-  id             String   @id @default(cuid())
-  originalKeyId  String   // Original AccessKey ID
-  outlineKeyId   String   // ID from Outline API
-  name           String
-  email          String?
-  telegramId     String?
-  notes          String?
+  id            String  @id @default(cuid())
+  originalKeyId String // Original AccessKey ID
+  outlineKeyId  String // ID from Outline API
+  name          String
+  email         String?
+  telegramId    String?
+  notes         String?
 
   // Server info (stored since original might be deleted)
   serverName     String
   serverLocation String?
 
   // Access key details
-  accessUrl      String?
+  accessUrl String?
 
   // Traffic data
   dataLimitBytes BigInt?
-  usedBytes      BigInt   @default(0)
+  usedBytes      BigInt  @default(0)
 
   // Expiration info
   expirationType String
@@ -374,19 +417,19 @@ model ArchivedKey {
   durationDays   Int?
 
   // Archive reason: EXPIRED, DEPLETED, DELETED, DISABLED
-  archiveReason  String
+  archiveReason String
 
   // Status at time of archival
   originalStatus String
 
   // Timestamps
-  firstUsedAt    DateTime?
-  lastUsedAt     DateTime?
-  createdAt      DateTime  // Original creation date
-  archivedAt     DateTime  @default(now())
+  firstUsedAt DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime // Original creation date
+  archivedAt  DateTime  @default(now())
 
   // Auto-delete after 3 months
-  deleteAfter    DateTime
+  deleteAfter DateTime
 
   @@index([archiveReason])
   @@index([archivedAt])
@@ -458,22 +501,22 @@ model NotificationChannel {
 }
 
 model NotificationDelivery {
-  id            String   @id @default(cuid())
+  id            String               @id @default(cuid())
   channelId     String?
   channel       NotificationChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
   event         String
   message       String
   payload       String?
-  payloadMode   String   @default("WRAPPED") // WRAPPED, RAW
+  payloadMode   String               @default("WRAPPED") // WRAPPED, RAW
   cooldownKey   String?
-  status        String   @default("PENDING") // PENDING, PROCESSING, RETRYING, SUCCESS, FAILED
-  attemptCount  Int      @default(0)
-  maxAttempts   Int      @default(5)
-  nextAttemptAt DateTime @default(now())
+  status        String               @default("PENDING") // PENDING, PROCESSING, RETRYING, SUCCESS, FAILED
+  attemptCount  Int                  @default(0)
+  maxAttempts   Int                  @default(5)
+  nextAttemptAt DateTime             @default(now())
   lastAttemptAt DateTime?
   processedAt   DateTime?
   lastError     String?
-  
+
   // Optional relation to access key
   accessKeyId String?
   accessKey   AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: SetNull)
@@ -518,38 +561,38 @@ model NotificationLog {
   status    String // SUCCESS, FAILED
   error     String?
   sentAt    DateTime @default(now())
-  
+
   // Optional relation to access key
   accessKeyId String?
   accessKey   AccessKey? @relation(fields: [accessKeyId], references: [id], onDelete: SetNull)
 }
 
 model Incident {
-  id                    String   @id @default(cuid())
-  sourceType            String   @default("SERVER_HEALTH") // SERVER_HEALTH, MANUAL
-  serverId              String?
-  title                 String
-  summary               String
-  severity              String   @default("warning") // critical, warning, info
-  status                String   @default("OPEN") // OPEN, ACKNOWLEDGED, RESOLVED
-  healthStatus          String?
-  countryCode           String?
-  affectedKeyCount      Int      @default(0)
-  affectedUserCount     Int      @default(0)
-  assignedUserId        String?
-  assignedUserEmail     String?
-  acknowledgedByUserId  String?
-  acknowledgedByEmail   String?
-  resolvedByUserId      String?
-  resolvedByEmail       String?
-  notes                 String?
-  metadata              String?
-  openedAt              DateTime @default(now())
-  lastSeenAt            DateTime @default(now())
-  acknowledgedAt        DateTime?
-  resolvedAt            DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  sourceType           String    @default("SERVER_HEALTH") // SERVER_HEALTH, MANUAL
+  serverId             String?
+  title                String
+  summary              String
+  severity             String    @default("warning") // critical, warning, info
+  status               String    @default("OPEN") // OPEN, ACKNOWLEDGED, RESOLVED
+  healthStatus         String?
+  countryCode          String?
+  affectedKeyCount     Int       @default(0)
+  affectedUserCount    Int       @default(0)
+  assignedUserId       String?
+  assignedUserEmail    String?
+  acknowledgedByUserId String?
+  acknowledgedByEmail  String?
+  resolvedByUserId     String?
+  resolvedByEmail      String?
+  notes                String?
+  metadata             String?
+  openedAt             DateTime  @default(now())
+  lastSeenAt           DateTime  @default(now())
+  acknowledgedAt       DateTime?
+  resolvedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   events IncidentEvent[]
 
@@ -562,7 +605,7 @@ model IncidentEvent {
   id                String   @id @default(cuid())
   incidentId        String
   incident          Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
-  type              String   // OPENED, STATUS_CHANGED, ACKNOWLEDGED, ASSIGNED, NOTE, RESOLVED, NOTIFICATION
+  type              String // OPENED, STATUS_CHANGED, ACKNOWLEDGED, ASSIGNED, NOTE, RESOLVED, NOTIFICATION
   severity          String?
   title             String
   message           String?
@@ -617,8 +660,8 @@ model AuditLog {
 // ============================================
 
 model KeyTemplate {
-  id          String   @id @default(cuid())
-  name        String   // Template name (e.g., "Standard 30 Day")
+  id          String  @id @default(cuid())
+  name        String // Template name (e.g., "Standard 30 Day")
   description String?
 
   // Key Configuration
@@ -626,15 +669,15 @@ model KeyTemplate {
   dataLimitBytes         BigInt?
   dataLimitResetStrategy String  @default("NEVER")
   expirationType         String  @default("NEVER")
-  durationDays           Int?    // For DURATION_FROM_CREATION or START_ON_FIRST_USE
+  durationDays           Int? // For DURATION_FROM_CREATION or START_ON_FIRST_USE
   method                 String  @default("chacha20-ietf-poly1305")
-  
+
   // Customization
-  notes                  String? // Default notes
-  
+  notes String? // Default notes
+
   // Default server (optional)
-  serverId               String?
-  server                 Server? @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  serverId String?
+  server   Server? @relation(fields: [serverId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -645,23 +688,23 @@ model KeyTemplate {
 // ============================================
 
 model SecurityRule {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Rule Type: ALLOW (Whitelist) or BLOCK (Blacklist)
-  type        String   @default("BLOCK")
+  type String @default("BLOCK")
 
   // Target: IP, CIDR, COUNTRY
   // Valid: IP, CIDR, COUNTRY
-  targetType  String
+  targetType String
 
   // Value: 192.168.1.1, 10.0.0.0/24, US, CN
   targetValue String
 
   description String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type, targetType])
 }
@@ -671,22 +714,22 @@ model SecurityRule {
 // ============================================
 
 model UsageSnapshot {
-  id        String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Optional server reference (for server-level aggregates)
-  serverId  String?
+  serverId String?
 
   // Optional key reference (for per-key snapshots)
-  keyId     String?
+  keyId String?
 
   // Key type: ACCESS_KEY or DYNAMIC_KEY
-  keyType   String?
+  keyType String?
 
   // Cumulative usage in bytes at this point in time
   usedBytes BigInt
 
   // Delta since last snapshot (calculated by worker)
-  deltaBytes BigInt   @default(0)
+  deltaBytes BigInt @default(0)
 
   createdAt DateTime @default(now())
 
@@ -700,16 +743,16 @@ model UsageSnapshot {
 // ============================================
 
 model WorkerLock {
-  id          String   @id @default("usage-snapshot-worker")
+  id String @id @default("usage-snapshot-worker")
 
   // Worker that holds the lock
-  workerId    String
+  workerId String
 
   // Lock acquisition time
-  lockedAt    DateTime @default(now())
+  lockedAt DateTime @default(now())
 
   // Lock expiration (auto-release if worker crashes)
-  expiresAt   DateTime
+  expiresAt DateTime
 
   // Last heartbeat from the worker
   heartbeatAt DateTime @default(now())
@@ -720,34 +763,34 @@ model WorkerLock {
 // ============================================
 
 model TotpSecret {
-  id              String   @id @default(cuid())
-  userId          String   @unique
+  id     String @id @default(cuid())
+  userId String @unique
 
   // Encrypted TOTP secret (base32 encoded, then encrypted)
   encryptedSecret String
 
   // Whether 2FA has been verified/enabled
-  verified        Boolean  @default(false)
+  verified Boolean @default(false)
 
   // Track verification attempts (for rate limiting)
-  lastAttemptAt   DateTime?
-  attemptCount    Int      @default(0)
+  lastAttemptAt DateTime?
+  attemptCount  Int       @default(0)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model RecoveryCode {
-  id        String    @id @default(cuid())
-  userId    String
+  id     String @id @default(cuid())
+  userId String
 
   // Hashed recovery code (bcrypt)
-  codeHash  String
+  codeHash String
 
   // When was this code used (null = not used)
-  usedAt    DateTime?
+  usedAt DateTime?
 
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -757,26 +800,26 @@ model RecoveryCode {
 // ============================================
 
 model WebAuthnCredential {
-  id              String   @id @default(cuid())
-  userId          String
+  id     String @id @default(cuid())
+  userId String
 
   // WebAuthn credential data
-  credentialId    String   @unique // Base64 encoded
-  publicKey       String   // Base64 encoded COSE public key
-  counter         Int      @default(0)
+  credentialId String @unique // Base64 encoded
+  publicKey    String // Base64 encoded COSE public key
+  counter      Int    @default(0)
 
   // Credential metadata
-  deviceType      String?  // platform, cross-platform
-  transports      String?  // JSON array: ["usb", "nfc", "ble", "internal"]
+  deviceType String? // platform, cross-platform
+  transports String? // JSON array: ["usb", "nfc", "ble", "internal"]
 
   // User-friendly name for the credential
-  name            String   @default("Security Key")
+  name String @default("Security Key")
 
   // Track last use
-  lastUsedAt      DateTime?
+  lastUsedAt DateTime?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
@@ -786,35 +829,35 @@ model WebAuthnCredential {
 // ============================================
 
 model SecurityProbe {
-  id            String   @id @default(cuid())
-  serverId      String   @unique
+  id       String @id @default(cuid())
+  serverId String @unique
 
   // TLS/Connection details
-  scheme        String?  // http, https
-  tlsVersion    String?  // TLSv1.2, TLSv1.3
-  cipherSuite   String?
+  scheme      String? // http, https
+  tlsVersion  String? // TLSv1.2, TLSv1.3
+  cipherSuite String?
 
   // Certificate details
-  certSubject   String?
-  certIssuer    String?
-  certExpiry    DateTime?
-  certDaysLeft  Int?
+  certSubject  String?
+  certIssuer   String?
+  certExpiry   DateTime?
+  certDaysLeft Int?
 
   // Security headers
-  hasHsts       Boolean  @default(false)
-  hstsMaxAge    Int?
+  hasHsts    Boolean @default(false)
+  hstsMaxAge Int?
 
   // Probe result
   // Valid: OK, CERT_EXPIRING, CERT_EXPIRED, TLS_ERROR, CONNECTION_ERROR
-  result        String   @default("UNKNOWN")
-  errorMessage  String?
+  result       String  @default("UNKNOWN")
+  errorMessage String?
 
   // Timestamps
   lastCheckedAt DateTime?
   nextCheckAt   DateTime?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================
@@ -822,41 +865,41 @@ model SecurityProbe {
 // ============================================
 
 model DashboardSecurityProbe {
-  id            String   @id @default("dashboard-security")
+  id String @id @default("dashboard-security")
 
   // Current dashboard URL being probed
-  dashboardUrl  String?
+  dashboardUrl String?
 
   // TLS/Connection details
-  scheme        String?  // http, https
-  tlsVersion    String?
+  scheme     String? // http, https
+  tlsVersion String?
 
   // Security headers
-  hasHsts       Boolean  @default(false)
-  hstsMaxAge    Int?
-  hasSecureCookies Boolean @default(false)
+  hasHsts            Boolean @default(false)
+  hstsMaxAge         Int?
+  hasSecureCookies   Boolean @default(false)
   hasHttpOnlyCookies Boolean @default(false)
   hasSameSiteCookies Boolean @default(false)
 
   // Content Security Policy
-  hasCsp        Boolean  @default(false)
-  cspDirectives String?  // JSON
+  hasCsp        Boolean @default(false)
+  cspDirectives String? // JSON
 
   // Other headers
-  hasXFrameOptions Boolean @default(false)
+  hasXFrameOptions       Boolean @default(false)
   hasXContentTypeOptions Boolean @default(false)
 
   // Probe result
-  result        String   @default("UNKNOWN")
-  errorMessage  String?
+  result       String  @default("UNKNOWN")
+  errorMessage String?
 
   // Overall security score (0-100)
-  securityScore Int      @default(0)
+  securityScore Int @default(0)
 
   lastCheckedAt DateTime?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================
@@ -864,12 +907,12 @@ model DashboardSecurityProbe {
 // ============================================
 
 model Report {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Report metadata
-  name        String             // e.g., "Monthly Report - January 2026"
-  type        String @default("MONTHLY") // MONTHLY, WEEKLY, CUSTOM
-  status      String @default("GENERATING") // GENERATING, READY, FAILED
+  name   String // e.g., "Monthly Report - January 2026"
+  type   String @default("MONTHLY") // MONTHLY, WEEKLY, CUSTOM
+  status String @default("GENERATING") // GENERATING, READY, FAILED
 
   // Date range covered by this report
   periodStart DateTime
@@ -877,13 +920,13 @@ model Report {
 
   // Report content (stored as JSON string)
   // Contains aggregated data: per-server totals, per-key usage, etc.
-  reportData  String?  // JSON blob
+  reportData String? // JSON blob
 
   // Summary stats (for quick display without parsing full data)
-  totalServers    Int      @default(0)
-  totalKeys       Int      @default(0)
-  totalBytesUsed  BigInt   @default(0)
-  totalDeltaBytes BigInt   @default(0) // Usage during the period
+  totalServers    Int    @default(0)
+  totalKeys       Int    @default(0)
+  totalBytesUsed  BigInt @default(0)
+  totalDeltaBytes BigInt @default(0) // Usage during the period
 
   // File reference for CSV download
   csvFileName String?
@@ -891,8 +934,8 @@ model Report {
   // Who generated the report
   generatedBy String?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   scheduledRuns ScheduledReportRun[]
 
@@ -901,19 +944,19 @@ model Report {
 }
 
 model ScheduledReportRun {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   reportId       String?
-  report         Report?  @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  report         Report?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
   frequency      String
-  status         String   @default("PENDING") // PENDING, RUNNING, SUCCESS, FAILED, SKIPPED
+  status         String    @default("PENDING") // PENDING, RUNNING, SUCCESS, FAILED, SKIPPED
   triggeredBy    String?
   periodStart    DateTime
   periodEnd      DateTime
   summaryMessage String?
   configSnapshot String?
   error          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   completedAt    DateTime?
 
   deliveries ScheduledReportDelivery[]
@@ -923,18 +966,18 @@ model ScheduledReportRun {
 }
 
 model ScheduledReportDelivery {
-  id                   String   @id @default(cuid())
-  runId                String
-  run                  ScheduledReportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  channelId            String?
-  channelName          String
-  channelType          String
-  status               String   @default("QUEUED") // QUEUED, SUCCESS, FAILED, SKIPPED
-  notificationDeliveryId String? @unique
-  lastError            String?
-  deliveredAt          DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                     String             @id @default(cuid())
+  runId                  String
+  run                    ScheduledReportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  channelId              String?
+  channelName            String
+  channelType            String
+  status                 String             @default("QUEUED") // QUEUED, SUCCESS, FAILED, SKIPPED
+  notificationDeliveryId String?            @unique
+  lastError              String?
+  deliveredAt            DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   @@index([runId, createdAt])
   @@index([status, createdAt])

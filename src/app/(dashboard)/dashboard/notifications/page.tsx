@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
@@ -144,6 +145,32 @@ type DeliveryLog = {
   accessKeyName: string | null;
   canRetry: boolean;
   retryQueued?: boolean;
+};
+
+type TelegramSettings = {
+  botToken: string;
+  botUsername?: string;
+  welcomeMessage?: string;
+  keyNotFoundMessage?: string;
+  isEnabled: boolean;
+  adminChatIds: string[];
+  dailyDigestEnabled: boolean;
+  dailyDigestHour: number;
+  dailyDigestMinute: number;
+  digestLookbackHours: number;
+};
+
+const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
+  botToken: '',
+  botUsername: '',
+  welcomeMessage: 'Welcome! Use /mykeys to view your linked VPN keys.',
+  keyNotFoundMessage: 'No linked keys were found. Please contact support to connect your Telegram account.',
+  isEnabled: false,
+  adminChatIds: [],
+  dailyDigestEnabled: false,
+  dailyDigestHour: 9,
+  dailyDigestMinute: 0,
+  digestLookbackHours: 24,
 };
 
 function getEventLabel(eventId: string, t: (key: string) => string) {
@@ -292,6 +319,453 @@ function buildEventCooldownPayload(eventCooldowns: EventCooldownInputs) {
   }
 
   return next;
+}
+
+function TelegramBotSetupCard() {
+  const { toast } = useToast();
+  const { t } = useLocale();
+  const utils = trpc.useUtils();
+  const settingsQuery = trpc.telegramBot.getSettings.useQuery();
+  const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+  const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
+  const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
+
+  useEffect(() => {
+    if (!settingsQuery.data) {
+      return;
+    }
+
+    setForm({
+      botToken: settingsQuery.data.botToken || '',
+      botUsername: settingsQuery.data.botUsername || '',
+      welcomeMessage: settingsQuery.data.welcomeMessage || DEFAULT_TELEGRAM_SETTINGS.welcomeMessage,
+      keyNotFoundMessage:
+        settingsQuery.data.keyNotFoundMessage || DEFAULT_TELEGRAM_SETTINGS.keyNotFoundMessage,
+      isEnabled: settingsQuery.data.isEnabled ?? false,
+      adminChatIds: settingsQuery.data.adminChatIds || [],
+      dailyDigestEnabled: settingsQuery.data.dailyDigestEnabled ?? false,
+      dailyDigestHour: settingsQuery.data.dailyDigestHour ?? 9,
+      dailyDigestMinute: settingsQuery.data.dailyDigestMinute ?? 0,
+      digestLookbackHours: settingsQuery.data.digestLookbackHours ?? 24,
+    });
+    setAdminChatIdsInput((settingsQuery.data.adminChatIds || []).join(', '));
+  }, [settingsQuery.data]);
+
+  const saveSettingsMutation = trpc.telegramBot.updateSettings.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.getSettings.invalidate(),
+        utils.telegramBot.getWebhookInfo.invalidate(),
+      ]);
+      toast({
+        title: 'Telegram settings saved',
+        description: 'The bot configuration and digest schedule were updated.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram settings failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const testConnectionMutation = trpc.telegramBot.testConnection.useMutation({
+    onSuccess: (result) => {
+      setForm((prev) => ({ ...prev, botUsername: result.botUsername || prev.botUsername }));
+      toast({
+        title: 'Telegram connected',
+        description: `Connected as @${result.botUsername || result.botName}.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram connection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const setWebhookMutation = trpc.telegramBot.setWebhook.useMutation({
+    onSuccess: async () => {
+      await webhookInfoQuery.refetch();
+      toast({
+        title: 'Webhook set',
+        description: 'Telegram will now send updates to this panel.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Webhook setup failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteWebhookMutation = trpc.telegramBot.deleteWebhook.useMutation({
+    onSuccess: async () => {
+      await webhookInfoQuery.refetch();
+      toast({
+        title: 'Webhook removed',
+        description: 'Telegram webhook delivery has been disabled.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Webhook removal failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const runDigestMutation = trpc.telegramBot.runDigestNow.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Telegram digest sent',
+        description: `Delivered to ${result.adminChats} admin chat(s).`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Digest failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const isSaving = saveSettingsMutation.isPending;
+  const hasToken = form.botToken.trim().length > 0;
+  const webhookUrl =
+    typeof window === 'undefined'
+      ? ''
+      : `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
+
+  const handleSave = () => {
+    const adminChatIds = adminChatIdsInput
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    saveSettingsMutation.mutate({
+      botToken: form.botToken.trim(),
+      botUsername: form.botUsername?.trim() || undefined,
+      welcomeMessage: form.welcomeMessage?.trim() || undefined,
+      keyNotFoundMessage: form.keyNotFoundMessage?.trim() || undefined,
+      isEnabled: form.isEnabled,
+      adminChatIds,
+      dailyDigestEnabled: form.dailyDigestEnabled,
+      dailyDigestHour: form.dailyDigestHour,
+      dailyDigestMinute: form.dailyDigestMinute,
+      digestLookbackHours: form.digestLookbackHours,
+    });
+  };
+
+  return (
+    <Card className="border-blue-500/20 bg-blue-500/[0.04] dark:bg-blue-500/[0.06]">
+      <CardHeader className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              {t('settings.telegram.title')}
+            </CardTitle>
+            <CardDescription>{t('settings.telegram.desc')}</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={form.isEnabled ? 'default' : 'secondary'}>
+              {form.isEnabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+            <Badge variant={webhookInfoQuery.data?.webhookSet ? 'default' : 'outline'}>
+              {webhookInfoQuery.data?.webhookSet
+                ? t('settings.telegram.webhook_active')
+                : t('settings.telegram.webhook_inactive')}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="telegram-bot-token">{t('settings.telegram.token')}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="telegram-bot-token"
+                    type="password"
+                    placeholder={t('settings.telegram.token_placeholder')}
+                    value={form.botToken}
+                    onChange={(event) => setForm((prev) => ({ ...prev, botToken: event.target.value }))}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => testConnectionMutation.mutate({ botToken: form.botToken.trim() })}
+                    disabled={!hasToken || testConnectionMutation.isPending}
+                  >
+                    {testConnectionMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <TestTube className="mr-2 h-4 w-4" />
+                    )}
+                    {t('settings.telegram.test')}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.telegram.help')}{' '}
+                  <Link
+                    href="https://t.me/BotFather"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    @BotFather
+                  </Link>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="telegram-bot-username">Bot Username</Label>
+                <Input
+                  id="telegram-bot-username"
+                  placeholder="@yourbot"
+                  value={form.botUsername || ''}
+                  onChange={(event) => setForm((prev) => ({ ...prev, botUsername: event.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="telegram-admin-chat-ids">{t('settings.telegram.admin_ids')}</Label>
+                <Input
+                  id="telegram-admin-chat-ids"
+                  placeholder={t('settings.telegram.admin_ids_placeholder')}
+                  value={adminChatIdsInput}
+                  onChange={(event) => setAdminChatIdsInput(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="telegram-welcome-message">{t('settings.telegram.welcome')}</Label>
+                <Textarea
+                  id="telegram-welcome-message"
+                  value={form.welcomeMessage || ''}
+                  onChange={(event) => setForm((prev) => ({ ...prev, welcomeMessage: event.target.value }))}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="telegram-not-found-message">{t('settings.telegram.not_found')}</Label>
+                <Textarea
+                  id="telegram-not-found-message"
+                  value={form.keyNotFoundMessage || ''}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, keyNotFoundMessage: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-2xl border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Enable Telegram bot</p>
+                  <p className="text-xs text-muted-foreground">
+                    Allow users to link keys, receive share pages, and run self-service bot commands.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.isEnabled}
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isEnabled: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Daily admin digest</p>
+                  <p className="text-xs text-muted-foreground">
+                    Send expiring-key, usage, and share-page activity summaries to admin chats.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.dailyDigestEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, dailyDigestEnabled: checked }))
+                  }
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-digest-hour">Digest hour</Label>
+                  <Input
+                    id="telegram-digest-hour"
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={String(form.dailyDigestHour)}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        dailyDigestHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)),
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-digest-minute">Digest minute</Label>
+                  <Input
+                    id="telegram-digest-minute"
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={String(form.dailyDigestMinute)}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        dailyDigestMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)),
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-lookback-hours">Lookback window</Label>
+                  <Input
+                    id="telegram-lookback-hours"
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={String(form.digestLookbackHours)}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        digestLookbackHours: Math.min(168, Math.max(1, Number(event.target.value) || 1)),
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">{t('settings.telegram.webhook_status')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Telegram sends new messages to this endpoint when the webhook is active.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => webhookInfoQuery.refetch()}
+                  disabled={webhookInfoQuery.isFetching}
+                >
+                  <RefreshCw className={cn('h-4 w-4', webhookInfoQuery.isFetching && 'animate-spin')} />
+                </Button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs break-all">
+                {webhookUrl || 'Webhook URL unavailable in this environment'}
+              </div>
+
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
+                <p>
+                  Pending updates:{' '}
+                  <span className="font-medium text-foreground">
+                    {webhookInfoQuery.data?.pendingUpdateCount ?? 0}
+                  </span>
+                </p>
+                {webhookInfoQuery.data?.lastErrorMessage ? (
+                  <p className="text-destructive">
+                    Last error: {webhookInfoQuery.data.lastErrorMessage}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="rounded-full"
+                  onClick={() => setWebhookMutation.mutate({ webhookUrl })}
+                  disabled={!hasToken || !webhookUrl || setWebhookMutation.isPending}
+                >
+                  {setWebhookMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                  )}
+                  {t('settings.telegram.set_webhook')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => deleteWebhookMutation.mutate()}
+                  disabled={!hasToken || deleteWebhookMutation.isPending}
+                >
+                  {deleteWebhookMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                  )}
+                  {t('settings.telegram.remove_webhook')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
+              <p className="text-sm font-medium">Bot command surface</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                User commands: <code>/start</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
+                <code>/usage</code>, <code>/server</code>, <code>/renew</code>, <code>/support</code>
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Admin commands: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
+                <code>/enable</code>, <code>/resend</code>, <code>/status</code>, <code>/sysinfo</code>,{' '}
+                <code>/backup</code>
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => runDigestMutation.mutate()}
+                  disabled={runDigestMutation.isPending || !hasToken}
+                >
+                  {runDigestMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Send digest now
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {t('settings.telegram.save')}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function getChannelRuleSummary(channel: Channel, t: (key: string) => string) {
@@ -1804,7 +2278,6 @@ export default function NotificationsPage() {
 
       <QueueStatusCard />
 
-      <div className="grid gap-4 xl:grid-cols-2">
       {/* Info card */}
       <Card className="border-dashed bg-background/55 dark:bg-white/[0.02]">
         <CardContent className="p-5">
@@ -1820,22 +2293,7 @@ export default function NotificationsPage() {
         </CardContent>
       </Card>
 
-      {/* Telegram bot setup note */}
-      <Card className="border-blue-500/20 bg-blue-500/[0.06]">
-        <CardContent className="p-5">
-          <div className="flex gap-3">
-            <MessageSquare className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{t('notifications.telegram.title')}</p>
-              <p className="text-sm text-muted-foreground">
-                {t('notifications.telegram.desc')}{' '}
-                <code className="bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</code> setting.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      </div>
+      <TelegramBotSetupCard />
 
       {/* Channels grid */}
       {isChannelsLoading ? (

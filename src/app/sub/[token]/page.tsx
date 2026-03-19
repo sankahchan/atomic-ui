@@ -7,8 +7,8 @@
  * Displays key information, usage stats, and quick-connect buttons.
  */
 
-import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -48,6 +48,10 @@ const ATOMIC_LOGO_SVG = `data:image/svg+xml,${encodeURIComponent(`
 </svg>
 `)}`;
 
+import {
+  SUBSCRIPTION_EVENT_TYPES,
+  type SubscriptionEventType,
+} from '@/lib/services/subscription-events';
 import {
   getTheme,
   clientApps,
@@ -247,7 +251,9 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 
 export default function SubscriptionPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
+  const sourceParam = searchParams.get('source');
 
   const [keyData, setKeyData] = useState<KeyData | null>(null);
   const [settings, setSettings] = useState<SettingsData>({});
@@ -256,7 +262,20 @@ export default function SubscriptionPage() {
   const [themeId, setThemeId] = useState<string>('dark');
   const [theme, setTheme] = useState<SubscriptionTheme>(getTheme('dark'));
   const [branding, setBranding] = useState<SubscriptionBranding>(defaultBranding);
-  const [platform, setPlatform] = useState<Platform>('android');
+  const [platform, setPlatform] = useState<Platform>(() => {
+    if (typeof window === 'undefined') {
+      return 'android';
+    }
+
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(userAgent)) {
+      return 'ios';
+    }
+    if (/android/.test(userAgent)) {
+      return 'android';
+    }
+    return 'windows';
+  });
   const [qrCode, setQrCode] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -268,6 +287,31 @@ export default function SubscriptionPage() {
   const [usageAlert, setUsageAlert] = useState<number | null>(null);
   const [refreshingUsage, setRefreshingUsage] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [pageViewLogged, setPageViewLogged] = useState(false);
+
+  const trackSubscriptionEvent = useCallback(async (
+    eventType: SubscriptionEventType,
+    metadata?: Record<string, unknown>,
+    eventPlatform?: string | null,
+  ) => {
+    try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      await fetch(`${basePath}/api/subscription/${token}/track`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType,
+          source: sourceParam,
+          platform: eventPlatform ?? null,
+          metadata,
+        }),
+      });
+    } catch {
+      // Tracking should never interrupt the page flow.
+    }
+  }, [sourceParam, token]);
 
   // Listen for system color scheme changes
   useEffect(() => {
@@ -379,7 +423,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [token]);
+  }, [token, trackSubscriptionEvent]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -412,18 +456,6 @@ export default function SubscriptionPage() {
     }
   }, [keyData, branding.showUsageAlerts, branding.usageAlertThresholds]);
 
-  // Detect platform on mount
-  useEffect(() => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(userAgent)) {
-      setPlatform('ios');
-    } else if (/android/.test(userAgent)) {
-      setPlatform('android');
-    } else {
-      setPlatform('windows');
-    }
-  }, []);
-
   useEffect(() => {
     if (!feedback) return;
     const timeoutId = window.setTimeout(() => setFeedback(null), 2200);
@@ -436,13 +468,43 @@ export default function SubscriptionPage() {
     }
   }, [showManualSetup]);
 
-  const copyToClipboard = async (text: string, successMessage = 'Copied to clipboard') => {
+  useEffect(() => {
+    if (showManualSetup) {
+      void trackSubscriptionEvent(
+        SUBSCRIPTION_EVENT_TYPES.OPEN_QR,
+        { context: 'manual_setup' },
+        platform,
+      );
+    }
+  }, [platform, showManualSetup, trackSubscriptionEvent]);
+
+  useEffect(() => {
+    if (!keyData || pageViewLogged) {
+      return;
+    }
+
+    void trackSubscriptionEvent(
+      SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW,
+      { status: keyData.status },
+      platform,
+    );
+    setPageViewLogged(true);
+  }, [keyData, pageViewLogged, platform, trackSubscriptionEvent]);
+
+  const copyToClipboard = async (
+    text: string,
+    successMessage = 'Copied to clipboard',
+    eventMetadata?: Record<string, unknown>,
+  ) => {
     if (!text) return;
 
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
         setFeedback(successMessage);
+        if (eventMetadata) {
+          void trackSubscriptionEvent(SUBSCRIPTION_EVENT_TYPES.COPY_URL, eventMetadata, platform);
+        }
         return;
       }
     } catch (err) {
@@ -464,6 +526,9 @@ export default function SubscriptionPage() {
 
       if (successful) {
         setFeedback(successMessage);
+        if (eventMetadata) {
+          void trackSubscriptionEvent(SUBSCRIPTION_EVENT_TYPES.COPY_URL, eventMetadata, platform);
+        }
         return;
       }
     } catch (err) {
@@ -558,6 +623,14 @@ export default function SubscriptionPage() {
     } else {
       url = keyData.accessUrl;
     }
+    void trackSubscriptionEvent(
+      SUBSCRIPTION_EVENT_TYPES.OPEN_APP,
+      {
+        appId,
+        destination: url,
+      },
+      platform,
+    );
     window.location.href = url;
   };
 
@@ -1029,7 +1102,12 @@ export default function SubscriptionPage() {
                               Connection URL
                             </p>
                             <button
-                              onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                              onClick={() =>
+                                copyToClipboard(actionFieldText, 'Connection URL copied', {
+                                  target: 'connection_url',
+                                  placement: 'hero_header',
+                                })
+                              }
                               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.9rem] border transition-colors"
                               style={{
                                 backgroundColor: controlButtonSurface,
@@ -1070,7 +1148,12 @@ export default function SubscriptionPage() {
                           </button>
                         ) : (
                           <button
-                            onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                            onClick={() =>
+                              copyToClipboard(actionFieldText, 'Connection URL copied', {
+                                target: 'connection_url',
+                                placement: 'hero_primary',
+                              })
+                            }
                             className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
@@ -1084,7 +1167,12 @@ export default function SubscriptionPage() {
 
                         <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                           <button
-                            onClick={() => copyToClipboard(actionFieldText, 'Connection URL copied')}
+                            onClick={() =>
+                              copyToClipboard(actionFieldText, 'Connection URL copied', {
+                                target: 'connection_url',
+                                placement: 'hero_secondary',
+                              })
+                            }
                             className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
@@ -1652,7 +1740,12 @@ export default function SubscriptionPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                        onClick={() =>
+                          copyToClipboard(keyData.accessUrl, 'Connection URL copied', {
+                            target: 'connection_url',
+                            placement: 'manual_setup_primary',
+                          })
+                        }
                         className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium"
                         style={{
                           backgroundColor: theme.accent,
@@ -1683,7 +1776,12 @@ export default function SubscriptionPage() {
                         </p>
                       </div>
                       <button
-                        onClick={() => copyToClipboard(keyData.accessUrl, 'Connection URL copied')}
+                        onClick={() =>
+                          copyToClipboard(keyData.accessUrl, 'Connection URL copied', {
+                            target: 'connection_url',
+                            placement: 'manual_setup_card',
+                          })
+                        }
                         className="rounded-full p-2"
                         style={{ backgroundColor: theme.accent, color: theme.accentText }}
                       >

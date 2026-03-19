@@ -531,6 +531,40 @@ function SubscriptionShareCard({
       });
     },
   });
+  const sendSharePageMutation = trpc.keys.sendSharePageViaTelegram.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Share page sent',
+        description: 'The latest share page was sent through Telegram.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram send failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const connectLinkMutation = trpc.keys.generateTelegramConnectLink.useMutation({
+    onSuccess: async (result) => {
+      await copyToClipboard(result.url, 'Copied!', 'Telegram connect link copied to clipboard.');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Connect link failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const analyticsQuery = trpc.keys.getSharePageAnalytics.useQuery(
+    { id: keyId },
+    {
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: false,
+    },
+  );
 
   const handleThemeChange = (value: string) => {
     setSelectedTheme(value);
@@ -848,7 +882,7 @@ function SubscriptionShareCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <Button
             variant="outline"
             className="w-full"
@@ -872,6 +906,31 @@ function SubscriptionShareCard({
           <Button
             variant="outline"
             className="w-full"
+            onClick={() => connectLinkMutation.mutate({ id: keyId })}
+            disabled={connectLinkMutation.isPending}
+          >
+            {connectLinkMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Link2 className="w-4 h-4 mr-2" />
+            )}
+            Connect Telegram
+          </Button>
+          <Button
+            className="w-full"
+            onClick={() => sendSharePageMutation.mutate({ id: keyId, reason: 'RESENT' })}
+            disabled={sendSharePageMutation.isPending}
+          >
+            {sendSharePageMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <MessageSquare className="w-4 h-4 mr-2" />
+            )}
+            Send via Telegram
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
             onClick={() => regenerateTokenMutation.mutate({ id: keyId })}
             disabled={regenerateTokenMutation.isPending}
           >
@@ -891,6 +950,27 @@ function SubscriptionShareCard({
             : regenerateTokenMutation.isPending
               ? 'Generating new subscription token...'
               : 'Generating subscription token...'}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Page Views</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.pageViews ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Copy Clicks</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.copyClicks ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram Sends</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.telegramSends ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last Viewed</p>
+            <p className="mt-2 text-sm font-medium">
+              {analyticsQuery.data?.lastViewedAt ? formatRelativeTime(analyticsQuery.data.lastViewedAt) : 'Never'}
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

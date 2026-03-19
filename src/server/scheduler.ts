@@ -28,6 +28,7 @@ import { processNotificationQueue } from '@/lib/services/notification-queue';
 import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
+import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 
@@ -178,6 +179,18 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Scheduled report cycle failed', error);
+        }
+    });
+
+    // 12. Telegram digest delivery (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runTelegramDigestCycle();
+            if (!result.skipped) {
+                logger.info(`Telegram digest delivered to ${result.adminChats} admin chat(s)`);
+            }
+        } catch (error) {
+            logger.error('Telegram digest cycle failed', error);
         }
     });
 

@@ -12,6 +12,7 @@ import {
   sendTelegramMessage,
   TelegramUpdate
 } from '@/lib/services/telegram-bot';
+import { getPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
 
 /**
  * POST /api/telegram/webhook
@@ -63,8 +64,7 @@ export async function GET(request: NextRequest) {
 
   if (setWebhook) {
     // Get the base URL from environment or request
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-    const webhookUrl = `${baseUrl}/api/telegram/webhook`;
+    const webhookUrl = `${getPublicAppOrigin(request.nextUrl.origin)}${getPublicBasePath()}/api/telegram/webhook`;
 
     try {
       const response = await fetch(
