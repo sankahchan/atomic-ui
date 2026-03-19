@@ -4,6 +4,10 @@ set -euo pipefail
 
 APP_PORT="${1:-${APP_PORT:-2053}}"
 SITE_NAME="${SITE_NAME:-atomic-ui}"
+SITE_FILE="/etc/nginx/sites-available/${SITE_NAME}"
+SITE_LINK="/etc/nginx/sites-enabled/${SITE_NAME}"
+LEGACY_SITE_FILE="/etc/nginx/sites-available/${SITE_NAME}.conf"
+LEGACY_SITE_LINK="/etc/nginx/sites-enabled/${SITE_NAME}.conf"
 PANEL_PATH="${PANEL_PATH:-}"
 PANEL_DOMAIN="${PANEL_DOMAIN:-}"
 ENABLE_FAIL2BAN="${ENABLE_FAIL2BAN:-true}"
@@ -154,10 +158,11 @@ fi
   if [[ -n "${PANEL_DOMAIN}" ]]; then
     emit_proxy_server "" "${PANEL_DOMAIN}"
   fi
-} >/etc/nginx/sites-available/${SITE_NAME}.conf
+} >"${SITE_FILE}"
 
 rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/${SITE_NAME}.conf /etc/nginx/sites-enabled/${SITE_NAME}.conf
+rm -f "${LEGACY_SITE_LINK}" "${LEGACY_SITE_FILE}"
+ln -sf "${SITE_FILE}" "${SITE_LINK}"
 
 nginx -t
 systemctl enable nginx >/dev/null 2>&1 || true

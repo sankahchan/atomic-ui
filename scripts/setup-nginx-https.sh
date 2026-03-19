@@ -5,6 +5,10 @@ set -euo pipefail
 APP_PORT="${1:-${APP_PORT:-2053}}"
 ACME_EMAIL="${2:-${ACME_EMAIL:-}}"
 SITE_NAME="${SITE_NAME:-atomic-ui}"
+SITE_FILE="/etc/nginx/sites-available/${SITE_NAME}"
+SITE_LINK="/etc/nginx/sites-enabled/${SITE_NAME}"
+LEGACY_SITE_FILE="/etc/nginx/sites-available/${SITE_NAME}.conf"
+LEGACY_SITE_LINK="/etc/nginx/sites-enabled/${SITE_NAME}.conf"
 LEGO_VERSION="${LEGO_VERSION:-v4.32.0}"
 LEGO_BIN="${LEGO_BIN:-/usr/local/bin/lego-latest}"
 LEGO_PATH="${LEGO_PATH:-/root/.lego-ip-prod}"
@@ -382,10 +386,11 @@ fi
   else
     emit_http_proxy_server "default_server" "_"
   fi
-} >/etc/nginx/sites-available/${SITE_NAME}.conf
+} >"${SITE_FILE}"
 
 rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/${SITE_NAME}.conf /etc/nginx/sites-enabled/${SITE_NAME}.conf
+rm -f "${LEGACY_SITE_LINK}" "${LEGACY_SITE_FILE}"
+ln -sf "${SITE_FILE}" "${SITE_LINK}"
 nginx -t
 systemctl enable nginx >/dev/null 2>&1 || true
 systemctl restart nginx
@@ -436,7 +441,7 @@ domain_key_path="/etc/letsencrypt/live/${PANEL_DOMAIN}/privkey.pem"
     emit_http_redirect_server "default_server" "_" "https://\$host"
     emit_https_proxy_server "default_server" "_" "${ip_cert_path}" "${ip_key_path}"
   fi
-} >/etc/nginx/sites-available/${SITE_NAME}.conf
+} >"${SITE_FILE}"
 
 nginx -t
 systemctl restart nginx
