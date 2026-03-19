@@ -8,7 +8,7 @@
  * management controls.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -26,6 +26,7 @@ import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildDynamicOutlineUrl, buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
 import QRCode from 'qrcode';
 import {
   AreaChart,
@@ -973,21 +974,23 @@ export default function DynamicKeyDetailPage() {
     pageSize: 100,
   });
 
-  // Generate ssconf:// URL for Outline client
-  const getSsconfUrl = () => {
+  const ssconfUrl = useMemo(() => {
     if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
-    // ssconf:// protocol tells Outline to fetch config from this URL
-    // We need to encode the https URL and use ssconf:// prefix
-    const httpsUrl = `${window.location.origin}/api/sub/${dak.dynamicUrl}`;
-    return `ssconf://${httpsUrl.replace('https://', '').replace('http://', '')}`;
-  };
+    return buildDynamicOutlineUrl(dak.dynamicUrl, dak.name, {
+      origin: window.location.origin,
+    });
+  }, [dak?.dynamicUrl, dak?.name]);
+
+  const subscriptionApiUrl = useMemo(() => {
+    if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
+    return buildDynamicSubscriptionApiUrl(dak.dynamicUrl, {
+      origin: window.location.origin,
+    });
+  }, [dak?.dynamicUrl]);
 
   // Generate QR code when data loads
   useEffect(() => {
-    if (dak?.dynamicUrl && typeof window !== 'undefined') {
-      // Use ssconf:// URL for QR code (Outline client compatible)
-      const httpsUrl = `${window.location.origin}/api/sub/${dak.dynamicUrl}`;
-      const ssconfUrl = `ssconf://${httpsUrl.replace('https://', '').replace('http://', '')}`;
+    if (ssconfUrl) {
       QRCode.toDataURL(ssconfUrl, {
         width: 256,
         margin: 2,
@@ -996,19 +999,17 @@ export default function DynamicKeyDetailPage() {
         .then((qr) => setQrCode(qr))
         .catch((err) => console.error('Failed to generate QR code:', err));
     }
-  }, [dak?.dynamicUrl]);
+  }, [ssconfUrl]);
 
   const handleCopyUrl = () => {
-    if (dak?.dynamicUrl) {
-      // Copy ssconf:// URL for Outline client
-      const ssconfUrl = getSsconfUrl();
+    if (ssconfUrl) {
       copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), 'Dynamic access key URL copied. Paste in Outline client.');
     }
   };
 
   const handleCopyToken = () => {
-    if (dak?.dynamicUrl) {
-      copyToClipboard(dak.dynamicUrl, t('dynamic_keys.msg.copied'), 'Subscription token copied to clipboard.');
+    if (subscriptionApiUrl) {
+      copyToClipboard(subscriptionApiUrl, t('dynamic_keys.msg.copied'), 'Subscription URL copied to clipboard.');
     }
   };
 
@@ -1289,7 +1290,7 @@ export default function DynamicKeyDetailPage() {
                     </Label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
-                        {getSsconfUrl()}
+                        {ssconfUrl}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyUrl}>
                         <Copy className="w-4 h-4" />
@@ -1305,7 +1306,7 @@ export default function DynamicKeyDetailPage() {
                     <Label className="text-sm text-muted-foreground">API Endpoint</Label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
-                        {typeof window !== 'undefined' ? `${window.location.origin}/api/sub/${dak.dynamicUrl}` : ''}
+                        {subscriptionApiUrl}
                       </div>
                       <Button variant="outline" size="icon" onClick={handleCopyToken}>
                         <Copy className="w-4 h-4" />

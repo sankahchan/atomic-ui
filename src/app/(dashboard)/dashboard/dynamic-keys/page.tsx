@@ -71,6 +71,7 @@ import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
+import { buildDynamicOutlineUrl, buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
 import { Wifi, EyeOff, Tag, User, Smartphone } from 'lucide-react';
 
 /**
@@ -536,14 +537,16 @@ function CreateDAKDialog({
  */
 // Helper to get the full subscription URL including base path
 function getSubscriptionUrl(dynamicUrl: string): string {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${window.location.origin}${basePath}/api/sub/${dynamicUrl}`;
+  return buildDynamicSubscriptionApiUrl(dynamicUrl, {
+    origin: window.location.origin,
+  });
 }
 
 // Helper to get ssconf:// URL for Outline app
 function getSsconfUrl(dynamicUrl: string, name: string): string {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `ssconf://${window.location.host}${basePath}/api/sub/${dynamicUrl}#${encodeURIComponent(name)}`;
+  return buildDynamicOutlineUrl(dynamicUrl, name, {
+    origin: window.location.origin,
+  });
 }
 
 function QRCodeDialog({
@@ -563,7 +566,7 @@ function QRCodeDialog({
   useEffect(() => {
     if (open && dak?.dynamicUrl) {
       setIsLoading(true);
-      const url = getSubscriptionUrl(dak.dynamicUrl);
+      const url = getSsconfUrl(dak.dynamicUrl, dak.name);
       QRCode.toDataURL(url, {
         width: 256,
         margin: 2,

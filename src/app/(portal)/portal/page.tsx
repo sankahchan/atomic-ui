@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'react-qr-code';
@@ -144,78 +145,90 @@ export default function PortalPage() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {dynamicKeys.map((dak) => (
-                            <Card key={dak.id} className="group overflow-hidden border-muted/50 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
-                                <CardHeader className="bg-muted/30 pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                                                <Wifi className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <CardTitle className="text-lg">{dak.name}</CardTitle>
-                                                <CardDescription className="mt-1">
-                                                    Dynamic Subscription
-                                                </CardDescription>
-                                            </div>
-                                        </div>
-                                        <Badge
-                                            variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'}
-                                            className={dak.status === 'ACTIVE' ? 'bg-green-500/15 text-green-500 hover:bg-green-500/25' : ''}
-                                        >
-                                            {dak.status}
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-6 space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">Data Usage</span>
-                                            <span className="font-medium">
-                                                {formatBytes(Number(dak.usedBytes))} / {dak.dataLimitBytes ? formatBytes(Number(dak.dataLimitBytes)) : '∞'}
-                                            </span>
-                                        </div>
-                                        {dak.dataLimitBytes && (
-                                            <Progress
-                                                value={Number(dak.usedBytes) / Number(dak.dataLimitBytes) * 100}
-                                                className="bg-indigo-500/20"
-                                                indicatorClassName="bg-indigo-500"
-                                            />
-                                        )}
-                                    </div>
+                            (() => {
+                                const dynamicSubscriptionUrl = dak.dynamicUrl
+                                    ? buildDynamicSubscriptionApiUrl(dak.dynamicUrl, {
+                                        origin: window.location.origin,
+                                    })
+                                    : '';
 
-                                    {/* Subscription URL */}
-                                    <div className="pt-2">
-                                        <div className="relative">
-                                            <input
-                                                readOnly
-                                                value={`${window.location.origin}/api/sub/${dak.dynamicUrl}`}
-                                                className="w-full text-xs font-mono bg-muted p-3 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                            />
+                                return (
+                                    <Card key={dak.id} className="group overflow-hidden border-muted/50 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
+                                        <CardHeader className="bg-muted/30 pb-4">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
+                                                        <Wifi className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <CardTitle className="text-lg">{dak.name}</CardTitle>
+                                                        <CardDescription className="mt-1">
+                                                            Dynamic Subscription
+                                                        </CardDescription>
+                                                    </div>
+                                                </div>
+                                                <Badge
+                                                    variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'}
+                                                    className={dak.status === 'ACTIVE' ? 'bg-green-500/15 text-green-500 hover:bg-green-500/25' : ''}
+                                                >
+                                                    {dak.status}
+                                                </Badge>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="pt-6 space-y-4">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-muted-foreground">Data Usage</span>
+                                                    <span className="font-medium">
+                                                        {formatBytes(Number(dak.usedBytes))} / {dak.dataLimitBytes ? formatBytes(Number(dak.dataLimitBytes)) : '∞'}
+                                                    </span>
+                                                </div>
+                                                {dak.dataLimitBytes && (
+                                                    <Progress
+                                                        value={Number(dak.usedBytes) / Number(dak.dataLimitBytes) * 100}
+                                                        className="bg-indigo-500/20"
+                                                        indicatorClassName="bg-indigo-500"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            {/* Subscription URL */}
+                                            <div className="pt-2">
+                                                <div className="relative">
+                                                    <input
+                                                        readOnly
+                                                        value={dynamicSubscriptionUrl}
+                                                        className="w-full text-xs font-mono bg-muted p-3 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                    />
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="absolute right-1 top-1 h-7 w-7"
+                                                        onClick={() => handleCopyAccessKey(dynamicSubscriptionUrl)}
+                                                        disabled={!dynamicSubscriptionUrl}
+                                                    >
+                                                        <Copy className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground mt-1.5 ml-1">
+                                                    Use this URL in your VPN client to auto-configure access.
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter className="bg-muted/10 pt-4">
                                             <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="absolute right-1 top-1 h-7 w-7"
-                                                onClick={() => handleCopyAccessKey(`${window.location.origin}/api/sub/${dak.dynamicUrl}`)}
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={() => dynamicSubscriptionUrl && window.open(dynamicSubscriptionUrl, '_blank')}
+                                                disabled={!dynamicSubscriptionUrl}
                                             >
-                                                <Copy className="h-3 w-3" />
+                                                <Download className="w-4 h-4 mr-2" />
+                                                Open Subscription
                                             </Button>
-                                        </div>
-                                        <p className="text-[10px] text-muted-foreground mt-1.5 ml-1">
-                                            Use this URL in your VPN client to auto-configure access.
-                                        </p>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="bg-muted/10 pt-4">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full"
-                                        onClick={() => window.open(`/api/sub/${dak.dynamicUrl}`, '_blank')}
-                                    >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Open Subscription
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                                        </CardFooter>
+                                    </Card>
+                                );
+                            })()
                         ))}
                     </div>
                 </div>

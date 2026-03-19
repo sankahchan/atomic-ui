@@ -63,3 +63,34 @@ export function buildSubscriptionApiUrl(
 
   return url.toString();
 }
+
+export function buildDynamicSubscriptionApiUrl(
+  token: string,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+  },
+) {
+  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/api/sub/${token}`);
+
+  if (options?.source) {
+    url.searchParams.set('source', options.source);
+  }
+
+  return url.toString();
+}
+
+export function buildDynamicOutlineUrl(
+  token: string,
+  name?: string | null,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+  },
+) {
+  const subscriptionUrl = buildDynamicSubscriptionApiUrl(token, options);
+  const normalizedUrl = subscriptionUrl.replace(/^https?:\/\//, '');
+  const suffix = (name || 'Dynamic Key').trim();
+
+  return `ssconf://${normalizedUrl}#${encodeURIComponent(suffix)}`;
+}
