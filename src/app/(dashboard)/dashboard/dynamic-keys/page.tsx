@@ -74,8 +74,10 @@ import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 import {
   buildDynamicOutlineUrl,
   buildDynamicShortClientUrl,
+  buildDynamicShortShareUrl,
   buildDynamicSubscriptionApiUrl,
 } from '@/lib/subscription-links';
+import { normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
 import { Wifi, EyeOff, Tag, User, Smartphone } from 'lucide-react';
 
 /**
@@ -200,8 +202,10 @@ function CreateDAKDialog({
 }) {
   const { t } = useLocale();
   const { toast } = useToast();
+  const utils = trpc.useUtils();
   const [formData, setFormData] = useState<{
     name: string;
+    publicSlug: string;
     type: keyof typeof DAK_TYPES;
     email: string;
     telegramId: string;
@@ -215,6 +219,7 @@ function CreateDAKDialog({
     loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
   }>({
     name: '',
+    publicSlug: '',
     type: 'SELF_MANAGED',
     email: '',
     telegramId: '',
@@ -227,10 +232,50 @@ function CreateDAKDialog({
     method: 'chacha20-ietf-poly1305',
     loadBalancerAlgorithm: 'IP_HASH',
   });
+  const [slugTouched, setSlugTouched] = useState(false);
+
+  useEffect(() => {
+    if (slugTouched) {
+      return;
+    }
+
+    const nextSlug = formData.name.trim() ? slugifyPublicName(formData.name) : '';
+    setFormData((current) => (
+      current.publicSlug === nextSlug
+        ? current
+        : { ...current, publicSlug: nextSlug }
+    ));
+  }, [formData.name, slugTouched]);
+
+  const previewSlug = formData.publicSlug.trim();
+  const normalizedPreviewSlug = normalizePublicSlug(previewSlug);
+  const hasPreviewSlug = normalizedPreviewSlug.length >= 3;
+  const slugAvailabilityQuery = trpc.dynamicKeys.checkPublicSlugAvailability.useQuery(
+    { slug: normalizedPreviewSlug },
+    {
+      enabled: open && hasPreviewSlug,
+      retry: false,
+      staleTime: 5_000,
+    },
+  );
+
+  const previewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const previewClientUrl = hasPreviewSlug
+    ? buildDynamicOutlineUrl(normalizedPreviewSlug, formData.name || 'Dynamic Key', {
+        origin: previewOrigin,
+        shortPath: true,
+      })
+    : '';
+  const previewShareUrl = hasPreviewSlug
+    ? buildDynamicShortShareUrl(normalizedPreviewSlug, {
+        origin: previewOrigin,
+      })
+    : '';
 
   const resetForm = () => {
     setFormData({
       name: '',
+      publicSlug: '',
       type: 'SELF_MANAGED',
       email: '',
       telegramId: '',
@@ -243,6 +288,7 @@ function CreateDAKDialog({
       method: 'chacha20-ietf-poly1305',
       loadBalancerAlgorithm: 'IP_HASH',
     });
+    setSlugTouched(false);
   };
 
   const createMutation = trpc.dynamicKeys.create.useMutation({
@@ -276,8 +322,32 @@ function CreateDAKDialog({
       return;
     }
 
+    const slugToCreate = normalizePublicSlug(formData.publicSlug || formData.name);
+    if (!slugToCreate || slugToCreate.length < 3) {
+      toast({
+        title: 'Short link is invalid',
+        description: 'Use at least 3 characters for the short link slug.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const slugCheck = await utils.dynamicKeys.checkPublicSlugAvailability.fetch({
+      slug: slugToCreate,
+    });
+
+    if (!slugCheck.valid || !slugCheck.available) {
+      toast({
+        title: 'Short link unavailable',
+        description: slugCheck.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     createMutation.mutate({
       name: formData.name,
+      publicSlug: slugToCreate,
       type: formData.type,
       email: formData.email || undefined,
       telegramId: formData.telegramId || undefined,
@@ -315,6 +385,71 @@ function CreateDAKDialog({
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="dakPublicSlug">Short Link Slug</Label>
+              <Input
+                id="dakPublicSlug"
+                placeholder="premium-users-pool"
+                value={formData.publicSlug}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setFormData({ ...formData, publicSlug: normalizePublicSlug(e.target.value) });
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {slugTouched
+                  ? 'Used for the short client URL and short share page URL.'
+                  : 'Auto-generated from the name until you edit it.'}
+              </p>
+            </div>
+
+            {previewSlug ? (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-medium text-foreground">Slug status:</span>
+                  {slugAvailabilityQuery.isFetching ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking availability
+                    </span>
+                  ) : hasPreviewSlug && slugAvailabilityQuery.data?.available ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {slugAvailabilityQuery.data.message}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                      <XCircle className="h-3.5 w-3.5" />
+                      {hasPreviewSlug
+                        ? (slugAvailabilityQuery.data?.message || 'This short link is unavailable.')
+                        : 'Enter at least 3 characters.'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                      Short Client URL
+                    </Label>
+                    <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
+                      {previewClientUrl || 'Enter a valid slug to preview the client URL.'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                      Short Share Page
+                    </Label>
+                    <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
+                      {previewShareUrl || 'Enter a valid slug to preview the share page.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Type selection */}

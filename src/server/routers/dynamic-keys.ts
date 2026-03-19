@@ -208,6 +208,41 @@ async function resolveDynamicKeySlug(requestedSlug: string | null | undefined, n
 }
 
 export const dynamicKeysRouter = router({
+  checkPublicSlugAvailability: adminProcedure
+    .input(
+      z.object({
+        slug: z.string().min(1),
+        excludeId: z.string().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const normalizedSlug = normalizePublicSlug(input.slug);
+
+      if (!normalizedSlug || normalizedSlug.length < 3 || !isValidPublicSlug(normalizedSlug)) {
+        return {
+          normalizedSlug,
+          available: false,
+          valid: false,
+          message: 'Slug must be 3-32 characters and use only lowercase letters, numbers, and hyphens.',
+        };
+      }
+
+      const existing = await db.dynamicAccessKey.findFirst({
+        where: {
+          publicSlug: normalizedSlug,
+          ...(input.excludeId ? { NOT: { id: input.excludeId } } : {}),
+        },
+        select: { id: true },
+      });
+
+      return {
+        normalizedSlug,
+        available: !existing,
+        valid: true,
+        message: existing ? 'That short link is already in use.' : 'This short link is available.',
+      };
+    }),
+
   /**
    * List Dynamic Access Keys with filtering and pagination
    */
