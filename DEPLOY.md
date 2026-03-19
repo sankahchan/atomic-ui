@@ -151,7 +151,22 @@ Notes:
 
 ### Domain-based HTTPS
 
-If you have a real domain, you can still use your own nginx/certbot or Caddy setup. Domain certificates are the better long-term production option because they use the standard longer-lived certificate flow.
+The same script now supports real domains too:
+
+```bash
+sudo APP_PORT=2053 \
+  PANEL_PATH=/7061c5df \
+  PANEL_DOMAIN=panel.example.com \
+  ALLOW_IP_FALLBACK=true \
+  ACME_EMAIL=you@example.com \
+  bash scripts/setup-nginx-https.sh
+```
+
+Notes:
+- `PANEL_DOMAIN` makes the domain the canonical public origin used by the installer.
+- `ALLOW_IP_FALLBACK=true` keeps the original server IP reachable in parallel. Set it to `false` if you want raw IP traffic redirected to the domain instead.
+- Domain certificates use the standard Let's Encrypt flow through `certbot`.
+- Auto-renew is handled by `certbot.timer`.
 
 ## Updates
 To update the application:

@@ -28,6 +28,22 @@ DEFAULT_PORT=2053  # Fixed port like 3x-ui
 CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
 ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
+PANEL_DOMAIN_INPUT="${PANEL_DOMAIN:-}"
+ALLOW_IP_FALLBACK_INPUT="${ALLOW_IP_FALLBACK:-true}"
+
+normalize_bool() {
+    case "${1,,}" in
+        1|true|yes|on) echo "true" ;;
+        *) echo "false" ;;
+    esac
+}
+
+normalize_host() {
+    local value="${1#http://}"
+    value="${value#https://}"
+    value="${value%%/*}"
+    echo "${value,,}"
+}
 
 set_env_var() {
     local key="$1"
@@ -86,6 +102,9 @@ if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}[✗] Please run as root (use sudo)${NC}"
     exit 1
 fi
+
+PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN_INPUT}")"
+ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK_INPUT}")"
 
 # Check system
 echo -e "${BLUE}[*]${NC} Checking system requirements..."
@@ -230,10 +249,19 @@ fi
 
 # Get server IP
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
-PUBLIC_ORIGIN="http://${SERVER_IP}"
+PUBLIC_HOST="${SERVER_IP}"
+if [ -n "${PANEL_DOMAIN}" ]; then
+    PUBLIC_HOST="${PANEL_DOMAIN}"
+fi
+PUBLIC_ORIGIN="http://${PUBLIC_HOST}"
 PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
 HTTPS_ENABLED=false
 HTTPS_NOTE="HTTP reverse proxy enabled on port 80."
+IP_FALLBACK_URL=""
+
+if [ -n "${PANEL_DOMAIN}" ] && [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
+    IP_FALLBACK_URL="http://${SERVER_IP}/${PANEL_PATH}/"
+fi
 
 # Set public application URL in .env
 set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
@@ -262,16 +290,42 @@ fi
 
 echo -e "${GREEN}[✓]${NC} Environment configured"
 
+if [ -n "${PANEL_DOMAIN}" ]; then
+    echo -e "${GREEN}[✓]${NC} Domain mode: ${CYAN}${PANEL_DOMAIN}${NC}"
+    if [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
+        echo -e "${GREEN}[✓]${NC} IP fallback: ${CYAN}enabled${NC}"
+    else
+        echo -e "${GREEN}[✓]${NC} IP fallback: ${CYAN}redirect to domain${NC}"
+    fi
+else
+    echo -e "${GREEN}[✓]${NC} Domain mode: ${CYAN}disabled (IP mode)${NC}"
+fi
+
 # Prefer HTTPS by default so fresh installs come up on the public origin.
 if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
-    echo -e "${BLUE}[*]${NC} Attempting HTTPS setup on public IP..."
+    if [ -n "${PANEL_DOMAIN}" ]; then
+        echo -e "${BLUE}[*]${NC} Attempting HTTPS setup for domain ${CYAN}${PANEL_DOMAIN}${NC}..."
+    else
+        echo -e "${BLUE}[*]${NC} Attempting HTTPS setup on public IP..."
+    fi
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-https.sh"
 
-    if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
+    if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
         HTTPS_ENABLED=true
-        PUBLIC_ORIGIN="https://${SERVER_IP}"
+        if [ -n "${PANEL_DOMAIN}" ]; then
+            PUBLIC_ORIGIN="https://${PANEL_DOMAIN}"
+            if [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
+                IP_FALLBACK_URL="https://${SERVER_IP}/${PANEL_PATH}/"
+                HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. The original IP remains available over HTTPS as a fallback."
+            else
+                IP_FALLBACK_URL=""
+                HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. Raw IP traffic redirects to the domain."
+            fi
+        else
+            PUBLIC_ORIGIN="https://${SERVER_IP}"
+            HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
+        fi
         PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
-        HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
         set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
         set_env_var "NEXT_PUBLIC_APP_URL" "${PUBLIC_ORIGIN}"
         echo -e "${GREEN}[✓]${NC} HTTPS enabled at ${CYAN}${PUBLIC_ORIGIN}${NC}"
@@ -282,7 +336,11 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
         fi
 
         echo -e "${YELLOW}[!]${NC} HTTPS setup failed. Falling back to HTTP reverse proxy."
-        HTTPS_NOTE="HTTPS setup failed during install; panel is exposed on HTTP via nginx. Re-run scripts/setup-nginx-https.sh later."
+        if [ -n "${PANEL_DOMAIN}" ]; then
+            HTTPS_NOTE="HTTPS setup failed during install; the panel is exposed on HTTP for ${PUBLIC_HOST}. Re-run scripts/setup-nginx-https.sh after DNS or ACME issues are fixed."
+        else
+            HTTPS_NOTE="HTTPS setup failed during install; panel is exposed on HTTP via nginx. Re-run scripts/setup-nginx-https.sh later."
+        fi
     fi
 fi
 
@@ -386,8 +444,8 @@ echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 if [ "$HTTPS_ENABLED" = false ]; then
     echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
-    PANEL_PATH="/${PANEL_PATH}" ENABLE_FAIL2BAN=true bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
-    echo -e "${GREEN}[✓]${NC} nginx proxy is serving http://${SERVER_IP}/"
+    PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
+    echo -e "${GREEN}[✓]${NC} nginx proxy is serving ${CYAN}${PUBLIC_ORIGIN}${NC}"
 fi
 
 # Disable cleanup after successful installation
@@ -432,6 +490,12 @@ fi
 echo "${PANEL_PORT}" > "$INSTALL_DIR/.panel_port"
 echo "/${PANEL_PATH}" > "$INSTALL_DIR/.panel_path"
 echo "${PUBLIC_ORIGIN}" > "$INSTALL_DIR/.public_origin"
+if [ -n "${PANEL_DOMAIN}" ]; then
+    echo "${PANEL_DOMAIN}" > "$INSTALL_DIR/.panel_domain"
+else
+    rm -f "$INSTALL_DIR/.panel_domain"
+fi
+echo "${ALLOW_IP_FALLBACK}" > "$INSTALL_DIR/.allow_ip_fallback"
 
 # Done!
 echo ""
@@ -442,8 +506,15 @@ echo ""
 echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
 echo -e "${CYAN}│${NC}  URL: ${GREEN}${PUBLIC_PANEL_URL}${NC}"
+if [ -n "${IP_FALLBACK_URL}" ]; then
+echo -e "${CYAN}│${NC}  ${YELLOW}IP fallback:${NC} ${GREEN}${IP_FALLBACK_URL}${NC}"
+fi
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Public origin:${NC} ${GREEN}${PUBLIC_ORIGIN}${NC}"
+if [ -n "${PANEL_DOMAIN}" ]; then
+echo -e "${CYAN}│${NC}  ${YELLOW}Domain:${NC} ${GREEN}${PANEL_DOMAIN}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Allow IP fallback:${NC} ${GREEN}${ALLOW_IP_FALLBACK}${NC}"
+fi
 echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"

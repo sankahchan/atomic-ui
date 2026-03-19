@@ -114,8 +114,11 @@ Set these in `.env` before production use:
 
 - Fresh VPS installs now prefer HTTPS by default.
 - The installer uses nginx in front of the app and keeps the internal Node process on port `2053`.
+- Set `PANEL_DOMAIN=panel.example.com` during install if you want the panel to use a real domain as its canonical public origin.
+- Set `ALLOW_IP_FALLBACK=true` to keep the original IP reachable alongside the domain on fresh installs. Leave it false if you want raw IP traffic redirected to the domain.
 - Bare-IP HTTPS uses Let's Encrypt's short-lived IP certificate profile, not a normal 90-day domain certificate.
 - Auto-renew is configured with `atomic-ui-cert-renew.timer` every 12 hours.
+- Domain installs use the standard Let's Encrypt domain flow and the system `certbot.timer`.
 - For long-term production use, a real domain is still recommended because standard domain certificates are longer-lived and easier to monitor.
 
 ## Production readiness
