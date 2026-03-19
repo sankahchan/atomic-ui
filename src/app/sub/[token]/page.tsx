@@ -73,6 +73,7 @@ interface KeyData {
   id: string;
   name: string;
   accessUrl: string;
+  outlineClientUrl?: string | null;
   status: string;
   server: {
     name: string;
@@ -615,13 +616,18 @@ export default function SubscriptionPage() {
     const app = allApps.find((a) => a.id === appId);
     if (!app || !keyData?.accessUrl) return;
 
+    const appAccessUrl =
+      app.id === 'outline' && keyData.outlineClientUrl
+        ? keyData.outlineClientUrl
+        : keyData.accessUrl;
+
     let url: string;
     if ('urlScheme' in app && typeof app.urlScheme === 'function') {
-      url = app.urlScheme(keyData.accessUrl);
+      url = app.urlScheme(appAccessUrl);
     } else if ('urlScheme' in app && typeof app.urlScheme === 'string') {
-      url = (app as CustomApp).urlScheme.replace('{url}', encodeURIComponent(keyData.accessUrl));
+      url = (app as CustomApp).urlScheme.replace('{url}', encodeURIComponent(appAccessUrl));
     } else {
-      url = keyData.accessUrl;
+      url = appAccessUrl;
     }
     void trackSubscriptionEvent(
       SUBSCRIPTION_EVENT_TYPES.OPEN_APP,

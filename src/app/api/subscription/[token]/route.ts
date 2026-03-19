@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { buildDynamicOutlineUrl } from '@/lib/subscription-links';
+import { buildDynamicOutlineUrl, buildSubscriptionClientUrl } from '@/lib/subscription-links';
 
 export async function GET(
   request: NextRequest,
@@ -106,6 +106,7 @@ export async function GET(
           id: dak.id,
           name: dak.name,
           accessUrl: ssConfUrl,
+          outlineClientUrl: ssConfUrl,
           status: dak.status,
           server: {
             name: "Dynamic Backend",
@@ -172,6 +173,9 @@ export async function GET(
     }
 
     const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
+    const outlineClientUrl = buildSubscriptionClientUrl(token, key.name, {
+      origin: request.nextUrl.origin,
+    });
 
     // Check Accept header to determine response format
     const acceptHeader = request.headers.get('accept') || '';
@@ -182,6 +186,7 @@ export async function GET(
         id: key.id,
         name: key.name,
         accessUrl: decoratedAccessUrl,
+        outlineClientUrl,
         status: key.status,
         server: {
           name: key.server.name,

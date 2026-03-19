@@ -64,6 +64,23 @@ export function buildSubscriptionApiUrl(
   return url.toString();
 }
 
+export function buildSubscriptionClientUrl(
+  token: string,
+  name?: string | null,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+  },
+) {
+  const subscriptionUrl = buildSubscriptionApiUrl(token, options);
+  const normalizedUrl = subscriptionUrl
+    .replace(/^ssconf:\/\//, '')
+    .replace(/^https?:\/\//, '');
+  const suffix = (name || 'Access Key').trim();
+
+  return `ssconf://${normalizedUrl}#${encodeURIComponent(suffix)}`;
+}
+
 export function buildDynamicSubscriptionApiUrl(
   token: string,
   options?: {
