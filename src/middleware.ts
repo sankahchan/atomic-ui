@@ -30,6 +30,8 @@ const publicRoutes = [
   '/login',
   '/verify-2fa',
   '/sub/',                  // Subscription URLs (Pages)
+  '/s/',                    // Short subscription URLs (Pages)
+  '/c/',                    // Short client URLs
   '/api/subscription/',     // Subscription API (Bypass auth)
   '/api/sub/',              // Alternative Subscription API
   '/api/health',            // Health check endpoint
