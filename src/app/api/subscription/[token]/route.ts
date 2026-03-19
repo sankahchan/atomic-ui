@@ -40,8 +40,13 @@ export async function GET(
 
     // If not found in AccessKey, check DynamicAccessKey
     if (!key) {
-      const dak = await db.dynamicAccessKey.findUnique({
-        where: { dynamicUrl: token },
+      const dak = await db.dynamicAccessKey.findFirst({
+        where: {
+          OR: [
+            { dynamicUrl: token },
+            { publicSlug: token },
+          ],
+        },
         include: {
           accessKeys: {
             where: { status: 'ACTIVE' },
@@ -90,8 +95,10 @@ export async function GET(
       }
 
       const acceptHeader = request.headers.get('accept') || '';
-      const ssConfUrl = buildDynamicOutlineUrl(token, dak.name, {
+      const dynamicIdentifier = dak.publicSlug || dak.dynamicUrl || token;
+      const ssConfUrl = buildDynamicOutlineUrl(dynamicIdentifier, dak.name, {
         origin: request.nextUrl.origin,
+        shortPath: Boolean(dak.publicSlug),
       });
 
       if (acceptHeader.includes('application/json')) {

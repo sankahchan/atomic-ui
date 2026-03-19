@@ -20,6 +20,7 @@ import { logger } from '@/lib/logger';
 import { formatTagsForStorage } from '@/lib/tags';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { subscriptionThemeIds } from '@/lib/subscription-themes';
+import { slugifyPublicName, normalizePublicSlug, isValidPublicSlug } from '@/lib/public-slug';
 import {
   collectTrafficActivity,
   TRAFFIC_ACTIVE_WINDOW_MS,
@@ -47,6 +48,7 @@ const createDAKSchema = z.object({
   method: z.enum(['chacha20-ietf-poly1305', 'aes-128-gcm', 'aes-192-gcm', 'aes-256-gcm']).optional().nullable(),
   // Load balancer algorithm
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).default('IP_HASH'),
+  publicSlug: z.string().min(3).max(32).optional().nullable(),
 });
 
 /**
@@ -79,6 +81,7 @@ const updateDAKSchema = z.object({
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(),
+  publicSlug: z.string().min(3).max(32).optional().nullable(),
 });
 
 /**
@@ -128,6 +131,81 @@ const calculateExpiration = (
       return { expiresAt: null, status: 'ACTIVE' };
   }
 };
+
+async function generateUniqueDynamicKeySlug(name: string, excludeId?: string) {
+  const baseSlug = slugifyPublicName(name);
+
+  const buildCandidate = (suffix?: string) => {
+    if (!suffix) {
+      return baseSlug;
+    }
+
+    const maxBaseLength = Math.max(3, 32 - suffix.length - 1);
+    return `${baseSlug.slice(0, maxBaseLength).replace(/-+$/g, '')}-${suffix}`;
+  };
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const suffix = attempt === 0 ? '' : String(attempt);
+    const candidate = buildCandidate(suffix || undefined);
+    const existing = await db.dynamicAccessKey.findFirst({
+      where: {
+        publicSlug: candidate,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  while (true) {
+    const candidate = buildCandidate(generateRandomString(6).toLowerCase());
+    const existing = await db.dynamicAccessKey.findFirst({
+      where: {
+        publicSlug: candidate,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+}
+
+async function resolveDynamicKeySlug(requestedSlug: string | null | undefined, name: string, excludeId?: string) {
+  if (!requestedSlug) {
+    return generateUniqueDynamicKeySlug(name, excludeId);
+  }
+
+  const normalizedSlug = normalizePublicSlug(requestedSlug);
+  if (!normalizedSlug || !isValidPublicSlug(normalizedSlug)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Slug must use only lowercase letters, numbers, and hyphens.',
+    });
+  }
+
+  const existing = await db.dynamicAccessKey.findFirst({
+    where: {
+      publicSlug: normalizedSlug,
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'That short link is already in use.',
+    });
+  }
+
+  return normalizedSlug;
+}
 
 export const dynamicKeysRouter = router({
   /**
@@ -242,6 +320,7 @@ export const dynamicKeysRouter = router({
           telegramId: dak.telegramId,
           notes: dak.notes,
           dynamicUrl: dak.dynamicUrl,
+          publicSlug: dak.publicSlug,
           dataLimitBytes: dak.dataLimitBytes,
           usedBytes: dak.usedBytes,
           usagePercent,
@@ -317,6 +396,15 @@ export const dynamicKeysRouter = router({
         });
       }
 
+      const publicSlug = dak.publicSlug || await generateUniqueDynamicKeySlug(dak.name, dak.id);
+
+      if (!dak.publicSlug) {
+        await db.dynamicAccessKey.update({
+          where: { id: dak.id },
+          data: { publicSlug },
+        });
+      }
+
       return {
         id: dak.id,
         name: dak.name,
@@ -327,6 +415,7 @@ export const dynamicKeysRouter = router({
         userId: dak.userId,
         notes: dak.notes,
         dynamicUrl: dak.dynamicUrl,
+        publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
@@ -372,6 +461,7 @@ export const dynamicKeysRouter = router({
 
       // Generate unique dynamic URL token
       const dynamicUrl = generateRandomString(32);
+      const publicSlug = await resolveDynamicKeySlug(input.publicSlug, input.name);
 
       // Create the DAK
       const dak = await db.dynamicAccessKey.create({
@@ -383,6 +473,7 @@ export const dynamicKeysRouter = router({
           userId: input.userId, // Assign to user if provided
           notes: input.notes,
           dynamicUrl,
+          publicSlug,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
@@ -407,6 +498,7 @@ export const dynamicKeysRouter = router({
         type: dak.type as 'SELF_MANAGED' | 'MANUAL',
         status: dak.status as 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DEPLETED',
         dynamicUrl: dak.dynamicUrl,
+        publicSlug: dak.publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
@@ -423,7 +515,7 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, owner, tags, ...data } = input;
+      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, owner, tags, publicSlug, ...data } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -493,6 +585,10 @@ export const dynamicKeysRouter = router({
         updateData.contactLinks = contactLinks;
       }
 
+      if (publicSlug !== undefined) {
+        updateData.publicSlug = await resolveDynamicKeySlug(publicSlug, data.name || existing.name, id);
+      }
+
       // Handle owner field
       if (owner !== undefined) {
         updateData.owner = owner;
@@ -543,6 +639,7 @@ export const dynamicKeysRouter = router({
         type: dak.type as 'SELF_MANAGED' | 'MANUAL',
         status: dak.status as 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DEPLETED',
         dynamicUrl: dak.dynamicUrl,
+        publicSlug: dak.publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
         expiresAt: dak.expiresAt,
@@ -552,6 +649,37 @@ export const dynamicKeysRouter = router({
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
+    }),
+
+  regeneratePublicSlug: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const existing = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const publicSlug = await generateUniqueDynamicKeySlug(existing.name, existing.id);
+      const dak = await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: { publicSlug },
+        select: {
+          id: true,
+          publicSlug: true,
+        },
+      });
+
+      return dak;
     }),
 
   /**

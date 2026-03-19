@@ -357,13 +357,11 @@ function buildOutlineJson(
  * Retrieves the access key configuration for the given token.
  * Returns JSON format compatible with Outline clients.
  */
-export async function GET(
+export async function handleSubscriptionRequest(
   request: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  token: string,
 ) {
   try {
-    const { token } = await params;
-
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
@@ -372,8 +370,13 @@ export async function GET(
     const clientIp = getClientIp(request);
 
     // First, try to find a Dynamic Access Key by dynamicUrl
-    const dynamicKey = await db.dynamicAccessKey.findUnique({
-      where: { dynamicUrl: token },
+    const dynamicKey = await db.dynamicAccessKey.findFirst({
+      where: {
+        OR: [
+          { dynamicUrl: token },
+          { publicSlug: token },
+        ],
+      },
       include: {
         accessKeys: {
           where: {
@@ -589,4 +592,12 @@ export async function GET(
     console.error('Subscription endpoint error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const { token } = await params;
+  return handleSubscriptionRequest(request, token);
 }

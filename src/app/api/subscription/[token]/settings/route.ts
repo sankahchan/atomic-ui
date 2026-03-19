@@ -28,8 +28,13 @@ export async function GET(
     let isValid = !!key;
 
     if (!isValid) {
-      const dak = await db.dynamicAccessKey.findUnique({
-        where: { dynamicUrl: token },
+      const dak = await db.dynamicAccessKey.findFirst({
+        where: {
+          OR: [
+            { dynamicUrl: token },
+            { publicSlug: token },
+          ],
+        },
         select: { id: true },
       });
       isValid = !!dak;

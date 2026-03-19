@@ -252,7 +252,7 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 export default function SubscriptionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const token = params.token as string;
+  const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
 
   const [keyData, setKeyData] = useState<KeyData | null>(null);

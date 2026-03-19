@@ -60,13 +60,20 @@ export async function recordSubscriptionPageEventByToken(input: {
     }),
   ]);
 
-  if (!accessKey && !dynamicKey) {
+  const dynamicKeyBySlug = !dynamicKey
+    ? await db.dynamicAccessKey.findFirst({
+        where: { publicSlug: input.token },
+        select: { id: true },
+      })
+    : null;
+
+  if (!accessKey && !dynamicKey && !dynamicKeyBySlug) {
     return null;
   }
 
   return recordSubscriptionPageEvent({
     accessKeyId: accessKey?.id ?? null,
-    dynamicAccessKeyId: dynamicKey?.id ?? null,
+    dynamicAccessKeyId: dynamicKey?.id ?? dynamicKeyBySlug?.id ?? null,
     eventType: input.eventType,
     source: input.source ?? null,
     platform: input.platform ?? null,

@@ -258,6 +258,7 @@ model DynamicAccessKey {
 
   // Dynamic URL
   dynamicUrl String? @unique
+  publicSlug String? @unique
 
   // Protocol obfuscation prefix (for protocol obfuscation)
   prefix String?

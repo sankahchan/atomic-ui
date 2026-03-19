@@ -26,7 +26,13 @@ import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
-import { buildDynamicOutlineUrl, buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
+import {
+  buildDynamicOutlineUrl,
+  buildDynamicShortClientUrl,
+  buildDynamicShortShareUrl,
+  buildDynamicSharePageUrl,
+  buildDynamicSubscriptionApiUrl,
+} from '@/lib/subscription-links';
 import QRCode from 'qrcode';
 import {
   AreaChart,
@@ -328,7 +334,9 @@ function EditDAKDialog({
  */
 function SubscriptionShareCard({
   dakId,
+  keyName,
   dynamicUrl,
+  publicSlug,
   currentTheme,
   currentCoverImage,
   currentCoverImageType,
@@ -336,7 +344,9 @@ function SubscriptionShareCard({
   onUpdate,
 }: {
   dakId: string;
+  keyName: string;
   dynamicUrl: string | null;
+  publicSlug: string | null;
   currentTheme: string | null;
   currentCoverImage: string | null;
   currentCoverImageType: string | null;
@@ -348,6 +358,7 @@ function SubscriptionShareCard({
   const [coverImageUrl, setCoverImageUrl] = useState(
     currentCoverImageType === 'url' ? currentCoverImage || '' : ''
   );
+  const [slugInput, setSlugInput] = useState(publicSlug || '');
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
@@ -363,6 +374,24 @@ function SubscriptionShareCard({
     onError: (error) => {
       toast({
         title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const regenerateSlugMutation = trpc.dynamicKeys.regeneratePublicSlug.useMutation({
+    onSuccess: (result) => {
+      setSlugInput(result.publicSlug || '');
+      toast({
+        title: 'Short link regenerated',
+        description: 'The new short URLs are ready to share.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Regeneration failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -429,14 +458,56 @@ function SubscriptionShareCard({
   };
 
   const getSubscriptionPageUrl = () => {
-    if (typeof window === 'undefined' || !dynamicUrl) return '';
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    return `${window.location.origin}${basePath}/sub/${dynamicUrl}`;
+    if (typeof window === 'undefined') return '';
+    if (slugInput.trim()) {
+      return buildDynamicShortShareUrl(slugInput.trim(), {
+        origin: window.location.origin,
+      });
+    }
+    if (!dynamicUrl) return '';
+    return buildDynamicSharePageUrl(dynamicUrl, {
+      origin: window.location.origin,
+    });
+  };
+
+  const getClientUrl = () => {
+    if (typeof window === 'undefined') return '';
+    if (slugInput.trim()) {
+      return buildDynamicOutlineUrl(slugInput.trim(), keyName, {
+        origin: window.location.origin,
+        shortPath: true,
+      });
+    }
+    if (!dynamicUrl) return '';
+    return buildDynamicOutlineUrl(dynamicUrl, keyName, {
+      origin: window.location.origin,
+    });
   };
 
   const copySubscriptionPageUrl = async () => {
     const url = getSubscriptionPageUrl();
     await copyToClipboard(url, 'Copied!', 'Subscription page URL copied to clipboard.');
+  };
+
+  const copyClientUrl = async () => {
+    const url = getClientUrl();
+    await copyToClipboard(url, 'Copied!', 'Client URL copied to clipboard.');
+  };
+
+  const saveSlug = () => {
+    if (!slugInput.trim()) {
+      toast({
+        title: 'Missing slug',
+        description: 'Enter a short slug before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateMutation.mutate({
+      id: dakId,
+      publicSlug: slugInput.trim(),
+    } as any);
   };
 
   const theme = getTheme(selectedTheme);
@@ -617,6 +688,41 @@ function SubscriptionShareCard({
           </div>
         </div>
 
+        {/* Short link controls */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            Short Link Slug
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="my-dynamic-key"
+              value={slugInput}
+              onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveSlug}
+              disabled={updateMutation.isPending || !dynamicUrl}
+            >
+              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => regenerateSlugMutation.mutate({ id: dakId })}
+              disabled={regenerateSlugMutation.isPending || !dynamicUrl}
+              title="Regenerate short slug"
+            >
+              {regenerateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Used for the short share page and short Outline client URL.
+          </p>
+        </div>
+
         {/* Preview & Copy Buttons */}
         <div className="flex gap-2">
           <Button
@@ -641,13 +747,31 @@ function SubscriptionShareCard({
           </Button>
         </div>
 
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={copyClientUrl}
+          disabled={!dynamicUrl}
+        >
+          <Link2 className="w-4 h-4 mr-2" />
+          Copy Client URL
+        </Button>
+
         {/* URL Display */}
         {dynamicUrl && (
-          <div className="p-2 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Subscription Page URL:</p>
-            <code className="text-xs break-all select-all">
-              {getSubscriptionPageUrl()}
-            </code>
+          <div className="space-y-2">
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Share Page URL:</p>
+              <code className="text-xs break-all select-all">
+                {getSubscriptionPageUrl()}
+              </code>
+            </div>
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Client URL:</p>
+              <code className="text-xs break-all select-all">
+                {getClientUrl()}
+              </code>
+            </div>
           </div>
         )}
       </CardContent>
@@ -976,17 +1100,24 @@ export default function DynamicKeyDetailPage() {
 
   const ssconfUrl = useMemo(() => {
     if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
-    return buildDynamicOutlineUrl(dak.dynamicUrl, dak.name, {
+    const identifier = dak.publicSlug || dak.dynamicUrl;
+    return buildDynamicOutlineUrl(identifier, dak.name, {
       origin: window.location.origin,
+      shortPath: Boolean(dak.publicSlug),
     });
-  }, [dak?.dynamicUrl, dak?.name]);
+  }, [dak?.dynamicUrl, dak?.name, dak?.publicSlug]);
 
   const subscriptionApiUrl = useMemo(() => {
     if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
+    if (dak.publicSlug) {
+      return buildDynamicShortClientUrl(dak.publicSlug, {
+        origin: window.location.origin,
+      });
+    }
     return buildDynamicSubscriptionApiUrl(dak.dynamicUrl, {
       origin: window.location.origin,
     });
-  }, [dak?.dynamicUrl]);
+  }, [dak?.dynamicUrl, dak?.publicSlug]);
 
   // Generate QR code when data loads
   useEffect(() => {
@@ -1533,7 +1664,9 @@ export default function DynamicKeyDetailPage() {
           {/* Share Page Settings */}
           <SubscriptionShareCard
             dakId={dak.id}
+            keyName={dak.name}
             dynamicUrl={dak.dynamicUrl}
+            publicSlug={dak.publicSlug}
             currentTheme={dak.subscriptionTheme}
             currentCoverImage={dak.coverImage}
             currentCoverImageType={dak.coverImageType}
