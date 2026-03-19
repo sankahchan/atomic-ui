@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { buildDynamicOutlineUrl } from '@/lib/subscription-links';
 
 export async function GET(
   request: NextRequest,
@@ -88,21 +89,15 @@ export async function GET(
         );
       }
 
-      // Check Accept header
       const acceptHeader = request.headers.get('accept') || '';
-      const host = request.headers.get('host') || 'localhost:3000';
-      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-
-      // Construct a subscription URL (SSCONF or similar) for the JSON response
-      // This allows the QR code to point to a subscription update
-      const subscriptionUrl = `${protocol}://${host}/api/subscription/${token}`;
-      const ssConfUrl = `ssconf://${host}/api/subscription/${token}#${encodeURIComponent(dak.name)}`;
+      const ssConfUrl = buildDynamicOutlineUrl(token, dak.name, {
+        origin: request.nextUrl.origin,
+      });
 
       if (acceptHeader.includes('application/json')) {
         return NextResponse.json({
           id: dak.id,
           name: dak.name,
-          // Use ssconf:// for the "accessUrl" in the UI so clients treat it as a subscription
           accessUrl: ssConfUrl,
           status: dak.status,
           server: {
