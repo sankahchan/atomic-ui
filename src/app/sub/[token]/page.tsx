@@ -377,7 +377,7 @@ export default function SubscriptionPage() {
     async function fetchData() {
       try {
         const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-        const response = await fetch(`${basePath}/api/subscription/${token}`, {
+        const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
           headers: { Accept: 'application/json' },
         });
 
@@ -644,7 +644,7 @@ export default function SubscriptionPage() {
     try {
       setRefreshingUsage(true);
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-      const response = await fetch(`${basePath}/api/subscription/${token}`, {
+      const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });

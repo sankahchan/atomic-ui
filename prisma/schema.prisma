@@ -296,6 +296,7 @@ model DynamicAccessKey {
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
   contactLinks String?
   subscriptionWelcomeMessage String?
+  sharePageEnabled           Boolean @default(true)
 
   // Key Auto-Rotation
   // When enabled, underlying access keys are periodically replaced

@@ -396,6 +396,7 @@ function SubscriptionShareCard({
   currentCoverImageType,
   currentContactLinks,
   currentWelcomeMessage,
+  currentSharePageEnabled,
   onUpdate,
 }: {
   dakId: string;
@@ -407,6 +408,7 @@ function SubscriptionShareCard({
   currentCoverImageType: string | null;
   currentContactLinks: ContactLink[] | null;
   currentWelcomeMessage: string | null;
+  currentSharePageEnabled: boolean;
   onUpdate: () => void;
 }) {
   const { toast } = useToast();
@@ -417,6 +419,7 @@ function SubscriptionShareCard({
   const [slugInput, setSlugInput] = useState(publicSlug || '');
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
   const [welcomeMessage, setWelcomeMessage] = useState(currentWelcomeMessage || '');
+  const [sharePageEnabled, setSharePageEnabled] = useState(currentSharePageEnabled);
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
 
@@ -480,6 +483,32 @@ function SubscriptionShareCard({
     },
   );
 
+  const regenerateDynamicUrlMutation = trpc.dynamicKeys.regenerateDynamicUrl.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Share token regenerated',
+        description: publicSlug
+          ? 'The legacy token link was rotated. Your short slug links stay the same.'
+          : 'The dynamic share link has been rotated.',
+      });
+      onUpdate();
+      await copyToClipboard(
+        result.sharePageUrl,
+        'Copied!',
+        publicSlug
+          ? 'New legacy share page link copied. Short slug links are unchanged.'
+          : 'New share page link copied to clipboard.',
+      );
+    },
+    onError: (error) => {
+      toast({
+        title: 'Regeneration failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleThemeChange = (value: string) => {
     setSelectedTheme(value);
     updateMutation.mutate({
@@ -536,6 +565,14 @@ function SubscriptionShareCard({
     updateMutation.mutate({
       id: dakId,
       contactLinks: newContacts.length > 0 ? JSON.stringify(newContacts) : null,
+    } as any);
+  };
+
+  const handleSharePageToggle = (checked: boolean) => {
+    setSharePageEnabled(checked);
+    updateMutation.mutate({
+      id: dakId,
+      sharePageEnabled: checked,
     } as any);
   };
 
@@ -616,6 +653,20 @@ function SubscriptionShareCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Theme Selector */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-3">
+          <div className="space-y-1">
+            <Label className="text-sm font-medium">Share Page Enabled</Label>
+            <p className="text-xs text-muted-foreground">
+              Disable the public share page without disabling the dynamic key or client URLs.
+            </p>
+          </div>
+          <Switch
+            checked={sharePageEnabled}
+            onCheckedChange={handleSharePageToggle}
+            disabled={updateMutation.isPending}
+          />
+        </div>
+
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <Palette className="w-4 h-4" />
@@ -880,7 +931,7 @@ function SubscriptionShareCard({
               const url = getSubscriptionPageUrl();
               if (url) window.open(url, '_blank');
             }}
-            disabled={!dynamicUrl}
+            disabled={!dynamicUrl || !sharePageEnabled}
           >
             <Eye className="w-4 h-4 mr-2" />
             Preview
@@ -888,7 +939,7 @@ function SubscriptionShareCard({
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copySubscriptionPageUrl}
-            disabled={!dynamicUrl}
+            disabled={!dynamicUrl || !sharePageEnabled}
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy Link
@@ -902,6 +953,19 @@ function SubscriptionShareCard({
             <Link2 className="w-4 h-4 mr-2" />
             Copy Client URL
           </Button>
+          <Button
+            variant="outline"
+            className="w-full min-w-0 text-xs sm:col-span-2 sm:text-sm"
+            onClick={() => regenerateDynamicUrlMutation.mutate({ id: dakId })}
+            disabled={regenerateDynamicUrlMutation.isPending || !dynamicUrl}
+          >
+            {regenerateDynamicUrlMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Regenerate Link
+          </Button>
         </div>
 
         {/* URL Display */}
@@ -910,7 +974,7 @@ function SubscriptionShareCard({
             <div className="p-2 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">Share Page URL:</p>
               <code className="text-xs break-all select-all">
-                {getSubscriptionPageUrl()}
+                {sharePageEnabled ? getSubscriptionPageUrl() : 'Share page disabled'}
               </code>
             </div>
             <div className="p-2 bg-muted rounded-lg">
@@ -919,6 +983,11 @@ function SubscriptionShareCard({
                 {getClientUrl()}
               </code>
             </div>
+            {publicSlug ? (
+              <p className="text-xs text-muted-foreground">
+                Regenerating the link rotates the legacy token URL only. Your short slug links stay active until you change the slug or disable the share page.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -2164,6 +2233,7 @@ export default function DynamicKeyDetailPage() {
             currentCoverImageType={dak.coverImageType}
             currentContactLinks={dak.contactLinks}
             currentWelcomeMessage={dak.subscriptionWelcomeMessage ?? null}
+            currentSharePageEnabled={dak.sharePageEnabled ?? true}
             onUpdate={() => refetch()}
           />
         </div>

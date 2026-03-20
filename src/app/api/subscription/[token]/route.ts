@@ -15,6 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
+  const audience = request.nextUrl.searchParams.get('audience');
 
   if (!token) {
     return NextResponse.json(
@@ -99,6 +100,13 @@ export async function GET(
         );
       }
 
+      if (audience === 'page' && !dak.sharePageEnabled) {
+        return NextResponse.json(
+          { error: 'Share page is disabled' },
+          { status: 403 }
+        );
+      }
+
       const acceptHeader = request.headers.get('accept') || '';
       const dynamicIdentifier = dak.publicSlug || dak.dynamicUrl || token;
       const ssConfUrl = buildDynamicOutlineUrl(dynamicIdentifier, dak.name, {
@@ -128,6 +136,7 @@ export async function GET(
           port: null,
           contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
           subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage || null,
+          sharePageEnabled: dak.sharePageEnabled,
           isDynamic: true,
         });
       }

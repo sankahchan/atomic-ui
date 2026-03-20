@@ -22,6 +22,11 @@ import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { subscriptionThemeIds } from '@/lib/subscription-themes';
 import { slugifyPublicName, normalizePublicSlug, isValidPublicSlug } from '@/lib/public-slug';
 import {
+  buildDynamicOutlineUrl,
+  buildDynamicSharePageUrl,
+  buildDynamicShortShareUrl,
+} from '@/lib/subscription-links';
+import {
   collectTrafficActivity,
   TRAFFIC_ACTIVE_WINDOW_MS,
 } from '@/lib/services/traffic-activity';
@@ -62,6 +67,7 @@ const createDAKSchema = z.object({
   preferredRegionMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
+  sharePageEnabled: z.boolean().optional(),
 });
 
 /**
@@ -95,6 +101,7 @@ const updateDAKSchema = z.object({
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
+  sharePageEnabled: z.boolean().optional(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(),
@@ -536,6 +543,7 @@ export const dynamicKeysRouter = router({
         coverImageType: dak.coverImageType,
         contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
         subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage,
+        sharePageEnabled: dak.sharePageEnabled,
         // Rotation settings
         rotationEnabled: dak.rotationEnabled,
         rotationInterval: dak.rotationInterval,
@@ -951,6 +959,7 @@ export const dynamicKeysRouter = router({
           method: input.method || 'chacha20-ietf-poly1305',
           loadBalancerAlgorithm: input.loadBalancerAlgorithm,
           subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
+          sharePageEnabled: input.sharePageEnabled ?? true,
         },
         include: {
           _count: {
@@ -1004,6 +1013,7 @@ export const dynamicKeysRouter = router({
         coverImageType,
         contactLinks,
         subscriptionWelcomeMessage,
+        sharePageEnabled,
         owner,
         tags,
         publicSlug,
@@ -1113,6 +1123,10 @@ export const dynamicKeysRouter = router({
         updateData.subscriptionWelcomeMessage = subscriptionWelcomeMessage;
       }
 
+      if (sharePageEnabled !== undefined) {
+        updateData.sharePageEnabled = sharePageEnabled;
+      }
+
       if (publicSlug !== undefined) {
         updateData.publicSlug = await resolveDynamicKeySlug(publicSlug, data.name || existing.name, id);
       }
@@ -1217,6 +1231,41 @@ export const dynamicKeysRouter = router({
       });
 
       return dak;
+    }),
+
+  regenerateDynamicUrl: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const existing = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          dynamicUrl: true,
+          name: true,
+          publicSlug: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const dynamicUrl = generateRandomString(32);
+      await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: { dynamicUrl },
+      });
+
+      return {
+        dynamicUrl,
+        sharePageUrl: buildDynamicSharePageUrl(dynamicUrl),
+        clientUrl: buildDynamicOutlineUrl(dynamicUrl, existing.name),
+        shortSharePageUrl: existing.publicSlug ? buildDynamicShortShareUrl(existing.publicSlug) : null,
+        shortClientUrl: existing.publicSlug ? buildDynamicOutlineUrl(existing.publicSlug, existing.name, { shortPath: true }) : null,
+      };
     }),
 
   /**
