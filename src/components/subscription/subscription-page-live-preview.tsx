@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/hooks/use-locale";
 import {
   AlertTriangle,
   ChevronRight,
@@ -54,11 +55,11 @@ interface SubscriptionPageLivePreviewProps {
 
 const viewportOptions: Array<{
   id: PreviewViewport;
-  label: string;
+  labelKey: string;
   icon: typeof Monitor;
 }> = [
-  { id: "desktop", label: "Desktop", icon: Monitor },
-  { id: "mobile", label: "Mobile", icon: Smartphone },
+  { id: "desktop", labelKey: "subscription.preview.desktop", icon: Monitor },
+  { id: "mobile", labelKey: "subscription.preview.mobile", icon: Smartphone },
 ];
 
 const radiusClasses: Record<NonNullable<SubscriptionBranding["cardStyle"]>, string> = {
@@ -77,12 +78,22 @@ const particles = [
   { left: "88%", top: "32%", size: 5 },
 ];
 
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 export function SubscriptionPageLivePreview({
   themeId,
   branding,
   supportLink,
 }: SubscriptionPageLivePreviewProps) {
   const [viewport, setViewport] = useState<PreviewViewport>("desktop");
+  const { t } = useLocale();
+  const tr = (key: string, values?: Record<string, string | number>) =>
+    values ? fillTemplate(t(key), values) : t(key);
 
   const mergedBranding = { ...defaultBranding, ...branding };
   const theme = getTheme(themeId);
@@ -133,8 +144,8 @@ export function SubscriptionPageLivePreview({
   const showHelpContact = mergedBranding.showHelpContact ?? true;
   const showManualSetupButton = mergedBranding.showManualSetupButton ?? true;
   const hasHelpContactContent = showHelpContact;
-  const usageHeadline = "176 GB / 200 GB";
-  const usageDetail = "88% of quota used";
+  const usageHeadline = t("subscription.preview.usage_headline");
+  const usageDetail = t("subscription.preview.usage_detail");
   const serverLabel = "Singapore";
 
   const renderBackdrop = () => (
@@ -239,9 +250,9 @@ export function SubscriptionPageLivePreview({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-foreground">Live Preview</p>
+          <p className="text-sm font-semibold text-foreground">{t("subscription.preview.title")}</p>
           <p className="text-xs text-muted-foreground">
-            Mirrors the current install-first subscription page layout.
+            {t("subscription.preview.description")}
           </p>
         </div>
         <div className="inline-flex rounded-full border border-border/60 bg-background/80 p-1">
@@ -260,7 +271,7 @@ export function SubscriptionPageLivePreview({
                 }}
               >
                 <Icon className="h-4 w-4" />
-                {option.label}
+                {t(option.labelKey)}
               </button>
             );
           })}
@@ -307,10 +318,10 @@ export function SubscriptionPageLivePreview({
                               {mergedBranding.brandName || "Atomic-UI"}
                             </div>
                             <h3 className={`mt-3 font-semibold tracking-tight ${titleSizeClass}`} style={{ color: textPrimary }}>
-                              Singapore Premium
+                              {t("subscription.preview.sample_name")}
                             </h3>
                             <p className="mt-2 max-w-3xl text-sm md:text-base" style={{ color: textMuted }}>
-                              Connect on {serverLabel} with the main app button, or open manual setup for the QR code and connection URL.
+                              {tr("subscription.hero.intro", { server: serverLabel })}
                             </p>
                           </div>
                         </div>
@@ -321,7 +332,7 @@ export function SubscriptionPageLivePreview({
                           className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
                           style={{ backgroundColor: `${theme.success}18`, color: theme.success }}
                         >
-                          Active
+                          {t("subscription.status.active")}
                         </div>
                       </div>
                     </div>
@@ -336,7 +347,7 @@ export function SubscriptionPageLivePreview({
                   <div className={`grid min-w-0 gap-3.5 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[256px_minmax(0,1fr)] lg:items-stretch"}`}>
                     <div className={`order-2 flex min-w-0 w-full overflow-hidden h-full flex-col rounded-[22px] border p-3.5 ${isMobile ? "" : "lg:order-1 lg:p-4"}`} style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                        Quick Scan
+                        {t("subscription.hero.quick_scan")}
                       </p>
                       <div className="mt-3 flex flex-1 items-center justify-center rounded-[16px] border p-3.5" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                         <div className="flex h-full w-full max-h-[148px] max-w-[148px] items-center justify-center rounded-[12px] border border-dashed" style={{ borderColor: controlBorder }}>
@@ -344,10 +355,10 @@ export function SubscriptionPageLivePreview({
                         </div>
                       </div>
                       <p className="mt-3 text-sm font-medium" style={{ color: controlText }}>
-                        Scan with {primaryApp?.name || "your VPN app"}
+                        {tr("subscription.hero.scan_with", { app: primaryApp?.name || t("subscription.defaults.vpn_app") })}
                       </p>
                       <p className="mt-1 text-sm" style={{ color: controlMuted }}>
-                        Fastest on mobile. If scanning fails, use the connection tools in the install card for the same URL.
+                        {t("subscription.hero.quick_scan_help")}
                       </p>
                     </div>
 
@@ -355,9 +366,13 @@ export function SubscriptionPageLivePreview({
                       <div className="space-y-3.5">
                         <div className="rounded-[18px] border p-1" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                           <div className="grid min-w-0 grid-cols-3 gap-1">
-                            {["Android", "iPhone", "Windows"].map((label, index) => (
+                            {[
+                              { label: t("subscription.platform.android"), short: t("subscription.platform.android") },
+                              { label: t("subscription.platform.ios"), short: t("subscription.platform.ios_short") },
+                              { label: t("subscription.platform.windows"), short: t("subscription.platform.windows") },
+                            ].map((platformLabel, index) => (
                               <div
-                                key={label}
+                                key={platformLabel.label}
                                 className="min-w-0 w-full rounded-[14px] px-2.5 py-2 text-center text-[12px] font-medium leading-tight sm:px-3 sm:text-[13px]"
                                 style={{
                                   background: index === 0
@@ -367,8 +382,8 @@ export function SubscriptionPageLivePreview({
                                   boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
                                 }}
                               >
-                                <span className="sm:hidden">{label === "iPhone / iPad" ? "iOS" : label}</span>
-                                <span className="hidden sm:inline">{label}</span>
+                                <span className="sm:hidden">{platformLabel.short}</span>
+                                <span className="hidden sm:inline">{platformLabel.label}</span>
                               </div>
                             ))}
                           </div>
@@ -378,7 +393,7 @@ export function SubscriptionPageLivePreview({
                           <div className="min-w-0 space-y-2">
                             <div className="flex min-w-0 items-center justify-between gap-3">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                                Connection URL
+                                {t("subscription.hero.connection_url")}
                               </p>
                               <div
                                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] border"
@@ -405,31 +420,31 @@ export function SubscriptionPageLivePreview({
                             }}
                           >
                             <span className="text-base">{primaryApp?.icon || "🔑"}</span>
-                            Open in {primaryApp?.name || "Outline"}
+                            {tr("subscription.hero.open_in", { app: primaryApp?.name || "Outline" })}
                             <ChevronRight className="h-4 w-4" />
                           </div>
 
                           <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "xl:grid-cols-4 sm:grid-cols-2"}`}>
                             <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                               <Copy className="h-4 w-4" />
-                              Copy URL
+                              {t("subscription.hero.copy_url")}
                             </div>
                             {showManualSetupButton && (
                               <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <QrCode className="h-4 w-4" />
-                                Manual Setup
+                                {t("subscription.hero.manual_setup")}
                               </div>
                             )}
                             {primaryApp && (
                               <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <ExternalLink className="h-4 w-4" />
-                                Get {primaryApp.name}
+                                {tr("subscription.hero.get_app", { app: primaryApp.name })}
                               </div>
                             )}
                             {showHelpContact && supportLink?.trim() && (
                               <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <MessageCircle className="h-4 w-4" />
-                                Get Support
+                                {t("subscription.hero.get_support")}
                               </div>
                             )}
                           </div>
@@ -437,24 +452,24 @@ export function SubscriptionPageLivePreview({
                           <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]"}`}>
                             <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                                Quick Tip
+                                {t("subscription.hero.quick_tip")}
                               </p>
                               <p className="mt-2 text-sm leading-6" style={{ color: controlText }}>
-                                If the app does not open, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                                {t("subscription.hero.quick_tip_desc")}
                               </p>
                             </div>
                             <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                                Last Updated
+                                {t("subscription.hero.last_updated")}
                               </p>
-                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>Updated just now</p>
+                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>{t("subscription.status.updated_just_now")}</p>
                             </div>
                             <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
-                                Endpoint
+                                {t("subscription.hero.endpoint")}
                               </p>
                               <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>{serverLabel}</p>
-                              <p className="mt-1 text-xs" style={{ color: controlMuted }}>Port 1158</p>
+                              <p className="mt-1 text-xs" style={{ color: controlMuted }}>{tr("subscription.summary.port", { port: 1158 })}</p>
                             </div>
                           </div>
                         </div>
@@ -472,7 +487,7 @@ export function SubscriptionPageLivePreview({
                     >
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.warning }} />
                       <span className="text-sm" style={{ color: textPrimary }}>
-                        88% of the included data has already been used. Users should expect a prominent warning here.
+                        {t("subscription.preview.usage_alert")}
                       </span>
                     </div>
                   )}
@@ -483,7 +498,7 @@ export function SubscriptionPageLivePreview({
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                              Data Usage
+                              {t("subscription.summary.data_usage")}
                             </p>
                             <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
                             <p className="mt-2 text-sm" style={{ color: textMuted }}>{usageDetail}</p>
@@ -494,9 +509,9 @@ export function SubscriptionPageLivePreview({
                               style={{ backgroundColor: theme.bgCard, color: textPrimary, border: `1px solid ${borderColor}` }}
                             >
                               <RefreshCw className="h-4 w-4" />
-                              Refresh usage
+                              {t("subscription.summary.refresh_usage")}
                             </div>
-                            <span className="text-xs" style={{ color: textMuted }}>Updated just now</span>
+                            <span className="text-xs" style={{ color: textMuted }}>{t("subscription.status.updated_just_now")}</span>
                           </div>
                         </div>
                         <div className="mt-4 h-2 overflow-hidden rounded-full" style={{ backgroundColor: theme.progressBg }}>
@@ -509,24 +524,24 @@ export function SubscriptionPageLivePreview({
                           />
                         </div>
                         <p className="mt-3 text-sm" style={{ color: textMuted }}>
-                          176 GB used of 200 GB total.
+                          {t("subscription.preview.usage_total")}
                         </p>
                       </div>
 
                       <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          Time Left
+                          {t("subscription.summary.time_left")}
                         </p>
-                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>12 days</p>
-                        <p className="mt-2 text-sm" style={{ color: textMuted }}>Expires on June 30, 2026</p>
+                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.time_left_value")}</p>
+                        <p className="mt-2 text-sm" style={{ color: textMuted }}>{t("subscription.preview.time_left_detail")}</p>
                       </div>
 
                       <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          Server
+                          {t("subscription.summary.server")}
                         </p>
-                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>Singapore</p>
-                        <p className="mt-2 text-sm" style={{ color: textMuted }}>Port 1158</p>
+                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.server_value")}</p>
+                        <p className="mt-2 text-sm" style={{ color: textMuted }}>{tr("subscription.summary.port", { port: 1158 })}</p>
                       </div>
                     </div>
                   )}
@@ -539,18 +554,18 @@ export function SubscriptionPageLivePreview({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        Compatible Apps
+                        {t("subscription.apps.title")}
                       </p>
                       <h4 className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>
-                        Other apps for this device
+                        {t("subscription.apps.heading")}
                       </h4>
                       <p className="mt-1 text-sm" style={{ color: textMuted }}>
-                        Enabled apps appear here as secondary install choices.
+                        {t("subscription.apps.description")}
                       </p>
                     </div>
                     {apps.length > visibleApps.length && (
                       <span className="text-sm font-medium" style={{ color: theme.accent }}>
-                        +{apps.length - visibleApps.length} more apps
+                        {tr("subscription.apps.more_apps", { count: apps.length - visibleApps.length })}
                       </span>
                     )}
                   </div>
@@ -568,14 +583,14 @@ export function SubscriptionPageLivePreview({
                             </div>
                             <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlText }}>{app.name}</p>
                             <p className="mt-1 text-sm" style={{ color: controlMuted }}>
-                              Manual alternative for this device if you prefer {app.name}.
+                              {tr("subscription.apps.manual_alternative", { app: app.name })}
                             </p>
                           </div>
                           <div
                             className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                             style={{ backgroundColor: controlButtonSurface, color: controlMuted, border: `1px solid ${controlBorder}` }}
                           >
-                            Client
+                            {t("subscription.apps.client")}
                           </div>
                         </div>
                         <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
@@ -586,7 +601,7 @@ export function SubscriptionPageLivePreview({
                               color: "#ffffff",
                             }}
                           >
-                            Open in {app.name}
+                            {tr("subscription.hero.open_in", { app: app.name })}
                           </div>
                           <div
                             className="inline-flex items-center justify-center rounded-[16px] border"
@@ -597,13 +612,13 @@ export function SubscriptionPageLivePreview({
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3 text-xs">
                           <span style={{ color: controlMuted }}>
-                            Uses the same URL and import flow.
+                            {t("subscription.apps.same_url_flow")}
                           </span>
                           <span
                             className="inline-flex rounded-full px-2.5 py-1 font-medium"
                             style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}
                           >
-                            iPhone / iPad
+                            {t("subscription.platform.ios")}
                           </span>
                         </div>
                       </div>
@@ -617,29 +632,34 @@ export function SubscriptionPageLivePreview({
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="max-w-2xl">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                        Help & Contact
+                        {t("subscription.help.title")}
                       </p>
                       <h4 className="mt-2 text-xl font-semibold" style={{ color: textPrimary }}>
-                        Need help connecting?
+                        {t("subscription.help.heading")}
                       </h4>
                       <p className="mt-2 text-sm" style={{ color: textMuted }}>
                         {supportLink?.trim()
-                          ? "Support stays available as a secondary action without adding another large card."
-                          : "No support link is configured. The support action stays hidden until you add one."}
+                          ? t("subscription.preview.help_available")
+                          : t("subscription.preview.help_hidden")}
                       </p>
                     </div>
                     <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium" style={pillStyle}>
                       {supportLink?.trim() ? <ExternalLink className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
-                      {supportLink?.trim() ? "Open Support" : "Support Hidden"}
+                      {supportLink?.trim() ? t("subscription.help.open_support") : t("subscription.hero.get_support")}
                     </div>
                   </div>
 
                   <div className={`mt-5 grid gap-3 ${isMobile ? "grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
-                    {["Telegram", "Discord", "WhatsApp", "Email"].map((label) => (
+                    {[
+                      t("subscription.contact.telegram"),
+                      t("subscription.contact.discord"),
+                      t("subscription.contact.whatsapp"),
+                      t("subscription.contact.email"),
+                    ].map((label) => (
                       <div key={label} className="rounded-[22px] border px-4 py-3" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-sm font-medium" style={{ color: textPrimary }}>{label}</p>
                         <p className="mt-1 text-sm" style={{ color: textMuted }}>
-                          Support shortcut
+                          {t("subscription.help.support_shortcut")}
                         </p>
                       </div>
                     ))}

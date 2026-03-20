@@ -18,6 +18,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Globe2,
   HardDrive,
   MapPin,
   MessageCircle,
@@ -52,6 +53,13 @@ import {
   SUBSCRIPTION_EVENT_TYPES,
   type SubscriptionEventType,
 } from '@/lib/services/subscription-events';
+import { useLocale } from '@/hooks/use-locale';
+import {
+  localeFlags,
+  localeNames,
+  supportedLocales,
+  type SupportedLocale,
+} from '@/lib/i18n/config';
 import {
   getTheme,
   clientApps,
@@ -105,6 +113,13 @@ interface ManualSetupGuide {
   tip: string;
 }
 
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 // Contact type icons and colors
 const contactConfig: Record<string, { icon: string; color: string; label: string }> = {
   telegram: { icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2s-.18-.05-.26-.03c-.11.02-1.93 1.23-5.46 3.62-.52.36-.99.53-1.41.52-.46-.01-1.35-.26-2.01-.48-.81-.27-1.45-.42-1.4-.88.03-.24.37-.49 1.02-.75 4.02-1.75 6.7-2.91 8.03-3.46 3.83-1.6 4.62-1.88 5.14-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.01.06.01.24 0 .38z', color: '#0088cc', label: 'Telegram' },
@@ -116,42 +131,47 @@ const contactConfig: Record<string, { icon: string; color: string; label: string
   facebook: { icon: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z', color: '#1877F2', label: 'Facebook' },
 };
 
-function getManualSetupGuide(platform: Platform, appName?: string | null): ManualSetupGuide {
-  const clientName = appName || 'your VPN client';
+function getManualSetupGuide(
+  platform: Platform,
+  t: (key: string) => string,
+  appName?: string | null,
+): ManualSetupGuide {
+  const clientName = appName || t('subscription.defaults.vpn_app');
+  const tr = (key: string, values: Record<string, string | number>) => fillTemplate(t(key), values);
 
   switch (platform) {
     case 'ios':
       return {
-        title: `Use ${clientName} on iPhone / iPad`,
-        summary: `Install ${clientName} first, then import the connection directly or scan the QR code if Safari does not hand off automatically.`,
+        title: tr('subscription.manual.guides.ios.title', { app: clientName }),
+        summary: tr('subscription.manual.guides.ios.summary', { app: clientName }),
         steps: [
-          `Install ${clientName} from the App Store if it is not already on this device.`,
-          `Tap "Open in ${clientName}" below. If iOS stays in Safari, copy the connection URL and import it from inside ${clientName}.`,
-          'If direct import still fails, scan the QR code or paste the connection URL manually in the app.',
+          tr('subscription.manual.guides.ios.step1', { app: clientName }),
+          tr('subscription.manual.guides.ios.step2', { app: clientName }),
+          t('subscription.manual.guides.ios.step3'),
         ],
-        tip: 'On iOS, app handoff usually works only after the client is already installed.',
+        tip: t('subscription.manual.guides.ios.tip'),
       };
     case 'windows':
       return {
-        title: `Import into ${clientName} on Windows`,
-        summary: `Desktop clients are usually more reliable with paste/import than with QR. Use the connection URL first, then fall back to the subscription page link if the client supports it.`,
+        title: tr('subscription.manual.guides.windows.title', { app: clientName }),
+        summary: tr('subscription.manual.guides.windows.summary', { app: clientName }),
         steps: [
-          `Install ${clientName} on this computer if you have not already.`,
-          `Use "Copy URL" below and paste it into ${clientName} using its import or add-server action.`,
-          'If the client supports subscription pages, use the subscription page link as the long-term update source.',
+          tr('subscription.manual.guides.windows.step1', { app: clientName }),
+          tr('subscription.manual.guides.windows.step2', { app: clientName }),
+          t('subscription.manual.guides.windows.step3'),
         ],
-        tip: 'QR import is mainly useful on mobile. On Windows, manual paste is the dependable fallback.',
+        tip: t('subscription.manual.guides.windows.tip'),
       };
     default:
       return {
-        title: `Use ${clientName} on Android`,
-        summary: `Android usually supports direct app handoff. If the app is missing, install it first, then retry the open button or use the QR code.`,
+        title: tr('subscription.manual.guides.android.title', { app: clientName }),
+        summary: tr('subscription.manual.guides.android.summary', { app: clientName }),
         steps: [
-          `Install ${clientName} from Google Play if it is not already on this device.`,
-          `Tap "Open in ${clientName}" below. If the app does not open, copy the connection URL and import it from inside ${clientName}.`,
-          'If import still fails, scan the QR code or paste the connection URL manually.',
+          tr('subscription.manual.guides.android.step1', { app: clientName }),
+          tr('subscription.manual.guides.android.step2', { app: clientName }),
+          t('subscription.manual.guides.android.step3'),
         ],
-        tip: 'Most Android clients can import either from the deep link, clipboard, or QR code.',
+        tip: t('subscription.manual.guides.android.tip'),
       };
   }
 }
@@ -253,6 +273,7 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 export default function SubscriptionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { locale, setLocale, t, mounted } = useLocale();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
 
@@ -289,6 +310,27 @@ export default function SubscriptionPage() {
   const [refreshingUsage, setRefreshingUsage] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [pageViewLogged, setPageViewLogged] = useState(false);
+  const localeTag = locale === 'my' ? 'my-MM' : 'en-US';
+  const tr = useCallback(
+    (key: string, values?: Record<string, string | number>) =>
+      values ? fillTemplate(t(key), values) : t(key),
+    [t],
+  );
+
+  const formatLocalizedDate = useCallback(
+    (value: string) =>
+      new Date(value).toLocaleDateString(localeTag, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }),
+    [localeTag],
+  );
+
+  const getContactLabel = useCallback(
+    (type: ContactLink['type']) => t(`subscription.contact.${type}`),
+    [t],
+  );
 
   const trackSubscriptionEvent = useCallback(async (
     eventType: SubscriptionEventType,
@@ -383,7 +425,7 @@ export default function SubscriptionPage() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          setError(errorData.error || 'Failed to load subscription');
+          setError(errorData.error || t('subscription.ui.load_failed'));
           setLoading(false);
           return;
         }
@@ -418,13 +460,13 @@ export default function SubscriptionPage() {
         setLastUpdatedAt(Date.now());
         setLoading(false);
       } catch (err) {
-        setError('Failed to load subscription');
+        setError(t('subscription.ui.load_failed'));
         setLoading(false);
       }
     }
 
     fetchData();
-  }, [token, trackSubscriptionEvent]);
+  }, [token, t, trackSubscriptionEvent]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -494,7 +536,7 @@ export default function SubscriptionPage() {
 
   const copyToClipboard = async (
     text: string,
-    successMessage = 'Copied to clipboard',
+    successMessage = t('keys.toast.copied'),
     eventMetadata?: Record<string, unknown>,
   ) => {
     if (!text) return;
@@ -536,7 +578,7 @@ export default function SubscriptionPage() {
       console.error("Fallback clipboard failed", err);
     }
 
-    alert(`Copy failed. Please copy manually:\n\n${text}`);
+    alert(tr('subscription.ui.copy_failed_manual', { text }));
   };
 
   const formatBytes = (bytes: string | number): string => {
@@ -549,15 +591,15 @@ export default function SubscriptionPage() {
   };
 
   const getTimeRemaining = (expiresAt: string | null): string => {
-    if (!expiresAt) return 'Unlimited';
+    if (!expiresAt) return t('subscription.summary.unlimited');
     const now = new Date();
     const expires = new Date(expiresAt);
     const diff = expires.getTime() - now.getTime();
-    if (diff <= 0) return 'Expired';
+    if (diff <= 0) return t('subscription.summary.expired');
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    if (days > 0) return `${days}d ${hours}h left`;
-    return `${hours}h left`;
+    if (days > 0) return tr('subscription.summary.days_hours_left', { days, hours });
+    return tr('subscription.summary.hours_left', { hours });
   };
 
   const getUsagePercent = (): number => {
@@ -568,17 +610,17 @@ export default function SubscriptionPage() {
   };
 
   const getLastUpdatedLabel = (): string => {
-    if (!lastUpdatedAt) return 'Not checked yet';
+    if (!lastUpdatedAt) return t('subscription.status.not_checked');
 
     const diffSeconds = Math.floor((Date.now() - lastUpdatedAt) / 1000);
-    if (diffSeconds < 10) return 'Updated just now';
-    if (diffSeconds < 60) return `Updated ${diffSeconds}s ago`;
+    if (diffSeconds < 10) return t('subscription.status.updated_just_now');
+    if (diffSeconds < 60) return tr('subscription.status.updated_seconds_ago', { seconds: diffSeconds });
 
     const diffMinutes = Math.floor(diffSeconds / 60);
-    if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`;
+    if (diffMinutes < 60) return tr('subscription.status.updated_minutes_ago', { minutes: diffMinutes });
 
     const diffHours = Math.floor(diffMinutes / 60);
-    return `Updated ${diffHours}h ago`;
+    return tr('subscription.status.updated_hours_ago', { hours: diffHours });
   };
 
   const getCountryFlag = (countryCode: string | null): string => {
@@ -663,18 +705,18 @@ export default function SubscriptionPage() {
       }
 
       setLastUpdatedAt(Date.now());
-      setFeedback('Usage refreshed');
+      setFeedback(t('subscription.feedback.usage_refreshed'));
     } catch {
-      setFeedback('Refresh failed');
+      setFeedback(t('subscription.feedback.refresh_failed'));
     } finally {
       setRefreshingUsage(false);
     }
   };
 
   const getPlatformLabel = (value: Platform): string => {
-    if (value === 'ios') return 'iPhone / iPad';
-    if (value === 'windows') return 'Windows';
-    return 'Android';
+    if (value === 'ios') return t('subscription.platform.ios');
+    if (value === 'windows') return t('subscription.platform.windows');
+    return t('subscription.platform.android');
   };
 
   const handleContactClick = (contact: ContactLink) => {
@@ -742,7 +784,7 @@ export default function SubscriptionPage() {
             {error}
           </h1>
           <p style={{ color: theme.textMuted }}>
-            This subscription link may be invalid, expired, or deactivated.
+            {t('subscription.ui.invalid_link_detail')}
           </p>
         </div>
       </div>
@@ -766,26 +808,32 @@ export default function SubscriptionPage() {
   const showHelpContact = branding.showHelpContact ?? true;
   const showManualSetupButton = branding.showManualSetupButton ?? true;
   const statusTone = keyData.status === 'ACTIVE'
-    ? { bg: `${theme.success}18`, color: theme.success, label: 'Active' }
+    ? { bg: `${theme.success}18`, color: theme.success, label: t('subscription.status.active') }
     : keyData.status === 'PENDING'
-      ? { bg: `${theme.warning}18`, color: theme.warning, label: 'Pending' }
-      : { bg: `${theme.warning}18`, color: theme.warning, label: keyData.status };
+      ? { bg: `${theme.warning}18`, color: theme.warning, label: t('subscription.status.pending') }
+      : keyData.status === 'DISABLED'
+        ? { bg: `${theme.warning}18`, color: theme.warning, label: t('subscription.status.disabled') }
+        : keyData.status === 'EXPIRED'
+          ? { bg: `${theme.warning}18`, color: theme.warning, label: t('subscription.status.expired') }
+          : keyData.status === 'DEPLETED'
+            ? { bg: `${theme.warning}18`, color: theme.warning, label: t('subscription.status.depleted') }
+            : { bg: `${theme.warning}18`, color: theme.warning, label: keyData.status };
   const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
   const hasHelpContactContent = showHelpContact && Boolean(supportLink || keyData.contactLinks?.length);
   const installAppUrl = getPlatformStoreUrl(primaryApp, platform);
-  const manualSetupGuide = getManualSetupGuide(platform, primaryApp?.name);
+  const manualSetupGuide = getManualSetupGuide(platform, t, primaryApp?.name);
   const serverLabel = keyData.server.location || keyData.server.name;
   const usageHeadline = keyData.dataLimitBytes
     ? `${formatBytes(keyData.usedBytes)} / ${formatBytes(keyData.dataLimitBytes)}`
-    : 'Unlimited data';
+    : t('subscription.summary.unlimited_data');
   const usageDetail = keyData.dataLimitBytes
-    ? `${usagePercent}% of quota used`
-    : `${formatBytes(keyData.usedBytes)} used with no quota limit`;
+    ? tr('subscription.summary.percent_used', { percent: usagePercent })
+    : tr('subscription.summary.used_no_limit', { used: formatBytes(keyData.usedBytes) });
   const keyWelcomeMessage = keyData.subscriptionWelcomeMessage?.trim() || '';
   const effectiveWelcomeMessage = keyWelcomeMessage || branding.welcomeMessage?.trim() || '';
   const shouldShowWelcome = Boolean(keyWelcomeMessage || (branding.showWelcome && branding.welcomeMessage?.trim()));
   const footerText = branding.footerText?.trim()
-    || (branding.showPoweredBy !== false ? `Powered by ${branding.brandName || 'Atomic-UI'}` : '');
+    || (branding.showPoweredBy !== false ? tr('subscription.ui.powered_by', { brand: branding.brandName || 'Atomic-UI' }) : '');
 
   const getCardStyle = () => {
     if (hasImageBackground) {
@@ -937,24 +985,64 @@ export default function SubscriptionPage() {
 
         <div className="relative z-10 mx-auto w-full space-y-4 px-3 py-8 pb-safe sm:px-4 md:px-6 lg:py-10">
 
-          {/* Dark/Light Theme Toggle */}
-          {(themeId === 'dark' || themeId === 'light') && (
-            <button
-              onClick={handleThemeToggle}
-              className="fixed top-4 right-4 z-50 p-2 rounded-full transition-all backdrop-blur-sm"
-              style={{
-                backgroundColor: isDarkTheme ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                color: isDarkTheme ? '#e4e4e7' : '#3f3f46',
-              }}
-              title={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDarkTheme ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-              )}
-            </button>
-          )}
+          <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+            {mounted && (
+              <div
+                className="inline-flex items-center gap-1 rounded-full border px-1 py-1 backdrop-blur-sm"
+                style={{
+                  backgroundColor: isDarkTheme ? 'rgba(15,23,42,0.58)' : 'rgba(255,255,255,0.88)',
+                  borderColor: isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)',
+                }}
+                aria-label={t('subscription.ui.language')}
+              >
+                <span
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full"
+                  style={{ color: isDarkTheme ? '#e4e4e7' : '#3f3f46' }}
+                >
+                  <Globe2 className="h-4 w-4" />
+                </span>
+                {supportedLocales.map((localeOption) => {
+                  const active = locale === localeOption;
+                  return (
+                    <button
+                      key={localeOption}
+                      type="button"
+                      onClick={() => setLocale(localeOption as SupportedLocale)}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all"
+                      style={{
+                        backgroundColor: active
+                          ? (isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)')
+                          : 'transparent',
+                        color: isDarkTheme ? '#e4e4e7' : '#334155',
+                      }}
+                      aria-pressed={active}
+                    >
+                      <span>{localeFlags[localeOption]}</span>
+                      <span className="hidden sm:inline">{localeNames[localeOption]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {(themeId === 'dark' || themeId === 'light') && (
+              <button
+                onClick={handleThemeToggle}
+                className="p-2 rounded-full transition-all backdrop-blur-sm"
+                style={{
+                  backgroundColor: isDarkTheme ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                  color: isDarkTheme ? '#e4e4e7' : '#3f3f46',
+                }}
+                title={isDarkTheme ? t('subscription.ui.switch_to_light') : t('subscription.ui.switch_to_dark')}
+              >
+                {isDarkTheme ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                )}
+              </button>
+            )}
+          </div>
 
           {feedback && (
             <div
@@ -1001,7 +1089,7 @@ export default function SubscriptionPage() {
                             {keyData.name}
                           </h1>
                           <p className="mt-2 max-w-3xl text-sm leading-6 md:text-[15px]" style={{ color: mutedTextColor }}>
-                            Connect on {serverLabel} with the app button below, or open manual setup for the QR code and raw connection URL.
+                            {tr('subscription.hero.intro', { server: serverLabel })}
                           </p>
                         </div>
                       </div>
@@ -1039,7 +1127,7 @@ export default function SubscriptionPage() {
                     }}
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                      Quick Scan
+                      {t('subscription.hero.quick_scan')}
                     </p>
                     <div
                       className="mt-3 flex flex-1 items-center justify-center rounded-[1.15rem] border p-3.5"
@@ -1050,16 +1138,16 @@ export default function SubscriptionPage() {
                     >
                       {qrCode ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={qrCode} alt="Connection QR Code" className="h-full w-full max-h-[156px] max-w-[156px] rounded-[0.9rem]" />
+                        <img src={qrCode} alt={t('subscription.manual.qr_code')} className="h-full w-full max-h-[156px] max-w-[156px] rounded-[0.9rem]" />
                       ) : (
                         <div className="h-[156px] w-[156px] animate-pulse rounded-[0.9rem]" style={{ backgroundColor: theme.bgSecondary }} />
                       )}
                     </div>
                     <p className="mt-3 text-sm font-medium" style={{ color: controlTextColor }}>
-                      Scan with {primaryApp?.name || 'your VPN app'}
+                      {tr('subscription.hero.scan_with', { app: primaryApp?.name || t('subscription.defaults.vpn_app') })}
                     </p>
                     <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
-                      Fastest on mobile. If scanning fails, use the connection tools in the install card for the same URL.
+                      {t('subscription.hero.quick_scan_help')}
                     </p>
                   </div>
 
@@ -1094,7 +1182,13 @@ export default function SubscriptionPage() {
                                 boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
                               }}
                             >
-                              <span className="sm:hidden">{p === 'ios' ? 'iOS' : p === 'windows' ? 'Windows' : 'Android'}</span>
+                              <span className="sm:hidden">
+                                {p === 'ios'
+                                  ? t('subscription.platform.ios_short')
+                                  : p === 'windows'
+                                    ? t('subscription.platform.windows')
+                                    : t('subscription.platform.android')}
+                              </span>
                               <span className="hidden sm:inline">{getPlatformLabel(p)}</span>
                             </button>
                           ))}
@@ -1105,11 +1199,11 @@ export default function SubscriptionPage() {
                         <div className="min-w-0 space-y-2">
                           <div className="flex min-w-0 items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                              Connection URL
+                              {t('subscription.hero.connection_url')}
                             </p>
                             <button
                               onClick={() =>
-                                copyToClipboard(actionFieldText, 'Connection URL copied', {
+                                copyToClipboard(actionFieldText, t('subscription.hero.copy_connection_url_done'), {
                                   target: 'connection_url',
                                   placement: 'hero_header',
                                 })
@@ -1120,7 +1214,7 @@ export default function SubscriptionPage() {
                                 color: controlTextColor,
                                 borderColor: controlBorder,
                               }}
-                              aria-label="Copy connection URL"
+                              aria-label={t('subscription.hero.copy_connection_url')}
                             >
                               <Copy className="h-4 w-4" />
                             </button>
@@ -1149,13 +1243,13 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <span className="text-base">{primaryApp.icon}</span>
-                            Open in {primaryApp.name}
+                            {tr('subscription.hero.open_in', { app: primaryApp.name })}
                             <ChevronRight className="h-4 w-4" />
                           </button>
                         ) : (
                           <button
                             onClick={() =>
-                              copyToClipboard(actionFieldText, 'Connection URL copied', {
+                              copyToClipboard(actionFieldText, t('subscription.hero.copy_connection_url_done'), {
                                 target: 'connection_url',
                                 placement: 'hero_primary',
                               })
@@ -1167,14 +1261,14 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            Copy Connection URL
+                            {t('subscription.hero.copy_connection_url_primary')}
                           </button>
                         )}
 
                         <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                           <button
                             onClick={() =>
-                              copyToClipboard(actionFieldText, 'Connection URL copied', {
+                              copyToClipboard(actionFieldText, t('subscription.hero.copy_connection_url_done'), {
                                 target: 'connection_url',
                                 placement: 'hero_secondary',
                               })
@@ -1187,7 +1281,7 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            Copy URL
+                            {t('subscription.hero.copy_url')}
                           </button>
 
                           {showManualSetupButton ? (
@@ -1199,10 +1293,10 @@ export default function SubscriptionPage() {
                                 color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
-                            >
-                              <QrCode className="h-4 w-4" />
-                              Manual Setup
-                            </button>
+                          >
+                            <QrCode className="h-4 w-4" />
+                            {t('subscription.hero.manual_setup')}
+                          </button>
                           ) : null}
 
                           {installAppUrl ? (
@@ -1216,11 +1310,11 @@ export default function SubscriptionPage() {
                                 color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
-                            >
-                              <Download className="h-4 w-4" />
-                              Get {primaryApp?.name ?? 'App'}
-                            </a>
-                          ) : null}
+                          >
+                            <Download className="h-4 w-4" />
+                            {tr('subscription.hero.get_app', { app: primaryApp?.name ?? t('subscription.defaults.app') })}
+                          </a>
+                        ) : null}
 
                           {showHelpContact && supportLink ? (
                             <a
@@ -1233,11 +1327,11 @@ export default function SubscriptionPage() {
                                 color: controlTextColor,
                                 border: `1px solid ${controlBorder}`,
                               }}
-                            >
-                              <MessageCircle className="h-4 w-4" />
-                              Get Support
-                            </a>
-                          ) : null}
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            {t('subscription.hero.get_support')}
+                          </a>
+                        ) : null}
                         </div>
 
                         <div className="grid gap-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]">
@@ -1249,10 +1343,10 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                              Quick Tip
+                              {t('subscription.hero.quick_tip')}
                             </p>
                             <p className="mt-2 text-sm leading-6" style={{ color: controlTextColor }}>
-                              If the app does not open from the main button, copy the URL above and import it from inside the client, or use manual setup for the QR code.
+                              {t('subscription.hero.quick_tip_desc')}
                             </p>
                           </div>
 
@@ -1264,7 +1358,7 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                              Last Updated
+                              {t('subscription.hero.last_updated')}
                             </p>
                             <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
                               {getLastUpdatedLabel()}
@@ -1279,13 +1373,15 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                              Endpoint
+                              {t('subscription.hero.endpoint')}
                             </p>
                             <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
                               {serverLabel}
                             </p>
                             <p className="mt-1 text-xs" style={{ color: controlMutedColor }}>
-                              {keyData.port ? `Port ${keyData.port}` : 'Ready to connect'}
+                              {keyData.port
+                                ? tr('subscription.summary.port', { port: keyData.port })
+                                : t('subscription.hero.ready_to_connect')}
                             </p>
                           </div>
                         </div>
@@ -1308,8 +1404,8 @@ export default function SubscriptionPage() {
                     />
                     <span className="text-sm" style={{ color: primaryTextColor }}>
                       {usageAlert >= 95
-                        ? 'Data is almost depleted. Reconnect may stop soon if the limit is reached.'
-                        : `${usageAlert}% of your available data has already been used.`}
+                        ? t('subscription.alert.high_usage')
+                        : tr('subscription.alert.threshold_usage', { percent: usageAlert })}
                     </span>
                   </div>
                 )}
@@ -1326,7 +1422,7 @@ export default function SubscriptionPage() {
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                            Data Usage
+                            {t('subscription.summary.data_usage')}
                           </p>
                           <h2 className="mt-2 text-[1.7rem] font-semibold md:text-[1.85rem]" style={{ color: primaryTextColor }}>
                             {usageHeadline}
@@ -1349,7 +1445,7 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <RefreshCw className={`h-4 w-4 ${refreshingUsage ? 'animate-spin' : ''}`} />
-                            {refreshingUsage ? 'Checking...' : 'Refresh usage'}
+                            {refreshingUsage ? t('subscription.summary.checking') : t('subscription.summary.refresh_usage')}
                           </button>
                           <span className="text-xs" style={{ color: mutedTextColor }}>
                             {getLastUpdatedLabel()}
@@ -1369,8 +1465,11 @@ export default function SubscriptionPage() {
 
                       <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
                         {keyData.dataLimitBytes
-                          ? `${formatBytes(keyData.usedBytes)} used of ${formatBytes(keyData.dataLimitBytes)} total`
-                          : `${formatBytes(keyData.usedBytes)} used with no quota limit`}
+                          ? tr('subscription.summary.used_of_total', {
+                              used: formatBytes(keyData.usedBytes),
+                              total: formatBytes(keyData.dataLimitBytes),
+                            })
+                          : tr('subscription.summary.used_no_limit', { used: formatBytes(keyData.usedBytes) })}
                       </p>
                     </div>
 
@@ -1382,15 +1481,15 @@ export default function SubscriptionPage() {
                       }}
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                        Time Left
+                        {t('subscription.summary.time_left')}
                       </p>
                       <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {timeRemaining}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
                         {keyData.expiresAt
-                          ? `Expires on ${new Date(keyData.expiresAt).toLocaleDateString()}`
-                          : 'No expiry date is set for this key.'}
+                          ? tr('subscription.summary.expires_on', { date: formatLocalizedDate(keyData.expiresAt) })
+                          : t('subscription.summary.no_expiry')}
                       </p>
                     </div>
 
@@ -1402,13 +1501,15 @@ export default function SubscriptionPage() {
                       }}
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                        Server
+                        {t('subscription.summary.server')}
                       </p>
                       <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
-                        {keyData.port ? `Port ${keyData.port}` : 'Server is ready for connection.'}
+                        {keyData.port
+                          ? tr('subscription.summary.port', { port: keyData.port })
+                          : t('subscription.summary.server_ready')}
                       </p>
                     </div>
                   </div>
@@ -1422,13 +1523,13 @@ export default function SubscriptionPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                      Compatible Apps
+                      {t('subscription.apps.title')}
                     </p>
                     <h2 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
-                      Other apps for {getPlatformLabel(platform)}
+                      {t('subscription.apps.heading')}
                     </h2>
                     <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                      The main button above is the fastest option. Use another client below if you prefer it.
+                      {t('subscription.apps.description')}
                     </p>
                   </div>
                   {remainingApps > 0 && (
@@ -1437,7 +1538,9 @@ export default function SubscriptionPage() {
                       className="inline-flex items-center gap-2 text-sm font-medium"
                       style={{ color: hasImageBackground ? '#ffffff' : theme.accent }}
                     >
-                      {showAllApps ? 'Show fewer apps' : `Show ${remainingApps} more`}
+                      {showAllApps
+                        ? t('subscription.apps.show_less')
+                        : tr('subscription.apps.more_apps', { count: remainingApps })}
                       <ChevronRight className={`h-4 w-4 transition-transform ${showAllApps ? 'rotate-90' : ''}`} />
                     </button>
                   )}
@@ -1467,7 +1570,7 @@ export default function SubscriptionPage() {
                           </div>
                           <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
                           <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
-                            Manual alternative for {getPlatformLabel(platform)} if you prefer {app.name}.
+                            {tr('subscription.apps.manual_alternative', { app: app.name })}
                           </p>
                         </div>
 
@@ -1479,7 +1582,7 @@ export default function SubscriptionPage() {
                             border: `1px solid ${controlBorder}`,
                           }}
                         >
-                          Client
+                          {t('subscription.apps.client')}
                         </div>
                       </div>
 
@@ -1492,7 +1595,7 @@ export default function SubscriptionPage() {
                             color: '#ffffff',
                           }}
                         >
-                          Open in {app.name}
+                          {tr('subscription.hero.open_in', { app: app.name })}
                         </button>
                         {getPlatformStoreUrl(app, platform) && (
                           <a
@@ -1505,7 +1608,7 @@ export default function SubscriptionPage() {
                               borderColor: controlBorder,
                               color: controlTextColor,
                             }}
-                            aria-label={`Get ${app.name}`}
+                            aria-label={tr('subscription.hero.get_app', { app: app.name })}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
@@ -1514,7 +1617,7 @@ export default function SubscriptionPage() {
 
                       <div className="mt-3 flex items-center justify-between gap-3 text-xs">
                         <span style={{ color: controlMutedColor }}>
-                          Uses the same URL and import flow.
+                          {t('subscription.apps.same_url_flow')}
                         </span>
                         <span
                           className="inline-flex rounded-full px-2.5 py-1 font-medium"
@@ -1538,13 +1641,13 @@ export default function SubscriptionPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-2xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                      Help & Contact
+                      {t('subscription.help.title')}
                     </p>
                     <h2 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
-                      Need help connecting?
+                      {t('subscription.help.heading')}
                     </h2>
                     <p className="mt-2 text-sm leading-6" style={{ color: mutedTextColor }}>
-                      If the import button does nothing, install the recommended app first and then retry. If that still fails, use manual setup or contact support below.
+                      {t('subscription.help.description')}
                     </p>
                   </div>
 
@@ -1561,7 +1664,7 @@ export default function SubscriptionPage() {
                       }}
                     >
                       <ExternalLink className="h-4 w-4" />
-                      Open Support
+                      {t('subscription.help.open_support')}
                     </a>
                   )}
                 </div>
@@ -1594,7 +1697,7 @@ export default function SubscriptionPage() {
                           </span>
                           <span className="min-w-0">
                             <span className="block text-sm font-medium" style={{ color: primaryTextColor }}>
-                              {config.label}
+                              {getContactLabel(contact.type)}
                             </span>
                             <span className="block truncate text-sm" style={{ color: mutedTextColor }}>
                               {contact.value}
@@ -1632,13 +1735,13 @@ export default function SubscriptionPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
-                    Manual Setup
+                    {t('subscription.manual.title')}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold" style={{ color: primaryTextColor }}>
-                    Import this connection yourself
+                    {t('subscription.manual.heading')}
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm" style={{ color: mutedTextColor }}>
-                    Scan the QR code or copy the connection URL below into your client manually.
+                    {t('subscription.manual.description')}
                   </p>
                 </div>
                 <button
@@ -1665,7 +1768,7 @@ export default function SubscriptionPage() {
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                          Quick Start
+                          {t('subscription.manual.quick_start')}
                         </p>
                         <h3 className="mt-2 text-xl font-semibold" style={{ color: primaryTextColor }}>
                           {manualSetupGuide.title}
@@ -1712,7 +1815,7 @@ export default function SubscriptionPage() {
                         color: primaryTextColor,
                       }}
                     >
-                      <span className="font-medium">Tip:</span>{' '}
+                      <span className="font-medium">{t('subscription.manual.tip_prefix')}</span>{' '}
                       <span style={{ color: mutedTextColor }}>{manualSetupGuide.tip}</span>
                     </div>
 
@@ -1729,7 +1832,7 @@ export default function SubscriptionPage() {
                           }}
                         >
                           <Download className="h-4 w-4" />
-                          Get {primaryApp?.name || 'App'}
+                          {tr('subscription.manual.download_app', { app: primaryApp?.name || t('subscription.defaults.app') })}
                         </a>
                       )}
                       {primaryApp && (
@@ -1742,12 +1845,12 @@ export default function SubscriptionPage() {
                           }}
                         >
                           <ExternalLink className="h-4 w-4" />
-                          Open in {primaryApp.name}
+                          {tr('subscription.hero.open_in', { app: primaryApp.name })}
                         </button>
                       )}
                       <button
                         onClick={() =>
-                          copyToClipboard(keyData.accessUrl, 'Connection URL copied', {
+                          copyToClipboard(keyData.accessUrl, t('subscription.hero.copy_connection_url_done'), {
                             target: 'connection_url',
                             placement: 'manual_setup_primary',
                           })
@@ -1759,7 +1862,7 @@ export default function SubscriptionPage() {
                         }}
                       >
                         <Copy className="h-4 w-4" />
-                        Copy URL
+                        {t('subscription.hero.copy_url')}
                       </button>
                     </div>
                   </div>
@@ -1773,17 +1876,17 @@ export default function SubscriptionPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Connection URL</p>
+                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.connection_url_title')}</p>
                         <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
                           {keyData.accessUrl}
                         </p>
                         <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
-                          Paste this directly into the client if the app does not open automatically.
+                          {t('subscription.manual.connection_url_help')}
                         </p>
                       </div>
                       <button
                         onClick={() =>
-                          copyToClipboard(keyData.accessUrl, 'Connection URL copied', {
+                          copyToClipboard(keyData.accessUrl, t('subscription.hero.copy_connection_url_done'), {
                             target: 'connection_url',
                             placement: 'manual_setup_card',
                           })
@@ -1809,9 +1912,9 @@ export default function SubscriptionPage() {
                       className="flex w-full items-center justify-between gap-4 text-left"
                     >
                       <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>Advanced connection details</p>
+                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.advanced_title')}</p>
                         <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                          Show encryption, server, port, and the current key status.
+                          {t('subscription.manual.advanced_desc')}
                         </p>
                       </div>
                       <ChevronDown
@@ -1829,7 +1932,7 @@ export default function SubscriptionPage() {
                             borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                           }}
                         >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Server</p>
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.server')}</p>
                           <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>
                             {`${getCountryFlag(keyData.server.countryCode)} ${keyData.server.name}`.trim() || '-'}
                           </p>
@@ -1841,7 +1944,7 @@ export default function SubscriptionPage() {
                             borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                           }}
                         >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Method</p>
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.method')}</p>
                           <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>{keyData.method || '-'}</p>
                         </div>
                         <div
@@ -1851,7 +1954,7 @@ export default function SubscriptionPage() {
                             borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                           }}
                         >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Port</p>
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.port')}</p>
                           <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{keyData.port || '-'}</p>
                         </div>
                         <div
@@ -1861,7 +1964,7 @@ export default function SubscriptionPage() {
                             borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
                           }}
                         >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>Status</p>
+                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.status')}</p>
                           <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{statusTone.label}</p>
                         </div>
                       </div>
@@ -1878,22 +1981,22 @@ export default function SubscriptionPage() {
                     }}
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                      QR Code
+                      {t('subscription.manual.qr_code')}
                     </p>
                     <div className={`mx-auto mt-4 inline-block bg-white p-2 ${getCardRadius()}`}>
                       {qrCode ? (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={qrCode} alt="QR Code" className="h-44 w-44" />
+                          <img src={qrCode} alt={t('subscription.manual.qr_code')} className="h-44 w-44" />
                         </>
                       ) : (
                         <div className="flex h-44 w-44 items-center justify-center text-sm text-slate-500">
-                          QR unavailable
+                          {t('subscription.manual.qr_unavailable')}
                         </div>
                       )}
                     </div>
                     <p className="mt-4 text-sm" style={{ color: mutedTextColor }}>
-                      Scan this with your VPN app if it supports QR import.
+                      {t('subscription.manual.qr_help')}
                     </p>
                   </div>
 
@@ -1905,19 +2008,19 @@ export default function SubscriptionPage() {
                     }}
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: mutedTextColor }}>
-                      Live Status
+                      {t('subscription.summary.live_status')}
                     </p>
                     <div className="mt-3 space-y-3">
                       <div className="flex items-center justify-between gap-3 text-sm">
-                        <span style={{ color: mutedTextColor }}>Usage</span>
+                        <span style={{ color: mutedTextColor }}>{t('subscription.summary.usage')}</span>
                         <span className="font-medium" style={{ color: primaryTextColor }}>{usageHeadline}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3 text-sm">
-                        <span style={{ color: mutedTextColor }}>Time left</span>
+                        <span style={{ color: mutedTextColor }}>{t('subscription.summary.time_left')}</span>
                         <span className="font-medium" style={{ color: primaryTextColor }}>{timeRemaining}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3 text-sm">
-                        <span style={{ color: mutedTextColor }}>Server</span>
+                        <span style={{ color: mutedTextColor }}>{t('subscription.summary.server')}</span>
                         <span className="font-medium text-right" style={{ color: primaryTextColor }}>
                           {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
                         </span>
@@ -1934,7 +2037,7 @@ export default function SubscriptionPage() {
                       }}
                     >
                       <RefreshCw className={`h-4 w-4 ${refreshingUsage ? 'animate-spin' : ''}`} />
-                      {refreshingUsage ? 'Checking...' : 'Refresh usage'}
+                      {refreshingUsage ? t('subscription.summary.checking') : t('subscription.summary.refresh_usage')}
                     </button>
                   </div>
                 </div>
@@ -1965,7 +2068,7 @@ export default function SubscriptionPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold" style={{ color: theme.textPrimary }}>
-                    {contactConfig[showContactPopup.type]?.label}
+                    {getContactLabel(showContactPopup.type)}
                   </h3>
                   <p className="text-sm" style={{ color: theme.textMuted }}>
                     {showContactPopup.value}
@@ -1981,7 +2084,7 @@ export default function SubscriptionPage() {
                     color: theme.textPrimary,
                   }}
                 >
-                  Copy
+                  {t('subscription.ui.copy')}
                 </button>
                 <a
                   href={getContactUrl(showContactPopup)}
@@ -1993,7 +2096,7 @@ export default function SubscriptionPage() {
                     color: '#ffffff',
                   }}
                 >
-                  Open
+                  {t('subscription.ui.open')}
                 </a>
               </div>
             </div>

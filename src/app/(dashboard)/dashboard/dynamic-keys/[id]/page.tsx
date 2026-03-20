@@ -86,13 +86,13 @@ import {
 
 // Contact type options for subscription page
 const CONTACT_TYPES = [
-  { value: 'telegram', label: 'Telegram', icon: '📱' },
-  { value: 'discord', label: 'Discord', icon: '🎮' },
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { value: 'phone', label: 'Phone', icon: '📞' },
-  { value: 'email', label: 'Email', icon: '📧' },
-  { value: 'website', label: 'Website', icon: '🌐' },
-  { value: 'facebook', label: 'Facebook', icon: '👤' },
+  { value: 'telegram', icon: '📱' },
+  { value: 'discord', icon: '🎮' },
+  { value: 'whatsapp', icon: '💬' },
+  { value: 'phone', icon: '📞' },
+  { value: 'email', icon: '📧' },
+  { value: 'website', icon: '🌐' },
+  { value: 'facebook', icon: '👤' },
 ] as const;
 
 interface ContactLink {
@@ -106,14 +106,14 @@ interface ContactLink {
 const DAK_TYPES = {
   SELF_MANAGED: {
     labelKey: 'dynamic_keys.type.self_managed',
-    description: 'Automatically creates and rotates keys across servers',
+    descriptionKey: 'dynamic_keys.dialog.type.self_managed_desc',
     icon: Shuffle,
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
   },
   MANUAL: {
     labelKey: 'dynamic_keys.type.manual',
-    description: 'Manually attach and detach keys as needed',
+    descriptionKey: 'dynamic_keys.dialog.type.manual_desc',
     icon: Settings,
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
@@ -411,7 +411,9 @@ function SubscriptionShareCard({
   currentSharePageEnabled: boolean;
   onUpdate: () => void;
 }) {
+  const { t } = useLocale();
   const { toast } = useToast();
+  const getContactTypeLabel = (type: ContactLink['type']) => t(`subscription.contact.${type}`);
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'glassPurple');
   const [coverImageUrl, setCoverImageUrl] = useState(
     currentCoverImageType === 'url' ? currentCoverImage || '' : ''
@@ -764,14 +766,14 @@ function SubscriptionShareCard({
           </Label>
 
           {/* Existing contacts */}
-          {contacts.length > 0 && (
+              {contacts.length > 0 && (
             <div className="space-y-2">
               {contacts.map((contact, index) => {
                 const contactType = CONTACT_TYPES.find(t => t.value === contact.type);
                 return (
                   <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
                     <span>{contactType?.icon}</span>
-                    <span className="text-sm font-medium">{contactType?.label}</span>
+                    <span className="text-sm font-medium">{contactType ? getContactTypeLabel(contactType.value) : contact.type}</span>
                     <span className="text-sm text-muted-foreground truncate flex-1">{contact.value}</span>
                     <Button
                       variant="ghost"
@@ -799,7 +801,7 @@ function SubscriptionShareCard({
                     <SelectItem key={type.value} value={type.value}>
                       <span className="flex items-center gap-2">
                         <span>{type.icon}</span>
-                        {type.label}
+                        {getContactTypeLabel(type.value)}
                       </span>
                     </SelectItem>
                   ))}
@@ -1836,7 +1838,7 @@ export default function DynamicKeyDetailPage() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight">{dak.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {typeConfig.description}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
+              {t(typeConfig.descriptionKey)}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
             </p>
           </div>
 
@@ -1932,7 +1934,7 @@ export default function DynamicKeyDetailPage() {
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{dak.name}</h1>
                 <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                  {typeConfig.description}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
+                  {t(typeConfig.descriptionKey)}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
                 </p>
               </div>
             </div>
@@ -2015,7 +2017,7 @@ export default function DynamicKeyDetailPage() {
                 <TypeIcon className={cn('w-5 h-5', typeConfig.color)} />
                 {t(typeConfig.labelKey)}
               </CardTitle>
-              <CardDescription>{typeConfig.description}</CardDescription>
+              <CardDescription>{t(typeConfig.descriptionKey)}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Subscription URL for Outline Client */}
