@@ -94,6 +94,7 @@ import {
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { useLocale } from '@/hooks/use-locale';
+import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
 
 /**
  * Status badge configuration
@@ -1782,6 +1783,12 @@ export default function KeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ClientEndpointTestCard
+            endpointUrl={subscriptionApiUrl}
+            title="Client URL Test"
+            description="Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly."
+          />
 
           <Card className="ops-detail-card">
             <CardHeader>

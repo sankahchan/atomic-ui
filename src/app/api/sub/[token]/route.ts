@@ -34,22 +34,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
-import { selectKeyByLeastLoad, selectLeastLoadedServer } from '@/lib/services/load-balancer';
-
-/**
- * Simple CRC32 implementation for IP-based hashing
- * Used to consistently route the same client IP to the same server
- */
-function crc32(str: string): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i);
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
+import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
+import { selectDynamicAccessKeyForClient } from '@/lib/services/dynamic-subscription-routing';
 
 /**
  * Get client IP address from request headers
@@ -132,6 +118,7 @@ function parseSSUrl(url: string): {
  */
 interface AccessKeyWithServer {
   id: string;
+  name: string;
   accessUrl: string | null;
   password: string | null;
   port: number | null;
@@ -141,74 +128,8 @@ interface AccessKeyWithServer {
     id: string;
     hostnameForAccessKeys: string | null;
     name: string;
+    countryCode?: string | null;
   };
-}
-
-/**
- * Select an access key based on the load balancing algorithm
- */
-async function selectAccessKey(
-  dakId: string,
-  accessKeys: AccessKeyWithServer[],
-  algorithm: string,
-  clientIp: string,
-  lastSelectedKeyIndex: number
-): Promise<{ key: AccessKeyWithServer; newIndex: number } | null> {
-  if (accessKeys.length === 0) {
-    return null;
-  }
-
-  if (accessKeys.length === 1) {
-    return { key: accessKeys[0], newIndex: 0 };
-  }
-
-  let selectedIndex: number;
-
-  switch (algorithm) {
-    case 'IP_HASH': {
-      // Use CRC32 hash of client IP for consistent routing
-      const hash = crc32(clientIp);
-      selectedIndex = hash % accessKeys.length;
-      break;
-    }
-
-    case 'RANDOM': {
-      // Random selection
-      selectedIndex = Math.floor(Math.random() * accessKeys.length);
-      break;
-    }
-
-    case 'ROUND_ROBIN': {
-      // Cycle through keys sequentially
-      selectedIndex = (lastSelectedKeyIndex + 1) % accessKeys.length;
-
-      // Update the index in the database for next request
-      await db.dynamicAccessKey.update({
-        where: { id: dakId },
-        data: { lastSelectedKeyIndex: selectedIndex },
-      });
-      break;
-    }
-
-    case 'LEAST_LOAD': {
-      // Smart selection based on server load
-      const keysWithServer = accessKeys.map((key, idx) => ({
-        ...key,
-        _originalIndex: idx,
-        server: { id: key.server.id, name: key.server.name },
-      }));
-      const bestIndex = await selectKeyByLeastLoad(keysWithServer);
-      selectedIndex = bestIndex ?? 0;
-      break;
-    }
-
-    default:
-      // Default to IP_HASH
-      const defaultHash = crc32(clientIp);
-      selectedIndex = defaultHash % accessKeys.length;
-  }
-
-  return { key: accessKeys[selectedIndex], newIndex: selectedIndex };
 }
 
 /**
@@ -481,13 +402,14 @@ export async function handleSubscriptionRequest(
       }
 
       // Select an access key using the load balancing algorithm
-      const selection = await selectAccessKey(
-        dynamicKey.id,
-        availableKeys as AccessKeyWithServer[],
-        dynamicKey.loadBalancerAlgorithm,
+      const selection = await selectDynamicAccessKeyForClient({
+        dakId: dynamicKey.id,
+        accessKeys: availableKeys as AccessKeyWithServer[],
+        algorithm: dynamicKey.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         clientIp,
-        dynamicKey.lastSelectedKeyIndex
-      );
+        lastSelectedKeyIndex: dynamicKey.lastSelectedKeyIndex,
+        persistRoundRobin: true,
+      });
 
       if (!selection || !selection.key.accessUrl) {
         return NextResponse.json(

@@ -74,6 +74,7 @@ import {
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
+import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
 
 // Contact type options for subscription page
 const CONTACT_TYPES = [
@@ -1012,6 +1013,255 @@ function KeyRotationCard({
   );
 }
 
+type DynamicRoutingDiagnostics = {
+  algorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
+  algorithmLabel: string;
+  algorithmHint: string;
+  viewerIp: string | null;
+  attachedActiveKeys: number;
+  selectionNote: string | null;
+  currentSelection: {
+    mode: 'ATTACHED_KEY' | 'SELF_MANAGED_KEY' | 'SELF_MANAGED_CANDIDATE';
+    keyId?: string | null;
+    keyName?: string | null;
+    serverId?: string | null;
+    serverName: string;
+    serverCountry: string | null;
+    reason: string;
+    lastTrafficAt?: string | null;
+  } | null;
+  lastResolvedBackend: {
+    keyId: string;
+    keyName: string;
+    serverId: string | null;
+    serverName: string;
+    serverCountry: string | null;
+    lastSeenAt: string;
+    lastTrafficAt: string | null;
+    isActive: boolean;
+    bytesUsed: string;
+  } | null;
+  recentBackends: Array<{
+    keyId: string;
+    keyName: string;
+    serverId: string | null;
+    serverName: string;
+    serverCountry: string | null;
+    lastSeenAt: string;
+    lastTrafficAt: string | null;
+    isActive: boolean;
+    bytesUsed: string;
+  }>;
+  recentBackendSwitches: Array<{
+    fromKeyId: string;
+    fromKeyName: string;
+    fromServerName: string;
+    toKeyId: string;
+    toKeyName: string;
+    toServerName: string;
+    switchedAt: string;
+  }>;
+  lastSharePageViewAt: string | null;
+  lastSharePageCopyAt: string | null;
+  lastSharePageOpenAppAt: string | null;
+};
+
+function DynamicRoutingDiagnosticsCard({
+  data,
+  isLoading,
+  onRefresh,
+  isRefreshing,
+}: {
+  data?: DynamicRoutingDiagnostics;
+  isLoading: boolean;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+}) {
+  if (isLoading && !data) {
+    return (
+      <Card className="ops-detail-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shuffle className="h-5 w-5 text-primary" />
+            Routing Diagnostics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-32 rounded-[1.2rem] border border-border/60 bg-background/45 animate-pulse dark:bg-white/[0.03]" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="ops-detail-card">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shuffle className="h-5 w-5 text-primary" />
+              Routing Diagnostics
+            </CardTitle>
+            <CardDescription>
+              See how this dynamic key will route requests and which backend handled traffic most recently.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={onRefresh} disabled={isRefreshing}>
+            {isRefreshing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="ops-row-card">
+          <div>
+            <p className="text-sm text-muted-foreground">Selection algorithm</p>
+            <p className="mt-1 text-sm font-medium">{data?.algorithmLabel || 'Unknown'}</p>
+          </div>
+          <Badge variant={data?.algorithm === 'LEAST_LOAD' ? 'default' : 'secondary'}>
+            {data?.algorithmLabel || 'Unknown'}
+          </Badge>
+        </div>
+
+        {data?.algorithmHint ? (
+          <p className="text-sm text-muted-foreground">{data.algorithmHint}</p>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="ops-inline-stat">
+            <p className="text-xs text-muted-foreground">Active backends</p>
+            <p className="font-medium">{data?.attachedActiveKeys ?? 0}</p>
+          </div>
+          <div className="ops-inline-stat">
+            <p className="text-xs text-muted-foreground">Viewer IP</p>
+            <p className="font-mono text-sm">{data?.viewerIp || 'Unavailable'}</p>
+          </div>
+        </div>
+
+        {data?.currentSelection ? (
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Current selection
+            </p>
+            <div className="mt-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">
+                  {getCountryFlag(data.currentSelection.serverCountry || '')} {data.currentSelection.serverName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {data.currentSelection.keyName
+                    ? `${data.currentSelection.keyName}`
+                    : data.currentSelection.mode === 'SELF_MANAGED_CANDIDATE'
+                      ? 'Server candidate for the next on-demand key'
+                      : 'No backend key selected'}
+                </p>
+              </div>
+              <Badge variant="outline">
+                {data.currentSelection.mode === 'SELF_MANAGED_CANDIDATE' ? 'Candidate' : 'Live'}
+              </Badge>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">{data.currentSelection.reason}</p>
+            {data.currentSelection.lastTrafficAt ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Last traffic {formatRelativeTime(new Date(data.currentSelection.lastTrafficAt))}
+              </p>
+            ) : null}
+          </div>
+        ) : data?.selectionNote ? (
+          <div className="rounded-[1.2rem] border border-dashed border-border/60 px-4 py-4 text-sm text-muted-foreground dark:border-cyan-400/16">
+            {data.selectionNote}
+          </div>
+        ) : null}
+
+        {data?.lastResolvedBackend ? (
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Last backend with traffic
+            </p>
+            <div className="mt-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">
+                  {getCountryFlag(data.lastResolvedBackend.serverCountry || '')} {data.lastResolvedBackend.serverName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{data.lastResolvedBackend.keyName}</p>
+              </div>
+              {data.lastResolvedBackend.isActive ? (
+                <Badge variant="outline" className="border-emerald-500/30 text-emerald-500">
+                  <Wifi className="mr-1 h-3 w-3" />
+                  Active
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
+                  <WifiOff className="mr-1 h-3 w-3" />
+                  Idle
+                </Badge>
+              )}
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="ops-inline-stat">
+                <p className="text-xs text-muted-foreground">Last seen</p>
+                <p className="font-medium">{formatRelativeTime(new Date(data.lastResolvedBackend.lastSeenAt))}</p>
+              </div>
+              <div className="ops-inline-stat">
+                <p className="text-xs text-muted-foreground">Usage on backend</p>
+                <p className="font-medium">{formatBytes(BigInt(data.lastResolvedBackend.bytesUsed))}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {data?.recentBackendSwitches?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Recent backend switches</p>
+            <div className="space-y-2">
+              {data.recentBackendSwitches.map((event) => (
+                <div key={`${event.fromKeyId}-${event.toKeyId}-${event.switchedAt}`} className="ops-row-card">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {event.fromServerName} to {event.toServerName}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {event.fromKeyName} to {event.toKeyName}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {formatRelativeTime(new Date(event.switchedAt))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="ops-inline-stat">
+            <p className="text-xs text-muted-foreground">Last share-page view</p>
+            <p className="font-medium">
+              {data?.lastSharePageViewAt ? formatRelativeTime(new Date(data.lastSharePageViewAt)) : 'Never'}
+            </p>
+          </div>
+          <div className="ops-inline-stat">
+            <p className="text-xs text-muted-foreground">Last copy</p>
+            <p className="font-medium">
+              {data?.lastSharePageCopyAt ? formatRelativeTime(new Date(data.lastSharePageCopyAt)) : 'Never'}
+            </p>
+          </div>
+          <div className="ops-inline-stat">
+            <p className="text-xs text-muted-foreground">Last app open</p>
+            <p className="font-medium">
+              {data?.lastSharePageOpenAppAt ? formatRelativeTime(new Date(data.lastSharePageOpenAppAt)) : 'Never'}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 /**
  * DynamicKeyDetailPage Component
  */
@@ -1031,6 +1281,14 @@ export default function DynamicKeyDetailPage() {
   const { data: dak, isLoading, refetch } = trpc.dynamicKeys.getById.useQuery(
     { id: dakId },
     { enabled: !!dakId }
+  );
+  const routingDiagnosticsQuery = trpc.dynamicKeys.getRoutingDiagnostics.useQuery(
+    { id: dakId },
+    {
+      enabled: !!dakId,
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: false,
+    },
   );
 
   // Delete mutation
@@ -1643,6 +1901,21 @@ export default function DynamicKeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ClientEndpointTestCard
+            endpointUrl={subscriptionApiUrl}
+            title="Client URL Test"
+            description="Probe the live Outline client endpoint and verify the current dynamic subscription payload."
+          />
+
+          <DynamicRoutingDiagnosticsCard
+            data={routingDiagnosticsQuery.data}
+            isLoading={routingDiagnosticsQuery.isLoading}
+            onRefresh={() => {
+              void routingDiagnosticsQuery.refetch();
+            }}
+            isRefreshing={routingDiagnosticsQuery.isFetching}
+          />
 
           {/* Server Load Distribution */}
           <ServerLoadCard />

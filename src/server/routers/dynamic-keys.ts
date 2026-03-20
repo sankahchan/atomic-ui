@@ -25,6 +25,13 @@ import {
   collectTrafficActivity,
   TRAFFIC_ACTIVE_WINDOW_MS,
 } from '@/lib/services/traffic-activity';
+import {
+  getDynamicRoutingAlgorithmHint,
+  getDynamicRoutingAlgorithmLabel,
+  getSelfManagedServerCandidate,
+  selectDynamicAccessKeyForClient,
+} from '@/lib/services/dynamic-subscription-routing';
+import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -510,6 +517,326 @@ export const dynamicKeysRouter = router({
         rotationCount: dak.rotationCount,
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
+      };
+    }),
+
+  getSharePageAnalytics: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          userId: true,
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      return getDynamicKeySubscriptionAnalytics(input.id);
+    }),
+
+  getRoutingDiagnostics: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          userId: true,
+          type: true,
+          status: true,
+          loadBalancerAlgorithm: true,
+          lastSelectedKeyIndex: true,
+          serverTagsJson: true,
+          lastTrafficAt: true,
+          accessKeys: {
+            where: {
+              status: 'ACTIVE',
+            },
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              usedBytes: true,
+              lastTrafficAt: true,
+              lastUsedAt: true,
+              createdAt: true,
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      const algorithm = dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
+      const viewerIp = ctx.clientIp ?? null;
+      const activeKeys = dak.accessKeys.filter((key) => Boolean(key.server));
+      const accessKeyIds = activeKeys.map((key) => key.id);
+      const serverTagIds = JSON.parse(dak.serverTagsJson || '[]') as string[];
+
+      const [sessions, analytics] = await Promise.all([
+        accessKeyIds.length > 0
+          ? db.connectionSession.findMany({
+              where: {
+                accessKeyId: { in: accessKeyIds },
+              },
+              orderBy: [
+                { lastActiveAt: 'desc' },
+                { startedAt: 'desc' },
+              ],
+              take: 25,
+              include: {
+                accessKey: {
+                  select: {
+                    id: true,
+                    name: true,
+                    server: {
+                      select: {
+                        id: true,
+                        name: true,
+                        countryCode: true,
+                      },
+                    },
+                  },
+                },
+              },
+            })
+          : Promise.resolve([]),
+        getDynamicKeySubscriptionAnalytics(input.id),
+      ]);
+
+      const latestSessionByKeyId = new Map<
+        string,
+        {
+          sessionId: string;
+          startedAt: Date;
+          lastActiveAt: Date;
+          isActive: boolean;
+          bytesUsed: bigint;
+          keyName: string;
+          serverName: string;
+          serverCountry: string | null;
+        }
+      >();
+
+      for (const session of sessions) {
+        if (!session.accessKey) {
+          continue;
+        }
+
+        if (!latestSessionByKeyId.has(session.accessKey.id)) {
+          latestSessionByKeyId.set(session.accessKey.id, {
+            sessionId: session.id,
+            startedAt: session.startedAt,
+            lastActiveAt: session.lastActiveAt,
+            isActive: session.isActive,
+            bytesUsed: session.bytesUsed,
+            keyName: session.accessKey.name,
+            serverName: session.accessKey.server?.name || 'Unknown',
+            serverCountry: session.accessKey.server?.countryCode || null,
+          });
+        }
+      }
+
+      const keysWithLastSeen = activeKeys
+        .map((key) => {
+          const latestSession = latestSessionByKeyId.get(key.id);
+          const lastSeenAt = latestSession?.lastActiveAt ?? key.lastTrafficAt ?? key.lastUsedAt ?? key.createdAt;
+          return {
+            keyId: key.id,
+            keyName: key.name,
+            serverId: key.server?.id || null,
+            serverName: key.server?.name || 'Unknown',
+            serverCountry: key.server?.countryCode || null,
+            lastSeenAt,
+            lastTrafficAt: key.lastTrafficAt ?? null,
+            isActive: latestSession?.isActive ?? false,
+            bytesUsed: key.usedBytes.toString(),
+          };
+        })
+        .sort((left, right) => right.lastSeenAt.getTime() - left.lastSeenAt.getTime());
+
+      const recentBackends = keysWithLastSeen.slice(0, 4).map((item) => ({
+        ...item,
+        lastSeenAt: item.lastSeenAt.toISOString(),
+        lastTrafficAt: item.lastTrafficAt?.toISOString() ?? null,
+      }));
+
+      const sessionTimeline = [...sessions]
+        .filter((session) => session.accessKey)
+        .sort((left, right) => left.lastActiveAt.getTime() - right.lastActiveAt.getTime());
+
+      const recentBackendSwitches: Array<{
+        fromKeyId: string;
+        fromKeyName: string;
+        fromServerName: string;
+        toKeyId: string;
+        toKeyName: string;
+        toServerName: string;
+        switchedAt: string;
+      }> = [];
+
+      let previousSession: (typeof sessionTimeline)[number] | null = null;
+      for (const session of sessionTimeline) {
+        if (!session.accessKey) {
+          continue;
+        }
+
+        if (
+          previousSession?.accessKey &&
+          previousSession.accessKey.id !== session.accessKey.id
+        ) {
+          recentBackendSwitches.push({
+            fromKeyId: previousSession.accessKey.id,
+            fromKeyName: previousSession.accessKey.name,
+            fromServerName: previousSession.accessKey.server?.name || 'Unknown',
+            toKeyId: session.accessKey.id,
+            toKeyName: session.accessKey.name,
+            toServerName: session.accessKey.server?.name || 'Unknown',
+            switchedAt: session.lastActiveAt.toISOString(),
+          });
+        }
+
+        previousSession = session;
+      }
+
+      let currentSelection: {
+        mode: 'ATTACHED_KEY' | 'SELF_MANAGED_KEY' | 'SELF_MANAGED_CANDIDATE';
+        keyId?: string | null;
+        keyName?: string | null;
+        serverId?: string | null;
+        serverName: string;
+        serverCountry: string | null;
+        reason: string;
+        lastTrafficAt?: string | null;
+      } | null = null;
+
+      let selectionNote: string | null = null;
+
+      if (dak.type === 'MANUAL') {
+        if (algorithm === 'RANDOM' && activeKeys.length > 1) {
+          selectionNote = 'Random routing changes per fetch. Use Test Client URL to inspect the live backend right now.';
+        } else {
+          const selection = await selectDynamicAccessKeyForClient({
+            dakId: dak.id,
+            accessKeys: activeKeys.map((key) => ({
+              id: key.id,
+              name: key.name,
+              status: key.status,
+              lastTrafficAt: key.lastTrafficAt,
+              lastUsedAt: key.lastUsedAt,
+              server: {
+                id: key.server!.id,
+                name: key.server!.name,
+                countryCode: key.server!.countryCode,
+              },
+            })),
+            algorithm,
+            clientIp: viewerIp || '127.0.0.1',
+            lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+            persistRoundRobin: false,
+          });
+
+          if (selection) {
+            currentSelection = {
+              mode: 'ATTACHED_KEY',
+              keyId: selection.key.id,
+              keyName: selection.key.name,
+              serverId: selection.key.server.id,
+              serverName: selection.key.server.name,
+              serverCountry: selection.key.server.countryCode ?? null,
+              reason: getDynamicRoutingAlgorithmHint(selection.algorithm),
+              lastTrafficAt: selection.key.lastTrafficAt?.toISOString() ?? null,
+            };
+          }
+        }
+      } else {
+        const activeSelfManagedKey = [...activeKeys]
+          .filter((key) => key.name.startsWith('self-managed-dak-'))
+          .sort((left, right) => {
+            const leftTime = (left.lastTrafficAt ?? left.lastUsedAt ?? left.createdAt).getTime();
+            const rightTime = (right.lastTrafficAt ?? right.lastUsedAt ?? right.createdAt).getTime();
+            return rightTime - leftTime;
+          })[0];
+
+        if (activeSelfManagedKey?.server) {
+          currentSelection = {
+            mode: 'SELF_MANAGED_KEY',
+            keyId: activeSelfManagedKey.id,
+            keyName: activeSelfManagedKey.name,
+            serverId: activeSelfManagedKey.server.id,
+            serverName: activeSelfManagedKey.server.name,
+            serverCountry: activeSelfManagedKey.server.countryCode ?? null,
+            reason: 'An active self-managed backend already exists and will be reused until it rotates or is replaced.',
+            lastTrafficAt: activeSelfManagedKey.lastTrafficAt?.toISOString() ?? null,
+          };
+        } else {
+          const candidate = await getSelfManagedServerCandidate({
+            serverTagIds,
+            algorithm,
+          });
+
+          if (candidate) {
+            currentSelection = {
+              mode: 'SELF_MANAGED_CANDIDATE',
+              serverId: candidate.serverId,
+              serverName: candidate.serverName,
+              serverCountry: candidate.countryCode,
+              reason: candidate.reason,
+            };
+          } else {
+            selectionNote = 'No active server currently matches this dynamic key. Add or activate servers before the next fetch.';
+          }
+        }
+      }
+
+      return {
+        algorithm,
+        algorithmLabel: getDynamicRoutingAlgorithmLabel(algorithm),
+        algorithmHint: getDynamicRoutingAlgorithmHint(algorithm),
+        viewerIp,
+        attachedActiveKeys: activeKeys.length,
+        selectionNote,
+        currentSelection,
+        lastResolvedBackend: recentBackends[0] ?? null,
+        recentBackends,
+        recentBackendSwitches: recentBackendSwitches.slice(-4).reverse(),
+        lastSharePageViewAt: analytics.lastViewedAt?.toISOString() ?? null,
+        lastSharePageCopyAt: analytics.lastCopiedAt?.toISOString() ?? null,
+        lastSharePageOpenAppAt:
+          analytics.recentEvents.find((event) => event.eventType === 'OPEN_APP')?.createdAt.toISOString() ?? null,
       };
     }),
 

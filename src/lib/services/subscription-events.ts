@@ -169,3 +169,73 @@ export async function getAccessKeySubscriptionAnalytics(accessKeyId: string) {
     })),
   };
 }
+
+export async function getDynamicKeySubscriptionAnalytics(dynamicAccessKeyId: string) {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [aggregate, recentEvents, lastViewedAt, lastCopiedAt, lastTelegramSentAt] = await Promise.all([
+    db.subscriptionPageEvent.groupBy({
+      by: ['eventType'],
+      where: { dynamicAccessKeyId },
+      _count: { eventType: true },
+    }),
+    db.subscriptionPageEvent.findMany({
+      where: { dynamicAccessKeyId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        eventType: true,
+        source: true,
+        platform: true,
+        metadata: true,
+        createdAt: true,
+      },
+    }),
+    db.subscriptionPageEvent.findFirst({
+      where: { dynamicAccessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    db.subscriptionPageEvent.findFirst({
+      where: { dynamicAccessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.COPY_URL },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    db.subscriptionPageEvent.findFirst({
+      where: { dynamicAccessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const counts = Object.fromEntries(aggregate.map((row) => [row.eventType, row._count.eventType]));
+  const last7dCount = await db.subscriptionPageEvent.count({
+    where: {
+      dynamicAccessKeyId,
+      createdAt: {
+        gte: sevenDaysAgo,
+      },
+    },
+  });
+
+  return {
+    counts: {
+      pageViews: counts[SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW] ?? 0,
+      copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
+      qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
+      appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+      telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
+      telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
+      last7dEvents: last7dCount,
+    },
+    lastViewedAt: lastViewedAt?.createdAt ?? null,
+    lastCopiedAt: lastCopiedAt?.createdAt ?? null,
+    lastTelegramSentAt: lastTelegramSentAt?.createdAt ?? null,
+    recentEvents: recentEvents.map((event) => ({
+      ...event,
+      metadata: parseMetadata(event.metadata),
+    })),
+  };
+}
