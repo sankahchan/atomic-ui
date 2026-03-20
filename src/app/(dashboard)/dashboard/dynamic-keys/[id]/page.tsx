@@ -75,6 +75,10 @@ import {
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
+import {
+  DynamicRoutingPreferencesEditor,
+  type DynamicRoutingPreferenceMode,
+} from '@/components/dynamic-keys/dynamic-routing-preferences-editor';
 
 // Contact type options for subscription page
 const CONTACT_TYPES = [
@@ -136,6 +140,9 @@ function EditDAKDialog({
     durationDays: number | null;
     expiresAt: Date | null;
     loadBalancerAlgorithm: string;
+    preferredServerIds: string[];
+    preferredCountryCodes: string[];
+    preferredRegionMode: DynamicRoutingPreferenceMode;
   };
   onSuccess: () => void;
 }) {
@@ -151,7 +158,28 @@ function EditDAKDialog({
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+    preferredServerIds: dakData.preferredServerIds || [],
+    preferredCountryCodes: dakData.preferredCountryCodes || [],
+    preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
   });
+
+  useEffect(() => {
+    setFormData({
+      name: dakData.name,
+      email: dakData.email || '',
+      telegramId: dakData.telegramId || '',
+      notes: dakData.notes || '',
+      dataLimitGB: dakData.dataLimitBytes
+        ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
+        : '',
+      durationDays: dakData.durationDays?.toString() || '',
+      expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+      loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+      preferredServerIds: dakData.preferredServerIds || [],
+      preferredCountryCodes: dakData.preferredCountryCodes || [],
+      preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
+    });
+  }, [dakData]);
 
   const updateMutation = trpc.dynamicKeys.update.useMutation({
     onSuccess: () => {
@@ -193,6 +221,9 @@ function EditDAKDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
+      preferredServerIds: formData.preferredServerIds,
+      preferredCountryCodes: formData.preferredCountryCodes,
+      preferredRegionMode: formData.preferredRegionMode,
     } as any);
   };
 
@@ -302,6 +333,24 @@ function EditDAKDialog({
                 ? 'Cycles through servers sequentially.'
                 : 'Randomly selects a server.'}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Preferred Routing Order</Label>
+            <DynamicRoutingPreferencesEditor
+              preferredRegionMode={formData.preferredRegionMode}
+              preferredServerIds={formData.preferredServerIds}
+              preferredCountryCodes={formData.preferredCountryCodes}
+              compact
+              onChange={(next) =>
+                setFormData((current) => ({
+                  ...current,
+                  preferredRegionMode: next.preferredRegionMode,
+                  preferredServerIds: next.preferredServerIds,
+                  preferredCountryCodes: next.preferredCountryCodes,
+                }))
+              }
+            />
           </div>
 
           <div className="space-y-2">
@@ -1018,6 +1067,14 @@ type DynamicRoutingDiagnostics = {
   algorithmLabel: string;
   algorithmHint: string;
   viewerIp: string | null;
+  preferredRegionMode: DynamicRoutingPreferenceMode;
+  preferredServerIds: string[];
+  preferredServers: Array<{
+    id: string;
+    name: string;
+    countryCode: string | null;
+  }>;
+  preferredCountryCodes: string[];
   attachedActiveKeys: number;
   selectionNote: string | null;
   currentSelection: {
@@ -1141,6 +1198,50 @@ function DynamicRoutingDiagnosticsCard({
             <p className="font-mono text-sm">{data?.viewerIp || 'Unavailable'}</p>
           </div>
         </div>
+
+        {data ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Preference mode</p>
+              <p className="font-medium">{data.preferredRegionMode === 'ONLY' ? 'Only matching' : 'Prefer matching'}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Preferred servers</p>
+              <p className="font-medium">{data.preferredServerIds.length || 0}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Preferred regions</p>
+              <p className="font-medium">{data.preferredCountryCodes.length || 0}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {data?.preferredServerIds?.length || data?.preferredCountryCodes?.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Preferred servers
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {data.preferredServers.length
+                  ? data.preferredServers
+                      .map((server) => `${getCountryFlag(server.countryCode || '')} ${server.name}`.trim())
+                      .join(' -> ')
+                  : 'No explicit server order configured.'}
+              </p>
+            </div>
+            <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Preferred regions
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {data.preferredCountryCodes.length
+                  ? data.preferredCountryCodes.join(' -> ')
+                  : 'No region order configured.'}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {data?.currentSelection ? (
           <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
@@ -2038,6 +2139,9 @@ export default function DynamicKeyDetailPage() {
             durationDays: dak.durationDays ?? null,
             expiresAt: dak.expiresAt ?? null,
             loadBalancerAlgorithm: dak.loadBalancerAlgorithm ?? 'IP_HASH',
+            preferredServerIds: dak.preferredServerIds ?? [],
+            preferredCountryCodes: dak.preferredCountryCodes ?? [],
+            preferredRegionMode: dak.preferredRegionMode ?? 'PREFER',
           }}
           onSuccess={() => refetch()}
         />

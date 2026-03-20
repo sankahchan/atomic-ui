@@ -272,8 +272,13 @@ model DynamicAccessKey {
   tags  String  @default("") // Comma-separated tags
 
   // Load balancer algorithm for selecting access keys
-  // Valid: IP_HASH, RANDOM, ROUND_ROBIN
+  // Valid: IP_HASH, RANDOM, ROUND_ROBIN, LEAST_LOAD
   loadBalancerAlgorithm String @default("IP_HASH")
+
+  // Dynamic routing preferences
+  preferredServerIdsJson   String @default("[]")
+  preferredCountryCodesJson String @default("[]")
+  preferredRegionMode      String @default("PREFER")
 
   // Track which server was last selected (for round-robin)
   lastSelectedKeyIndex Int @default(0)

@@ -34,8 +34,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
-import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
-import { selectDynamicAccessKeyForClient } from '@/lib/services/dynamic-subscription-routing';
+import {
+  getSelfManagedServerCandidate,
+  parseDynamicRoutingPreferences,
+  selectDynamicAccessKeyForClient,
+} from '@/lib/services/dynamic-subscription-routing';
 
 /**
  * Get client IP address from request headers
@@ -141,7 +144,12 @@ async function createSelfManagedKey(
   serverTagsJson: string | null,
   method: string | null,
   prefix: string | null,
-  algorithm?: string
+  algorithm?: string,
+  clientIp?: string,
+  lastSelectedKeyIndex?: number,
+  preferredServerIds?: string[],
+  preferredCountryCodes?: string[],
+  preferredRegionMode?: 'PREFER' | 'ONLY',
 ): Promise<{ accessUrl: string; server: { hostnameForAccessKeys: string | null } } | null> {
   const keyName = `self-managed-dak-${dakId}`;
 
@@ -167,43 +175,28 @@ async function createSelfManagedKey(
   // Get available servers based on tags
   const serverTagIds: string[] = JSON.parse(serverTagsJson || '[]');
 
-  let servers;
-  if (serverTagIds.length > 0) {
-    // Filter by tags
-    servers = await db.server.findMany({
-      where: {
-        isActive: true,
-        tags: {
-          some: {
-            tagId: { in: serverTagIds },
-          },
-        },
-      },
-    });
-  } else {
-    // Get all active servers
-    servers = await db.server.findMany({
-      where: { isActive: true },
-    });
-  }
+  const candidate = await getSelfManagedServerCandidate({
+    dakId,
+    serverTagIds,
+    algorithm: (algorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD') || 'IP_HASH',
+    clientIp,
+    lastSelectedKeyIndex,
+    preferredServerIds,
+    preferredCountryCodes,
+    preferredRegionMode,
+    persistRoundRobin: true,
+  });
 
-  if (servers.length === 0) {
+  if (!candidate) {
     return null;
   }
 
-  // Select server based on algorithm
-  let selectedServer;
-  if (algorithm === 'LEAST_LOAD' && servers.length > 1) {
-    // Use smart load-based selection
-    const leastLoaded = await selectLeastLoadedServer(serverTagIds);
-    if (leastLoaded) {
-      selectedServer = servers.find(s => s.id === leastLoaded.serverId) || servers[0];
-    } else {
-      selectedServer = servers[Math.floor(Math.random() * servers.length)];
-    }
-  } else {
-    // Default: random selection
-    selectedServer = servers[Math.floor(Math.random() * servers.length)];
+  const selectedServer = await db.server.findUnique({
+    where: { id: candidate.serverId },
+  });
+
+  if (!selectedServer) {
+    return null;
   }
 
   try {
@@ -358,6 +351,12 @@ export async function handleSubscriptionRequest(
       }
 
       // Handle SELF_MANAGED vs MANUAL mode differently
+      const routingPreferences = parseDynamicRoutingPreferences({
+        preferredServerIdsJson: dynamicKey.preferredServerIdsJson,
+        preferredCountryCodesJson: dynamicKey.preferredCountryCodesJson,
+        preferredRegionMode: dynamicKey.preferredRegionMode,
+      });
+
       if (dynamicKey.type === 'SELF_MANAGED') {
         // SELF_MANAGED: Auto-create keys on demand
         const selfManagedResult = await createSelfManagedKey(
@@ -365,7 +364,12 @@ export async function handleSubscriptionRequest(
           dynamicKey.serverTagsJson,
           dynamicKey.method,
           dynamicKey.prefix,
-          dynamicKey.loadBalancerAlgorithm
+          dynamicKey.loadBalancerAlgorithm,
+          clientIp,
+          dynamicKey.lastSelectedKeyIndex,
+          routingPreferences.preferredServerIds,
+          routingPreferences.preferredCountryCodes,
+          routingPreferences.preferredRegionMode,
         );
 
         if (!selfManagedResult) {
@@ -408,6 +412,9 @@ export async function handleSubscriptionRequest(
         algorithm: dynamicKey.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         clientIp,
         lastSelectedKeyIndex: dynamicKey.lastSelectedKeyIndex,
+        preferredServerIds: routingPreferences.preferredServerIds,
+        preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredRegionMode: routingPreferences.preferredRegionMode,
         persistRoundRobin: true,
       });
 

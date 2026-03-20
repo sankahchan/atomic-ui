@@ -29,6 +29,8 @@ import {
   getDynamicRoutingAlgorithmHint,
   getDynamicRoutingAlgorithmLabel,
   getSelfManagedServerCandidate,
+  normalizeDynamicRoutingPreferences,
+  parseDynamicRoutingPreferences,
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
@@ -55,6 +57,9 @@ const createDAKSchema = z.object({
   method: z.enum(['chacha20-ietf-poly1305', 'aes-128-gcm', 'aes-192-gcm', 'aes-256-gcm']).optional().nullable(),
   // Load balancer algorithm
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).default('IP_HASH'),
+  preferredServerIds: z.array(z.string()).optional(),
+  preferredCountryCodes: z.array(z.string()).optional(),
+  preferredRegionMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
 });
 
@@ -80,6 +85,9 @@ const updateDAKSchema = z.object({
   prefix: z.string().max(16).optional().nullable(),
   // Load balancer algorithm
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).optional(),
+  preferredServerIds: z.array(z.string()).optional(),
+  preferredCountryCodes: z.array(z.string()).optional(),
+  preferredRegionMode: z.enum(['PREFER', 'ONLY']).optional(),
   // Subscription page customization
   subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
   coverImage: z.string().url().optional().nullable(),
@@ -375,6 +383,11 @@ export const dynamicKeysRouter = router({
       // Transform the data and calculate days remaining
       const now = new Date();
       let items = daks.map((dak) => {
+        const routingPreferences = parseDynamicRoutingPreferences({
+          preferredServerIdsJson: dak.preferredServerIdsJson,
+          preferredCountryCodesJson: dak.preferredCountryCodesJson,
+          preferredRegionMode: dak.preferredRegionMode,
+        });
         let daysRemaining: number | null = null;
         if (dak.expiresAt) {
           const diffMs = dak.expiresAt.getTime() - now.getTime();
@@ -404,6 +417,9 @@ export const dynamicKeysRouter = router({
           method: dak.method,
           loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
           serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
+          preferredServerIds: routingPreferences.preferredServerIds,
+          preferredCountryCodes: routingPreferences.preferredCountryCodes,
+          preferredRegionMode: routingPreferences.preferredRegionMode,
           attachedKeysCount: dak._count.accessKeys,
           createdAt: dak.createdAt,
           updatedAt: dak.updatedAt,
@@ -471,6 +487,11 @@ export const dynamicKeysRouter = router({
       }
 
       const publicSlug = dak.publicSlug || await generateUniqueDynamicKeySlug(dak.name, dak.id);
+      const routingPreferences = parseDynamicRoutingPreferences({
+        preferredServerIdsJson: dak.preferredServerIdsJson,
+        preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredRegionMode: dak.preferredRegionMode,
+      });
 
       if (!dak.publicSlug) {
         await db.dynamicAccessKey.update({
@@ -500,6 +521,9 @@ export const dynamicKeysRouter = router({
         prefix: dak.prefix,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
+        preferredServerIds: routingPreferences.preferredServerIds,
+        preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredRegionMode: routingPreferences.preferredRegionMode,
         accessKeys: dak.accessKeys.map((key) => ({
           ...key,
           accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
@@ -561,6 +585,9 @@ export const dynamicKeysRouter = router({
           loadBalancerAlgorithm: true,
           lastSelectedKeyIndex: true,
           serverTagsJson: true,
+          preferredServerIdsJson: true,
+          preferredCountryCodesJson: true,
+          preferredRegionMode: true,
           lastTrafficAt: true,
           accessKeys: {
             where: {
@@ -605,8 +632,13 @@ export const dynamicKeysRouter = router({
       const activeKeys = dak.accessKeys.filter((key) => Boolean(key.server));
       const accessKeyIds = activeKeys.map((key) => key.id);
       const serverTagIds = JSON.parse(dak.serverTagsJson || '[]') as string[];
+      const routingPreferences = parseDynamicRoutingPreferences({
+        preferredServerIdsJson: dak.preferredServerIdsJson,
+        preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredRegionMode: dak.preferredRegionMode,
+      });
 
-      const [sessions, analytics] = await Promise.all([
+      const [sessions, analytics, preferredServers] = await Promise.all([
         accessKeyIds.length > 0
           ? db.connectionSession.findMany({
               where: {
@@ -635,7 +667,22 @@ export const dynamicKeysRouter = router({
             })
           : Promise.resolve([]),
         getDynamicKeySubscriptionAnalytics(input.id),
+        routingPreferences.preferredServerIds.length > 0
+          ? db.server.findMany({
+              where: {
+                id: { in: routingPreferences.preferredServerIds },
+              },
+              select: {
+                id: true,
+                name: true,
+                countryCode: true,
+              },
+            })
+          : Promise.resolve([]),
       ]);
+      const orderedPreferredServers = routingPreferences.preferredServerIds
+        .map((serverId) => preferredServers.find((server) => server.id === serverId))
+        .filter((server): server is NonNullable<typeof preferredServers[number]> => Boolean(server));
 
       const latestSessionByKeyId = new Map<
         string,
@@ -766,6 +813,9 @@ export const dynamicKeysRouter = router({
             algorithm,
             clientIp: viewerIp || '127.0.0.1',
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+            preferredServerIds: routingPreferences.preferredServerIds,
+            preferredCountryCodes: routingPreferences.preferredCountryCodes,
+            preferredRegionMode: routingPreferences.preferredRegionMode,
             persistRoundRobin: false,
           });
 
@@ -777,7 +827,7 @@ export const dynamicKeysRouter = router({
               serverId: selection.key.server.id,
               serverName: selection.key.server.name,
               serverCountry: selection.key.server.countryCode ?? null,
-              reason: getDynamicRoutingAlgorithmHint(selection.algorithm),
+              reason: `${selection.preferenceResolution.note} ${getDynamicRoutingAlgorithmHint(selection.algorithm)}`.trim(),
               lastTrafficAt: selection.key.lastTrafficAt?.toISOString() ?? null,
             };
           }
@@ -804,8 +854,15 @@ export const dynamicKeysRouter = router({
           };
         } else {
           const candidate = await getSelfManagedServerCandidate({
+            dakId: dak.id,
             serverTagIds,
             algorithm,
+            clientIp: viewerIp || '127.0.0.1',
+            lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+            preferredServerIds: routingPreferences.preferredServerIds,
+            preferredCountryCodes: routingPreferences.preferredCountryCodes,
+            preferredRegionMode: routingPreferences.preferredRegionMode,
+            persistRoundRobin: false,
           });
 
           if (candidate) {
@@ -827,6 +884,10 @@ export const dynamicKeysRouter = router({
         algorithmLabel: getDynamicRoutingAlgorithmLabel(algorithm),
         algorithmHint: getDynamicRoutingAlgorithmHint(algorithm),
         viewerIp,
+        preferredRegionMode: routingPreferences.preferredRegionMode,
+        preferredServerIds: routingPreferences.preferredServerIds,
+        preferredServers: orderedPreferredServers,
+        preferredCountryCodes: routingPreferences.preferredCountryCodes,
         attachedActiveKeys: activeKeys.length,
         selectionNote,
         currentSelection,
@@ -856,6 +917,11 @@ export const dynamicKeysRouter = router({
       // Generate unique dynamic URL token
       const dynamicUrl = generateRandomString(32);
       const publicSlug = await resolveDynamicKeySlug(input.publicSlug, input.name);
+      const routingPreferences = normalizeDynamicRoutingPreferences({
+        preferredServerIds: input.preferredServerIds,
+        preferredCountryCodes: input.preferredCountryCodes,
+        preferredRegionMode: input.preferredRegionMode,
+      });
 
       // Create the DAK
       const dak = await db.dynamicAccessKey.create({
@@ -875,6 +941,9 @@ export const dynamicKeysRouter = router({
           durationDays: input.durationDays,
           status,
           serverTagsJson: JSON.stringify(input.serverTagIds || []),
+          preferredServerIdsJson: JSON.stringify(routingPreferences.preferredServerIds),
+          preferredCountryCodesJson: JSON.stringify(routingPreferences.preferredCountryCodes),
+          preferredRegionMode: routingPreferences.preferredRegionMode,
           prefix: input.prefix,
           method: input.method || 'chacha20-ietf-poly1305',
           loadBalancerAlgorithm: input.loadBalancerAlgorithm,
@@ -898,6 +967,9 @@ export const dynamicKeysRouter = router({
         expiresAt: dak.expiresAt,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
+        preferredServerIds: routingPreferences.preferredServerIds,
+        preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredRegionMode: routingPreferences.preferredRegionMode,
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
       };
@@ -909,7 +981,29 @@ export const dynamicKeysRouter = router({
   update: adminProcedure
     .input(updateDAKSchema)
     .mutation(async ({ input }) => {
-      const { id, serverTagIds, dataLimitGB, dataLimitResetStrategy, email, telegramId, userId, notes, prefix, loadBalancerAlgorithm, subscriptionTheme, coverImage, coverImageType, contactLinks, owner, tags, publicSlug, ...data } = input;
+      const {
+        id,
+        serverTagIds,
+        dataLimitGB,
+        dataLimitResetStrategy,
+        email,
+        telegramId,
+        userId,
+        notes,
+        prefix,
+        loadBalancerAlgorithm,
+        preferredServerIds,
+        preferredCountryCodes,
+        preferredRegionMode,
+        subscriptionTheme,
+        coverImage,
+        coverImageType,
+        contactLinks,
+        owner,
+        tags,
+        publicSlug,
+        ...data
+      } = input;
 
       // Check if DAK exists
       const existing = await db.dynamicAccessKey.findUnique({
@@ -960,6 +1054,37 @@ export const dynamicKeysRouter = router({
 
       if (loadBalancerAlgorithm !== undefined) {
         updateData.loadBalancerAlgorithm = loadBalancerAlgorithm;
+      }
+
+      if (
+        preferredServerIds !== undefined ||
+        preferredCountryCodes !== undefined ||
+        preferredRegionMode !== undefined
+      ) {
+        const routingPreferences = normalizeDynamicRoutingPreferences({
+          preferredServerIds:
+            preferredServerIds !== undefined
+              ? preferredServerIds
+              : parseDynamicRoutingPreferences({
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                }).preferredServerIds,
+          preferredCountryCodes:
+            preferredCountryCodes !== undefined
+              ? preferredCountryCodes
+              : parseDynamicRoutingPreferences({
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                }).preferredCountryCodes,
+          preferredRegionMode:
+            preferredRegionMode !== undefined
+              ? preferredRegionMode
+              : parseDynamicRoutingPreferences({
+                  preferredRegionMode: existing.preferredRegionMode,
+                }).preferredRegionMode,
+        });
+
+        updateData.preferredServerIdsJson = JSON.stringify(routingPreferences.preferredServerIds);
+        updateData.preferredCountryCodesJson = JSON.stringify(routingPreferences.preferredCountryCodes);
+        updateData.preferredRegionMode = routingPreferences.preferredRegionMode;
       }
 
       // Subscription page customization
@@ -1039,6 +1164,15 @@ export const dynamicKeysRouter = router({
         expiresAt: dak.expiresAt,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
+        preferredServerIds: parseDynamicRoutingPreferences({
+          preferredServerIdsJson: dak.preferredServerIdsJson,
+        }).preferredServerIds,
+        preferredCountryCodes: parseDynamicRoutingPreferences({
+          preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        }).preferredCountryCodes,
+        preferredRegionMode: parseDynamicRoutingPreferences({
+          preferredRegionMode: dak.preferredRegionMode,
+        }).preferredRegionMode,
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,

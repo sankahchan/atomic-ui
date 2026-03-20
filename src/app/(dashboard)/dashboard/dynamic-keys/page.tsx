@@ -68,6 +68,10 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { DynamicGroupList } from '@/components/dynamic-keys/dynamic-group-list';
+import {
+  DynamicRoutingPreferencesEditor,
+  type DynamicRoutingPreferenceMode,
+} from '@/components/dynamic-keys/dynamic-routing-preferences-editor';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
@@ -176,6 +180,10 @@ type DAKData = {
   serverTagIds: string[];
   prefix: string | null;
   method: string | null;
+  loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
+  preferredServerIds: string[];
+  preferredCountryCodes: string[];
+  preferredRegionMode: DynamicRoutingPreferenceMode;
   expiresAt?: Date | null;
   durationDays?: number | null;
   daysRemaining?: number | null;
@@ -217,6 +225,9 @@ function CreateDAKDialog({
     durationDays: string;
     method: string;
     loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
+    preferredServerIds: string[];
+    preferredCountryCodes: string[];
+    preferredRegionMode: DynamicRoutingPreferenceMode;
   }>({
     name: '',
     publicSlug: '',
@@ -231,6 +242,9 @@ function CreateDAKDialog({
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
     loadBalancerAlgorithm: 'IP_HASH',
+    preferredServerIds: [],
+    preferredCountryCodes: [],
+    preferredRegionMode: 'PREFER',
   });
   const [slugTouched, setSlugTouched] = useState(false);
 
@@ -287,6 +301,9 @@ function CreateDAKDialog({
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
       loadBalancerAlgorithm: 'IP_HASH',
+      preferredServerIds: [],
+      preferredCountryCodes: [],
+      preferredRegionMode: 'PREFER',
     });
     setSlugTouched(false);
   };
@@ -359,6 +376,9 @@ function CreateDAKDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       method: formData.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm',
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
+      preferredServerIds: formData.preferredServerIds,
+      preferredCountryCodes: formData.preferredCountryCodes,
+      preferredRegionMode: formData.preferredRegionMode,
     });
   };
 
@@ -527,6 +547,24 @@ function CreateDAKDialog({
                 ? t('dynamic_keys.dialog.load_balancer_desc.round_robin')
                 : t('dynamic_keys.dialog.load_balancer_desc.random')}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Preferred Routing Order</Label>
+            <DynamicRoutingPreferencesEditor
+              preferredRegionMode={formData.preferredRegionMode}
+              preferredServerIds={formData.preferredServerIds}
+              preferredCountryCodes={formData.preferredCountryCodes}
+              compact
+              onChange={(next) =>
+                setFormData((current) => ({
+                  ...current,
+                  preferredRegionMode: next.preferredRegionMode,
+                  preferredServerIds: next.preferredServerIds,
+                  preferredCountryCodes: next.preferredCountryCodes,
+                }))
+              }
+            />
           </div>
 
           {/* Contact info */}
@@ -1080,16 +1118,7 @@ function EditDAKDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  dakData: {
-    id: string;
-    name: string;
-    email: string | null;
-    telegramId: string | null;
-    notes: string | null;
-    dataLimitBytes: bigint | null;
-    durationDays: number | null;
-    expiresAt: Date | null;
-  };
+  dakData: DAKData;
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
@@ -1104,6 +1133,10 @@ function EditDAKDialog({
       : '',
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+    loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+    preferredServerIds: dakData.preferredServerIds || [],
+    preferredCountryCodes: dakData.preferredCountryCodes || [],
+    preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
   });
 
   useEffect(() => {
@@ -1117,6 +1150,10 @@ function EditDAKDialog({
         : '',
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
+      loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+      preferredServerIds: dakData.preferredServerIds || [],
+      preferredCountryCodes: dakData.preferredCountryCodes || [],
+      preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
     });
   }, [dakData]);
 
@@ -1159,6 +1196,10 @@ function EditDAKDialog({
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+      loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
+      preferredServerIds: formData.preferredServerIds,
+      preferredCountryCodes: formData.preferredCountryCodes,
+      preferredRegionMode: formData.preferredRegionMode,
     } as any);
   };
 
@@ -1240,6 +1281,44 @@ function EditDAKDialog({
             <p className="text-xs text-muted-foreground">
               {t('dynamic_keys.dialog.expiration_date_help')}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Load Balancer Algorithm</Label>
+            <Select
+              value={formData.loadBalancerAlgorithm}
+              onValueChange={(value) =>
+                setFormData({ ...formData, loadBalancerAlgorithm: value as typeof formData.loadBalancerAlgorithm })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select algorithm" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
+                <SelectItem value="RANDOM">Random</SelectItem>
+                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
+                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Preferred Routing Order</Label>
+            <DynamicRoutingPreferencesEditor
+              preferredRegionMode={formData.preferredRegionMode}
+              preferredServerIds={formData.preferredServerIds}
+              preferredCountryCodes={formData.preferredCountryCodes}
+              compact
+              onChange={(next) =>
+                setFormData((current) => ({
+                  ...current,
+                  preferredRegionMode: next.preferredRegionMode,
+                  preferredServerIds: next.preferredServerIds,
+                  preferredCountryCodes: next.preferredCountryCodes,
+                }))
+              }
+            />
           </div>
 
           <div className="space-y-2">
@@ -1500,16 +1579,7 @@ export default function DynamicKeysPage() {
   const [qrDialogDak, setQrDialogDak] = useState<DAKData | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
-  const [editingDAK, setEditingDAK] = useState<{
-    id: string;
-    name: string;
-    email: string | null;
-    telegramId: string | null;
-    notes: string | null;
-    dataLimitBytes: bigint | null;
-    durationDays: number | null;
-    expiresAt: Date | null;
-  } | null>(null);
+  const [editingDAK, setEditingDAK] = useState<DAKData | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'group'>('list');
   const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | null>(null);
@@ -2768,16 +2838,7 @@ export default function DynamicKeysPage() {
                   {t('dynamic_keys.actions.details')}
                 </Link>
               </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEditingDAK({
-                              id: dak.id,
-                              name: dak.name,
-                              email: dak.email ?? null,
-                              telegramId: dak.telegramId ?? null,
-                              notes: dak.notes ?? null,
-                              dataLimitBytes: dak.dataLimitBytes,
-                              durationDays: (dak as DAKData).durationDays ?? null,
-                              expiresAt: dak.expiresAt ?? null,
-                            })}>
+                            <DropdownMenuItem onClick={() => setEditingDAK(dak)}>
                               <Pencil className="w-4 h-4 mr-2" />
                               {t('dynamic_keys.actions.edit')}
                             </DropdownMenuItem>
@@ -2810,16 +2871,7 @@ export default function DynamicKeysPage() {
           onDelete={(key) => handleDelete(key)}
           onCopyUrl={(key) => handleCopyUrl(key)}
           onShowQR={(key) => handleShowQR(key)}
-          onEdit={(key) => setEditingDAK({
-            id: key.id,
-            name: key.name,
-            email: key.email ?? null,
-            telegramId: key.telegramId ?? null,
-            notes: key.notes ?? null,
-            dataLimitBytes: key.dataLimitBytes,
-            durationDays: key.durationDays ?? null,
-            expiresAt: key.expiresAt ?? null,
-          })}
+          onEdit={(key) => setEditingDAK(key)}
           isProcessingId={togglingKeyId}
         />
       )}
@@ -2925,16 +2977,7 @@ export default function DynamicKeysPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditingDAK({
-                        id: dak.id,
-                        name: dak.name,
-                        email: dak.email ?? null,
-                        telegramId: dak.telegramId ?? null,
-                        notes: dak.notes ?? null,
-                        dataLimitBytes: dak.dataLimitBytes,
-                        durationDays: (dak as DAKData).durationDays ?? null,
-                        expiresAt: dak.expiresAt ?? null,
-                      })}>
+                      <DropdownMenuItem onClick={() => setEditingDAK(dak)}>
                         <Pencil className="w-4 h-4 mr-2" />
                         {t('dynamic_keys.actions.edit')}
                       </DropdownMenuItem>
@@ -3008,16 +3051,7 @@ export default function DynamicKeysPage() {
                     onShowQR={() => handleShowQR(dak)}
                     onDelete={() => handleDelete(dak)}
                     onToggleStatus={() => handleToggleStatus(dak)}
-                    onEdit={() => setEditingDAK({
-                      id: dak.id,
-                      name: dak.name,
-                      email: dak.email ?? null,
-                      telegramId: dak.telegramId ?? null,
-                      notes: dak.notes ?? null,
-                      dataLimitBytes: dak.dataLimitBytes,
-                      durationDays: (dak as DAKData).durationDays ?? null,
-                      expiresAt: dak.expiresAt ?? null,
-                    })}
+                    onEdit={() => setEditingDAK(dak)}
                     isSelected={selectedKeys.has(dak.id)}
                     onSelect={() => handleSelectKey(dak.id)}
                     isTogglingStatus={togglingKeyId === dak.id}
