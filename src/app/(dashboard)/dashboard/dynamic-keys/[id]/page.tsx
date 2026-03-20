@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -26,6 +27,7 @@ import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { normalizePublicSlug } from '@/lib/public-slug';
 import {
   buildDynamicOutlineUrl,
   buildDynamicShortClientUrl,
@@ -71,6 +73,8 @@ import {
   Wifi,
   WifiOff,
   RotateCw,
+  MessageSquare,
+  Eye,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -391,6 +395,7 @@ function SubscriptionShareCard({
   currentCoverImage,
   currentCoverImageType,
   currentContactLinks,
+  currentWelcomeMessage,
   onUpdate,
 }: {
   dakId: string;
@@ -401,6 +406,7 @@ function SubscriptionShareCard({
   currentCoverImage: string | null;
   currentCoverImageType: string | null;
   currentContactLinks: ContactLink[] | null;
+  currentWelcomeMessage: string | null;
   onUpdate: () => void;
 }) {
   const { toast } = useToast();
@@ -410,6 +416,7 @@ function SubscriptionShareCard({
   );
   const [slugInput, setSlugInput] = useState(publicSlug || '');
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
+  const [welcomeMessage, setWelcomeMessage] = useState(currentWelcomeMessage || '');
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
 
@@ -447,6 +454,31 @@ function SubscriptionShareCard({
       });
     },
   });
+
+  const updateWelcomeMutation = trpc.dynamicKeys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Welcome message updated',
+        description: 'The share page welcome message has been updated.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const analyticsQuery = trpc.dynamicKeys.getSharePageAnalytics.useQuery(
+    { id: dakId },
+    {
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: false,
+    },
+  );
 
   const handleThemeChange = (value: string) => {
     setSelectedTheme(value);
@@ -545,18 +577,27 @@ function SubscriptionShareCard({
   };
 
   const saveSlug = () => {
-    if (!slugInput.trim()) {
+    const normalizedSlug = normalizePublicSlug(slugInput);
+    if (!normalizedSlug || normalizedSlug.length < 3) {
       toast({
         title: 'Missing slug',
-        description: 'Enter a short slug before saving.',
+        description: 'Enter at least 3 valid characters before saving.',
         variant: 'destructive',
       });
       return;
     }
 
+    setSlugInput(normalizedSlug);
     updateMutation.mutate({
       id: dakId,
-      publicSlug: slugInput.trim(),
+      publicSlug: normalizedSlug,
+    } as any);
+  };
+
+  const handleWelcomeMessageSave = () => {
+    updateWelcomeMutation.mutate({
+      id: dakId,
+      subscriptionWelcomeMessage: welcomeMessage.trim() || null,
     } as any);
   };
 
@@ -701,6 +742,36 @@ function SubscriptionShareCard({
           )}
         </div>
 
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Welcome Message Override
+          </Label>
+          <Textarea
+            value={welcomeMessage}
+            onChange={(e) => setWelcomeMessage(e.target.value)}
+            placeholder="Shown near the top of this key's share page. Leave empty to use the global message."
+            className="min-h-[96px]"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              This overrides the global subscription page welcome message for this dynamic key only.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWelcomeMessageSave}
+              disabled={updateWelcomeMutation.isPending}
+            >
+              {updateWelcomeMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+        </div>
+
         {/* Theme Preview */}
         <div
           className="rounded-lg p-4 border transition-colors relative overflow-hidden"
@@ -731,9 +802,36 @@ function SubscriptionShareCard({
                 📊
               </div>
               <div>
-                <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Preview</p>
-                <p className="text-xs" style={{ color: theme.textMuted }}>Image Background</p>
+                <p className="text-sm font-medium" style={{ color: coverImageUrl ? '#ffffff' : theme.textPrimary }}>Preview</p>
+                <p className="text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
+                  {coverImageUrl ? 'Image Background' : `${theme.name} Theme`}
+                </p>
               </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <div
+                className="flex-1 h-2 rounded-full"
+                style={{ backgroundColor: coverImageUrl ? 'rgba(255,255,255,0.3)' : theme.progressBg }}
+              >
+                <div
+                  className="h-full rounded-full w-2/3"
+                  style={{ backgroundColor: coverImageUrl ? '#ffffff' : theme.progressFill }}
+                />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1 text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.76)' : theme.textMuted }}>
+              <p>Contact shortcuts: {contacts.length}</p>
+              <p>{coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
+              <p>{welcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
+            </div>
+            <div
+              className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
+              style={{
+                background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                color: '#fff',
+              }}
+            >
+              Add to Outline
             </div>
           </div>
         </div>
@@ -748,7 +846,7 @@ function SubscriptionShareCard({
             <Input
               placeholder="my-dynamic-key"
               value={slugInput}
-              onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+              onChange={(e) => setSlugInput(normalizePublicSlug(e.target.value))}
             />
             <Button
               variant="outline"
@@ -774,38 +872,37 @@ function SubscriptionShareCard({
         </div>
 
         {/* Preview & Copy Buttons */}
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="outline"
-            className="flex-1"
+            className="w-full min-w-0 text-xs sm:text-sm"
             onClick={() => {
               const url = getSubscriptionPageUrl();
               if (url) window.open(url, '_blank');
             }}
             disabled={!dynamicUrl}
           >
-            <Share2 className="w-4 h-4 mr-2" />
+            <Eye className="w-4 h-4 mr-2" />
             Preview
           </Button>
           <Button
-            className="flex-1"
+            className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copySubscriptionPageUrl}
             disabled={!dynamicUrl}
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy Link
           </Button>
+          <Button
+            variant="outline"
+            className="w-full min-w-0 text-xs sm:col-span-2 sm:text-sm"
+            onClick={copyClientUrl}
+            disabled={!dynamicUrl}
+          >
+            <Link2 className="w-4 h-4 mr-2" />
+            Copy Client URL
+          </Button>
         </div>
-
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={copyClientUrl}
-          disabled={!dynamicUrl}
-        >
-          <Link2 className="w-4 h-4 mr-2" />
-          Copy Client URL
-        </Button>
 
         {/* URL Display */}
         {dynamicUrl && (
@@ -824,6 +921,27 @@ function SubscriptionShareCard({
             </div>
           </div>
         )}
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Page Views</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.pageViews ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Copy Clicks</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.copyClicks ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram Sends</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.telegramSends ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last Viewed</p>
+            <p className="mt-2 text-sm font-medium">
+              {analyticsQuery.data?.lastViewedAt ? formatRelativeTime(analyticsQuery.data.lastViewedAt) : 'Never'}
+            </p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -2045,6 +2163,7 @@ export default function DynamicKeyDetailPage() {
             currentCoverImage={dak.coverImage}
             currentCoverImageType={dak.coverImageType}
             currentContactLinks={dak.contactLinks}
+            currentWelcomeMessage={dak.subscriptionWelcomeMessage ?? null}
             onUpdate={() => refetch()}
           />
         </div>

@@ -61,6 +61,7 @@ const createDAKSchema = z.object({
   preferredCountryCodes: z.array(z.string()).optional(),
   preferredRegionMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
+  subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
 });
 
 /**
@@ -93,6 +94,7 @@ const updateDAKSchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   coverImageType: z.enum(['url', 'gradient', 'upload']).optional().nullable(),
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
+  subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(),
@@ -533,6 +535,7 @@ export const dynamicKeysRouter = router({
         coverImage: dak.coverImage,
         coverImageType: dak.coverImageType,
         contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
+        subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage,
         // Rotation settings
         rotationEnabled: dak.rotationEnabled,
         rotationInterval: dak.rotationInterval,
@@ -947,6 +950,7 @@ export const dynamicKeysRouter = router({
           prefix: input.prefix,
           method: input.method || 'chacha20-ietf-poly1305',
           loadBalancerAlgorithm: input.loadBalancerAlgorithm,
+          subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
         },
         include: {
           _count: {
@@ -999,6 +1003,7 @@ export const dynamicKeysRouter = router({
         coverImage,
         coverImageType,
         contactLinks,
+        subscriptionWelcomeMessage,
         owner,
         tags,
         publicSlug,
@@ -1102,6 +1107,10 @@ export const dynamicKeysRouter = router({
 
       if (contactLinks !== undefined) {
         updateData.contactLinks = contactLinks;
+      }
+
+      if (subscriptionWelcomeMessage !== undefined) {
+        updateData.subscriptionWelcomeMessage = subscriptionWelcomeMessage;
       }
 
       if (publicSlug !== undefined) {

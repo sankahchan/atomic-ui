@@ -295,6 +295,7 @@ model DynamicAccessKey {
   // Contact links for subscription page (JSON array of up to 3 contacts)
   // Format: [{"type": "telegram", "value": "https://t.me/user"}, ...]
   contactLinks String?
+  subscriptionWelcomeMessage String?
 
   // Key Auto-Rotation
   // When enabled, underlying access keys are periodically replaced

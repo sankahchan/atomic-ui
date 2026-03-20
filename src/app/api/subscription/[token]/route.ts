@@ -127,7 +127,7 @@ export async function GET(
           method: dak.method || null,
           port: null,
           contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
-          subscriptionWelcomeMessage: null,
+          subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage || null,
           isDynamic: true,
         });
       }
