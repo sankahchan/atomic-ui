@@ -1,4 +1,4 @@
-import { locales, type Locale } from './config';
+import { defaultLocale, locales, type Locale } from './config';
 
 // Navigation Translations
 const navTranslations: Record<Locale, Record<string, string>> = {
@@ -5204,6 +5204,7 @@ export const translations = {
     ...(serverDetailsTranslations.zh || {}),
     ...(archivedTranslations.zh || {}),
     ...(dynamicKeysTranslations.zh || {}),
+    ...(subscriptionPageTranslations.zh || {}),
     ...(daysTranslations.zh || {}),
   },
   my: {
@@ -5236,6 +5237,7 @@ export const translations = {
     ...(serverDetailsTranslations.ja || {}),
     ...(archivedTranslations.ja || {}),
     ...(dynamicKeysTranslations.ja || {}),
+    ...(subscriptionPageTranslations.ja || {}),
     ...(daysTranslations.ja || {}),
   },
   ko: {
@@ -5251,6 +5253,7 @@ export const translations = {
     ...(serverDetailsTranslations.ko || {}),
     ...(archivedTranslations.ko || {}),
     ...(dynamicKeysTranslations.ko || {}),
+    ...(subscriptionPageTranslations.ko || {}),
     ...(daysTranslations.ko || {}),
   },
   ru: {
@@ -5266,6 +5269,21 @@ export const translations = {
     ...(serverDetailsTranslations.ru || {}),
     ...(archivedTranslations.ru || {}),
     ...(dynamicKeysTranslations.ru || {}),
+    ...(subscriptionPageTranslations.ru || {}),
     ...(daysTranslations.ru || {}),
   },
 };
+
+export function resolveTranslation(locale: Locale, key: string): string | undefined {
+  const direct = translations[locale]?.[key];
+  if (direct) {
+    return direct;
+  }
+
+  if (key.startsWith('subscription.')) {
+    return subscriptionPageTranslations[locale]?.[key]
+      ?? subscriptionPageTranslations[defaultLocale]?.[key];
+  }
+
+  return translations[defaultLocale]?.[key];
+}

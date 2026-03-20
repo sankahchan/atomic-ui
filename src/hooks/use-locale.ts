@@ -14,7 +14,7 @@ import {
   defaultLocale,
   isSupportedLocale,
 } from '@/lib/i18n/config';
-import { translations } from '@/lib/i18n/translations';
+import { resolveTranslation } from '@/lib/i18n/translations';
 
 const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
 const LOCALE_CHANGE_EVENT = 'atomic-ui-locale-change';
@@ -65,7 +65,7 @@ export function useLocale() {
 
   const t = useCallback(
     (key: string): string => {
-      return translations[locale]?.[key] ?? translations[defaultLocale]?.[key] ?? key;
+      return resolveTranslation(locale, key) ?? key;
     },
     [locale]
   );
