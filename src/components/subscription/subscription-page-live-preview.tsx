@@ -382,8 +382,8 @@ export function SubscriptionPageLivePreview({
                                   boxShadow: index === 0 ? "0 10px 24px rgba(59,130,246,0.22)" : "none",
                                 }}
                               >
-                                <span className="sm:hidden">{platformLabel.short}</span>
-                                <span className="hidden sm:inline">{platformLabel.label}</span>
+                                <span className="block truncate sm:hidden">{platformLabel.short}</span>
+                                <span className="hidden truncate sm:inline">{platformLabel.label}</span>
                               </div>
                             ))}
                           </div>
@@ -413,44 +413,44 @@ export function SubscriptionPageLivePreview({
                           </div>
 
                           <div
-                            className="inline-flex items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-sm font-semibold shadow-lg"
+                            className="inline-flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[16px] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: "#ffffff",
                             }}
                           >
                             <span className="text-base">{primaryApp?.icon || "🔑"}</span>
-                            {tr("subscription.hero.open_in", { app: primaryApp?.name || "Outline" })}
+                            <span className="truncate">{tr("subscription.hero.open_in", { app: primaryApp?.name || "Outline" })}</span>
                             <ChevronRight className="h-4 w-4" />
                           </div>
 
                           <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "xl:grid-cols-4 sm:grid-cols-2"}`}>
-                            <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                            <div className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                               <Copy className="h-4 w-4" />
-                              {t("subscription.hero.copy_url")}
+                              <span className="truncate">{t("subscription.hero.copy_url")}</span>
                             </div>
                             {showManualSetupButton && (
-                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <QrCode className="h-4 w-4" />
-                                {t("subscription.hero.manual_setup")}
+                                <span className="truncate">{t("subscription.hero.manual_setup")}</span>
                               </div>
                             )}
                             {primaryApp && (
-                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <ExternalLink className="h-4 w-4" />
-                                {tr("subscription.hero.get_app", { app: primaryApp.name })}
+                                <span className="truncate">{tr("subscription.hero.get_app", { app: primaryApp.name })}</span>
                               </div>
                             )}
                             {showHelpContact && supportLink?.trim() && (
-                              <div className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
+                              <div className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[16px] px-3.5 py-2.5 text-sm font-medium" style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}>
                                 <MessageCircle className="h-4 w-4" />
-                                {t("subscription.hero.get_support")}
+                                <span className="truncate">{t("subscription.hero.get_support")}</span>
                               </div>
                             )}
                           </div>
 
                           <div className={`grid gap-2 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]"}`}>
-                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <div className="min-w-0 rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 {t("subscription.hero.quick_tip")}
                               </p>
@@ -458,17 +458,17 @@ export function SubscriptionPageLivePreview({
                                 {t("subscription.hero.quick_tip_desc")}
                               </p>
                             </div>
-                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <div className="min-w-0 rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 {t("subscription.hero.last_updated")}
                               </p>
-                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>{t("subscription.status.updated_just_now")}</p>
+                              <p className="mt-2 break-words text-sm font-semibold" style={{ color: controlText }}>{t("subscription.status.updated_just_now")}</p>
                             </div>
-                            <div className="rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
+                            <div className="min-w-0 rounded-[16px] border px-3.5 py-3" style={{ backgroundColor: controlButtonSurface, borderColor: controlBorder }}>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMuted }}>
                                 {t("subscription.hero.endpoint")}
                               </p>
-                              <p className="mt-2 text-sm font-semibold" style={{ color: controlText }}>{serverLabel}</p>
+                              <p className="mt-2 break-words text-sm font-semibold" style={{ color: controlText }}>{serverLabel}</p>
                               <p className="mt-1 text-xs" style={{ color: controlMuted }}>{tr("subscription.summary.port", { port: 1158 })}</p>
                             </div>
                           </div>
@@ -494,13 +494,13 @@ export function SubscriptionPageLivePreview({
 
                   {showConnectionSummary && (
                     <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.75fr))]"}`}>
-                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="min-w-0 rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                               {t("subscription.summary.data_usage")}
                             </p>
-                            <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
+                            <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{usageHeadline}</p>
                             <p className="mt-2 text-sm" style={{ color: textMuted }}>{usageDetail}</p>
                           </div>
                           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -528,19 +528,19 @@ export function SubscriptionPageLivePreview({
                         </p>
                       </div>
 
-                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="min-w-0 rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           {t("subscription.summary.time_left")}
                         </p>
-                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.time_left_value")}</p>
+                        <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.time_left_value")}</p>
                         <p className="mt-2 text-sm" style={{ color: textMuted }}>{t("subscription.preview.time_left_detail")}</p>
                       </div>
 
-                      <div className="rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
+                      <div className="min-w-0 rounded-[20px] border p-4" style={{ ...pillStyle, backgroundColor: softSurface }}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           {t("subscription.summary.server")}
                         </p>
-                        <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.server_value")}</p>
+                        <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: textPrimary }}>{t("subscription.preview.server_value")}</p>
                         <p className="mt-2 text-sm" style={{ color: textMuted }}>{tr("subscription.summary.port", { port: 1158 })}</p>
                       </div>
                     </div>
@@ -572,7 +572,7 @@ export function SubscriptionPageLivePreview({
 
                   <div className={`mt-4 grid gap-3 ${isMobile ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
                     {visibleApps.map((app) => (
-                      <div key={app.id} className="rounded-[20px] border p-3.5" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
+                      <div key={app.id} className="min-w-0 rounded-[20px] border p-3.5" style={{ backgroundColor: controlSurface, borderColor: controlBorder }}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div
@@ -582,12 +582,12 @@ export function SubscriptionPageLivePreview({
                               {app.icon}
                             </div>
                             <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlText }}>{app.name}</p>
-                            <p className="mt-1 text-sm" style={{ color: controlMuted }}>
+                            <p className="mt-1 line-clamp-2 text-sm" style={{ color: controlMuted }}>
                               {tr("subscription.apps.manual_alternative", { app: app.name })}
                             </p>
                           </div>
                           <div
-                            className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                            className="max-w-full shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                             style={{ backgroundColor: controlButtonSurface, color: controlMuted, border: `1px solid ${controlBorder}` }}
                           >
                             {t("subscription.apps.client")}
@@ -595,13 +595,13 @@ export function SubscriptionPageLivePreview({
                         </div>
                         <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
                           <div
-                            className="inline-flex items-center justify-center rounded-[16px] px-4 py-2.5 text-sm font-semibold"
+                            className="inline-flex min-w-0 items-center justify-center overflow-hidden rounded-[16px] px-4 py-2.5 text-sm font-semibold"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: "#ffffff",
                             }}
                           >
-                            {tr("subscription.hero.open_in", { app: app.name })}
+                            <span className="truncate">{tr("subscription.hero.open_in", { app: app.name })}</span>
                           </div>
                           <div
                             className="inline-flex items-center justify-center rounded-[16px] border"
@@ -611,11 +611,11 @@ export function SubscriptionPageLivePreview({
                           </div>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                          <span style={{ color: controlMuted }}>
+                          <span className="min-w-0 break-words" style={{ color: controlMuted }}>
                             {t("subscription.apps.same_url_flow")}
                           </span>
                           <span
-                            className="inline-flex rounded-full px-2.5 py-1 font-medium"
+                            className="inline-flex max-w-full shrink-0 rounded-full px-2.5 py-1 font-medium"
                             style={{ backgroundColor: controlButtonSurface, color: controlText, border: `1px solid ${controlBorder}` }}
                           >
                             {t("subscription.platform.ios")}

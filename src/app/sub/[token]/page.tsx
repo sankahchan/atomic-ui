@@ -1212,14 +1212,14 @@ export default function SubscriptionPage() {
                                 boxShadow: platform === p ? '0 10px 24px rgba(59,130,246,0.22)' : 'none',
                               }}
                             >
-                              <span className="sm:hidden">
+                              <span className="block truncate sm:hidden">
                                 {p === 'ios'
                                   ? t('subscription.platform.ios_short')
                                   : p === 'windows'
                                     ? t('subscription.platform.windows')
                                     : t('subscription.platform.android')}
                               </span>
-                              <span className="hidden sm:inline">{getPlatformLabel(p)}</span>
+                              <span className="hidden truncate sm:inline">{getPlatformLabel(p)}</span>
                             </button>
                           ))}
                         </div>
@@ -1266,14 +1266,14 @@ export default function SubscriptionPage() {
                         {primaryApp ? (
                           <button
                             onClick={() => handleAddToApp(primaryApp.id)}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
+                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
                             }}
                           >
                             <span className="text-base">{primaryApp.icon}</span>
-                            {tr('subscription.hero.open_in', { app: primaryApp.name })}
+                            <span className="truncate">{tr('subscription.hero.open_in', { app: primaryApp.name })}</span>
                             <ChevronRight className="h-4 w-4" />
                           </button>
                         ) : (
@@ -1284,14 +1284,14 @@ export default function SubscriptionPage() {
                                 placement: 'hero_primary',
                               })
                             }
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
+                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            {t('subscription.hero.copy_connection_url_primary')}
+                            <span className="truncate">{t('subscription.hero.copy_connection_url_primary')}</span>
                           </button>
                         )}
 
@@ -1303,7 +1303,7 @@ export default function SubscriptionPage() {
                                 placement: 'hero_secondary',
                               })
                             }
-                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               color: controlTextColor,
@@ -1311,13 +1311,13 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            {t('subscription.hero.copy_url')}
+                            <span className="truncate">{t('subscription.hero.copy_url')}</span>
                           </button>
 
                           {showManualSetupButton ? (
                             <button
                               onClick={() => setShowManualSetup(true)}
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1325,7 +1325,7 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <QrCode className="h-4 w-4" />
-                            {t('subscription.hero.manual_setup')}
+                            <span className="truncate">{t('subscription.hero.manual_setup')}</span>
                           </button>
                           ) : null}
 
@@ -1334,7 +1334,7 @@ export default function SubscriptionPage() {
                               href={installAppUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1342,7 +1342,7 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <Download className="h-4 w-4" />
-                            {tr('subscription.hero.get_app', { app: primaryApp?.name ?? t('subscription.defaults.app') })}
+                            <span className="truncate">{tr('subscription.hero.get_app', { app: primaryApp?.name ?? t('subscription.defaults.app') })}</span>
                           </a>
                         ) : null}
 
@@ -1351,7 +1351,7 @@ export default function SubscriptionPage() {
                               href={supportLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1359,14 +1359,14 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <MessageCircle className="h-4 w-4" />
-                            {t('subscription.hero.get_support')}
+                            <span className="truncate">{t('subscription.hero.get_support')}</span>
                           </a>
                         ) : null}
                         </div>
 
                         <div className="grid gap-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(2,minmax(0,0.85fr))]">
                           <div
-                            className="rounded-[1rem] border px-3.5 py-3"
+                            className="min-w-0 rounded-[1rem] border px-3.5 py-3"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1381,7 +1381,7 @@ export default function SubscriptionPage() {
                           </div>
 
                           <div
-                            className="rounded-[1rem] border px-3.5 py-3"
+                            className="min-w-0 rounded-[1rem] border px-3.5 py-3"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1390,13 +1390,13 @@ export default function SubscriptionPage() {
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
                               {t('subscription.hero.last_updated')}
                             </p>
-                            <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
+                            <p className="mt-2 break-words text-sm font-semibold" style={{ color: controlTextColor }}>
                               {getLastUpdatedLabel()}
                             </p>
                           </div>
 
                           <div
-                            className="rounded-[1rem] border px-3.5 py-3"
+                            className="min-w-0 rounded-[1rem] border px-3.5 py-3"
                             style={{
                               backgroundColor: controlButtonSurface,
                               borderColor: controlBorder,
@@ -1405,7 +1405,7 @@ export default function SubscriptionPage() {
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
                               {t('subscription.hero.endpoint')}
                             </p>
-                            <p className="mt-2 text-sm font-semibold" style={{ color: controlTextColor }}>
+                            <p className="mt-2 break-words text-sm font-semibold" style={{ color: controlTextColor }}>
                               {serverLabel}
                             </p>
                             <p className="mt-1 text-xs" style={{ color: controlMutedColor }}>
@@ -1443,7 +1443,7 @@ export default function SubscriptionPage() {
                 {showConnectionSummary && (
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]">
                     <div
-                      className="rounded-[1.3rem] border p-4"
+                      className="min-w-0 rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1454,7 +1454,7 @@ export default function SubscriptionPage() {
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                             {t('subscription.summary.data_usage')}
                           </p>
-                          <h2 className="mt-2 text-[1.7rem] font-semibold md:text-[1.85rem]" style={{ color: primaryTextColor }}>
+                          <h2 className="mt-2 break-words text-[1.7rem] font-semibold md:text-[1.85rem]" style={{ color: primaryTextColor }}>
                             {usageHeadline}
                           </h2>
                           <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1504,7 +1504,7 @@ export default function SubscriptionPage() {
                     </div>
 
                     <div
-                      className="rounded-[1.3rem] border p-4"
+                      className="min-w-0 rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1513,7 +1513,7 @@ export default function SubscriptionPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                         {t('subscription.summary.time_left')}
                       </p>
-                      <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
+                      <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {timeRemaining}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1524,7 +1524,7 @@ export default function SubscriptionPage() {
                     </div>
 
                     <div
-                      className="rounded-[1.3rem] border p-4"
+                      className="min-w-0 rounded-[1.3rem] border p-4"
                       style={{
                         backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
                         borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
@@ -1533,7 +1533,7 @@ export default function SubscriptionPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
                         {t('subscription.summary.server')}
                       </p>
-                      <p className="mt-2 text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
+                      <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
                         {`${getCountryFlag(keyData.server.countryCode)} ${serverLabel}`.trim()}
                       </p>
                       <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
@@ -1580,7 +1580,7 @@ export default function SubscriptionPage() {
                   {visibleApps.map((app) => (
                     <div
                       key={app.id}
-                      className="rounded-[1.25rem] border p-3.5"
+                      className="min-w-0 rounded-[1.25rem] border p-3.5"
                       style={{
                         backgroundColor: controlSurface,
                         borderColor: controlBorder,
@@ -1599,13 +1599,13 @@ export default function SubscriptionPage() {
                             {app.icon}
                           </div>
                           <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
-                          <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
+                          <p className="mt-1 line-clamp-2 text-sm" style={{ color: controlMutedColor }}>
                             {tr('subscription.apps.manual_alternative', { app: app.name })}
                           </p>
                         </div>
 
                         <div
-                          className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                          className="max-w-full shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                           style={{
                             backgroundColor: controlButtonSurface,
                             color: controlMutedColor,
@@ -1619,13 +1619,13 @@ export default function SubscriptionPage() {
                       <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
                         <button
                           onClick={() => handleAddToApp(app.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-[1rem] px-4 py-2.5 text-sm font-semibold"
+                          className="inline-flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-2.5 text-sm font-semibold"
                           style={{
                             background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                             color: '#ffffff',
                           }}
                         >
-                          {tr('subscription.hero.open_in', { app: app.name })}
+                          <span className="truncate">{tr('subscription.hero.open_in', { app: app.name })}</span>
                         </button>
                         {getPlatformStoreUrl(app, platform) && (
                           <a
@@ -1646,11 +1646,11 @@ export default function SubscriptionPage() {
                       </div>
 
                       <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                        <span style={{ color: controlMutedColor }}>
+                        <span className="min-w-0 break-words" style={{ color: controlMutedColor }}>
                           {t('subscription.apps.same_url_flow')}
                         </span>
                         <span
-                          className="inline-flex rounded-full px-2.5 py-1 font-medium"
+                          className="inline-flex max-w-full shrink-0 rounded-full px-2.5 py-1 font-medium"
                           style={{
                             backgroundColor: controlButtonSurface,
                             color: controlTextColor,
