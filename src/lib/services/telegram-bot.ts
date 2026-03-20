@@ -18,7 +18,16 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { createOutlineClient } from '@/lib/outline-api';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { buildSharePageUrl, buildShortShareUrl, buildSubscriptionApiUrl } from '@/lib/subscription-links';
+import {
+  buildDynamicOutlineUrl,
+  buildDynamicSharePageUrl,
+  buildDynamicShortClientUrl,
+  buildDynamicShortShareUrl,
+  buildDynamicSubscriptionApiUrl,
+  buildSharePageUrl,
+  buildShortShareUrl,
+  buildSubscriptionApiUrl,
+} from '@/lib/subscription-links';
 import {
   recordSubscriptionPageEvent,
   SUBSCRIPTION_EVENT_TYPES,
@@ -452,11 +461,68 @@ async function loadAccessKeyForMessaging(accessKeyId: string) {
   });
 }
 
+async function loadDynamicAccessKeyForMessaging(dynamicAccessKeyId: string) {
+  return db.dynamicAccessKey.findUnique({
+    where: { id: dynamicAccessKeyId },
+    include: {
+      user: true,
+      accessKeys: {
+        include: {
+          server: true,
+        },
+      },
+    },
+  });
+}
+
 function resolveTelegramChatIdForKey(key: {
   telegramId?: string | null;
   user?: { telegramChatId?: string | null } | null;
 }) {
   return key.telegramId || key.user?.telegramChatId || null;
+}
+
+function resolveTelegramChatIdForDynamicKey(key: {
+  telegramId?: string | null;
+  user?: { telegramChatId?: string | null } | null;
+}) {
+  return key.telegramId || key.user?.telegramChatId || null;
+}
+
+function getDynamicKeyMessagingUrls(
+  key: {
+    dynamicUrl?: string | null;
+    publicSlug?: string | null;
+    name: string;
+  },
+  source?: string | null,
+) {
+  const sharePageUrl = key.publicSlug
+    ? buildDynamicShortShareUrl(key.publicSlug, { source: source || undefined })
+    : key.dynamicUrl
+      ? buildDynamicSharePageUrl(key.dynamicUrl, { source: source || undefined })
+      : null;
+  const subscriptionUrl = key.publicSlug
+    ? buildDynamicShortClientUrl(key.publicSlug, { source: source || undefined })
+    : key.dynamicUrl
+      ? buildDynamicSubscriptionApiUrl(key.dynamicUrl, { source: source || undefined })
+      : null;
+  const outlineClientUrl = key.publicSlug
+    ? buildDynamicOutlineUrl(key.publicSlug, key.name, {
+        source: source || undefined,
+        shortPath: true,
+      })
+    : key.dynamicUrl
+      ? buildDynamicOutlineUrl(key.dynamicUrl, key.name, {
+          source: source || undefined,
+        })
+      : null;
+
+  return {
+    sharePageUrl,
+    subscriptionUrl,
+    outlineClientUrl,
+  };
 }
 
 export async function createAccessKeyTelegramConnectLink(input: {
@@ -493,6 +559,55 @@ export async function createAccessKeyTelegramConnectLink(input: {
     data: {
       token,
       accessKeyId: key.id,
+      userId: key.userId,
+      createdByUserId: input.createdByUserId ?? null,
+      expiresAt,
+    },
+  });
+
+  return {
+    startToken: token,
+    botUsername,
+    expiresAt,
+    url: `https://t.me/${botUsername}?start=${token}`,
+  };
+}
+
+export async function createDynamicKeyTelegramConnectLink(input: {
+  dynamicAccessKeyId: string;
+  createdByUserId?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const key = await db.dynamicAccessKey.findUnique({
+    where: { id: input.dynamicAccessKeyId },
+    select: {
+      id: true,
+      userId: true,
+      name: true,
+    },
+  });
+
+  if (!key) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const botUsername = await getTelegramBotUsername(config.botToken, config.botUsername);
+  if (!botUsername) {
+    throw new Error('Unable to resolve the Telegram bot username.');
+  }
+
+  const token = generateRandomString(24);
+  const expiresAt = new Date(Date.now() + TELEGRAM_CONNECT_TOKEN_TTL_MS);
+
+  await db.telegramLinkToken.create({
+    data: {
+      token,
+      kind: 'DYNAMIC_KEY_CONNECT',
+      dynamicAccessKeyId: key.id,
       userId: key.userId,
       createdByUserId: input.createdByUserId ?? null,
       expiresAt,
@@ -627,6 +742,159 @@ export async function sendAccessKeySharePageToTelegram(input: {
   return {
     sharePageUrl,
     subscriptionUrl,
+    destinationChatId,
+  };
+}
+
+export async function sendDynamicKeySharePageToTelegram(input: {
+  dynamicAccessKeyId: string;
+  chatId?: string | number | null;
+  reason?:
+    | 'CREATED'
+    | 'RESENT'
+    | 'LINKED'
+    | 'KEY_ENABLED'
+    | 'USAGE_REQUEST'
+    | 'SUBSCRIPTION_REQUEST';
+  source?: string | null;
+  includeQr?: boolean;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
+  if (!key) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const destinationChatId =
+    (input.chatId ? String(input.chatId) : null) || resolveTelegramChatIdForDynamicKey(key);
+  if (!destinationChatId) {
+    throw new Error('This dynamic key is not linked to a Telegram chat yet.');
+  }
+
+  const { sharePageUrl, subscriptionUrl, outlineClientUrl } = getDynamicKeyMessagingUrls(
+    key,
+    input.source || 'telegram',
+  );
+  if (!subscriptionUrl || !outlineClientUrl) {
+    throw new Error('This dynamic key does not have a usable client URL yet.');
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
+  const supportLink = defaults.supportLink;
+  const attachedCount = key.accessKeys.length;
+  const uniqueServers = Array.from(
+    new Set(
+      key.accessKeys
+        .map((attachedKey) => attachedKey.server?.name)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const coverageSummary =
+    uniqueServers.length > 0
+      ? uniqueServers.slice(0, 3).join(', ') + (uniqueServers.length > 3 ? ` +${uniqueServers.length - 3} more` : '')
+      : 'Auto-selected at fetch time';
+
+  const reasonTitle =
+    input.reason === 'CREATED'
+      ? '🎉 <b>Your dynamic key is ready</b>'
+      : input.reason === 'KEY_ENABLED'
+        ? '✅ <b>Your dynamic key has been re-enabled</b>'
+        : input.reason === 'LINKED'
+          ? '🔗 <b>Telegram linked successfully</b>'
+          : input.reason === 'USAGE_REQUEST'
+            ? '📊 <b>Your dynamic VPN access details</b>'
+            : input.reason === 'SUBSCRIPTION_REQUEST'
+              ? '📎 <b>Your dynamic subscription links</b>'
+              : '📨 <b>Your dynamic share page</b>';
+
+  const lines = [
+    reasonTitle,
+    '',
+    `🔁 Key: <b>${escapeHtml(key.name)}</b>`,
+    `🧭 Mode: ${escapeHtml(key.type === 'SELF_MANAGED' ? 'Self-Managed' : 'Manual')}`,
+    `🖥 Backends: ${attachedCount} attached key(s)`,
+    `🌍 Coverage: ${escapeHtml(coverageSummary)}`,
+    `📈 Status: ${escapeHtml(key.status)}`,
+    `⏳ Expiration: ${escapeHtml(formatExpirationSummary(key))}`,
+    key.dataLimitBytes ? `📦 Quota: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : '📦 Quota: Unlimited',
+    '',
+    welcomeMessage
+      ? escapeHtml(welcomeMessage)
+      : key.sharePageEnabled
+        ? 'Open the share page below for install steps, manual setup, and the latest backend details.'
+        : 'The share page is disabled for this key. Use the client endpoint below inside Outline or another compatible client.',
+  ];
+
+  if (key.sharePageEnabled && sharePageUrl) {
+    lines.push('', `🌐 Share page: ${sharePageUrl}`);
+  }
+
+  lines.push(`🔄 Client endpoint: ${subscriptionUrl}`);
+  lines.push(`⚡ Outline client URL: ${outlineClientUrl}`);
+
+  const inlineKeyboard: Array<Array<{ text: string; url: string }>> = [];
+  if (key.sharePageEnabled && sharePageUrl) {
+    inlineKeyboard.push([{ text: 'Open Share Page', url: sharePageUrl }]);
+  }
+  inlineKeyboard.push([{ text: 'Open Client Endpoint', url: subscriptionUrl }]);
+
+  if (supportLink) {
+    inlineKeyboard.push([{ text: 'Get Support', url: supportLink }]);
+  }
+
+  await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+
+  if (input.includeQr ?? true) {
+    try {
+      const qrBuffer = await QRCode.toBuffer(outlineClientUrl, {
+        width: 300,
+        margin: 2,
+      });
+      await sendTelegramPhoto(
+        config.botToken,
+        destinationChatId,
+        qrBuffer,
+        'Scan this QR code with Outline or another compatible client if direct import is unavailable.',
+      );
+    } catch (error) {
+      console.error('Failed to generate Telegram QR code for dynamic key:', error);
+    }
+  }
+
+  await recordSubscriptionPageEvent({
+    dynamicAccessKeyId: key.id,
+    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+    source: input.source || 'telegram',
+    metadata: {
+      reason: input.reason || 'RESENT',
+      destinationChatId,
+      sharePageEnabled: key.sharePageEnabled,
+    },
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SHARE_SENT',
+    entity: 'DYNAMIC_ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      reason: input.reason || 'RESENT',
+      destinationChatId,
+      sharePageUrl,
+      subscriptionUrl,
+    },
+  });
+
+  return {
+    sharePageUrl,
+    subscriptionUrl,
+    outlineClientUrl,
     destinationChatId,
   };
 }
@@ -818,6 +1086,11 @@ async function markTelegramLinkTokenConsumed(input: {
           user: true,
         },
       },
+      dynamicAccessKey: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 
@@ -829,6 +1102,7 @@ async function markTelegramLinkTokenConsumed(input: {
     return {
       status: 'already-linked' as const,
       accessKeyId: linkToken.accessKey?.id ?? null,
+      dynamicAccessKeyId: linkToken.dynamicAccessKey?.id ?? null,
     };
   }
 
@@ -836,17 +1110,28 @@ async function markTelegramLinkTokenConsumed(input: {
     return { status: 'expired' as const };
   }
 
-  if (!linkToken.accessKey) {
+  if (!linkToken.accessKey && !linkToken.dynamicAccessKey) {
     return { status: 'missing-key' as const };
   }
 
   await db.$transaction(async (tx) => {
-    await tx.accessKey.update({
-      where: { id: linkToken.accessKey!.id },
-      data: {
-        telegramId: input.telegramUserId,
-      },
-    });
+    if (linkToken.accessKey) {
+      await tx.accessKey.update({
+        where: { id: linkToken.accessKey.id },
+        data: {
+          telegramId: input.telegramUserId,
+        },
+      });
+    }
+
+    if (linkToken.dynamicAccessKey) {
+      await tx.dynamicAccessKey.update({
+        where: { id: linkToken.dynamicAccessKey.id },
+        data: {
+          telegramId: input.telegramUserId,
+        },
+      });
+    }
 
     if (linkToken.userId) {
       await tx.user.update({
@@ -866,29 +1151,54 @@ async function markTelegramLinkTokenConsumed(input: {
     });
   });
 
-  await recordSubscriptionPageEvent({
-    accessKeyId: linkToken.accessKey.id,
-    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED,
-    source: 'telegram_start',
-    metadata: {
-      telegramUserId: input.telegramUserId,
-      chatId: input.chatId,
-    },
-  });
+  if (linkToken.accessKey) {
+    await recordSubscriptionPageEvent({
+      accessKeyId: linkToken.accessKey.id,
+      eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED,
+      source: 'telegram_start',
+      metadata: {
+        telegramUserId: input.telegramUserId,
+        chatId: input.chatId,
+      },
+    });
 
-  await writeAuditLog({
-    action: 'TELEGRAM_LINK_COMPLETED',
-    entity: 'ACCESS_KEY',
-    entityId: linkToken.accessKey.id,
-    details: {
-      telegramUserId: input.telegramUserId,
-      chatId: input.chatId,
-    },
-  });
+    await writeAuditLog({
+      action: 'TELEGRAM_LINK_COMPLETED',
+      entity: 'ACCESS_KEY',
+      entityId: linkToken.accessKey.id,
+      details: {
+        telegramUserId: input.telegramUserId,
+        chatId: input.chatId,
+      },
+    });
+  }
+
+  if (linkToken.dynamicAccessKey) {
+    await recordSubscriptionPageEvent({
+      dynamicAccessKeyId: linkToken.dynamicAccessKey.id,
+      eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED,
+      source: 'telegram_start',
+      metadata: {
+        telegramUserId: input.telegramUserId,
+        chatId: input.chatId,
+      },
+    });
+
+    await writeAuditLog({
+      action: 'TELEGRAM_LINK_COMPLETED',
+      entity: 'DYNAMIC_ACCESS_KEY',
+      entityId: linkToken.dynamicAccessKey.id,
+      details: {
+        telegramUserId: input.telegramUserId,
+        chatId: input.chatId,
+      },
+    });
+  }
 
   return {
     status: 'linked' as const,
-    accessKeyId: linkToken.accessKey.id,
+    accessKeyId: linkToken.accessKey?.id ?? null,
+    dynamicAccessKeyId: linkToken.dynamicAccessKey?.id ?? null,
   };
 }
 
@@ -1100,6 +1410,19 @@ async function handleStartCommand(
           });
         } catch (error) {
           console.error('Failed to send share page after Telegram link:', error);
+        }
+      }
+
+      if (linkResult.dynamicAccessKeyId) {
+        try {
+          await sendDynamicKeySharePageToTelegram({
+            dynamicAccessKeyId: linkResult.dynamicAccessKeyId,
+            chatId: String(chatId),
+            reason: 'LINKED',
+            source: 'telegram_start',
+          });
+        } catch (error) {
+          console.error('Failed to send dynamic share page after Telegram link:', error);
         }
       }
 

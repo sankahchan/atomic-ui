@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -77,6 +78,7 @@ import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 import {
   buildDynamicOutlineUrl,
+  buildDynamicSharePageUrl,
   buildDynamicShortClientUrl,
   buildDynamicShortShareUrl,
   buildDynamicSubscriptionApiUrl,
@@ -247,6 +249,10 @@ function CreateDAKDialog({
     preferredRegionMode: 'PREFER',
   });
   const [slugTouched, setSlugTouched] = useState(false);
+  const [openPreviewAfterCreate, setOpenPreviewAfterCreate] = useState(false);
+  const [copyShareLinkAfterCreate, setCopyShareLinkAfterCreate] = useState(false);
+  const [sendSharePageViaTelegramAfterCreate, setSendSharePageViaTelegramAfterCreate] = useState(false);
+  const previewWindowRef = useRef<Window | null>(null);
 
   useEffect(() => {
     if (slugTouched) {
@@ -286,6 +292,16 @@ function CreateDAKDialog({
       })
     : '';
 
+  const sendSharePageMutation = trpc.dynamicKeys.sendSharePageViaTelegram.useMutation({
+    onError: (error) => {
+      toast({
+        title: 'Telegram send failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -306,10 +322,56 @@ function CreateDAKDialog({
       preferredRegionMode: 'PREFER',
     });
     setSlugTouched(false);
+    setOpenPreviewAfterCreate(false);
+    setCopyShareLinkAfterCreate(false);
+    setSendSharePageViaTelegramAfterCreate(false);
+    previewWindowRef.current = null;
   };
 
   const createMutation = trpc.dynamicKeys.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      const sharePageUrl = data.publicSlug
+        ? buildDynamicShortShareUrl(data.publicSlug, {
+            origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+          })
+        : data.dynamicUrl
+          ? buildDynamicSharePageUrl(data.dynamicUrl, {
+              origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+            })
+          : '';
+
+      if (sharePageUrl && copyShareLinkAfterCreate) {
+        void copyToClipboard(sharePageUrl, 'Copied!', 'Share page link copied to clipboard.');
+      }
+
+      if (sharePageUrl && openPreviewAfterCreate) {
+        if (previewWindowRef.current && !previewWindowRef.current.closed) {
+          previewWindowRef.current.location.href = sharePageUrl;
+          previewWindowRef.current.focus();
+        } else {
+          window.open(sharePageUrl, '_blank');
+        }
+      } else if (previewWindowRef.current && !previewWindowRef.current.closed) {
+        previewWindowRef.current.close();
+      }
+
+      previewWindowRef.current = null;
+
+      if (sendSharePageViaTelegramAfterCreate) {
+        try {
+          await sendSharePageMutation.mutateAsync({
+            id: data.id,
+            reason: 'CREATED',
+          });
+          toast({
+            title: 'Share page sent',
+            description: 'The new dynamic key has been sent through Telegram.',
+          });
+        } catch {
+          // Error handled by the mutation toast.
+        }
+      }
+
       toast({
         title: t('dynamic_keys.msg.created'),
         description: t('dynamic_keys.msg.created_desc'),
@@ -319,6 +381,10 @@ function CreateDAKDialog({
       resetForm();
     },
     onError: (error) => {
+      if (previewWindowRef.current && !previewWindowRef.current.closed) {
+        previewWindowRef.current.close();
+      }
+      previewWindowRef.current = null;
       toast({
         title: t('dynamic_keys.msg.create_failed'),
         description: error.message,
@@ -360,6 +426,12 @@ function CreateDAKDialog({
         variant: 'destructive',
       });
       return;
+    }
+
+    if (openPreviewAfterCreate && typeof window !== 'undefined') {
+      previewWindowRef.current = window.open('about:blank', '_blank');
+    } else {
+      previewWindowRef.current = null;
     }
 
     createMutation.mutate({
@@ -689,6 +761,56 @@ function CreateDAKDialog({
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">After create</p>
+              <p className="text-xs text-muted-foreground">
+                The share page link is generated with the dynamic key. Choose what should happen as soon as creation finishes.
+              </p>
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                <Checkbox
+                  checked={openPreviewAfterCreate}
+                  onCheckedChange={(checked) => setOpenPreviewAfterCreate(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Open preview after create</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Opens the new dynamic share page in a separate tab right after the key is created.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                <Checkbox
+                  checked={copyShareLinkAfterCreate}
+                  onCheckedChange={(checked) => setCopyShareLinkAfterCreate(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Copy share page link after create</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Copies the generated share page link immediately instead of making you open the detail page first.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+                <Checkbox
+                  checked={sendSharePageViaTelegramAfterCreate}
+                  onCheckedChange={(checked) => setSendSharePageViaTelegramAfterCreate(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Send share page via Telegram after create</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Uses the dynamic key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
 
           <DialogFooter>

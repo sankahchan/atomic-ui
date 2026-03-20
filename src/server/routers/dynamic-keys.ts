@@ -39,6 +39,10 @@ import {
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
+import {
+  createDynamicKeyTelegramConnectLink,
+  sendDynamicKeySharePageToTelegram,
+} from '@/lib/services/telegram-bot';
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -1266,6 +1270,60 @@ export const dynamicKeysRouter = router({
         shortSharePageUrl: existing.publicSlug ? buildDynamicShortShareUrl(existing.publicSlug) : null,
         shortClientUrl: existing.publicSlug ? buildDynamicOutlineUrl(existing.publicSlug, existing.name, { shortPath: true }) : null,
       };
+    }),
+
+  generateTelegramConnectLink: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      try {
+        return await createDynamicKeyTelegramConnectLink({
+          dynamicAccessKeyId: input.id,
+          createdByUserId: ctx.user.id,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  sendSharePageViaTelegram: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        reason: z
+          .enum(['CREATED', 'RESENT', 'LINKED', 'KEY_ENABLED', 'USAGE_REQUEST', 'SUBSCRIPTION_REQUEST'])
+          .optional(),
+        chatId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await sendDynamicKeySharePageToTelegram({
+          dynamicAccessKeyId: input.id,
+          chatId: input.chatId,
+          reason: input.reason,
+          source: 'dashboard',
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
     }),
 
   /**

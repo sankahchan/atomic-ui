@@ -475,6 +475,40 @@ function SubscriptionShareCard({
     },
   });
 
+  const sendSharePageMutation = trpc.dynamicKeys.sendSharePageViaTelegram.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Share page sent',
+        description: 'The dynamic key has been sent through Telegram.',
+      });
+      void analyticsQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram send failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const connectLinkMutation = trpc.dynamicKeys.generateTelegramConnectLink.useMutation({
+    onSuccess: async (result) => {
+      await copyToClipboard(
+        result.url,
+        'Copied!',
+        'Telegram connect link copied to clipboard.',
+      );
+    },
+    onError: (error) => {
+      toast({
+        title: 'Connect link failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const analyticsQuery = trpc.dynamicKeys.getSharePageAnalytics.useQuery(
     { id: dakId },
     {
@@ -952,6 +986,32 @@ function SubscriptionShareCard({
           >
             <Link2 className="w-4 h-4 mr-2" />
             Copy Client URL
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full min-w-0 text-xs sm:text-sm"
+            onClick={() => connectLinkMutation.mutate({ id: dakId })}
+            disabled={connectLinkMutation.isPending || !dynamicUrl}
+          >
+            {connectLinkMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Link2 className="w-4 h-4 mr-2" />
+            )}
+            Connect Telegram
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full min-w-0 text-xs sm:text-sm"
+            onClick={() => sendSharePageMutation.mutate({ id: dakId, reason: 'RESENT' })}
+            disabled={sendSharePageMutation.isPending || !dynamicUrl}
+          >
+            {sendSharePageMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <MessageSquare className="w-4 h-4 mr-2" />
+            )}
+            Send via Telegram
           </Button>
           <Button
             variant="outline"
