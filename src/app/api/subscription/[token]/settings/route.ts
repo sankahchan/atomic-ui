@@ -53,6 +53,7 @@ export async function GET(
     const settingsKeys = [
       'supportLink',
       'defaultSubscriptionTheme',
+      'defaultLanguage',
       // Branding settings
       'subscriptionLogoUrl',
       'subscriptionLogoSize',
@@ -161,6 +162,7 @@ export async function GET(
     return NextResponse.json({
       supportLink: settingsMap.get('supportLink') || null,
       defaultSubscriptionTheme: settingsMap.get('defaultSubscriptionTheme') || 'dark',
+      defaultLanguage: settingsMap.get('defaultLanguage') || 'en',
       branding,
     });
   } catch (error) {

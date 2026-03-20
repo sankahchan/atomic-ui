@@ -451,7 +451,89 @@ function SubscriptionShareCard({
   currentWelcomeMessage: string | null;
   onThemeChange: () => void;
 }) {
+  const { locale } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
+  const shareUi = {
+    title: isMyanmar ? 'မျှဝေရန် စာမျက်နှာ' : 'Share Page',
+    description: isMyanmar ? 'အသုံးပြုသူထံသို့ လှပသော subscription စာမျက်နှာကို မျှဝေပါ' : 'Share a beautiful subscription page with your user',
+    theme: isMyanmar ? 'စာမျက်နှာ Theme' : 'Page Theme',
+    selectTheme: isMyanmar ? 'Theme ကို ရွေးပါ' : 'Select theme',
+    shortSlug: isMyanmar ? 'Short Link Slug' : 'Short Link Slug',
+    slugPlaceholder: isMyanmar ? 'my-access-key' : 'my-access-key',
+    slugHelp: isMyanmar ? 'Short share page URL နှင့် Outline client URL အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
+    save: isMyanmar ? 'သိမ်းမည်' : 'Save',
+    regenerateShortSlug: isMyanmar ? 'Short slug ကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
+    backgroundImage: isMyanmar ? 'နောက်ခံပုံ (ရွေးချယ်နိုင်သည်)' : 'Background Image (Optional)',
+    backgroundImageHelp: isMyanmar ? 'ပုံထည့်ပါက အပြည့်စုံ နောက်ခံပုံစံအဖြစ် အသုံးပြုမည်။ Theme အရောင်ကို အစားထိုးနိုင်သည်။' : 'Use image as full-page background theme. Overrides color theme when set.',
+    contactLinks: isMyanmar ? 'ဆက်သွယ်ရန် Link များ' : 'Contact Links',
+    contactPlaceholder: isMyanmar ? 'Link သို့မဟုတ် ID ထည့်ပါ' : 'Enter link or ID',
+    welcomeOverride: isMyanmar ? 'ကြိုဆိုစာ Override' : 'Welcome Message Override',
+    welcomePlaceholder: isMyanmar ? 'ဤ key ၏ share page အပေါ်ဘက်တွင် ပြသမည့် စာသား။ မဖြည့်ပါက global message ကို အသုံးပြုမည်။' : "Shown near the top of this key's share page. Leave empty to use the global message.",
+    welcomeHelp: isMyanmar ? 'ဤ key အတွက်သာ global subscription page welcome message ကို အစားထိုးမည်။' : 'This overrides the global subscription page welcome message for this key only.',
+    preview: isMyanmar ? 'အကြိုကြည့်မည်' : 'Preview',
+    previewImage: isMyanmar ? 'ပုံနောက်ခံကို ဖွင့်ထားသည်' : 'Image Background',
+    previewColorOnly: isMyanmar ? 'အရောင် Theme သာ' : 'Color theme only',
+    previewCustomWelcome: isMyanmar ? 'ကိုယ်ပိုင်ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Custom welcome message enabled',
+    previewGlobalWelcome: isMyanmar ? 'Global ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Using global welcome message',
+    previewContacts: isMyanmar ? 'ဆက်သွယ်ရန် shortcut များ' : 'Contact shortcuts',
+    previewAddToOutline: isMyanmar ? 'Outline ထဲသို့ ထည့်မည်' : 'Add to Outline',
+    copyLink: isMyanmar ? 'Link ကို ကူးယူမည်' : 'Copy Link',
+    copyClientUrl: isMyanmar ? 'Client URL ကို ကူးယူမည်' : 'Copy Client URL',
+    connectTelegram: isMyanmar ? 'Telegram ချိတ်ဆက်မည်' : 'Connect Telegram',
+    sendTelegram: isMyanmar ? 'Telegram ဖြင့် ပို့မည်' : 'Send via Telegram',
+    regenerateLink: isMyanmar ? 'Link ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
+    sharePageUrl: isMyanmar ? 'Share Page URL' : 'Share Page URL',
+    clientUrl: isMyanmar ? 'Client URL' : 'Client URL',
+    pageViews: isMyanmar ? 'စာမျက်နှာကြည့်ရှုမှု' : 'Page Views',
+    copyClicks: isMyanmar ? 'Copy အကြိမ်ရေ' : 'Copy Clicks',
+    telegramSends: isMyanmar ? 'Telegram ပို့ထားမှု' : 'Telegram Sends',
+    lastViewed: isMyanmar ? 'နောက်ဆုံးကြည့်ရှုချိန်' : 'Last Viewed',
+    never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
+    copied: isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
+    copiedShareUrl: isMyanmar ? 'Subscription page URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Subscription page URL copied to clipboard.',
+    copiedClientUrl: isMyanmar ? 'Client URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Client URL copied to clipboard.',
+    copiedConnectLink: isMyanmar ? 'Telegram connect link ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Telegram connect link copied to clipboard.',
+    copiedNewShareUrl: isMyanmar ? 'Share page link အသစ်ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'New share page link copied to clipboard.',
+    copiedNewShortLink: isMyanmar ? 'Short share link အသစ်ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'New short share link copied to clipboard.',
+    updatedTitle: isMyanmar ? 'အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Updated',
+    updateFailed: isMyanmar ? 'အပ်ဒိတ် မအောင်မြင်ပါ' : 'Update failed',
+    themeUpdated: isMyanmar ? 'Subscription page theme ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The subscription page theme has been updated.',
+    shortLinkUpdated: isMyanmar ? 'Short share link ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The short share link has been updated.',
+    coverUpdated: isMyanmar ? 'နောက်ခံပုံကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The cover image has been updated.',
+    contactsUpdated: isMyanmar ? 'ဆက်သွယ်ရန် link များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Contact links have been updated.',
+    welcomeUpdatedTitle: isMyanmar ? 'ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Welcome message updated',
+    welcomeUpdatedDesc: isMyanmar ? 'Share page ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
+    shareRegeneratedTitle: isMyanmar ? 'Share link ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Share link regenerated',
+    shareRegeneratedDesc: isMyanmar ? 'အဟောင်း shared link သည် မအသုံးပြုနိုင်တော့ပါ။' : 'The old shared link is no longer valid.',
+    shortRegeneratedTitle: isMyanmar ? 'Short link ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
+    shortRegeneratedDesc: isMyanmar ? 'Short share link အသစ်ကို အသုံးပြုနိုင်ပါပြီ။' : 'The new short share link is ready to use.',
+    slugRegenerationFailed: isMyanmar ? 'Slug ပြန်ဖန်တီးမှု မအောင်မြင်ပါ' : 'Slug regeneration failed',
+    shareSentTitle: isMyanmar ? 'Share page ကို ပို့ပြီးပါပြီ' : 'Share page sent',
+    shareSentDesc: isMyanmar ? 'နောက်ဆုံး share page ကို Telegram မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The latest share page was sent through Telegram.',
+    telegramFailed: isMyanmar ? 'Telegram ပို့မှု မအောင်မြင်ပါ' : 'Telegram send failed',
+    connectFailed: isMyanmar ? 'Connect link ဖန်တီးမှု မအောင်မြင်ပါ' : 'Connect link failed',
+    errorTitle: isMyanmar ? 'အမှား' : 'Error',
+    contactRequired: isMyanmar ? 'ဆက်သွယ်ရန် တန်ဖိုးတစ်ခု ထည့်ပါ။' : 'Please enter a contact value.',
+    limitReached: isMyanmar ? 'အများဆုံး အရေအတွက် ပြည့်သွားပါပြီ' : 'Limit reached',
+    limitDesc: isMyanmar ? 'ဆက်သွယ်ရန် ၃ ခုအထိသာ ထည့်နိုင်ပါသည်။' : 'Maximum 3 contacts allowed.',
+    missingSlug: isMyanmar ? 'Slug မပြည့်စုံပါ' : 'Missing slug',
+    missingSlugDesc: isMyanmar ? 'သိမ်းမီ အနည်းဆုံး တရားဝင် စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 valid characters before saving.',
+    generatingNewToken: isMyanmar ? 'Subscription token အသစ်ကို ဖန်တီးနေသည်...' : 'Generating new subscription token...',
+    generatingToken: isMyanmar ? 'Subscription token ကို ဖန်တီးနေသည်...' : 'Generating subscription token...',
+  };
+  const getContactTypeLabel = (type: ContactLink['type']) =>
+    locale === 'my'
+      ? ({
+          telegram: 'Telegram',
+          discord: 'Discord',
+          whatsapp: 'WhatsApp',
+          phone: 'ဖုန်း',
+          email: 'အီးမေးလ်',
+          website: 'ဝဘ်ဆိုက်',
+          facebook: 'Facebook',
+        } as const)[type]
+      : CONTACT_TYPES.find((item) => item.value === type)?.label || type;
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
   const [coverImageUrl, setCoverImageUrl] = useState(
     currentCoverImageType === 'url' ? currentCoverImage || '' : ''
@@ -465,14 +547,14 @@ function SubscriptionShareCard({
   const updateThemeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Theme updated',
-        description: 'The subscription page theme has been updated.',
+        title: shareUi.updatedTitle,
+        description: shareUi.themeUpdated,
       });
       onThemeChange();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -481,14 +563,14 @@ function SubscriptionShareCard({
   const updateSlugMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Short link updated',
-        description: 'The short share link has been updated.',
+        title: shareUi.updatedTitle,
+        description: shareUi.shortLinkUpdated,
       });
       onThemeChange();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -498,14 +580,14 @@ function SubscriptionShareCard({
   const updateCoverMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Cover image updated',
-        description: 'The cover image has been updated.',
+        title: shareUi.updatedTitle,
+        description: shareUi.coverUpdated,
       });
       onThemeChange();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -515,14 +597,14 @@ function SubscriptionShareCard({
   const updateContactsMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Contacts updated',
-        description: 'Contact links have been updated.',
+        title: shareUi.updatedTitle,
+        description: shareUi.contactsUpdated,
       });
       onThemeChange();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -532,14 +614,14 @@ function SubscriptionShareCard({
   const updateWelcomeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Welcome message updated',
-        description: 'The share page welcome message has been updated.',
+        title: shareUi.welcomeUpdatedTitle,
+        description: shareUi.welcomeUpdatedDesc,
       });
       onThemeChange();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -549,15 +631,15 @@ function SubscriptionShareCard({
   const regenerateTokenMutation = trpc.keys.regenerateSubscriptionToken.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Share link regenerated',
-        description: 'The old shared link is no longer valid.',
+        title: shareUi.shareRegeneratedTitle,
+        description: shareUi.shareRegeneratedDesc,
       });
       onThemeChange();
-      void copyToClipboard(result.sharePageUrl, 'Copied!', 'New share page link copied to clipboard.');
+      void copyToClipboard(result.sharePageUrl, shareUi.copied, shareUi.copiedNewShareUrl);
     },
     onError: (error) => {
       toast({
-        title: 'Regeneration failed',
+        title: shareUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -567,15 +649,15 @@ function SubscriptionShareCard({
     onSuccess: (result) => {
       setSlugInput(result.publicSlug || '');
       toast({
-        title: 'Short link regenerated',
-        description: 'The new short share link is ready to use.',
+        title: shareUi.shortRegeneratedTitle,
+        description: shareUi.shortRegeneratedDesc,
       });
       onThemeChange();
-      void copyToClipboard(result.sharePageUrl, 'Copied!', 'New short share link copied to clipboard.');
+      void copyToClipboard(result.sharePageUrl, shareUi.copied, shareUi.copiedNewShortLink);
     },
     onError: (error) => {
       toast({
-        title: 'Slug regeneration failed',
+        title: shareUi.slugRegenerationFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -584,13 +666,13 @@ function SubscriptionShareCard({
   const sendSharePageMutation = trpc.keys.sendSharePageViaTelegram.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Share page sent',
-        description: 'The latest share page was sent through Telegram.',
+        title: shareUi.shareSentTitle,
+        description: shareUi.shareSentDesc,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Telegram send failed',
+        title: shareUi.telegramFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -598,11 +680,11 @@ function SubscriptionShareCard({
   });
   const connectLinkMutation = trpc.keys.generateTelegramConnectLink.useMutation({
     onSuccess: async (result) => {
-      await copyToClipboard(result.url, 'Copied!', 'Telegram connect link copied to clipboard.');
+      await copyToClipboard(result.url, shareUi.copied, shareUi.copiedConnectLink);
     },
     onError: (error) => {
       toast({
-        title: 'Connect link failed',
+        title: shareUi.connectFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -644,16 +726,16 @@ function SubscriptionShareCard({
   const handleAddContact = () => {
     if (!newContactValue.trim()) {
       toast({
-        title: 'Error',
-        description: 'Please enter a contact value.',
+        title: shareUi.errorTitle,
+        description: shareUi.contactRequired,
         variant: 'destructive',
       });
       return;
     }
     if (contacts.length >= 3) {
       toast({
-        title: 'Limit reached',
-        description: 'Maximum 3 contacts allowed.',
+        title: shareUi.limitReached,
+        description: shareUi.limitDesc,
         variant: 'destructive',
       });
       return;
@@ -686,10 +768,10 @@ function SubscriptionShareCard({
   const getSubscriptionPageUrl = () => {
     if (typeof window === 'undefined') return '';
     if (slugInput.trim()) {
-      return buildShortShareUrl(slugInput.trim(), { origin: window.location.origin });
+      return buildShortShareUrl(slugInput.trim(), { origin: window.location.origin, lang: locale });
     }
     if (!subscriptionToken) return '';
-    return buildSharePageUrl(subscriptionToken, { origin: window.location.origin });
+    return buildSharePageUrl(subscriptionToken, { origin: window.location.origin, lang: locale });
   };
 
   const getClientUrl = () => {
@@ -708,20 +790,20 @@ function SubscriptionShareCard({
 
   const copySubscriptionPageUrl = async () => {
     const url = getSubscriptionPageUrl();
-    await copyToClipboard(url, 'Copied!', 'Subscription page URL copied to clipboard.');
+    await copyToClipboard(url, shareUi.copied, shareUi.copiedShareUrl);
   };
 
   const copyClientUrl = async () => {
     const url = getClientUrl();
-    await copyToClipboard(url, 'Copied!', 'Client URL copied to clipboard.');
+    await copyToClipboard(url, shareUi.copied, shareUi.copiedClientUrl);
   };
 
   const saveSlug = () => {
     const normalizedSlug = normalizePublicSlug(slugInput);
     if (!normalizedSlug || normalizedSlug.length < 3) {
       toast({
-        title: 'Missing slug',
-        description: 'Enter at least 3 valid characters before saving.',
+        title: shareUi.missingSlug,
+        description: shareUi.missingSlugDesc,
         variant: 'destructive',
       });
       return;
@@ -741,10 +823,10 @@ function SubscriptionShareCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Share2 className="w-5 h-5 text-primary" />
-          Share Page
+          {shareUi.title}
         </CardTitle>
         <CardDescription>
-          Share a beautiful subscription page with your user
+          {shareUi.description}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -752,11 +834,11 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <Palette className="w-4 h-4" />
-            Page Theme
+            {shareUi.theme}
           </Label>
           <Select value={selectedTheme} onValueChange={handleThemeChange}>
             <SelectTrigger>
-              <SelectValue placeholder="Select theme" />
+              <SelectValue placeholder={shareUi.selectTheme} />
             </SelectTrigger>
             <SelectContent>
               {themeList.map((t) => (
@@ -777,11 +859,11 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <Link2 className="w-4 h-4" />
-            Short Link Slug
+            {shareUi.shortSlug}
           </Label>
           <div className="flex gap-2">
             <Input
-              placeholder="my-access-key"
+              placeholder={shareUi.slugPlaceholder}
               value={slugInput}
               onChange={(e) => setSlugInput(normalizePublicSlug(e.target.value))}
             />
@@ -791,20 +873,20 @@ function SubscriptionShareCard({
               onClick={saveSlug}
               disabled={updateSlugMutation.isPending}
             >
-              {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+              {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : shareUi.save}
             </Button>
             <Button
               variant="outline"
               size="icon"
               onClick={() => regenerateSlugMutation.mutate({ id: keyId })}
               disabled={regenerateSlugMutation.isPending}
-              title="Regenerate short slug"
+              title={shareUi.regenerateShortSlug}
             >
               {regenerateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Used for the short share page and short Outline client URL.
+            {shareUi.slugHelp}
           </p>
         </div>
 
@@ -812,7 +894,7 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <ImageIcon className="w-4 h-4" />
-            Background Image (Optional)
+            {shareUi.backgroundImage}
           </Label>
           <div className="flex gap-2">
             <Input
@@ -829,12 +911,12 @@ function SubscriptionShareCard({
               {updateCoverMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                'Save'
+                shareUi.save
               )}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Use image as full-page background theme. Overrides color theme when set.
+            {shareUi.backgroundImageHelp}
           </p>
         </div>
 
@@ -842,7 +924,7 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <Phone className="w-4 h-4" />
-            Contact Links ({contacts.length}/3)
+            {shareUi.contactLinks} ({contacts.length}/3)
           </Label>
 
           {/* Existing contacts */}
@@ -853,7 +935,7 @@ function SubscriptionShareCard({
                 return (
                   <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
                     <span>{contactType?.icon}</span>
-                    <span className="text-sm font-medium">{contactType?.label}</span>
+                    <span className="text-sm font-medium">{contactType ? getContactTypeLabel(contact.type) : contact.type}</span>
                     <span className="text-sm text-muted-foreground truncate flex-1">{contact.value}</span>
                     <Button
                       variant="ghost"
@@ -881,14 +963,14 @@ function SubscriptionShareCard({
                     <SelectItem key={type.value} value={type.value}>
                       <span className="flex items-center gap-2">
                         <span>{type.icon}</span>
-                        {type.label}
+                        {getContactTypeLabel(type.value)}
                       </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Input
-                placeholder="Enter link or ID"
+                placeholder={shareUi.contactPlaceholder}
                 value={newContactValue}
                 onChange={(e) => setNewContactValue(e.target.value)}
                 className="flex-1"
@@ -912,17 +994,17 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
-            Welcome Message Override
+            {shareUi.welcomeOverride}
           </Label>
           <Textarea
             value={welcomeMessage}
             onChange={(e) => setWelcomeMessage(e.target.value)}
-            placeholder="Shown near the top of this key's share page. Leave empty to use the global message."
+            placeholder={shareUi.welcomePlaceholder}
             className="min-h-[96px]"
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              This overrides the global subscription page welcome message for this key only.
+              {shareUi.welcomeHelp}
             </p>
             <Button
               variant="outline"
@@ -933,7 +1015,7 @@ function SubscriptionShareCard({
               {updateWelcomeMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                'Save'
+                shareUi.save
               )}
             </Button>
           </div>
@@ -970,10 +1052,10 @@ function SubscriptionShareCard({
               </div>
               <div>
                 <div className="text-sm font-medium" style={{ color: coverImageUrl ? '#ffffff' : theme.textPrimary }}>
-                  Preview
+                  {shareUi.preview}
                 </div>
                 <div className="text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.7)' : theme.textMuted }}>
-                  {coverImageUrl ? 'Image Background' : theme.name + ' Theme'}
+                  {coverImageUrl ? shareUi.previewImage : `${theme.name} Theme`}
                 </div>
               </div>
             </div>
@@ -989,9 +1071,9 @@ function SubscriptionShareCard({
               </div>
             </div>
             <div className="mt-3 space-y-1 text-xs" style={{ color: coverImageUrl ? 'rgba(255,255,255,0.76)' : theme.textMuted }}>
-              <p>Contact shortcuts: {contacts.length}</p>
-              <p>{coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
-              <p>{welcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
+              <p>{shareUi.previewContacts}: {contacts.length}</p>
+              <p>{coverImageUrl ? shareUi.previewImage : shareUi.previewColorOnly}</p>
+              <p>{welcomeMessage.trim() ? shareUi.previewCustomWelcome : shareUi.previewGlobalWelcome}</p>
             </div>
             <div
               className="mt-3 py-2 px-3 rounded-lg text-center text-xs font-medium"
@@ -1000,7 +1082,7 @@ function SubscriptionShareCard({
                 color: '#fff',
               }}
             >
-              Add to Outline
+              {shareUi.previewAddToOutline}
             </div>
           </div>
         </div>
@@ -1017,7 +1099,7 @@ function SubscriptionShareCard({
             }}
           >
             <Eye className="w-4 h-4 mr-2" />
-            Preview
+            {shareUi.preview}
           </Button>
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
@@ -1025,7 +1107,7 @@ function SubscriptionShareCard({
             disabled={!subscriptionToken && !slugInput.trim()}
           >
             <Copy className="w-4 h-4 mr-2" />
-            Copy Link
+            {shareUi.copyLink}
           </Button>
           <Button
             variant="outline"
@@ -1034,7 +1116,7 @@ function SubscriptionShareCard({
             disabled={!subscriptionToken && !slugInput.trim()}
           >
             <Link2 className="w-4 h-4 mr-2" />
-            Copy Client URL
+            {shareUi.copyClientUrl}
           </Button>
           <Button
             variant="outline"
@@ -1047,7 +1129,7 @@ function SubscriptionShareCard({
             ) : (
               <Link2 className="w-4 h-4 mr-2" />
             )}
-            Connect Telegram
+            {shareUi.connectTelegram}
           </Button>
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
@@ -1059,7 +1141,7 @@ function SubscriptionShareCard({
             ) : (
               <MessageSquare className="w-4 h-4 mr-2" />
             )}
-            Send via Telegram
+            {shareUi.sendTelegram}
           </Button>
           <Button
             variant="outline"
@@ -1072,45 +1154,45 @@ function SubscriptionShareCard({
             ) : (
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
-            Regenerate Link
+            {shareUi.regenerateLink}
           </Button>
         </div>
 
         {/* URL Display */}
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
-            <p className="mb-1 font-medium text-foreground">Share Page URL</p>
+            <p className="mb-1 font-medium text-foreground">{shareUi.sharePageUrl}</p>
             {subscriptionToken || slugInput.trim()
               ? getSubscriptionPageUrl()
               : regenerateTokenMutation.isPending
-                ? 'Generating new subscription token...'
-                : 'Generating subscription token...'}
+                ? shareUi.generatingNewToken
+                : shareUi.generatingToken}
           </div>
           <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
-            <p className="mb-1 font-medium text-foreground">Client URL</p>
+            <p className="mb-1 font-medium text-foreground">{shareUi.clientUrl}</p>
             {subscriptionToken || slugInput.trim()
               ? getClientUrl()
-              : 'Generating client URL...'}
+              : `${shareUi.clientUrl}...`}
           </div>
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-lg border bg-muted/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Page Views</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.pageViews}</p>
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.pageViews ?? 0}</p>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Copy Clicks</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.copyClicks}</p>
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.copyClicks ?? 0}</p>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram Sends</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.telegramSends}</p>
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.telegramSends ?? 0}</p>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last Viewed</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.lastViewed}</p>
             <p className="mt-2 text-sm font-medium">
-              {analyticsQuery.data?.lastViewedAt ? formatRelativeTime(analyticsQuery.data.lastViewedAt) : 'Never'}
+              {analyticsQuery.data?.lastViewedAt ? formatRelativeTime(analyticsQuery.data.lastViewedAt) : shareUi.never}
             </p>
           </div>
         </div>

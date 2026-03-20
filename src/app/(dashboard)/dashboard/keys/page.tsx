@@ -183,20 +183,24 @@ function fillTemplate(template: string, values: Record<string, string | number>)
   );
 }
 
-function getKeySubscriptionPageUrl(subscriptionToken?: string | null, publicSlug?: string | null): string {
+function getKeySubscriptionPageUrl(
+  subscriptionToken?: string | null,
+  publicSlug?: string | null,
+  locale?: string | null,
+): string {
   if (typeof window === 'undefined') {
     return '';
   }
 
   if (publicSlug) {
-    return buildShortShareUrl(publicSlug, { origin: window.location.origin });
+    return buildShortShareUrl(publicSlug, { origin: window.location.origin, lang: locale });
   }
 
   if (!subscriptionToken) {
     return '';
   }
 
-  return buildSharePageUrl(subscriptionToken, { origin: window.location.origin });
+  return buildSharePageUrl(subscriptionToken, { origin: window.location.origin, lang: locale });
 }
 
 /**
@@ -280,7 +284,7 @@ function CreateKeyDialog({
   const { data: users } = trpc.users.list.useQuery(undefined, {
     enabled: open,
   });
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const globalShareThemeName = themeList.find((theme) => theme.id === globalSubscriptionTheme)?.name || globalSubscriptionTheme;
   const selectedShareTheme = getTheme(
     formData.subscriptionTheme === 'default' ? globalSubscriptionTheme : formData.subscriptionTheme,
@@ -320,6 +324,7 @@ function CreateKeyDialog({
   const previewShareUrl = hasPreviewSlug
     ? buildShortShareUrl(normalizedPreviewSlug, {
         origin: previewOrigin,
+        lang: locale,
       })
     : '';
 
@@ -336,7 +341,11 @@ function CreateKeyDialog({
   // Create key mutation
   const createMutation = trpc.keys.create.useMutation({
     onSuccess: async (createdKey) => {
-      const sharePageUrl = getKeySubscriptionPageUrl(createdKey.subscriptionToken, createdKey.publicSlug);
+      const sharePageUrl = getKeySubscriptionPageUrl(
+        createdKey.subscriptionToken,
+        createdKey.publicSlug,
+        locale,
+      );
 
       if (sharePageUrl && copyShareLinkAfterCreate) {
         void copyToClipboard(sharePageUrl, 'Copied!', 'Share page link copied to clipboard.');

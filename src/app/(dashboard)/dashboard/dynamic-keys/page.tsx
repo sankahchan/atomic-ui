@@ -210,7 +210,7 @@ function CreateDAKDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const [formData, setFormData] = useState<{
@@ -289,6 +289,7 @@ function CreateDAKDialog({
   const previewShareUrl = hasPreviewSlug
     ? buildDynamicShortShareUrl(normalizedPreviewSlug, {
         origin: previewOrigin,
+        lang: locale,
       })
     : '';
 
@@ -333,10 +334,12 @@ function CreateDAKDialog({
       const sharePageUrl = data.publicSlug
         ? buildDynamicShortShareUrl(data.publicSlug, {
             origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+            lang: locale,
           })
         : data.dynamicUrl
           ? buildDynamicSharePageUrl(data.dynamicUrl, {
               origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+              lang: locale,
             })
           : '';
 

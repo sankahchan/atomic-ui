@@ -45,6 +45,7 @@ export async function GET() {
     const allKeys = [
       'supportLink',
       'defaultSubscriptionTheme',
+      'defaultLanguage',
       'unsplashApiKey',
       ...brandingKeys,
     ];
@@ -131,6 +132,7 @@ export async function GET() {
     return NextResponse.json({
       supportLink: settingsMap.get('supportLink') || '',
       defaultSubscriptionTheme: settingsMap.get('defaultSubscriptionTheme') || 'dark',
+      defaultLanguage: settingsMap.get('defaultLanguage') || 'en',
       unsplashApiKey: hasUnsplashKey ? '********' : '',
       branding,
     });
@@ -149,7 +151,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { supportLink, defaultSubscriptionTheme, unsplashApiKey, branding } = body;
+    const {
+      supportLink,
+      defaultSubscriptionTheme,
+      defaultLanguage,
+      unsplashApiKey,
+      branding,
+    } = body;
 
     // Build upsert operations
     const operations: Promise<unknown>[] = [
@@ -162,6 +170,11 @@ export async function POST(request: NextRequest) {
         where: { key: 'defaultSubscriptionTheme' },
         update: { value: defaultSubscriptionTheme || 'dark' },
         create: { key: 'defaultSubscriptionTheme', value: defaultSubscriptionTheme || 'dark' },
+      }),
+      db.settings.upsert({
+        where: { key: 'defaultLanguage' },
+        update: { value: defaultLanguage || 'en' },
+        create: { key: 'defaultLanguage', value: defaultLanguage || 'en' },
       }),
     ];
 

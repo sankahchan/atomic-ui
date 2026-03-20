@@ -12,7 +12,9 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { SubscriptionPageLivePreview } from "@/components/subscription/subscription-page-live-preview";
+import { useLocale } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
+import { localeFlags, localeNames, supportedLocales, type SupportedLocale } from "@/lib/i18n/config";
 import {
     ArrowDown,
     ArrowUp,
@@ -47,12 +49,15 @@ interface BrandingState extends SubscriptionBranding {
 
 export function SubscriptionSettings() {
     const { toast } = useToast();
+    const { locale } = useLocale();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const isMyanmar = locale === "my";
 
     // Basic settings
     const [supportLink, setSupportLink] = useState("");
     const [defaultTheme, setDefaultTheme] = useState("dark");
+    const [defaultLanguage, setDefaultLanguage] = useState<SupportedLocale>("en");
     const [unsplashApiKey, setUnsplashApiKey] = useState("");
     const [showApiKey, setShowApiKey] = useState(false);
 
@@ -91,6 +96,7 @@ export function SubscriptionSettings() {
                     const data = await response.json();
                     setSupportLink(data.supportLink || "");
                     setDefaultTheme(data.defaultSubscriptionTheme || "dark");
+                    setDefaultLanguage(data.defaultLanguage || "en");
                     setUnsplashApiKey(data.unsplashApiKey || "");
 
                     // Load branding settings
@@ -120,6 +126,7 @@ export function SubscriptionSettings() {
                 body: JSON.stringify({
                     supportLink,
                     defaultSubscriptionTheme: defaultTheme,
+                    defaultLanguage,
                     unsplashApiKey,
                     branding,
                 }),
@@ -127,22 +134,129 @@ export function SubscriptionSettings() {
 
             if (response.ok) {
                 toast({
-                    title: "Settings saved",
-                    description: "Subscription page settings have been updated.",
+                    title: isMyanmar ? "ဆက်တင်များကို သိမ်းပြီးပါပြီ" : "Settings saved",
+                    description: isMyanmar ? "Subscription page ဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။" : "Subscription page settings have been updated.",
                 });
             } else {
                 throw new Error("Failed to save settings");
             }
         } catch (error) {
             toast({
-                title: "Save failed",
-                description: "Failed to save settings. Please try again.",
+                title: isMyanmar ? "သိမ်းဆည်းမှု မအောင်မြင်ပါ" : "Save failed",
+                description: isMyanmar ? "ဆက်တင်များကို မသိမ်းနိုင်ခဲ့ပါ။ ထပ်မံကြိုးစားပါ။" : "Failed to save settings. Please try again.",
                 variant: "destructive",
             });
         } finally {
             setSaving(false);
         }
     };
+
+    const settingsUi = {
+        livePreviewTitle: isMyanmar ? "တိုက်ရိုက် အကြိုကြည့်မည်" : "Live Preview",
+        livePreviewDesc: isMyanmar ? "Theme၊ branding၊ support၊ layout နှင့် app ဆက်တင်များကို ပြင်ဆင်နေစဉ် user မြင်မည့် subscription page ကို စစ်ဆေးပါ။" : "Review the actual subscription page structure while you adjust theme, branding, support, layout, and app settings.",
+        presetsTitle: isMyanmar ? "Preset များ" : "Presets",
+        presetsDesc: isMyanmar ? "Theme၊ layout၊ card ပုံစံနှင့် motion အတွက် စတင်အသုံးပြုရန် အဆင်သင့်ဖြစ်သော preset များကို ရွေးပါ။" : "Apply a curated starting point for theme, layout, card shape, and motion.",
+        presetActive: isMyanmar ? "လက်ရှိ" : "Active",
+        supportTitle: isMyanmar ? "အကူအညီ ဆက်သွယ်ရန်" : "Support Contact",
+        supportDesc: isMyanmar ? "User subscription page များပေါ်တွင် ပြသမည့် support link ကို သတ်မှတ်ပါ။" : "Configure the support link shown on user subscription pages.",
+        supportLink: isMyanmar ? "Support Link" : "Support Link",
+        supportPlaceholder: isMyanmar ? "https://t.me/yourusername သို့မဟုတ် မည်သည့် URL မဆို" : "https://t.me/yourusername or any URL",
+        supportHelp: isMyanmar ? "Telegram၊ WhatsApp၊ email (mailto:) သို့မဟုတ် website URL ကို ထည့်နိုင်သည်။ မဖြည့်ပါက support button ကို ဝှက်ထားမည်။" : "Enter any URL - Telegram, WhatsApp, email (mailto:), or your website. Leave empty to hide the support button.",
+        testLink: isMyanmar ? "Link စမ်းမည်" : "Test link",
+        themeTitle: isMyanmar ? "မူလ Theme" : "Default Theme",
+        themeDesc: isMyanmar ? "Subscription page များအတွက် မူလ theme ကို သတ်မှတ်ပါ။ Key အလိုက် ပြန်လည် အစားထိုးနိုင်သည်။" : "Set the default theme for subscription pages. This can be overridden per-key.",
+        defaultLanguage: isMyanmar ? "မူလ ဘာသာစကား" : "Default Language",
+        defaultLanguageHelp: isMyanmar ? "Share page နှင့် subscription page များကို ပထမဆုံး ဖွင့်ချိန်တွင် အသုံးပြုမည့် ဘာသာစကား ဖြစ်သည်။ User သည် နောက်ပိုင်း ပြောင်းနိုင်ပြီး browser ထဲတွင် မှတ်ထားမည်။" : "This is the starting language for share and subscription pages. Users can switch later and the choice will persist in their browser.",
+        themeLabel: isMyanmar ? "Theme" : "Theme",
+        selectTheme: isMyanmar ? "Theme ကို ရွေးပါ" : "Select theme",
+        previewThemeHelp: isMyanmar ? "အပေါ်ဘက်ရှိ preview သည် theme ပြောင်းလိုက်သည်နှင့် ချက်ချင်း အပ်ဒိတ်ဖြစ်မည်။" : "The live preview above updates instantly as you switch themes.",
+        brandingTitle: isMyanmar ? "လိုဂို နှင့် Branding" : "Logo & Branding",
+        brandingDesc: isMyanmar ? "Subscription page များပေါ်ရှိ logo နှင့် brand name ကို စိတ်ကြိုက် ပြင်ဆင်ပါ။" : "Customize your logo and brand name on subscription pages.",
+        logoUrl: isMyanmar ? "Logo URL" : "Logo URL",
+        logoUrlHelp: isMyanmar ? "ကိုယ်ပိုင် logo URL ဖြစ်ပါသည်။ QR code အလယ်တွင် ပြသမည်။ မဖြည့်ပါက default logo ကို သုံးမည်။" : "URL to your custom logo. Appears in the QR code center. Leave empty for default.",
+        logoSize: isMyanmar ? "QR Code အတွင်း Logo အရွယ်အစား" : "Logo Size in QR Code",
+        logoSizeHelp: isMyanmar ? "QR code အတွင်း logo overlay အရွယ်အစား (15-40%)" : "Size of the logo overlay in the QR code (15-40%)",
+        brandName: isMyanmar ? "Brand Name" : "Brand Name",
+        brandNameHelp: isMyanmar ? "Page title နှင့် footer တွင် ပြသမည့် brand name ဖြစ်သည်။" : "Your brand name shown in the page title and footer.",
+        logoPreview: isMyanmar ? "Logo အကြိုကြည့်မည်" : "Logo Preview",
+        brandFallback: isMyanmar ? "သင့် Brand" : "Your Brand",
+        footerTitle: isMyanmar ? "Footer" : "Footer",
+        footerDesc: isMyanmar ? "Subscription page များတွင် footer စာသားကို စိတ်ကြိုက် ပြင်ဆင်ပါ။" : "Customize the footer text displayed on subscription pages.",
+        footerText: isMyanmar ? "Custom Footer Text" : "Custom Footer Text",
+        footerHelp: isMyanmar ? "Footer တွင် ပြသမည့် စာသား။ မဖြည့်ပါက default ကို အသုံးပြုမည်။" : "Custom footer text. Leave empty for default.",
+        showPoweredBy: isMyanmar ? '"Powered by" စာသားကို ပြမည်' : 'Show "Powered by" Text',
+        showPoweredByDesc: isMyanmar ? 'Footer တွင် "Powered by Atomic-UI" ကို ပြသမည်။' : 'Display "Powered by Atomic-UI" in the footer.',
+        welcomeTitle: isMyanmar ? "ကြိုဆိုစာ" : "Welcome Message",
+        welcomeDesc: isMyanmar ? "အသုံးပြုသူများအတွက် စိတ်ကြိုက် ကြိုဆိုစာကို ပြသပါ။" : "Display a custom welcome message to users.",
+        showWelcome: isMyanmar ? "ကြိုဆိုစာကို ပြမည်" : "Show Welcome Message",
+        showWelcomeDesc: isMyanmar ? "စာမျက်နှာ အပေါ်ဘက်တွင် ကြိုဆိုစာတစ်ခုကို ပြသမည်။" : "Display a greeting message at the top of the page.",
+        welcomeMessage: isMyanmar ? "ကြိုဆိုစာ" : "Welcome Message",
+        welcomePlaceholder: isMyanmar ? "မင်္ဂလာပါ။ ဒီမှာ သင့် VPN subscription အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။" : "Welcome! Here's your VPN subscription details.",
+        layoutTitle: isMyanmar ? "Layout နှင့် စာလုံးပုံစံ" : "Layout & Typography",
+        layoutDesc: isMyanmar ? "Page layout၊ card ပုံစံနှင့် font များကို စိတ်ကြိုက် ပြင်ဆင်ပါ။" : "Customize the page layout, card styles, and fonts.",
+        layoutStyle: isMyanmar ? "Layout Style" : "Layout Style",
+        cardStyle: isMyanmar ? "Card Style" : "Card Style",
+        themeDefault: isMyanmar ? "မူလ" : "Default",
+        themeCompact: isMyanmar ? "ကျစ်လစ်" : "Compact",
+        themeDetailed: isMyanmar ? "အသေးစိတ်" : "Detailed",
+        themeMinimal: isMyanmar ? "အနည်းဆုံး" : "Minimal",
+        cardRounded: isMyanmar ? "ဝိုင်း" : "Rounded",
+        cardSharp: isMyanmar ? "ထောင့်ရှင်း" : "Sharp",
+        cardPill: isMyanmar ? "လုံးဝိုင်း" : "Pill",
+        customFont: isMyanmar ? "Custom Font (Google Fonts)" : "Custom Font (Google Fonts)",
+        customFontHelp: isMyanmar ? "Google Font အမည်ကို ထည့်ပါ။ မဖြည့်ပါက system default ကို သုံးမည်။" : "Enter a Google Font name. Leave empty for system default.",
+        fontUrl: isMyanmar ? "Font URL (ရွေးချယ်နိုင်သည်)" : "Font URL (optional)",
+        fontUrlHelp: isMyanmar ? "Google Fonts URL အပြည့်အစုံ။ မဖြည့်ပါက အလိုအလျောက် ဖန်တီးမည်။" : "Full Google Fonts URL. Auto-generated if left empty.",
+        visibilityTitle: isMyanmar ? "Section များ ပြသမှု" : "Section Visibility",
+        visibilityDesc: isMyanmar ? "User များအတွက် subscription page ပေါ်တွင် ပြနေမည့် section များကို ရွေးပါ။" : "Choose which subscription page sections stay visible to end users.",
+        animationsTitle: isMyanmar ? "Animation များ" : "Animations",
+        animationsDesc: isMyanmar ? "Page animation နှင့် နောက်ခံ effect များကို သတ်မှတ်ပါ။" : "Configure page animations and background effects.",
+        enableAnimations: isMyanmar ? "Animation များကို ဖွင့်မည်" : "Enable Animations",
+        enableAnimationsDesc: isMyanmar ? "ပြောင်းလဲမှုများနှင့် hover effect များကို ချောမွေ့စေမည်။" : "Enable smooth transitions and hover effects.",
+        animatedBackground: isMyanmar ? "Animated Background" : "Animated Background",
+        animatedBackgroundHelp: isMyanmar ? "Subscription page နောက်ခံတွင် dynamic effect များ ထည့်မည်။" : "Add dynamic background effects to the subscription page.",
+        animationNone: isMyanmar ? "မရှိ" : "None",
+        animationGradient: isMyanmar ? "လှုပ်ရှား Gradient" : "Animated Gradient",
+        animationParticles: isMyanmar ? "Particles" : "Particles",
+        animationWaves: isMyanmar ? "လှိုင်းများ" : "Waves",
+        alertsTitle: isMyanmar ? "အသုံးပြုမှု သတိပေးချက်များ" : "Usage Alerts",
+        alertsDesc: isMyanmar ? "အသုံးပြုမှုသည် သတ်မှတ်ထားသော အဆင့်သို့ ရောက်သောအခါ မြင်သာသော သတိပေးချက်များကို ပြသပါ။" : "Show visual alerts when usage reaches certain thresholds.",
+        showUsageAlerts: isMyanmar ? "အသုံးပြုမှု သတိပေးချက်ကို ပြမည်" : "Show Usage Alerts",
+        showUsageAlertsDesc: isMyanmar ? "ဒေတာအသုံးပြုမှုသည် threshold များသို့ ရောက်သောအခါ သတိပေးချက်ပြမည်။" : "Display warnings when data usage reaches thresholds.",
+        alertThresholds: isMyanmar ? "သတိပေး Threshold များ (%)" : "Alert Thresholds (%)",
+        alertThresholdsHelp: isMyanmar ? "ဤအသုံးပြုမှု ရာခိုင်နှုန်းများတွင် သတိပေးချက်ပြမည် (ဥပမာ 80%, 90%, 95%)။" : "Show alerts at these usage percentages (e.g., 80%, 90%, 95%).",
+        appsTitle: isMyanmar ? "App Button များ" : "App Buttons",
+        appsDesc: isMyanmar ? "Subscription page များပေါ်တွင် ပြသမည့် VPN client app များကို ရွေးပါ။" : "Choose which VPN client apps to show on subscription pages.",
+        appsIntro: isMyanmar ? "Public page ပေါ်ရှိ ပထမဆုံး install button သည် သင်ရွေးထားသော primary app မှ လာမည်။ ကျန် app များကို အောက်တွင် ယခင်အစဉ်အတိုင်း ပြသမည်။" : "The first install button on the public page comes from your selected primary app. The remaining enabled apps appear below it in the order shown here.",
+        primary: isMyanmar ? "အဓိက" : "Primary",
+        primaryAppCta: isMyanmar ? "Primary App CTA" : "Primary App CTA",
+        selectPrimaryApp: isMyanmar ? "Primary app ကို ရွေးပါ" : "Select primary app",
+        primaryAppHelp: isMyanmar ? "ဤ app သည် hero section ထဲရှိ main install button ဖြစ်လာမည်။" : "This app becomes the main install button in the hero section.",
+        secondaryAppOrder: isMyanmar ? "Secondary App အစဉ်" : "Secondary App Order",
+        primaryCta: isMyanmar ? "Primary CTA" : "Primary CTA",
+        orderPosition: (index: number) => isMyanmar ? `အစဉ် ${index}` : `Order position ${index}`,
+        noApps: isMyanmar ? "Subscription page ပေါ်တွင် install button ပြသရန် အနည်းဆုံး app တစ်ခုကို ဖွင့်ပါ။" : "Enable at least one app to show install buttons on the subscription page.",
+        customCssTitle: isMyanmar ? "Custom CSS" : "Custom CSS",
+        customCssDesc: isMyanmar ? "အဆင့်မြင့် styling စိတ်ကြိုက် ပြင်ဆင်မှုများအတွက် custom CSS ထည့်သွင်းပါ။" : "Inject custom CSS for advanced styling customizations.",
+        customCssHelp: isMyanmar ? "အဆင့်မြင့်: default style များကို override လုပ်ရန် custom CSS ထည့်နိုင်သည်။" : "Advanced: Add custom CSS to override default styles.",
+        unsplashTitle: isMyanmar ? "Unsplash ချိတ်ဆက်မှု" : "Unsplash Integration",
+        unsplashDesc: isMyanmar ? "Subscription page များအတွက် Unsplash မှ cover image များကို အသုံးပြုရန် ဖွင့်ပါ။ အခမဲ့ API key ကို unsplash.com/developers မှ ရယူနိုင်သည်။" : "Enable cover images from Unsplash for subscription pages. Get a free API key at unsplash.com/developers",
+        unsplashAccessKey: isMyanmar ? "Access Key" : "Access Key",
+        unsplashPlaceholder: isMyanmar ? "သင့် Unsplash Access Key ကို ထည့်ပါ" : "Enter your Unsplash Access Key",
+        unsplashHelp: isMyanmar ? "Unsplash မှ photo ရှာဖွေရန်နှင့် ရွေးချယ်ရန် လိုအပ်သည်။ မဖြည့်ပါက gradient နှင့် custom upload များကိုသာ သုံးမည်။" : "Required for searching and selecting photos from Unsplash. Leave empty to use only gradients and custom uploads.",
+        unsplashEnabled: isMyanmar ? "Unsplash ချိတ်ဆက်မှုကို ဖွင့်ထားသည်" : "Unsplash integration enabled",
+        saveAll: isMyanmar ? "ဆက်တင်အားလုံးကို သိမ်းမည်" : "Save All Settings",
+    };
+
+    const presetCopy: Record<string, { name: string; description: string }> = isMyanmar
+        ? {
+            minimal: { name: "Minimal", description: "အနည်းဆုံး အချက်အလက်နှင့် သန့်ရှင်းသော layout ကို အသုံးပြုသည်။" },
+            glass: { name: "Glass", description: "ဖန်သားပုံစံ card များနှင့် နူးညံ့သော အလင်းရောင်ကို အသုံးပြုသည်။" },
+            business: { name: "Business", description: "တည်ငြိမ်ပြီး စနစ်တကျဖြစ်သော professional layout ကို အသုံးပြုသည်။" },
+            bold: { name: "Bold", description: "CTA နှင့် အရေးကြီးသော အချက်အလက်များကို ပြင်းထန်စွာ မီးမောင်းထိုးပြသည်။" },
+            neon: { name: "Neon", description: "တောက်ပသော neon အရောင်နှင့် futuristic surface များကို အသုံးပြုသည်။" },
+        }
+        : {};
 
     const updateBranding = <K extends keyof BrandingState>(key: K, value: BrandingState[K]) => {
         setBranding((prev) => ({ ...prev, [key]: value }));
@@ -234,23 +348,23 @@ export function SubscriptionSettings() {
     }> = [
         {
             key: "showConnectionSummary",
-            label: "Connection Summary",
-            description: "Show the right-side or mobile summary card with usage and expiry.",
+            label: isMyanmar ? "Connection Summary" : "Connection Summary",
+            description: isMyanmar ? "အသုံးပြုမှုနှင့် expiration ပါသော summary card ကို desktop/mobile တွင် ပြသမည်။" : "Show the right-side or mobile summary card with usage and expiry.",
         },
         {
             key: "showCompatibleApps",
-            label: "Compatible Apps",
-            description: "Show the secondary app grid below the hero area.",
+            label: isMyanmar ? "Compatible Apps" : "Compatible Apps",
+            description: isMyanmar ? "Hero area အောက်တွင် secondary app grid ကို ပြသမည်။" : "Show the secondary app grid below the hero area.",
         },
         {
             key: "showHelpContact",
-            label: "Help & Contact",
-            description: "Show support shortcuts and contact actions.",
+            label: isMyanmar ? "Help & Contact" : "Help & Contact",
+            description: isMyanmar ? "Support shortcut နှင့် contact action များကို ပြသမည်။" : "Show support shortcuts and contact actions.",
         },
         {
             key: "showManualSetupButton",
-            label: "Manual Setup Button",
-            description: "Keep the QR/manual setup trigger visible in the hero actions.",
+            label: isMyanmar ? "Manual Setup Button" : "Manual Setup Button",
+            description: isMyanmar ? "Hero action များထဲတွင် QR/manual setup trigger ကို ဆက်လက် ပြသမည်။" : "Keep the QR/manual setup trigger visible in the hero actions.",
         },
     ];
 
@@ -268,10 +382,9 @@ export function SubscriptionSettings() {
         <div className="space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Live Preview</CardTitle>
+                    <CardTitle className="text-base">{settingsUi.livePreviewTitle}</CardTitle>
                     <CardDescription>
-                        Review the actual subscription page structure while you adjust theme, branding,
-                        support, layout, and app settings.
+                        {settingsUi.livePreviewDesc}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -290,14 +403,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Sparkles className="w-5 h-5" />
-                                    <CardTitle className="text-base">Presets</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.presetsTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.presets ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Apply a curated starting point for theme, layout, card shape, and motion.
+                                {settingsUi.presetsDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -316,15 +429,15 @@ export function SubscriptionSettings() {
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-semibold">{preset.name}</span>
+                                                        <span className="text-sm font-semibold">{presetCopy[preset.id]?.name || preset.name}</span>
                                                         {isActive && (
                                                             <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                                                                Active
+                                                                {settingsUi.presetActive}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <p className="mt-1 text-sm text-muted-foreground">
-                                                        {preset.description}
+                                                        {presetCopy[preset.id]?.description || preset.description}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-1">
@@ -354,30 +467,29 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5" />
-                                    <CardTitle className="text-base">Support Contact</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.supportTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.basic ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Configure the support link shown on user subscription pages.
+                                {settingsUi.supportDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="space-y-2">
-                                <Label htmlFor="supportLink">Support Link</Label>
+                                <Label htmlFor="supportLink">{settingsUi.supportLink}</Label>
                                 <Input
                                     id="supportLink"
-                                    placeholder="https://t.me/yourusername or any URL"
+                                    placeholder={settingsUi.supportPlaceholder}
                                     value={supportLink}
                                     onChange={(e) => setSupportLink(e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Enter any URL - Telegram, WhatsApp, email (mailto:), or your website.
-                                    Leave empty to hide the support button.
+                                    {settingsUi.supportHelp}
                                 </p>
                             </div>
                             {supportLink && (
@@ -389,7 +501,7 @@ export function SubscriptionSettings() {
                                         rel="noopener noreferrer"
                                         className="text-primary hover:underline"
                                     >
-                                        Test link
+                                        {settingsUi.testLink}
                                     </a>
                                 </div>
                             )}
@@ -406,24 +518,45 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Palette className="w-5 h-5" />
-                                    <CardTitle className="text-base">Default Theme</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.themeTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.theme ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Set the default theme for subscription pages. This can be overridden per-key.
+                                {settingsUi.themeDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="space-y-2">
-                                <Label>Theme</Label>
+                                <Label>{settingsUi.defaultLanguage}</Label>
+                                <Select value={defaultLanguage} onValueChange={(value) => setDefaultLanguage(value as SupportedLocale)}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {supportedLocales.map((localeOption) => (
+                                            <SelectItem key={localeOption} value={localeOption}>
+                                                <div className="flex items-center gap-2">
+                                                    <span>{localeFlags[localeOption]}</span>
+                                                    <span>{localeNames[localeOption]}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    {settingsUi.defaultLanguageHelp}
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{settingsUi.themeLabel}</Label>
                                 <Select value={defaultTheme} onValueChange={setDefaultTheme}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select theme" />
+                                        <SelectValue placeholder={settingsUi.selectTheme} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {themeList.map((t) => (
@@ -441,7 +574,7 @@ export function SubscriptionSettings() {
                                 </Select>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                The live preview above updates instantly as you switch themes.
+                                {settingsUi.previewThemeHelp}
                             </p>
                         </CardContent>
                     </CollapsibleContent>
@@ -456,21 +589,21 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <ImageIcon className="w-5 h-5" aria-hidden="true" />
-                                    <CardTitle className="text-base">Logo & Branding</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.brandingTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.branding ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Customize your logo and brand name on subscription pages.
+                                {settingsUi.brandingDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="space-y-2">
-                                <Label htmlFor="logoUrl">Logo URL</Label>
+                                <Label htmlFor="logoUrl">{settingsUi.logoUrl}</Label>
                                 <Input
                                     id="logoUrl"
                                     placeholder="https://example.com/logo.png"
@@ -478,12 +611,12 @@ export function SubscriptionSettings() {
                                     onChange={(e) => updateBranding("logoUrl", e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    URL to your custom logo. Appears in the QR code center. Leave empty for default.
+                                    {settingsUi.logoUrlHelp}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Logo Size in QR Code: {branding.logoSize || 25}%</Label>
+                                <Label>{settingsUi.logoSize}: {branding.logoSize || 25}%</Label>
                                 <Slider
                                     value={[branding.logoSize || 25]}
                                     onValueChange={([value]) => updateBranding("logoSize", value)}
@@ -493,12 +626,12 @@ export function SubscriptionSettings() {
                                     className="w-full"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Size of the logo overlay in the QR code (15-40%)
+                                    {settingsUi.logoSizeHelp}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="brandName">Brand Name</Label>
+                                <Label htmlFor="brandName">{settingsUi.brandName}</Label>
                                 <Input
                                     id="brandName"
                                     placeholder="Atomic-UI"
@@ -506,13 +639,13 @@ export function SubscriptionSettings() {
                                     onChange={(e) => updateBranding("brandName", e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Your brand name shown in the page title and footer.
+                                    {settingsUi.brandNameHelp}
                                 </p>
                             </div>
 
                             {branding.logoUrl && (
                                 <div className="space-y-2">
-                                    <Label className="text-sm text-muted-foreground">Logo Preview</Label>
+                                    <Label className="text-sm text-muted-foreground">{settingsUi.logoPreview}</Label>
                                     <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
@@ -524,7 +657,7 @@ export function SubscriptionSettings() {
                                             }}
                                         />
                                         <span className="text-sm text-muted-foreground">
-                                            {branding.brandName || "Your Brand"}
+                                            {branding.brandName || settingsUi.brandFallback}
                                         </span>
                                     </div>
                                 </div>
@@ -542,21 +675,21 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <FileText className="w-5 h-5" />
-                                    <CardTitle className="text-base">Footer</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.footerTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.footer ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Customize the footer text displayed on subscription pages.
+                                {settingsUi.footerDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="space-y-2">
-                                <Label htmlFor="footerText">Custom Footer Text</Label>
+                                <Label htmlFor="footerText">{settingsUi.footerText}</Label>
                                 <Input
                                     id="footerText"
                                     placeholder="Powered by Atomic-UI"
@@ -564,15 +697,15 @@ export function SubscriptionSettings() {
                                     onChange={(e) => updateBranding("footerText", e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Custom footer text. Leave empty for default.
+                                    {settingsUi.footerHelp}
                                 </p>
                             </div>
 
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <Label>Show &quot;Powered by&quot; Text</Label>
+                                    <Label>{settingsUi.showPoweredBy}</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Display &quot;Powered by Atomic-UI&quot; in the footer.
+                                        {settingsUi.showPoweredByDesc}
                                     </p>
                                 </div>
                                 <Switch
@@ -593,14 +726,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5" />
-                                    <CardTitle className="text-base">Welcome Message</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.welcomeTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.welcome ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Display a custom welcome message to users.
+                                {settingsUi.welcomeDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -608,9 +741,9 @@ export function SubscriptionSettings() {
                         <CardContent className="space-y-4 pt-0">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <Label>Show Welcome Message</Label>
+                                    <Label>{settingsUi.showWelcome}</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Display a greeting message at the top of the page.
+                                        {settingsUi.showWelcomeDesc}
                                     </p>
                                 </div>
                                 <Switch
@@ -621,10 +754,10 @@ export function SubscriptionSettings() {
 
                             {branding.showWelcome && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="welcomeMessage">Welcome Message</Label>
+                                    <Label htmlFor="welcomeMessage">{settingsUi.welcomeMessage}</Label>
                                     <Textarea
                                         id="welcomeMessage"
-                                        placeholder="Welcome! Here's your VPN subscription details."
+                                        placeholder={settingsUi.welcomePlaceholder}
                                         value={branding.welcomeMessage || ""}
                                         onChange={(e) => updateBranding("welcomeMessage", e.target.value)}
                                         rows={3}
@@ -644,14 +777,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Layout className="w-5 h-5" />
-                                    <CardTitle className="text-base">Layout & Typography</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.layoutTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.layout ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Customize the page layout, card styles, and fonts.
+                                {settingsUi.layoutDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -659,7 +792,7 @@ export function SubscriptionSettings() {
                         <CardContent className="space-y-4 pt-0">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Layout Style</Label>
+                                    <Label>{settingsUi.layoutStyle}</Label>
                                     <Select
                                         value={branding.layout || "default"}
                                         onValueChange={(value) =>
@@ -670,16 +803,16 @@ export function SubscriptionSettings() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="default">Default</SelectItem>
-                                            <SelectItem value="compact">Compact</SelectItem>
-                                            <SelectItem value="detailed">Detailed</SelectItem>
-                                            <SelectItem value="minimal">Minimal</SelectItem>
+                                            <SelectItem value="default">{settingsUi.themeDefault}</SelectItem>
+                                            <SelectItem value="compact">{settingsUi.themeCompact}</SelectItem>
+                                            <SelectItem value="detailed">{settingsUi.themeDetailed}</SelectItem>
+                                            <SelectItem value="minimal">{settingsUi.themeMinimal}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Card Style</Label>
+                                    <Label>{settingsUi.cardStyle}</Label>
                                     <Select
                                         value={branding.cardStyle || "rounded"}
                                         onValueChange={(value) =>
@@ -690,16 +823,16 @@ export function SubscriptionSettings() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="rounded">Rounded</SelectItem>
-                                            <SelectItem value="sharp">Sharp</SelectItem>
-                                            <SelectItem value="pill">Pill</SelectItem>
+                                            <SelectItem value="rounded">{settingsUi.cardRounded}</SelectItem>
+                                            <SelectItem value="sharp">{settingsUi.cardSharp}</SelectItem>
+                                            <SelectItem value="pill">{settingsUi.cardPill}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="fontFamily">Custom Font (Google Fonts)</Label>
+                                <Label htmlFor="fontFamily">{settingsUi.customFont}</Label>
                                 <Input
                                     id="fontFamily"
                                     placeholder="Inter, Roboto, Open Sans..."
@@ -707,13 +840,13 @@ export function SubscriptionSettings() {
                                     onChange={(e) => updateBranding("fontFamily", e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Enter a Google Font name. Leave empty for system default.
+                                    {settingsUi.customFontHelp}
                                 </p>
                             </div>
 
                             {branding.fontFamily && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="fontUrl">Font URL (optional)</Label>
+                                    <Label htmlFor="fontUrl">{settingsUi.fontUrl}</Label>
                                     <Input
                                         id="fontUrl"
                                         placeholder="https://fonts.googleapis.com/css2?family=Inter..."
@@ -721,7 +854,7 @@ export function SubscriptionSettings() {
                                         onChange={(e) => updateBranding("fontUrl", e.target.value)}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        Full Google Fonts URL. Auto-generated if left empty.
+                                        {settingsUi.fontUrlHelp}
                                     </p>
                                 </div>
                             )}
@@ -737,14 +870,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Layout className="w-5 h-5" />
-                                    <CardTitle className="text-base">Section Visibility</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.visibilityTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.visibility ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Choose which subscription page sections stay visible to end users.
+                                {settingsUi.visibilityDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -780,14 +913,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Sparkles className="w-5 h-5" />
-                                    <CardTitle className="text-base">Animations</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.animationsTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.animations ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Configure page animations and background effects.
+                                {settingsUi.animationsDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -795,9 +928,9 @@ export function SubscriptionSettings() {
                         <CardContent className="space-y-4 pt-0">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <Label>Enable Animations</Label>
+                                    <Label>{settingsUi.enableAnimations}</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Enable smooth transitions and hover effects.
+                                        {settingsUi.enableAnimationsDesc}
                                     </p>
                                 </div>
                                 <Switch
@@ -807,7 +940,7 @@ export function SubscriptionSettings() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Animated Background</Label>
+                                <Label>{settingsUi.animatedBackground}</Label>
                                 <Select
                                     value={branding.animatedBackground || "none"}
                                     onValueChange={(value) =>
@@ -818,14 +951,14 @@ export function SubscriptionSettings() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        <SelectItem value="gradient">Animated Gradient</SelectItem>
-                                        <SelectItem value="particles">Particles</SelectItem>
-                                        <SelectItem value="waves">Waves</SelectItem>
+                                        <SelectItem value="none">{settingsUi.animationNone}</SelectItem>
+                                        <SelectItem value="gradient">{settingsUi.animationGradient}</SelectItem>
+                                        <SelectItem value="particles">{settingsUi.animationParticles}</SelectItem>
+                                        <SelectItem value="waves">{settingsUi.animationWaves}</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
-                                    Add dynamic background effects to the subscription page.
+                                    {settingsUi.animatedBackgroundHelp}
                                 </p>
                             </div>
                         </CardContent>
@@ -841,14 +974,14 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Bell className="w-5 h-5" />
-                                    <CardTitle className="text-base">Usage Alerts</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.alertsTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.alerts ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Show visual alerts when usage reaches certain thresholds.
+                                {settingsUi.alertsDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
@@ -856,9 +989,9 @@ export function SubscriptionSettings() {
                         <CardContent className="space-y-4 pt-0">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <Label>Show Usage Alerts</Label>
+                                    <Label>{settingsUi.showUsageAlerts}</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Display warnings when data usage reaches thresholds.
+                                        {settingsUi.showUsageAlertsDesc}
                                     </p>
                                 </div>
                                 <Switch
@@ -869,7 +1002,7 @@ export function SubscriptionSettings() {
 
                             {branding.showUsageAlerts && (
                                 <div className="space-y-2">
-                                    <Label>Alert Thresholds (%)</Label>
+                                    <Label>{settingsUi.alertThresholds}</Label>
                                     <div className="flex gap-2">
                                         {(branding.usageAlertThresholds || [80, 90, 95]).map((threshold, index) => (
                                             <Input
@@ -890,7 +1023,7 @@ export function SubscriptionSettings() {
                                         ))}
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Show alerts at these usage percentages (e.g., 80%, 90%, 95%).
+                                        {settingsUi.alertThresholdsHelp}
                                     </p>
                                 </div>
                             )}
@@ -907,22 +1040,21 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Smartphone className="w-5 h-5" />
-                                    <CardTitle className="text-base">App Buttons</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.appsTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.apps ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Choose which VPN client apps to show on subscription pages.
+                                {settingsUi.appsDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="rounded-xl border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                                The first install button on the public page comes from your selected primary app.
-                                The remaining enabled apps appear below it in the order shown here.
+                                {settingsUi.appsIntro}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {clientApps.map((app) => (
@@ -944,7 +1076,7 @@ export function SubscriptionSettings() {
                                                 <span className="font-medium">{app.name}</span>
                                                 {resolvedPrimaryAppId === app.id && (
                                                     <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                                                        Primary
+                                                        {settingsUi.primary}
                                                     </span>
                                                 )}
                                             </div>
@@ -959,13 +1091,13 @@ export function SubscriptionSettings() {
                             {enabledApps.length > 0 ? (
                                 <div className="space-y-4 rounded-2xl border border-border/60 p-4">
                                     <div className="space-y-2">
-                                        <Label>Primary App CTA</Label>
+                                        <Label>{settingsUi.primaryAppCta}</Label>
                                         <Select
                                             value={resolvedPrimaryAppId}
                                             onValueChange={(value) => updateBranding("primaryAppId", value)}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select primary app" />
+                                                <SelectValue placeholder={settingsUi.selectPrimaryApp} />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {enabledApps.map((app) => (
@@ -979,12 +1111,12 @@ export function SubscriptionSettings() {
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-muted-foreground">
-                                            This app becomes the main install button in the hero section.
+                                            {settingsUi.primaryAppHelp}
                                         </p>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Secondary App Order</Label>
+                                        <Label>{settingsUi.secondaryAppOrder}</Label>
                                         <div className="space-y-2">
                                             {enabledApps.map((app, index) => (
                                                 <div
@@ -997,12 +1129,12 @@ export function SubscriptionSettings() {
                                                             <span className="font-medium">{app.name}</span>
                                                             {resolvedPrimaryAppId === app.id && (
                                                                 <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                                                                    Primary CTA
+                                                                    {settingsUi.primaryCta}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <p className="mt-1 text-xs text-muted-foreground">
-                                                            Order position {index + 1}
+                                                            {settingsUi.orderPosition(index + 1)}
                                                         </p>
                                                     </div>
                                                     <div className="flex items-center gap-1">
@@ -1032,7 +1164,7 @@ export function SubscriptionSettings() {
                                 </div>
                             ) : (
                                 <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
-                                    Enable at least one app to show install buttons on the subscription page.
+                                    {settingsUi.noApps}
                                 </div>
                             )}
                         </CardContent>
@@ -1048,21 +1180,21 @@ export function SubscriptionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Code className="w-5 h-5" />
-                                    <CardTitle className="text-base">Custom CSS</CardTitle>
+                                    <CardTitle className="text-base">{settingsUi.customCssTitle}</CardTitle>
                                 </div>
                                 <ChevronDown
                                     className={`w-5 h-5 transition-transform ${openSections.css ? "rotate-180" : ""}`}
                                 />
                             </div>
                             <CardDescription>
-                                Inject custom CSS for advanced styling customizations.
+                                {settingsUi.customCssDesc}
                             </CardDescription>
                         </CardHeader>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
                             <div className="space-y-2">
-                                <Label htmlFor="customCss">Custom CSS</Label>
+                                <Label htmlFor="customCss">{settingsUi.customCssTitle}</Label>
                                 <Textarea
                                     id="customCss"
                                     placeholder={`.subscription-page {
@@ -1078,7 +1210,7 @@ export function SubscriptionSettings() {
                                     className="font-mono text-sm"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Advanced: Add custom CSS to override default styles.
+                                    {settingsUi.customCssHelp}
                                 </p>
                             </div>
                         </CardContent>
@@ -1091,11 +1223,10 @@ export function SubscriptionSettings() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                         <Camera className="w-5 h-5" />
-                        Unsplash Integration
+                        {settingsUi.unsplashTitle}
                     </CardTitle>
                     <CardDescription>
-                        Enable cover images from Unsplash for subscription pages.
-                        Get a free API key at{" "}
+                        {settingsUi.unsplashDesc}{" "}
                         <a
                             href="https://unsplash.com/developers"
                             target="_blank"
@@ -1108,12 +1239,12 @@ export function SubscriptionSettings() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="unsplashApiKey">Access Key</Label>
+                        <Label htmlFor="unsplashApiKey">{settingsUi.unsplashAccessKey}</Label>
                         <div className="relative">
                             <Input
                                 id="unsplashApiKey"
                                 type={showApiKey ? "text" : "password"}
-                                placeholder="Enter your Unsplash Access Key"
+                                placeholder={settingsUi.unsplashPlaceholder}
                                 value={unsplashApiKey}
                                 onChange={(e) => setUnsplashApiKey(e.target.value)}
                                 className="pr-10"
@@ -1133,14 +1264,13 @@ export function SubscriptionSettings() {
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Required for searching and selecting photos from Unsplash.
-                            Leave empty to use only gradients and custom uploads.
+                            {settingsUi.unsplashHelp}
                         </p>
                     </div>
                     {unsplashApiKey && (
                         <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                             <div className="w-2 h-2 bg-green-500 rounded-full" />
-                            Unsplash integration enabled
+                            {settingsUi.unsplashEnabled}
                         </div>
                     )}
                 </CardContent>
@@ -1154,7 +1284,7 @@ export function SubscriptionSettings() {
                     ) : (
                         <Save className="w-4 h-4 mr-2" />
                     )}
-                    Save All Settings
+                    {settingsUi.saveAll}
                 </Button>
             </div>
         </div>

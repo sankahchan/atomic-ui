@@ -1,3 +1,5 @@
+import { coerceSupportedLocale } from '@/lib/i18n/config';
+
 const DEFAULT_LOCAL_ORIGIN = 'http://localhost:3000';
 
 function trimTrailingSlash(value: string) {
@@ -37,12 +39,18 @@ export function buildSharePageUrl(
   options?: {
     origin?: string | null;
     source?: string | null;
+    lang?: string | null;
   },
 ) {
   const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
+  }
+
+  const locale = coerceSupportedLocale(options?.lang);
+  if (locale) {
+    url.searchParams.set('lang', locale);
   }
 
   return url.toString();
@@ -53,12 +61,18 @@ export function buildShortShareUrl(
   options?: {
     origin?: string | null;
     source?: string | null;
+    lang?: string | null;
   },
 ) {
   const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/s/${slug}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
+  }
+
+  const locale = coerceSupportedLocale(options?.lang);
+  if (locale) {
+    url.searchParams.set('lang', locale);
   }
 
   return url.toString();
@@ -157,12 +171,18 @@ export function buildDynamicSharePageUrl(
   options?: {
     origin?: string | null;
     source?: string | null;
+    lang?: string | null;
   },
 ) {
   const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
+  }
+
+  const locale = coerceSupportedLocale(options?.lang);
+  if (locale) {
+    url.searchParams.set('lang', locale);
   }
 
   return url.toString();
@@ -173,6 +193,7 @@ export function buildDynamicShortShareUrl(
   options?: {
     origin?: string | null;
     source?: string | null;
+    lang?: string | null;
   },
 ) {
   return buildShortShareUrl(slug, options);

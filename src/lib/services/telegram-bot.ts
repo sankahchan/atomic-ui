@@ -33,6 +33,7 @@ import {
   SUBSCRIPTION_EVENT_TYPES,
 } from '@/lib/services/subscription-events';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
+import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import { formatBytes, generateRandomString } from '@/lib/utils';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -113,34 +114,210 @@ function getFlagEmoji(countryCode: string) {
   return String.fromCodePoint(...codePoints);
 }
 
+async function getTelegramDefaultLocale(): Promise<SupportedLocale> {
+  const setting = await db.settings.findUnique({
+    where: { key: 'defaultLanguage' },
+    select: { value: true },
+  });
+
+  return coerceSupportedLocale(setting?.value) || 'en';
+}
+
+function getTelegramUi(locale: SupportedLocale) {
+  const isMyanmar = locale === 'my';
+
+  return {
+    unlimited: isMyanmar ? 'အကန့်အသတ်မရှိ' : 'Unlimited',
+    startsOnFirstUse: (days?: number | null) =>
+      isMyanmar
+        ? days
+          ? `ပထမအသုံးပြုချိန်မှ စတင်မည် (${days} ရက်)`
+          : 'ပထမအသုံးပြုချိန်မှ စတင်မည်'
+        : days
+          ? `Starts on first use (${days} days)`
+          : 'Starts on first use',
+    never: isMyanmar ? 'မကုန်ဆုံးပါ' : 'Never',
+    expiredOn: (date: string) => (isMyanmar ? `${date} တွင် သက်တမ်းကုန်ပြီး` : `Expired on ${date}`),
+    daysLeft: (days: number, date: string) =>
+      isMyanmar ? `${days} ရက်ခန့် ကျန်သည် (${date})` : `${days} day(s) left (${date})`,
+    openSharePage: isMyanmar ? 'Share Page ဖွင့်မည်' : 'Open Share Page',
+    openSubscriptionUrl: isMyanmar ? 'Subscription URL ဖွင့်မည်' : 'Open Subscription URL',
+    openClientEndpoint: isMyanmar ? 'Client Endpoint ဖွင့်မည်' : 'Open Client Endpoint',
+    getSupport: isMyanmar ? 'အကူအညီ ရယူမည်' : 'Get Support',
+    accessShareFallback: isMyanmar
+      ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် နောက်ဆုံး connection အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
+      : 'Open the share page below for install steps, manual setup, and the latest connection details.',
+    dynamicShareFallback: isMyanmar
+      ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် backend အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
+      : 'Open the share page below for install steps, manual setup, and the latest backend details.',
+    dynamicShareDisabledFallback: isMyanmar
+      ? 'ဤ key အတွက် share page ကို ပိတ်ထားသည်။ Outline သို့မဟုတ် compatible client ထဲတွင် အောက်ပါ client endpoint ကို အသုံးပြုပါ။'
+      : 'The share page is disabled for this key. Use the client endpoint below inside Outline or another compatible client.',
+    accessQrCaption: isMyanmar
+      ? 'Direct import မရပါက ဤ QR code ကို သင့် VPN client ဖြင့် scan လုပ်ပါ။'
+      : 'Scan this QR code with your VPN client if direct import is unavailable.',
+    dynamicQrCaption: isMyanmar
+      ? 'Direct import မရပါက Outline သို့မဟုတ် compatible client ဖြင့် ဤ QR code ကို scan လုပ်ပါ။'
+      : 'Scan this QR code with Outline or another compatible client if direct import is unavailable.',
+    accessReasonTitle: (reason?: string) =>
+      reason === 'CREATED'
+        ? (isMyanmar ? '🎉 <b>သင့် access key အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your access key is ready</b>')
+        : reason === 'KEY_ENABLED'
+          ? (isMyanmar ? '✅ <b>သင့် access key ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your access key has been re-enabled</b>')
+          : reason === 'LINKED'
+            ? (isMyanmar ? '🔗 <b>Telegram ချိတ်ဆက်မှု အောင်မြင်ပါသည်</b>' : '🔗 <b>Telegram linked successfully</b>')
+            : reason === 'USAGE_REQUEST'
+              ? (isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု အသေးစိတ်</b>' : '📊 <b>Your VPN access details</b>')
+              : reason === 'SUBSCRIPTION_REQUEST'
+                ? (isMyanmar ? '📎 <b>သင့် subscription link များ</b>' : '📎 <b>Your subscription links</b>')
+                : (isMyanmar ? '📨 <b>သင့် share page</b>' : '📨 <b>Your share page</b>'),
+    dynamicReasonTitle: (reason?: string) =>
+      reason === 'CREATED'
+        ? (isMyanmar ? '🎉 <b>သင့် dynamic key အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your dynamic key is ready</b>')
+        : reason === 'KEY_ENABLED'
+          ? (isMyanmar ? '✅ <b>သင့် dynamic key ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your dynamic key has been re-enabled</b>')
+          : reason === 'LINKED'
+            ? (isMyanmar ? '🔗 <b>Telegram ချိတ်ဆက်မှု အောင်မြင်ပါသည်</b>' : '🔗 <b>Telegram linked successfully</b>')
+            : reason === 'USAGE_REQUEST'
+              ? (isMyanmar ? '📊 <b>သင့် dynamic VPN အသေးစိတ်</b>' : '📊 <b>Your dynamic VPN access details</b>')
+              : reason === 'SUBSCRIPTION_REQUEST'
+                ? (isMyanmar ? '📎 <b>သင့် dynamic subscription link များ</b>' : '📎 <b>Your dynamic subscription links</b>')
+                : (isMyanmar ? '📨 <b>သင့် dynamic share page</b>' : '📨 <b>Your dynamic share page</b>'),
+    modeSelfManaged: isMyanmar ? 'Self-Managed' : 'Self-Managed',
+    modeManual: isMyanmar ? 'Manual' : 'Manual',
+    coverageAutoSelected: isMyanmar ? 'Fetch လုပ်ချိန်တွင် အလိုအလျောက် ရွေးမည်' : 'Auto-selected at fetch time',
+    lifecycleDisabledTitle: isMyanmar ? '⛔ <b>သင့် access key ကို ပိတ်ထားပါသည်</b>' : '⛔ <b>Your access key has been disabled</b>',
+    lifecycleDisabledBody: isMyanmar ? 'Administrator က ပြန်ဖွင့်ပေးသည့်အထိ traffic ကို အသုံးမပြုနိုင်ပါ။' : 'Traffic is blocked until the key is re-enabled by an administrator.',
+    lifecycleExpiring7Title: isMyanmar ? '⏳ <b>သင့် access key သက်တမ်း မကြာမီကုန်မည်</b>' : '⏳ <b>Your access key will expire soon</b>',
+    lifecycleExpiring7Body: (days: number) => isMyanmar ? `သက်တမ်းကုန်ရန် ${days} ရက်ခန့် ကျန်ပါသည်။` : `There are about ${days} day(s) left before expiration.`,
+    lifecycleExpiring1Title: isMyanmar ? '⚠️ <b>သင့် access key သက်တမ်း အလွန်နီးကပ်ပါပြီ</b>' : '⚠️ <b>Your access key expires very soon</b>',
+    lifecycleExpiring1Body: (days: number) => isMyanmar ? `${days} ရက်ခန့်သာ ကျန်ပါသည်။` : `Only about ${days} day(s) remain.`,
+    lifecycleExpiredTitle: isMyanmar ? '⌛ <b>သင့် access key သက်တမ်းကုန်သွားပါပြီ</b>' : '⌛ <b>Your access key has expired</b>',
+    lifecycleExpiredBody: isMyanmar ? 'ဤ key ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက support ကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
+    startLinked: (username: string) => isMyanmar ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\nလိုအပ်သည့်အချိန်တွင် /usage သို့မဟုတ် /mykeys ကို အသုံးပြုနိုင်ပါသည်။` : `✅ Telegram linked for <b>${username}</b>.\n\nUse /usage or /mykeys to fetch your keys any time.`,
+    linkExpired: isMyanmar ? '⚠️ ဤ Telegram link သက်တမ်းကုန်သွားပါပြီ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '⚠️ This Telegram link has expired. Ask the admin to generate a new one.',
+    linkInvalid: isMyanmar ? '❌ ဤ Telegram link ကို မသုံးနိုင်တော့ပါ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.',
+    welcomeBack: (username: string) => isMyanmar ? `✅ ပြန်လည်ကြိုဆိုပါသည်၊ <b>${username}</b>!\n\nသင့် account သည် ချိတ်ဆက်ပြီးဖြစ်သည်။ /usage သို့မဟုတ် /mykeys ကို အချိန်မရွေး အသုံးပြုနိုင်ပါသည်။` : `✅ Welcome back, <b>${username}</b>!\n\nYour account is already linked. Use /usage or /mykeys any time.`,
+    accountLinked: (username: string) => isMyanmar ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\nကြိုဆိုပါသည်၊ <b>${username}</b>! /usage သို့မဟုတ် /mykeys ကို အသုံးပြုနိုင်ပါသည်။` : `✅ Account linked successfully!\n\nWelcome, <b>${username}</b>! Use /usage or /mykeys to fetch your keys.`,
+    adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
+    hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
+      isMyanmar
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+    defaultWelcome: isMyanmar ? 'သင့် email ကို ပို့ပါ၊ သို့မဟုတ် admin ကို Telegram connect link ဖန်တီးပေးရန် တောင်းဆိုပါ။' : 'Send your email address, or ask your admin to generate a Telegram connect link from your key.',
+    emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
+    emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\n/access အသေးစိတ်ရရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your access details.`,
+    keyNotFoundDefault: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော VPN key မရှိသေးပါ။\n\nသင့် email ကို ပို့ပါ သို့မဟုတ် admin ထံမှ Telegram connect link အသုံးပြုပါ။' : '❌ No VPN keys are linked to this Telegram account yet.\n\nSend your email address or use a Telegram connect link from the admin.',
+    usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
+    myKeysEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိပါ။' : '❌ No linked keys found for this Telegram account.',
+    myKeysTitle: isMyanmar ? '🗂 <b>သင့်နှင့် ချိတ်ထားသော key များ</b>' : '🗂 <b>Your linked keys</b>',
+    subEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော active key မရှိပါ။' : '❌ No active keys are linked to this Telegram account.',
+    subSent: (count: number) => isMyanmar ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။` : `📎 Sent ${count} share page(s) to this chat.`,
+    noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ support link မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
+    supportLabel: isMyanmar ? '🛟 အကူအညီ' : '🛟 Support',
+    keyLabel: isMyanmar ? 'Key' : 'Key',
+    serverLabel: isMyanmar ? 'Server' : 'Server',
+    statusLineLabel: isMyanmar ? 'Status' : 'Status',
+    expirationLabel: isMyanmar ? 'Expiration' : 'Expiration',
+    quotaLabel: isMyanmar ? 'Quota' : 'Quota',
+    sharePageLabel: isMyanmar ? 'Share page' : 'Share page',
+    subscriptionUrlLabel: isMyanmar ? 'Subscription URL' : 'Subscription URL',
+    clientEndpointLabel: isMyanmar ? 'Client endpoint' : 'Client endpoint',
+    outlineClientUrlLabel: isMyanmar ? 'Outline client URL' : 'Outline client URL',
+    modeLabel: isMyanmar ? 'Mode' : 'Mode',
+    backendsLabel: isMyanmar ? 'Backends' : 'Backends',
+    coverageLabel: isMyanmar ? 'Coverage' : 'Coverage',
+    idLabel: isMyanmar ? 'ID' : 'ID',
+    emailLabel: isMyanmar ? 'Email' : 'Email',
+    telegramIdLabel: isMyanmar ? 'Telegram ID' : 'Telegram ID',
+    requesterLabel: isMyanmar ? 'Requester' : 'Requester',
+    serversTitle: isMyanmar ? '🖥 <b>သင့် server များ</b>' : '🖥 <b>Your servers</b>',
+    renewNoMatch: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော linked key မရှိပါ။` : `❌ No linked key matched "${query}".`,
+    renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
+    statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
+    statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
+    statusLabel: isMyanmar ? 'အခြေအနေ' : 'Status',
+    latencyLabel: isMyanmar ? 'Latency' : 'Latency',
+    uptimeLabel: isMyanmar ? 'Uptime' : 'Uptime',
+    keysLabel: isMyanmar ? 'Key များ' : 'Keys',
+    expiringNone: (days: number) => isMyanmar ? `✅ နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key မရှိပါ။` : `✅ No keys are expiring in the next ${days} day(s).`,
+    expiringTitle: (days: number) => isMyanmar ? `⏳ <b>နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key များ</b>` : `⏳ <b>Keys expiring in the next ${days} day(s)</b>`,
+    findUsage: isMyanmar ? '🔎 အသုံးပြုပုံ: /find <name, email, Telegram ID, key ID, or Outline ID>' : '🔎 Usage: /find <name, email, Telegram ID, key ID, or Outline ID>',
+    findKeyFound: isMyanmar ? '🔎 <b>Key ကို တွေ့ရှိပါသည်</b>' : '🔎 <b>Key found</b>',
+    findNoMatches: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော access key မရှိပါ။` : `❌ No access keys matched "${query}".`,
+    findMatches: (query: string) => isMyanmar ? `🔎 <b>"${query}" အတွက် ကိုက်ညီမှုများ</b>` : `🔎 <b>Matches for "${query}"</b>`,
+    findProvideQuery: isMyanmar ? '❌ Key ID သို့မဟုတ် ရှာဖွေရန် စာသားတစ်ခု ထည့်ပါ။' : '❌ Please provide a key identifier or search term.',
+    adminOnly: isMyanmar ? '❌ ဤ command ကို administrator များသာ အသုံးပြုနိုင်ပါသည်။' : '❌ This command is only available to administrators.',
+    enableUsage: isMyanmar ? 'အသုံးပြုပုံ: /enable <key-id>' : 'Usage: /enable <key-id>',
+    disableUsage: isMyanmar ? 'အသုံးပြုပုံ: /disable <key-id>' : 'Usage: /disable <key-id>',
+    multiMatchUseIds: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ အောက်ပါ ID များထဲမှ တစ်ခုကို တိတိကျကျ အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one of these exact IDs:',
+    keyNotFound: isMyanmar ? '❌ Key မတွေ့ပါ။' : '❌ Key not found.',
+    keyEnabled: (name: string) => isMyanmar ? `✅ <b>${name}</b> ကို ပြန်ဖွင့်ပြီးပါပြီ။` : `✅ Re-enabled <b>${name}</b>.`,
+    keyDisabled: (name: string) => isMyanmar ? `⛔ <b>${name}</b> ကို ပိတ်လိုက်ပါပြီ။` : `⛔ Disabled <b>${name}</b>.`,
+    resendUsage: isMyanmar ? 'အသုံးပြုပုံ: /resend <key-id>' : 'Usage: /resend <key-id>',
+    resendMulti: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ တိတိကျကျ ID တစ်ခုကို အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one exact ID:',
+    resendFailed: (message: string) => isMyanmar ? `❌ ပြန်ပို့မှု မအောင်မြင်ပါ: ${message}` : `❌ Failed to resend: ${message}`,
+    resendSuccess: (name: string) => isMyanmar ? `📨 <b>${name}</b> အတွက် share page ကို ပြန်ပို့ပြီးပါပြီ။` : `📨 Resent the share page for <b>${name}</b>.`,
+    sysinfoGathering: isMyanmar ? '🔄 System information စုဆောင်းနေပါသည်...' : '🔄 Gathering system information...',
+    sysinfoTitle: isMyanmar ? '<b>System Information</b> 🖥️' : '<b>System Information</b> 🖥️',
+    sysinfoOs: isMyanmar ? 'OS' : 'OS',
+    sysinfoCpu: isMyanmar ? 'CPU Load' : 'CPU Load',
+    sysinfoMemory: isMyanmar ? 'Memory' : 'Memory',
+    sysinfoDisk: isMyanmar ? 'Disk' : 'Disk',
+    sysinfoFailed: isMyanmar ? '❌ System information မရယူနိုင်ပါ။' : '❌ Failed to retrieve system information.',
+    backupCreating: isMyanmar ? '📦 Backup ဖန်တီးနေပါသည်... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။' : '📦 Creating backup... please wait.',
+    backupCaption: (date: string) => isMyanmar ? `${date} တွင် backup ဖန်တီးထားပါသည်` : `Backup created at ${date}`,
+    backupFailed: (message: string) => isMyanmar ? `❌ Backup မအောင်မြင်ပါ: ${message}` : `❌ Backup failed: ${message}`,
+    helpTitle: isMyanmar ? '📚 <b>အသုံးပြုနိုင်သော Command များ</b>' : '📚 <b>Available Commands</b>',
+    helpEmailHint: isMyanmar ? 'ဤ Telegram account ကို ချိတ်ရန် သင့် email ကို တိုက်ရိုက် ပို့နိုင်ပါသည်။' : 'You can also send your email address directly to link this Telegram account.',
+    unknownCommand: isMyanmar ? '❓ မသိသော command ဖြစ်သည်။ အသုံးပြုနိုင်သော command များကို ကြည့်ရန် /help ကို အသုံးပြုပါ။' : '❓ Unknown command. Use /help to see the available commands.',
+    digestTitle: isMyanmar ? '🧾 <b>Atomic-UI Telegram အနှစ်ချုပ်</b>' : '🧾 <b>Atomic-UI Telegram Digest</b>',
+    digestWindow: (hours: number) => isMyanmar ? `အချိန်ကာလ: နောက်ဆုံး ${hours} နာရီ` : `Window: last ${hours} hour(s)`,
+    digestActiveKeys: isMyanmar ? 'Active key များ' : 'Active keys',
+    digestPendingKeys: isMyanmar ? 'Pending key များ' : 'Pending keys',
+    digestDepletedKeys: isMyanmar ? 'Depleted key များ' : 'Depleted keys',
+    digestExpiringSoon: isMyanmar ? '၇ ရက်အတွင်း သက်တမ်းကုန်မည်' : 'Expiring in 7 days',
+    digestOpenIncidents: isMyanmar ? 'ဖွင့်ထားသော incident များ' : 'Open incidents',
+    digestEvents: isMyanmar ? 'Subscription page event များ' : 'Subscription page events',
+    digestServerHealth: isMyanmar ? 'Server health' : 'Server health',
+    digestHealthSummary: (up: number, slow: number, down: number, unknown: number) =>
+      isMyanmar
+        ? `${up} up, ${slow} slow, ${down} down, ${unknown} unknown`
+        : `${up} up, ${slow} slow, ${down} down, ${unknown} unknown`,
+  };
+}
+
 function formatExpirationSummary(key: {
   expiresAt?: Date | null;
   expirationType?: string | null;
   durationDays?: number | null;
-}) {
+}, locale: SupportedLocale = 'en') {
+  const ui = getTelegramUi(locale);
+  const localeCode = locale === 'my' ? 'my-MM' : 'en-US';
   if (!key.expiresAt) {
     if (key.expirationType === 'START_ON_FIRST_USE') {
-      return key.durationDays ? `Starts on first use (${key.durationDays} days)` : 'Starts on first use';
+      return ui.startsOnFirstUse(key.durationDays);
     }
 
-    return 'Never';
+    return ui.never;
   }
 
   const remainingMs = key.expiresAt.getTime() - Date.now();
   const daysLeft = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+  const dateText = key.expiresAt.toLocaleDateString(localeCode);
 
   if (daysLeft <= 0) {
-    return `Expired on ${key.expiresAt.toLocaleDateString()}`;
+    return ui.expiredOn(dateText);
   }
 
-  return `${daysLeft} day(s) left (${key.expiresAt.toLocaleDateString()})`;
+  return ui.daysLeft(daysLeft, dateText);
 }
 
 async function getSubscriptionDefaults() {
   const settings = await db.settings.findMany({
     where: {
       key: {
-        in: ['supportLink', 'subscriptionWelcomeMessage'],
+        in: ['supportLink', 'subscriptionWelcomeMessage', 'defaultLanguage'],
       },
     },
     select: {
@@ -154,6 +331,7 @@ async function getSubscriptionDefaults() {
   return {
     supportLink: settingsMap.get('supportLink') || null,
     welcomeMessage: settingsMap.get('subscriptionWelcomeMessage') || null,
+    defaultLanguage: coerceSupportedLocale(settingsMap.get('defaultLanguage')) || 'en',
   };
 }
 
@@ -496,11 +674,18 @@ function getDynamicKeyMessagingUrls(
     name: string;
   },
   source?: string | null,
+  lang?: SupportedLocale,
 ) {
   const sharePageUrl = key.publicSlug
-    ? buildDynamicShortShareUrl(key.publicSlug, { source: source || undefined })
+    ? buildDynamicShortShareUrl(key.publicSlug, {
+        source: source || undefined,
+        lang,
+      })
     : key.dynamicUrl
-      ? buildDynamicSharePageUrl(key.dynamicUrl, { source: source || undefined })
+      ? buildDynamicSharePageUrl(key.dynamicUrl, {
+          source: source || undefined,
+          lang,
+        })
       : null;
   const subscriptionUrl = key.publicSlug
     ? buildDynamicShortClientUrl(key.publicSlug, { source: source || undefined })
@@ -652,49 +837,39 @@ export async function sendAccessKeySharePageToTelegram(input: {
   }
 
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-  const sharePageUrl = key.publicSlug
-    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram' })
-    : buildSharePageUrl(token, { source: input.source || 'telegram' });
-  const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'telegram' });
   const defaults = await getSubscriptionDefaults();
+  const locale = defaults.defaultLanguage;
+  const ui = getTelegramUi(locale);
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram', lang: locale })
+    : buildSharePageUrl(token, { source: input.source || 'telegram', lang: locale });
+  const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'telegram' });
   const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
   const supportLink = defaults.supportLink;
-
-  const reasonTitle =
-    input.reason === 'CREATED'
-      ? '🎉 <b>Your access key is ready</b>'
-      : input.reason === 'KEY_ENABLED'
-        ? '✅ <b>Your access key has been re-enabled</b>'
-        : input.reason === 'LINKED'
-          ? '🔗 <b>Telegram linked successfully</b>'
-          : input.reason === 'USAGE_REQUEST'
-            ? '📊 <b>Your VPN access details</b>'
-            : input.reason === 'SUBSCRIPTION_REQUEST'
-              ? '📎 <b>Your subscription links</b>'
-              : '📨 <b>Your share page</b>';
+  const reasonTitle = ui.accessReasonTitle(input.reason);
 
   const lines = [
     reasonTitle,
     '',
-    `🔑 Key: <b>${escapeHtml(key.name)}</b>`,
-    `🖥 Server: ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
-    `📈 Status: ${escapeHtml(key.status)}`,
-    `⏳ Expiration: ${escapeHtml(formatExpirationSummary(key))}`,
-    key.dataLimitBytes ? `📦 Quota: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : '📦 Quota: Unlimited',
+    `🔑 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `🖥 ${ui.serverLabel}: ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
+    `📈 ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+    `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+    key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
     '',
-    welcomeMessage ? escapeHtml(welcomeMessage) : 'Open the share page below for install steps, manual setup, and the latest connection details.',
+    welcomeMessage ? escapeHtml(welcomeMessage) : ui.accessShareFallback,
     '',
-    `🌐 Share page: ${sharePageUrl}`,
-    `🔄 Subscription URL: ${subscriptionUrl}`,
+    `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
+    `🔄 ${ui.subscriptionUrlLabel}: ${subscriptionUrl}`,
   ];
 
   const inlineKeyboard: Array<Array<{ text: string; url: string }>> = [
-    [{ text: 'Open Share Page', url: sharePageUrl }],
-    [{ text: 'Open Subscription URL', url: subscriptionUrl }],
+    [{ text: ui.openSharePage, url: sharePageUrl }],
+    [{ text: ui.openSubscriptionUrl, url: subscriptionUrl }],
   ];
 
   if (supportLink) {
-    inlineKeyboard.push([{ text: 'Get Support', url: supportLink }]);
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
@@ -711,7 +886,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
         config.botToken,
         destinationChatId,
         qrBuffer,
-        'Scan this QR code with your VPN client if direct import is unavailable.',
+        ui.accessQrCaption,
       );
     } catch (error) {
       console.error('Failed to generate Telegram QR code:', error);
@@ -775,15 +950,18 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     throw new Error('This dynamic key is not linked to a Telegram chat yet.');
   }
 
+  const defaults = await getSubscriptionDefaults();
+  const locale = defaults.defaultLanguage;
+  const ui = getTelegramUi(locale);
   const { sharePageUrl, subscriptionUrl, outlineClientUrl } = getDynamicKeyMessagingUrls(
     key,
     input.source || 'telegram',
+    locale,
   );
   if (!subscriptionUrl || !outlineClientUrl) {
     throw new Error('This dynamic key does not have a usable client URL yet.');
   }
 
-  const defaults = await getSubscriptionDefaults();
   const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
   const supportLink = defaults.supportLink;
   const attachedCount = key.accessKeys.length;
@@ -797,54 +975,42 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   const coverageSummary =
     uniqueServers.length > 0
       ? uniqueServers.slice(0, 3).join(', ') + (uniqueServers.length > 3 ? ` +${uniqueServers.length - 3} more` : '')
-      : 'Auto-selected at fetch time';
-
-  const reasonTitle =
-    input.reason === 'CREATED'
-      ? '🎉 <b>Your dynamic key is ready</b>'
-      : input.reason === 'KEY_ENABLED'
-        ? '✅ <b>Your dynamic key has been re-enabled</b>'
-        : input.reason === 'LINKED'
-          ? '🔗 <b>Telegram linked successfully</b>'
-          : input.reason === 'USAGE_REQUEST'
-            ? '📊 <b>Your dynamic VPN access details</b>'
-            : input.reason === 'SUBSCRIPTION_REQUEST'
-              ? '📎 <b>Your dynamic subscription links</b>'
-              : '📨 <b>Your dynamic share page</b>';
+      : ui.coverageAutoSelected;
+  const reasonTitle = ui.dynamicReasonTitle(input.reason);
 
   const lines = [
     reasonTitle,
     '',
-    `🔁 Key: <b>${escapeHtml(key.name)}</b>`,
-    `🧭 Mode: ${escapeHtml(key.type === 'SELF_MANAGED' ? 'Self-Managed' : 'Manual')}`,
-    `🖥 Backends: ${attachedCount} attached key(s)`,
-    `🌍 Coverage: ${escapeHtml(coverageSummary)}`,
-    `📈 Status: ${escapeHtml(key.status)}`,
-    `⏳ Expiration: ${escapeHtml(formatExpirationSummary(key))}`,
-    key.dataLimitBytes ? `📦 Quota: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : '📦 Quota: Unlimited',
+    `🔁 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `🧭 ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
+    `🖥 ${ui.backendsLabel}: ${attachedCount} attached key(s)`,
+    `🌍 ${ui.coverageLabel}: ${escapeHtml(coverageSummary)}`,
+    `📈 ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+    `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+    key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
     '',
     welcomeMessage
       ? escapeHtml(welcomeMessage)
       : key.sharePageEnabled
-        ? 'Open the share page below for install steps, manual setup, and the latest backend details.'
-        : 'The share page is disabled for this key. Use the client endpoint below inside Outline or another compatible client.',
+        ? ui.dynamicShareFallback
+        : ui.dynamicShareDisabledFallback,
   ];
 
   if (key.sharePageEnabled && sharePageUrl) {
-    lines.push('', `🌐 Share page: ${sharePageUrl}`);
+    lines.push('', `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
   }
 
-  lines.push(`🔄 Client endpoint: ${subscriptionUrl}`);
-  lines.push(`⚡ Outline client URL: ${outlineClientUrl}`);
+  lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
+  lines.push(`⚡ ${ui.outlineClientUrlLabel}: ${outlineClientUrl}`);
 
   const inlineKeyboard: Array<Array<{ text: string; url: string }>> = [];
   if (key.sharePageEnabled && sharePageUrl) {
-    inlineKeyboard.push([{ text: 'Open Share Page', url: sharePageUrl }]);
+    inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
   }
-  inlineKeyboard.push([{ text: 'Open Client Endpoint', url: subscriptionUrl }]);
+  inlineKeyboard.push([{ text: ui.openClientEndpoint, url: subscriptionUrl }]);
 
   if (supportLink) {
-    inlineKeyboard.push([{ text: 'Get Support', url: supportLink }]);
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
@@ -861,7 +1027,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
         config.botToken,
         destinationChatId,
         qrBuffer,
-        'Scan this QR code with Outline or another compatible client if direct import is unavailable.',
+        ui.dynamicQrCaption,
       );
     } catch (error) {
       console.error('Failed to generate Telegram QR code for dynamic key:', error);
@@ -933,7 +1099,8 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     return null;
   }
 
-  const { supportLink } = await getSubscriptionDefaults();
+  const { supportLink, defaultLanguage } = await getSubscriptionDefaults();
+  const ui = getTelegramUi(defaultLanguage);
   const includeSharePage = input.type === 'EXPIRING_7D' || input.type === 'EXPIRING_1D';
   const token = includeSharePage
     ? await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken)
@@ -941,50 +1108,50 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
   const sharePageUrl = token
     ? (
         key.publicSlug
-          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_notification' })
-          : buildSharePageUrl(token, { source: 'telegram_notification' })
+          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_notification', lang: defaultLanguage })
+          : buildSharePageUrl(token, { source: 'telegram_notification', lang: defaultLanguage })
       )
     : null;
 
   const lines =
     input.type === 'DISABLED'
       ? [
-          '⛔ <b>Your access key has been disabled</b>',
+          ui.lifecycleDisabledTitle,
           '',
           `🔑 ${escapeHtml(key.name)}`,
-          'Traffic is blocked until the key is re-enabled by an administrator.',
+          ui.lifecycleDisabledBody,
         ]
       : input.type === 'EXPIRING_7D'
         ? [
-            '⏳ <b>Your access key will expire soon</b>',
+            ui.lifecycleExpiring7Title,
             '',
             `🔑 ${escapeHtml(key.name)}`,
-            `There are about ${input.daysLeft ?? 7} day(s) left before expiration.`,
+            ui.lifecycleExpiring7Body(input.daysLeft ?? 7),
           ]
         : input.type === 'EXPIRING_1D'
           ? [
-              '⚠️ <b>Your access key expires very soon</b>',
+              ui.lifecycleExpiring1Title,
               '',
               `🔑 ${escapeHtml(key.name)}`,
-              `Only about ${input.daysLeft ?? 1} day(s) remain.`,
+              ui.lifecycleExpiring1Body(input.daysLeft ?? 1),
             ]
           : [
-              '⌛ <b>Your access key has expired</b>',
+              ui.lifecycleExpiredTitle,
               '',
               `🔑 ${escapeHtml(key.name)}`,
-              'The key is no longer active. Contact support if it should be renewed.',
+              ui.lifecycleExpiredBody,
             ];
 
   if (sharePageUrl) {
-    lines.push('', `Share page: ${sharePageUrl}`);
+    lines.push('', `${ui.sharePageLabel}: ${sharePageUrl}`);
   }
   if (supportLink) {
-    lines.push(`Support: ${supportLink}`);
+    lines.push(`${ui.supportLabel}: ${supportLink}`);
   }
 
-  const buttons = sharePageUrl ? [[{ text: 'Open Share Page', url: sharePageUrl }]] : [];
+  const buttons = sharePageUrl ? [[{ text: ui.openSharePage, url: sharePageUrl }]] : [];
   if (supportLink) {
-    buttons.push([{ text: 'Get Support', url: supportLink }]);
+    buttons.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
@@ -1036,20 +1203,22 @@ export async function sendRenewalRequestToAdmins(input: {
     throw new Error('Access key not found.');
   }
 
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
   const sharePageUrl = key.publicSlug
-    ? buildShortShareUrl(key.publicSlug, { source: 'telegram_renew_request' })
-    : buildSharePageUrl(token, { source: 'telegram_renew_request' });
+    ? buildShortShareUrl(key.publicSlug, { source: 'telegram_renew_request', lang: locale })
+    : buildSharePageUrl(token, { source: 'telegram_renew_request', lang: locale });
   const message = [
-    '🔁 <b>Renewal requested from Telegram</b>',
+    locale === 'my' ? '🔁 <b>Telegram မှ သက်တမ်းတိုးရန် တောင်းဆိုထားပါသည်</b>' : '🔁 <b>Renewal requested from Telegram</b>',
     '',
-    `Requester: <b>${escapeHtml(input.requesterName)}</b>`,
-    `Telegram ID: <code>${escapeHtml(input.requesterTelegramId)}</code>`,
-    `Key: <b>${escapeHtml(key.name)}</b>`,
-    `Server: ${escapeHtml(key.server.name)}`,
-    key.email ? `Email: ${escapeHtml(key.email)}` : '',
+    `${ui.requesterLabel}: <b>${escapeHtml(input.requesterName)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(input.requesterTelegramId)}</code>`,
+    `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `${ui.serverLabel}: ${escapeHtml(key.server.name)}`,
+    key.email ? `${ui.emailLabel}: ${escapeHtml(key.email)}` : '',
     '',
-    `Share page: ${sharePageUrl}`,
+    `${ui.sharePageLabel}: ${sharePageUrl}`,
   ]
     .filter(Boolean)
     .join('\n');
@@ -1382,6 +1551,8 @@ async function handleStartCommand(
   argsText: string,
 ): Promise<string | null> {
   const trimmedArgs = argsText.trim();
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
 
   if (trimmedArgs) {
     const linkResult = await markTelegramLinkTokenConsumed({
@@ -1394,7 +1565,7 @@ async function handleStartCommand(
       await sendTelegramMessage(
         botToken,
         chatId,
-        `✅ Telegram linked for <b>${escapeHtml(username)}</b>.\n\nUse /usage or /mykeys to fetch your keys any time.`,
+        ui.startLinked(escapeHtml(username)),
         {
           replyMarkup: getCommandKeyboard(isAdmin),
         },
@@ -1431,8 +1602,8 @@ async function handleStartCommand(
 
     const errorMessage =
       linkResult.status === 'expired'
-        ? '⚠️ This Telegram link has expired. Ask the admin to generate a new one.'
-        : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.';
+        ? ui.linkExpired
+        : ui.linkInvalid;
 
     await sendTelegramMessage(botToken, chatId, errorMessage, {
       replyMarkup: getCommandKeyboard(isAdmin),
@@ -1448,7 +1619,7 @@ async function handleStartCommand(
     await sendTelegramMessage(
       botToken,
       chatId,
-      `✅ Welcome back, <b>${escapeHtml(username)}</b>!\n\nYour account is already linked. Use /usage or /mykeys any time.`,
+      ui.welcomeBack(escapeHtml(username)),
       {
         replyMarkup: getCommandKeyboard(isAdmin),
       },
@@ -1470,7 +1641,7 @@ async function handleStartCommand(
     await sendTelegramMessage(
       botToken,
       chatId,
-      `✅ Account linked successfully!\n\nWelcome, <b>${escapeHtml(username)}</b>! Use /usage or /mykeys to fetch your keys.`,
+      ui.accountLinked(escapeHtml(username)),
       {
         replyMarkup: getCommandKeyboard(isAdmin),
       },
@@ -1479,15 +1650,15 @@ async function handleStartCommand(
   }
 
   const config = await getTelegramConfig();
-  const adminMsg = isAdmin ? '\n\nYou are recognized as an administrator.' : '';
+  const adminMsg = isAdmin ? ui.adminRecognized : '';
   const welcomeMessage =
     config?.welcomeMessage ||
-    'Send your email address, or ask your admin to generate a Telegram connect link from your key.';
+    ui.defaultWelcome;
 
   await sendTelegramMessage(
     botToken,
     chatId,
-    `👋 Hello, <b>${escapeHtml(username)}</b>!${adminMsg}\n\n${escapeHtml(welcomeMessage)}\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+    ui.hello(escapeHtml(username), escapeHtml(welcomeMessage), telegramUserId, adminMsg),
     {
       replyMarkup: getCommandKeyboard(isAdmin),
     },
@@ -1496,6 +1667,8 @@ async function handleStartCommand(
 }
 
 async function handleEmailLink(chatId: number, telegramUserId: number, email: string) {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await db.accessKey.findMany({
     where: {
       email: email.toLowerCase(),
@@ -1504,7 +1677,7 @@ async function handleEmailLink(chatId: number, telegramUserId: number, email: st
   });
 
   if (keys.length === 0) {
-    return `❌ No keys found for email: ${escapeHtml(email)}`;
+    return ui.emailNoKeys(escapeHtml(email));
   }
 
   await db.accessKey.updateMany({
@@ -1520,7 +1693,7 @@ async function handleEmailLink(chatId: number, telegramUserId: number, email: st
     });
   }
 
-  return `✅ Linked ${keys.length} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your access details.`;
+  return ui.emailLinked(keys.length);
 }
 
 async function handleUsageCommand(
@@ -1528,17 +1701,19 @@ async function handleUsageCommand(
   telegramUserId: number,
   botToken: string,
 ): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, false);
 
   if (keys.length === 0) {
     const config = await getTelegramConfig();
     return (
       config?.keyNotFoundMessage ||
-      '❌ No VPN keys are linked to this Telegram account yet.\n\nSend your email address or use a Telegram connect link from the admin.'
+      ui.keyNotFoundDefault
     );
   }
 
-  let response = '📊 <b>Your VPN Usage</b>\n\n';
+  let response = ui.usageTitle;
 
   for (const key of keys) {
     const usedBytes = Number(key.usedBytes);
@@ -1550,7 +1725,7 @@ async function handleUsageCommand(
     response += `${key.status === 'ACTIVE' ? '🟢' : '🔵'} <b>${escapeHtml(key.name)}</b>\n`;
     response += `   📡 ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}\n`;
     response += `   📈 ${usageText}\n`;
-    response += `   ⏳ ${escapeHtml(formatExpirationSummary(key))}\n\n`;
+    response += `   ⏳ ${escapeHtml(formatExpirationSummary(key, locale))}\n\n`;
 
     if (key.accessUrl) {
       setTimeout(async () => {
@@ -1573,25 +1748,27 @@ async function handleUsageCommand(
 }
 
 async function handleMyKeysCommand(chatId: number, telegramUserId: number): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
   if (keys.length === 0) {
-    return '❌ No linked keys found for this Telegram account.';
+    return ui.myKeysEmpty;
   }
 
-  const lines = ['🗂 <b>Your linked keys</b>', ''];
+  const lines = [ui.myKeysTitle, ''];
 
   for (const key of keys) {
     const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
     const sharePageUrl = key.publicSlug
-      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys' })
-      : buildSharePageUrl(token, { source: 'telegram_mykeys' });
+      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: locale })
+      : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: locale });
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
-      `  ID: <code>${key.id}</code>`,
-      `  Status: ${escapeHtml(key.status)}`,
-      `  Server: ${escapeHtml(key.server.name)}`,
-      `  Share page: ${sharePageUrl}`,
+      `  ${ui.idLabel}: <code>${key.id}</code>`,
+      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+      `  ${ui.serverLabel}: ${escapeHtml(key.server.name)}`,
+      `  ${ui.sharePageLabel}: ${sharePageUrl}`,
       '',
     );
   }
@@ -1603,10 +1780,12 @@ async function handleSubscriptionLinksCommand(
   chatId: number,
   telegramUserId: number,
 ): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, false);
 
   if (keys.length === 0) {
-    return '❌ No active keys are linked to this Telegram account.';
+    return ui.subEmpty;
   }
 
   for (const key of keys) {
@@ -1623,24 +1802,28 @@ async function handleSubscriptionLinksCommand(
     }
   }
 
-  return `📎 Sent ${keys.length} share page(s) to this chat.`;
+  return ui.subSent(keys.length);
 }
 
 async function handleSupportCommand(): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const { supportLink } = await getSubscriptionDefaults();
 
   if (!supportLink) {
-    return 'ℹ️ No support link is configured right now.';
+    return ui.noSupportLink;
   }
 
-  return `🛟 Support: ${supportLink}`;
+  return `${ui.supportLabel}: ${supportLink}`;
 }
 
 async function handleUserServerCommand(chatId: number, telegramUserId: number): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
   if (keys.length === 0) {
-    return '❌ No linked keys found for this Telegram account.';
+    return ui.myKeysEmpty;
   }
 
   const grouped = new Map<
@@ -1663,11 +1846,11 @@ async function handleUserServerCommand(chatId: number, telegramUserId: number): 
     grouped.set(key.serverId, current);
   }
 
-  const lines = ['🖥 <b>Your servers</b>', ''];
+  const lines = [ui.serversTitle, ''];
   for (const server of Array.from(grouped.values())) {
     lines.push(
       `• ${escapeHtml(server.name)}${server.countryCode ? ` ${getFlagEmoji(server.countryCode)}` : ''}`,
-      `  Keys: ${server.keyCount} total, ${server.activeCount} active`,
+      `  ${ui.keysLabel}: ${server.keyCount} total, ${server.activeCount} active`,
       '',
     );
   }
@@ -1681,10 +1864,12 @@ async function handleRenewCommand(
   username: string,
   argsText: string,
 ): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
   if (keys.length === 0) {
-    return '❌ No linked keys found for this Telegram account.';
+    return ui.myKeysEmpty;
   }
 
   const requestedKeys =
@@ -1693,7 +1878,7 @@ async function handleRenewCommand(
       : keys;
 
   if (requestedKeys.length === 0) {
-    return `❌ No linked key matched "${escapeHtml(argsText.trim())}".`;
+    return ui.renewNoMatch(escapeHtml(argsText.trim()));
   }
 
   for (const key of requestedKeys) {
@@ -1704,18 +1889,20 @@ async function handleRenewCommand(
     });
   }
 
-  return `✅ Renewal request sent for ${requestedKeys.length} key(s). An administrator has been notified.`;
+  return ui.renewSent(requestedKeys.length);
 }
 
 async function handleStatusCommand(): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const servers = await db.server.findMany({
     where: { isActive: true },
     include: { healthCheck: true, _count: { select: { accessKeys: true } } },
   });
 
-  if (servers.length === 0) return '❌ No servers configured.';
+  if (servers.length === 0) return ui.statusNoServers;
 
-  let response = '🖥️ <b>Server Status</b>\n\n';
+  let response = ui.statusTitle;
 
   for (const server of servers) {
     const status = server.healthCheck?.lastStatus || 'UNKNOWN';
@@ -1725,16 +1912,18 @@ async function handleStatusCommand(): Promise<string> {
     const uptime = server.healthCheck?.uptimePercent?.toFixed(1) || '-';
 
     response += `${statusEmoji} <b>${escapeHtml(server.name)}</b>\n`;
-    response += `   • Status: ${status}\n`;
-    response += `   • Latency: ${latency ? `${latency}ms` : '-'}\n`;
-    response += `   • Uptime: ${uptime}%\n`;
-    response += `   • Keys: ${server._count.accessKeys}\n\n`;
+    response += `   • ${ui.statusLabel}: ${status}\n`;
+    response += `   • ${ui.latencyLabel}: ${latency ? `${latency}ms` : '-'}\n`;
+    response += `   • ${ui.uptimeLabel}: ${uptime}%\n`;
+    response += `   • ${ui.keysLabel}: ${server._count.accessKeys}\n\n`;
   }
 
   return response;
 }
 
 async function handleExpiringCommand(argsText: string): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const requestedDays = Number.parseInt(argsText.trim(), 10);
   const days = Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(requestedDays, 30) : 7;
   const now = new Date();
@@ -1758,10 +1947,10 @@ async function handleExpiringCommand(argsText: string): Promise<string> {
   });
 
   if (keys.length === 0) {
-    return `✅ No keys are expiring in the next ${days} day(s).`;
+    return ui.expiringNone(days);
   }
 
-  const lines = [`⏳ <b>Keys expiring in the next ${days} day(s)</b>`, ''];
+  const lines = [ui.expiringTitle(days), ''];
   for (const key of keys) {
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
@@ -1776,9 +1965,11 @@ async function handleExpiringCommand(argsText: string): Promise<string> {
 }
 
 async function handleFindCommand(argsText: string): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
-    return '🔎 Usage: /find <name, email, Telegram ID, key ID, or Outline ID>';
+    return ui.findUsage;
   }
 
   const result = await resolveAdminKeyQuery(query);
@@ -1786,14 +1977,14 @@ async function handleFindCommand(argsText: string): Promise<string> {
   if (result.kind === 'single') {
     const key = result.key;
     return [
-      '🔎 <b>Key found</b>',
+      ui.findKeyFound,
       '',
       `Name: <b>${escapeHtml(key.name)}</b>`,
-      `ID: <code>${key.id}</code>`,
+      `${ui.idLabel}: <code>${key.id}</code>`,
       `Outline ID: <code>${escapeHtml(key.outlineKeyId)}</code>`,
-      `Status: ${escapeHtml(key.status)}`,
-      `Server: ${escapeHtml(key.server.name)}`,
-      key.email ? `Email: ${escapeHtml(key.email)}` : '',
+      `${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+      `${ui.serverLabel}: ${escapeHtml(key.server.name)}`,
+      key.email ? `${ui.emailLabel}: ${escapeHtml(key.email)}` : '',
       key.telegramId ? `Telegram: <code>${escapeHtml(key.telegramId)}</code>` : '',
     ]
       .filter(Boolean)
@@ -1802,44 +1993,46 @@ async function handleFindCommand(argsText: string): Promise<string> {
 
   if (result.kind === 'many') {
     if (result.matches.length === 0) {
-      return `❌ No access keys matched "${escapeHtml(query)}".`;
+      return ui.findNoMatches(escapeHtml(query));
     }
 
     return [
-      `🔎 <b>Matches for "${escapeHtml(query)}"</b>`,
+      ui.findMatches(escapeHtml(query)),
       '',
-      ...result.matches.flatMap((key) => [
-        `• <b>${escapeHtml(key.name)}</b>`,
-        `  ID: <code>${key.id}</code>`,
-        `  Status: ${escapeHtml(key.status)} • ${escapeHtml(key.server.name)}`,
-        '',
-      ]),
+        ...result.matches.flatMap((key) => [
+          `• <b>${escapeHtml(key.name)}</b>`,
+          `  ${ui.idLabel}: <code>${key.id}</code>`,
+          `  ${ui.statusLineLabel}: ${escapeHtml(key.status)} • ${escapeHtml(key.server.name)}`,
+          '',
+        ]),
     ].join('\n');
   }
 
-  return '❌ Please provide a key identifier or search term.';
+  return ui.findProvideQuery;
 }
 
 async function handleAdminToggleCommand(
   argsText: string,
   enable: boolean,
 ): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
-    return enable ? 'Usage: /enable <key-id>' : 'Usage: /disable <key-id>';
+    return enable ? ui.enableUsage : ui.disableUsage;
   }
 
   const result = await resolveAdminKeyQuery(query);
   if (result.kind !== 'single') {
     if (result.kind === 'many' && result.matches.length > 0) {
       return [
-        '⚠️ Multiple keys matched. Use one of these exact IDs:',
+        ui.multiMatchUseIds,
         '',
         ...result.matches.map((key) => `• <code>${key.id}</code> — ${escapeHtml(key.name)}`),
       ].join('\n');
     }
 
-    return '❌ Key not found.';
+    return ui.keyNotFound;
   }
 
   const updatedKey = await setAccessKeyEnabledState(result.key.id, enable);
@@ -1858,27 +2051,29 @@ async function handleAdminToggleCommand(
   });
 
   return enable
-    ? `✅ Re-enabled <b>${escapeHtml(updatedKey.name)}</b>.`
-    : `⛔ Disabled <b>${escapeHtml(updatedKey.name)}</b>.`;
+    ? ui.keyEnabled(escapeHtml(updatedKey.name))
+    : ui.keyDisabled(escapeHtml(updatedKey.name));
 }
 
 async function handleResendCommand(argsText: string): Promise<string> {
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
-    return 'Usage: /resend <key-id>';
+    return ui.resendUsage;
   }
 
   const result = await resolveAdminKeyQuery(query);
   if (result.kind !== 'single') {
     if (result.kind === 'many' && result.matches.length > 0) {
       return [
-        '⚠️ Multiple keys matched. Use one exact ID:',
+        ui.resendMulti,
         '',
         ...result.matches.map((key) => `• <code>${key.id}</code> — ${escapeHtml(key.name)}`),
       ].join('\n');
     }
 
-    return '❌ Key not found.';
+    return ui.keyNotFound;
   }
 
   try {
@@ -1889,14 +2084,16 @@ async function handleResendCommand(argsText: string): Promise<string> {
       includeQr: true,
     });
   } catch (error) {
-    return `❌ Failed to resend: ${escapeHtml((error as Error).message)}`;
+    return ui.resendFailed(escapeHtml((error as Error).message));
   }
 
-  return `📨 Resent the share page for <b>${escapeHtml(result.key.name)}</b>.`;
+  return ui.resendSuccess(escapeHtml(result.key.name));
 }
 
 async function handleSysInfoCommand(chatId: number, botToken: string): Promise<string> {
-  await sendTelegramMessage(botToken, chatId, '🔄 Gathering system information...');
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
+  await sendTelegramMessage(botToken, chatId, ui.sysinfoGathering);
 
   try {
     const [cpu, mem, disk, osInfo] = await Promise.all([
@@ -1911,21 +2108,23 @@ async function handleSysInfoCommand(chatId: number, botToken: string): Promise<s
     const usedDiskPercent = totalDisk > 0 ? (usedDisk / totalDisk) * 100 : 0;
 
     return [
-      '<b>System Information</b> 🖥️',
+      ui.sysinfoTitle,
       '',
-      `<b>OS:</b> ${escapeHtml(`${osInfo.distro} ${osInfo.release}`)}`,
-      `<b>CPU Load:</b> ${cpu.currentLoad.toFixed(1)}%`,
-      `<b>Memory:</b> ${formatBytes(BigInt(mem.active))} / ${formatBytes(BigInt(mem.total))} (${((mem.active / mem.total) * 100).toFixed(1)}%)`,
-      `<b>Disk:</b> ${formatBytes(BigInt(usedDisk))} / ${formatBytes(BigInt(totalDisk))} (${usedDiskPercent.toFixed(1)}%)`,
+      `<b>${ui.sysinfoOs}:</b> ${escapeHtml(`${osInfo.distro} ${osInfo.release}`)}`,
+      `<b>${ui.sysinfoCpu}:</b> ${cpu.currentLoad.toFixed(1)}%`,
+      `<b>${ui.sysinfoMemory}:</b> ${formatBytes(BigInt(mem.active))} / ${formatBytes(BigInt(mem.total))} (${((mem.active / mem.total) * 100).toFixed(1)}%)`,
+      `<b>${ui.sysinfoDisk}:</b> ${formatBytes(BigInt(usedDisk))} / ${formatBytes(BigInt(totalDisk))} (${usedDiskPercent.toFixed(1)}%)`,
     ].join('\n');
   } catch (error) {
     console.error('Sysinfo error:', error);
-    return '❌ Failed to retrieve system information.';
+    return ui.sysinfoFailed;
   }
 }
 
 async function handleBackupCommand(chatId: number, botToken: string): Promise<string | null> {
-  await sendTelegramMessage(botToken, chatId, '📦 Creating backup... please wait.');
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
+  await sendTelegramMessage(botToken, chatId, ui.backupCreating);
 
   try {
     const backupDir = path.join(process.cwd(), 'storage', 'backups');
@@ -1965,13 +2164,13 @@ async function handleBackupCommand(chatId: number, botToken: string): Promise<st
       chatId,
       fileBuffer,
       filename,
-      `Backup created at ${new Date().toLocaleString()}`,
+      ui.backupCaption(new Date().toLocaleString()),
     );
 
     return null;
   } catch (error) {
     console.error('Backup error:', error);
-    return `❌ Backup failed: ${escapeHtml((error as Error).message)}`;
+    return ui.backupFailed(escapeHtml((error as Error).message));
   }
 }
 
@@ -1980,7 +2179,20 @@ async function handleHelpCommand(
   botToken: string,
   isAdmin: boolean,
 ): Promise<null> {
-  let message = `📚 <b>Available Commands</b>
+  const locale = await getTelegramDefaultLocale();
+  const isMyanmar = locale === 'my';
+  let message = isMyanmar
+    ? `📚 <b>အသုံးပြုနိုင်သော Command များ</b>
+
+/start - Telegram account ကို ချိတ်ဆက်မည်
+/usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
+/mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
+/sub - Share page များကို လက်ခံမည်
+/support - သတ်မှတ်ထားသော support link ကို ကြည့်မည်
+/server - သင့် key များအတွက် server များကို ကြည့်မည်
+/renew - Admin ထံသို့ သက်တမ်းတိုးရန် တောင်းမည်
+/help - ဤ help စာမျက်နှာကို ပြမည်`
+    : `📚 <b>Available Commands</b>
 
 /start - Link your Telegram account
 /usage - Fetch your usage and QR/setup info
@@ -1992,7 +2204,17 @@ async function handleHelpCommand(
 /help - Show this help message`;
 
   if (isAdmin) {
-    message += `\n\n<b>Admin Commands</b>
+    message += isMyanmar
+      ? `\n\n<b>Admin Commands</b>
+/status - Server အခြေအနေအနှစ်ချုပ်
+/expiring [days] - မကြာမီ သက်တမ်းကုန်မည့် key များ
+/find &lt;query&gt; - Key ကို ရှာမည်
+/disable &lt;key-id&gt; - Key ကို ပိတ်မည်
+/enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
+/resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
+/sysinfo - System resource usage
+/backup - Backup ဖန်တီးပြီး ဒေါင်းလုဒ်ဆွဲမည်`
+      : `\n\n<b>Admin Commands</b>
 /status - Server status summary
 /expiring [days] - Keys expiring soon
 /find &lt;query&gt; - Search for a key
@@ -2003,7 +2225,9 @@ async function handleHelpCommand(
 /backup - Create and download a backup`;
   }
 
-  message += `\n\nYou can also send your email address directly to link this Telegram account.`;
+  message += isMyanmar
+    ? `\n\nဤ Telegram account ကို ချိတ်ရန် သင့် email ကိုလည်း တိုက်ရိုက် ပို့နိုင်ပါသည်။`
+    : `\n\nYou can also send your email address directly to link this Telegram account.`;
 
   await sendTelegramMessage(botToken, chatId, message, {
     replyMarkup: getCommandKeyboard(isAdmin),
@@ -2026,6 +2250,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
   const config = await getTelegramConfig();
   if (!config) return null;
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (emailRegex.test(text)) {
@@ -2066,25 +2292,25 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'renew':
       return handleRenewCommand(chatId, telegramUserId, username, argsText);
     case 'status':
-      return isAdmin ? handleStatusCommand() : '❌ This command is only available to administrators.';
+      return isAdmin ? handleStatusCommand() : ui.adminOnly;
     case 'expiring':
-      return isAdmin ? handleExpiringCommand(argsText) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleExpiringCommand(argsText) : ui.adminOnly;
     case 'find':
-      return isAdmin ? handleFindCommand(argsText) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleFindCommand(argsText) : ui.adminOnly;
     case 'disable':
-      return isAdmin ? handleAdminToggleCommand(argsText, false) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleAdminToggleCommand(argsText, false) : ui.adminOnly;
     case 'enable':
-      return isAdmin ? handleAdminToggleCommand(argsText, true) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleAdminToggleCommand(argsText, true) : ui.adminOnly;
     case 'resend':
-      return isAdmin ? handleResendCommand(argsText) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleResendCommand(argsText) : ui.adminOnly;
     case 'sysinfo':
-      return isAdmin ? handleSysInfoCommand(chatId, config.botToken) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleSysInfoCommand(chatId, config.botToken) : ui.adminOnly;
     case 'backup':
-      return isAdmin ? handleBackupCommand(chatId, config.botToken) : '❌ This command is only available to administrators.';
+      return isAdmin ? handleBackupCommand(chatId, config.botToken) : ui.adminOnly;
     case 'help':
       return handleHelpCommand(chatId, config.botToken, isAdmin);
     default:
-      return '❓ Unknown command. Use /help to see the available commands.';
+      return ui.unknownCommand;
   }
 }
 
@@ -2098,6 +2324,8 @@ export async function sendTelegramDigestToAdmins(input?: {
 
   const now = input?.now || new Date();
   const lookbackHours = config.digestLookbackHours || 24;
+  const locale = await getTelegramDefaultLocale();
+  const ui = getTelegramUi(locale);
   const since = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);
 
   const [activeKeys, pendingKeys, depletedKeys, expiringSoon, openIncidents, healthCounts, recentViews] =
@@ -2157,17 +2385,17 @@ export async function sendTelegramDigestToAdmins(input?: {
   }
 
   const message = [
-    '🧾 <b>Atomic-UI Telegram Digest</b>',
+    ui.digestTitle,
     '',
-    `Window: last ${lookbackHours} hour(s)`,
-    `Active keys: ${activeKeys}`,
-    `Pending keys: ${pendingKeys}`,
-    `Depleted keys: ${depletedKeys}`,
-    `Expiring in 7 days: ${expiringSoon}`,
-    `Open incidents: ${openIncidents}`,
-    `Subscription page events: ${recentViews}`,
+    ui.digestWindow(lookbackHours),
+    `${ui.digestActiveKeys}: ${activeKeys}`,
+    `${ui.digestPendingKeys}: ${pendingKeys}`,
+    `${ui.digestDepletedKeys}: ${depletedKeys}`,
+    `${ui.digestExpiringSoon}: ${expiringSoon}`,
+    `${ui.digestOpenIncidents}: ${openIncidents}`,
+    `${ui.digestEvents}: ${recentViews}`,
     '',
-    `Server health: ${healthSummary.up} up, ${healthSummary.slow} slow, ${healthSummary.down} down, ${healthSummary.unknown} unknown`,
+    `${ui.digestServerHealth}: ${ui.digestHealthSummary(healthSummary.up, healthSummary.slow, healthSummary.down, healthSummary.unknown)}`,
   ].join('\n');
 
   for (const chatId of config.adminChatIds) {

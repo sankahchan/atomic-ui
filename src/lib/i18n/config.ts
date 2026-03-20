@@ -34,3 +34,11 @@ export const localeFlags: Record<Locale, string> = {
 export function isSupportedLocale(value: string): value is SupportedLocale {
   return supportedLocales.includes(value as SupportedLocale);
 }
+
+export function coerceSupportedLocale(value: string | null | undefined): SupportedLocale | null {
+  if (!value) {
+    return null;
+  }
+
+  return isSupportedLocale(value) ? value : null;
+}

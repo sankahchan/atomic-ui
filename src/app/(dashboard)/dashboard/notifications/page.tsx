@@ -323,7 +323,43 @@ function buildEventCooldownPayload(eventCooldowns: EventCooldownInputs) {
 
 function TelegramBotSetupCard() {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
+  const telegramUi = {
+    enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
+    disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
+    botUsername: isMyanmar ? 'ဘော့ Username' : 'Bot Username',
+    botUsernamePlaceholder: '@yourbot',
+    enableBot: isMyanmar ? 'Telegram bot ကို ဖွင့်မည်' : 'Enable Telegram bot',
+    enableBotDesc: isMyanmar ? 'အသုံးပြုသူများက key ကို ချိတ်ဆက်နိုင်ခြင်း၊ share page ရယူနိုင်ခြင်းနှင့် self-service command များ အသုံးပြုနိုင်ခြင်းကို ခွင့်ပြုမည်။' : 'Allow users to link keys, receive share pages, and run self-service bot commands.',
+    dailyDigest: isMyanmar ? 'Admin digest ကို နေ့စဉ် ပို့မည်' : 'Daily admin digest',
+    dailyDigestDesc: isMyanmar ? 'သက်တမ်းကုန်နီးသော key များ၊ usage နှင့် share-page activity summary များကို admin chat များသို့ ပို့မည်။' : 'Send expiring-key, usage, and share-page activity summaries to admin chats.',
+    digestHour: isMyanmar ? 'Digest ပို့ချိန် (နာရီ)' : 'Digest hour',
+    digestMinute: isMyanmar ? 'Digest ပို့ချိန် (မိနစ်)' : 'Digest minute',
+    lookbackWindow: isMyanmar ? 'ပြန်ကြည့်မည့် အချိန်အပိုင်းအခြား' : 'Lookback window',
+    settingsSaved: isMyanmar ? 'Telegram ဆက်တင်များ သိမ်းပြီးပါပြီ' : 'Telegram settings saved',
+    settingsSavedDesc: isMyanmar ? 'ဘော့ configuration နှင့် digest schedule ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The bot configuration and digest schedule were updated.',
+    settingsFailed: isMyanmar ? 'Telegram ဆက်တင် သိမ်းမရပါ' : 'Telegram settings failed',
+    connected: isMyanmar ? 'Telegram ချိတ်ဆက်ပြီးပါပြီ' : 'Telegram connected',
+    connectedDesc: (botName: string) => isMyanmar ? `@${botName} အဖြစ် ချိတ်ဆက်ထားသည်။` : `Connected as @${botName}.`,
+    webhookSet: isMyanmar ? 'Webhook သတ်မှတ်ပြီးပါပြီ' : 'Webhook set',
+    webhookSetDesc: isMyanmar ? 'ယခုမှစပြီး Telegram သည် update များကို ဤ panel သို့ ပို့မည်။' : 'Telegram will now send updates to this panel.',
+    webhookRemoved: isMyanmar ? 'Webhook ဖယ်ရှားပြီးပါပြီ' : 'Webhook removed',
+    webhookRemovedDesc: isMyanmar ? 'Telegram webhook delivery ကို ပိတ်လိုက်ပါပြီ။' : 'Telegram webhook delivery has been disabled.',
+    webhookFailed: isMyanmar ? 'Webhook ပြင်ဆင်မှု မအောင်မြင်ပါ' : 'Webhook setup failed',
+    webhookRemoveFailed: isMyanmar ? 'Webhook ဖယ်ရှားမှု မအောင်မြင်ပါ' : 'Webhook removal failed',
+    digestSent: isMyanmar ? 'Telegram digest ပို့ပြီးပါပြီ' : 'Telegram digest sent',
+    digestSentDesc: (count: number) => isMyanmar ? `Admin chat ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
+    digestFailed: isMyanmar ? 'Digest ပို့မှု မအောင်မြင်ပါ' : 'Digest failed',
+    webhookDesc: isMyanmar ? 'Webhook ဖွင့်ထားပါက message အသစ်များကို Telegram မှ ဤ endpoint သို့ ပို့မည်။' : 'Telegram sends new messages to this endpoint when the webhook is active.',
+    webhookUnavailable: isMyanmar ? 'ဤ environment တွင် Webhook URL မရနိုင်ပါ' : 'Webhook URL unavailable in this environment',
+    pendingUpdates: isMyanmar ? 'စောင့်ဆိုင်းနေသော update များ' : 'Pending updates',
+    lastError: isMyanmar ? 'နောက်ဆုံးအမှား' : 'Last error',
+    commandSurface: isMyanmar ? 'ဘော့ command မျက်နှာပြင်' : 'Bot command surface',
+    userCommands: isMyanmar ? 'အသုံးပြုသူ command များ' : 'User commands',
+    adminCommands: isMyanmar ? 'Admin command များ' : 'Admin commands',
+    sendDigestNow: isMyanmar ? 'Digest ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
+  };
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSettings.useQuery();
   const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
@@ -340,9 +376,9 @@ function TelegramBotSetupCard() {
     setForm({
       botToken: settingsQuery.data.botToken || '',
       botUsername: settingsQuery.data.botUsername || '',
-      welcomeMessage: settingsQuery.data.welcomeMessage || DEFAULT_TELEGRAM_SETTINGS.welcomeMessage,
+      welcomeMessage: settingsQuery.data.welcomeMessage || t('settings.telegram.welcome_placeholder'),
       keyNotFoundMessage:
-        settingsQuery.data.keyNotFoundMessage || DEFAULT_TELEGRAM_SETTINGS.keyNotFoundMessage,
+        settingsQuery.data.keyNotFoundMessage || t('settings.telegram.not_found_placeholder'),
       isEnabled: settingsQuery.data.isEnabled ?? false,
       adminChatIds: settingsQuery.data.adminChatIds || [],
       dailyDigestEnabled: settingsQuery.data.dailyDigestEnabled ?? false,
@@ -351,7 +387,7 @@ function TelegramBotSetupCard() {
       digestLookbackHours: settingsQuery.data.digestLookbackHours ?? 24,
     });
     setAdminChatIdsInput((settingsQuery.data.adminChatIds || []).join(', '));
-  }, [settingsQuery.data]);
+  }, [settingsQuery.data, t]);
 
   const saveSettingsMutation = trpc.telegramBot.updateSettings.useMutation({
     onSuccess: async () => {
@@ -360,13 +396,13 @@ function TelegramBotSetupCard() {
         utils.telegramBot.getWebhookInfo.invalidate(),
       ]);
       toast({
-        title: 'Telegram settings saved',
-        description: 'The bot configuration and digest schedule were updated.',
+        title: telegramUi.settingsSaved,
+        description: telegramUi.settingsSavedDesc,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Telegram settings failed',
+        title: telegramUi.settingsFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -377,8 +413,8 @@ function TelegramBotSetupCard() {
     onSuccess: (result) => {
       setForm((prev) => ({ ...prev, botUsername: result.botUsername || prev.botUsername }));
       toast({
-        title: 'Telegram connected',
-        description: `Connected as @${result.botUsername || result.botName}.`,
+        title: telegramUi.connected,
+        description: telegramUi.connectedDesc(result.botUsername || result.botName),
       });
     },
     onError: (error) => {
@@ -394,13 +430,13 @@ function TelegramBotSetupCard() {
     onSuccess: async () => {
       await webhookInfoQuery.refetch();
       toast({
-        title: 'Webhook set',
-        description: 'Telegram will now send updates to this panel.',
+        title: telegramUi.webhookSet,
+        description: telegramUi.webhookSetDesc,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Webhook setup failed',
+        title: telegramUi.webhookFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -411,13 +447,13 @@ function TelegramBotSetupCard() {
     onSuccess: async () => {
       await webhookInfoQuery.refetch();
       toast({
-        title: 'Webhook removed',
-        description: 'Telegram webhook delivery has been disabled.',
+        title: telegramUi.webhookRemoved,
+        description: telegramUi.webhookRemovedDesc,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Webhook removal failed',
+        title: telegramUi.webhookRemoveFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -427,13 +463,13 @@ function TelegramBotSetupCard() {
   const runDigestMutation = trpc.telegramBot.runDigestNow.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Telegram digest sent',
-        description: `Delivered to ${result.adminChats} admin chat(s).`,
+        title: telegramUi.digestSent,
+        description: telegramUi.digestSentDesc(result.adminChats ?? 0),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Digest failed',
+        title: telegramUi.digestFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -480,7 +516,7 @@ function TelegramBotSetupCard() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={form.isEnabled ? 'default' : 'secondary'}>
-              {form.isEnabled ? 'Enabled' : 'Disabled'}
+              {form.isEnabled ? telegramUi.enabled : telegramUi.disabled}
             </Badge>
             <Badge variant={webhookInfoQuery.data?.webhookSet ? 'default' : 'outline'}>
               {webhookInfoQuery.data?.webhookSet
@@ -533,10 +569,10 @@ function TelegramBotSetupCard() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="telegram-bot-username">Bot Username</Label>
+                <Label htmlFor="telegram-bot-username">{telegramUi.botUsername}</Label>
                 <Input
                   id="telegram-bot-username"
-                  placeholder="@yourbot"
+                  placeholder={telegramUi.botUsernamePlaceholder}
                   value={form.botUsername || ''}
                   onChange={(event) => setForm((prev) => ({ ...prev, botUsername: event.target.value }))}
                 />
@@ -578,9 +614,9 @@ function TelegramBotSetupCard() {
             <div className="grid gap-3 rounded-2xl border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Enable Telegram bot</p>
+                  <p className="text-sm font-medium">{telegramUi.enableBot}</p>
                   <p className="text-xs text-muted-foreground">
-                    Allow users to link keys, receive share pages, and run self-service bot commands.
+                    {telegramUi.enableBotDesc}
                   </p>
                 </div>
                 <Switch
@@ -591,9 +627,9 @@ function TelegramBotSetupCard() {
 
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Daily admin digest</p>
+                  <p className="text-sm font-medium">{telegramUi.dailyDigest}</p>
                   <p className="text-xs text-muted-foreground">
-                    Send expiring-key, usage, and share-page activity summaries to admin chats.
+                    {telegramUi.dailyDigestDesc}
                   </p>
                 </div>
                 <Switch
@@ -606,7 +642,7 @@ function TelegramBotSetupCard() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="telegram-digest-hour">Digest hour</Label>
+                  <Label htmlFor="telegram-digest-hour">{telegramUi.digestHour}</Label>
                   <Input
                     id="telegram-digest-hour"
                     type="number"
@@ -622,7 +658,7 @@ function TelegramBotSetupCard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telegram-digest-minute">Digest minute</Label>
+                  <Label htmlFor="telegram-digest-minute">{telegramUi.digestMinute}</Label>
                   <Input
                     id="telegram-digest-minute"
                     type="number"
@@ -638,7 +674,7 @@ function TelegramBotSetupCard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telegram-lookback-hours">Lookback window</Label>
+                  <Label htmlFor="telegram-lookback-hours">{telegramUi.lookbackWindow}</Label>
                   <Input
                     id="telegram-lookback-hours"
                     type="number"
@@ -663,7 +699,7 @@ function TelegramBotSetupCard() {
                 <div>
                   <p className="text-sm font-medium">{t('settings.telegram.webhook_status')}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Telegram sends new messages to this endpoint when the webhook is active.
+                    {telegramUi.webhookDesc}
                   </p>
                 </div>
                 <Button
@@ -678,19 +714,19 @@ function TelegramBotSetupCard() {
               </div>
 
               <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs break-all">
-                {webhookUrl || 'Webhook URL unavailable in this environment'}
+                {webhookUrl || telegramUi.webhookUnavailable}
               </div>
 
               <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
                 <p>
-                  Pending updates:{' '}
+                  {telegramUi.pendingUpdates}:{' '}
                   <span className="font-medium text-foreground">
                     {webhookInfoQuery.data?.pendingUpdateCount ?? 0}
                   </span>
                 </p>
                 {webhookInfoQuery.data?.lastErrorMessage ? (
                   <p className="text-destructive">
-                    Last error: {webhookInfoQuery.data.lastErrorMessage}
+                    {telegramUi.lastError}: {webhookInfoQuery.data.lastErrorMessage}
                   </p>
                 ) : null}
               </div>
@@ -727,13 +763,13 @@ function TelegramBotSetupCard() {
             </div>
 
             <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
-              <p className="text-sm font-medium">Bot command surface</p>
+              <p className="text-sm font-medium">{telegramUi.commandSurface}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                User commands: <code>/start</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
+                {telegramUi.userCommands}: <code>/start</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
                 <code>/usage</code>, <code>/server</code>, <code>/renew</code>, <code>/support</code>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Admin commands: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
+                {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
                 <code>/enable</code>, <code>/resend</code>, <code>/status</code>, <code>/sysinfo</code>,{' '}
                 <code>/backup</code>
               </p>
@@ -750,7 +786,7 @@ function TelegramBotSetupCard() {
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Send digest now
+                  {telegramUi.sendDigestNow}
                 </Button>
               </div>
             </div>

@@ -55,6 +55,7 @@ import {
 } from '@/lib/services/subscription-events';
 import { useLocale } from '@/hooks/use-locale';
 import {
+  coerceSupportedLocale,
   localeFlags,
   localeNames,
   supportedLocales,
@@ -103,6 +104,7 @@ interface KeyData {
 interface SettingsData {
   supportLink?: string;
   defaultSubscriptionTheme?: string;
+  defaultLanguage?: SupportedLocale | null;
   branding?: SubscriptionBranding;
 }
 
@@ -276,6 +278,7 @@ export default function SubscriptionPage() {
   const { locale, setLocale, t, mounted } = useLocale();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
+  const langParam = coerceSupportedLocale(searchParams.get('lang'));
 
   const [keyData, setKeyData] = useState<KeyData | null>(null);
   const [settings, setSettings] = useState<SettingsData>({});
@@ -365,6 +368,28 @@ export default function SubscriptionPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  useEffect(() => {
+    if (!mounted || !langParam || locale === langParam) {
+      return;
+    }
+
+    setLocale(langParam);
+  }, [langParam, locale, mounted, setLocale]);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    if (coerceSupportedLocale(url.searchParams.get('lang')) === locale) {
+      return;
+    }
+
+    url.searchParams.set('lang', locale);
+    window.history.replaceState({}, '', url.toString());
+  }, [locale, mounted]);
+
   // Toggle between dark and light (only for generic dark/light themes)
   const handleThemeToggle = () => {
     const newId = themeId === 'dark' ? 'light' : themeId === 'light' ? 'dark' : themeId;
@@ -440,6 +465,11 @@ export default function SubscriptionPage() {
           if (settingsRes.ok) {
             settingsData = await settingsRes.json();
             setSettings(settingsData);
+            const storedLocale = coerceSupportedLocale(window.localStorage.getItem('atomic-ui-locale'));
+            const preferredLocale = coerceSupportedLocale(settingsData.defaultLanguage);
+            if (!langParam && !storedLocale && preferredLocale && preferredLocale !== locale) {
+              setLocale(preferredLocale);
+            }
             if (settingsData.branding) {
               setBranding({ ...defaultBranding, ...settingsData.branding });
             }
@@ -466,7 +496,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [token, t, trackSubscriptionEvent]);
+  }, [langParam, locale, setLocale, t, token, trackSubscriptionEvent]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -985,10 +1015,10 @@ export default function SubscriptionPage() {
 
         <div className="relative z-10 mx-auto w-full space-y-4 px-3 py-8 pb-safe sm:px-4 md:px-6 lg:py-10">
 
-          <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+          <div className="fixed left-3 right-3 top-3 z-50 flex items-start justify-between gap-2 sm:left-auto sm:right-4 sm:top-4 sm:items-center sm:justify-end">
             {mounted && (
               <div
-                className="inline-flex items-center gap-1 rounded-full border px-1 py-1 backdrop-blur-sm"
+                className="inline-flex max-w-[calc(100vw-5.5rem)] items-center gap-1 rounded-full border px-1 py-1 backdrop-blur-sm"
                 style={{
                   backgroundColor: isDarkTheme ? 'rgba(15,23,42,0.58)' : 'rgba(255,255,255,0.88)',
                   borderColor: isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)',
@@ -1008,7 +1038,7 @@ export default function SubscriptionPage() {
                       key={localeOption}
                       type="button"
                       onClick={() => setLocale(localeOption as SupportedLocale)}
-                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all"
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all sm:px-3 sm:text-xs"
                       style={{
                         backgroundColor: active
                           ? (isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)')
@@ -1173,7 +1203,7 @@ export default function SubscriptionPage() {
                             <button
                               key={p}
                               onClick={() => setPlatform(p)}
-                              className="min-w-0 w-full rounded-[0.9rem] px-2.5 py-2 text-[12px] font-medium leading-tight transition-all sm:px-3 sm:text-[13px]"
+                              className="min-w-0 w-full rounded-[0.9rem] px-2 py-2 text-[11px] font-medium leading-tight transition-all sm:px-3 sm:text-[13px]"
                               style={{
                                 background: platform === p
                                   ? `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`
@@ -1273,7 +1303,7 @@ export default function SubscriptionPage() {
                                 placement: 'hero_secondary',
                               })
                             }
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                             style={{
                               backgroundColor: controlButtonSurface,
                               color: controlTextColor,
@@ -1287,7 +1317,7 @@ export default function SubscriptionPage() {
                           {showManualSetupButton ? (
                             <button
                               onClick={() => setShowManualSetup(true)}
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1304,7 +1334,7 @@ export default function SubscriptionPage() {
                               href={installAppUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1321,7 +1351,7 @@ export default function SubscriptionPage() {
                               href={supportLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-sm font-medium"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
