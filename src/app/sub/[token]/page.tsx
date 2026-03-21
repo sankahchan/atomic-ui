@@ -7,8 +7,8 @@
  * Displays key information, usage stats, and quick-connect buttons.
  */
 
-import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useParams, usePathname, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState, useMemo, type MouseEvent } from 'react';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -277,6 +277,7 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 export default function SubscriptionPage() {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
@@ -345,6 +346,17 @@ export default function SubscriptionPage() {
     const query = params.toString();
     return query ? `${normalizedPath}?${query}` : normalizedPath;
   }, [pathname, searchParams]);
+
+  const handleLocaleSwitch = useCallback((event: MouseEvent<HTMLAnchorElement>, nextLocale: SupportedLocale) => {
+    event.preventDefault();
+
+    if (nextLocale === locale) {
+      return;
+    }
+
+    persistLocale(nextLocale);
+    router.replace(getLocaleHref(nextLocale), { scroll: false });
+  }, [getLocaleHref, locale, persistLocale, router]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -1052,7 +1064,7 @@ export default function SubscriptionPage() {
                     <a
                       key={localeOption}
                       href={getLocaleHref(localeOption)}
-                      onClick={() => persistLocale(localeOption)}
+                      onClick={(event) => handleLocaleSwitch(event, localeOption)}
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all sm:px-3 sm:text-xs"
                       style={{
                         backgroundColor: active
