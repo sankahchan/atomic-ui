@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -274,6 +274,8 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 
 export default function SubscriptionPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { locale, setLocale, t, mounted } = useLocale();
   const token = (params.token || params.slug) as string;
@@ -319,6 +321,19 @@ export default function SubscriptionPage() {
       values ? fillTemplate(t(key), values) : t(key),
     [t],
   );
+
+  const applyLocale = useCallback((nextLocale: SupportedLocale) => {
+    setLocale(nextLocale);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('lang', nextLocale);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams, setLocale]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -375,20 +390,6 @@ export default function SubscriptionPage() {
 
     setLocale(langParam);
   }, [langParam, locale, mounted, setLocale]);
-
-  useEffect(() => {
-    if (!mounted) {
-      return;
-    }
-
-    const url = new URL(window.location.href);
-    if (coerceSupportedLocale(url.searchParams.get('lang')) === locale) {
-      return;
-    }
-
-    url.searchParams.set('lang', locale);
-    window.history.replaceState({}, '', url.toString());
-  }, [locale, mounted]);
 
   // Toggle between dark and light (only for generic dark/light themes)
   const handleThemeToggle = () => {
@@ -468,7 +469,7 @@ export default function SubscriptionPage() {
             const storedLocale = coerceSupportedLocale(window.localStorage.getItem('atomic-ui-locale'));
             const preferredLocale = coerceSupportedLocale(settingsData.defaultLanguage);
             if (!langParam && !storedLocale && preferredLocale && preferredLocale !== locale) {
-              setLocale(preferredLocale);
+              applyLocale(preferredLocale);
             }
             if (settingsData.branding) {
               setBranding({ ...defaultBranding, ...settingsData.branding });
@@ -496,7 +497,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [langParam, locale, setLocale, t, token, trackSubscriptionEvent]);
+  }, [applyLocale, langParam, locale, setLocale, t, token, trackSubscriptionEvent]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -1037,7 +1038,7 @@ export default function SubscriptionPage() {
                     <button
                       key={localeOption}
                       type="button"
-                      onClick={() => setLocale(localeOption as SupportedLocale)}
+                      onClick={() => applyLocale(localeOption as SupportedLocale)}
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all sm:px-3 sm:text-xs"
                       style={{
                         backgroundColor: active
