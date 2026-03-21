@@ -7,8 +7,8 @@
  * Displays key information, usage stats, and quick-connect buttons.
  */
 
-import { useCallback, useEffect, useState, useMemo, type MouseEvent } from 'react';
-import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useParams, usePathname, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -277,7 +277,6 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 export default function SubscriptionPage() {
   const params = useParams();
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
@@ -347,16 +346,16 @@ export default function SubscriptionPage() {
     return query ? `${normalizedPath}?${query}` : normalizedPath;
   }, [pathname, searchParams]);
 
-  const handleLocaleSwitch = useCallback((event: MouseEvent<HTMLAnchorElement>, nextLocale: SupportedLocale) => {
-    event.preventDefault();
-
+  const handleLocaleSwitch = useCallback((nextLocale: SupportedLocale) => {
     if (nextLocale === locale) {
       return;
     }
 
     persistLocale(nextLocale);
-    router.replace(getLocaleHref(nextLocale), { scroll: false });
-  }, [getLocaleHref, locale, persistLocale, router]);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(window.history.state, '', getLocaleHref(nextLocale));
+    }
+  }, [getLocaleHref, locale, persistLocale]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -416,6 +415,20 @@ export default function SubscriptionPage() {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [langParam, persistLocale]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextLocale = coerceSupportedLocale(new URLSearchParams(window.location.search).get('lang'));
+      if (nextLocale) {
+        persistLocale(nextLocale);
+      } else {
+        persistLocale(defaultLocale);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [persistLocale]);
 
   // Toggle between dark and light (only for generic dark/light themes)
   const handleThemeToggle = () => {
@@ -1061,10 +1074,10 @@ export default function SubscriptionPage() {
                 {supportedLocales.map((localeOption) => {
                   const active = locale === localeOption;
                   return (
-                    <a
+                    <button
                       key={localeOption}
-                      href={getLocaleHref(localeOption)}
-                      onClick={(event) => handleLocaleSwitch(event, localeOption)}
+                      type="button"
+                      onClick={() => handleLocaleSwitch(localeOption)}
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all sm:px-3 sm:text-xs"
                       style={{
                         backgroundColor: active
@@ -1072,11 +1085,11 @@ export default function SubscriptionPage() {
                           : 'transparent',
                         color: isDarkTheme ? '#e4e4e7' : '#334155',
                       }}
-                      aria-current={active ? 'true' : undefined}
+                      aria-pressed={active}
                     >
                       <span>{localeFlags[localeOption]}</span>
                       <span className="hidden sm:inline">{localeNames[localeOption]}</span>
-                    </a>
+                    </button>
                   );
                 })}
               </div>
