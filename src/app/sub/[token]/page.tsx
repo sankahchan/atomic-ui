@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useParams, usePathname, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -278,7 +278,6 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 
 export default function SubscriptionPage() {
   const params = useParams();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
@@ -337,27 +336,13 @@ export default function SubscriptionPage() {
     }
   }, []);
 
-  const getLocaleHref = useCallback((nextLocale: SupportedLocale) => {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    const normalizedPath = pathname.startsWith(basePath) || !basePath
-      ? pathname
-      : `${basePath}${pathname}`;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('lang', nextLocale);
-    const query = params.toString();
-    return query ? `${normalizedPath}?${query}` : normalizedPath;
-  }, [pathname, searchParams]);
-
   const handleLocaleSwitch = useCallback((nextLocale: SupportedLocale) => {
     if (nextLocale === locale) {
       return;
     }
 
     persistLocale(nextLocale);
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(window.history.state, '', getLocaleHref(nextLocale));
-    }
-  }, [getLocaleHref, locale, persistLocale]);
+  }, [locale, persistLocale]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -417,20 +402,6 @@ export default function SubscriptionPage() {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [langParam, persistLocale]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const nextLocale = coerceSupportedLocale(new URLSearchParams(window.location.search).get('lang'));
-      if (nextLocale) {
-        persistLocale(nextLocale);
-      } else {
-        persistLocale(defaultLocale);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [persistLocale]);
 
   // Toggle between dark and light (only for generic dark/light themes)
   const handleThemeToggle = () => {
