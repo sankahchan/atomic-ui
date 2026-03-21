@@ -582,6 +582,7 @@ export async function selectDynamicAccessKeyForClient(input: {
   algorithm: LoadBalancerAlgorithm;
   clientIp: string;
   lastSelectedKeyIndex: number;
+  pinnedAccessKeyId?: string | null;
   preferredServerIds?: string[];
   preferredCountryCodes?: string[];
   preferredServerWeights?: Record<string, number>;
@@ -598,6 +599,7 @@ export async function selectDynamicAccessKeyForClient(input: {
     dakId,
     lastSelectedKeyIndex,
     persistRoundRobin,
+    pinnedAccessKeyId,
     preferredServerIds,
     preferredCountryCodes,
     preferredServerWeights,
@@ -624,6 +626,20 @@ export async function selectDynamicAccessKeyForClient(input: {
 
   if (preferredPool.length === 0) {
     return null;
+  }
+
+  if (pinnedAccessKeyId) {
+    const pinnedCandidate = preferredPool.find((candidate) => candidate.id === pinnedAccessKeyId);
+    if (pinnedCandidate) {
+      return {
+        key: pinnedCandidate,
+        selectedIndex: preferredPool.findIndex((candidate) => candidate.id === pinnedCandidate.id),
+        algorithm,
+        preferenceResolution: resolution,
+        stickinessApplied: false,
+        selectionReason: 'Operator pin forced routing to this backend until the pin is cleared.',
+      };
+    }
   }
 
   const stickySelection = await resolveStickyKeyCandidate({
@@ -710,6 +726,7 @@ export async function getSelfManagedServerCandidate(input: {
   algorithm: LoadBalancerAlgorithm;
   clientIp?: string;
   lastSelectedKeyIndex?: number;
+  pinnedServerId?: string | null;
   preferredServerIds?: string[];
   preferredCountryCodes?: string[];
   preferredServerWeights?: Record<string, number>;
@@ -725,6 +742,7 @@ export async function getSelfManagedServerCandidate(input: {
     algorithm,
     clientIp = '127.0.0.1',
     lastSelectedKeyIndex = 0,
+    pinnedServerId,
     preferredServerIds,
     preferredCountryCodes,
     preferredServerWeights,
@@ -761,6 +779,19 @@ export async function getSelfManagedServerCandidate(input: {
 
   if (preferredPool.length === 0) {
     return null;
+  }
+
+  if (pinnedServerId) {
+    const pinnedCandidate = preferredPool.find((server) => server.id === pinnedServerId);
+    if (pinnedCandidate) {
+      return {
+        serverId: pinnedCandidate.id,
+        serverName: pinnedCandidate.name,
+        countryCode: pinnedCandidate.countryCode ?? null,
+        reason: 'Operator pin forced routing to this server until the pin is cleared.',
+        preferenceResolution: resolution,
+      };
+    }
   }
 
   if (algorithm === 'LEAST_LOAD') {

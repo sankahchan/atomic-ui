@@ -159,6 +159,8 @@ async function createSelfManagedKey(
   preferredRegionMode?: 'PREFER' | 'ONLY',
   sessionStickinessMode?: 'NONE' | 'DRAIN',
   drainGraceMinutes?: number,
+  pinnedAccessKeyId?: string | null,
+  pinnedServerId?: string | null,
 ): Promise<{
   accessUrl: string;
   keyId: string;
@@ -173,8 +175,7 @@ async function createSelfManagedKey(
 } | null> {
   const keyName = `self-managed-dak-${dakId}`;
 
-  // Check if a key already exists for this DAK
-  const existingKey = await db.accessKey.findFirst({
+  const existingKeys = await db.accessKey.findMany({
     where: {
       dynamicKeyId: dakId,
       name: { startsWith: 'self-managed-dak-' },
@@ -185,12 +186,40 @@ async function createSelfManagedKey(
     },
   });
 
+  const pickExistingKey = () => {
+    if (pinnedAccessKeyId) {
+      const pinnedKey = existingKeys.find((key) => key.id === pinnedAccessKeyId && key.accessUrl);
+      if (pinnedKey) {
+        return pinnedKey;
+      }
+    }
+
+    if (pinnedServerId) {
+      const pinnedServerKey = existingKeys.find((key) => key.serverId === pinnedServerId && key.accessUrl);
+      if (pinnedServerKey) {
+        return pinnedServerKey;
+      }
+    }
+
+    return [...existingKeys]
+      .filter((key) => Boolean(key.accessUrl))
+      .sort((left, right) => {
+        const leftTime = (left.lastTrafficAt ?? left.lastUsedAt ?? left.createdAt).getTime();
+        const rightTime = (right.lastTrafficAt ?? right.lastUsedAt ?? right.createdAt).getTime();
+        return rightTime - leftTime;
+      })[0] ?? null;
+  };
+
+  const existingKey = pickExistingKey();
+
   if (existingKey && existingKey.accessUrl) {
     return {
       accessUrl: existingKey.accessUrl,
       keyId: existingKey.id,
       keyName: existingKey.name,
-      selectionReason: 'Reusing the active self-managed backend that already exists for this dynamic key.',
+      selectionReason: pinnedAccessKeyId || pinnedServerId
+        ? 'Reusing the pinned self-managed backend for this dynamic key.'
+        : 'Reusing the active self-managed backend that already exists for this dynamic key.',
       server: {
         id: existingKey.server.id,
         name: existingKey.server.name,
@@ -216,6 +245,7 @@ async function createSelfManagedKey(
     preferredRegionMode,
     sessionStickinessMode,
     drainGraceMinutes,
+    pinnedServerId,
     persistRoundRobin: true,
   });
 
@@ -475,6 +505,8 @@ export async function handleSubscriptionRequest(
           routingPreferences.preferredRegionMode,
           routingPreferences.sessionStickinessMode,
           routingPreferences.drainGraceMinutes,
+          dynamicKey.pinnedAccessKeyId,
+          dynamicKey.pinnedServerId,
         );
 
         if (!selfManagedResult) {
@@ -539,6 +571,7 @@ export async function handleSubscriptionRequest(
         algorithm: dynamicKey.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         clientIp,
         lastSelectedKeyIndex: dynamicKey.lastSelectedKeyIndex,
+        pinnedAccessKeyId: dynamicKey.pinnedAccessKeyId,
         preferredServerIds: routingPreferences.preferredServerIds,
         preferredCountryCodes: routingPreferences.preferredCountryCodes,
         preferredServerWeights: routingPreferences.preferredServerWeights,

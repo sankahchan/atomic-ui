@@ -78,6 +78,10 @@ import {
   MessageSquare,
   Eye,
   Download,
+  Pin,
+  PinOff,
+  ArrowRightLeft,
+  FlaskConical,
 } from 'lucide-react';
 import { themeList, getTheme, subscriptionThemeIds } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -1579,6 +1583,18 @@ type DynamicRoutingDiagnostics = {
     reason: string;
     lastTrafficAt?: string | null;
   } | null;
+  pinnedAccessKeyId: string | null;
+  pinnedServerId: string | null;
+  pinnedAt: string | null;
+  pinnedBackend: {
+    mode: 'ATTACHED_KEY' | 'SELF_MANAGED_SERVER';
+    keyId?: string | null;
+    keyName?: string | null;
+    serverId: string;
+    serverName: string;
+    serverCountry: string | null;
+    pinnedAt: string | null;
+  } | null;
   lastResolvedBackend: {
     keyId: string;
     keyName: string;
@@ -1655,24 +1671,104 @@ type DynamicRoutingDiagnostics = {
   lastSharePageOpenAppAt: string | null;
 };
 
+type DynamicRoutingCandidate = DynamicRoutingDiagnostics['candidateRanking'][number];
+
+type DynamicRoutingSimulationResult = {
+  mode: 'ATTACHED_KEY' | 'SELF_MANAGED_SERVER';
+  target: DynamicRoutingCandidate;
+};
+
+type DynamicRoutingCandidateTestResult = {
+  testedAt: string;
+  mode: 'MANUAL' | 'SELF_MANAGED';
+  candidates: DynamicRoutingCandidate[];
+};
+
+function formatRoutingEventLabel(eventType: string, t: (key: string) => string) {
+  switch (eventType) {
+    case 'BACKEND_SWITCH':
+      return t('dynamic_keys.routing.event.backend_switch');
+    case 'NO_MATCH':
+      return t('dynamic_keys.routing.event.no_match');
+    case 'STICKY_SESSION':
+      return t('dynamic_keys.routing.event.sticky_session');
+    case 'ROTATION_TRIGGERED':
+      return t('dynamic_keys.routing.event.rotation_triggered');
+    case 'ROTATION_SKIPPED':
+      return t('dynamic_keys.routing.event.rotation_skipped');
+    case 'HEALTH_ALERT':
+      return t('dynamic_keys.routing.event.health_alert');
+    case 'QUOTA_ALERT':
+      return t('dynamic_keys.routing.event.quota_alert');
+    case 'FLAPPING_ALERT':
+      return t('dynamic_keys.routing.event.flapping_alert');
+    case 'TEST_RUN':
+      return t('dynamic_keys.routing.event.test_run');
+    case 'FAILOVER_SIMULATION':
+      return t('dynamic_keys.routing.event.failover_simulation');
+    case 'PIN_APPLIED':
+      return t('dynamic_keys.routing.event.pin_applied');
+    case 'PIN_CLEARED':
+      return t('dynamic_keys.routing.event.pin_cleared');
+    default:
+      return eventType.replaceAll('_', ' ');
+  }
+}
+
+function formatRoutingPreferenceModeLabel(mode: DynamicRoutingPreferenceMode, t: (key: string) => string) {
+  return mode === 'ONLY'
+    ? t('dynamic_keys.routing.preference_mode.only')
+    : t('dynamic_keys.routing.preference_mode.prefer');
+}
+
+function formatStickinessModeLabel(mode: 'NONE' | 'DRAIN', t: (key: string) => string) {
+  return mode === 'DRAIN'
+    ? t('dynamic_keys.routing.stickiness.drain')
+    : t('dynamic_keys.routing.stickiness.none');
+}
+
 function DynamicRoutingDiagnosticsCard({
   data,
   isLoading,
   onRefresh,
   isRefreshing,
+  onPinCurrent,
+  onClearPin,
+  onSimulateFailover,
+  onTestCandidates,
+  isPinning,
+  isClearingPin,
+  isSimulating,
+  isTesting,
+  canPinCurrent,
+  simulationResult,
+  candidateTestResult,
 }: {
   data?: DynamicRoutingDiagnostics;
   isLoading: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
+  onPinCurrent: () => void;
+  onClearPin: () => void;
+  onSimulateFailover: () => void;
+  onTestCandidates: () => void;
+  isPinning: boolean;
+  isClearingPin: boolean;
+  isSimulating: boolean;
+  isTesting: boolean;
+  canPinCurrent: boolean;
+  simulationResult?: DynamicRoutingSimulationResult | null;
+  candidateTestResult?: DynamicRoutingCandidateTestResult | null;
 }) {
+  const { t } = useLocale();
+
   if (isLoading && !data) {
     return (
       <Card className="ops-detail-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shuffle className="h-5 w-5 text-primary" />
-            Routing Diagnostics
+            {t('dynamic_keys.routing.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1689,11 +1785,9 @@ function DynamicRoutingDiagnosticsCard({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Shuffle className="h-5 w-5 text-primary" />
-              Routing Diagnostics
+              {t('dynamic_keys.routing.title')}
             </CardTitle>
-            <CardDescription>
-              See how this dynamic key will route requests and which backend handled traffic most recently.
-            </CardDescription>
+            <CardDescription>{t('dynamic_keys.routing.description')}</CardDescription>
           </div>
           <Button variant="outline" size="sm" className="rounded-full" onClick={onRefresh} disabled={isRefreshing}>
             {isRefreshing ? (
@@ -1701,18 +1795,18 @@ function DynamicRoutingDiagnosticsCard({
             ) : (
               <RefreshCw className="mr-2 h-4 w-4" />
             )}
-            Refresh
+            {t('dynamic_keys.detail.refresh')}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="ops-row-card">
           <div>
-            <p className="text-sm text-muted-foreground">Selection algorithm</p>
-            <p className="mt-1 text-sm font-medium">{data?.algorithmLabel || 'Unknown'}</p>
+            <p className="text-sm text-muted-foreground">{t('dynamic_keys.routing.selection_algorithm')}</p>
+            <p className="mt-1 text-sm font-medium">{data?.algorithmLabel || t('dynamic_keys.routing.unknown')}</p>
           </div>
           <Badge variant={data?.algorithm === 'LEAST_LOAD' ? 'default' : 'secondary'}>
-            {data?.algorithmLabel || 'Unknown'}
+            {data?.algorithmLabel || t('dynamic_keys.routing.unknown')}
           </Badge>
         </div>
 
@@ -1722,43 +1816,118 @@ function DynamicRoutingDiagnosticsCard({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="ops-inline-stat">
-            <p className="text-xs text-muted-foreground">Active backends</p>
+            <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.active_backends')}</p>
             <p className="font-medium">{data?.attachedActiveKeys ?? 0}</p>
           </div>
           <div className="ops-inline-stat">
-            <p className="text-xs text-muted-foreground">Viewer IP</p>
-            <p className="font-mono text-sm">{data?.viewerIp || 'Unavailable'}</p>
+            <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.viewer_ip')}</p>
+            <p className="font-mono text-sm">{data?.viewerIp || t('dynamic_keys.routing.unavailable')}</p>
           </div>
         </div>
 
         {data ? (
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Preference mode</p>
-              <p className="font-medium">{data.preferredRegionMode === 'ONLY' ? 'Only matching' : 'Prefer matching'}</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.preference_mode.label')}</p>
+              <p className="font-medium">{formatRoutingPreferenceModeLabel(data.preferredRegionMode, t)}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Preferred servers</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.preferred_servers')}</p>
               <p className="font-medium">{data.preferredServerIds.length || 0}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Preferred regions</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.preferred_regions')}</p>
               <p className="font-medium">{data.preferredCountryCodes.length || 0}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Stickiness</p>
-              <p className="font-medium">{data.sessionStickinessMode === 'DRAIN' ? 'Drain active sessions' : 'None'}</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.stickiness.label')}</p>
+              <p className="font-medium">{formatStickinessModeLabel(data.sessionStickinessMode, t)}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Drain grace</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.drain_grace')}</p>
               <p className="font-medium">{data.drainGraceMinutes} min</p>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button variant="outline" className="justify-start" onClick={onPinCurrent} disabled={!canPinCurrent || isPinning}>
+            {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pin className="mr-2 h-4 w-4" />}
+            {t('dynamic_keys.routing.action.pin_current')}
+          </Button>
+          <Button variant="outline" className="justify-start" onClick={onClearPin} disabled={!data?.pinnedBackend || isClearingPin}>
+            {isClearingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PinOff className="mr-2 h-4 w-4" />}
+            {t('dynamic_keys.routing.action.clear_pin')}
+          </Button>
+          <Button variant="outline" className="justify-start" onClick={onSimulateFailover} disabled={isSimulating}>
+            {isSimulating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+            {t('dynamic_keys.routing.action.simulate_failover')}
+          </Button>
+          <Button variant="outline" className="justify-start" onClick={onTestCandidates} disabled={isTesting}>
+            {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FlaskConical className="mr-2 h-4 w-4" />}
+            {t('dynamic_keys.routing.action.test_candidates')}
+          </Button>
+        </div>
+
+        {data?.pinnedBackend ? (
+          <div className="rounded-[1.2rem] border border-primary/20 bg-primary/5 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {t('dynamic_keys.routing.pinned_backend')}
+            </p>
+            <div className="mt-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {getCountryFlag(data.pinnedBackend.serverCountry || '')} {data.pinnedBackend.serverName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground break-words">
+                  {data.pinnedBackend.keyName || t('dynamic_keys.routing.server_pin_only')}
+                </p>
+              </div>
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                {t('dynamic_keys.routing.pin_active')}
+              </Badge>
+            </div>
+            {data.pinnedBackend.pinnedAt ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t('dynamic_keys.routing.pinned_at')} {formatRelativeTime(new Date(data.pinnedBackend.pinnedAt))}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {simulationResult ? (
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {t('dynamic_keys.routing.simulation_result')}
+            </p>
+            <p className="mt-3 text-sm font-medium">
+              {getCountryFlag(simulationResult.target.serverCountry || '')} {simulationResult.target.serverName}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground break-words">{simulationResult.target.reason}</p>
+          </div>
+        ) : null}
+
+        {candidateTestResult ? (
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('dynamic_keys.routing.test_result')}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {candidateTestResult.candidates.length} {t('dynamic_keys.routing.candidates_checked')}
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {formatRelativeTime(new Date(candidateTestResult.testedAt))}
+              </span>
             </div>
           </div>
         ) : null}
 
         {data?.routingAlerts?.length ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Active alerts</p>
+            <p className="text-sm font-medium">{t('dynamic_keys.routing.active_alerts')}</p>
             <div className="space-y-2">
               {data.routingAlerts.map((alert) => (
                 <div key={alert.id} className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
@@ -1788,33 +1957,33 @@ function DynamicRoutingDiagnosticsCard({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Preferred servers
+                {t('dynamic_keys.routing.preferred_servers')}
               </p>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm text-muted-foreground break-words">
                 {data.preferredServers.length
                   ? data.preferredServers
                       .map((server) => `${getCountryFlag(server.countryCode || '')} ${server.name}`.trim())
                       .join(' -> ')
-                  : 'No explicit server order configured.'}
+                  : t('dynamic_keys.routing.no_server_order')}
               </p>
               {Object.keys(data.preferredServerWeights).length ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Weights: {Object.entries(data.preferredServerWeights).map(([serverId, weight]) => `${serverId.slice(0, 6)}=${weight}x`).join(', ')}
+                <p className="mt-3 text-xs text-muted-foreground break-words">
+                  {t('dynamic_keys.routing.weights')} {Object.entries(data.preferredServerWeights).map(([serverId, weight]) => `${serverId.slice(0, 6)}=${weight}x`).join(', ')}
                 </p>
               ) : null}
             </div>
             <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Preferred regions
+                {t('dynamic_keys.routing.preferred_regions')}
               </p>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm text-muted-foreground break-words">
                 {data.preferredCountryCodes.length
                   ? data.preferredCountryCodes.join(' -> ')
-                  : 'No region order configured.'}
+                  : t('dynamic_keys.routing.no_region_order')}
               </p>
               {Object.keys(data.preferredCountryWeights).length ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Weights: {Object.entries(data.preferredCountryWeights).map(([countryCode, weight]) => `${countryCode}=${weight}x`).join(', ')}
+                <p className="mt-3 text-xs text-muted-foreground break-words">
+                  {t('dynamic_keys.routing.weights')} {Object.entries(data.preferredCountryWeights).map(([countryCode, weight]) => `${countryCode}=${weight}x`).join(', ')}
                 </p>
               ) : null}
             </div>
@@ -1824,21 +1993,21 @@ function DynamicRoutingDiagnosticsCard({
         {data ? (
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Applied template</p>
-              <p className="font-medium">{data.appliedTemplate?.name || 'None'}</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.applied_template')}</p>
+              <p className="font-medium">{data.appliedTemplate?.name || t('dynamic_keys.routing.none')}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Rotation trigger</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.rotation_trigger')}</p>
               <p className="font-medium">{data.rotationTriggerMode}</p>
             </div>
             <div className="ops-inline-stat">
-              <p className="text-xs text-muted-foreground">Rotation policy</p>
+              <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.rotation_policy')}</p>
               <p className="font-medium">
                 {data.rotationTriggerMode === 'USAGE' || data.rotationTriggerMode === 'COMBINED'
                   ? `${data.rotationUsageThresholdPercent}% quota`
                   : data.rotateOnHealthFailure
-                    ? 'Health-aware'
-                    : 'Scheduled'}
+                    ? t('dynamic_keys.routing.health_aware')
+                    : t('dynamic_keys.routing.scheduled')}
               </p>
             </div>
           </div>
@@ -1847,29 +2016,29 @@ function DynamicRoutingDiagnosticsCard({
         {data?.currentSelection ? (
           <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Current selection
+              {t('dynamic_keys.routing.current_selection')}
             </p>
             <div className="mt-3 flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {getCountryFlag(data.currentSelection.serverCountry || '')} {data.currentSelection.serverName}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground break-words">
                   {data.currentSelection.keyName
-                    ? `${data.currentSelection.keyName}`
+                    ? data.currentSelection.keyName
                     : data.currentSelection.mode === 'SELF_MANAGED_CANDIDATE'
-                      ? 'Server candidate for the next on-demand key'
-                      : 'No backend key selected'}
+                      ? t('dynamic_keys.routing.server_candidate')
+                      : t('dynamic_keys.routing.no_backend_selected')}
                 </p>
               </div>
               <Badge variant="outline">
-                {data.currentSelection.mode === 'SELF_MANAGED_CANDIDATE' ? 'Candidate' : 'Live'}
+                {data.currentSelection.mode === 'SELF_MANAGED_CANDIDATE' ? t('dynamic_keys.routing.candidate') : t('dynamic_keys.routing.live')}
               </Badge>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{data.currentSelection.reason}</p>
+            <p className="mt-3 text-sm text-muted-foreground break-words">{data.currentSelection.reason}</p>
             {data.currentSelection.lastTrafficAt ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                Last traffic {formatRelativeTime(new Date(data.currentSelection.lastTrafficAt))}
+                {t('dynamic_keys.routing.last_traffic')} {formatRelativeTime(new Date(data.currentSelection.lastTrafficAt))}
               </p>
             ) : null}
           </div>
@@ -1882,34 +2051,34 @@ function DynamicRoutingDiagnosticsCard({
         {data?.lastResolvedBackend ? (
           <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Last backend with traffic
+              {t('dynamic_keys.routing.last_backend')}
             </p>
             <div className="mt-3 flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {getCountryFlag(data.lastResolvedBackend.serverCountry || '')} {data.lastResolvedBackend.serverName}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">{data.lastResolvedBackend.keyName}</p>
+                <p className="mt-1 text-xs text-muted-foreground break-words">{data.lastResolvedBackend.keyName}</p>
               </div>
               {data.lastResolvedBackend.isActive ? (
                 <Badge variant="outline" className="border-emerald-500/30 text-emerald-500">
                   <Wifi className="mr-1 h-3 w-3" />
-                  Active
+                  {t('dynamic_keys.routing.active')}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
                   <WifiOff className="mr-1 h-3 w-3" />
-                  Idle
+                  {t('dynamic_keys.routing.idle')}
                 </Badge>
               )}
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="ops-inline-stat">
-                <p className="text-xs text-muted-foreground">Last seen</p>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.last_seen')}</p>
                 <p className="font-medium">{formatRelativeTime(new Date(data.lastResolvedBackend.lastSeenAt))}</p>
               </div>
               <div className="ops-inline-stat">
-                <p className="text-xs text-muted-foreground">Usage on backend</p>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.backend_usage')}</p>
                 <p className="font-medium">{formatBytes(BigInt(data.lastResolvedBackend.bytesUsed))}</p>
               </div>
             </div>
@@ -1918,16 +2087,16 @@ function DynamicRoutingDiagnosticsCard({
 
         {data?.recentBackendSwitches?.length ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Recent backend switches</p>
+            <p className="text-sm font-medium">{t('dynamic_keys.routing.recent_switches')}</p>
             <div className="space-y-2">
               {data.recentBackendSwitches.map((event) => (
                 <div key={`${event.fromKeyId}-${event.toKeyId}-${event.switchedAt}`} className="ops-row-card">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {event.fromServerName} to {event.toServerName}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium break-words">
+                      {event.fromServerName} → {event.toServerName}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {event.fromKeyName} to {event.toKeyName}
+                    <p className="mt-1 text-xs text-muted-foreground break-words">
+                      {event.fromKeyName} → {event.toKeyName}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground">
@@ -1941,22 +2110,22 @@ function DynamicRoutingDiagnosticsCard({
 
         {data?.candidateRanking?.length ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Candidate ranking</p>
+            <p className="text-sm font-medium">{t('dynamic_keys.routing.candidate_ranking')}</p>
             <div className="space-y-2">
               {data.candidateRanking.slice(0, 5).map((candidate, index) => (
                 <div key={`${candidate.serverId}-${candidate.keyId || index}`} className="ops-row-card items-start">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-medium break-words">
                       {index + 1}. {getCountryFlag(candidate.serverCountry || '')} {candidate.serverName}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground break-words">
                       {candidate.keyName ? `${candidate.keyName} · ` : ''}
                       {candidate.reason}
                     </p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    <p>{candidate.weight}x weight</p>
-                    <p>{candidate.loadScore !== null ? `${candidate.loadScore}% load` : 'No load data'}</p>
+                    <p>{candidate.weight}x {t('dynamic_keys.routing.weight')}</p>
+                    <p>{candidate.loadScore !== null ? `${candidate.loadScore}% ${t('dynamic_keys.routing.load')}` : t('dynamic_keys.routing.no_load')}</p>
                   </div>
                 </div>
               ))}
@@ -1966,13 +2135,13 @@ function DynamicRoutingDiagnosticsCard({
 
         {data?.routingTimeline?.length ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Routing timeline</p>
+            <p className="text-sm font-medium">{t('dynamic_keys.routing.timeline')}</p>
             <div className="space-y-2">
               {data.routingTimeline.slice(0, 6).map((event) => (
                 <div key={event.id} className="ops-row-card items-start">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{event.eventType.replaceAll('_', ' ')}</p>
+                      <p className="text-sm font-medium">{formatRoutingEventLabel(event.eventType, t)}</p>
                       <Badge
                         variant="outline"
                         className={cn(
@@ -1984,10 +2153,10 @@ function DynamicRoutingDiagnosticsCard({
                         {event.severity}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{event.reason}</p>
+                    <p className="mt-1 text-xs text-muted-foreground break-words">{event.reason}</p>
                     {(event.fromServerName || event.toServerName) ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {event.fromServerName || 'None'} → {event.toServerName || 'None'}
+                      <p className="mt-1 text-xs text-muted-foreground break-words">
+                        {(event.fromServerName || t('dynamic_keys.routing.none'))} → {(event.toServerName || t('dynamic_keys.routing.none'))}
                       </p>
                     ) : null}
                   </div>
@@ -2002,21 +2171,21 @@ function DynamicRoutingDiagnosticsCard({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="ops-inline-stat">
-            <p className="text-xs text-muted-foreground">Last share-page view</p>
+            <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.last_share_view')}</p>
             <p className="font-medium">
-              {data?.lastSharePageViewAt ? formatRelativeTime(new Date(data.lastSharePageViewAt)) : 'Never'}
+              {data?.lastSharePageViewAt ? formatRelativeTime(new Date(data.lastSharePageViewAt)) : t('dynamic_keys.routing.never')}
             </p>
           </div>
           <div className="ops-inline-stat">
-            <p className="text-xs text-muted-foreground">Last copy</p>
+            <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.last_copy')}</p>
             <p className="font-medium">
-              {data?.lastSharePageCopyAt ? formatRelativeTime(new Date(data.lastSharePageCopyAt)) : 'Never'}
+              {data?.lastSharePageCopyAt ? formatRelativeTime(new Date(data.lastSharePageCopyAt)) : t('dynamic_keys.routing.never')}
             </p>
           </div>
           <div className="ops-inline-stat">
-            <p className="text-xs text-muted-foreground">Last app open</p>
+            <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.last_app_open')}</p>
             <p className="font-medium">
-              {data?.lastSharePageOpenAppAt ? formatRelativeTime(new Date(data.lastSharePageOpenAppAt)) : 'Never'}
+              {data?.lastSharePageOpenAppAt ? formatRelativeTime(new Date(data.lastSharePageOpenAppAt)) : t('dynamic_keys.routing.never')}
             </p>
           </div>
         </div>
@@ -2284,6 +2453,70 @@ export default function DynamicKeyDetailPage() {
       refetchIntervalInBackground: false,
     },
   );
+  const pinBackendMutation = trpc.dynamicKeys.pinBackend.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: t('dynamic_keys.routing.toast.pinned_title'),
+        description: t('dynamic_keys.routing.toast.pinned_desc'),
+      });
+      await Promise.all([refetch(), routingDiagnosticsQuery.refetch()]);
+    },
+    onError: (error) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.pin_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const clearPinnedBackendMutation = trpc.dynamicKeys.clearPinnedBackend.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: t('dynamic_keys.routing.toast.pin_cleared_title'),
+        description: t('dynamic_keys.routing.toast.pin_cleared_desc'),
+      });
+      await Promise.all([refetch(), routingDiagnosticsQuery.refetch()]);
+    },
+    onError: (error) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.pin_clear_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const simulateFailoverMutation = trpc.dynamicKeys.simulateFailover.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.simulation_title'),
+        description: `${t('dynamic_keys.routing.toast.simulation_desc')} ${result.target.serverName}.`,
+      });
+      await routingDiagnosticsQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.simulation_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const testCandidatesMutation = trpc.dynamicKeys.testCandidates.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.test_title'),
+        description: `${result.candidates.length} ${t('dynamic_keys.routing.toast.test_desc')}`,
+      });
+      await routingDiagnosticsQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: t('dynamic_keys.routing.toast.test_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Delete mutation
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({
@@ -2376,10 +2609,28 @@ export default function DynamicKeyDetailPage() {
       return `${window.location.origin}${getPublicBasePath()}/c/${dak.publicSlug}`;
     }
 
-    return `${window.location.origin}${getPublicBasePath()}/api/sub/${dak.dynamicUrl}`;
+  return `${window.location.origin}${getPublicBasePath()}/api/sub/${dak.dynamicUrl}`;
   }, [dak?.dynamicUrl, dak?.publicSlug]);
   const qrDownloadFilename = buildDownloadFilename(dak?.name, 'qr', 'png');
-  const configDownloadFilename = buildDownloadFilename(dak?.name, 'client-config', 'txt');
+  const configDownloadFilename = buildDownloadFilename(dak?.name, 'dynamic-config', 'txt');
+  const currentBackendConfigFilename = buildDownloadFilename(dak?.name, 'current-backend', 'txt');
+  const currentBackendAccessUrl = useMemo(() => {
+    if (!dak) {
+      return '';
+    }
+
+    const selectedKeyId =
+      routingDiagnosticsQuery.data?.currentSelection?.keyId
+      || routingDiagnosticsQuery.data?.pinnedBackend?.keyId
+      || routingDiagnosticsQuery.data?.lastResolvedBackend?.keyId
+      || null;
+
+    if (!selectedKeyId) {
+      return '';
+    }
+
+    return dak.accessKeys.find((key) => key.id === selectedKeyId)?.accessUrl || '';
+  }, [dak, routingDiagnosticsQuery.data]);
 
   // Generate QR code when data loads
   useEffect(() => {
@@ -2438,6 +2689,65 @@ export default function DynamicKeyDetailPage() {
       title: 'Config downloaded',
       description: `${configDownloadFilename} has been saved.`,
     });
+  };
+
+  const handleDownloadCurrentBackendConfig = () => {
+    if (!currentBackendAccessUrl) {
+      toast({
+        title: t('dynamic_keys.routing.toast.backend_config_unavailable'),
+        description: t('dynamic_keys.routing.toast.backend_config_unavailable_desc'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    downloadTextFile(`${currentBackendAccessUrl}\n`, currentBackendConfigFilename);
+    toast({
+      title: t('dynamic_keys.routing.toast.backend_config_downloaded'),
+      description: `${currentBackendConfigFilename} ${t('dynamic_keys.routing.toast.file_saved')}`,
+    });
+  };
+
+  const handlePinCurrentBackend = () => {
+    if (!dak || !routingDiagnosticsQuery.data?.currentSelection) {
+      toast({
+        title: t('dynamic_keys.routing.toast.pin_failed'),
+        description: t('dynamic_keys.routing.toast.no_selection'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const selection = routingDiagnosticsQuery.data.currentSelection;
+    pinBackendMutation.mutate({
+      id: dak.id,
+      accessKeyId: selection.keyId ?? undefined,
+      serverId: selection.serverId ?? undefined,
+    });
+  };
+
+  const handleClearPinnedBackend = () => {
+    if (!dak) {
+      return;
+    }
+
+    clearPinnedBackendMutation.mutate({ id: dak.id });
+  };
+
+  const handleSimulateFailover = () => {
+    if (!dak) {
+      return;
+    }
+
+    simulateFailoverMutation.mutate({ id: dak.id });
+  };
+
+  const handleTestCandidates = () => {
+    if (!dak) {
+      return;
+    }
+
+    testCandidatesMutation.mutate({ id: dak.id });
   };
 
   const handleDelete = () => {
@@ -2905,6 +3215,10 @@ export default function DynamicKeyDetailPage() {
                   <Download className="w-4 h-4 mr-2" />
                   Download Config
                 </Button>
+                <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadCurrentBackendConfig}>
+                  <Download className="w-4 h-4 mr-2" />
+                  {t('dynamic_keys.routing.action.download_current_backend')}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -2962,6 +3276,17 @@ export default function DynamicKeyDetailPage() {
               void routingDiagnosticsQuery.refetch();
             }}
             isRefreshing={routingDiagnosticsQuery.isFetching}
+            onPinCurrent={handlePinCurrentBackend}
+            onClearPin={handleClearPinnedBackend}
+            onSimulateFailover={handleSimulateFailover}
+            onTestCandidates={handleTestCandidates}
+            isPinning={pinBackendMutation.isPending}
+            isClearingPin={clearPinnedBackendMutation.isPending}
+            isSimulating={simulateFailoverMutation.isPending}
+            isTesting={testCandidatesMutation.isPending}
+            canPinCurrent={Boolean(routingDiagnosticsQuery.data?.currentSelection?.serverId)}
+            simulationResult={simulateFailoverMutation.data}
+            candidateTestResult={testCandidatesMutation.data}
           />
 
           <DynamicKeyTemplateCard

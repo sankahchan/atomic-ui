@@ -894,6 +894,9 @@ export const dynamicKeysRouter = router({
         lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
         lastResolvedServerId: dak.lastResolvedServerId,
         lastResolvedAt: dak.lastResolvedAt,
+        pinnedAccessKeyId: dak.pinnedAccessKeyId,
+        pinnedServerId: dak.pinnedServerId,
+        pinnedAt: dak.pinnedAt,
         appliedTemplateId: dak.appliedTemplateId,
         appliedTemplate: dak.appliedTemplate,
         createdAt: dak.createdAt,
@@ -955,6 +958,9 @@ export const dynamicKeysRouter = router({
           lastResolvedAccessKeyId: true,
           lastResolvedServerId: true,
           lastResolvedAt: true,
+          pinnedAccessKeyId: true,
+          pinnedServerId: true,
+          pinnedAt: true,
           rotationTriggerMode: true,
           rotationUsageThresholdPercent: true,
           rotateOnHealthFailure: true,
@@ -971,6 +977,7 @@ export const dynamicKeysRouter = router({
             select: {
               id: true,
               name: true,
+              accessUrl: true,
               status: true,
               usedBytes: true,
               lastTrafficAt: true,
@@ -1193,6 +1200,15 @@ export const dynamicKeysRouter = router({
         reason: string;
         lastTrafficAt?: string | null;
       } | null = null;
+      let pinnedBackend: {
+        mode: 'ATTACHED_KEY' | 'SELF_MANAGED_SERVER';
+        keyId?: string | null;
+        keyName?: string | null;
+        serverId: string;
+        serverName: string;
+        serverCountry: string | null;
+        pinnedAt: string | null;
+      } | null = null;
 
       let selectionNote: string | null = null;
       let candidateRanking: Array<{
@@ -1245,6 +1261,7 @@ export const dynamicKeysRouter = router({
             algorithm,
             clientIp: viewerIp || '127.0.0.1',
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+            pinnedAccessKeyId: dak.pinnedAccessKeyId,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
             preferredServerWeights: routingPreferences.preferredServerWeights,
@@ -1268,14 +1285,35 @@ export const dynamicKeysRouter = router({
             };
           }
         }
+
+        if (dak.pinnedAccessKeyId) {
+          const pinnedKey = activeKeys.find((key) => key.id === dak.pinnedAccessKeyId);
+          if (pinnedKey?.server) {
+            pinnedBackend = {
+              mode: 'ATTACHED_KEY',
+              keyId: pinnedKey.id,
+              keyName: pinnedKey.name,
+              serverId: pinnedKey.server.id,
+              serverName: pinnedKey.server.name,
+              serverCountry: pinnedKey.server.countryCode ?? null,
+              pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+            };
+          }
+        }
       } else {
-        const activeSelfManagedKey = [...activeKeys]
+        const sortedSelfManagedKeys = [...activeKeys]
           .filter((key) => key.name.startsWith('self-managed-dak-'))
           .sort((left, right) => {
             const leftTime = (left.lastTrafficAt ?? left.lastUsedAt ?? left.createdAt).getTime();
             const rightTime = (right.lastTrafficAt ?? right.lastUsedAt ?? right.createdAt).getTime();
             return rightTime - leftTime;
-          })[0];
+          });
+        const pinnedSelfManagedKey = dak.pinnedAccessKeyId
+          ? sortedSelfManagedKeys.find((key) => key.id === dak.pinnedAccessKeyId)
+          : dak.pinnedServerId
+            ? sortedSelfManagedKeys.find((key) => key.server?.id === dak.pinnedServerId)
+            : null;
+        const activeSelfManagedKey = pinnedSelfManagedKey ?? sortedSelfManagedKeys[0];
 
         if (activeSelfManagedKey?.server) {
           currentSelection = {
@@ -1285,7 +1323,9 @@ export const dynamicKeysRouter = router({
             serverId: activeSelfManagedKey.server.id,
             serverName: activeSelfManagedKey.server.name,
             serverCountry: activeSelfManagedKey.server.countryCode ?? null,
-            reason: 'An active self-managed backend already exists and will be reused until it rotates or is replaced.',
+            reason: pinnedSelfManagedKey
+              ? 'Operator pin forced routing to the current self-managed backend until the pin is cleared.'
+              : 'An active self-managed backend already exists and will be reused until it rotates or is replaced.',
             lastTrafficAt: activeSelfManagedKey.lastTrafficAt?.toISOString() ?? null,
           };
         } else {
@@ -1304,6 +1344,7 @@ export const dynamicKeysRouter = router({
             algorithm,
             clientIp: viewerIp || '127.0.0.1',
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+            pinnedServerId: dak.pinnedServerId,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
             preferredServerWeights: routingPreferences.preferredServerWeights,
@@ -1324,6 +1365,31 @@ export const dynamicKeysRouter = router({
             };
           } else {
             selectionNote = 'No active server currently matches this dynamic key. Add or activate servers before the next fetch.';
+          }
+        }
+
+        if (activeSelfManagedKey?.server) {
+          pinnedBackend = dak.pinnedAccessKeyId || dak.pinnedServerId
+            ? {
+                mode: 'ATTACHED_KEY',
+                keyId: activeSelfManagedKey.id,
+                keyName: activeSelfManagedKey.name,
+                serverId: activeSelfManagedKey.server.id,
+                serverName: activeSelfManagedKey.server.name,
+                serverCountry: activeSelfManagedKey.server.countryCode ?? null,
+                pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+              }
+            : null;
+        } else if (dak.pinnedServerId) {
+          const pinnedServer = candidateServers.find((server) => server.id === dak.pinnedServerId);
+          if (pinnedServer) {
+            pinnedBackend = {
+              mode: 'SELF_MANAGED_SERVER',
+              serverId: pinnedServer.id,
+              serverName: pinnedServer.name,
+              serverCountry: pinnedServer.countryCode ?? null,
+              pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+            };
           }
         }
       }
@@ -1356,6 +1422,10 @@ export const dynamicKeysRouter = router({
         lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
         lastResolvedServerId: dak.lastResolvedServerId,
         lastResolvedAt: dak.lastResolvedAt?.toISOString() ?? null,
+        pinnedAccessKeyId: dak.pinnedAccessKeyId,
+        pinnedServerId: dak.pinnedServerId,
+        pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+        pinnedBackend,
         rotationTriggerMode: dak.rotationTriggerMode,
         rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
         rotateOnHealthFailure: dak.rotateOnHealthFailure,
@@ -1364,6 +1434,481 @@ export const dynamicKeysRouter = router({
         lastSharePageCopyAt: analytics.lastCopiedAt?.toISOString() ?? null,
         lastSharePageOpenAppAt:
           analytics.recentEvents.find((event) => event.eventType === 'OPEN_APP')?.createdAt.toISOString() ?? null,
+      };
+    }),
+
+  pinBackend: adminProcedure
+    .input(z.object({
+      id: z.string(),
+      accessKeyId: z.string().optional().nullable(),
+      serverId: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          accessKeys: {
+            where: { status: 'ACTIVE' },
+            select: {
+              id: true,
+              name: true,
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      if (!input.accessKeyId && !input.serverId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Choose a backend key or server to pin.',
+        });
+      }
+
+      let pinnedAccessKeyId: string | null = null;
+      let pinnedServerId: string | null = null;
+      let pinnedLabel = dak.name;
+      let fromKeyId: string | null = null;
+      let fromKeyName: string | null = null;
+      let fromServerId: string | null = null;
+      let fromServerName: string | null = null;
+
+      if (input.accessKeyId) {
+        const matchedKey = dak.accessKeys.find((key) => key.id === input.accessKeyId);
+        if (!matchedKey?.server) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'That backend key is no longer available for pinning.',
+          });
+        }
+
+        pinnedAccessKeyId = matchedKey.id;
+        pinnedServerId = matchedKey.server.id;
+        pinnedLabel = matchedKey.server.name;
+        fromKeyId = matchedKey.id;
+        fromKeyName = matchedKey.name;
+        fromServerId = matchedKey.server.id;
+        fromServerName = matchedKey.server.name;
+      } else if (input.serverId) {
+        if (dak.type === 'MANUAL') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Manual dynamic keys must pin a specific attached backend key.',
+          });
+        }
+
+        const matchedServer = await db.server.findUnique({
+          where: { id: input.serverId },
+          select: {
+            id: true,
+            name: true,
+            countryCode: true,
+          },
+        });
+
+        if (!matchedServer) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'That server is no longer available for pinning.',
+          });
+        }
+
+        pinnedServerId = matchedServer.id;
+        pinnedLabel = matchedServer.name;
+        fromServerId = matchedServer.id;
+        fromServerName = matchedServer.name;
+      }
+
+      const updated = await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: {
+          pinnedAccessKeyId,
+          pinnedServerId,
+          pinnedAt: new Date(),
+        },
+        select: {
+          pinnedAccessKeyId: true,
+          pinnedServerId: true,
+          pinnedAt: true,
+        },
+      });
+
+      await recordDynamicRoutingEvent({
+        dynamicAccessKeyId: input.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.PIN_APPLIED,
+        reason: `Pinned routing to ${pinnedLabel}.`,
+        fromKeyId,
+        fromKeyName,
+        fromServerId,
+        fromServerName,
+        metadata: {
+          mode: dak.type,
+        },
+      });
+
+      return updated;
+    }),
+
+  clearPinnedBackend: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const existing = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          pinnedAccessKeyId: true,
+          pinnedServerId: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const updated = await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: {
+          pinnedAccessKeyId: null,
+          pinnedServerId: null,
+          pinnedAt: null,
+        },
+        select: {
+          pinnedAccessKeyId: true,
+          pinnedServerId: true,
+          pinnedAt: true,
+        },
+      });
+
+      if (existing.pinnedAccessKeyId || existing.pinnedServerId) {
+        await recordDynamicRoutingEvent({
+          dynamicAccessKeyId: input.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.PIN_CLEARED,
+          reason: 'Cleared the operator pin and returned routing control to the live policy.',
+          fromKeyId: existing.pinnedAccessKeyId,
+          fromServerId: existing.pinnedServerId,
+        });
+      }
+
+      return updated;
+    }),
+
+  simulateFailover: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          serverTagsJson: true,
+          preferredServerIdsJson: true,
+          preferredCountryCodesJson: true,
+          preferredServerWeightsJson: true,
+          preferredCountryWeightsJson: true,
+          preferredRegionMode: true,
+          sessionStickinessMode: true,
+          drainGraceMinutes: true,
+          lastResolvedAccessKeyId: true,
+          lastResolvedServerId: true,
+          pinnedAccessKeyId: true,
+          pinnedServerId: true,
+          accessKeys: {
+            where: { status: 'ACTIVE' },
+            select: {
+              id: true,
+              name: true,
+              lastTrafficAt: true,
+              lastUsedAt: true,
+              createdAt: true,
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const routingPreferences = parseDynamicRoutingPreferences({
+        preferredServerIdsJson: dak.preferredServerIdsJson,
+        preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredServerWeightsJson: dak.preferredServerWeightsJson,
+        preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
+        preferredRegionMode: dak.preferredRegionMode,
+        sessionStickinessMode: dak.sessionStickinessMode,
+        drainGraceMinutes: dak.drainGraceMinutes,
+      });
+
+      if (dak.type === 'MANUAL') {
+        const activeKeys = dak.accessKeys.filter((key) => Boolean(key.server));
+        const ranking = await rankDynamicAccessKeyCandidates({
+          accessKeys: activeKeys.map((key) => ({
+            id: key.id,
+            name: key.name,
+            status: 'ACTIVE',
+            lastTrafficAt: key.lastTrafficAt,
+            lastUsedAt: key.lastUsedAt,
+            server: {
+              id: key.server!.id,
+              name: key.server!.name,
+              countryCode: key.server!.countryCode,
+            },
+          })),
+          preferences: routingPreferences,
+          serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
+        });
+
+        const currentKeyId = dak.pinnedAccessKeyId || dak.lastResolvedAccessKeyId;
+        const target = ranking.find((candidate) => candidate.keyId && candidate.keyId !== currentKeyId);
+
+        if (!target) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'No alternate backend is available to simulate a failover.',
+          });
+        }
+
+        await recordDynamicRoutingEvent({
+          dynamicAccessKeyId: dak.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.FAILOVER_SIMULATION,
+          reason: `A simulated failover would move this key to ${target.serverName}.`,
+          fromKeyId: currentKeyId ?? null,
+          fromServerId: dak.pinnedServerId || dak.lastResolvedServerId,
+          toKeyId: target.keyId,
+          toKeyName: target.keyName,
+          toServerId: target.serverId,
+          toServerName: target.serverName,
+          metadata: {
+            mode: 'MANUAL',
+          },
+        });
+
+        return {
+          mode: 'ATTACHED_KEY' as const,
+          target,
+        };
+      }
+
+      const serverTagIds = JSON.parse(dak.serverTagsJson || '[]') as string[];
+      const candidateServers = await db.server.findMany({
+        where: {
+          isActive: true,
+          ...(serverTagIds.length > 0
+            ? {
+                tags: {
+                  some: {
+                    tagId: { in: serverTagIds },
+                  },
+                },
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          countryCode: true,
+        },
+      });
+
+      const ranking = await rankDynamicServerCandidates({
+        servers: candidateServers.map((server) => ({
+          id: server.id,
+          name: server.name,
+          countryCode: server.countryCode,
+        })),
+        preferences: routingPreferences,
+        serverTagIds,
+      });
+
+      const currentServerId = dak.pinnedServerId || dak.lastResolvedServerId;
+      const target = ranking.find((candidate) => candidate.serverId !== currentServerId);
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No alternate server is available to simulate a failover.',
+        });
+      }
+
+      await recordDynamicRoutingEvent({
+        dynamicAccessKeyId: dak.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.FAILOVER_SIMULATION,
+        reason: `A simulated failover would move this key to ${target.serverName}.`,
+        fromServerId: currentServerId,
+        toServerId: target.serverId,
+        toServerName: target.serverName,
+        metadata: {
+          mode: 'SELF_MANAGED',
+        },
+      });
+
+      return {
+        mode: 'SELF_MANAGED_SERVER' as const,
+        target,
+      };
+    }),
+
+  testCandidates: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          type: true,
+          serverTagsJson: true,
+          preferredServerIdsJson: true,
+          preferredCountryCodesJson: true,
+          preferredServerWeightsJson: true,
+          preferredCountryWeightsJson: true,
+          preferredRegionMode: true,
+          sessionStickinessMode: true,
+          drainGraceMinutes: true,
+          accessKeys: {
+            where: { status: 'ACTIVE' },
+            select: {
+              id: true,
+              name: true,
+              lastTrafficAt: true,
+              lastUsedAt: true,
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const serverTagIds = JSON.parse(dak.serverTagsJson || '[]') as string[];
+      const routingPreferences = parseDynamicRoutingPreferences({
+        preferredServerIdsJson: dak.preferredServerIdsJson,
+        preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredServerWeightsJson: dak.preferredServerWeightsJson,
+        preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
+        preferredRegionMode: dak.preferredRegionMode,
+        sessionStickinessMode: dak.sessionStickinessMode,
+        drainGraceMinutes: dak.drainGraceMinutes,
+      });
+
+      let candidates: Array<{
+        keyId?: string;
+        keyName?: string;
+        serverId: string;
+        serverName: string;
+        serverCountry: string | null;
+        weight: number;
+        preferenceScope: 'COUNTRY' | 'SERVER' | 'NONE' | 'UNRESTRICTED' | 'FALLBACK';
+        loadScore: number | null;
+        effectiveScore: number | null;
+        reason: string;
+      }> = [];
+
+      if (dak.type === 'MANUAL') {
+        candidates = await rankDynamicAccessKeyCandidates({
+          accessKeys: dak.accessKeys
+            .filter((key) => Boolean(key.server))
+            .map((key) => ({
+              id: key.id,
+              name: key.name,
+              status: 'ACTIVE',
+              lastTrafficAt: key.lastTrafficAt,
+              lastUsedAt: key.lastUsedAt,
+              server: {
+                id: key.server!.id,
+                name: key.server!.name,
+                countryCode: key.server!.countryCode,
+              },
+            })),
+          preferences: routingPreferences,
+          serverTagIds,
+        });
+      } else {
+        const candidateServers = await db.server.findMany({
+          where: {
+            isActive: true,
+            ...(serverTagIds.length > 0
+              ? {
+                  tags: {
+                    some: {
+                      tagId: { in: serverTagIds },
+                    },
+                  },
+                }
+              : {}),
+          },
+          select: {
+            id: true,
+            name: true,
+            countryCode: true,
+          },
+        });
+
+        candidates = await rankDynamicServerCandidates({
+          servers: candidateServers.map((server) => ({
+            id: server.id,
+            name: server.name,
+            countryCode: server.countryCode,
+          })),
+          preferences: routingPreferences,
+          serverTagIds,
+        });
+      }
+
+      await recordDynamicRoutingEvent({
+        dynamicAccessKeyId: dak.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.TEST_RUN,
+        reason: `Ran a candidate routing test across ${candidates.length} backend option${candidates.length === 1 ? '' : 's'}.`,
+        metadata: {
+          candidateCount: candidates.length,
+          mode: dak.type,
+        },
+      });
+
+      return {
+        testedAt: new Date().toISOString(),
+        mode: dak.type as 'MANUAL' | 'SELF_MANAGED',
+        candidates,
       };
     }),
 

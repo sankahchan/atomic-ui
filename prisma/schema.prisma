@@ -289,6 +289,9 @@ model DynamicAccessKey {
   lastResolvedAccessKeyId String?
   lastResolvedServerId    String?
   lastResolvedAt          DateTime?
+  pinnedAccessKeyId      String?
+  pinnedServerId         String?
+  pinnedAt               DateTime?
 
   // Subscription page theme (overrides global default)
   // Valid themes: dark, light, purple, blue, green, orange, pink, red, glass*
