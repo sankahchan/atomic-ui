@@ -336,10 +336,14 @@ export default function SubscriptionPage() {
   }, []);
 
   const getLocaleHref = useCallback((nextLocale: SupportedLocale) => {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const normalizedPath = pathname.startsWith(basePath) || !basePath
+      ? pathname
+      : `${basePath}${pathname}`;
     const params = new URLSearchParams(searchParams.toString());
     params.set('lang', nextLocale);
     const query = params.toString();
-    return query ? `${pathname}?${query}` : pathname;
+    return query ? `${normalizedPath}?${query}` : normalizedPath;
   }, [pathname, searchParams]);
 
   const formatLocalizedDate = useCallback(
