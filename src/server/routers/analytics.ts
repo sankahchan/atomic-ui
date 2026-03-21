@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
+import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
 
 // Time range options
 const timeRangeSchema = z.enum(['24h', '7d', '30d']);
@@ -589,6 +590,272 @@ export const analyticsRouter = router({
         deltaBytes: s.deltaBytes.toString(),
         timestamp: s.createdAt.toISOString(),
       }));
+    }),
+
+  shareDashboard: adminProcedure
+    .input(z.object({
+      range: timeRangeSchema.default('7d'),
+      limit: z.number().int().min(1).max(20).default(6),
+    }))
+    .query(async ({ input }) => {
+      const cutoff = getDateCutoff(input.range);
+
+      const [
+        aggregate,
+        accessAggregates,
+        dynamicAggregates,
+        accessKeys,
+        dynamicKeys,
+        recentEvents,
+        activeAccessLinks,
+        activeDynamicLinks,
+      ] = await Promise.all([
+        db.subscriptionPageEvent.groupBy({
+          by: ['eventType'],
+          where: { createdAt: { gte: cutoff } },
+          _count: { eventType: true },
+        }),
+        db.subscriptionPageEvent.groupBy({
+          by: ['accessKeyId', 'eventType'],
+          where: {
+            createdAt: { gte: cutoff },
+            accessKeyId: { not: null },
+          },
+          _count: { eventType: true },
+        }),
+        db.subscriptionPageEvent.groupBy({
+          by: ['dynamicAccessKeyId', 'eventType'],
+          where: {
+            createdAt: { gte: cutoff },
+            dynamicAccessKeyId: { not: null },
+          },
+          _count: { eventType: true },
+        }),
+        db.accessKey.findMany({
+          where: {
+            OR: [
+              { publicSlug: { not: null } },
+              { subscriptionToken: { not: null } },
+            ],
+          },
+          select: {
+            id: true,
+            name: true,
+            publicSlug: true,
+            status: true,
+          },
+        }),
+        db.dynamicAccessKey.findMany({
+          where: {
+            OR: [
+              { publicSlug: { not: null } },
+              { dynamicUrl: { not: null } },
+            ],
+          },
+          select: {
+            id: true,
+            name: true,
+            publicSlug: true,
+            status: true,
+            sharePageEnabled: true,
+          },
+        }),
+        db.subscriptionPageEvent.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          select: {
+            id: true,
+            eventType: true,
+            source: true,
+            platform: true,
+            createdAt: true,
+            accessKey: {
+              select: {
+                id: true,
+                name: true,
+                publicSlug: true,
+              },
+            },
+            dynamicAccessKey: {
+              select: {
+                id: true,
+                name: true,
+                publicSlug: true,
+              },
+            },
+          },
+        }),
+        db.accessKey.count({
+          where: {
+            OR: [
+              { publicSlug: { not: null } },
+              { subscriptionToken: { not: null } },
+            ],
+          },
+        }),
+        db.dynamicAccessKey.count({
+          where: {
+            sharePageEnabled: true,
+            OR: [
+              { publicSlug: { not: null } },
+              { dynamicUrl: { not: null } },
+            ],
+          },
+        }),
+      ]);
+
+      const counts = Object.fromEntries(
+        aggregate.map((row) => [row.eventType, row._count.eventType]),
+      );
+
+      type ShareMetrics = {
+        pageViews: number;
+        copyClicks: number;
+        qrOpens: number;
+        appOpens: number;
+        telegramSends: number;
+        telegramConnects: number;
+        totalEvents: number;
+      };
+
+      const emptyMetrics = (): ShareMetrics => ({
+        pageViews: 0,
+        copyClicks: 0,
+        qrOpens: 0,
+        appOpens: 0,
+        telegramSends: 0,
+        telegramConnects: 0,
+        totalEvents: 0,
+      });
+
+      const reduceMetrics = <T extends { eventType: string; _count: { eventType: number } }>(
+        rows: T[],
+        idKey: 'accessKeyId' | 'dynamicAccessKeyId',
+      ) => {
+        const byId = new Map<string, ShareMetrics>();
+
+        for (const row of rows as Array<T & { accessKeyId?: string | null; dynamicAccessKeyId?: string | null }>) {
+          const id = row[idKey];
+          if (!id) continue;
+
+          const current = byId.get(id) ?? emptyMetrics();
+          const next = { ...current, totalEvents: current.totalEvents + row._count.eventType };
+
+          switch (row.eventType) {
+            case SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW:
+              next.pageViews += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.COPY_URL:
+              next.copyClicks += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.OPEN_QR:
+              next.qrOpens += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.OPEN_APP:
+              next.appOpens += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT:
+              next.telegramSends += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED:
+              next.telegramConnects += row._count.eventType;
+              break;
+          }
+
+          byId.set(id, next);
+        }
+
+        return byId;
+      };
+
+      const accessMetrics = reduceMetrics(accessAggregates, 'accessKeyId');
+      const dynamicMetrics = reduceMetrics(dynamicAggregates, 'dynamicAccessKeyId');
+
+      const combinedLinks = [
+        ...accessKeys.map((key) => ({
+          id: key.id,
+          type: 'ACCESS_KEY' as const,
+          name: key.name,
+          publicSlug: key.publicSlug,
+          status: key.status,
+          sharePageEnabled: true,
+          metrics: accessMetrics.get(key.id) ?? emptyMetrics(),
+        })),
+        ...dynamicKeys.map((key) => ({
+          id: key.id,
+          type: 'DYNAMIC_KEY' as const,
+          name: key.name,
+          publicSlug: key.publicSlug,
+          status: key.status,
+          sharePageEnabled: key.sharePageEnabled,
+          metrics: dynamicMetrics.get(key.id) ?? emptyMetrics(),
+        })),
+      ]
+        .filter((item) => item.metrics.totalEvents > 0)
+        .sort((a, b) => {
+          if (b.metrics.pageViews !== a.metrics.pageViews) {
+            return b.metrics.pageViews - a.metrics.pageViews;
+          }
+          return b.metrics.totalEvents - a.metrics.totalEvents;
+        })
+        .slice(0, input.limit);
+
+      const topLinks = await Promise.all(
+        combinedLinks.map(async (item) => {
+          const lastEvent =
+            item.type === 'ACCESS_KEY'
+              ? await db.subscriptionPageEvent.findFirst({
+                  where: {
+                    accessKeyId: item.id,
+                    createdAt: { gte: cutoff },
+                  },
+                  orderBy: { createdAt: 'desc' },
+                  select: { createdAt: true, eventType: true },
+                })
+              : await db.subscriptionPageEvent.findFirst({
+                  where: {
+                    dynamicAccessKeyId: item.id,
+                    createdAt: { gte: cutoff },
+                  },
+                  orderBy: { createdAt: 'desc' },
+                  select: { createdAt: true, eventType: true },
+                });
+
+          return {
+            ...item,
+            lastEventAt: lastEvent?.createdAt ?? null,
+            lastEventType: lastEvent?.eventType ?? null,
+          };
+        }),
+      );
+
+      return {
+        range: input.range,
+        summary: {
+          pageViews: counts[SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW] ?? 0,
+          copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
+          qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
+          appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+          telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
+          telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
+          activePublicLinks: activeAccessLinks + activeDynamicLinks,
+        },
+        topLinks,
+        recentEvents: recentEvents.map((event) => ({
+          id: event.id,
+          eventType: event.eventType,
+          source: event.source,
+          platform: event.platform,
+          createdAt: event.createdAt,
+          type: event.accessKey ? 'ACCESS_KEY' : 'DYNAMIC_KEY',
+          entityId: event.accessKey?.id ?? event.dynamicAccessKey?.id ?? null,
+          entityName: event.accessKey?.name ?? event.dynamicAccessKey?.name ?? 'Unknown link',
+          publicSlug: event.accessKey?.publicSlug ?? event.dynamicAccessKey?.publicSlug ?? null,
+        })),
+      };
     }),
 
   /**

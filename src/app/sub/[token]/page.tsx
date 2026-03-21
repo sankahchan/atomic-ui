@@ -63,6 +63,7 @@ import {
 } from '@/lib/i18n/config';
 import { resolveTranslation } from '@/lib/i18n/translations';
 import { buildDownloadFilename, downloadDataUrl, downloadTextFile } from '@/lib/download';
+import { resolveLocalizedTemplate } from '@/lib/localized-templates';
 import {
   getTheme,
   clientApps,
@@ -901,9 +902,18 @@ export default function SubscriptionPage() {
     ? tr('subscription.summary.percent_used', { percent: usagePercent })
     : tr('subscription.summary.used_no_limit', { used: formatBytes(keyData.usedBytes) });
   const keyWelcomeMessage = keyData.subscriptionWelcomeMessage?.trim() || '';
-  const effectiveWelcomeMessage = keyWelcomeMessage || branding.welcomeMessage?.trim() || '';
-  const shouldShowWelcome = Boolean(keyWelcomeMessage || (branding.showWelcome && branding.welcomeMessage?.trim()));
-  const footerText = branding.footerText?.trim()
+  const localizedWelcomeMessage = resolveLocalizedTemplate(
+    branding.localizedWelcomeMessages,
+    locale,
+    branding.welcomeMessage,
+  );
+  const effectiveWelcomeMessage = keyWelcomeMessage || localizedWelcomeMessage;
+  const shouldShowWelcome = Boolean(keyWelcomeMessage || (branding.showWelcome && localizedWelcomeMessage));
+  const footerText = resolveLocalizedTemplate(
+    branding.localizedFooterTexts,
+    locale,
+    branding.footerText,
+  )?.trim()
     || (branding.showPoweredBy !== false ? tr('subscription.ui.powered_by', { brand: branding.brandName || 'Atomic-UI' }) : '');
 
   const getCardStyle = () => {

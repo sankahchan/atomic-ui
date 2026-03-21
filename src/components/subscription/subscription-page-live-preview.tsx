@@ -24,6 +24,7 @@ import {
   prioritizeSubscriptionApps,
   type SubscriptionBranding,
 } from "@/lib/subscription-themes";
+import { resolveLocalizedTemplate } from "@/lib/localized-templates";
 
 const ATOMIC_LOGO_SVG = `data:image/svg+xml,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
@@ -91,7 +92,7 @@ export function SubscriptionPageLivePreview({
   supportLink,
 }: SubscriptionPageLivePreviewProps) {
   const [viewport, setViewport] = useState<PreviewViewport>("desktop");
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const tr = (key: string, values?: Record<string, string | number>) =>
     values ? fillTemplate(t(key), values) : t(key);
 
@@ -137,8 +138,13 @@ export function SubscriptionPageLivePreview({
         ? "text-[2.2rem] md:text-[2.35rem]"
         : "text-[2rem] md:text-[2.1rem]";
   const footerText =
-    mergedBranding.footerText?.trim() ||
+    resolveLocalizedTemplate(mergedBranding.localizedFooterTexts, locale, mergedBranding.footerText)?.trim() ||
     (mergedBranding.showPoweredBy === false ? "" : defaultBranding.footerText);
+  const localizedWelcomeMessage = resolveLocalizedTemplate(
+    mergedBranding.localizedWelcomeMessages,
+    locale,
+    mergedBranding.welcomeMessage,
+  );
   const showConnectionSummary = mergedBranding.showConnectionSummary ?? true;
   const showCompatibleApps = mergedBranding.showCompatibleApps ?? true;
   const showHelpContact = mergedBranding.showHelpContact ?? true;
@@ -338,9 +344,9 @@ export function SubscriptionPageLivePreview({
                     </div>
                   </div>
 
-                  {mergedBranding.showWelcome && mergedBranding.welcomeMessage && (
+                  {mergedBranding.showWelcome && localizedWelcomeMessage && (
                     <div className="rounded-2xl px-4 py-3 text-sm" style={{ ...pillStyle, backgroundColor: softSurface }}>
-                      {mergedBranding.welcomeMessage}
+                      {localizedWelcomeMessage}
                     </div>
                   )}
 

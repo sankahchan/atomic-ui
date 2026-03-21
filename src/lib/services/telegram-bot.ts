@@ -34,6 +34,11 @@ import {
 } from '@/lib/services/subscription-events';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
+import {
+  normalizeLocalizedTemplateMap,
+  resolveLocalizedTemplate,
+  type LocalizedTemplateMap,
+} from '@/lib/localized-templates';
 import { formatBytes, generateRandomString } from '@/lib/utils';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -66,6 +71,8 @@ export interface TelegramConfig {
   adminChatIds: string[];
   welcomeMessage?: string;
   keyNotFoundMessage?: string;
+  localizedWelcomeMessages?: LocalizedTemplateMap;
+  localizedKeyNotFoundMessages?: LocalizedTemplateMap;
   dailyDigestEnabled?: boolean;
   dailyDigestHour?: number;
   dailyDigestMinute?: number;
@@ -317,7 +324,12 @@ async function getSubscriptionDefaults() {
   const settings = await db.settings.findMany({
     where: {
       key: {
-        in: ['supportLink', 'subscriptionWelcomeMessage', 'defaultLanguage'],
+        in: [
+          'supportLink',
+          'subscriptionWelcomeMessage',
+          'subscriptionLocalizedWelcomeMessages',
+          'defaultLanguage',
+        ],
       },
     },
     select: {
@@ -331,6 +343,9 @@ async function getSubscriptionDefaults() {
   return {
     supportLink: settingsMap.get('supportLink') || null,
     welcomeMessage: settingsMap.get('subscriptionWelcomeMessage') || null,
+    localizedWelcomeMessages: normalizeLocalizedTemplateMap(
+      settingsMap.get('subscriptionLocalizedWelcomeMessages'),
+    ),
     defaultLanguage: coerceSupportedLocale(settingsMap.get('defaultLanguage')) || 'en',
   };
 }
@@ -452,6 +467,12 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
               ? config.keyNotFoundMessage
               : undefined,
+          localizedWelcomeMessages: normalizeLocalizedTemplateMap(
+            config.localizedWelcomeMessages,
+          ),
+          localizedKeyNotFoundMessages: normalizeLocalizedTemplateMap(
+            config.localizedKeyNotFoundMessages,
+          ),
           dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
           dailyDigestHour:
             typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
@@ -667,6 +688,14 @@ function resolveTelegramChatIdForDynamicKey(key: {
   return key.telegramId || key.user?.telegramChatId || null;
 }
 
+function resolveTelegramTemplate(
+  templates: LocalizedTemplateMap | undefined,
+  locale: SupportedLocale,
+  fallback?: string,
+) {
+  return resolveLocalizedTemplate(templates, locale, fallback)?.trim() || '';
+}
+
 function getDynamicKeyMessagingUrls(
   key: {
     dynamicUrl?: string | null;
@@ -844,7 +873,13 @@ export async function sendAccessKeySharePageToTelegram(input: {
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram', lang: locale })
     : buildSharePageUrl(token, { source: input.source || 'telegram', lang: locale });
   const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'telegram' });
-  const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
+  const welcomeMessage =
+    key.subscriptionWelcomeMessage?.trim() ||
+    resolveTelegramTemplate(
+      defaults.localizedWelcomeMessages,
+      locale,
+      defaults.welcomeMessage ?? undefined,
+    );
   const supportLink = defaults.supportLink;
   const reasonTitle = ui.accessReasonTitle(input.reason);
 
@@ -962,7 +997,13 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     throw new Error('This dynamic key does not have a usable client URL yet.');
   }
 
-  const welcomeMessage = key.subscriptionWelcomeMessage?.trim() || defaults.welcomeMessage?.trim() || '';
+  const welcomeMessage =
+    key.subscriptionWelcomeMessage?.trim() ||
+    resolveTelegramTemplate(
+      defaults.localizedWelcomeMessages,
+      locale,
+      defaults.welcomeMessage ?? undefined,
+    );
   const supportLink = defaults.supportLink;
   const attachedCount = key.accessKeys.length;
   const uniqueServers = Array.from(
@@ -1651,9 +1692,11 @@ async function handleStartCommand(
 
   const config = await getTelegramConfig();
   const adminMsg = isAdmin ? ui.adminRecognized : '';
-  const welcomeMessage =
-    config?.welcomeMessage ||
-    ui.defaultWelcome;
+  const welcomeMessage = resolveTelegramTemplate(
+    config?.localizedWelcomeMessages,
+    locale,
+    config?.welcomeMessage || ui.defaultWelcome,
+  );
 
   await sendTelegramMessage(
     botToken,
@@ -1707,9 +1750,10 @@ async function handleUsageCommand(
 
   if (keys.length === 0) {
     const config = await getTelegramConfig();
-    return (
-      config?.keyNotFoundMessage ||
-      ui.keyNotFoundDefault
+    return resolveTelegramTemplate(
+      config?.localizedKeyNotFoundMessages,
+      locale,
+      config?.keyNotFoundMessage || ui.keyNotFoundDefault,
     );
   }
 

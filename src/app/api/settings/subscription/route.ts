@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { defaultBranding } from '@/lib/subscription-themes';
+import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
 // All branding setting keys
 const brandingKeys = [
@@ -16,8 +17,10 @@ const brandingKeys = [
   'subscriptionLogoSize',
   'subscriptionBrandName',
   'subscriptionFooterText',
+  'subscriptionLocalizedFooterTexts',
   'subscriptionShowPoweredBy',
   'subscriptionWelcomeMessage',
+  'subscriptionLocalizedWelcomeMessages',
   'subscriptionShowWelcome',
   'subscriptionCustomCss',
   'subscriptionFontFamily',
@@ -77,10 +80,16 @@ export async function GET() {
         : 25,
       brandName: settingsMap.get('subscriptionBrandName') || defaultBranding.brandName,
       footerText: settingsMap.get('subscriptionFooterText') || '',
+      localizedFooterTexts: normalizeLocalizedTemplateMap(
+        parseJson(settingsMap.get('subscriptionLocalizedFooterTexts'), {}),
+      ),
       showPoweredBy: settingsMap.get('subscriptionShowPoweredBy')
         ? settingsMap.get('subscriptionShowPoweredBy') === 'true'
         : defaultBranding.showPoweredBy,
       welcomeMessage: settingsMap.get('subscriptionWelcomeMessage') || '',
+      localizedWelcomeMessages: normalizeLocalizedTemplateMap(
+        parseJson(settingsMap.get('subscriptionLocalizedWelcomeMessages'), {}),
+      ),
       showWelcome: settingsMap.get('subscriptionShowWelcome')
         ? settingsMap.get('subscriptionShowWelcome') === 'true'
         : defaultBranding.showWelcome,
@@ -240,6 +249,8 @@ export async function POST(request: NextRequest) {
 
       // JSON settings
       const jsonSettings: Record<string, unknown> = {
+        subscriptionLocalizedFooterTexts: branding.localizedFooterTexts,
+        subscriptionLocalizedWelcomeMessages: branding.localizedWelcomeMessages,
         subscriptionUsageAlertThresholds: branding.usageAlertThresholds,
         subscriptionEnabledApps: branding.enabledApps,
         subscriptionCustomApps: branding.customApps,

@@ -10,6 +10,7 @@ import { router, adminProcedure, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
+import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
 /**
  * Telegram Bot Settings Schema
@@ -19,6 +20,8 @@ const telegramSettingsSchema = z.object({
   botUsername: z.string().optional(),
   welcomeMessage: z.string().optional(),
   keyNotFoundMessage: z.string().optional(),
+  localizedWelcomeMessages: z.record(z.string(), z.string()).optional().default({}),
+  localizedKeyNotFoundMessages: z.record(z.string(), z.string()).optional().default({}),
   isEnabled: z.boolean().default(true),
   adminChatIds: z.array(z.string()).optional().default([]),
   dailyDigestEnabled: z.boolean().default(false),
@@ -42,6 +45,8 @@ export const telegramBotRouter = router({
         botUsername: '',
         welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
+        localizedWelcomeMessages: {},
+        localizedKeyNotFoundMessages: {},
         isEnabled: false,
         adminChatIds: [],
         dailyDigestEnabled: false,
@@ -58,6 +63,8 @@ export const telegramBotRouter = router({
         botUsername: parsed.botUsername || '',
         welcomeMessage: parsed.welcomeMessage || 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: parsed.keyNotFoundMessage || 'No key found for your account. Please contact the administrator.',
+        localizedWelcomeMessages: normalizeLocalizedTemplateMap(parsed.localizedWelcomeMessages),
+        localizedKeyNotFoundMessages: normalizeLocalizedTemplateMap(parsed.localizedKeyNotFoundMessages),
         isEnabled: parsed.isEnabled ?? false,
         adminChatIds: parsed.adminChatIds || [],
         dailyDigestEnabled: parsed.dailyDigestEnabled ?? false,
@@ -71,6 +78,8 @@ export const telegramBotRouter = router({
         botUsername: '',
         welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
         keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
+        localizedWelcomeMessages: {},
+        localizedKeyNotFoundMessages: {},
         isEnabled: false,
         adminChatIds: [],
         dailyDigestEnabled: false,

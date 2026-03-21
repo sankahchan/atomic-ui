@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import type { LocalizedTemplateMap } from '@/lib/localized-templates';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import {
@@ -152,6 +153,8 @@ type TelegramSettings = {
   botUsername?: string;
   welcomeMessage?: string;
   keyNotFoundMessage?: string;
+  localizedWelcomeMessages: LocalizedTemplateMap;
+  localizedKeyNotFoundMessages: LocalizedTemplateMap;
   isEnabled: boolean;
   adminChatIds: string[];
   dailyDigestEnabled: boolean;
@@ -165,6 +168,8 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   botUsername: '',
   welcomeMessage: 'Welcome! Use /mykeys to view your linked VPN keys.',
   keyNotFoundMessage: 'No linked keys were found. Please contact support to connect your Telegram account.',
+  localizedWelcomeMessages: {},
+  localizedKeyNotFoundMessages: {},
   isEnabled: false,
   adminChatIds: [],
   dailyDigestEnabled: false,
@@ -337,6 +342,12 @@ function TelegramBotSetupCard() {
     digestHour: isMyanmar ? 'Digest ပို့ချိန် (နာရီ)' : 'Digest hour',
     digestMinute: isMyanmar ? 'Digest ပို့ချိန် (မိနစ်)' : 'Digest minute',
     lookbackWindow: isMyanmar ? 'ပြန်ကြည့်မည့် အချိန်အပိုင်းအခြား' : 'Lookback window',
+    localizedWelcome: isMyanmar ? 'ဘာသာစကားလိုက် Welcome template များ' : 'Localized welcome templates',
+    localizedWelcomeDesc: isMyanmar ? 'Default welcome message ကို အစားထိုးမည့် English / Burmese message များကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the bot welcome message.',
+    localizedNotFound: isMyanmar ? 'ဘာသာစကားလိုက် Key-not-found template များ' : 'Localized key-not-found templates',
+    localizedNotFoundDesc: isMyanmar ? 'Key မတွေ့သောအခါ အသုံးပြုမည့် English / Burmese message များကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the missing-key reply.',
+    englishTemplate: isMyanmar ? 'English template' : 'English template',
+    burmeseTemplate: isMyanmar ? 'မြန်မာ template' : 'Burmese template',
     settingsSaved: isMyanmar ? 'Telegram ဆက်တင်များ သိမ်းပြီးပါပြီ' : 'Telegram settings saved',
     settingsSavedDesc: isMyanmar ? 'ဘော့ configuration နှင့် digest schedule ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The bot configuration and digest schedule were updated.',
     settingsFailed: isMyanmar ? 'Telegram ဆက်တင် သိမ်းမရပါ' : 'Telegram settings failed',
@@ -379,6 +390,8 @@ function TelegramBotSetupCard() {
       welcomeMessage: settingsQuery.data.welcomeMessage || t('settings.telegram.welcome_placeholder'),
       keyNotFoundMessage:
         settingsQuery.data.keyNotFoundMessage || t('settings.telegram.not_found_placeholder'),
+      localizedWelcomeMessages: settingsQuery.data.localizedWelcomeMessages || {},
+      localizedKeyNotFoundMessages: settingsQuery.data.localizedKeyNotFoundMessages || {},
       isEnabled: settingsQuery.data.isEnabled ?? false,
       adminChatIds: settingsQuery.data.adminChatIds || [],
       dailyDigestEnabled: settingsQuery.data.dailyDigestEnabled ?? false,
@@ -494,6 +507,16 @@ function TelegramBotSetupCard() {
       botUsername: form.botUsername?.trim() || undefined,
       welcomeMessage: form.welcomeMessage?.trim() || undefined,
       keyNotFoundMessage: form.keyNotFoundMessage?.trim() || undefined,
+      localizedWelcomeMessages: Object.fromEntries(
+        Object.entries(form.localizedWelcomeMessages || {})
+          .map(([localeCode, value]) => [localeCode, value.trim()])
+          .filter(([, value]) => value.length > 0),
+      ),
+      localizedKeyNotFoundMessages: Object.fromEntries(
+        Object.entries(form.localizedKeyNotFoundMessages || {})
+          .map(([localeCode, value]) => [localeCode, value.trim()])
+          .filter(([, value]) => value.length > 0),
+      ),
       isEnabled: form.isEnabled,
       adminChatIds,
       dailyDigestEnabled: form.dailyDigestEnabled,
@@ -501,6 +524,20 @@ function TelegramBotSetupCard() {
       dailyDigestMinute: form.dailyDigestMinute,
       digestLookbackHours: form.digestLookbackHours,
     });
+  };
+
+  const updateLocalizedTelegramText = (
+    key: 'localizedWelcomeMessages' | 'localizedKeyNotFoundMessages',
+    localeCode: 'en' | 'my',
+    value: string,
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        [localeCode]: value,
+      },
+    }));
   };
 
   return (
@@ -598,6 +635,37 @@ function TelegramBotSetupCard() {
                 />
               </div>
 
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4 md:col-span-2">
+                <div>
+                  <p className="text-sm font-medium">{telegramUi.localizedWelcome}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{telegramUi.localizedWelcomeDesc}</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="telegram-welcome-message-en">{telegramUi.englishTemplate}</Label>
+                    <Textarea
+                      id="telegram-welcome-message-en"
+                      value={form.localizedWelcomeMessages?.en || ''}
+                      onChange={(event) =>
+                        updateLocalizedTelegramText('localizedWelcomeMessages', 'en', event.target.value)
+                      }
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telegram-welcome-message-my">{telegramUi.burmeseTemplate}</Label>
+                    <Textarea
+                      id="telegram-welcome-message-my"
+                      value={form.localizedWelcomeMessages?.my || ''}
+                      onChange={(event) =>
+                        updateLocalizedTelegramText('localizedWelcomeMessages', 'my', event.target.value)
+                      }
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="telegram-not-found-message">{t('settings.telegram.not_found')}</Label>
                 <Textarea
@@ -608,6 +676,37 @@ function TelegramBotSetupCard() {
                   }
                   rows={3}
                 />
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4 md:col-span-2">
+                <div>
+                  <p className="text-sm font-medium">{telegramUi.localizedNotFound}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{telegramUi.localizedNotFoundDesc}</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="telegram-not-found-message-en">{telegramUi.englishTemplate}</Label>
+                    <Textarea
+                      id="telegram-not-found-message-en"
+                      value={form.localizedKeyNotFoundMessages?.en || ''}
+                      onChange={(event) =>
+                        updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'en', event.target.value)
+                      }
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telegram-not-found-message-my">{telegramUi.burmeseTemplate}</Label>
+                    <Textarea
+                      id="telegram-not-found-message-my"
+                      value={form.localizedKeyNotFoundMessages?.my || ''}
+                      onChange={(event) =>
+                        updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'my', event.target.value)
+                      }
+                      rows={3}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

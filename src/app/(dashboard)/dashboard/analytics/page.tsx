@@ -11,16 +11,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrafficChart } from '@/components/ui/traffic-chart';
 import { useLocale } from '@/hooks/use-locale';
-import { cn, formatBytes, getCountryFlag } from '@/lib/utils';
+import { cn, formatBytes, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import {
   Activity,
   AlertTriangle,
   BarChart3,
   Calendar,
   Clock,
+  Copy,
   Gauge,
   Info,
   Key,
+  QrCode,
+  Send,
+  Share2,
   TrendingUp,
   Users,
   Zap,
@@ -125,10 +129,30 @@ function AnalyticsStatCard({
   );
 }
 
+function getShareEventLabel(eventType: string) {
+  switch (eventType) {
+    case 'PAGE_VIEW':
+      return 'Page view';
+    case 'COPY_URL':
+      return 'Copy URL';
+    case 'OPEN_QR':
+      return 'Open QR';
+    case 'OPEN_APP':
+      return 'Open in app';
+    case 'TELEGRAM_SENT':
+      return 'Telegram send';
+    case 'TELEGRAM_CONNECTED':
+      return 'Telegram connected';
+    default:
+      return eventType.replaceAll('_', ' ');
+  }
+}
+
 export default function AnalyticsPage() {
   const { t } = useLocale();
   const [days, setDays] = useState(30);
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const [shareRange, setShareRange] = useState<'24h' | '7d' | '30d'>('7d');
 
   const { data: trafficHistory, isLoading: loadingTraffic } = trpc.dashboard.trafficHistory.useQuery({ days });
   const { data: topUsers, isLoading: loadingTopUsers } = trpc.dashboard.topUsers.useQuery({ limit: 5 });
@@ -142,6 +166,10 @@ export default function AnalyticsPage() {
   });
   const { data: analyticsSummary, isLoading: loadingSummary } = trpc.analytics.summary.useQuery({
     range: topConsumersRange,
+  });
+  const { data: shareDashboard, isLoading: loadingShareDashboard } = trpc.analytics.shareDashboard.useQuery({
+    range: shareRange,
+    limit: 6,
   });
 
   const totalTraffic =
@@ -375,6 +403,244 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+          <Card className="ops-panel">
+            <CardHeader className="px-0 pt-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Share2 className="h-5 w-5 text-primary" />
+                    Public share performance
+                  </CardTitle>
+                  <CardDescription>How users interact with public share pages, copied configs, and Telegram deliveries.</CardDescription>
+                </div>
+                <Select value={shareRange} onValueChange={(value) => setShareRange(value as '24h' | '7d' | '30d')}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24h">24h</SelectItem>
+                    <SelectItem value="7d">7 days</SelectItem>
+                    <SelectItem value="30d">30 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-0 pb-0">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public links</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.activePublicLinks || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Access + dynamic links currently exposed.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Page views</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.pageViews || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Share page opens in the selected range.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Copy clicks</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.copyClicks || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Raw URLs copied from public pages.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">QR opens</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.qrOpens || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Manual setup / QR-focused interactions.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">App opens</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.appOpens || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">One-click import attempts from the share page.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram sends</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.telegramSends || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Deliveries initiated through Telegram sharing.</p>
+                </div>
+              </div>
+
+              {loadingShareDashboard ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                  ))}
+                </div>
+              ) : shareDashboard && shareDashboard.topLinks.length > 0 ? (
+                <>
+                  <div className="space-y-3 md:hidden">
+                    {shareDashboard.topLinks.map((link) => (
+                      <div key={`${link.type}-${link.id}`} className="ops-mobile-card space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <Link
+                              href={link.type === 'ACCESS_KEY' ? `/dashboard/keys/${link.id}` : `/dashboard/dynamic-keys/${link.id}`}
+                              className="font-medium hover:text-primary"
+                            >
+                              {link.name}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">
+                              {link.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                              {link.publicSlug ? ` · /s/${link.publicSlug}` : ''}
+                            </p>
+                          </div>
+                          <Badge variant="outline">{link.metrics.pageViews} views</Badge>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Events</p>
+                            <p className="mt-2 text-lg font-semibold">{link.metrics.totalEvents}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Copies {link.metrics.copyClicks} · App opens {link.metrics.appOpens}</p>
+                          </div>
+                          <div className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last activity</p>
+                            <p className="mt-2 text-sm font-medium">
+                              {link.lastEventAt ? formatRelativeTime(link.lastEventAt) : 'No recent activity'}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {link.lastEventType ? getShareEventLabel(link.lastEventType) : 'Waiting for first hit'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="ops-data-shell hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Public link</TableHead>
+                          <TableHead className="text-right">Views</TableHead>
+                          <TableHead className="text-right">Copies</TableHead>
+                          <TableHead className="text-right">App opens</TableHead>
+                          <TableHead className="text-right">Telegram</TableHead>
+                          <TableHead>Last activity</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {shareDashboard.topLinks.map((link) => (
+                          <TableRow key={`${link.type}-${link.id}`}>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <Link
+                                  href={link.type === 'ACCESS_KEY' ? `/dashboard/keys/${link.id}` : `/dashboard/dynamic-keys/${link.id}`}
+                                  className="font-medium hover:text-primary"
+                                >
+                                  {link.name}
+                                </Link>
+                                <p className="text-xs text-muted-foreground">
+                                  {link.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                                  {link.publicSlug ? ` · /s/${link.publicSlug}` : ''}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.pageViews}</TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.copyClicks}</TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.appOpens}</TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.telegramSends}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {link.lastEventAt ? (
+                                <>
+                                  <div>{formatRelativeTime(link.lastEventAt)}</div>
+                                  <div className="text-xs">{link.lastEventType ? getShareEventLabel(link.lastEventType) : ''}</div>
+                                </>
+                              ) : (
+                                'No recent activity'
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              ) : (
+                <div className="ops-chart-empty">
+                  <div className="space-y-2 text-center">
+                    <Share2 className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                    <p className="font-medium text-foreground">No public-share traffic yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Share-link events will appear here after users open pages, copy configs, or launch client apps.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-panel">
+            <CardHeader className="px-0 pt-0">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Clock className="h-5 w-5 text-primary" />
+                Recent share activity
+              </CardTitle>
+              <CardDescription>Latest page views, copy actions, app launches, and Telegram handoffs across public links.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-0 pb-0">
+              {loadingShareDashboard ? (
+                [...Array(6)].map((_, i) => (
+                  <div key={i} className="h-16 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                ))
+              ) : shareDashboard && shareDashboard.recentEvents.length > 0 ? (
+                shareDashboard.recentEvents.map((event) => {
+                  const icon = event.eventType === 'COPY_URL'
+                    ? <Copy className="h-4 w-4" />
+                    : event.eventType === 'OPEN_QR'
+                      ? <QrCode className="h-4 w-4" />
+                      : event.eventType === 'TELEGRAM_SENT' || event.eventType === 'TELEGRAM_CONNECTED'
+                        ? <Send className="h-4 w-4" />
+                        : <Share2 className="h-4 w-4" />;
+
+                  return (
+                    <div key={event.id} className="ops-row-card flex items-center justify-between gap-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="rounded-full bg-primary/10 p-2 text-primary">{icon}</div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {event.entityId ? (
+                              <Link
+                                href={event.type === 'ACCESS_KEY' ? `/dashboard/keys/${event.entityId}` : `/dashboard/dynamic-keys/${event.entityId}`}
+                                className="truncate font-medium hover:text-primary"
+                              >
+                                {event.entityName}
+                              </Link>
+                            ) : (
+                              <span className="truncate font-medium">{event.entityName}</span>
+                            )}
+                            <Badge variant="outline" className="text-[10px]">
+                              {event.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {getShareEventLabel(event.eventType)}
+                            {event.platform ? ` · ${event.platform}` : ''}
+                            {event.source ? ` · ${event.source}` : ''}
+                            {event.publicSlug ? ` · /s/${event.publicSlug}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="shrink-0 text-xs text-muted-foreground">
+                        {formatRelativeTime(event.createdAt)}
+                      </p>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="ops-chart-empty">
+                  <div className="space-y-2 text-center">
+                    <Clock className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                    <p className="font-medium text-foreground">No recent share activity</p>
+                    <p className="text-sm text-muted-foreground">
+                      The latest public interactions will appear here once users start using share links.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card className="ops-panel">

@@ -15,6 +15,7 @@ import { SubscriptionPageLivePreview } from "@/components/subscription/subscript
 import { useLocale } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 import { localeFlags, localeNames, supportedLocales, type SupportedLocale } from "@/lib/i18n/config";
+import type { LocalizedTemplateMap } from "@/lib/localized-templates";
 import {
     ArrowDown,
     ArrowUp,
@@ -184,6 +185,8 @@ export function SubscriptionSettings() {
         footerDesc: isMyanmar ? "Subscription page များတွင် footer စာသားကို စိတ်ကြိုက် ပြင်ဆင်ပါ။" : "Customize the footer text displayed on subscription pages.",
         footerText: isMyanmar ? "Custom Footer Text" : "Custom Footer Text",
         footerHelp: isMyanmar ? "Footer တွင် ပြသမည့် စာသား။ မဖြည့်ပါက default ကို အသုံးပြုမည်။" : "Custom footer text. Leave empty for default.",
+        localizedFooter: isMyanmar ? "Footer ဘာသာပြန် template များ" : "Localized Footer Templates",
+        localizedFooterDesc: isMyanmar ? "Share page ၏ ဘာသာစကားအလိုက် footer ကို သီးခြား သတ်မှတ်ပါ။ မဖြည့်ပါက အထက်ပါ fallback footer စာသားကို သုံးမည်။" : "Set footer copy per share-page language. Leave these empty to fall back to the default footer text above.",
         showPoweredBy: isMyanmar ? '"Powered by" စာသားကို ပြမည်' : 'Show "Powered by" Text',
         showPoweredByDesc: isMyanmar ? 'Footer တွင် "Powered by Atomic-UI" ကို ပြသမည်။' : 'Display "Powered by Atomic-UI" in the footer.',
         welcomeTitle: isMyanmar ? "ကြိုဆိုစာ" : "Welcome Message",
@@ -192,6 +195,10 @@ export function SubscriptionSettings() {
         showWelcomeDesc: isMyanmar ? "စာမျက်နှာ အပေါ်ဘက်တွင် ကြိုဆိုစာတစ်ခုကို ပြသမည်။" : "Display a greeting message at the top of the page.",
         welcomeMessage: isMyanmar ? "ကြိုဆိုစာ" : "Welcome Message",
         welcomePlaceholder: isMyanmar ? "မင်္ဂလာပါ။ ဒီမှာ သင့် VPN subscription အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။" : "Welcome! Here's your VPN subscription details.",
+        localizedWelcome: isMyanmar ? "ကြိုဆိုစာ ဘာသာပြန် template များ" : "Localized Welcome Templates",
+        localizedWelcomeDesc: isMyanmar ? "Share page ကို English သို့မဟုတ် မြန်မာဖြင့် ဖွင့်သည့်အခါ အသုံးပြုမည့် ကြိုဆိုစာကို သီးခြားရေးနိုင်သည်။ မဖြည့်ပါက အထက်ပါ fallback ကြိုဆိုစာကို သုံးမည်။" : "Set separate welcome copy for English and Burmese share-page visits. Leave empty to reuse the default welcome message above.",
+        englishTemplate: isMyanmar ? "English Template" : "English Template",
+        burmeseTemplate: isMyanmar ? "မြန်မာ Template" : "Burmese Template",
         layoutTitle: isMyanmar ? "Layout နှင့် စာလုံးပုံစံ" : "Layout & Typography",
         layoutDesc: isMyanmar ? "Page layout၊ card ပုံစံနှင့် font များကို စိတ်ကြိုက် ပြင်ဆင်ပါ။" : "Customize the page layout, card styles, and fonts.",
         layoutStyle: isMyanmar ? "Layout Style" : "Layout Style",
@@ -260,6 +267,20 @@ export function SubscriptionSettings() {
 
     const updateBranding = <K extends keyof BrandingState>(key: K, value: BrandingState[K]) => {
         setBranding((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const updateLocalizedBrandingText = (
+        key: "localizedFooterTexts" | "localizedWelcomeMessages",
+        localeCode: SupportedLocale,
+        value: string,
+    ) => {
+        setBranding((prev) => ({
+            ...prev,
+            [key]: {
+                ...((prev[key] as LocalizedTemplateMap | undefined) || {}),
+                [localeCode]: value,
+            },
+        }));
     };
 
     const toggleApp = (appId: string) => {
@@ -701,6 +722,37 @@ export function SubscriptionSettings() {
                                 </p>
                             </div>
 
+                            <div className="space-y-3 rounded-xl border border-border/60 p-4">
+                                <div>
+                                    <Label>{settingsUi.localizedFooter}</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        {settingsUi.localizedFooterDesc}
+                                    </p>
+                                </div>
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="footerTextEn">{settingsUi.englishTemplate}</Label>
+                                        <Textarea
+                                            id="footerTextEn"
+                                            placeholder="Powered by Atomic-UI"
+                                            value={branding.localizedFooterTexts?.en || ""}
+                                            onChange={(e) => updateLocalizedBrandingText("localizedFooterTexts", "en", e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="footerTextMy">{settingsUi.burmeseTemplate}</Label>
+                                        <Textarea
+                                            id="footerTextMy"
+                                            placeholder="Atomic-UI ဖြင့် စွမ်းဆောင်ထားသည်"
+                                            value={branding.localizedFooterTexts?.my || ""}
+                                            onChange={(e) => updateLocalizedBrandingText("localizedFooterTexts", "my", e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
                                     <Label>{settingsUi.showPoweredBy}</Label>
@@ -753,15 +805,48 @@ export function SubscriptionSettings() {
                             </div>
 
                             {branding.showWelcome && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="welcomeMessage">{settingsUi.welcomeMessage}</Label>
-                                    <Textarea
-                                        id="welcomeMessage"
-                                        placeholder={settingsUi.welcomePlaceholder}
-                                        value={branding.welcomeMessage || ""}
-                                        onChange={(e) => updateBranding("welcomeMessage", e.target.value)}
-                                        rows={3}
-                                    />
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="welcomeMessage">{settingsUi.welcomeMessage}</Label>
+                                        <Textarea
+                                            id="welcomeMessage"
+                                            placeholder={settingsUi.welcomePlaceholder}
+                                            value={branding.welcomeMessage || ""}
+                                            onChange={(e) => updateBranding("welcomeMessage", e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-3 rounded-xl border border-border/60 p-4">
+                                        <div>
+                                            <Label>{settingsUi.localizedWelcome}</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                {settingsUi.localizedWelcomeDesc}
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="welcomeMessageEn">{settingsUi.englishTemplate}</Label>
+                                                <Textarea
+                                                    id="welcomeMessageEn"
+                                                    placeholder="Welcome! Here is your VPN setup page."
+                                                    value={branding.localizedWelcomeMessages?.en || ""}
+                                                    onChange={(e) => updateLocalizedBrandingText("localizedWelcomeMessages", "en", e.target.value)}
+                                                    rows={4}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="welcomeMessageMy">{settingsUi.burmeseTemplate}</Label>
+                                                <Textarea
+                                                    id="welcomeMessageMy"
+                                                    placeholder="မင်္ဂလာပါ။ ဤနေရာတွင် သင့် VPN setup စာမျက်နှာကို တွေ့နိုင်ပါသည်။"
+                                                    value={branding.localizedWelcomeMessages?.my || ""}
+                                                    onChange={(e) => updateLocalizedBrandingText("localizedWelcomeMessages", "my", e.target.value)}
+                                                    rows={4}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

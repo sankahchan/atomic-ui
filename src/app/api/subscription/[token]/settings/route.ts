@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { defaultBranding, type SubscriptionBranding } from '@/lib/subscription-themes';
+import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
 export async function GET(
   request: NextRequest,
@@ -59,8 +60,10 @@ export async function GET(
       'subscriptionLogoSize',
       'subscriptionBrandName',
       'subscriptionFooterText',
+      'subscriptionLocalizedFooterTexts',
       'subscriptionShowPoweredBy',
       'subscriptionWelcomeMessage',
+      'subscriptionLocalizedWelcomeMessages',
       'subscriptionShowWelcome',
       'subscriptionCustomCss',
       'subscriptionFontFamily',
@@ -107,10 +110,19 @@ export async function GET(
         : defaultBranding.logoSize,
       brandName: settingsMap.get('subscriptionBrandName') || defaultBranding.brandName,
       footerText: settingsMap.get('subscriptionFooterText') || defaultBranding.footerText,
+      localizedFooterTexts: normalizeLocalizedTemplateMap(
+        parseJson(settingsMap.get('subscriptionLocalizedFooterTexts'), defaultBranding.localizedFooterTexts || {}),
+      ),
       showPoweredBy: settingsMap.get('subscriptionShowPoweredBy')
         ? settingsMap.get('subscriptionShowPoweredBy') === 'true'
         : defaultBranding.showPoweredBy,
       welcomeMessage: settingsMap.get('subscriptionWelcomeMessage') || defaultBranding.welcomeMessage,
+      localizedWelcomeMessages: normalizeLocalizedTemplateMap(
+        parseJson(
+          settingsMap.get('subscriptionLocalizedWelcomeMessages'),
+          defaultBranding.localizedWelcomeMessages || {},
+        ),
+      ),
       showWelcome: settingsMap.get('subscriptionShowWelcome')
         ? settingsMap.get('subscriptionShowWelcome') === 'true'
         : defaultBranding.showWelcome,

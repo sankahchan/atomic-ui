@@ -1,3 +1,6 @@
+import type { SupportedLocale } from '@/lib/i18n/config';
+import type { LocalizedTemplateMap } from '@/lib/localized-templates';
+
 /**
  * Subscription Page Themes
  *
@@ -53,10 +56,12 @@ export interface SubscriptionBranding {
 
   // Footer
   footerText?: string;        // Custom footer text (default: "Powered by Atomic-UI")
+  localizedFooterTexts?: LocalizedTemplateMap;
   showPoweredBy?: boolean;    // Show/hide "Powered by" text
 
   // Welcome Message
   welcomeMessage?: string;    // Custom welcome/greeting message
+  localizedWelcomeMessages?: LocalizedTemplateMap;
   showWelcome?: boolean;      // Show/hide welcome message
 
   // Custom CSS
@@ -112,8 +117,10 @@ export interface CustomApp {
 export const defaultBranding: SubscriptionBranding = {
   brandName: 'Atomic-UI',
   footerText: 'Powered by Atomic-UI',
+  localizedFooterTexts: {},
   showPoweredBy: true,
   showWelcome: false,
+  localizedWelcomeMessages: {},
   layout: 'default',
   cardStyle: 'rounded',
   enableAnimations: true,
