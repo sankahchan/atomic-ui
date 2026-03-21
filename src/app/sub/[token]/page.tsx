@@ -336,13 +336,24 @@ export default function SubscriptionPage() {
     }
   }, []);
 
+  const syncLocaleUrl = useCallback((nextLocale: SupportedLocale) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('lang', nextLocale);
+    window.history.replaceState(window.history.state, '', nextUrl.toString());
+  }, []);
+
   const handleLocaleSwitch = useCallback((nextLocale: SupportedLocale) => {
     if (nextLocale === locale) {
       return;
     }
 
     persistLocale(nextLocale);
-  }, [locale, persistLocale]);
+    syncLocaleUrl(nextLocale);
+  }, [locale, persistLocale, syncLocaleUrl]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -400,7 +411,18 @@ export default function SubscriptionPage() {
     setSystemPrefersDark(mq.matches);
     const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
     mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    const popstateHandler = () => {
+      const nextLocale = coerceSupportedLocale(new URL(window.location.href).searchParams.get('lang'));
+      if (nextLocale) {
+        setLocale(nextLocale);
+      }
+    };
+    window.addEventListener('popstate', popstateHandler);
+
+    return () => {
+      mq.removeEventListener('change', handler);
+      window.removeEventListener('popstate', popstateHandler);
+    };
   }, [langParam, persistLocale]);
 
   // Toggle between dark and light (only for generic dark/light themes)
