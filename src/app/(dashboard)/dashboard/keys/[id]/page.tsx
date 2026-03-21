@@ -45,6 +45,7 @@ import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildDownloadFilename, downloadDataUrl, downloadTextFile } from '@/lib/download';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
@@ -1354,6 +1355,42 @@ export default function KeyDetailPage() {
       Date.now() - lastTrafficAt.getTime() <= TRAFFIC_ACTIVE_WINDOW_MS,
   );
   const isAdmin = currentUser?.role === 'ADMIN';
+  const qrDownloadFilename = buildDownloadFilename(key.name, 'qr', 'png');
+  const configDownloadFilename = buildDownloadFilename(key.name, 'client-config', 'txt');
+
+  const handleDownloadQr = () => {
+    if (!qrData?.qrCode) {
+      toast({
+        title: 'QR unavailable',
+        description: 'The QR image is not ready yet.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    downloadDataUrl(qrData.qrCode, qrDownloadFilename);
+    toast({
+      title: 'QR downloaded',
+      description: `${qrDownloadFilename} has been saved.`,
+    });
+  };
+
+  const handleDownloadConfig = () => {
+    if (!decoratedAccessUrl) {
+      toast({
+        title: 'Config unavailable',
+        description: 'The client config is not ready yet.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    downloadTextFile(`${decoratedAccessUrl}\n`, configDownloadFilename);
+    toast({
+      title: 'Config downloaded',
+      description: `${configDownloadFilename} has been saved.`,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -1842,7 +1879,7 @@ export default function KeyDetailPage() {
                 </div>
               )}
 
-              <div className="ops-mobile-action-bar mt-4 w-full md:grid-cols-1">
+              <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   variant="outline"
                   className="w-full"
@@ -1850,6 +1887,14 @@ export default function KeyDetailPage() {
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL
+                </Button>
+                <Button variant="outline" className="w-full" onClick={handleDownloadQr}>
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Download QR
+                </Button>
+                <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadConfig}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Config
                 </Button>
               </div>
             </CardContent>

@@ -62,6 +62,7 @@ import {
   type SupportedLocale,
 } from '@/lib/i18n/config';
 import { resolveTranslation } from '@/lib/i18n/translations';
+import { buildDownloadFilename, downloadDataUrl, downloadTextFile } from '@/lib/download';
 import {
   getTheme,
   clientApps,
@@ -948,6 +949,28 @@ export default function SubscriptionPage() {
   const controlTextColor = hasImageBackground ? '#ffffff' : '#0f172a';
   const controlMutedColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : '#64748b';
   const actionFieldText = keyData.accessUrl;
+  const qrDownloadFilename = buildDownloadFilename(keyData.name, 'qr', 'png');
+  const configDownloadFilename = buildDownloadFilename(keyData.name, 'client-config', 'txt');
+
+  const handleDownloadQr = () => {
+    if (!qrCode) {
+      setFeedback(t('subscription.manual.qr_unavailable'));
+      return;
+    }
+
+    downloadDataUrl(qrCode, qrDownloadFilename);
+    setFeedback(t('subscription.feedback.qr_downloaded'));
+  };
+
+  const handleDownloadConfig = () => {
+    if (!actionFieldText) {
+      setFeedback(t('subscription.ui.load_failed'));
+      return;
+    }
+
+    downloadTextFile(`${actionFieldText}\n`, configDownloadFilename);
+    setFeedback(t('subscription.feedback.config_downloaded'));
+  };
 
   // Render animated background
   const renderAnimatedBackground = () => {
@@ -1219,6 +1242,18 @@ export default function SubscriptionPage() {
                     <p className="mt-1 text-sm" style={{ color: controlMutedColor }}>
                       {t('subscription.hero.quick_scan_help')}
                     </p>
+                    <button
+                      onClick={handleDownloadQr}
+                      className="mt-4 inline-flex min-h-[2.85rem] w-full items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
+                      style={{
+                        backgroundColor: controlButtonSurface,
+                        color: controlTextColor,
+                        border: `1px solid ${controlBorder}`,
+                      }}
+                    >
+                      <QrCode className="h-4 w-4" />
+                      <span className="line-clamp-2 text-center">{t('subscription.hero.download_qr')}</span>
+                    </button>
                   </div>
 
                   <div
@@ -1335,7 +1370,7 @@ export default function SubscriptionPage() {
                           </button>
                         )}
 
-                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                           <button
                             onClick={() =>
                               copyToClipboard(actionFieldText, t('subscription.hero.copy_connection_url_done'), {
@@ -1352,6 +1387,19 @@ export default function SubscriptionPage() {
                           >
                             <Copy className="h-4 w-4" />
                             <span className="line-clamp-2 text-center">{t('subscription.hero.copy_url')}</span>
+                          </button>
+
+                          <button
+                            onClick={handleDownloadConfig}
+                            className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
+                            style={{
+                              backgroundColor: controlButtonSurface,
+                              color: controlTextColor,
+                              border: `1px solid ${controlBorder}`,
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                            <span className="line-clamp-2 text-center">{t('subscription.hero.download_config')}</span>
                           </button>
 
                           {showManualSetupButton ? (
