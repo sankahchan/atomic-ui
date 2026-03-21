@@ -46,12 +46,53 @@ const publicRoutes = [
   '/uploads/',              // Uploaded files (covers, etc.)
 ];
 
+const shareDomainRoutes = [
+  '/sub/',
+  '/s/',
+  '/c/',
+  '/api/subscription/',
+  '/api/sub/',
+  '/_next',
+  '/favicon.ico',
+  '/uploads/',
+];
+
 /**
  * Check if a path matches any of the public route patterns
  * Uses startsWith for prefix matching to handle dynamic segments.
  */
 function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some((route) => pathname.startsWith(route));
+}
+
+function isShareDomainRoute(pathname: string): boolean {
+  return shareDomainRoutes.some((route) => pathname.startsWith(route));
+}
+
+function normalizeHost(value: string | null | undefined) {
+  if (!value) {
+    return '';
+  }
+
+  const withoutProtocol = value.replace(/^https?:\/\//i, '');
+  const hostPort = withoutProtocol.split('/')[0] ?? '';
+  return hostPort.split(':')[0]?.toLowerCase() ?? '';
+}
+
+function getRequestHost(request: NextRequest) {
+  return normalizeHost(
+    request.headers.get('x-forwarded-host') ||
+      request.headers.get('host') ||
+      request.nextUrl.host,
+  );
+}
+
+function getPublicShareHost() {
+  return normalizeHost(
+    process.env.NEXT_PUBLIC_PUBLIC_SHARE_URL ||
+      process.env.PUBLIC_SHARE_URL ||
+      process.env.PUBLIC_SHARE_DOMAIN,
+  );
 }
 
 /**
@@ -116,6 +157,17 @@ function buildRedirectUrl(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const normalizedPath = normalizePathname(request, pathname);
+  const publicShareHost = getPublicShareHost();
+  const requestHost = getRequestHost(request);
+
+  // The public share host must never expose admin/login routes.
+  if (publicShareHost && requestHost === publicShareHost) {
+    if (!isShareDomainRoute(normalizedPath)) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    return NextResponse.next();
+  }
 
   // Allow public routes without authentication
   if (isPublicRoute(normalizedPath)) {

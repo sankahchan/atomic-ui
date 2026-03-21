@@ -40,10 +40,12 @@ function summarizeErrorText(value: string) {
 
 export function ClientEndpointTestCard({
   endpointUrl,
+  probeUrl,
   title = 'Client URL Test',
   description = 'Probe the live client endpoint and inspect the returned Outline config.',
 }: {
   endpointUrl: string;
+  probeUrl?: string;
   title?: string;
   description?: string;
 }) {
@@ -64,13 +66,15 @@ export function ClientEndpointTestCard({
   }, [endpointUrl]);
 
   const runTest = async () => {
-    if (!endpointUrl || isTesting) {
+    const resolvedProbeUrl = probeUrl || endpointUrl;
+
+    if (!resolvedProbeUrl || isTesting) {
       return;
     }
 
     setIsTesting(true);
     try {
-      const response = await fetch(endpointUrl, {
+      const response = await fetch(resolvedProbeUrl, {
         headers: {
           accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
         },

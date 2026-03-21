@@ -6,6 +6,19 @@ function trimTrailingSlash(value: string) {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
+function normalizeOrigin(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const normalized = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    return trimTrailingSlash(new URL(normalized).origin);
+  } catch {
+    return null;
+  }
+}
+
 function normalizeBasePath(value: string) {
   if (!value) {
     return '';
@@ -17,10 +30,19 @@ function normalizeBasePath(value: string) {
 
 export function getPublicAppOrigin(fallbackOrigin?: string | null) {
   const configuredOrigin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    fallbackOrigin ||
+    normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
+    normalizeOrigin(process.env.APP_URL) ||
+    normalizeOrigin(fallbackOrigin) ||
     DEFAULT_LOCAL_ORIGIN;
+
+  return trimTrailingSlash(configuredOrigin);
+}
+
+export function getPublicShareOrigin(fallbackOrigin?: string | null) {
+  const configuredOrigin =
+    normalizeOrigin(process.env.NEXT_PUBLIC_PUBLIC_SHARE_URL) ||
+    normalizeOrigin(process.env.PUBLIC_SHARE_URL) ||
+    getPublicAppOrigin(fallbackOrigin);
 
   return trimTrailingSlash(configuredOrigin);
 }
@@ -42,7 +64,7 @@ export function buildSharePageUrl(
     lang?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
@@ -64,7 +86,7 @@ export function buildShortShareUrl(
     lang?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/s/${slug}`);
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/s/${slug}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
@@ -85,7 +107,9 @@ export function buildSubscriptionApiUrl(
     source?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/api/subscription/${token}`);
+  const url = new URL(
+    `${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/api/subscription/${token}`,
+  );
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
@@ -121,7 +145,7 @@ export function buildShortClientUrl(
     source?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/c/${slug}`);
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/c/${slug}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
@@ -137,7 +161,7 @@ export function buildDynamicSubscriptionApiUrl(
     source?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/api/sub/${token}`);
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/api/sub/${token}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);
@@ -174,7 +198,7 @@ export function buildDynamicSharePageUrl(
     lang?: string | null;
   },
 ) {
-  const url = new URL(`${getPublicAppOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/sub/${token}`);
 
   if (options?.source) {
     url.searchParams.set('source', options.source);

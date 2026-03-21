@@ -74,6 +74,7 @@ Useful install-time overrides:
 sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_HTTPS=false bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 ```
 
 For production deployment details, see [DEPLOY.md](DEPLOY.md).
@@ -89,8 +90,10 @@ Set these in `.env` before production use:
 | `SESSION_EXPIRY_DAYS` | No | Session TTL in days (default: `7`) |
 | `TOTP_ENCRYPTION_KEY` | Strongly recommended | Stable key for encrypting TOTP secrets |
 | `CRON_SECRET` | Strongly recommended | Protects task endpoints (`/api/health-check`, `/api/tasks/check-expirations`) |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical public URL used by webhook/subscription links |
-| `APP_URL` | Recommended | App base URL for server-side flows |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL used by webhook and server-side flows |
+| `APP_URL` | Recommended | Admin/app base URL for server-side flows |
+| `PUBLIC_SHARE_URL` | Optional | Public share host origin for `/s`, `/sub`, `/c`, and subscription APIs |
+| `NEXT_PUBLIC_PUBLIC_SHARE_URL` | Optional | Client-side mirror of `PUBLIC_SHARE_URL` |
 | `TELEGRAM_BOT_TOKEN` | Optional | Bot token from @BotFather |
 | `SMTP_HOST` | Optional | SMTP host for `EMAIL` notification channels |
 | `SMTP_PORT` | Optional | SMTP port (for example `587` or `465`) |
@@ -115,7 +118,10 @@ Set these in `.env` before production use:
 - Fresh VPS installs now prefer HTTPS by default.
 - The installer uses nginx in front of the app and keeps the internal Node process on port `2053`.
 - Set `PANEL_DOMAIN=panel.example.com` during install if you want the panel to use a real domain as its canonical public origin.
+- Set `PUBLIC_SHARE_DOMAIN=share.example.com` during install if you want all public share/client URLs to use a dedicated subdomain.
 - Set `ALLOW_IP_FALLBACK=true` to keep the original IP reachable alongside the domain on fresh installs. Leave it false if you want raw IP traffic redirected to the domain.
+- When `PUBLIC_SHARE_DOMAIN` is configured, nginx only serves public share routes on that host. `/login`, `/dashboard`, and other admin routes return `404`.
+- Point the `share` DNS record at the same VPS IP before running the installer if you want HTTPS on the public share host during the first install.
 - Bare-IP HTTPS uses Let's Encrypt's short-lived IP certificate profile, not a normal 90-day domain certificate.
 - Auto-renew is configured with `atomic-ui-cert-renew.timer` every 12 hours.
 - Domain installs use the standard Let's Encrypt domain flow and the system `certbot.timer`.

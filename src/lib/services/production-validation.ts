@@ -81,6 +81,22 @@ export function validateProductionEnvironment(
     warnings.push('APP_URL and NEXT_PUBLIC_APP_URL do not match');
   }
 
+  if (env.PUBLIC_SHARE_URL && !isHttpUrl(env.PUBLIC_SHARE_URL)) {
+    warnings.push('PUBLIC_SHARE_URL is present but not a valid http(s) URL');
+  }
+
+  if (env.NEXT_PUBLIC_PUBLIC_SHARE_URL && !isHttpUrl(env.NEXT_PUBLIC_PUBLIC_SHARE_URL)) {
+    warnings.push('NEXT_PUBLIC_PUBLIC_SHARE_URL is present but not a valid http(s) URL');
+  }
+
+  if (
+    env.PUBLIC_SHARE_URL &&
+    env.NEXT_PUBLIC_PUBLIC_SHARE_URL &&
+    env.PUBLIC_SHARE_URL !== env.NEXT_PUBLIC_PUBLIC_SHARE_URL
+  ) {
+    warnings.push('PUBLIC_SHARE_URL and NEXT_PUBLIC_PUBLIC_SHARE_URL do not match');
+  }
+
   if (!env.NODE_ENV || env.NODE_ENV !== 'production') {
     warnings.push('NODE_ENV is not set to production in the validated environment');
   }

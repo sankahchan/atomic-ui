@@ -29,6 +29,7 @@ CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
 ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
 PANEL_DOMAIN_INPUT="${PANEL_DOMAIN:-}"
+PUBLIC_SHARE_DOMAIN_INPUT="${PUBLIC_SHARE_DOMAIN:-}"
 ALLOW_IP_FALLBACK_INPUT="${ALLOW_IP_FALLBACK:-true}"
 
 normalize_bool() {
@@ -104,7 +105,13 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN_INPUT}")"
+PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN_INPUT}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK_INPUT}")"
+
+if [ -n "${PANEL_DOMAIN}" ] && [ "${PUBLIC_SHARE_DOMAIN}" = "${PANEL_DOMAIN}" ]; then
+    echo -e "${RED}[✗]${NC} PUBLIC_SHARE_DOMAIN must be different from PANEL_DOMAIN"
+    exit 1
+fi
 
 # Check system
 echo -e "${BLUE}[*]${NC} Checking system requirements..."
@@ -255,6 +262,8 @@ if [ -n "${PANEL_DOMAIN}" ]; then
 fi
 PUBLIC_ORIGIN="http://${PUBLIC_HOST}"
 PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
+PUBLIC_SHARE_ORIGIN=""
+PUBLIC_SHARE_URL=""
 HTTPS_ENABLED=false
 HTTPS_NOTE="HTTP reverse proxy enabled on port 80."
 IP_FALLBACK_URL=""
@@ -263,9 +272,16 @@ if [ -n "${PANEL_DOMAIN}" ] && [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
     IP_FALLBACK_URL="http://${SERVER_IP}/${PANEL_PATH}/"
 fi
 
+if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
+    PUBLIC_SHARE_ORIGIN="http://${PUBLIC_SHARE_DOMAIN}"
+    PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
+fi
+
 # Set public application URL in .env
 set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
 set_env_var "NEXT_PUBLIC_APP_URL" "${PUBLIC_ORIGIN}"
+set_env_var "PUBLIC_SHARE_URL" "${PUBLIC_SHARE_ORIGIN}"
+set_env_var "NEXT_PUBLIC_PUBLIC_SHARE_URL" "${PUBLIC_SHARE_ORIGIN}"
 
 # Add PORT to .env if not exists
 if ! grep -q "^PORT=" .env; then
@@ -301,6 +317,12 @@ else
     echo -e "${GREEN}[✓]${NC} Domain mode: ${CYAN}disabled (IP mode)${NC}"
 fi
 
+if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
+    echo -e "${GREEN}[✓]${NC} Public share host: ${CYAN}${PUBLIC_SHARE_DOMAIN}${NC}"
+else
+    echo -e "${GREEN}[✓]${NC} Public share host: ${CYAN}disabled (shares use app origin)${NC}"
+fi
+
 # Prefer HTTPS by default so fresh installs come up on the public origin.
 if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
     if [ -n "${PANEL_DOMAIN}" ]; then
@@ -310,7 +332,7 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
     fi
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-https.sh"
 
-    if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
+    if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
         HTTPS_ENABLED=true
         if [ -n "${PANEL_DOMAIN}" ]; then
             PUBLIC_ORIGIN="https://${PANEL_DOMAIN}"
@@ -326,8 +348,14 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
             HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
         fi
         PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
+        if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
+            PUBLIC_SHARE_ORIGIN="https://${PUBLIC_SHARE_DOMAIN}"
+            PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
+        fi
         set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
         set_env_var "NEXT_PUBLIC_APP_URL" "${PUBLIC_ORIGIN}"
+        set_env_var "PUBLIC_SHARE_URL" "${PUBLIC_SHARE_ORIGIN}"
+        set_env_var "NEXT_PUBLIC_PUBLIC_SHARE_URL" "${PUBLIC_SHARE_ORIGIN}"
         echo -e "${GREEN}[✓]${NC} HTTPS enabled at ${CYAN}${PUBLIC_ORIGIN}${NC}"
     else
         if [ "${INSTALL_HTTPS_MODE}" = "require" ]; then
@@ -444,7 +472,7 @@ echo -e "${GREEN}[✓]${NC} Service started on port ${PANEL_PORT}"
 if [ "$HTTPS_ENABLED" = false ]; then
     echo -e "${BLUE}[*]${NC} Configuring nginx reverse proxy..."
     chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
-    PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
+    PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true bash "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" "${PANEL_PORT}"
     echo -e "${GREEN}[✓]${NC} nginx proxy is serving ${CYAN}${PUBLIC_ORIGIN}${NC}"
 fi
 
@@ -490,10 +518,20 @@ fi
 echo "${PANEL_PORT}" > "$INSTALL_DIR/.panel_port"
 echo "/${PANEL_PATH}" > "$INSTALL_DIR/.panel_path"
 echo "${PUBLIC_ORIGIN}" > "$INSTALL_DIR/.public_origin"
+if [ -n "${PUBLIC_SHARE_ORIGIN}" ]; then
+    echo "${PUBLIC_SHARE_ORIGIN}" > "$INSTALL_DIR/.public_share_origin"
+else
+    rm -f "$INSTALL_DIR/.public_share_origin"
+fi
 if [ -n "${PANEL_DOMAIN}" ]; then
     echo "${PANEL_DOMAIN}" > "$INSTALL_DIR/.panel_domain"
 else
     rm -f "$INSTALL_DIR/.panel_domain"
+fi
+if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
+    echo "${PUBLIC_SHARE_DOMAIN}" > "$INSTALL_DIR/.public_share_domain"
+else
+    rm -f "$INSTALL_DIR/.public_share_domain"
 fi
 echo "${ALLOW_IP_FALLBACK}" > "$INSTALL_DIR/.allow_ip_fallback"
 
@@ -509,11 +547,17 @@ echo -e "${CYAN}│${NC}  URL: ${GREEN}${PUBLIC_PANEL_URL}${NC}"
 if [ -n "${IP_FALLBACK_URL}" ]; then
 echo -e "${CYAN}│${NC}  ${YELLOW}IP fallback:${NC} ${GREEN}${IP_FALLBACK_URL}${NC}"
 fi
+if [ -n "${PUBLIC_SHARE_URL}" ]; then
+echo -e "${CYAN}│${NC}  ${YELLOW}Public share URL:${NC} ${GREEN}${PUBLIC_SHARE_URL}${NC}"
+fi
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Public origin:${NC} ${GREEN}${PUBLIC_ORIGIN}${NC}"
 if [ -n "${PANEL_DOMAIN}" ]; then
 echo -e "${CYAN}│${NC}  ${YELLOW}Domain:${NC} ${GREEN}${PANEL_DOMAIN}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Allow IP fallback:${NC} ${GREEN}${ALLOW_IP_FALLBACK}${NC}"
+fi
+if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
+echo -e "${CYAN}│${NC}  ${YELLOW}Share host:${NC} ${GREEN}${PUBLIC_SHARE_DOMAIN}${NC}"
 fi
 echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"

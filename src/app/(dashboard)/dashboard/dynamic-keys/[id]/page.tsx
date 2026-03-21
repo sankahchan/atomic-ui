@@ -34,6 +34,7 @@ import {
   buildDynamicShortShareUrl,
   buildDynamicSharePageUrl,
   buildDynamicSubscriptionApiUrl,
+  getPublicBasePath,
 } from '@/lib/subscription-links';
 import QRCode from 'qrcode';
 import {
@@ -1796,6 +1797,14 @@ export default function DynamicKeyDetailPage() {
       origin: window.location.origin,
     });
   }, [dak?.dynamicUrl, dak?.publicSlug]);
+  const subscriptionProbeUrl = useMemo(() => {
+    if (typeof window === 'undefined' || !dak?.dynamicUrl) return '';
+    if (dak.publicSlug) {
+      return `${window.location.origin}${getPublicBasePath()}/c/${dak.publicSlug}`;
+    }
+
+    return `${window.location.origin}${getPublicBasePath()}/api/sub/${dak.dynamicUrl}`;
+  }, [dak?.dynamicUrl, dak?.publicSlug]);
 
   // Generate QR code when data loads
   useEffect(() => {
@@ -2324,6 +2333,7 @@ export default function DynamicKeyDetailPage() {
 
           <ClientEndpointTestCard
             endpointUrl={subscriptionApiUrl}
+            probeUrl={subscriptionProbeUrl}
             title="Client URL Test"
             description="Probe the live Outline client endpoint and verify the current dynamic subscription payload."
           />

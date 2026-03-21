@@ -10,6 +10,7 @@ LEGACY_SITE_FILE="/etc/nginx/sites-available/${SITE_NAME}.conf"
 LEGACY_SITE_LINK="/etc/nginx/sites-enabled/${SITE_NAME}.conf"
 PANEL_PATH="${PANEL_PATH:-}"
 PANEL_DOMAIN="${PANEL_DOMAIN:-}"
+PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN:-}"
 ENABLE_FAIL2BAN="${ENABLE_FAIL2BAN:-true}"
 ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK:-true}"
 LOGIN_LIMIT_RATE="${LOGIN_LIMIT_RATE:-20r/m}"
@@ -116,9 +117,96 @@ server {
 EOF
 }
 
+emit_share_proxy_location() {
+  local location_prefix="$1"
+
+  cat <<EOF
+    location ^~ ${location_prefix} {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+    }
+EOF
+}
+
+emit_share_exact_proxy_location() {
+  local location_path="$1"
+
+  cat <<EOF
+    location = ${location_path} {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+    }
+EOF
+}
+
+emit_public_share_locations() {
+  emit_share_proxy_location "/_next/"
+  emit_share_exact_proxy_location "/favicon.ico"
+  emit_share_proxy_location "/uploads/"
+
+  if [[ -n "${PANEL_PATH}" ]]; then
+    emit_share_proxy_location "${PANEL_PATH}/sub/"
+    emit_share_proxy_location "${PANEL_PATH}/s/"
+    emit_share_proxy_location "${PANEL_PATH}/c/"
+    emit_share_proxy_location "${PANEL_PATH}/api/subscription/"
+    emit_share_proxy_location "${PANEL_PATH}/api/sub/"
+  else
+    emit_share_proxy_location "/sub/"
+    emit_share_proxy_location "/s/"
+    emit_share_proxy_location "/c/"
+    emit_share_proxy_location "/api/subscription/"
+    emit_share_proxy_location "/api/sub/"
+  fi
+
+  cat <<'EOF'
+    location / {
+        return 404;
+    }
+EOF
+}
+
+emit_share_proxy_server() {
+  local listen_args="$1"
+  local server_name="$2"
+
+  cat <<EOF
+server {
+    listen 80 ${listen_args};
+    listen [::]:80 ${listen_args};
+    server_name ${server_name};
+
+    client_max_body_size 32m;
+
+$(emit_public_share_locations)
+}
+EOF
+}
+
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN}")"
+PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK}")"
 ENABLE_FAIL2BAN="$(normalize_bool "${ENABLE_FAIL2BAN}")"
+
+if [[ -n "${PANEL_DOMAIN}" && "${PUBLIC_SHARE_DOMAIN}" == "${PANEL_DOMAIN}" ]]; then
+  echo "PUBLIC_SHARE_DOMAIN must be different from PANEL_DOMAIN" >&2
+  exit 1
+fi
 
 if [[ -n "${PANEL_PATH}" ]]; then
   if [[ "${PANEL_PATH}" != /* ]]; then
@@ -158,6 +246,10 @@ fi
   if [[ -n "${PANEL_DOMAIN}" ]]; then
     emit_proxy_server "" "${PANEL_DOMAIN}"
   fi
+
+  if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+    emit_share_proxy_server "" "${PUBLIC_SHARE_DOMAIN}"
+  fi
 } >"${SITE_FILE}"
 
 rm -f /etc/nginx/sites-enabled/default
@@ -194,10 +286,20 @@ fi
 
 if [[ -n "${PANEL_DOMAIN}" ]]; then
   if [[ "${ALLOW_IP_FALLBACK}" == "true" ]]; then
-    echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN} with IP fallback -> 127.0.0.1:${APP_PORT}"
+    if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+      echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN} with public share host ${PUBLIC_SHARE_DOMAIN} and IP fallback -> 127.0.0.1:${APP_PORT}"
+    else
+      echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN} with IP fallback -> 127.0.0.1:${APP_PORT}"
+    fi
   else
-    echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN}; IP access redirects to the domain"
+    if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+      echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN} with public share host ${PUBLIC_SHARE_DOMAIN}; IP access redirects to the domain"
+    else
+      echo "nginx proxy configured on port 80 for ${PANEL_DOMAIN}; IP access redirects to the domain"
+    fi
   fi
+elif [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+  echo "nginx proxy configured on port 80 for IP admin access with public share host ${PUBLIC_SHARE_DOMAIN}"
 else
   echo "nginx proxy configured on port 80 -> 127.0.0.1:${APP_PORT}"
 fi

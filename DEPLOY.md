@@ -156,7 +156,8 @@ The same script now supports real domains too:
 ```bash
 sudo APP_PORT=2053 \
   PANEL_PATH=/7061c5df \
-  PANEL_DOMAIN=panel.example.com \
+  PANEL_DOMAIN=admin.example.com \
+  PUBLIC_SHARE_DOMAIN=share.example.com \
   ALLOW_IP_FALLBACK=true \
   ACME_EMAIL=you@example.com \
   bash scripts/setup-nginx-https.sh
@@ -164,9 +165,12 @@ sudo APP_PORT=2053 \
 
 Notes:
 - `PANEL_DOMAIN` makes the domain the canonical public origin used by the installer.
+- `PUBLIC_SHARE_DOMAIN` adds a dedicated public-only host for `/s`, `/sub`, `/c`, `/api/subscription/*`, and `/api/sub/*`.
 - `ALLOW_IP_FALLBACK=true` keeps the original server IP reachable in parallel. Set it to `false` if you want raw IP traffic redirected to the domain instead.
 - Domain certificates use the standard Let's Encrypt flow through `certbot`.
 - Auto-renew is handled by `certbot.timer`.
+- On the public share host, nginx blocks admin routes like `/login`, `/dashboard`, and `/settings` with `404`.
+- Make sure the `share` DNS record already points at your VPS before the HTTPS script runs, or certificate issuance for the public share host will fail.
 
 ## Updates
 To update the application:

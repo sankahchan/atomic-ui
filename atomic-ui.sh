@@ -74,6 +74,22 @@ get_public_origin() {
     echo "http://${fallback_ip}:${fallback_port}"
 }
 
+get_public_share_origin() {
+    if [ -f "$INSTALL_DIR/.public_share_origin" ]; then
+        cat "$INSTALL_DIR/.public_share_origin"
+        return
+    fi
+
+    if [ -f "$INSTALL_DIR/.env" ]; then
+        local env_origin
+        env_origin=$(grep -E '^(PUBLIC_SHARE_URL|NEXT_PUBLIC_PUBLIC_SHARE_URL)=' "$INSTALL_DIR/.env" | head -n 1 | cut -d'=' -f2- | tr -d '"' || true)
+        if [ -n "$env_origin" ]; then
+            echo "${env_origin%/}"
+            return
+        fi
+    fi
+}
+
 get_public_panel_url() {
     local origin
     origin=$(get_public_origin)
@@ -627,6 +643,7 @@ show_status() {
     CURRENT_PATH=$(get_current_path)
     PUBLIC_ORIGIN=$(get_public_origin)
     PANEL_URL=$(get_public_panel_url)
+    SHARE_ORIGIN=$(get_public_share_origin)
     
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
@@ -651,6 +668,9 @@ show_status() {
     fi
     echo -e "${CYAN}│${NC}  Public URL: ${GREEN}${PANEL_URL}${NC}"
     echo -e "${CYAN}│${NC}  Origin:     ${BLUE}${PUBLIC_ORIGIN}${NC}"
+    if [ -n "$SHARE_ORIGIN" ]; then
+        echo -e "${CYAN}│${NC}  Share host: ${GREEN}${SHARE_ORIGIN}${NC}"
+    fi
     
     if [ -d "$INSTALL_DIR" ]; then
         if [ -f "$INSTALL_DIR/package.json" ]; then
@@ -1404,6 +1424,7 @@ show_port() {
     CURRENT_PORT=$(get_current_port)
     PUBLIC_ORIGIN=$(get_public_origin)
     PANEL_URL=$(get_public_panel_url)
+    SHARE_ORIGIN=$(get_public_share_origin)
     
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
@@ -1412,6 +1433,9 @@ show_port() {
     echo -e "${CYAN}│${NC}  Internal Port: ${GREEN}${CURRENT_PORT}${NC}"
     echo -e "${CYAN}│${NC}  Public URL:    ${GREEN}${PANEL_URL}${NC}"
     echo -e "${CYAN}│${NC}  Origin:        ${BLUE}${PUBLIC_ORIGIN}${NC}"
+    if [ -n "$SHARE_ORIGIN" ]; then
+        echo -e "${CYAN}│${NC}  Share host:    ${GREEN}${SHARE_ORIGIN}${NC}"
+    fi
     echo -e "${CYAN}└──────────────────────────────────────────────────────────────┘${NC}"
     echo ""
     echo -e "To change port, run: ${BLUE}atomic-ui port <new-port>${NC}"

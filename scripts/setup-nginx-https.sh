@@ -16,6 +16,7 @@ LETSENCRYPT_WEBROOT="${LETSENCRYPT_WEBROOT:-/var/www/letsencrypt}"
 PUBLIC_IP="${PUBLIC_IP:-$(curl -4 -fsSL https://ifconfig.me || true)}"
 PANEL_PATH="${PANEL_PATH:-}"
 PANEL_DOMAIN="${PANEL_DOMAIN:-}"
+PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN:-}"
 ENABLE_FAIL2BAN="${ENABLE_FAIL2BAN:-true}"
 ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK:-true}"
 LOGIN_LIMIT_RATE="${LOGIN_LIMIT_RATE:-20r/m}"
@@ -227,6 +228,126 @@ $(emit_https_security_headers)
 EOF
 }
 
+emit_share_proxy_location() {
+  local location_prefix="$1"
+  local forwarded_proto="$2"
+
+  cat <<EOF
+    location ^~ ${location_prefix} {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${forwarded_proto};
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+EOF
+}
+
+emit_share_exact_proxy_location() {
+  local location_path="$1"
+  local forwarded_proto="$2"
+
+  cat <<EOF
+    location = ${location_path} {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${forwarded_proto};
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+EOF
+}
+
+emit_public_share_locations() {
+  local forwarded_proto="$1"
+
+  emit_share_proxy_location "/_next/" "${forwarded_proto}"
+  emit_share_exact_proxy_location "/favicon.ico" "${forwarded_proto}"
+  emit_share_proxy_location "/uploads/" "${forwarded_proto}"
+
+  if [[ -n "${PANEL_PATH}" ]]; then
+    emit_share_proxy_location "${PANEL_PATH}/sub/" "${forwarded_proto}"
+    emit_share_proxy_location "${PANEL_PATH}/s/" "${forwarded_proto}"
+    emit_share_proxy_location "${PANEL_PATH}/c/" "${forwarded_proto}"
+    emit_share_proxy_location "${PANEL_PATH}/api/subscription/" "${forwarded_proto}"
+    emit_share_proxy_location "${PANEL_PATH}/api/sub/" "${forwarded_proto}"
+  else
+    emit_share_proxy_location "/sub/" "${forwarded_proto}"
+    emit_share_proxy_location "/s/" "${forwarded_proto}"
+    emit_share_proxy_location "/c/" "${forwarded_proto}"
+    emit_share_proxy_location "/api/subscription/" "${forwarded_proto}"
+    emit_share_proxy_location "/api/sub/" "${forwarded_proto}"
+  fi
+
+  cat <<'EOF'
+    location / {
+        return 404;
+    }
+EOF
+}
+
+emit_http_share_proxy_server() {
+  local listen_args="$1"
+  local server_name="$2"
+
+  cat <<EOF
+server {
+    listen 80 ${listen_args};
+    listen [::]:80 ${listen_args};
+    server_name ${server_name};
+
+    client_max_body_size 32m;
+
+$(emit_acme_location)
+
+$(emit_public_share_locations "\$scheme")
+}
+EOF
+}
+
+emit_https_share_proxy_server() {
+  local listen_args="$1"
+  local server_name="$2"
+  local cert_path="$3"
+  local key_path="$4"
+
+  cat <<EOF
+server {
+    listen 443 ssl http2 ${listen_args};
+    listen [::]:443 ssl http2 ${listen_args};
+    server_name ${server_name};
+
+    client_max_body_size 32m;
+    ssl_certificate ${cert_path};
+    ssl_certificate_key ${key_path};
+
+$(emit_https_security_headers)
+
+$(emit_public_share_locations "https")
+}
+EOF
+}
+
 install_lego() {
   if [[ -x "${LEGO_BIN}" ]]; then
     return
@@ -255,11 +376,12 @@ issue_ip_certificate() {
 }
 
 issue_domain_certificate() {
+  local domain_name="$1"
   apt-get install -y -qq certbot >/dev/null
   certbot certonly \
     --webroot \
     -w "${LETSENCRYPT_WEBROOT}" \
-    -d "${PANEL_DOMAIN}" \
+    -d "${domain_name}" \
     --email "${ACME_EMAIL}" \
     --agree-tos \
     --non-interactive \
@@ -330,8 +452,14 @@ EOF
 }
 
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN}")"
+PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK}")"
 ENABLE_FAIL2BAN="$(normalize_bool "${ENABLE_FAIL2BAN}")"
+
+if [[ -n "${PANEL_DOMAIN}" && "${PUBLIC_SHARE_DOMAIN}" == "${PANEL_DOMAIN}" ]]; then
+  echo "PUBLIC_SHARE_DOMAIN must be different from PANEL_DOMAIN" >&2
+  exit 1
+fi
 
 if [[ -n "${PANEL_PATH}" ]]; then
   if [[ "${PANEL_PATH}" != /* ]]; then
@@ -348,6 +476,8 @@ fi
 if [[ -z "${ACME_EMAIL}" ]]; then
   if [[ -n "${PANEL_DOMAIN}" ]]; then
     ACME_EMAIL="admin@${PANEL_DOMAIN}"
+  elif [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+    ACME_EMAIL="admin@${PUBLIC_SHARE_DOMAIN}"
   else
     ACME_EMAIL="admin@${PUBLIC_IP//./-}.sslip.io"
   fi
@@ -386,6 +516,10 @@ fi
   else
     emit_http_proxy_server "default_server" "_"
   fi
+
+  if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+    emit_http_share_proxy_server "" "${PUBLIC_SHARE_DOMAIN}"
+  fi
 } >"${SITE_FILE}"
 
 rm -f /etc/nginx/sites-enabled/default
@@ -395,11 +529,12 @@ nginx -t
 systemctl enable nginx >/dev/null 2>&1 || true
 systemctl restart nginx
 
-issue_domain_cert="false"
+issue_panel_domain_cert="false"
+issue_share_domain_cert="false"
 issue_ip_cert="true"
 
 if [[ -n "${PANEL_DOMAIN}" ]]; then
-  issue_domain_cert="true"
+  issue_panel_domain_cert="true"
   if [[ "${ALLOW_IP_FALLBACK}" == "true" ]]; then
     issue_ip_cert="true"
   else
@@ -407,8 +542,19 @@ if [[ -n "${PANEL_DOMAIN}" ]]; then
   fi
 fi
 
-if [[ "${issue_domain_cert}" == "true" ]]; then
-  issue_domain_certificate
+if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+  issue_share_domain_cert="true"
+fi
+
+if [[ "${issue_panel_domain_cert}" == "true" ]]; then
+  issue_domain_certificate "${PANEL_DOMAIN}"
+fi
+
+if [[ "${issue_share_domain_cert}" == "true" ]]; then
+  issue_domain_certificate "${PUBLIC_SHARE_DOMAIN}"
+fi
+
+if [[ "${issue_panel_domain_cert}" == "true" || "${issue_share_domain_cert}" == "true" ]]; then
   systemctl enable --now certbot.timer >/dev/null 2>&1 || true
 fi
 
@@ -423,6 +569,8 @@ ip_cert_path="${LEGO_PATH}/certificates/${PUBLIC_IP}.crt"
 ip_key_path="${LEGO_PATH}/certificates/${PUBLIC_IP}.key"
 domain_cert_path="/etc/letsencrypt/live/${PANEL_DOMAIN}/fullchain.pem"
 domain_key_path="/etc/letsencrypt/live/${PANEL_DOMAIN}/privkey.pem"
+share_cert_path="/etc/letsencrypt/live/${PUBLIC_SHARE_DOMAIN}/fullchain.pem"
+share_key_path="/etc/letsencrypt/live/${PUBLIC_SHARE_DOMAIN}/privkey.pem"
 
 {
   if [[ -n "${PANEL_DOMAIN}" ]]; then
@@ -440,6 +588,11 @@ domain_key_path="/etc/letsencrypt/live/${PANEL_DOMAIN}/privkey.pem"
   else
     emit_http_redirect_server "default_server" "_" "https://\$host"
     emit_https_proxy_server "default_server" "_" "${ip_cert_path}" "${ip_key_path}"
+  fi
+
+  if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+    emit_http_redirect_server "" "${PUBLIC_SHARE_DOMAIN}" "https://${PUBLIC_SHARE_DOMAIN}"
+    emit_https_share_proxy_server "" "${PUBLIC_SHARE_DOMAIN}" "${share_cert_path}" "${share_key_path}"
   fi
 } >"${SITE_FILE}"
 
@@ -464,10 +617,20 @@ fi
 
 if [[ -n "${PANEL_DOMAIN}" ]]; then
   if [[ "${ALLOW_IP_FALLBACK}" == "true" ]]; then
-    echo "HTTPS enabled for https://${PANEL_DOMAIN}/ with HTTPS IP fallback at https://${PUBLIC_IP}/"
+    if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+      echo "HTTPS enabled for https://${PANEL_DOMAIN}/ with public share host https://${PUBLIC_SHARE_DOMAIN}/ and HTTPS IP fallback at https://${PUBLIC_IP}/"
+    else
+      echo "HTTPS enabled for https://${PANEL_DOMAIN}/ with HTTPS IP fallback at https://${PUBLIC_IP}/"
+    fi
   else
-    echo "HTTPS enabled for https://${PANEL_DOMAIN}/"
+    if [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+      echo "HTTPS enabled for https://${PANEL_DOMAIN}/ with public share host https://${PUBLIC_SHARE_DOMAIN}/"
+    else
+      echo "HTTPS enabled for https://${PANEL_DOMAIN}/"
+    fi
   fi
+elif [[ -n "${PUBLIC_SHARE_DOMAIN}" ]]; then
+  echo "HTTPS enabled for https://${PUBLIC_IP}/ with public share host https://${PUBLIC_SHARE_DOMAIN}/"
 else
   echo "HTTPS enabled for https://${PUBLIC_IP}/"
 fi

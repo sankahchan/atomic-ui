@@ -54,6 +54,7 @@ import {
   buildShortShareUrl,
   buildSubscriptionApiUrl,
   buildSubscriptionClientUrl,
+  getPublicBasePath,
 } from '@/lib/subscription-links';
 import { normalizePublicSlug } from '@/lib/public-slug';
 import {
@@ -1320,6 +1321,15 @@ export default function KeyDetailPage() {
           origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         })
       : '';
+  const subscriptionProbeUrl = key.publicSlug
+    ? (typeof window !== 'undefined'
+        ? `${window.location.origin}${getPublicBasePath()}/c/${key.publicSlug}`
+        : '')
+    : key.subscriptionToken
+      ? (typeof window !== 'undefined'
+          ? `${window.location.origin}${getPublicBasePath()}/api/subscription/${key.subscriptionToken}`
+          : '')
+      : '';
 
   const usagePercent = key.dataLimitBytes
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
@@ -1868,6 +1878,7 @@ export default function KeyDetailPage() {
 
           <ClientEndpointTestCard
             endpointUrl={subscriptionApiUrl}
+            probeUrl={subscriptionProbeUrl}
             title="Client URL Test"
             description="Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly."
           />
