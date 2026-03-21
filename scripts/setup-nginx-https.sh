@@ -286,6 +286,9 @@ emit_public_share_locations() {
   emit_share_proxy_location "/uploads/" "${forwarded_proto}"
 
   if [[ -n "${PANEL_PATH}" ]]; then
+    emit_share_proxy_location "${PANEL_PATH}/_next/" "${forwarded_proto}"
+    emit_share_exact_proxy_location "${PANEL_PATH}/favicon.ico" "${forwarded_proto}"
+    emit_share_proxy_location "${PANEL_PATH}/uploads/" "${forwarded_proto}"
     emit_share_proxy_location "${PANEL_PATH}/sub/" "${forwarded_proto}"
     emit_share_proxy_location "${PANEL_PATH}/s/" "${forwarded_proto}"
     emit_share_proxy_location "${PANEL_PATH}/c/" "${forwarded_proto}"
