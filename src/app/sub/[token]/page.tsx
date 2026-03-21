@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import {
   AlertTriangle,
@@ -53,14 +53,15 @@ import {
   SUBSCRIPTION_EVENT_TYPES,
   type SubscriptionEventType,
 } from '@/lib/services/subscription-events';
-import { useLocale } from '@/hooks/use-locale';
 import {
+  defaultLocale,
   coerceSupportedLocale,
   localeFlags,
   localeNames,
   supportedLocales,
   type SupportedLocale,
 } from '@/lib/i18n/config';
+import { resolveTranslation } from '@/lib/i18n/translations';
 import {
   getTheme,
   clientApps,
@@ -72,6 +73,7 @@ import {
 } from '@/lib/subscription-themes';
 
 type Platform = 'android' | 'ios' | 'windows';
+const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
 
 interface ContactLink {
   type: 'telegram' | 'discord' | 'whatsapp' | 'phone' | 'email' | 'website' | 'facebook';
@@ -275,12 +277,12 @@ function WavesBackground({ theme }: { theme: SubscriptionTheme }) {
 export default function SubscriptionPage() {
   const params = useParams();
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { locale, setLocale, t, mounted } = useLocale();
   const token = (params.token || params.slug) as string;
   const sourceParam = searchParams.get('source');
   const langParam = coerceSupportedLocale(searchParams.get('lang'));
+  const [locale, setLocale] = useState<SupportedLocale>(langParam ?? defaultLocale);
+  const [mounted, setMounted] = useState(false);
 
   const [keyData, setKeyData] = useState<KeyData | null>(null);
   const [settings, setSettings] = useState<SettingsData>({});
@@ -316,24 +318,29 @@ export default function SubscriptionPage() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [pageViewLogged, setPageViewLogged] = useState(false);
   const localeTag = locale === 'my' ? 'my-MM' : 'en-US';
+  const t = useCallback(
+    (key: string) => resolveTranslation(locale, key) ?? resolveTranslation(defaultLocale, key) ?? key,
+    [locale],
+  );
   const tr = useCallback(
     (key: string, values?: Record<string, string | number>) =>
       values ? fillTemplate(t(key), values) : t(key),
     [t],
   );
 
-  const applyLocale = useCallback((nextLocale: SupportedLocale) => {
+  const persistLocale = useCallback((nextLocale: SupportedLocale) => {
     setLocale(nextLocale);
-
-    if (typeof window === 'undefined') {
-      return;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
     }
+  }, []);
 
+  const getLocaleHref = useCallback((nextLocale: SupportedLocale) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('lang', nextLocale);
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams, setLocale]);
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -376,20 +383,23 @@ export default function SubscriptionPage() {
 
   // Listen for system color scheme changes
   useEffect(() => {
+    setMounted(true);
+
+    if (langParam) {
+      persistLocale(langParam);
+    } else if (typeof window !== 'undefined') {
+      const storedLocale = coerceSupportedLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
+      if (storedLocale) {
+        setLocale(storedLocale);
+      }
+    }
+
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     setSystemPrefersDark(mq.matches);
     const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted || !langParam || locale === langParam) {
-      return;
-    }
-
-    setLocale(langParam);
-  }, [langParam, locale, mounted, setLocale]);
+  }, [langParam, persistLocale]);
 
   // Toggle between dark and light (only for generic dark/light themes)
   const handleThemeToggle = () => {
@@ -466,10 +476,10 @@ export default function SubscriptionPage() {
           if (settingsRes.ok) {
             settingsData = await settingsRes.json();
             setSettings(settingsData);
-            const storedLocale = coerceSupportedLocale(window.localStorage.getItem('atomic-ui-locale'));
+            const storedLocale = coerceSupportedLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
             const preferredLocale = coerceSupportedLocale(settingsData.defaultLanguage);
             if (!langParam && !storedLocale && preferredLocale && preferredLocale !== locale) {
-              applyLocale(preferredLocale);
+              persistLocale(preferredLocale);
             }
             if (settingsData.branding) {
               setBranding({ ...defaultBranding, ...settingsData.branding });
@@ -497,7 +507,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [applyLocale, langParam, locale, setLocale, t, token, trackSubscriptionEvent]);
+  }, [langParam, locale, persistLocale, t, token]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -1035,10 +1045,10 @@ export default function SubscriptionPage() {
                 {supportedLocales.map((localeOption) => {
                   const active = locale === localeOption;
                   return (
-                    <button
+                    <a
                       key={localeOption}
-                      type="button"
-                      onClick={() => applyLocale(localeOption as SupportedLocale)}
+                      href={getLocaleHref(localeOption)}
+                      onClick={() => persistLocale(localeOption)}
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all sm:px-3 sm:text-xs"
                       style={{
                         backgroundColor: active
@@ -1046,11 +1056,11 @@ export default function SubscriptionPage() {
                           : 'transparent',
                         color: isDarkTheme ? '#e4e4e7' : '#334155',
                       }}
-                      aria-pressed={active}
+                      aria-current={active ? 'true' : undefined}
                     >
                       <span>{localeFlags[localeOption]}</span>
                       <span className="hidden sm:inline">{localeNames[localeOption]}</span>
-                    </button>
+                    </a>
                   );
                 })}
               </div>
@@ -1265,16 +1275,16 @@ export default function SubscriptionPage() {
                         </div>
 
                         {primaryApp ? (
-                          <button
-                            onClick={() => handleAddToApp(primaryApp.id)}
-                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
+                        <button
+                          onClick={() => handleAddToApp(primaryApp.id)}
+                          className="inline-flex min-h-[3rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold leading-tight shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
                             }}
                           >
                             <span className="text-base">{primaryApp.icon}</span>
-                            <span className="truncate">{tr('subscription.hero.open_in', { app: primaryApp.name })}</span>
+                            <span className="line-clamp-2 text-center">{tr('subscription.hero.open_in', { app: primaryApp.name })}</span>
                             <ChevronRight className="h-4 w-4" />
                           </button>
                         ) : (
@@ -1285,14 +1295,14 @@ export default function SubscriptionPage() {
                                 placement: 'hero_primary',
                               })
                             }
-                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold shadow-lg"
+                            className="inline-flex min-h-[3rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-3 text-sm font-semibold leading-tight shadow-lg"
                             style={{
                               background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                               color: '#ffffff',
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            <span className="truncate">{t('subscription.hero.copy_connection_url_primary')}</span>
+                            <span className="line-clamp-2 text-center">{t('subscription.hero.copy_connection_url_primary')}</span>
                           </button>
                         )}
 
@@ -1304,7 +1314,7 @@ export default function SubscriptionPage() {
                                 placement: 'hero_secondary',
                               })
                             }
-                            className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                            className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
                             style={{
                               backgroundColor: controlButtonSurface,
                               color: controlTextColor,
@@ -1312,13 +1322,13 @@ export default function SubscriptionPage() {
                             }}
                           >
                             <Copy className="h-4 w-4" />
-                            <span className="truncate">{t('subscription.hero.copy_url')}</span>
+                            <span className="line-clamp-2 text-center">{t('subscription.hero.copy_url')}</span>
                           </button>
 
                           {showManualSetupButton ? (
                             <button
                               onClick={() => setShowManualSetup(true)}
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1326,7 +1336,7 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <QrCode className="h-4 w-4" />
-                            <span className="truncate">{t('subscription.hero.manual_setup')}</span>
+                            <span className="line-clamp-2 text-center">{t('subscription.hero.manual_setup')}</span>
                           </button>
                           ) : null}
 
@@ -1335,7 +1345,7 @@ export default function SubscriptionPage() {
                               href={installAppUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1343,7 +1353,7 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <Download className="h-4 w-4" />
-                            <span className="truncate">{tr('subscription.hero.get_app', { app: primaryApp?.name ?? t('subscription.defaults.app') })}</span>
+                            <span className="line-clamp-2 text-center">{tr('subscription.hero.get_app', { app: primaryApp?.name ?? t('subscription.defaults.app') })}</span>
                           </a>
                         ) : null}
 
@@ -1352,7 +1362,7 @@ export default function SubscriptionPage() {
                               href={supportLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium"
+                              className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
                               style={{
                                 backgroundColor: controlButtonSurface,
                                 color: controlTextColor,
@@ -1360,7 +1370,7 @@ export default function SubscriptionPage() {
                               }}
                           >
                             <MessageCircle className="h-4 w-4" />
-                            <span className="truncate">{t('subscription.hero.get_support')}</span>
+                            <span className="line-clamp-2 text-center">{t('subscription.hero.get_support')}</span>
                           </a>
                         ) : null}
                         </div>
@@ -1581,14 +1591,14 @@ export default function SubscriptionPage() {
                   {visibleApps.map((app) => (
                     <div
                       key={app.id}
-                      className="min-w-0 rounded-[1.25rem] border p-3.5"
+                      className="flex min-w-0 flex-col rounded-[1.25rem] border p-3.5"
                       style={{
                         backgroundColor: controlSurface,
                         borderColor: controlBorder,
                       }}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div
                             className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border text-lg"
                             style={{
@@ -1599,8 +1609,8 @@ export default function SubscriptionPage() {
                           >
                             {app.icon}
                           </div>
-                          <p className="mt-2.5 text-[15px] font-semibold" style={{ color: controlTextColor }}>{app.name}</p>
-                          <p className="mt-1 line-clamp-2 text-sm" style={{ color: controlMutedColor }}>
+                          <p className="mt-2.5 break-words text-[15px] font-semibold leading-tight" style={{ color: controlTextColor }}>{app.name}</p>
+                          <p className="mt-1 line-clamp-3 break-words text-sm leading-6" style={{ color: controlMutedColor }}>
                             {tr('subscription.apps.manual_alternative', { app: app.name })}
                           </p>
                         </div>
@@ -1613,20 +1623,20 @@ export default function SubscriptionPage() {
                             border: `1px solid ${controlBorder}`,
                           }}
                         >
-                          {t('subscription.apps.client')}
+                          <span className="block truncate">{t('subscription.apps.client')}</span>
                         </div>
                       </div>
 
-                      <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_46px]">
+                      <div className="mt-3.5 grid gap-2 sm:mt-auto sm:grid-cols-[minmax(0,1fr)_46px]">
                         <button
                           onClick={() => handleAddToApp(app.id)}
-                          className="inline-flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-2.5 text-sm font-semibold"
+                          className="inline-flex min-h-[3rem] min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-4 py-2.5 text-sm font-semibold leading-tight"
                           style={{
                             background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
                             color: '#ffffff',
                           }}
                         >
-                          <span className="truncate">{tr('subscription.hero.open_in', { app: app.name })}</span>
+                          <span className="line-clamp-2 text-center">{tr('subscription.hero.open_in', { app: app.name })}</span>
                         </button>
                         {getPlatformStoreUrl(app, platform) && (
                           <a
@@ -1646,8 +1656,8 @@ export default function SubscriptionPage() {
                         )}
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                        <span className="min-w-0 break-words" style={{ color: controlMutedColor }}>
+                      <div className="mt-3 flex items-start justify-between gap-3 text-xs">
+                        <span className="min-w-0 break-words leading-5" style={{ color: controlMutedColor }}>
                           {t('subscription.apps.same_url_flow')}
                         </span>
                         <span
@@ -1658,7 +1668,7 @@ export default function SubscriptionPage() {
                             border: `1px solid ${controlBorder}`,
                           }}
                         >
-                          {getPlatformLabel(platform)}
+                          <span className="block truncate">{getPlatformLabel(platform)}</span>
                         </span>
                       </div>
                     </div>
