@@ -186,6 +186,16 @@ type DAKData = {
   preferredServerIds: string[];
   preferredCountryCodes: string[];
   preferredRegionMode: DynamicRoutingPreferenceMode;
+  preferredServerWeights?: Record<string, number>;
+  preferredCountryWeights?: Record<string, number>;
+  sessionStickinessMode?: 'NONE' | 'DRAIN';
+  drainGraceMinutes?: number;
+  rotationEnabled?: boolean;
+  rotationInterval?: string;
+  rotationTriggerMode?: string;
+  rotationUsageThresholdPercent?: number;
+  rotateOnHealthFailure?: boolean;
+  appliedTemplateId?: string | null;
   expiresAt?: Date | null;
   durationDays?: number | null;
   daysRemaining?: number | null;
@@ -213,9 +223,13 @@ function CreateDAKDialog({
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const utils = trpc.useUtils();
+  const { data: templates } = trpc.dynamicKeys.listTemplates.useQuery(undefined, {
+    staleTime: 60_000,
+  });
   const [formData, setFormData] = useState<{
     name: string;
     publicSlug: string;
+    appliedTemplateId: string;
     type: keyof typeof DAK_TYPES;
     email: string;
     telegramId: string;
@@ -229,10 +243,20 @@ function CreateDAKDialog({
     loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
     preferredServerIds: string[];
     preferredCountryCodes: string[];
+    preferredServerWeights: Record<string, number>;
+    preferredCountryWeights: Record<string, number>;
     preferredRegionMode: DynamicRoutingPreferenceMode;
+    sessionStickinessMode: 'NONE' | 'DRAIN';
+    drainGraceMinutes: number;
+    rotationEnabled: boolean;
+    rotationInterval: 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+    rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
+    rotationUsageThresholdPercent: number;
+    rotateOnHealthFailure: boolean;
   }>({
     name: '',
     publicSlug: '',
+    appliedTemplateId: '',
     type: 'SELF_MANAGED',
     email: '',
     telegramId: '',
@@ -247,6 +271,15 @@ function CreateDAKDialog({
     preferredServerIds: [],
     preferredCountryCodes: [],
     preferredRegionMode: 'PREFER',
+    preferredServerWeights: {},
+    preferredCountryWeights: {},
+    sessionStickinessMode: 'DRAIN',
+    drainGraceMinutes: 20,
+    rotationEnabled: false,
+    rotationInterval: 'NEVER',
+    rotationTriggerMode: 'SCHEDULED',
+    rotationUsageThresholdPercent: 85,
+    rotateOnHealthFailure: false,
   });
   const [slugTouched, setSlugTouched] = useState(false);
   const [openPreviewAfterCreate, setOpenPreviewAfterCreate] = useState(false);
@@ -307,6 +340,7 @@ function CreateDAKDialog({
     setFormData({
       name: '',
       publicSlug: '',
+      appliedTemplateId: '',
       type: 'SELF_MANAGED',
       email: '',
       telegramId: '',
@@ -321,12 +355,59 @@ function CreateDAKDialog({
       preferredServerIds: [],
       preferredCountryCodes: [],
       preferredRegionMode: 'PREFER',
+      preferredServerWeights: {},
+      preferredCountryWeights: {},
+      sessionStickinessMode: 'DRAIN',
+      drainGraceMinutes: 20,
+      rotationEnabled: false,
+      rotationInterval: 'NEVER',
+      rotationTriggerMode: 'SCHEDULED',
+      rotationUsageThresholdPercent: 85,
+      rotateOnHealthFailure: false,
     });
     setSlugTouched(false);
     setOpenPreviewAfterCreate(false);
     setCopyShareLinkAfterCreate(false);
     setSendSharePageViaTelegramAfterCreate(false);
     previewWindowRef.current = null;
+  };
+
+  const handleTemplateChange = (templateId: string) => {
+    const template = templates?.find((item) => item.id === templateId);
+
+    setFormData((current) => {
+      if (!template) {
+        return {
+          ...current,
+          appliedTemplateId: '',
+        };
+      }
+
+      return {
+        ...current,
+        appliedTemplateId: template.id,
+        type: template.type,
+        notes: template.notes || current.notes,
+        dataLimitGB: template.dataLimitGB ? String(template.dataLimitGB) : '',
+        dataLimitResetStrategy: template.dataLimitResetStrategy as typeof current.dataLimitResetStrategy,
+        expirationType: template.expirationType as typeof current.expirationType,
+        durationDays: template.durationDays ? String(template.durationDays) : '',
+        method: template.method,
+        loadBalancerAlgorithm: template.loadBalancerAlgorithm,
+        preferredServerIds: template.preferredServerIds,
+        preferredCountryCodes: template.preferredCountryCodes,
+        preferredServerWeights: template.preferredServerWeights,
+        preferredCountryWeights: template.preferredCountryWeights,
+        preferredRegionMode: template.preferredRegionMode,
+        sessionStickinessMode: template.sessionStickinessMode,
+        drainGraceMinutes: template.drainGraceMinutes,
+        rotationEnabled: template.rotationEnabled,
+        rotationInterval: template.rotationInterval as typeof current.rotationInterval,
+        rotationTriggerMode: template.rotationTriggerMode as typeof current.rotationTriggerMode,
+        rotationUsageThresholdPercent: template.rotationUsageThresholdPercent,
+        rotateOnHealthFailure: template.rotateOnHealthFailure,
+      };
+    });
   };
 
   const createMutation = trpc.dynamicKeys.create.useMutation({
@@ -453,7 +534,17 @@ function CreateDAKDialog({
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
       preferredServerIds: formData.preferredServerIds,
       preferredCountryCodes: formData.preferredCountryCodes,
+      preferredServerWeights: formData.preferredServerWeights,
+      preferredCountryWeights: formData.preferredCountryWeights,
       preferredRegionMode: formData.preferredRegionMode,
+      sessionStickinessMode: formData.sessionStickinessMode,
+      drainGraceMinutes: formData.drainGraceMinutes,
+      rotationEnabled: formData.rotationEnabled,
+      rotationInterval: formData.rotationInterval,
+      rotationTriggerMode: formData.rotationTriggerMode,
+      rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
+      rotateOnHealthFailure: formData.rotateOnHealthFailure,
+      appliedTemplateId: formData.appliedTemplateId || undefined,
     });
   };
 
@@ -471,6 +562,29 @@ function CreateDAKDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Routing Template</Label>
+            <Select
+              value={formData.appliedTemplateId || '__none__'}
+              onValueChange={(value) => handleTemplateChange(value === '__none__' ? '' : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Start from scratch or apply a saved template" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No template</SelectItem>
+                {(templates ?? []).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Applying a template pre-fills routing, rotation, and quota defaults. You can still adjust everything before create.
+            </p>
+          </div>
+
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="dakName">{t('dynamic_keys.dialog.name')} *</Label>
@@ -630,6 +744,10 @@ function CreateDAKDialog({
               preferredRegionMode={formData.preferredRegionMode}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
+              preferredServerWeights={formData.preferredServerWeights}
+              preferredCountryWeights={formData.preferredCountryWeights}
+              sessionStickinessMode={formData.sessionStickinessMode}
+              drainGraceMinutes={formData.drainGraceMinutes}
               compact
               onChange={(next) =>
                 setFormData((current) => ({
@@ -637,9 +755,118 @@ function CreateDAKDialog({
                   preferredRegionMode: next.preferredRegionMode,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
+                  preferredServerWeights: next.preferredServerWeights,
+                  preferredCountryWeights: next.preferredCountryWeights,
+                  sessionStickinessMode: next.sessionStickinessMode,
+                  drainGraceMinutes: next.drainGraceMinutes,
                 }))
               }
             />
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Smart Rotation Policy</p>
+              <p className="text-xs text-muted-foreground">
+                Rotate this dynamic key on a schedule, when quota pressure is high, or when the active backend becomes unhealthy.
+              </p>
+            </div>
+
+            <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3">
+              <Checkbox
+                checked={formData.rotationEnabled}
+                onCheckedChange={(checked) =>
+                  setFormData((current) => ({ ...current, rotationEnabled: checked === true }))
+                }
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">Enable automatic rotation</span>
+                <span className="block text-xs text-muted-foreground">
+                  Background rotation keeps a stable subscription URL while refreshing the underlying backend keys.
+                </span>
+              </span>
+            </label>
+
+            {formData.rotationEnabled ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Rotation Interval</Label>
+                  <Select
+                    value={formData.rotationInterval}
+                    onValueChange={(value: typeof formData.rotationInterval) =>
+                      setFormData((current) => ({ ...current, rotationInterval: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DAILY">Daily</SelectItem>
+                      <SelectItem value="WEEKLY">Weekly</SelectItem>
+                      <SelectItem value="BIWEEKLY">Every 2 Weeks</SelectItem>
+                      <SelectItem value="MONTHLY">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Rotation Trigger</Label>
+                  <Select
+                    value={formData.rotationTriggerMode}
+                    onValueChange={(value: typeof formData.rotationTriggerMode) =>
+                      setFormData((current) => ({ ...current, rotationTriggerMode: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SCHEDULED">Schedule only</SelectItem>
+                      <SelectItem value="USAGE">Quota threshold</SelectItem>
+                      <SelectItem value="HEALTH">Health issue</SelectItem>
+                      <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(formData.rotationTriggerMode === 'USAGE' || formData.rotationTriggerMode === 'COMBINED') && (
+                  <div className="space-y-2">
+                    <Label>Usage Threshold (%)</Label>
+                    <Input
+                      type="number"
+                      min="50"
+                      max="100"
+                      value={formData.rotationUsageThresholdPercent}
+                      onChange={(event) =>
+                        setFormData((current) => ({
+                          ...current,
+                          rotationUsageThresholdPercent: Math.max(50, Math.min(100, Number(event.target.value) || 85)),
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {(formData.rotationTriggerMode === 'HEALTH' || formData.rotationTriggerMode === 'COMBINED') && (
+                  <label className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-3 sm:col-span-2">
+                    <Checkbox
+                      checked={formData.rotateOnHealthFailure}
+                      onCheckedChange={(checked) =>
+                        setFormData((current) => ({ ...current, rotateOnHealthFailure: checked === true }))
+                      }
+                      className="mt-0.5"
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium">Rotate on health failure</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Move traffic to a fresh backend when a serving server becomes slow or unavailable.
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Contact info */}
@@ -1262,6 +1489,13 @@ function EditDAKDialog({
     preferredServerIds: dakData.preferredServerIds || [],
     preferredCountryCodes: dakData.preferredCountryCodes || [],
     preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
+    preferredServerWeights: dakData.preferredServerWeights || {},
+    preferredCountryWeights: dakData.preferredCountryWeights || {},
+    sessionStickinessMode: dakData.sessionStickinessMode || 'DRAIN',
+    drainGraceMinutes: dakData.drainGraceMinutes || 20,
+    rotationTriggerMode: (dakData.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') || 'SCHEDULED',
+    rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
+    rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
   });
 
   useEffect(() => {
@@ -1279,6 +1513,13 @@ function EditDAKDialog({
       preferredServerIds: dakData.preferredServerIds || [],
       preferredCountryCodes: dakData.preferredCountryCodes || [],
       preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
+      preferredServerWeights: dakData.preferredServerWeights || {},
+      preferredCountryWeights: dakData.preferredCountryWeights || {},
+      sessionStickinessMode: dakData.sessionStickinessMode || 'DRAIN',
+      drainGraceMinutes: dakData.drainGraceMinutes || 20,
+      rotationTriggerMode: (dakData.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') || 'SCHEDULED',
+      rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
+      rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
     });
   }, [dakData]);
 
@@ -1325,7 +1566,14 @@ function EditDAKDialog({
       preferredServerIds: formData.preferredServerIds,
       preferredCountryCodes: formData.preferredCountryCodes,
       preferredRegionMode: formData.preferredRegionMode,
-    } as any);
+      preferredServerWeights: formData.preferredServerWeights,
+      preferredCountryWeights: formData.preferredCountryWeights,
+      sessionStickinessMode: formData.sessionStickinessMode,
+      drainGraceMinutes: formData.drainGraceMinutes,
+      rotationTriggerMode: formData.rotationTriggerMode,
+      rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
+      rotateOnHealthFailure: formData.rotateOnHealthFailure,
+    });
   };
 
   return (
@@ -1434,6 +1682,10 @@ function EditDAKDialog({
               preferredRegionMode={formData.preferredRegionMode}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
+              preferredServerWeights={formData.preferredServerWeights}
+              preferredCountryWeights={formData.preferredCountryWeights}
+              sessionStickinessMode={formData.sessionStickinessMode}
+              drainGraceMinutes={formData.drainGraceMinutes}
               compact
               onChange={(next) =>
                 setFormData((current) => ({
@@ -1441,6 +1693,10 @@ function EditDAKDialog({
                   preferredRegionMode: next.preferredRegionMode,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
+                  preferredServerWeights: next.preferredServerWeights,
+                  preferredCountryWeights: next.preferredCountryWeights,
+                  sessionStickinessMode: next.sessionStickinessMode,
+                  drainGraceMinutes: next.drainGraceMinutes,
                 }))
               }
             />

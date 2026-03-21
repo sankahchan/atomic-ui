@@ -278,10 +278,17 @@ model DynamicAccessKey {
   // Dynamic routing preferences
   preferredServerIdsJson   String @default("[]")
   preferredCountryCodesJson String @default("[]")
+  preferredServerWeightsJson String @default("{}")
+  preferredCountryWeightsJson String @default("{}")
   preferredRegionMode      String @default("PREFER")
+  sessionStickinessMode    String @default("DRAIN") // NONE, DRAIN
+  drainGraceMinutes        Int    @default(20)
 
   // Track which server was last selected (for round-robin)
   lastSelectedKeyIndex Int @default(0)
+  lastResolvedAccessKeyId String?
+  lastResolvedServerId    String?
+  lastResolvedAt          DateTime?
 
   // Subscription page theme (overrides global default)
   // Valid themes: dark, light, purple, blue, green, orange, pink, red, glass*
@@ -303,19 +310,85 @@ model DynamicAccessKey {
   // while keeping the subscription URL stable
   rotationEnabled  Boolean   @default(false)
   rotationInterval String    @default("NEVER") // NEVER, DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  rotationTriggerMode String @default("SCHEDULED") // SCHEDULED, USAGE, HEALTH, COMBINED
+  rotationUsageThresholdPercent Int @default(85)
+  rotateOnHealthFailure Boolean @default(false)
   lastRotatedAt    DateTime?
   nextRotationAt   DateTime?
   rotationCount    Int       @default(0) // Total rotations performed
+  lastRoutingAlertAt DateTime?
+
+  appliedTemplateId String?
+  appliedTemplate DynamicKeyTemplate? @relation(fields: [appliedTemplateId], references: [id], onDelete: SetNull)
 
   accessKeys         AccessKey[]
   telegramLinkTokens TelegramLinkToken[]
   subscriptionEvents SubscriptionPageEvent[]
+  routingEvents      DynamicRoutingEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status, lastTrafficAt])
+  @@index([appliedTemplateId])
+}
+
+model DynamicKeyTemplate {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  type        String @default("SELF_MANAGED")
+  notes       String?
+  dataLimitBytes BigInt?
+  dataLimitResetStrategy String @default("NEVER")
+  expirationType String @default("NEVER")
+  durationDays Int?
+  method String @default("chacha20-ietf-poly1305")
+  serverTagsJson String @default("[]")
+  loadBalancerAlgorithm String @default("IP_HASH")
+  preferredServerIdsJson String @default("[]")
+  preferredCountryCodesJson String @default("[]")
+  preferredServerWeightsJson String @default("{}")
+  preferredCountryWeightsJson String @default("{}")
+  preferredRegionMode String @default("PREFER")
+  sessionStickinessMode String @default("DRAIN")
+  drainGraceMinutes Int @default(20)
+  rotationEnabled Boolean @default(false)
+  rotationInterval String @default("NEVER")
+  rotationTriggerMode String @default("SCHEDULED")
+  rotationUsageThresholdPercent Int @default(85)
+  rotateOnHealthFailure Boolean @default(false)
+  sharePageEnabled Boolean @default(true)
+  subscriptionTheme String?
+  subscriptionWelcomeMessage String?
+
+  dynamicAccessKeys DynamicAccessKey[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DynamicRoutingEvent {
+  id String @id @default(cuid())
+  dynamicAccessKeyId String
+  dynamicAccessKey DynamicAccessKey @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  eventType String
+  severity String @default("INFO") // INFO, WARNING, CRITICAL
+  reason String
+  fromKeyId String?
+  fromKeyName String?
+  fromServerId String?
+  fromServerName String?
+  toKeyId String?
+  toKeyName String?
+  toServerId String?
+  toServerName String?
+  metadata String?
+  createdAt DateTime @default(now())
+
+  @@index([dynamicAccessKeyId, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model TelegramLinkToken {

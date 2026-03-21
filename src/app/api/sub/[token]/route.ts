@@ -35,6 +35,11 @@ import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
 import {
+  DYNAMIC_ROUTING_EVENT_TYPES,
+  recordDynamicRoutingEvent,
+  recordDynamicRoutingEventOnce,
+} from '@/lib/services/dynamic-routing-events';
+import {
   getSelfManagedServerCandidate,
   parseDynamicRoutingPreferences,
   selectDynamicAccessKeyForClient,
@@ -149,8 +154,23 @@ async function createSelfManagedKey(
   lastSelectedKeyIndex?: number,
   preferredServerIds?: string[],
   preferredCountryCodes?: string[],
+  preferredServerWeights?: Record<string, number>,
+  preferredCountryWeights?: Record<string, number>,
   preferredRegionMode?: 'PREFER' | 'ONLY',
-): Promise<{ accessUrl: string; server: { hostnameForAccessKeys: string | null } } | null> {
+  sessionStickinessMode?: 'NONE' | 'DRAIN',
+  drainGraceMinutes?: number,
+): Promise<{
+  accessUrl: string;
+  keyId: string;
+  keyName: string;
+  selectionReason: string;
+  server: {
+    id: string;
+    name: string;
+    countryCode: string | null;
+    hostnameForAccessKeys: string | null;
+  };
+} | null> {
   const keyName = `self-managed-dak-${dakId}`;
 
   // Check if a key already exists for this DAK
@@ -168,7 +188,15 @@ async function createSelfManagedKey(
   if (existingKey && existingKey.accessUrl) {
     return {
       accessUrl: existingKey.accessUrl,
-      server: { hostnameForAccessKeys: existingKey.server.hostnameForAccessKeys },
+      keyId: existingKey.id,
+      keyName: existingKey.name,
+      selectionReason: 'Reusing the active self-managed backend that already exists for this dynamic key.',
+      server: {
+        id: existingKey.server.id,
+        name: existingKey.server.name,
+        countryCode: existingKey.server.countryCode ?? null,
+        hostnameForAccessKeys: existingKey.server.hostnameForAccessKeys,
+      },
     };
   }
 
@@ -183,7 +211,11 @@ async function createSelfManagedKey(
     lastSelectedKeyIndex,
     preferredServerIds,
     preferredCountryCodes,
+    preferredServerWeights,
+    preferredCountryWeights,
     preferredRegionMode,
+    sessionStickinessMode,
+    drainGraceMinutes,
     persistRoundRobin: true,
   });
 
@@ -230,11 +262,76 @@ async function createSelfManagedKey(
 
     return {
       accessUrl: newKey.accessUrl!,
-      server: { hostnameForAccessKeys: newKey.server.hostnameForAccessKeys },
+      keyId: newKey.id,
+      keyName: newKey.name,
+      selectionReason: candidate.reason,
+      server: {
+        id: newKey.server.id,
+        name: newKey.server.name,
+        countryCode: newKey.server.countryCode ?? null,
+        hostnameForAccessKeys: newKey.server.hostnameForAccessKeys,
+      },
     };
   } catch (error) {
     console.error('Failed to create self-managed key:', error);
     return null;
+  }
+}
+
+async function persistDynamicResolution(input: {
+  dynamicAccessKey: {
+    id: string;
+    lastResolvedAccessKeyId: string | null;
+    lastResolvedServerId: string | null;
+  };
+  next: {
+    keyId: string | null;
+    keyName: string | null;
+    serverId: string | null;
+    serverName: string | null;
+    reason: string;
+  };
+  stickinessApplied?: boolean;
+}) {
+  const switched =
+    input.dynamicAccessKey.lastResolvedAccessKeyId !== input.next.keyId ||
+    input.dynamicAccessKey.lastResolvedServerId !== input.next.serverId;
+
+  await db.dynamicAccessKey.update({
+    where: { id: input.dynamicAccessKey.id },
+    data: {
+      lastResolvedAccessKeyId: input.next.keyId,
+      lastResolvedServerId: input.next.serverId,
+      lastResolvedAt: new Date(),
+    },
+  });
+
+  if (switched && (input.dynamicAccessKey.lastResolvedAccessKeyId || input.dynamicAccessKey.lastResolvedServerId)) {
+    await recordDynamicRoutingEvent({
+      dynamicAccessKeyId: input.dynamicAccessKey.id,
+      eventType: DYNAMIC_ROUTING_EVENT_TYPES.BACKEND_SWITCH,
+      reason: input.next.reason,
+      fromKeyId: input.dynamicAccessKey.lastResolvedAccessKeyId,
+      fromServerId: input.dynamicAccessKey.lastResolvedServerId,
+      toKeyId: input.next.keyId,
+      toKeyName: input.next.keyName,
+      toServerId: input.next.serverId,
+      toServerName: input.next.serverName,
+      metadata: {
+        stickinessApplied: Boolean(input.stickinessApplied),
+      },
+    });
+  } else if (input.stickinessApplied) {
+    await recordDynamicRoutingEventOnce({
+      dynamicAccessKeyId: input.dynamicAccessKey.id,
+      eventType: DYNAMIC_ROUTING_EVENT_TYPES.STICKY_SESSION,
+      reason: input.next.reason,
+      windowMinutes: 30,
+      metadata: {
+        keyId: input.next.keyId,
+        serverId: input.next.serverId,
+      },
+    });
   }
 }
 
@@ -354,7 +451,11 @@ export async function handleSubscriptionRequest(
       const routingPreferences = parseDynamicRoutingPreferences({
         preferredServerIdsJson: dynamicKey.preferredServerIdsJson,
         preferredCountryCodesJson: dynamicKey.preferredCountryCodesJson,
+        preferredServerWeightsJson: dynamicKey.preferredServerWeightsJson,
+        preferredCountryWeightsJson: dynamicKey.preferredCountryWeightsJson,
         preferredRegionMode: dynamicKey.preferredRegionMode,
+        sessionStickinessMode: dynamicKey.sessionStickinessMode,
+        drainGraceMinutes: dynamicKey.drainGraceMinutes,
       });
 
       if (dynamicKey.type === 'SELF_MANAGED') {
@@ -369,15 +470,41 @@ export async function handleSubscriptionRequest(
           dynamicKey.lastSelectedKeyIndex,
           routingPreferences.preferredServerIds,
           routingPreferences.preferredCountryCodes,
+          routingPreferences.preferredServerWeights,
+          routingPreferences.preferredCountryWeights,
           routingPreferences.preferredRegionMode,
+          routingPreferences.sessionStickinessMode,
+          routingPreferences.drainGraceMinutes,
         );
 
         if (!selfManagedResult) {
+          await recordDynamicRoutingEventOnce({
+            dynamicAccessKeyId: dynamicKey.id,
+            eventType: DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH,
+            severity: 'WARNING',
+            reason: 'No self-managed server matched the current routing preferences.',
+            windowMinutes: 30,
+          });
           return NextResponse.json(
             { error: 'No servers available. Please configure servers first.' },
             { status: 503 }
           );
         }
+
+        await persistDynamicResolution({
+          dynamicAccessKey: {
+            id: dynamicKey.id,
+            lastResolvedAccessKeyId: dynamicKey.lastResolvedAccessKeyId,
+            lastResolvedServerId: dynamicKey.lastResolvedServerId,
+          },
+          next: {
+            keyId: selfManagedResult.keyId,
+            keyName: selfManagedResult.keyName,
+            serverId: selfManagedResult.server.id,
+            serverName: selfManagedResult.server.name,
+            reason: selfManagedResult.selectionReason,
+          },
+        });
 
         // Parse and return
         const parsed = parseSSUrl(selfManagedResult.accessUrl);
@@ -414,16 +541,43 @@ export async function handleSubscriptionRequest(
         lastSelectedKeyIndex: dynamicKey.lastSelectedKeyIndex,
         preferredServerIds: routingPreferences.preferredServerIds,
         preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredServerWeights: routingPreferences.preferredServerWeights,
+        preferredCountryWeights: routingPreferences.preferredCountryWeights,
         preferredRegionMode: routingPreferences.preferredRegionMode,
+        sessionStickinessMode: routingPreferences.sessionStickinessMode,
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
         persistRoundRobin: true,
       });
 
       if (!selection || !selection.key.accessUrl) {
+        await recordDynamicRoutingEventOnce({
+          dynamicAccessKeyId: dynamicKey.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH,
+          severity: 'WARNING',
+          reason: 'No attached backend matched the current dynamic routing preferences.',
+          windowMinutes: 30,
+        });
         return NextResponse.json(
           { error: 'No active access key available. Please attach keys to this dynamic key.' },
           { status: 404 }
         );
       }
+
+      await persistDynamicResolution({
+        dynamicAccessKey: {
+          id: dynamicKey.id,
+          lastResolvedAccessKeyId: dynamicKey.lastResolvedAccessKeyId,
+          lastResolvedServerId: dynamicKey.lastResolvedServerId,
+        },
+        next: {
+          keyId: selection.key.id,
+          keyName: selection.key.name,
+          serverId: selection.key.server.id,
+          serverName: selection.key.server.name,
+          reason: selection.selectionReason,
+        },
+        stickinessApplied: selection.stickinessApplied,
+      });
 
       const attachedKey = selection.key;
       const accessUrl = attachedKey.accessUrl as string;

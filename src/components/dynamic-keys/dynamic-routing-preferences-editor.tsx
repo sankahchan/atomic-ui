@@ -14,16 +14,28 @@ export function DynamicRoutingPreferencesEditor({
   preferredRegionMode,
   preferredServerIds,
   preferredCountryCodes,
+  preferredServerWeights,
+  preferredCountryWeights,
+  sessionStickinessMode,
+  drainGraceMinutes,
   onChange,
   compact = false,
 }: {
   preferredRegionMode: DynamicRoutingPreferenceMode;
   preferredServerIds: string[];
   preferredCountryCodes: string[];
+  preferredServerWeights: Record<string, number>;
+  preferredCountryWeights: Record<string, number>;
+  sessionStickinessMode: 'NONE' | 'DRAIN';
+  drainGraceMinutes: number;
   onChange: (next: {
     preferredRegionMode: DynamicRoutingPreferenceMode;
     preferredServerIds: string[];
     preferredCountryCodes: string[];
+    preferredServerWeights: Record<string, number>;
+    preferredCountryWeights: Record<string, number>;
+    sessionStickinessMode: 'NONE' | 'DRAIN';
+    drainGraceMinutes: number;
   }) => void;
   compact?: boolean;
 }) {
@@ -57,11 +69,19 @@ export function DynamicRoutingPreferencesEditor({
     preferredRegionMode: DynamicRoutingPreferenceMode;
     preferredServerIds: string[];
     preferredCountryCodes: string[];
+    preferredServerWeights: Record<string, number>;
+    preferredCountryWeights: Record<string, number>;
+    sessionStickinessMode: 'NONE' | 'DRAIN';
+    drainGraceMinutes: number;
   }>) => {
     onChange({
       preferredRegionMode,
       preferredServerIds,
       preferredCountryCodes,
+      preferredServerWeights,
+      preferredCountryWeights,
+      sessionStickinessMode,
+      drainGraceMinutes,
       ...partial,
     });
   };
@@ -86,7 +106,22 @@ export function DynamicRoutingPreferencesEditor({
   };
 
   const removeServer = (serverId: string) => {
-    update({ preferredServerIds: preferredServerIds.filter((id) => id !== serverId) });
+    const nextWeights = { ...preferredServerWeights };
+    delete nextWeights[serverId];
+    update({
+      preferredServerIds: preferredServerIds.filter((id) => id !== serverId),
+      preferredServerWeights: nextWeights,
+    });
+  };
+
+  const updateServerWeight = (serverId: string, value: string) => {
+    const nextWeight = Math.max(1, Math.min(20, Number(value) || 1));
+    update({
+      preferredServerWeights: {
+        ...preferredServerWeights,
+        [serverId]: nextWeight,
+      },
+    });
   };
 
   const addCountry = () => {
@@ -109,7 +144,22 @@ export function DynamicRoutingPreferencesEditor({
   };
 
   const removeCountry = (countryCode: string) => {
-    update({ preferredCountryCodes: preferredCountryCodes.filter((code) => code !== countryCode) });
+    const nextWeights = { ...preferredCountryWeights };
+    delete nextWeights[countryCode];
+    update({
+      preferredCountryCodes: preferredCountryCodes.filter((code) => code !== countryCode),
+      preferredCountryWeights: nextWeights,
+    });
+  };
+
+  const updateCountryWeight = (countryCode: string, value: string) => {
+    const nextWeight = Math.max(1, Math.min(20, Number(value) || 1));
+    update({
+      preferredCountryWeights: {
+        ...preferredCountryWeights,
+        [countryCode]: nextWeight,
+      },
+    });
   };
 
   const helperText = preferredRegionMode === 'ONLY'
@@ -154,6 +204,19 @@ export function DynamicRoutingPreferencesEditor({
                     <p className="text-xs text-muted-foreground">
                       {server.countryCode ? `${server.countryCode.toUpperCase()} priority ${index + 1}` : `Priority ${index + 1}`}
                     </p>
+                  </div>
+                  <div className="w-16">
+                    <Label className="mb-1 block text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Weight
+                    </Label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={preferredServerWeights[server.id] ?? 1}
+                      onChange={(event) => updateServerWeight(server.id, event.target.value)}
+                      className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+                    />
                   </div>
                   <div className="flex items-center gap-1">
                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveServer(index, -1)} disabled={index === 0}>
@@ -211,6 +274,19 @@ export function DynamicRoutingPreferencesEditor({
                     </p>
                     <p className="text-xs text-muted-foreground">Priority {index + 1}</p>
                   </div>
+                  <div className="w-16">
+                    <Label className="mb-1 block text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Weight
+                    </Label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={preferredCountryWeights[countryCode] ?? 1}
+                      onChange={(event) => updateCountryWeight(countryCode, event.target.value)}
+                      className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+                    />
+                  </div>
                   <div className="flex items-center gap-1">
                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveCountry(index, -1)} disabled={index === 0}>
                       <ChevronUp className="h-3.5 w-3.5" />
@@ -250,6 +326,43 @@ export function DynamicRoutingPreferencesEditor({
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2')}>
+        <div className="space-y-2">
+          <Label>Session Stickiness</Label>
+          <Select
+            value={sessionStickinessMode}
+            onValueChange={(value: 'NONE' | 'DRAIN') => update({ sessionStickinessMode: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DRAIN">Drain active sessions first</SelectItem>
+              <SelectItem value="NONE">Switch immediately</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Drain mode keeps recent or active clients on the same backend until the grace window passes.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Drain Grace Window (minutes)</Label>
+          <input
+            type="number"
+            min={1}
+            max={240}
+            value={drainGraceMinutes}
+            onChange={(event) => update({ drainGraceMinutes: Math.max(1, Math.min(240, Number(event.target.value) || 20)) })}
+            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+            disabled={sessionStickinessMode === 'NONE'}
+          />
+          <p className="text-xs text-muted-foreground">
+            Used when drain mode is enabled to protect active sessions before failover or rotation.
+          </p>
         </div>
       </div>
     </div>

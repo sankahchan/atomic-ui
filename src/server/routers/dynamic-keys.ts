@@ -36,13 +36,25 @@ import {
   getSelfManagedServerCandidate,
   normalizeDynamicRoutingPreferences,
   parseDynamicRoutingPreferences,
+  rankDynamicAccessKeyCandidates,
+  rankDynamicServerCandidates,
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
 import {
+  DYNAMIC_ROUTING_EVENT_TYPES,
+  getDynamicRoutingAlerts,
+  getDynamicRoutingTimeline,
+  recordDynamicRoutingEvent,
+} from '@/lib/services/dynamic-routing-events';
+import {
   createDynamicKeyTelegramConnectLink,
   sendDynamicKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
+
+const routingWeightsSchema = z.record(z.number().positive()).optional();
+const sessionStickinessSchema = z.enum(['NONE', 'DRAIN']).default('DRAIN');
+const rotationTriggerSchema = z.enum(['SCHEDULED', 'USAGE', 'HEALTH', 'COMBINED']).default('SCHEDULED');
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -68,10 +80,20 @@ const createDAKSchema = z.object({
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).default('IP_HASH'),
   preferredServerIds: z.array(z.string()).optional(),
   preferredCountryCodes: z.array(z.string()).optional(),
+  preferredServerWeights: routingWeightsSchema,
+  preferredCountryWeights: routingWeightsSchema,
   preferredRegionMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
+  sessionStickinessMode: sessionStickinessSchema,
+  drainGraceMinutes: z.number().int().min(1).max(240).default(20),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
   sharePageEnabled: z.boolean().optional(),
+  rotationEnabled: z.boolean().optional(),
+  rotationInterval: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
+  rotationTriggerMode: rotationTriggerSchema,
+  rotationUsageThresholdPercent: z.number().int().min(50).max(100).default(85),
+  rotateOnHealthFailure: z.boolean().optional(),
+  appliedTemplateId: z.string().optional().nullable(),
 });
 
 /**
@@ -98,7 +120,11 @@ const updateDAKSchema = z.object({
   loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).optional(),
   preferredServerIds: z.array(z.string()).optional(),
   preferredCountryCodes: z.array(z.string()).optional(),
+  preferredServerWeights: routingWeightsSchema,
+  preferredCountryWeights: routingWeightsSchema,
   preferredRegionMode: z.enum(['PREFER', 'ONLY']).optional(),
+  sessionStickinessMode: sessionStickinessSchema.optional(),
+  drainGraceMinutes: z.number().int().min(1).max(240).optional(),
   // Subscription page customization
   subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
   coverImage: z.string().url().optional().nullable(),
@@ -110,6 +136,40 @@ const updateDAKSchema = z.object({
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
+  rotationTriggerMode: rotationTriggerSchema.optional(),
+  rotationUsageThresholdPercent: z.number().int().min(50).max(100).optional(),
+  rotateOnHealthFailure: z.boolean().optional(),
+  appliedTemplateId: z.string().optional().nullable(),
+});
+
+const dynamicKeyTemplateSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(280).optional().nullable(),
+  type: z.enum(['SELF_MANAGED', 'MANUAL']).default('SELF_MANAGED'),
+  notes: z.string().max(500).optional().nullable(),
+  dataLimitGB: z.number().positive().optional().nullable(),
+  dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
+  expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
+  durationDays: z.number().int().positive().optional().nullable(),
+  method: z.enum(['chacha20-ietf-poly1305', 'aes-128-gcm', 'aes-192-gcm', 'aes-256-gcm']).default('chacha20-ietf-poly1305'),
+  serverTagIds: z.array(z.string()).optional(),
+  loadBalancerAlgorithm: z.enum(['IP_HASH', 'RANDOM', 'ROUND_ROBIN', 'LEAST_LOAD']).default('IP_HASH'),
+  preferredServerIds: z.array(z.string()).optional(),
+  preferredCountryCodes: z.array(z.string()).optional(),
+  preferredServerWeights: routingWeightsSchema,
+  preferredCountryWeights: routingWeightsSchema,
+  preferredRegionMode: z.enum(['PREFER', 'ONLY']).default('PREFER'),
+  sessionStickinessMode: sessionStickinessSchema,
+  drainGraceMinutes: z.number().int().min(1).max(240).default(20),
+  rotationEnabled: z.boolean().optional(),
+  rotationInterval: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).default('NEVER'),
+  rotationTriggerMode: rotationTriggerSchema,
+  rotationUsageThresholdPercent: z.number().int().min(50).max(100).default(85),
+  rotateOnHealthFailure: z.boolean().optional(),
+  sharePageEnabled: z.boolean().optional(),
+  subscriptionTheme: z.enum(subscriptionThemeIds).optional().nullable(),
+  subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
 });
 
 /**
@@ -133,6 +193,40 @@ const listDAKSchema = z.object({
 
 // Helper function to convert GB to bytes
 const gbToBytes = (gb: number): bigint => BigInt(Math.floor(gb * 1024 * 1024 * 1024));
+
+function serializeRoutingPreferences(
+  preferences: ReturnType<typeof normalizeDynamicRoutingPreferences>,
+) {
+  return {
+    preferredServerIdsJson: JSON.stringify(preferences.preferredServerIds),
+    preferredCountryCodesJson: JSON.stringify(preferences.preferredCountryCodes),
+    preferredServerWeightsJson: JSON.stringify(preferences.preferredServerWeights),
+    preferredCountryWeightsJson: JSON.stringify(preferences.preferredCountryWeights),
+    preferredRegionMode: preferences.preferredRegionMode,
+    sessionStickinessMode: preferences.sessionStickinessMode,
+    drainGraceMinutes: preferences.drainGraceMinutes,
+  };
+}
+
+function parseDynamicTemplate(template: {
+  preferredServerIdsJson: string;
+  preferredCountryCodesJson: string;
+  preferredServerWeightsJson: string;
+  preferredCountryWeightsJson: string;
+  preferredRegionMode: string;
+  sessionStickinessMode: string;
+  drainGraceMinutes: number;
+}) {
+  return parseDynamicRoutingPreferences({
+    preferredServerIdsJson: template.preferredServerIdsJson,
+    preferredCountryCodesJson: template.preferredCountryCodesJson,
+    preferredServerWeightsJson: template.preferredServerWeightsJson,
+    preferredCountryWeightsJson: template.preferredCountryWeightsJson,
+    preferredRegionMode: template.preferredRegionMode,
+    sessionStickinessMode: template.sessionStickinessMode,
+    drainGraceMinutes: template.drainGraceMinutes,
+  });
+}
 
 // Helper function to calculate expiration based on type
 const calculateExpiration = (
@@ -303,6 +397,217 @@ export const dynamicKeysRouter = router({
       };
     }),
 
+  listTemplates: protectedProcedure.query(async () => {
+    const templates = await db.dynamicKeyTemplate.findMany({
+      orderBy: [
+        { updatedAt: 'desc' },
+        { name: 'asc' },
+      ],
+    });
+
+    return templates.map((template) => {
+      const routingPreferences = parseDynamicTemplate(template);
+      return {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        type: template.type as 'SELF_MANAGED' | 'MANUAL',
+        notes: template.notes,
+        dataLimitGB: template.dataLimitBytes ? Number(template.dataLimitBytes) / (1024 * 1024 * 1024) : null,
+        dataLimitResetStrategy: template.dataLimitResetStrategy,
+        expirationType: template.expirationType,
+        durationDays: template.durationDays,
+        method: template.method,
+        serverTagIds: JSON.parse(template.serverTagsJson || '[]') as string[],
+        loadBalancerAlgorithm: template.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
+        preferredServerIds: routingPreferences.preferredServerIds,
+        preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredServerWeights: routingPreferences.preferredServerWeights,
+        preferredCountryWeights: routingPreferences.preferredCountryWeights,
+        preferredRegionMode: routingPreferences.preferredRegionMode,
+        sessionStickinessMode: routingPreferences.sessionStickinessMode,
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
+        rotationEnabled: template.rotationEnabled,
+        rotationInterval: template.rotationInterval,
+        rotationTriggerMode: template.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED',
+        rotationUsageThresholdPercent: template.rotationUsageThresholdPercent,
+        rotateOnHealthFailure: template.rotateOnHealthFailure,
+        sharePageEnabled: template.sharePageEnabled,
+        subscriptionTheme: template.subscriptionTheme,
+        subscriptionWelcomeMessage: template.subscriptionWelcomeMessage,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt,
+      };
+    });
+  }),
+
+  createTemplate: adminProcedure
+    .input(dynamicKeyTemplateSchema)
+    .mutation(async ({ input }) => {
+      const routingPreferences = normalizeDynamicRoutingPreferences({
+        preferredServerIds: input.preferredServerIds,
+        preferredCountryCodes: input.preferredCountryCodes,
+        preferredServerWeights: input.preferredServerWeights,
+        preferredCountryWeights: input.preferredCountryWeights,
+        preferredRegionMode: input.preferredRegionMode,
+        sessionStickinessMode: input.sessionStickinessMode,
+        drainGraceMinutes: input.drainGraceMinutes,
+      });
+
+      const template = await db.dynamicKeyTemplate.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          type: input.type,
+          notes: input.notes,
+          dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          dataLimitResetStrategy: input.dataLimitResetStrategy,
+          expirationType: input.expirationType,
+          durationDays: input.durationDays,
+          method: input.method,
+          serverTagsJson: JSON.stringify(input.serverTagIds || []),
+          loadBalancerAlgorithm: input.loadBalancerAlgorithm,
+          ...serializeRoutingPreferences(routingPreferences),
+          rotationEnabled: input.rotationEnabled ?? false,
+          rotationInterval: input.rotationInterval,
+          rotationTriggerMode: input.rotationTriggerMode,
+          rotationUsageThresholdPercent: input.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: input.rotateOnHealthFailure ?? false,
+          sharePageEnabled: input.sharePageEnabled ?? true,
+          subscriptionTheme: input.subscriptionTheme,
+          subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
+        },
+      });
+
+      return { id: template.id };
+    }),
+
+  updateTemplate: adminProcedure
+    .input(dynamicKeyTemplateSchema.extend({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const routingPreferences = normalizeDynamicRoutingPreferences({
+        preferredServerIds: input.preferredServerIds,
+        preferredCountryCodes: input.preferredCountryCodes,
+        preferredServerWeights: input.preferredServerWeights,
+        preferredCountryWeights: input.preferredCountryWeights,
+        preferredRegionMode: input.preferredRegionMode,
+        sessionStickinessMode: input.sessionStickinessMode,
+        drainGraceMinutes: input.drainGraceMinutes,
+      });
+
+      await db.dynamicKeyTemplate.update({
+        where: { id: input.id },
+        data: {
+          name: input.name,
+          description: input.description,
+          type: input.type,
+          notes: input.notes,
+          dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          dataLimitResetStrategy: input.dataLimitResetStrategy,
+          expirationType: input.expirationType,
+          durationDays: input.durationDays,
+          method: input.method,
+          serverTagsJson: JSON.stringify(input.serverTagIds || []),
+          loadBalancerAlgorithm: input.loadBalancerAlgorithm,
+          ...serializeRoutingPreferences(routingPreferences),
+          rotationEnabled: input.rotationEnabled ?? false,
+          rotationInterval: input.rotationInterval,
+          rotationTriggerMode: input.rotationTriggerMode,
+          rotationUsageThresholdPercent: input.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: input.rotateOnHealthFailure ?? false,
+          sharePageEnabled: input.sharePageEnabled ?? true,
+          subscriptionTheme: input.subscriptionTheme,
+          subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
+        },
+      });
+
+      return { success: true };
+    }),
+
+  deleteTemplate: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      await db.dynamicKeyTemplate.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true };
+    }),
+
+  applyTemplate: adminProcedure
+    .input(z.object({ id: z.string(), templateId: z.string().nullable() }))
+    .mutation(async ({ input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: { id: true, name: true },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      if (!input.templateId) {
+        await db.dynamicAccessKey.update({
+          where: { id: input.id },
+          data: { appliedTemplateId: null },
+        });
+
+        return { success: true };
+      }
+
+      const template = await db.dynamicKeyTemplate.findUnique({
+        where: { id: input.templateId },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Template not found',
+        });
+      }
+
+      const routingPreferences = parseDynamicTemplate(template);
+      await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: {
+          type: template.type,
+          notes: template.notes,
+          dataLimitBytes: template.dataLimitBytes,
+          dataLimitResetStrategy: template.dataLimitResetStrategy,
+          expirationType: template.expirationType,
+          durationDays: template.durationDays,
+          method: template.method,
+          serverTagsJson: template.serverTagsJson,
+          loadBalancerAlgorithm: template.loadBalancerAlgorithm,
+          ...serializeRoutingPreferences(routingPreferences),
+          rotationEnabled: template.rotationEnabled,
+          rotationInterval: template.rotationInterval,
+          rotationTriggerMode: template.rotationTriggerMode,
+          rotationUsageThresholdPercent: template.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: template.rotateOnHealthFailure,
+          sharePageEnabled: template.sharePageEnabled,
+          subscriptionTheme: template.subscriptionTheme,
+          subscriptionWelcomeMessage: template.subscriptionWelcomeMessage,
+          appliedTemplateId: template.id,
+        },
+      });
+
+      await recordDynamicRoutingEvent({
+        dynamicAccessKeyId: input.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.TEST_RUN,
+        reason: `Applied dynamic key template "${template.name}".`,
+        metadata: {
+          templateId: template.id,
+          templateName: template.name,
+        },
+      });
+
+      return { success: true };
+    }),
+
   /**
    * List Dynamic Access Keys with filtering and pagination
    */
@@ -399,7 +704,11 @@ export const dynamicKeysRouter = router({
         const routingPreferences = parseDynamicRoutingPreferences({
           preferredServerIdsJson: dak.preferredServerIdsJson,
           preferredCountryCodesJson: dak.preferredCountryCodesJson,
+          preferredServerWeightsJson: dak.preferredServerWeightsJson,
+          preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
           preferredRegionMode: dak.preferredRegionMode,
+          sessionStickinessMode: dak.sessionStickinessMode,
+          drainGraceMinutes: dak.drainGraceMinutes,
         });
         let daysRemaining: number | null = null;
         if (dak.expiresAt) {
@@ -432,7 +741,17 @@ export const dynamicKeysRouter = router({
           serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
           preferredServerIds: routingPreferences.preferredServerIds,
           preferredCountryCodes: routingPreferences.preferredCountryCodes,
+          preferredServerWeights: routingPreferences.preferredServerWeights,
+          preferredCountryWeights: routingPreferences.preferredCountryWeights,
           preferredRegionMode: routingPreferences.preferredRegionMode,
+          sessionStickinessMode: routingPreferences.sessionStickinessMode,
+          drainGraceMinutes: routingPreferences.drainGraceMinutes,
+          rotationEnabled: dak.rotationEnabled,
+          rotationInterval: dak.rotationInterval,
+          rotationTriggerMode: dak.rotationTriggerMode,
+          rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: dak.rotateOnHealthFailure,
+          appliedTemplateId: dak.appliedTemplateId,
           attachedKeysCount: dak._count.accessKeys,
           createdAt: dak.createdAt,
           updatedAt: dak.updatedAt,
@@ -470,6 +789,12 @@ export const dynamicKeysRouter = router({
       const dak = await db.dynamicAccessKey.findUnique({
         where: { id: input.id },
         include: {
+          appliedTemplate: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           accessKeys: {
             include: {
               server: {
@@ -503,7 +828,11 @@ export const dynamicKeysRouter = router({
       const routingPreferences = parseDynamicRoutingPreferences({
         preferredServerIdsJson: dak.preferredServerIdsJson,
         preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredServerWeightsJson: dak.preferredServerWeightsJson,
+        preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
         preferredRegionMode: dak.preferredRegionMode,
+        sessionStickinessMode: dak.sessionStickinessMode,
+        drainGraceMinutes: dak.drainGraceMinutes,
       });
 
       if (!dak.publicSlug) {
@@ -532,11 +861,16 @@ export const dynamicKeysRouter = router({
         firstUsedAt: dak.firstUsedAt,
         lastTrafficAt: dak.lastTrafficAt,
         prefix: dak.prefix,
+        method: dak.method,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         preferredServerIds: routingPreferences.preferredServerIds,
         preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredServerWeights: routingPreferences.preferredServerWeights,
+        preferredCountryWeights: routingPreferences.preferredCountryWeights,
         preferredRegionMode: routingPreferences.preferredRegionMode,
+        sessionStickinessMode: routingPreferences.sessionStickinessMode,
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
         accessKeys: dak.accessKeys.map((key) => ({
           ...key,
           accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
@@ -551,9 +885,17 @@ export const dynamicKeysRouter = router({
         // Rotation settings
         rotationEnabled: dak.rotationEnabled,
         rotationInterval: dak.rotationInterval,
+        rotationTriggerMode: dak.rotationTriggerMode,
+        rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+        rotateOnHealthFailure: dak.rotateOnHealthFailure,
         lastRotatedAt: dak.lastRotatedAt,
         nextRotationAt: dak.nextRotationAt,
         rotationCount: dak.rotationCount,
+        lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
+        lastResolvedServerId: dak.lastResolvedServerId,
+        lastResolvedAt: dak.lastResolvedAt,
+        appliedTemplateId: dak.appliedTemplateId,
+        appliedTemplate: dak.appliedTemplate,
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
@@ -602,8 +944,26 @@ export const dynamicKeysRouter = router({
           serverTagsJson: true,
           preferredServerIdsJson: true,
           preferredCountryCodesJson: true,
+          preferredServerWeightsJson: true,
+          preferredCountryWeightsJson: true,
           preferredRegionMode: true,
+          sessionStickinessMode: true,
+          drainGraceMinutes: true,
           lastTrafficAt: true,
+          usedBytes: true,
+          dataLimitBytes: true,
+          lastResolvedAccessKeyId: true,
+          lastResolvedServerId: true,
+          lastResolvedAt: true,
+          rotationTriggerMode: true,
+          rotationUsageThresholdPercent: true,
+          rotateOnHealthFailure: true,
+          appliedTemplate: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           accessKeys: {
             where: {
               status: 'ACTIVE',
@@ -650,10 +1010,14 @@ export const dynamicKeysRouter = router({
       const routingPreferences = parseDynamicRoutingPreferences({
         preferredServerIdsJson: dak.preferredServerIdsJson,
         preferredCountryCodesJson: dak.preferredCountryCodesJson,
+        preferredServerWeightsJson: dak.preferredServerWeightsJson,
+        preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
         preferredRegionMode: dak.preferredRegionMode,
+        sessionStickinessMode: dak.sessionStickinessMode,
+        drainGraceMinutes: dak.drainGraceMinutes,
       });
 
-      const [sessions, analytics, preferredServers] = await Promise.all([
+      const [sessions, analytics, preferredServers, candidateServers, routingTimeline, routingAlerts] = await Promise.all([
         accessKeyIds.length > 0
           ? db.connectionSession.findMany({
               where: {
@@ -694,6 +1058,31 @@ export const dynamicKeysRouter = router({
               },
             })
           : Promise.resolve([]),
+        db.server.findMany({
+          where: {
+            isActive: true,
+            ...(serverTagIds.length > 0
+              ? {
+                  tags: {
+                    some: {
+                      tagId: { in: serverTagIds },
+                    },
+                  },
+                }
+              : {}),
+          },
+          select: {
+            id: true,
+            name: true,
+            countryCode: true,
+          },
+        }),
+        getDynamicRoutingTimeline(input.id, 10),
+        getDynamicRoutingAlerts({
+          dynamicAccessKeyId: input.id,
+          usedBytes: dak.usedBytes,
+          dataLimitBytes: dak.dataLimitBytes,
+        }),
       ]);
       const orderedPreferredServers = routingPreferences.preferredServerIds
         .map((serverId) => preferredServers.find((server) => server.id === serverId))
@@ -806,11 +1195,39 @@ export const dynamicKeysRouter = router({
       } | null = null;
 
       let selectionNote: string | null = null;
+      let candidateRanking: Array<{
+        keyId?: string;
+        keyName?: string;
+        serverId: string;
+        serverName: string;
+        serverCountry: string | null;
+        weight: number;
+        preferenceScope: 'COUNTRY' | 'SERVER' | 'NONE' | 'UNRESTRICTED' | 'FALLBACK';
+        loadScore: number | null;
+        effectiveScore: number | null;
+        reason: string;
+      }> = [];
 
       if (dak.type === 'MANUAL') {
         if (algorithm === 'RANDOM' && activeKeys.length > 1) {
           selectionNote = 'Random routing changes per fetch. Use Test Client URL to inspect the live backend right now.';
         } else {
+          candidateRanking = await rankDynamicAccessKeyCandidates({
+            accessKeys: activeKeys.map((key) => ({
+              id: key.id,
+              name: key.name,
+              status: key.status,
+              lastTrafficAt: key.lastTrafficAt,
+              lastUsedAt: key.lastUsedAt,
+              server: {
+                id: key.server!.id,
+                name: key.server!.name,
+                countryCode: key.server!.countryCode,
+              },
+            })),
+            preferences: routingPreferences,
+            serverTagIds,
+          });
           const selection = await selectDynamicAccessKeyForClient({
             dakId: dak.id,
             accessKeys: activeKeys.map((key) => ({
@@ -830,7 +1247,11 @@ export const dynamicKeysRouter = router({
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
+            preferredServerWeights: routingPreferences.preferredServerWeights,
+            preferredCountryWeights: routingPreferences.preferredCountryWeights,
             preferredRegionMode: routingPreferences.preferredRegionMode,
+            sessionStickinessMode: routingPreferences.sessionStickinessMode,
+            drainGraceMinutes: routingPreferences.drainGraceMinutes,
             persistRoundRobin: false,
           });
 
@@ -842,7 +1263,7 @@ export const dynamicKeysRouter = router({
               serverId: selection.key.server.id,
               serverName: selection.key.server.name,
               serverCountry: selection.key.server.countryCode ?? null,
-              reason: `${selection.preferenceResolution.note} ${getDynamicRoutingAlgorithmHint(selection.algorithm)}`.trim(),
+              reason: selection.selectionReason,
               lastTrafficAt: selection.key.lastTrafficAt?.toISOString() ?? null,
             };
           }
@@ -868,6 +1289,15 @@ export const dynamicKeysRouter = router({
             lastTrafficAt: activeSelfManagedKey.lastTrafficAt?.toISOString() ?? null,
           };
         } else {
+          candidateRanking = await rankDynamicServerCandidates({
+            servers: candidateServers.map((server) => ({
+              id: server.id,
+              name: server.name,
+              countryCode: server.countryCode,
+            })),
+            preferences: routingPreferences,
+            serverTagIds,
+          });
           const candidate = await getSelfManagedServerCandidate({
             dakId: dak.id,
             serverTagIds,
@@ -876,7 +1306,11 @@ export const dynamicKeysRouter = router({
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
+            preferredServerWeights: routingPreferences.preferredServerWeights,
+            preferredCountryWeights: routingPreferences.preferredCountryWeights,
             preferredRegionMode: routingPreferences.preferredRegionMode,
+            sessionStickinessMode: routingPreferences.sessionStickinessMode,
+            drainGraceMinutes: routingPreferences.drainGraceMinutes,
             persistRoundRobin: false,
           });
 
@@ -903,12 +1337,29 @@ export const dynamicKeysRouter = router({
         preferredServerIds: routingPreferences.preferredServerIds,
         preferredServers: orderedPreferredServers,
         preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredServerWeights: routingPreferences.preferredServerWeights,
+        preferredCountryWeights: routingPreferences.preferredCountryWeights,
+        sessionStickinessMode: routingPreferences.sessionStickinessMode,
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
         attachedActiveKeys: activeKeys.length,
         selectionNote,
         currentSelection,
         lastResolvedBackend: recentBackends[0] ?? null,
         recentBackends,
         recentBackendSwitches: recentBackendSwitches.slice(-4).reverse(),
+        candidateRanking,
+        routingTimeline: routingTimeline.map((event) => ({
+          ...event,
+          createdAt: event.createdAt.toISOString(),
+        })),
+        routingAlerts: routingAlerts,
+        lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
+        lastResolvedServerId: dak.lastResolvedServerId,
+        lastResolvedAt: dak.lastResolvedAt?.toISOString() ?? null,
+        rotationTriggerMode: dak.rotationTriggerMode,
+        rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+        rotateOnHealthFailure: dak.rotateOnHealthFailure,
+        appliedTemplate: dak.appliedTemplate,
         lastSharePageViewAt: analytics.lastViewedAt?.toISOString() ?? null,
         lastSharePageCopyAt: analytics.lastCopiedAt?.toISOString() ?? null,
         lastSharePageOpenAppAt:
@@ -935,8 +1386,18 @@ export const dynamicKeysRouter = router({
       const routingPreferences = normalizeDynamicRoutingPreferences({
         preferredServerIds: input.preferredServerIds,
         preferredCountryCodes: input.preferredCountryCodes,
+        preferredServerWeights: input.preferredServerWeights,
+        preferredCountryWeights: input.preferredCountryWeights,
         preferredRegionMode: input.preferredRegionMode,
+        sessionStickinessMode: input.sessionStickinessMode,
+        drainGraceMinutes: input.drainGraceMinutes,
       });
+      const now = new Date();
+      const rotationInterval = input.rotationInterval ?? 'NEVER';
+      const rotationEnabled = input.rotationEnabled ?? false;
+      const nextRotationAt = rotationEnabled && rotationInterval !== 'NEVER'
+        ? (await import('@/lib/services/key-rotation')).calculateNextRotation(rotationInterval, now)
+        : null;
 
       // Create the DAK
       const dak = await db.dynamicAccessKey.create({
@@ -956,14 +1417,19 @@ export const dynamicKeysRouter = router({
           durationDays: input.durationDays,
           status,
           serverTagsJson: JSON.stringify(input.serverTagIds || []),
-          preferredServerIdsJson: JSON.stringify(routingPreferences.preferredServerIds),
-          preferredCountryCodesJson: JSON.stringify(routingPreferences.preferredCountryCodes),
-          preferredRegionMode: routingPreferences.preferredRegionMode,
+          ...serializeRoutingPreferences(routingPreferences),
           prefix: input.prefix,
           method: input.method || 'chacha20-ietf-poly1305',
           loadBalancerAlgorithm: input.loadBalancerAlgorithm,
           subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
           sharePageEnabled: input.sharePageEnabled ?? true,
+          rotationEnabled,
+          rotationInterval,
+          rotationTriggerMode: input.rotationTriggerMode,
+          rotationUsageThresholdPercent: input.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: input.rotateOnHealthFailure ?? false,
+          nextRotationAt,
+          appliedTemplateId: input.appliedTemplateId,
         },
         include: {
           _count: {
@@ -986,7 +1452,17 @@ export const dynamicKeysRouter = router({
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         preferredServerIds: routingPreferences.preferredServerIds,
         preferredCountryCodes: routingPreferences.preferredCountryCodes,
+        preferredServerWeights: routingPreferences.preferredServerWeights,
+        preferredCountryWeights: routingPreferences.preferredCountryWeights,
         preferredRegionMode: routingPreferences.preferredRegionMode,
+        sessionStickinessMode: routingPreferences.sessionStickinessMode,
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
+        rotationEnabled: dak.rotationEnabled,
+        rotationInterval: dak.rotationInterval,
+        rotationTriggerMode: dak.rotationTriggerMode,
+        rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+        rotateOnHealthFailure: dak.rotateOnHealthFailure,
+        appliedTemplateId: dak.appliedTemplateId,
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
       };
@@ -1011,7 +1487,11 @@ export const dynamicKeysRouter = router({
         loadBalancerAlgorithm,
         preferredServerIds,
         preferredCountryCodes,
+        preferredServerWeights,
+        preferredCountryWeights,
         preferredRegionMode,
+        sessionStickinessMode,
+        drainGraceMinutes,
         subscriptionTheme,
         coverImage,
         coverImageType,
@@ -1021,6 +1501,10 @@ export const dynamicKeysRouter = router({
         owner,
         tags,
         publicSlug,
+        rotationTriggerMode,
+        rotationUsageThresholdPercent,
+        rotateOnHealthFailure,
+        appliedTemplateId,
         ...data
       } = input;
 
@@ -1086,24 +1570,88 @@ export const dynamicKeysRouter = router({
               ? preferredServerIds
               : parseDynamicRoutingPreferences({
                   preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
                 }).preferredServerIds,
           preferredCountryCodes:
             preferredCountryCodes !== undefined
               ? preferredCountryCodes
               : parseDynamicRoutingPreferences({
                   preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
                 }).preferredCountryCodes,
+          preferredServerWeights:
+            preferredServerWeights !== undefined
+              ? preferredServerWeights
+              : parseDynamicRoutingPreferences({
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
+                }).preferredServerWeights,
+          preferredCountryWeights:
+            preferredCountryWeights !== undefined
+              ? preferredCountryWeights
+              : parseDynamicRoutingPreferences({
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
+                }).preferredCountryWeights,
           preferredRegionMode:
             preferredRegionMode !== undefined
               ? preferredRegionMode
               : parseDynamicRoutingPreferences({
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
                   preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
                 }).preferredRegionMode,
+          sessionStickinessMode:
+            sessionStickinessMode !== undefined
+              ? sessionStickinessMode
+              : parseDynamicRoutingPreferences({
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
+                }).sessionStickinessMode,
+          drainGraceMinutes:
+            drainGraceMinutes !== undefined
+              ? drainGraceMinutes
+              : parseDynamicRoutingPreferences({
+                  preferredServerIdsJson: existing.preferredServerIdsJson,
+                  preferredCountryCodesJson: existing.preferredCountryCodesJson,
+                  preferredServerWeightsJson: existing.preferredServerWeightsJson,
+                  preferredCountryWeightsJson: existing.preferredCountryWeightsJson,
+                  preferredRegionMode: existing.preferredRegionMode,
+                  sessionStickinessMode: existing.sessionStickinessMode,
+                  drainGraceMinutes: existing.drainGraceMinutes,
+                }).drainGraceMinutes,
         });
 
-        updateData.preferredServerIdsJson = JSON.stringify(routingPreferences.preferredServerIds);
-        updateData.preferredCountryCodesJson = JSON.stringify(routingPreferences.preferredCountryCodes);
-        updateData.preferredRegionMode = routingPreferences.preferredRegionMode;
+        Object.assign(updateData, serializeRoutingPreferences(routingPreferences));
       }
 
       // Subscription page customization
@@ -1129,6 +1677,22 @@ export const dynamicKeysRouter = router({
 
       if (sharePageEnabled !== undefined) {
         updateData.sharePageEnabled = sharePageEnabled;
+      }
+
+      if (rotationTriggerMode !== undefined) {
+        updateData.rotationTriggerMode = rotationTriggerMode;
+      }
+
+      if (rotationUsageThresholdPercent !== undefined) {
+        updateData.rotationUsageThresholdPercent = rotationUsageThresholdPercent;
+      }
+
+      if (rotateOnHealthFailure !== undefined) {
+        updateData.rotateOnHealthFailure = rotateOnHealthFailure;
+      }
+
+      if (appliedTemplateId !== undefined) {
+        updateData.appliedTemplateId = appliedTemplateId;
       }
 
       if (publicSlug !== undefined) {
@@ -2075,6 +2639,9 @@ export const dynamicKeysRouter = router({
         id: z.string(),
         rotationEnabled: z.boolean(),
         rotationInterval: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']),
+        rotationTriggerMode: rotationTriggerSchema,
+        rotationUsageThresholdPercent: z.number().int().min(50).max(100),
+        rotateOnHealthFailure: z.boolean(),
       })
     )
     .mutation(async ({ input }) => {
@@ -2101,6 +2668,9 @@ export const dynamicKeysRouter = router({
         data: {
           rotationEnabled: input.rotationEnabled,
           rotationInterval: input.rotationInterval,
+          rotationTriggerMode: input.rotationTriggerMode,
+          rotationUsageThresholdPercent: input.rotationUsageThresholdPercent,
+          rotateOnHealthFailure: input.rotateOnHealthFailure,
           nextRotationAt,
         },
       });

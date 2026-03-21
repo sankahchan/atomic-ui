@@ -79,7 +79,7 @@ import {
   Eye,
   Download,
 } from 'lucide-react';
-import { themeList, getTheme } from '@/lib/subscription-themes';
+import { themeList, getTheme, subscriptionThemeIds } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
 import {
@@ -150,6 +150,13 @@ function EditDAKDialog({
     preferredServerIds: string[];
     preferredCountryCodes: string[];
     preferredRegionMode: DynamicRoutingPreferenceMode;
+    preferredServerWeights: Record<string, number>;
+    preferredCountryWeights: Record<string, number>;
+    sessionStickinessMode: 'NONE' | 'DRAIN';
+    drainGraceMinutes: number;
+    rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
+    rotationUsageThresholdPercent: number;
+    rotateOnHealthFailure: boolean;
   };
   onSuccess: () => void;
 }) {
@@ -168,6 +175,13 @@ function EditDAKDialog({
     preferredServerIds: dakData.preferredServerIds || [],
     preferredCountryCodes: dakData.preferredCountryCodes || [],
     preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
+    preferredServerWeights: dakData.preferredServerWeights || {},
+    preferredCountryWeights: dakData.preferredCountryWeights || {},
+    sessionStickinessMode: dakData.sessionStickinessMode || 'DRAIN',
+    drainGraceMinutes: dakData.drainGraceMinutes || 20,
+    rotationTriggerMode: dakData.rotationTriggerMode || 'SCHEDULED',
+    rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
+    rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
   });
 
   useEffect(() => {
@@ -185,6 +199,13 @@ function EditDAKDialog({
       preferredServerIds: dakData.preferredServerIds || [],
       preferredCountryCodes: dakData.preferredCountryCodes || [],
       preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
+      preferredServerWeights: dakData.preferredServerWeights || {},
+      preferredCountryWeights: dakData.preferredCountryWeights || {},
+      sessionStickinessMode: dakData.sessionStickinessMode || 'DRAIN',
+      drainGraceMinutes: dakData.drainGraceMinutes || 20,
+      rotationTriggerMode: dakData.rotationTriggerMode || 'SCHEDULED',
+      rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
+      rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
     });
   }, [dakData]);
 
@@ -231,7 +252,14 @@ function EditDAKDialog({
       preferredServerIds: formData.preferredServerIds,
       preferredCountryCodes: formData.preferredCountryCodes,
       preferredRegionMode: formData.preferredRegionMode,
-    } as any);
+      preferredServerWeights: formData.preferredServerWeights,
+      preferredCountryWeights: formData.preferredCountryWeights,
+      sessionStickinessMode: formData.sessionStickinessMode,
+      drainGraceMinutes: formData.drainGraceMinutes,
+      rotationTriggerMode: formData.rotationTriggerMode,
+      rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
+      rotateOnHealthFailure: formData.rotateOnHealthFailure,
+    });
   };
 
   return (
@@ -348,6 +376,10 @@ function EditDAKDialog({
               preferredRegionMode={formData.preferredRegionMode}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
+              preferredServerWeights={formData.preferredServerWeights}
+              preferredCountryWeights={formData.preferredCountryWeights}
+              sessionStickinessMode={formData.sessionStickinessMode}
+              drainGraceMinutes={formData.drainGraceMinutes}
               compact
               onChange={(next) =>
                 setFormData((current) => ({
@@ -355,9 +387,79 @@ function EditDAKDialog({
                   preferredRegionMode: next.preferredRegionMode,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
+                  preferredServerWeights: next.preferredServerWeights,
+                  preferredCountryWeights: next.preferredCountryWeights,
+                  sessionStickinessMode: next.sessionStickinessMode,
+                  drainGraceMinutes: next.drainGraceMinutes,
                 }))
               }
             />
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Rotation Trigger Policy</p>
+              <p className="text-xs text-muted-foreground">
+                Fine-tune when this dynamic key should rotate to a new backend.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Trigger Mode</Label>
+                <Select
+                  value={formData.rotationTriggerMode}
+                  onValueChange={(value: typeof formData.rotationTriggerMode) =>
+                    setFormData((current) => ({ ...current, rotationTriggerMode: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SCHEDULED">Schedule only</SelectItem>
+                    <SelectItem value="USAGE">Quota threshold</SelectItem>
+                    <SelectItem value="HEALTH">Health issue</SelectItem>
+                    <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(formData.rotationTriggerMode === 'USAGE' || formData.rotationTriggerMode === 'COMBINED') && (
+                <div className="space-y-2">
+                  <Label>Usage Threshold (%)</Label>
+                  <Input
+                    type="number"
+                    min="50"
+                    max="100"
+                    value={formData.rotationUsageThresholdPercent}
+                    onChange={(event) =>
+                      setFormData((current) => ({
+                        ...current,
+                        rotationUsageThresholdPercent: Math.max(50, Math.min(100, Number(event.target.value) || 85)),
+                      }))
+                    }
+                  />
+                </div>
+              )}
+            </div>
+
+            {(formData.rotationTriggerMode === 'HEALTH' || formData.rotationTriggerMode === 'COMBINED') && (
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">Rotate on health failure</p>
+                  <p className="text-xs text-muted-foreground">
+                    Force a fresh backend when a serving server is degraded or down.
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.rotateOnHealthFailure}
+                  onCheckedChange={(checked) =>
+                    setFormData((current) => ({ ...current, rotateOnHealthFailure: checked === true }))
+                  }
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -1228,6 +1330,9 @@ function KeyRotationCard({
   dakId,
   rotationEnabled,
   rotationInterval,
+  rotationTriggerMode,
+  rotationUsageThresholdPercent,
+  rotateOnHealthFailure,
   lastRotatedAt,
   nextRotationAt,
   rotationCount,
@@ -1236,6 +1341,9 @@ function KeyRotationCard({
   dakId: string;
   rotationEnabled: boolean;
   rotationInterval: string;
+  rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
+  rotationUsageThresholdPercent: number;
+  rotateOnHealthFailure: boolean;
   lastRotatedAt: Date | null;
   nextRotationAt: Date | null;
   rotationCount: number;
@@ -1244,6 +1352,9 @@ function KeyRotationCard({
   const { toast } = useToast();
   const [enabled, setEnabled] = useState(rotationEnabled);
   const [interval, setInterval] = useState(rotationInterval);
+  const [triggerMode, setTriggerMode] = useState(rotationTriggerMode);
+  const [usageThreshold, setUsageThreshold] = useState(String(rotationUsageThresholdPercent));
+  const [rotateOnHealth, setRotateOnHealth] = useState(rotateOnHealthFailure);
 
   const updateMutation = trpc.dynamicKeys.updateRotation.useMutation({
     onSuccess: (data) => {
@@ -1286,6 +1397,9 @@ function KeyRotationCard({
       id: dakId,
       rotationEnabled: enabled,
       rotationInterval: interval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+      rotationTriggerMode: triggerMode,
+      rotationUsageThresholdPercent: Math.min(100, Math.max(50, Number(usageThreshold) || 85)),
+      rotateOnHealthFailure: rotateOnHealth,
     });
   };
 
@@ -1312,27 +1426,79 @@ function KeyRotationCard({
 
         {/* Interval Selector */}
         {enabled && (
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Rotation Interval</Label>
-            <Select
-              value={interval}
-              onValueChange={setInterval}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DAILY">Daily</SelectItem>
-                <SelectItem value="WEEKLY">Weekly</SelectItem>
-                <SelectItem value="BIWEEKLY">Every 2 Weeks</SelectItem>
-                <SelectItem value="MONTHLY">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Rotation Interval</Label>
+              <Select
+                value={interval}
+                onValueChange={setInterval}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAILY">Daily</SelectItem>
+                  <SelectItem value="WEEKLY">Weekly</SelectItem>
+                  <SelectItem value="BIWEEKLY">Every 2 Weeks</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Rotation Trigger</Label>
+              <Select
+                value={triggerMode}
+                onValueChange={(value) => setTriggerMode(value as typeof triggerMode)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SCHEDULED">Schedule only</SelectItem>
+                  <SelectItem value="USAGE">Quota threshold</SelectItem>
+                  <SelectItem value="HEALTH">Health issue</SelectItem>
+                  <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(triggerMode === 'USAGE' || triggerMode === 'COMBINED') && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Usage Threshold (%)</Label>
+                <Input
+                  type="number"
+                  min={50}
+                  max={100}
+                  value={usageThreshold}
+                  onChange={(event) => setUsageThreshold(event.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
+
+            {(triggerMode === 'HEALTH' || triggerMode === 'COMBINED') && (
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Rotate on health failure</p>
+                  <p className="text-xs text-muted-foreground">
+                    Trigger a new backend when the current server is slow or down.
+                  </p>
+                </div>
+                <Switch checked={rotateOnHealth} onCheckedChange={setRotateOnHealth} />
+              </div>
+            )}
           </div>
         )}
 
         {/* Save Button */}
-        {(enabled !== rotationEnabled || interval !== rotationInterval) && (
+        {(
+          enabled !== rotationEnabled ||
+          interval !== rotationInterval ||
+          triggerMode !== rotationTriggerMode ||
+          usageThreshold !== String(rotationUsageThresholdPercent) ||
+          rotateOnHealth !== rotateOnHealthFailure
+        ) && (
           <Button
             size="sm"
             className="w-full"
@@ -1397,6 +1563,10 @@ type DynamicRoutingDiagnostics = {
     countryCode: string | null;
   }>;
   preferredCountryCodes: string[];
+  preferredServerWeights: Record<string, number>;
+  preferredCountryWeights: Record<string, number>;
+  sessionStickinessMode: 'NONE' | 'DRAIN';
+  drainGraceMinutes: number;
   attachedActiveKeys: number;
   selectionNote: string | null;
   currentSelection: {
@@ -1440,6 +1610,46 @@ type DynamicRoutingDiagnostics = {
     toServerName: string;
     switchedAt: string;
   }>;
+  candidateRanking: Array<{
+    keyId?: string;
+    keyName?: string;
+    serverId: string;
+    serverName: string;
+    serverCountry: string | null;
+    weight: number;
+    preferenceScope: 'COUNTRY' | 'SERVER' | 'NONE' | 'UNRESTRICTED' | 'FALLBACK';
+    loadScore: number | null;
+    effectiveScore: number | null;
+    reason: string;
+  }>;
+  routingTimeline: Array<{
+    id: string;
+    eventType: string;
+    severity: string;
+    reason: string;
+    fromKeyName: string | null;
+    fromServerName: string | null;
+    toKeyName: string | null;
+    toServerName: string | null;
+    createdAt: string;
+  }>;
+  routingAlerts: Array<{
+    id: string;
+    severity: string;
+    title: string;
+    description: string;
+    createdAt: string;
+  }>;
+  lastResolvedAccessKeyId: string | null;
+  lastResolvedServerId: string | null;
+  lastResolvedAt: string | null;
+  rotationTriggerMode: string;
+  rotationUsageThresholdPercent: number;
+  rotateOnHealthFailure: boolean;
+  appliedTemplate: {
+    id: string;
+    name: string;
+  } | null;
   lastSharePageViewAt: string | null;
   lastSharePageCopyAt: string | null;
   lastSharePageOpenAppAt: string | null;
@@ -1522,7 +1732,7 @@ function DynamicRoutingDiagnosticsCard({
         </div>
 
         {data ? (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <div className="ops-inline-stat">
               <p className="text-xs text-muted-foreground">Preference mode</p>
               <p className="font-medium">{data.preferredRegionMode === 'ONLY' ? 'Only matching' : 'Prefer matching'}</p>
@@ -1534,6 +1744,42 @@ function DynamicRoutingDiagnosticsCard({
             <div className="ops-inline-stat">
               <p className="text-xs text-muted-foreground">Preferred regions</p>
               <p className="font-medium">{data.preferredCountryCodes.length || 0}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Stickiness</p>
+              <p className="font-medium">{data.sessionStickinessMode === 'DRAIN' ? 'Drain active sessions' : 'None'}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Drain grace</p>
+              <p className="font-medium">{data.drainGraceMinutes} min</p>
+            </div>
+          </div>
+        ) : null}
+
+        {data?.routingAlerts?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Active alerts</p>
+            <div className="space-y-2">
+              {data.routingAlerts.map((alert) => (
+                <div key={alert.id} className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{alert.title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{alert.description}</p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        alert.severity === 'CRITICAL' && 'border-red-500/40 text-red-500',
+                        alert.severity === 'WARNING' && 'border-amber-500/40 text-amber-500',
+                        alert.severity === 'INFO' && 'border-cyan-500/40 text-cyan-500',
+                      )}
+                    >
+                      {alert.severity}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}
@@ -1551,6 +1797,11 @@ function DynamicRoutingDiagnosticsCard({
                       .join(' -> ')
                   : 'No explicit server order configured.'}
               </p>
+              {Object.keys(data.preferredServerWeights).length ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Weights: {Object.entries(data.preferredServerWeights).map(([serverId, weight]) => `${serverId.slice(0, 6)}=${weight}x`).join(', ')}
+                </p>
+              ) : null}
             </div>
             <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -1560,6 +1811,34 @@ function DynamicRoutingDiagnosticsCard({
                 {data.preferredCountryCodes.length
                   ? data.preferredCountryCodes.join(' -> ')
                   : 'No region order configured.'}
+              </p>
+              {Object.keys(data.preferredCountryWeights).length ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Weights: {Object.entries(data.preferredCountryWeights).map(([countryCode, weight]) => `${countryCode}=${weight}x`).join(', ')}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {data ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Applied template</p>
+              <p className="font-medium">{data.appliedTemplate?.name || 'None'}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Rotation trigger</p>
+              <p className="font-medium">{data.rotationTriggerMode}</p>
+            </div>
+            <div className="ops-inline-stat">
+              <p className="text-xs text-muted-foreground">Rotation policy</p>
+              <p className="font-medium">
+                {data.rotationTriggerMode === 'USAGE' || data.rotationTriggerMode === 'COMBINED'
+                  ? `${data.rotationUsageThresholdPercent}% quota`
+                  : data.rotateOnHealthFailure
+                    ? 'Health-aware'
+                    : 'Scheduled'}
               </p>
             </div>
           </div>
@@ -1660,6 +1939,67 @@ function DynamicRoutingDiagnosticsCard({
           </div>
         ) : null}
 
+        {data?.candidateRanking?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Candidate ranking</p>
+            <div className="space-y-2">
+              {data.candidateRanking.slice(0, 5).map((candidate, index) => (
+                <div key={`${candidate.serverId}-${candidate.keyId || index}`} className="ops-row-card items-start">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {index + 1}. {getCountryFlag(candidate.serverCountry || '')} {candidate.serverName}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {candidate.keyName ? `${candidate.keyName} · ` : ''}
+                      {candidate.reason}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    <p>{candidate.weight}x weight</p>
+                    <p>{candidate.loadScore !== null ? `${candidate.loadScore}% load` : 'No load data'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {data?.routingTimeline?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Routing timeline</p>
+            <div className="space-y-2">
+              {data.routingTimeline.slice(0, 6).map((event) => (
+                <div key={event.id} className="ops-row-card items-start">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{event.eventType.replaceAll('_', ' ')}</p>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          event.severity === 'CRITICAL' && 'border-red-500/40 text-red-500',
+                          event.severity === 'WARNING' && 'border-amber-500/40 text-amber-500',
+                          event.severity === 'INFO' && 'border-cyan-500/40 text-cyan-500',
+                        )}
+                      >
+                        {event.severity}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{event.reason}</p>
+                    {(event.fromServerName || event.toServerName) ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {event.fromServerName || 'None'} → {event.toServerName || 'None'}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {formatRelativeTime(new Date(event.createdAt))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="ops-inline-stat">
             <p className="text-xs text-muted-foreground">Last share-page view</p>
@@ -1679,6 +2019,237 @@ function DynamicRoutingDiagnosticsCard({
               {data?.lastSharePageOpenAppAt ? formatRelativeTime(new Date(data.lastSharePageOpenAppAt)) : 'Never'}
             </p>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DynamicKeyTemplateCard({
+  dak,
+  onUpdate,
+}: {
+  dak: {
+    id: string;
+    name: string;
+    type: 'SELF_MANAGED' | 'MANUAL';
+    notes: string | null;
+    dataLimitBytes: bigint | null;
+    durationDays: number | null;
+    method: string | null;
+    serverTagIds: string[];
+    loadBalancerAlgorithm: 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
+    preferredServerIds: string[];
+    preferredCountryCodes: string[];
+    preferredServerWeights: Record<string, number>;
+    preferredCountryWeights: Record<string, number>;
+    preferredRegionMode: DynamicRoutingPreferenceMode;
+    sessionStickinessMode: 'NONE' | 'DRAIN';
+    drainGraceMinutes: number;
+    rotationEnabled: boolean;
+    rotationInterval: string;
+    rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
+    rotationUsageThresholdPercent: number;
+    rotateOnHealthFailure: boolean;
+    sharePageEnabled: boolean;
+    subscriptionTheme: string | null;
+    subscriptionWelcomeMessage: string | null;
+    appliedTemplateId: string | null;
+  };
+  onUpdate: () => void;
+}) {
+  const { toast } = useToast();
+  const [selectedTemplateId, setSelectedTemplateId] = useState(dak.appliedTemplateId || '__none__');
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const templatesQuery = trpc.dynamicKeys.listTemplates.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    setSelectedTemplateId(dak.appliedTemplateId || '__none__');
+  }, [dak.appliedTemplateId]);
+
+  const applyTemplateMutation = trpc.dynamicKeys.applyTemplate.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Template applied',
+        description: 'The dynamic key was updated with the selected template.',
+      });
+      onUpdate();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Template apply failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const createTemplateMutation = trpc.dynamicKeys.createTemplate.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Template saved',
+        description: 'This dynamic key can now be reused as a routing template.',
+      });
+      setTemplateName('');
+      setTemplateDescription('');
+      await templatesQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Template save failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteTemplateMutation = trpc.dynamicKeys.deleteTemplate.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Template deleted',
+        description: 'The saved template has been removed.',
+      });
+      setSelectedTemplateId('__none__');
+      await templatesQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Template delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const saveCurrentTemplate = () => {
+    if (!templateName.trim()) {
+      toast({
+        title: 'Template name required',
+        description: 'Enter a template name before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const normalizedSubscriptionTheme =
+      dak.subscriptionTheme &&
+      subscriptionThemeIds.includes(dak.subscriptionTheme as (typeof subscriptionThemeIds)[number])
+        ? (dak.subscriptionTheme as (typeof subscriptionThemeIds)[number])
+        : undefined;
+
+    createTemplateMutation.mutate({
+      name: templateName.trim(),
+      description: templateDescription.trim() || undefined,
+      type: dak.type,
+      notes: dak.notes || undefined,
+      dataLimitGB: dak.dataLimitBytes ? Number(dak.dataLimitBytes) / (1024 * 1024 * 1024) : undefined,
+      durationDays: dak.durationDays ?? undefined,
+      method: (dak.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm') || 'chacha20-ietf-poly1305',
+      serverTagIds: dak.serverTagIds,
+      loadBalancerAlgorithm: dak.loadBalancerAlgorithm,
+      preferredServerIds: dak.preferredServerIds,
+      preferredCountryCodes: dak.preferredCountryCodes,
+      preferredServerWeights: dak.preferredServerWeights,
+      preferredCountryWeights: dak.preferredCountryWeights,
+      preferredRegionMode: dak.preferredRegionMode,
+      sessionStickinessMode: dak.sessionStickinessMode,
+      drainGraceMinutes: dak.drainGraceMinutes,
+      rotationEnabled: dak.rotationEnabled,
+      rotationInterval: dak.rotationInterval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+      rotationTriggerMode: dak.rotationTriggerMode,
+      rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+      rotateOnHealthFailure: dak.rotateOnHealthFailure,
+      sharePageEnabled: dak.sharePageEnabled,
+      subscriptionTheme: normalizedSubscriptionTheme,
+      subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage || undefined,
+    });
+  };
+
+  return (
+    <Card className="ops-detail-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          <Settings className="h-5 w-5 text-primary" />
+          Routing Templates
+        </CardTitle>
+        <CardDescription>
+          Save this dynamic key as a reusable routing policy or apply an existing template.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Apply existing template</Label>
+          <div className="flex gap-2">
+            <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Select a template" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No template</SelectItem>
+                {(templatesQuery.data ?? []).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={() =>
+                applyTemplateMutation.mutate({
+                  id: dak.id,
+                  templateId: selectedTemplateId === '__none__' ? null : selectedTemplateId,
+                })
+              }
+              disabled={applyTemplateMutation.isPending}
+            >
+              {applyTemplateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Templates can replace routing preferences, rotation defaults, and share-page defaults in one click.
+          </p>
+        </div>
+
+        {selectedTemplateId !== '__none__' ? (
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-destructive"
+            onClick={() => deleteTemplateMutation.mutate({ id: selectedTemplateId })}
+            disabled={deleteTemplateMutation.isPending}
+          >
+            {deleteTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete selected template
+          </Button>
+        ) : null}
+
+        <div className="space-y-3 rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Save current configuration as template</p>
+            <p className="text-xs text-muted-foreground">
+              Capture the current routing weights, drain mode, and rotation policy for reuse when creating future dynamic keys.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Template name</Label>
+            <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="Premium SG failover policy" />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              value={templateDescription}
+              onChange={(event) => setTemplateDescription(event.target.value)}
+              placeholder="Explain when to use this template."
+              rows={3}
+            />
+          </div>
+          <Button className="w-full" onClick={saveCurrentTemplate} disabled={createTemplateMutation.isPending}>
+            {createTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save as template
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -2393,6 +2964,37 @@ export default function DynamicKeyDetailPage() {
             isRefreshing={routingDiagnosticsQuery.isFetching}
           />
 
+          <DynamicKeyTemplateCard
+            dak={{
+              id: dak.id,
+              name: dak.name,
+              type: dak.type,
+              notes: dak.notes ?? null,
+              dataLimitBytes: dak.dataLimitBytes,
+              durationDays: dak.durationDays ?? null,
+              method: dak.method ?? null,
+              serverTagIds: dak.serverTagIds,
+              loadBalancerAlgorithm: dak.loadBalancerAlgorithm,
+              preferredServerIds: dak.preferredServerIds,
+              preferredCountryCodes: dak.preferredCountryCodes,
+              preferredServerWeights: dak.preferredServerWeights,
+              preferredCountryWeights: dak.preferredCountryWeights,
+              preferredRegionMode: dak.preferredRegionMode,
+              sessionStickinessMode: dak.sessionStickinessMode,
+              drainGraceMinutes: dak.drainGraceMinutes,
+              rotationEnabled: dak.rotationEnabled,
+              rotationInterval: dak.rotationInterval,
+              rotationTriggerMode: dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED',
+              rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+              rotateOnHealthFailure: dak.rotateOnHealthFailure,
+              sharePageEnabled: dak.sharePageEnabled ?? true,
+              subscriptionTheme: dak.subscriptionTheme ?? null,
+              subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage ?? null,
+              appliedTemplateId: dak.appliedTemplateId ?? null,
+            }}
+            onUpdate={() => refetch()}
+          />
+
           {/* Server Load Distribution */}
           <ServerLoadCard />
 
@@ -2401,6 +3003,9 @@ export default function DynamicKeyDetailPage() {
             dakId={dak.id}
             rotationEnabled={dak.rotationEnabled}
             rotationInterval={dak.rotationInterval}
+            rotationTriggerMode={dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED'}
+            rotationUsageThresholdPercent={dak.rotationUsageThresholdPercent}
+            rotateOnHealthFailure={dak.rotateOnHealthFailure}
             lastRotatedAt={dak.lastRotatedAt ?? null}
             nextRotationAt={dak.nextRotationAt ?? null}
             rotationCount={dak.rotationCount}
@@ -2519,6 +3124,13 @@ export default function DynamicKeyDetailPage() {
             preferredServerIds: dak.preferredServerIds ?? [],
             preferredCountryCodes: dak.preferredCountryCodes ?? [],
             preferredRegionMode: dak.preferredRegionMode ?? 'PREFER',
+            preferredServerWeights: dak.preferredServerWeights ?? {},
+            preferredCountryWeights: dak.preferredCountryWeights ?? {},
+            sessionStickinessMode: dak.sessionStickinessMode ?? 'DRAIN',
+            drainGraceMinutes: dak.drainGraceMinutes ?? 20,
+            rotationTriggerMode: (dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') ?? 'SCHEDULED',
+            rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent ?? 85,
+            rotateOnHealthFailure: dak.rotateOnHealthFailure ?? false,
           }}
           onSuccess={() => refetch()}
         />

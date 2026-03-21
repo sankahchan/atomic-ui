@@ -19,6 +19,12 @@ import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
+import {
+  DYNAMIC_ROUTING_EVENT_TYPES,
+  recordDynamicRoutingEvent,
+  recordDynamicRoutingEventOnce,
+} from '@/lib/services/dynamic-routing-events';
 
 interface RotationResult {
   rotated: number;
@@ -191,6 +197,75 @@ async function rotateDakKeys(dakId: string): Promise<{ success: boolean; error?:
   }
 }
 
+async function shouldSkipRotationForDrain(input: {
+  accessKeyIds: string[];
+  drainGraceMinutes: number;
+}) {
+  if (input.accessKeyIds.length === 0) {
+    return false;
+  }
+
+  const cutoff = new Date(Date.now() - input.drainGraceMinutes * 60_000);
+  const session = await db.connectionSession.findFirst({
+    where: {
+      accessKeyId: { in: input.accessKeyIds },
+      OR: [{ isActive: true }, { lastActiveAt: { gte: cutoff } }],
+    },
+    orderBy: [{ isActive: 'desc' }, { lastActiveAt: 'desc' }],
+    select: {
+      id: true,
+      isActive: true,
+      lastActiveAt: true,
+    },
+  });
+
+  return session;
+}
+
+function resolveRotationTrigger(input: {
+  rotationTriggerMode: string;
+  nextRotationAt: Date | null;
+  dataLimitBytes: bigint | null;
+  usedBytes: bigint;
+  rotationUsageThresholdPercent: number;
+  rotateOnHealthFailure: boolean;
+  healthStatuses: Array<'UP' | 'DOWN' | 'SLOW' | 'UNKNOWN'>;
+  now: Date;
+}) {
+  const scheduledDue = Boolean(input.nextRotationAt && input.nextRotationAt <= input.now);
+  const usagePercent = input.dataLimitBytes && input.dataLimitBytes > BigInt(0)
+    ? Number((input.usedBytes * BigInt(100)) / input.dataLimitBytes)
+    : null;
+  const usageDue = usagePercent !== null && usagePercent >= input.rotationUsageThresholdPercent;
+  const healthDue = input.rotateOnHealthFailure && input.healthStatuses.some((status) => status === 'DOWN' || status === 'SLOW');
+
+  switch (input.rotationTriggerMode) {
+    case 'USAGE':
+      return usageDue
+        ? { shouldRotate: true, reason: `Usage reached ${usagePercent}% of quota.`, trigger: 'USAGE' as const }
+        : { shouldRotate: false, reason: 'Usage threshold has not been reached yet.', trigger: 'USAGE' as const };
+    case 'HEALTH':
+      return healthDue
+        ? { shouldRotate: true, reason: 'A serving backend is degraded or down.', trigger: 'HEALTH' as const }
+        : { shouldRotate: false, reason: 'No serving backend is degraded right now.', trigger: 'HEALTH' as const };
+    case 'COMBINED':
+      if (healthDue) {
+        return { shouldRotate: true, reason: 'A serving backend is degraded or down.', trigger: 'HEALTH' as const };
+      }
+      if (usageDue) {
+        return { shouldRotate: true, reason: `Usage reached ${usagePercent}% of quota.`, trigger: 'USAGE' as const };
+      }
+      if (scheduledDue) {
+        return { shouldRotate: true, reason: 'The scheduled rotation window has been reached.', trigger: 'SCHEDULED' as const };
+      }
+      return { shouldRotate: false, reason: 'No rotation trigger has fired yet.', trigger: 'COMBINED' as const };
+    default:
+      return scheduledDue
+        ? { shouldRotate: true, reason: 'The scheduled rotation window has been reached.', trigger: 'SCHEDULED' as const }
+        : { shouldRotate: false, reason: 'The next scheduled rotation is not due yet.', trigger: 'SCHEDULED' as const };
+  }
+}
+
 /**
  * Check all DAKs with rotation enabled and rotate any that are due.
  * Called periodically by the scheduler.
@@ -208,22 +283,86 @@ export async function checkKeyRotations(): Promise<RotationResult> {
   const daksToRotate = await db.dynamicAccessKey.findMany({
     where: {
       rotationEnabled: true,
-      rotationInterval: { not: 'NEVER' },
       status: 'ACTIVE',
-      OR: [
-        { nextRotationAt: { lte: now } },
-        { nextRotationAt: null, lastRotatedAt: null }, // Never rotated yet
-      ],
     },
-    select: {
-      id: true,
-      name: true,
-      rotationInterval: true,
+    include: {
+      accessKeys: {
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          server: {
+            select: {
+              id: true,
+              name: true,
+              healthCheck: {
+                select: { lastStatus: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
   for (const dak of daksToRotate) {
-    logger.debug(`🔄 Rotating keys for DAK "${dak.name}" (interval: ${dak.rotationInterval})`);
+    const routingPreferences = parseDynamicRoutingPreferences({
+      preferredServerIdsJson: dak.preferredServerIdsJson,
+      preferredCountryCodesJson: dak.preferredCountryCodesJson,
+      preferredServerWeightsJson: dak.preferredServerWeightsJson,
+      preferredCountryWeightsJson: dak.preferredCountryWeightsJson,
+      preferredRegionMode: dak.preferredRegionMode,
+      sessionStickinessMode: dak.sessionStickinessMode,
+      drainGraceMinutes: dak.drainGraceMinutes,
+    });
+    const trigger = resolveRotationTrigger({
+      rotationTriggerMode: dak.rotationTriggerMode,
+      nextRotationAt: dak.nextRotationAt,
+      dataLimitBytes: dak.dataLimitBytes,
+      usedBytes: dak.usedBytes,
+      rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+      rotateOnHealthFailure: dak.rotateOnHealthFailure,
+      healthStatuses: dak.accessKeys.map((key) => (key.server?.healthCheck?.lastStatus as 'UP' | 'DOWN' | 'SLOW' | 'UNKNOWN' | null) ?? 'UNKNOWN'),
+      now,
+    });
+
+    if (!trigger.shouldRotate) {
+      result.skipped++;
+      continue;
+    }
+
+    if (routingPreferences.sessionStickinessMode === 'DRAIN') {
+      const activeSession = await shouldSkipRotationForDrain({
+        accessKeyIds: dak.accessKeys.map((key) => key.id),
+        drainGraceMinutes: routingPreferences.drainGraceMinutes,
+      });
+
+      if (activeSession) {
+        result.skipped++;
+        await recordDynamicRoutingEventOnce({
+          dynamicAccessKeyId: dak.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.ROTATION_SKIPPED,
+          severity: 'INFO',
+          reason: `Rotation skipped because drain mode detected an active or recent session within ${routingPreferences.drainGraceMinutes} minutes.`,
+          windowMinutes: routingPreferences.drainGraceMinutes,
+          metadata: {
+            trigger: trigger.trigger,
+            sessionId: activeSession.id,
+          },
+        });
+        continue;
+      }
+    }
+
+    logger.debug(`🔄 Rotating keys for DAK "${dak.name}" (${trigger.trigger.toLowerCase()})`);
+
+    await recordDynamicRoutingEvent({
+      dynamicAccessKeyId: dak.id,
+      eventType: DYNAMIC_ROUTING_EVENT_TYPES.ROTATION_TRIGGERED,
+      reason: trigger.reason,
+      metadata: {
+        trigger: trigger.trigger,
+      },
+    });
 
     const rotationResult = await rotateDakKeys(dak.id);
 
@@ -233,15 +372,6 @@ export async function checkKeyRotations(): Promise<RotationResult> {
       result.errors.push(`${dak.name}: ${rotationResult.error}`);
     }
   }
-
-  result.skipped = (await db.dynamicAccessKey.count({
-    where: {
-      rotationEnabled: true,
-      rotationInterval: { not: 'NEVER' },
-      status: 'ACTIVE',
-      nextRotationAt: { gt: now },
-    },
-  }));
 
   return result;
 }

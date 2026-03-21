@@ -336,24 +336,13 @@ export default function SubscriptionPage() {
     }
   }, []);
 
-  const syncLocaleUrl = useCallback((nextLocale: SupportedLocale) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('lang', nextLocale);
-    window.history.replaceState(window.history.state, '', nextUrl.toString());
-  }, []);
-
   const handleLocaleSwitch = useCallback((nextLocale: SupportedLocale) => {
     if (nextLocale === locale) {
       return;
     }
 
     persistLocale(nextLocale);
-    syncLocaleUrl(nextLocale);
-  }, [locale, persistLocale, syncLocaleUrl]);
+  }, [locale, persistLocale]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
