@@ -69,6 +69,14 @@ export interface DynamicRoutingCandidateRank {
   reason: string;
 }
 
+export interface DynamicPinState {
+  pinnedAccessKeyId: string | null;
+  pinnedServerId: string | null;
+  pinnedAt: Date | null;
+  pinExpiresAt: Date | null;
+  expired: boolean;
+}
+
 function normalizeCountryCode(countryCode: string | null | undefined) {
   if (!countryCode) {
     return null;
@@ -76,6 +84,86 @@ function normalizeCountryCode(countryCode: string | null | undefined) {
 
   const normalized = countryCode.trim().toUpperCase();
   return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
+
+export function isDynamicPinExpired(pinExpiresAt?: Date | null) {
+  return Boolean(pinExpiresAt && pinExpiresAt.getTime() <= Date.now());
+}
+
+export async function clearExpiredDynamicPinIfNeeded(input: {
+  dynamicAccessKeyId: string;
+  pinnedAccessKeyId?: string | null;
+  pinnedServerId?: string | null;
+  pinnedAt?: Date | null;
+  pinExpiresAt?: Date | null;
+}) {
+  if (
+    !isDynamicPinExpired(input.pinExpiresAt) ||
+    (!input.pinnedAccessKeyId && !input.pinnedServerId)
+  ) {
+    return false;
+  }
+
+  const result = await db.dynamicAccessKey.updateMany({
+    where: {
+      id: input.dynamicAccessKeyId,
+      pinExpiresAt: {
+        lte: new Date(),
+      },
+      OR: [
+        { pinnedAccessKeyId: { not: null } },
+        { pinnedServerId: { not: null } },
+      ],
+    },
+    data: {
+      pinnedAccessKeyId: null,
+      pinnedServerId: null,
+      pinnedAt: null,
+      pinExpiresAt: null,
+    },
+  });
+
+  if (result.count > 0) {
+    const { DYNAMIC_ROUTING_EVENT_TYPES, recordDynamicRoutingEvent } = await import(
+      '@/lib/services/dynamic-routing-events'
+    );
+    await recordDynamicRoutingEvent({
+      dynamicAccessKeyId: input.dynamicAccessKeyId,
+      eventType: DYNAMIC_ROUTING_EVENT_TYPES.PIN_CLEARED,
+      severity: 'INFO',
+      reason: 'The operator pin expired and routing returned to the live policy.',
+      fromKeyId: input.pinnedAccessKeyId ?? null,
+      fromServerId: input.pinnedServerId ?? null,
+      metadata: {
+        automatic: true,
+        expired: true,
+      },
+    });
+  }
+
+  return result.count > 0;
+}
+
+export async function resolveDynamicPinState(input: {
+  dynamicAccessKeyId: string;
+  pinnedAccessKeyId?: string | null;
+  pinnedServerId?: string | null;
+  pinnedAt?: Date | null;
+  pinExpiresAt?: Date | null;
+}): Promise<DynamicPinState> {
+  const expired = isDynamicPinExpired(input.pinExpiresAt);
+
+  if (expired) {
+    await clearExpiredDynamicPinIfNeeded(input);
+  }
+
+  return {
+    pinnedAccessKeyId: expired ? null : input.pinnedAccessKeyId ?? null,
+    pinnedServerId: expired ? null : input.pinnedServerId ?? null,
+    pinnedAt: expired ? null : input.pinnedAt ?? null,
+    pinExpiresAt: expired ? null : input.pinExpiresAt ?? null,
+    expired,
+  };
 }
 
 function normalizeStringArray(values: string[] | null | undefined) {

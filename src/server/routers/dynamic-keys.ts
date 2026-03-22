@@ -38,6 +38,7 @@ import {
   parseDynamicRoutingPreferences,
   rankDynamicAccessKeyCandidates,
   rankDynamicServerCandidates,
+  resolveDynamicPinState,
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
@@ -824,6 +825,14 @@ export const dynamicKeysRouter = router({
         });
       }
 
+      const pinState = await resolveDynamicPinState({
+        dynamicAccessKeyId: dak.id,
+        pinnedAccessKeyId: dak.pinnedAccessKeyId,
+        pinnedServerId: dak.pinnedServerId,
+        pinnedAt: dak.pinnedAt,
+        pinExpiresAt: dak.pinExpiresAt,
+      });
+
       const publicSlug = dak.publicSlug || await generateUniqueDynamicKeySlug(dak.name, dak.id);
       const routingPreferences = parseDynamicRoutingPreferences({
         preferredServerIdsJson: dak.preferredServerIdsJson,
@@ -894,9 +903,10 @@ export const dynamicKeysRouter = router({
         lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
         lastResolvedServerId: dak.lastResolvedServerId,
         lastResolvedAt: dak.lastResolvedAt,
-        pinnedAccessKeyId: dak.pinnedAccessKeyId,
-        pinnedServerId: dak.pinnedServerId,
-        pinnedAt: dak.pinnedAt,
+        pinnedAccessKeyId: pinState.pinnedAccessKeyId,
+        pinnedServerId: pinState.pinnedServerId,
+        pinnedAt: pinState.pinnedAt,
+        pinExpiresAt: pinState.pinExpiresAt,
         appliedTemplateId: dak.appliedTemplateId,
         appliedTemplate: dak.appliedTemplate,
         createdAt: dak.createdAt,
@@ -961,6 +971,7 @@ export const dynamicKeysRouter = router({
           pinnedAccessKeyId: true,
           pinnedServerId: true,
           pinnedAt: true,
+          pinExpiresAt: true,
           rotationTriggerMode: true,
           rotationUsageThresholdPercent: true,
           rotateOnHealthFailure: true,
@@ -1008,6 +1019,14 @@ export const dynamicKeysRouter = router({
           message: 'You do not have permission to view this key',
         });
       }
+
+      const pinState = await resolveDynamicPinState({
+        dynamicAccessKeyId: dak.id,
+        pinnedAccessKeyId: dak.pinnedAccessKeyId,
+        pinnedServerId: dak.pinnedServerId,
+        pinnedAt: dak.pinnedAt,
+        pinExpiresAt: dak.pinExpiresAt,
+      });
 
       const algorithm = dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD';
       const viewerIp = ctx.clientIp ?? null;
@@ -1084,7 +1103,7 @@ export const dynamicKeysRouter = router({
             countryCode: true,
           },
         }),
-        getDynamicRoutingTimeline(input.id, 10),
+        getDynamicRoutingTimeline(input.id, 20),
         getDynamicRoutingAlerts({
           dynamicAccessKeyId: input.id,
           usedBytes: dak.usedBytes,
@@ -1208,6 +1227,7 @@ export const dynamicKeysRouter = router({
         serverName: string;
         serverCountry: string | null;
         pinnedAt: string | null;
+        pinExpiresAt: string | null;
       } | null = null;
 
       let selectionNote: string | null = null;
@@ -1261,7 +1281,7 @@ export const dynamicKeysRouter = router({
             algorithm,
             clientIp: viewerIp || '127.0.0.1',
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
-            pinnedAccessKeyId: dak.pinnedAccessKeyId,
+            pinnedAccessKeyId: pinState.pinnedAccessKeyId,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
             preferredServerWeights: routingPreferences.preferredServerWeights,
@@ -1286,8 +1306,8 @@ export const dynamicKeysRouter = router({
           }
         }
 
-        if (dak.pinnedAccessKeyId) {
-          const pinnedKey = activeKeys.find((key) => key.id === dak.pinnedAccessKeyId);
+        if (pinState.pinnedAccessKeyId) {
+          const pinnedKey = activeKeys.find((key) => key.id === pinState.pinnedAccessKeyId);
           if (pinnedKey?.server) {
             pinnedBackend = {
               mode: 'ATTACHED_KEY',
@@ -1296,7 +1316,8 @@ export const dynamicKeysRouter = router({
               serverId: pinnedKey.server.id,
               serverName: pinnedKey.server.name,
               serverCountry: pinnedKey.server.countryCode ?? null,
-              pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+              pinnedAt: pinState.pinnedAt?.toISOString() ?? null,
+              pinExpiresAt: pinState.pinExpiresAt?.toISOString() ?? null,
             };
           }
         }
@@ -1308,10 +1329,10 @@ export const dynamicKeysRouter = router({
             const rightTime = (right.lastTrafficAt ?? right.lastUsedAt ?? right.createdAt).getTime();
             return rightTime - leftTime;
           });
-        const pinnedSelfManagedKey = dak.pinnedAccessKeyId
-          ? sortedSelfManagedKeys.find((key) => key.id === dak.pinnedAccessKeyId)
-          : dak.pinnedServerId
-            ? sortedSelfManagedKeys.find((key) => key.server?.id === dak.pinnedServerId)
+        const pinnedSelfManagedKey = pinState.pinnedAccessKeyId
+          ? sortedSelfManagedKeys.find((key) => key.id === pinState.pinnedAccessKeyId)
+          : pinState.pinnedServerId
+            ? sortedSelfManagedKeys.find((key) => key.server?.id === pinState.pinnedServerId)
             : null;
         const activeSelfManagedKey = pinnedSelfManagedKey ?? sortedSelfManagedKeys[0];
 
@@ -1344,7 +1365,7 @@ export const dynamicKeysRouter = router({
             algorithm,
             clientIp: viewerIp || '127.0.0.1',
             lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
-            pinnedServerId: dak.pinnedServerId,
+            pinnedServerId: pinState.pinnedServerId,
             preferredServerIds: routingPreferences.preferredServerIds,
             preferredCountryCodes: routingPreferences.preferredCountryCodes,
             preferredServerWeights: routingPreferences.preferredServerWeights,
@@ -1369,7 +1390,7 @@ export const dynamicKeysRouter = router({
         }
 
         if (activeSelfManagedKey?.server) {
-          pinnedBackend = dak.pinnedAccessKeyId || dak.pinnedServerId
+          pinnedBackend = pinState.pinnedAccessKeyId || pinState.pinnedServerId
             ? {
                 mode: 'ATTACHED_KEY',
                 keyId: activeSelfManagedKey.id,
@@ -1377,18 +1398,20 @@ export const dynamicKeysRouter = router({
                 serverId: activeSelfManagedKey.server.id,
                 serverName: activeSelfManagedKey.server.name,
                 serverCountry: activeSelfManagedKey.server.countryCode ?? null,
-                pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+                pinnedAt: pinState.pinnedAt?.toISOString() ?? null,
+                pinExpiresAt: pinState.pinExpiresAt?.toISOString() ?? null,
               }
             : null;
-        } else if (dak.pinnedServerId) {
-          const pinnedServer = candidateServers.find((server) => server.id === dak.pinnedServerId);
+        } else if (pinState.pinnedServerId) {
+          const pinnedServer = candidateServers.find((server) => server.id === pinState.pinnedServerId);
           if (pinnedServer) {
             pinnedBackend = {
               mode: 'SELF_MANAGED_SERVER',
               serverId: pinnedServer.id,
               serverName: pinnedServer.name,
               serverCountry: pinnedServer.countryCode ?? null,
-              pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+              pinnedAt: pinState.pinnedAt?.toISOString() ?? null,
+              pinExpiresAt: pinState.pinExpiresAt?.toISOString() ?? null,
             };
           }
         }
@@ -1422,9 +1445,10 @@ export const dynamicKeysRouter = router({
         lastResolvedAccessKeyId: dak.lastResolvedAccessKeyId,
         lastResolvedServerId: dak.lastResolvedServerId,
         lastResolvedAt: dak.lastResolvedAt?.toISOString() ?? null,
-        pinnedAccessKeyId: dak.pinnedAccessKeyId,
-        pinnedServerId: dak.pinnedServerId,
-        pinnedAt: dak.pinnedAt?.toISOString() ?? null,
+        pinnedAccessKeyId: pinState.pinnedAccessKeyId,
+        pinnedServerId: pinState.pinnedServerId,
+        pinnedAt: pinState.pinnedAt?.toISOString() ?? null,
+        pinExpiresAt: pinState.pinExpiresAt?.toISOString() ?? null,
         pinnedBackend,
         rotationTriggerMode: dak.rotationTriggerMode,
         rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
@@ -1442,6 +1466,7 @@ export const dynamicKeysRouter = router({
       id: z.string(),
       accessKeyId: z.string().optional().nullable(),
       serverId: z.string().optional().nullable(),
+      expiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const dak = await db.dynamicAccessKey.findUnique({
@@ -1541,11 +1566,15 @@ export const dynamicKeysRouter = router({
           pinnedAccessKeyId,
           pinnedServerId,
           pinnedAt: new Date(),
+          pinExpiresAt: input.expiresInMinutes
+            ? new Date(Date.now() + input.expiresInMinutes * 60_000)
+            : null,
         },
         select: {
           pinnedAccessKeyId: true,
           pinnedServerId: true,
           pinnedAt: true,
+          pinExpiresAt: true,
         },
       });
 
@@ -1559,6 +1588,7 @@ export const dynamicKeysRouter = router({
         fromServerName,
         metadata: {
           mode: dak.type,
+          expiresInMinutes: input.expiresInMinutes ?? null,
         },
       });
 
@@ -1574,6 +1604,7 @@ export const dynamicKeysRouter = router({
           id: true,
           pinnedAccessKeyId: true,
           pinnedServerId: true,
+          pinExpiresAt: true,
         },
       });
 
@@ -1590,11 +1621,13 @@ export const dynamicKeysRouter = router({
           pinnedAccessKeyId: null,
           pinnedServerId: null,
           pinnedAt: null,
+          pinExpiresAt: null,
         },
         select: {
           pinnedAccessKeyId: true,
           pinnedServerId: true,
           pinnedAt: true,
+          pinExpiresAt: true,
         },
       });
 
@@ -1632,6 +1665,8 @@ export const dynamicKeysRouter = router({
           lastResolvedServerId: true,
           pinnedAccessKeyId: true,
           pinnedServerId: true,
+          pinnedAt: true,
+          pinExpiresAt: true,
           accessKeys: {
             where: { status: 'ACTIVE' },
             select: {
@@ -1668,6 +1703,13 @@ export const dynamicKeysRouter = router({
         sessionStickinessMode: dak.sessionStickinessMode,
         drainGraceMinutes: dak.drainGraceMinutes,
       });
+      const pinState = await resolveDynamicPinState({
+        dynamicAccessKeyId: dak.id,
+        pinnedAccessKeyId: dak.pinnedAccessKeyId,
+        pinnedServerId: dak.pinnedServerId,
+        pinnedAt: dak.pinnedAt,
+        pinExpiresAt: dak.pinExpiresAt,
+      });
 
       if (dak.type === 'MANUAL') {
         const activeKeys = dak.accessKeys.filter((key) => Boolean(key.server));
@@ -1688,7 +1730,7 @@ export const dynamicKeysRouter = router({
           serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
         });
 
-        const currentKeyId = dak.pinnedAccessKeyId || dak.lastResolvedAccessKeyId;
+        const currentKeyId = pinState.pinnedAccessKeyId || dak.lastResolvedAccessKeyId;
         const target = ranking.find((candidate) => candidate.keyId && candidate.keyId !== currentKeyId);
 
         if (!target) {
@@ -1703,7 +1745,7 @@ export const dynamicKeysRouter = router({
           eventType: DYNAMIC_ROUTING_EVENT_TYPES.FAILOVER_SIMULATION,
           reason: `A simulated failover would move this key to ${target.serverName}.`,
           fromKeyId: currentKeyId ?? null,
-          fromServerId: dak.pinnedServerId || dak.lastResolvedServerId,
+          fromServerId: pinState.pinnedServerId || dak.lastResolvedServerId,
           toKeyId: target.keyId,
           toKeyName: target.keyName,
           toServerId: target.serverId,
@@ -1750,7 +1792,7 @@ export const dynamicKeysRouter = router({
         serverTagIds,
       });
 
-      const currentServerId = dak.pinnedServerId || dak.lastResolvedServerId;
+      const currentServerId = pinState.pinnedServerId || dak.lastResolvedServerId;
       const target = ranking.find((candidate) => candidate.serverId !== currentServerId);
 
       if (!target) {

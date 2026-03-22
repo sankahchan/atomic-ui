@@ -70,6 +70,7 @@ const EVENT_TYPES = [
   { id: 'TRAFFIC_DEPLETED', labelKey: 'notifications.event.TRAFFIC_DEPLETED' },
   { id: 'AUDIT_ALERT', labelKey: 'notifications.event.AUDIT_ALERT' },
   { id: 'SCHEDULED_REPORT', labelKey: 'notifications.event.SCHEDULED_REPORT' },
+  { id: 'DYNAMIC_ROUTING_ALERT', labelKey: 'notifications.event.DYNAMIC_ROUTING_ALERT' },
 ] as const;
 
 type NotificationEventId = (typeof EVENT_TYPES)[number]['id'];

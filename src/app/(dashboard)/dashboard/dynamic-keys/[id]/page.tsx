@@ -1586,6 +1586,7 @@ type DynamicRoutingDiagnostics = {
   pinnedAccessKeyId: string | null;
   pinnedServerId: string | null;
   pinnedAt: string | null;
+  pinExpiresAt: string | null;
   pinnedBackend: {
     mode: 'ATTACHED_KEY' | 'SELF_MANAGED_SERVER';
     keyId?: string | null;
@@ -1594,6 +1595,7 @@ type DynamicRoutingDiagnostics = {
     serverName: string;
     serverCountry: string | null;
     pinnedAt: string | null;
+    pinExpiresAt: string | null;
   } | null;
   lastResolvedBackend: {
     keyId: string;
@@ -1684,6 +1686,17 @@ type DynamicRoutingCandidateTestResult = {
   candidates: DynamicRoutingCandidate[];
 };
 
+type RoutingTimelineFilter = 'ALL' | 'FAILOVER' | 'ALERTS' | 'PINS' | 'ROTATION' | 'TESTS';
+
+const PIN_EXPIRY_OPTIONS = [
+  { value: 'never', translationKey: 'dynamic_keys.routing.pin_expiry.option.never', minutes: null },
+  { value: '30', translationKey: 'dynamic_keys.routing.pin_expiry.option.30m', minutes: 30 },
+  { value: '120', translationKey: 'dynamic_keys.routing.pin_expiry.option.2h', minutes: 120 },
+  { value: '480', translationKey: 'dynamic_keys.routing.pin_expiry.option.8h', minutes: 480 },
+  { value: '1440', translationKey: 'dynamic_keys.routing.pin_expiry.option.24h', minutes: 1440 },
+  { value: '4320', translationKey: 'dynamic_keys.routing.pin_expiry.option.72h', minutes: 4320 },
+] as const;
+
 function formatRoutingEventLabel(eventType: string, t: (key: string) => string) {
   switch (eventType) {
     case 'BACKEND_SWITCH':
@@ -1727,6 +1740,39 @@ function formatStickinessModeLabel(mode: 'NONE' | 'DRAIN', t: (key: string) => s
     : t('dynamic_keys.routing.stickiness.none');
 }
 
+function matchesRoutingTimelineFilter(eventType: string, filter: RoutingTimelineFilter) {
+  if (filter === 'ALL') {
+    return true;
+  }
+
+  if (filter === 'FAILOVER') {
+    return [
+      'BACKEND_SWITCH',
+      'NO_MATCH',
+      'HEALTH_ALERT',
+      'FLAPPING_ALERT',
+    ].includes(eventType);
+  }
+
+  if (filter === 'ALERTS') {
+    return ['NO_MATCH', 'HEALTH_ALERT', 'QUOTA_ALERT', 'FLAPPING_ALERT'].includes(eventType);
+  }
+
+  if (filter === 'PINS') {
+    return ['PIN_APPLIED', 'PIN_CLEARED'].includes(eventType);
+  }
+
+  if (filter === 'ROTATION') {
+    return ['ROTATION_TRIGGERED', 'ROTATION_SKIPPED'].includes(eventType);
+  }
+
+  if (filter === 'TESTS') {
+    return ['TEST_RUN', 'FAILOVER_SIMULATION'].includes(eventType);
+  }
+
+  return true;
+}
+
 function DynamicRoutingDiagnosticsCard({
   data,
   isLoading,
@@ -1748,7 +1794,7 @@ function DynamicRoutingDiagnosticsCard({
   isLoading: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
-  onPinCurrent: () => void;
+  onPinCurrent: (expiresInMinutes: number | null) => void;
   onClearPin: () => void;
   onSimulateFailover: () => void;
   onTestCandidates: () => void;
@@ -1761,6 +1807,12 @@ function DynamicRoutingDiagnosticsCard({
   candidateTestResult?: DynamicRoutingCandidateTestResult | null;
 }) {
   const { t } = useLocale();
+  const [timelineFilter, setTimelineFilter] = useState<RoutingTimelineFilter>('ALL');
+  const [pinExpiryValue, setPinExpiryValue] = useState<string>('never');
+  const filteredTimeline = useMemo(
+    () => (data?.routingTimeline ?? []).filter((event) => matchesRoutingTimelineFilter(event.eventType, timelineFilter)),
+    [data?.routingTimeline, timelineFilter],
+  );
 
   if (isLoading && !data) {
     return (
@@ -1851,7 +1903,35 @@ function DynamicRoutingDiagnosticsCard({
         ) : null}
 
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="outline" className="justify-start" onClick={onPinCurrent} disabled={!canPinCurrent || isPinning}>
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-3 dark:bg-white/[0.03] sm:col-span-2">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t('dynamic_keys.routing.pin_expiry.label')}</p>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.pin_expiry.help')}</p>
+              </div>
+              <Select value={pinExpiryValue} onValueChange={setPinExpiryValue}>
+                <SelectTrigger className="w-full lg:w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PIN_EXPIRY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {t(option.translationKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="justify-start"
+            onClick={() => {
+              const selectedOption = PIN_EXPIRY_OPTIONS.find((option) => option.value === pinExpiryValue);
+              onPinCurrent(selectedOption?.minutes ?? null);
+            }}
+            disabled={!canPinCurrent || isPinning}
+          >
             {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pin className="mr-2 h-4 w-4" />}
             {t('dynamic_keys.routing.action.pin_current')}
           </Button>
@@ -1890,6 +1970,11 @@ function DynamicRoutingDiagnosticsCard({
             {data.pinnedBackend.pinnedAt ? (
               <p className="mt-3 text-xs text-muted-foreground">
                 {t('dynamic_keys.routing.pinned_at')} {formatRelativeTime(new Date(data.pinnedBackend.pinnedAt))}
+              </p>
+            ) : null}
+            {data.pinnedBackend.pinExpiresAt ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('dynamic_keys.routing.pin_expires')} {formatRelativeTime(new Date(data.pinnedBackend.pinExpiresAt))}
               </p>
             ) : null}
           </div>
@@ -2135,9 +2220,26 @@ function DynamicRoutingDiagnosticsCard({
 
         {data?.routingTimeline?.length ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">{t('dynamic_keys.routing.timeline')}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium">{t('dynamic_keys.routing.timeline')}</p>
+              <div className="w-full sm:w-[220px]">
+                <Select value={timelineFilter} onValueChange={(value) => setTimelineFilter(value as RoutingTimelineFilter)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('dynamic_keys.routing.timeline_filter.all')}</SelectItem>
+                    <SelectItem value="FAILOVER">{t('dynamic_keys.routing.timeline_filter.failover')}</SelectItem>
+                    <SelectItem value="ALERTS">{t('dynamic_keys.routing.timeline_filter.alerts')}</SelectItem>
+                    <SelectItem value="PINS">{t('dynamic_keys.routing.timeline_filter.pins')}</SelectItem>
+                    <SelectItem value="ROTATION">{t('dynamic_keys.routing.timeline_filter.rotation')}</SelectItem>
+                    <SelectItem value="TESTS">{t('dynamic_keys.routing.timeline_filter.tests')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-2">
-              {data.routingTimeline.slice(0, 6).map((event) => (
+              {filteredTimeline.length ? filteredTimeline.slice(0, 10).map((event) => (
                 <div key={event.id} className="ops-row-card items-start">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -2164,7 +2266,11 @@ function DynamicRoutingDiagnosticsCard({
                     {formatRelativeTime(new Date(event.createdAt))}
                   </span>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-[1.2rem] border border-dashed border-border/60 px-4 py-4 text-sm text-muted-foreground dark:border-cyan-400/16">
+                  {t('dynamic_keys.routing.timeline_filter.empty')}
+                </div>
+              )}
             </div>
           </div>
         ) : null}
@@ -2609,7 +2715,7 @@ export default function DynamicKeyDetailPage() {
       return `${window.location.origin}${getPublicBasePath()}/c/${dak.publicSlug}`;
     }
 
-  return `${window.location.origin}${getPublicBasePath()}/api/sub/${dak.dynamicUrl}`;
+    return `${window.location.origin}${getPublicBasePath()}/api/sub/${dak.dynamicUrl}`;
   }, [dak?.dynamicUrl, dak?.publicSlug]);
   const qrDownloadFilename = buildDownloadFilename(dak?.name, 'qr', 'png');
   const configDownloadFilename = buildDownloadFilename(dak?.name, 'dynamic-config', 'txt');
@@ -2708,7 +2814,7 @@ export default function DynamicKeyDetailPage() {
     });
   };
 
-  const handlePinCurrentBackend = () => {
+  const handlePinCurrentBackend = (expiresInMinutes: number | null) => {
     if (!dak || !routingDiagnosticsQuery.data?.currentSelection) {
       toast({
         title: t('dynamic_keys.routing.toast.pin_failed'),
@@ -2723,6 +2829,7 @@ export default function DynamicKeyDetailPage() {
       id: dak.id,
       accessKeyId: selection.keyId ?? undefined,
       serverId: selection.serverId ?? undefined,
+      expiresInMinutes,
     });
   };
 

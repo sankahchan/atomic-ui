@@ -42,6 +42,7 @@ import {
 import {
   getSelfManagedServerCandidate,
   parseDynamicRoutingPreferences,
+  resolveDynamicPinState,
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 
@@ -351,6 +352,31 @@ async function persistDynamicResolution(input: {
         stickinessApplied: Boolean(input.stickinessApplied),
       },
     });
+
+    const recentSwitches = await db.dynamicRoutingEvent.count({
+      where: {
+        dynamicAccessKeyId: input.dynamicAccessKey.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.BACKEND_SWITCH,
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 60_000),
+        },
+      },
+    });
+
+    if (recentSwitches >= 3) {
+      await recordDynamicRoutingEventOnce({
+        dynamicAccessKeyId: input.dynamicAccessKey.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.FLAPPING_ALERT,
+        severity: 'WARNING',
+        reason: `${recentSwitches} backend switches were recorded in the last 30 minutes.`,
+        windowMinutes: 30,
+        metadata: {
+          switchCount: recentSwitches,
+          keyId: input.next.keyId,
+          serverId: input.next.serverId,
+        },
+      });
+    }
   } else if (input.stickinessApplied) {
     await recordDynamicRoutingEventOnce({
       dynamicAccessKeyId: input.dynamicAccessKey.id,
@@ -411,7 +437,7 @@ export async function handleSubscriptionRequest(
     const clientIp = getClientIp(request);
 
     // First, try to find a Dynamic Access Key by dynamicUrl
-    const dynamicKey = await db.dynamicAccessKey.findFirst({
+    const foundDynamicKey = await db.dynamicAccessKey.findFirst({
       where: {
         OR: [
           { dynamicUrl: token },
@@ -441,7 +467,24 @@ export async function handleSubscriptionRequest(
       },
     });
 
-    if (dynamicKey) {
+    if (foundDynamicKey) {
+      let dynamicKey = foundDynamicKey;
+      const pinState = await resolveDynamicPinState({
+        dynamicAccessKeyId: dynamicKey.id,
+        pinnedAccessKeyId: dynamicKey.pinnedAccessKeyId,
+        pinnedServerId: dynamicKey.pinnedServerId,
+        pinnedAt: dynamicKey.pinnedAt,
+        pinExpiresAt: dynamicKey.pinExpiresAt,
+      });
+
+      dynamicKey = {
+        ...dynamicKey,
+        pinnedAccessKeyId: pinState.pinnedAccessKeyId,
+        pinnedServerId: pinState.pinnedServerId,
+        pinnedAt: pinState.pinnedAt,
+        pinExpiresAt: pinState.pinExpiresAt,
+      };
+
       // Found a dynamic key - validate it
       if (dynamicKey.status !== 'ACTIVE' && dynamicKey.status !== 'PENDING') {
         return NextResponse.json(
@@ -453,6 +496,22 @@ export async function handleSubscriptionRequest(
       // Check if expired
       if (dynamicKey.expiresAt && new Date() > dynamicKey.expiresAt) {
         return NextResponse.json({ error: 'Key has expired' }, { status: 403 });
+      }
+
+      if (dynamicKey.dataLimitBytes && dynamicKey.dataLimitBytes > BigInt(0)) {
+        const usagePercent = Number((dynamicKey.usedBytes * BigInt(100)) / dynamicKey.dataLimitBytes);
+        if (usagePercent >= 85) {
+          await recordDynamicRoutingEventOnce({
+            dynamicAccessKeyId: dynamicKey.id,
+            eventType: DYNAMIC_ROUTING_EVENT_TYPES.QUOTA_ALERT,
+            severity: usagePercent >= 95 ? 'CRITICAL' : 'WARNING',
+            reason: `Dynamic key traffic usage reached ${usagePercent}% of the configured quota.`,
+            windowMinutes: usagePercent >= 95 ? 60 : 240,
+            metadata: {
+              usagePercent,
+            },
+          });
+        }
       }
 
       // Check data limit

@@ -305,6 +305,9 @@ export async function checkKeyRotations(): Promise<RotationResult> {
   });
 
   for (const dak of daksToRotate) {
+    const healthStatuses = dak.accessKeys.map((key) =>
+      (key.server?.healthCheck?.lastStatus as 'UP' | 'DOWN' | 'SLOW' | 'UNKNOWN' | null) ?? 'UNKNOWN',
+    );
     const routingPreferences = parseDynamicRoutingPreferences({
       preferredServerIdsJson: dak.preferredServerIdsJson,
       preferredCountryCodesJson: dak.preferredCountryCodesJson,
@@ -321,9 +324,22 @@ export async function checkKeyRotations(): Promise<RotationResult> {
       usedBytes: dak.usedBytes,
       rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
       rotateOnHealthFailure: dak.rotateOnHealthFailure,
-      healthStatuses: dak.accessKeys.map((key) => (key.server?.healthCheck?.lastStatus as 'UP' | 'DOWN' | 'SLOW' | 'UNKNOWN' | null) ?? 'UNKNOWN'),
+      healthStatuses,
       now,
     });
+
+    if (dak.rotateOnHealthFailure && healthStatuses.some((status) => status === 'DOWN' || status === 'SLOW')) {
+      await recordDynamicRoutingEventOnce({
+        dynamicAccessKeyId: dak.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.HEALTH_ALERT,
+        severity: 'WARNING',
+        reason: 'One or more serving backends are degraded or down, so health-aware routing may rotate this dynamic key.',
+        windowMinutes: 60,
+        metadata: {
+          healthStatuses,
+        },
+      });
+    }
 
     if (!trigger.shouldRotate) {
       result.skipped++;

@@ -20,6 +20,13 @@ export type DynamicRoutingEventType =
 
 export type DynamicRoutingEventSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 
+const ALERT_EVENT_TYPES = new Set<string>([
+  DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH,
+  DYNAMIC_ROUTING_EVENT_TYPES.HEALTH_ALERT,
+  DYNAMIC_ROUTING_EVENT_TYPES.QUOTA_ALERT,
+  DYNAMIC_ROUTING_EVENT_TYPES.FLAPPING_ALERT,
+]);
+
 function parseMetadata(value: string | null) {
   if (!value) {
     return null;
@@ -30,6 +37,98 @@ function parseMetadata(value: string | null) {
   } catch {
     return null;
   }
+}
+
+async function dispatchDynamicRoutingAlert(input: {
+  dynamicAccessKeyId: string;
+  eventType: string;
+  severity: DynamicRoutingEventSeverity;
+  reason: string;
+  metadata?: Record<string, unknown> | null;
+}) {
+  if (!ALERT_EVENT_TYPES.has(input.eventType)) {
+    return;
+  }
+
+  const dynamicKey = await db.dynamicAccessKey.findUnique({
+    where: { id: input.dynamicAccessKeyId },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      dynamicUrl: true,
+      publicSlug: true,
+    },
+  });
+
+  if (!dynamicKey) {
+    return;
+  }
+
+  const [
+    { channelSupportsEvent, parseNotificationChannelRecord },
+    { enqueueNotificationDelivery },
+    { sendAdminAlert },
+  ] = await Promise.all([
+    import('@/lib/services/notification-channels'),
+    import('@/lib/services/notification-queue'),
+    import('@/lib/services/telegram-bot'),
+  ]);
+
+  const channels = await db.notificationChannel.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      config: true,
+      events: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const activeChannels = channels
+    .map((channel) => parseNotificationChannelRecord(channel))
+    .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
+    .filter((channel) => channelSupportsEvent(channel, 'DYNAMIC_ROUTING_ALERT'));
+
+  const cooldownKey = `dynamic-routing:${dynamicKey.id}:${input.eventType}`;
+  const message = `[Dynamic Routing][${input.severity}] ${dynamicKey.name}: ${input.reason}`;
+  const payload = {
+    dynamicAccessKeyId: dynamicKey.id,
+    dynamicKeyName: dynamicKey.name,
+    dynamicKeyType: dynamicKey.type,
+    eventType: input.eventType,
+    severity: input.severity,
+    reason: input.reason,
+    publicSlug: dynamicKey.publicSlug,
+    dynamicUrl: dynamicKey.dynamicUrl,
+    metadata: input.metadata ?? null,
+  };
+
+  for (const channel of activeChannels) {
+    await enqueueNotificationDelivery({
+      channelId: channel.id,
+      event: 'DYNAMIC_ROUTING_ALERT',
+      message,
+      payload,
+      payloadMode: channel.type === 'WEBHOOK' ? 'RAW' : 'WRAPPED',
+      cooldownKey,
+    });
+  }
+
+  if (!activeChannels.some((channel) => channel.type === 'TELEGRAM')) {
+    await sendAdminAlert(
+      `Dynamic routing alert\nKey: ${dynamicKey.name}\nSeverity: ${input.severity}\nReason: ${input.reason}`,
+    );
+  }
+
+  await db.dynamicAccessKey.update({
+    where: { id: dynamicKey.id },
+    data: { lastRoutingAlertAt: new Date() },
+  });
 }
 
 export async function recordDynamicRoutingEvent(input: {
@@ -47,7 +146,7 @@ export async function recordDynamicRoutingEvent(input: {
   toServerName?: string | null;
   metadata?: Record<string, unknown> | null;
 }) {
-  return db.dynamicRoutingEvent.create({
+  const created = await db.dynamicRoutingEvent.create({
     data: {
       dynamicAccessKeyId: input.dynamicAccessKeyId,
       eventType: input.eventType,
@@ -64,6 +163,16 @@ export async function recordDynamicRoutingEvent(input: {
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
     },
   });
+
+  await dispatchDynamicRoutingAlert({
+    dynamicAccessKeyId: input.dynamicAccessKeyId,
+    eventType: input.eventType,
+    severity: input.severity ?? 'INFO',
+    reason: input.reason,
+    metadata: input.metadata,
+  });
+
+  return created;
 }
 
 export async function recordDynamicRoutingEventOnce(input: {
