@@ -20,6 +20,8 @@ AUTH_LIMIT_BURST="${AUTH_LIMIT_BURST:-15}"
 HARDEN_CONF="/etc/nginx/conf.d/${SITE_NAME}-hardening.conf"
 FAIL2BAN_FILTER="/etc/fail2ban/filter.d/${SITE_NAME}-login-abuse.conf"
 FAIL2BAN_JAIL="/etc/fail2ban/jail.d/${SITE_NAME}.local"
+SHARE_STATIC_DIR="/var/www/atomic-ui/share"
+SHARE_BLOCKED_FILE="${SHARE_STATIC_DIR}/blocked.html"
 
 normalize_bool() {
   case "${1,,}" in
@@ -33,6 +35,144 @@ normalize_host() {
   value="${value#https://}"
   value="${value%%/*}"
   echo "${value,,}"
+}
+
+install_share_blocked_page() {
+  mkdir -p "${SHARE_STATIC_DIR}"
+  cat >"${SHARE_BLOCKED_FILE}" <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Public Share Site</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07111f;
+        --bg-glow: rgba(17, 198, 255, 0.16);
+        --panel: rgba(11, 22, 42, 0.92);
+        --border: rgba(77, 211, 255, 0.24);
+        --text: #eef4ff;
+        --muted: #9eb2cf;
+        --accent: #33d6ff;
+        --accent-strong: #1dd9ff;
+        --button-text: #04111f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(26, 199, 255, 0.18), transparent 34%),
+          radial-gradient(circle at bottom right, rgba(111, 76, 255, 0.18), transparent 30%),
+          linear-gradient(180deg, #07111f 0%, #0a1425 100%);
+        color: var(--text);
+      }
+      .card {
+        width: min(100%, 640px);
+        padding: 32px;
+        border-radius: 28px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -120px auto auto -80px;
+        width: 240px;
+        height: 240px;
+        background: var(--bg-glow);
+        filter: blur(48px);
+        pointer-events: none;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        background: rgba(51, 214, 255, 0.12);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 20px 0 12px;
+        font-size: clamp(28px, 5vw, 42px);
+        line-height: 1.05;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      .copy { display: grid; gap: 16px; }
+      .copy p + p { font-size: 15px; }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 14px 20px;
+        font: inherit;
+        cursor: pointer;
+        transition: transform 0.18s ease;
+      }
+      button:hover { transform: translateY(-1px); }
+      .primary {
+        background: linear-gradient(135deg, var(--accent-strong), #8b5dff);
+        color: var(--button-text);
+        font-weight: 700;
+      }
+      .ghost {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .helper {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 640px) {
+        .card { padding: 24px 20px; border-radius: 22px; }
+        .actions { flex-direction: column; }
+        button { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <span class="badge">Public Share Site</span>
+      <h1>Timed out</h1>
+      <div class="copy">
+        <p>This link is not available on the public share site.</p>
+        <p>အများသုံး share site မှာ ဒီလင့်ကို မဖွင့်နိုင်ပါ။</p>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" onclick="window.history.length > 1 ? history.back() : window.location.href='/'">Go Back</button>
+        <button class="ghost" type="button" onclick="window.history.length > 1 ? history.back() : window.location.href='/'">ရှေ့စာမျက်နှာသို့ ပြန်သွားရန်</button>
+      </div>
+      <p class="helper">Public links work only for subscription, share, and client import routes.<br />အများသုံးလင့်များသည် subscription, share နှင့် client import route များအတွက်သာ အသုံးပြုနိုင်ပါသည်။</p>
+    </main>
+  </body>
+</html>
+EOF
 }
 
 emit_rate_limited_locations() {
@@ -156,6 +296,17 @@ EOF
 }
 
 emit_public_share_locations() {
+  cat <<EOF
+    error_page 403 = /__atomic_share_blocked.html;
+
+    location = /__atomic_share_blocked.html {
+        internal;
+        default_type text/html;
+        alias ${SHARE_BLOCKED_FILE};
+        add_header Cache-Control "no-store";
+    }
+EOF
+
   emit_share_proxy_location "/_next/"
   emit_share_exact_proxy_location "/favicon.ico"
   emit_share_proxy_location "/uploads/"
@@ -179,7 +330,7 @@ emit_public_share_locations() {
 
   cat <<'EOF'
     location / {
-        return 404;
+        return 403;
     }
 EOF
 }
@@ -229,6 +380,8 @@ if ! command -v nginx >/dev/null 2>&1; then
   apt-get update -qq
   apt-get install -y -qq nginx >/dev/null
 fi
+
+install_share_blocked_page
 
 if [[ -n "${PANEL_PATH}" ]]; then
   cat >"${HARDEN_CONF}" <<EOF
