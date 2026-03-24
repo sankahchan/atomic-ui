@@ -99,6 +99,16 @@ export function initScheduler() {
         }
     });
 
+    // 6. Dynamic Key Smart Alerts (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const { evaluateDynamicKeyAlerts } = await import('@/lib/services/dynamic-routing-events');
+            await evaluateDynamicKeyAlerts();
+        } catch (error) {
+            logger.error('Dynamic key smart alerts check failed', error);
+        }
+    });
+
     // 6. Key Rotation Check (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {

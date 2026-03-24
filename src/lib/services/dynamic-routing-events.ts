@@ -296,3 +296,38 @@ export async function getDynamicRoutingAlerts(input: {
 
   return alerts;
 }
+
+export async function evaluateDynamicKeyAlerts() {
+  const daks = await db.dynamicAccessKey.findMany({
+    where: { status: 'ACTIVE' },
+    select: { id: true, usedBytes: true, dataLimitBytes: true }
+  });
+  
+  for (const dak of daks) {
+    const alerts = await getDynamicRoutingAlerts({
+      dynamicAccessKeyId: dak.id,
+      usedBytes: dak.usedBytes,
+      dataLimitBytes: dak.dataLimitBytes,
+    });
+    
+    for (const alert of alerts) {
+      if (alert.id === 'flapping') {
+        await recordDynamicRoutingEventOnce({
+          dynamicAccessKeyId: dak.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.FLAPPING_ALERT,
+          severity: alert.severity,
+          reason: alert.description,
+          windowMinutes: 60,
+        });
+      } else if (alert.id === 'quota') {
+        await recordDynamicRoutingEventOnce({
+          dynamicAccessKeyId: dak.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.QUOTA_ALERT,
+          severity: alert.severity,
+          reason: alert.description,
+          windowMinutes: 24 * 60, // Warn about quota at most once per day
+        });
+      }
+    }
+  }
+}

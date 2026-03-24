@@ -329,6 +329,7 @@ model DynamicAccessKey {
   telegramLinkTokens TelegramLinkToken[]
   subscriptionEvents SubscriptionPageEvent[]
   routingEvents      DynamicRoutingEvent[]
+  distributionLinks  AccessDistributionLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -435,6 +436,20 @@ model SubscriptionPageEvent {
   @@index([accessKeyId, createdAt])
   @@index([dynamicAccessKeyId, createdAt])
   @@index([eventType, createdAt])
+}
+
+model AccessDistributionLink {
+  id                 String           @id @default(cuid())
+  dynamicAccessKeyId String
+  dynamicAccessKey   DynamicAccessKey @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  token              String           @unique
+  expiresAt          DateTime
+  maxUses            Int              @default(1)
+  currentUses        Int              @default(0)
+  createdAt          DateTime         @default(now())
+
+  @@index([dynamicAccessKeyId, expiresAt])
+  @@index([token, expiresAt])
 }
 
 model TrafficLog {

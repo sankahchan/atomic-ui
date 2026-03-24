@@ -72,6 +72,7 @@ import {
   Phone,
   X,
   Smartphone,
+  AlertTriangle,
   Wifi,
   WifiOff,
   RotateCw,
@@ -151,6 +152,7 @@ function EditDAKDialog({
     durationDays: number | null;
     expiresAt: Date | null;
     loadBalancerAlgorithm: string;
+    serverTagIds: string[];
     preferredServerIds: string[];
     preferredCountryCodes: string[];
     preferredRegionMode: DynamicRoutingPreferenceMode;
@@ -176,6 +178,7 @@ function EditDAKDialog({
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+    serverTagIds: dakData.serverTagIds || [],
     preferredServerIds: dakData.preferredServerIds || [],
     preferredCountryCodes: dakData.preferredCountryCodes || [],
     preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
@@ -200,6 +203,7 @@ function EditDAKDialog({
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+      serverTagIds: dakData.serverTagIds || [],
       preferredServerIds: dakData.preferredServerIds || [],
       preferredCountryCodes: dakData.preferredCountryCodes || [],
       preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
@@ -253,6 +257,7 @@ function EditDAKDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
+      serverTagIds: formData.serverTagIds,
       preferredServerIds: formData.preferredServerIds,
       preferredCountryCodes: formData.preferredCountryCodes,
       preferredRegionMode: formData.preferredRegionMode,
@@ -378,6 +383,7 @@ function EditDAKDialog({
             <Label>Preferred Routing Order</Label>
             <DynamicRoutingPreferencesEditor
               preferredRegionMode={formData.preferredRegionMode}
+              serverTagIds={formData.serverTagIds}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
               preferredServerWeights={formData.preferredServerWeights}
@@ -389,6 +395,7 @@ function EditDAKDialog({
                 setFormData((current) => ({
                   ...current,
                   preferredRegionMode: next.preferredRegionMode,
+                  serverTagIds: next.serverTagIds,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
                   preferredServerWeights: next.preferredServerWeights,
@@ -1903,6 +1910,35 @@ function DynamicRoutingDiagnosticsCard({
         ) : null}
 
         <div className="grid gap-2 sm:grid-cols-2">
+          {data?.routingAlerts && data.routingAlerts.length > 0 && (
+            <div className="col-span-2 space-y-3 rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400">
+                <AlertTriangle className="h-4 w-4" />
+                Active Alerts
+              </p>
+              <div className="space-y-2">
+                {data.routingAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={cn(
+                      "flex flex-col gap-1 rounded-lg border p-3 text-sm",
+                      alert.severity === 'CRITICAL'
+                        ? "border-red-500/30 bg-red-500/10"
+                        : "border-orange-500/30 bg-orange-500/10"
+                    )}
+                  >
+                    <div className="flex items-center justify-between font-medium">
+                      <span>{alert.title}</span>
+                      <span className="text-xs opacity-70">
+                        {formatRelativeTime(alert.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground">{alert.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-3 dark:bg-white/[0.03] sm:col-span-2">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="space-y-1">
@@ -2534,6 +2570,155 @@ function DynamicKeyTemplateCard({
 /**
  * DynamicKeyDetailPage Component
  */
+
+function AccessDistributionCard({
+  dakId,
+  dakName,
+  accessKeys,
+}: {
+  dakId: string;
+  dakName: string;
+  accessKeys: any[];
+}) {
+  const { t } = useLocale();
+  const [maxUses, setMaxUses] = useState<number | undefined>();
+  const [expiresInHours, setExpiresInHours] = useState<number | undefined>();
+  
+  const utils = trpc.useUtils();
+  const { data: links = [], isLoading } = trpc.dynamicKeys.listDistributionLinks.useQuery({ dakId });
+  
+  const createMutation = trpc.dynamicKeys.createDistributionLink.useMutation({
+    onSuccess: () => {
+      utils.dynamicKeys.listDistributionLinks.invalidate({ dakId });
+      setMaxUses(undefined);
+      setExpiresInHours(undefined);
+      toast({ title: 'Distribution link created' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to create link', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const deleteMutation = trpc.dynamicKeys.deleteDistributionLink.useMutation({
+    onSuccess: () => {
+      utils.dynamicKeys.listDistributionLinks.invalidate({ dakId });
+      toast({ title: 'Distribution link deleted' });
+    },
+  });
+
+  const handleCreate = () => {
+    createMutation.mutate({ dakId, maxUses, expiresInHours });
+  };
+
+  const handleCopyLink = (token: string) => {
+    const url = `${window.location.origin}/share/${token}`;
+    copyToClipboard(url, 'Link copied', 'Distribution link copied to clipboard');
+  };
+
+  const handleDownloadBundle = () => {
+    const bundle = {
+      name: dakName,
+      generatedAt: new Date().toISOString(),
+      backends: accessKeys.map(k => ({
+        name: k.name,
+        server: k.server?.name,
+        accessUrl: k.accessUrl,
+        password: k.password,
+        port: k.port,
+        method: k.method,
+      }))
+    };
+    downloadTextFile(JSON.stringify(bundle, null, 2), `${dakName}-bundle.json`);
+    toast({ title: 'Bundle downloaded' });
+  };
+
+  return (
+    <Card className="ops-detail-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Share2 className="w-5 h-5 text-primary" />
+          Distribution & Sharing
+        </CardTitle>
+        <CardDescription>Create expiring invite links or download raw configuration bundles.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Create Invite Link</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Max Uses (Optional)</Label>
+              <Input
+                type="number"
+                placeholder="Unlimited"
+                value={maxUses || ''}
+                onChange={(e) => setMaxUses(e.target.value ? parseInt(e.target.value) : undefined)}
+                min={1}
+                max={100}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Expires In Hours (Optional)</Label>
+              <Input
+                type="number"
+                placeholder="Never"
+                value={expiresInHours || ''}
+                onChange={(e) => setExpiresInHours(e.target.value ? parseInt(e.target.value) : undefined)}
+                min={1}
+                max={720}
+              />
+            </div>
+          </div>
+          <Button onClick={handleCreate} disabled={createMutation.isPending}>
+            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Generate Link
+          </Button>
+        </div>
+
+        {links.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Active Links</p>
+            <div className="space-y-2">
+              {links.map((link) => (
+                <div key={link.id} className="flex flex-col gap-2 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1 font-mono text-xs max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                    {link.token}
+                  </div>
+                  <div className="flex shrink-0 items-center justify-between sm:justify-end gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {link.maxUses ? `${link.currentUses}/${link.maxUses} uses` : `${link.currentUses} uses`}
+                      {link.expiresAt && ` · Exp: ${formatRelativeTime(link.expiresAt)}`}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="outline" size="icon" onClick={() => handleCopyLink(link.token)} className="h-7 w-7">
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate({ id: link.id })} disabled={deleteMutation.isPending} className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="border-t pt-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium flex items-center gap-2">
+              <FlaskConical className="h-4 w-4" /> Power User Tools
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Download raw connection details for all backends</p>
+          </div>
+          <Button variant="secondary" onClick={handleDownloadBundle}>
+            <Download className="mr-2 h-4 w-4" /> Download config bundle (.json)
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DynamicKeyDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -3396,6 +3581,8 @@ export default function DynamicKeyDetailPage() {
             candidateTestResult={testCandidatesMutation.data}
           />
 
+          <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
+
           <DynamicKeyTemplateCard
             dak={{
               id: dak.id,
@@ -3553,6 +3740,7 @@ export default function DynamicKeyDetailPage() {
             durationDays: dak.durationDays ?? null,
             expiresAt: dak.expiresAt ?? null,
             loadBalancerAlgorithm: dak.loadBalancerAlgorithm ?? 'IP_HASH',
+            serverTagIds: dak.serverTagIds ?? [],
             preferredServerIds: dak.preferredServerIds ?? [],
             preferredCountryCodes: dak.preferredCountryCodes ?? [],
             preferredRegionMode: dak.preferredRegionMode ?? 'PREFER',
@@ -3795,6 +3983,34 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
         {(!data?.sessions || data.sessions.length === 0) && (
           <div className="text-center py-4 text-muted-foreground text-sm">
             No connection sessions recorded yet
+          </div>
+        )}
+
+        {/* Subscriber Devices */}
+        {data?.subscriberDevices && data.subscriberDevices.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <p className="text-sm font-medium">Subscriber Devices</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {data.subscriberDevices.slice(0, 10).map((device, idx) => (
+                <div
+                  key={`${device.ip}-${idx}`}
+                  className="flex flex-col gap-1 p-2 rounded-lg text-sm bg-background/45 dark:bg-white/[0.03]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono">{device.ip}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatRelativeTime(device.lastSeenAt)}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate" title={device.userAgent}>
+                    {device.platform ? (
+                      <span className="font-medium text-foreground mr-1">[{device.platform}]</span>
+                    ) : null}
+                    {device.userAgent || 'Unknown device'}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

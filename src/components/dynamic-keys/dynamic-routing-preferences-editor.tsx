@@ -6,12 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
 import { cn, getCountryFlag } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Globe, Loader2, Plus, Server, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Loader2, Plus, Server, Tags, X } from 'lucide-react';
 
 export type DynamicRoutingPreferenceMode = 'PREFER' | 'ONLY';
 
 export function DynamicRoutingPreferencesEditor({
   preferredRegionMode,
+  serverTagIds,
   preferredServerIds,
   preferredCountryCodes,
   preferredServerWeights,
@@ -22,6 +23,7 @@ export function DynamicRoutingPreferencesEditor({
   compact = false,
 }: {
   preferredRegionMode: DynamicRoutingPreferenceMode;
+  serverTagIds: string[];
   preferredServerIds: string[];
   preferredCountryCodes: string[];
   preferredServerWeights: Record<string, number>;
@@ -30,6 +32,7 @@ export function DynamicRoutingPreferencesEditor({
   drainGraceMinutes: number;
   onChange: (next: {
     preferredRegionMode: DynamicRoutingPreferenceMode;
+    serverTagIds: string[];
     preferredServerIds: string[];
     preferredCountryCodes: string[];
     preferredServerWeights: Record<string, number>;
@@ -42,10 +45,15 @@ export function DynamicRoutingPreferencesEditor({
   const { data: servers, isLoading } = trpc.servers.list.useQuery(undefined, {
     staleTime: 60_000,
   });
+  const { data: serverTagsResponse, isLoading: tagsLoading } = trpc.tags.list.useQuery(undefined, {
+    staleTime: 60_000,
+  });
   const [pendingServerId, setPendingServerId] = useState('');
   const [pendingCountryCode, setPendingCountryCode] = useState('');
+  const [pendingTagId, setPendingTagId] = useState('');
 
   const serverOptions = useMemo(() => servers ?? [], [servers]);
+  const tagOptions = useMemo(() => serverTagsResponse ?? [], [serverTagsResponse]);
   const availableCountries = useMemo(() => {
     const map = new Map<string, number>();
     for (const server of serverOptions) {
@@ -67,6 +75,7 @@ export function DynamicRoutingPreferencesEditor({
 
   const update = (partial: Partial<{
     preferredRegionMode: DynamicRoutingPreferenceMode;
+    serverTagIds: string[];
     preferredServerIds: string[];
     preferredCountryCodes: string[];
     preferredServerWeights: Record<string, number>;
@@ -76,6 +85,7 @@ export function DynamicRoutingPreferencesEditor({
   }>) => {
     onChange({
       preferredRegionMode,
+      serverTagIds,
       preferredServerIds,
       preferredCountryCodes,
       preferredServerWeights,
@@ -84,6 +94,18 @@ export function DynamicRoutingPreferencesEditor({
       drainGraceMinutes,
       ...partial,
     });
+  };
+
+  const addTag = () => {
+    if (!pendingTagId || serverTagIds.includes(pendingTagId)) {
+      return;
+    }
+    update({ serverTagIds: [...serverTagIds, pendingTagId] });
+    setPendingTagId('');
+  };
+
+  const removeTag = (tagId: string) => {
+    update({ serverTagIds: serverTagIds.filter((id) => id !== tagId) });
   };
 
   const addServer = () => {
@@ -188,6 +210,56 @@ export function DynamicRoutingPreferencesEditor({
       </div>
 
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2')}>
+        <div className="space-y-3 lg:col-span-2">
+          <div className="flex items-center gap-2">
+            <Tags className="h-4 w-4 text-primary" />
+            <Label className="text-sm">Required Server Tags</Label>
+          </div>
+          {serverTagIds.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {serverTagIds.map((tagId) => {
+                const tagData = tagOptions.find((t) => t.id === tagId);
+                return (
+                  <div key={tagId} className="flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-sm dark:bg-white/[0.03]">
+                    <span>{tagData?.name || tagId}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tagId)}
+                      className="ml-1 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border/60 px-3 py-3 text-sm text-muted-foreground dark:border-cyan-400/16">
+              No tags filtered. All active servers are eligible candidates.
+            </div>
+          )}
+          <div className="flex gap-2 lg:w-1/2">
+            <Select value={pendingTagId} onValueChange={setPendingTagId} disabled={tagsLoading}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder={tagsLoading ? 'Loading tags...' : 'Add a required tag'} />
+              </SelectTrigger>
+              <SelectContent>
+                {tagOptions
+                  .filter((tag) => !serverTagIds.includes(tag.id))
+                  .map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" onClick={addTag} disabled={!pendingTagId || tagsLoading}>
+              {tagsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">If tags are added, routing will only pick servers matching <strong>all</strong> selected tags.</p>
+        </div>
+
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4 text-primary" />

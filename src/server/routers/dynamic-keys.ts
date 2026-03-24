@@ -3196,11 +3196,42 @@ export const dynamicKeysRouter = router({
         };
       });
 
+      // Fetch recent subscription events to show subscriber IPs/Devices
+      const subscriptionEvents = await db.subscriptionPageEvent.findMany({
+        where: {
+          dynamicAccessKeyId: input.dakId,
+          ip: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: {
+          ip: true,
+          userAgent: true,
+          createdAt: true,
+          platform: true,
+        },
+      });
+
+      // Deduplicate by IP
+      const uniqueDevicesMap = new Map();
+      for (const event of subscriptionEvents) {
+        if (!uniqueDevicesMap.has(event.ip)) {
+          uniqueDevicesMap.set(event.ip, {
+            ip: event.ip,
+            userAgent: event.userAgent,
+            platform: event.platform,
+            lastSeenAt: event.createdAt,
+          });
+        }
+      }
+      const subscriberDevices = Array.from(uniqueDevicesMap.values());
+
       return {
         estimatedDevices: totalEstimatedDevices,
         peakDevices: maxPeakDevices,
         activeCount,
         sessions: sessionsWithDuration,
+        subscriberDevices,
       };
     }),
 
@@ -3292,6 +3323,88 @@ export const dynamicKeysRouter = router({
           message: `Rotation failed: ${result.error}`,
         });
       }
+
+      return { success: true };
+    }),
+
+  /**
+   * List distribution links for a Dynamic Access Key
+   */
+  listDistributionLinks: protectedProcedure
+    .input(z.object({ dakId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.dakId },
+        select: { userId: true },
+      });
+
+      if (!dak || (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id)) {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
+
+      return db.accessDistributionLink.findMany({
+        where: { dynamicKeyId: input.dakId },
+        orderBy: { createdAt: 'desc' },
+      });
+    }),
+
+  /**
+   * Create an expiring distribution link
+   */
+  createDistributionLink: protectedProcedure
+    .input(z.object({
+      dakId: z.string(),
+      maxUses: z.number().int().min(1).max(100).optional().nullable(),
+      expiresInHours: z.number().int().min(1).max(720).optional().nullable(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.dakId },
+        select: { userId: true },
+      });
+
+      if (!dak || (ctx.user.role !== 'ADMIN' && dak.userId !== ctx.user.id)) {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
+
+      let expiresAt: Date | null = null;
+      if (input.expiresInHours) {
+        expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + input.expiresInHours);
+      }
+
+      const token = generateRandomString(32);
+
+      const link = await db.accessDistributionLink.create({
+        data: {
+          dynamicKeyId: input.dakId,
+          token,
+          maxUses: input.maxUses || null,
+          expiresAt,
+        },
+      });
+
+      return link;
+    }),
+
+  /**
+   * Delete a distribution link
+   */
+  deleteDistributionLink: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const link = await db.accessDistributionLink.findUnique({
+        where: { id: input.id },
+        include: { dynamicKey: { select: { userId: true } } },
+      });
+
+      if (!link || (ctx.user.role !== 'ADMIN' && link.dynamicKey.userId !== ctx.user.id)) {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
+
+      await db.accessDistributionLink.delete({
+        where: { id: input.id },
+      });
 
       return { success: true };
     }),
