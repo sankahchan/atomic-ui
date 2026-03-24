@@ -143,7 +143,7 @@ export function KeyRowItem({
                         className="h-7 w-7"
                         onClick={(e) => {
                             e.stopPropagation();
-                            // More options dropdown
+                            setIsExpanded(!isExpanded);
                         }}
                     >
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
