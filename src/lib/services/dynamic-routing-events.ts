@@ -13,6 +13,7 @@ export const DYNAMIC_ROUTING_EVENT_TYPES = {
   FAILOVER_SIMULATION: 'FAILOVER_SIMULATION',
   PIN_APPLIED: 'PIN_APPLIED',
   PIN_CLEARED: 'PIN_CLEARED',
+  AUTO_RECOVERY: 'AUTO_RECOVERY',
 } as const;
 
 export type DynamicRoutingEventType =
@@ -58,6 +59,7 @@ async function dispatchDynamicRoutingAlert(input: {
       type: true,
       dynamicUrl: true,
       publicSlug: true,
+      routingAlertRules: true,
     },
   });
 
@@ -94,6 +96,19 @@ async function dispatchDynamicRoutingAlert(input: {
     .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
     .filter((channel) => channelSupportsEvent(channel, 'DYNAMIC_ROUTING_ALERT'));
 
+  // Parse per-DAK routing alert rules for custom cooldowns
+  let cooldownMs = 30 * 60_000; // Default 30-minute cooldown
+  if (dynamicKey.routingAlertRules) {
+    try {
+      const rules = JSON.parse(dynamicKey.routingAlertRules) as Record<string, unknown>;
+      if (rules.cooldownMinutes && typeof rules.cooldownMinutes === 'number') {
+        cooldownMs = rules.cooldownMinutes * 60_000;
+      }
+    } catch {
+      // Use default cooldown
+    }
+  }
+
   const cooldownKey = `dynamic-routing:${dynamicKey.id}:${input.eventType}`;
   const message = `[Dynamic Routing][${input.severity}] ${dynamicKey.name}: ${input.reason}`;
   const payload = {
@@ -116,6 +131,7 @@ async function dispatchDynamicRoutingAlert(input: {
       payload,
       payloadMode: channel.type === 'WEBHOOK' ? 'RAW' : 'WRAPPED',
       cooldownKey,
+      cooldownMs,
     });
   }
 
@@ -145,6 +161,7 @@ export async function recordDynamicRoutingEvent(input: {
   toServerId?: string | null;
   toServerName?: string | null;
   metadata?: Record<string, unknown> | null;
+  operatorNote?: string | null;
 }) {
   const created = await db.dynamicRoutingEvent.create({
     data: {
@@ -161,6 +178,7 @@ export async function recordDynamicRoutingEvent(input: {
       toServerId: input.toServerId ?? null,
       toServerName: input.toServerName ?? null,
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+      operatorNote: input.operatorNote ?? null,
     },
   });
 

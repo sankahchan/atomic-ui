@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mobile Probe</title>
+    <style>
+      html, body, iframe {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      body {
+        font: 14px/1.4 sans-serif;
+      }
+      #report {
+        position: fixed;
+        inset: 0 auto auto 0;
+        z-index: 2;
+        max-width: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">loading…</pre>
+    <iframe id="frame" src="http://127.0.0.1:3010/sub/68nZAZfHfQ08EvH6MPcofuNpwgvOGd8M"></iframe>
+    <script>
+      const report = document.getElementById('report');
+      const frame = document.getElementById('frame');
+      frame.addEventListener('load', () => {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const vw = win.innerWidth;
+        const offenders = [];
+        for (const el of doc.querySelectorAll('*')) {
+          const rect = el.getBoundingClientRect();
+          const sw = el.scrollWidth;
+          const cw = el.clientWidth;
+          if (rect.right > vw + 1 || sw > cw + 1) {
+            offenders.push({
+              tag: el.tagName.toLowerCase(),
+              className: typeof el.className === 'string' ? el.className.slice(0, 120) : '',
+              text: (el.textContent || '').trim().slice(0, 80),
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width),
+              scrollWidth: sw,
+              clientWidth: cw,
+            });
+          }
+        }
+        report.textContent = JSON.stringify({
+          viewport: vw,
+          docScrollWidth: doc.documentElement.scrollWidth,
+          bodyScrollWidth: doc.body.scrollWidth,
+          offenders: offenders.slice(0, 40),
+        }, null, 2);
+      });
+    </script>
+  </body>
+  </html>

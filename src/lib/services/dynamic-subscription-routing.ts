@@ -357,6 +357,7 @@ function formatSelectionReason(input: {
 function resolvePreferencePool<T extends { server: { id: string; countryCode?: string | null } }>(
   items: T[],
   preferences?: Partial<DynamicRoutingPreferences> | null,
+  autoRecovery?: { autoFallbackToPrefer?: boolean; autoSkipUnhealthy?: boolean },
 ): {
   items: T[];
   resolution: DynamicRoutingPreferenceResolution;
@@ -419,6 +420,18 @@ function resolvePreferencePool<T extends { server: { id: string; countryCode?: s
   }
 
   if (normalized.preferredRegionMode === 'ONLY') {
+    // Auto-recovery: if autoFallbackToPrefer is enabled, gracefully downgrade ONLY→PREFER
+    if (autoRecovery?.autoFallbackToPrefer) {
+      return {
+        items: remaining.length > 0 ? remaining : items,
+        resolution: {
+          ...normalized,
+          scope: 'FALLBACK',
+          note: 'Auto-recovery downgraded ONLY to PREFER because no preferred servers matched.',
+        },
+      };
+    }
+
     return {
       items: [],
       resolution: {
@@ -679,6 +692,8 @@ export async function selectDynamicAccessKeyForClient(input: {
   sessionStickinessMode?: 'NONE' | 'DRAIN';
   drainGraceMinutes?: number;
   persistRoundRobin?: boolean;
+  autoFallbackToPrefer?: boolean;
+  autoSkipUnhealthy?: boolean;
 }): Promise<DynamicRoutingSelectionResult | null> {
   const {
     accessKeys,
@@ -695,10 +710,30 @@ export async function selectDynamicAccessKeyForClient(input: {
     preferredRegionMode,
     sessionStickinessMode,
     drainGraceMinutes,
+    autoFallbackToPrefer,
+    autoSkipUnhealthy,
   } = input;
 
   if (accessKeys.length === 0) {
     return null;
+  }
+
+  // Auto-recovery: skip unhealthy servers if flag is set
+  let candidates = accessKeys;
+  if (autoSkipUnhealthy) {
+    const healthChecks = await db.healthCheck.findMany({
+      where: {
+        serverId: { in: accessKeys.map(k => k.server.id) },
+        lastStatus: { in: ['DOWN', 'SLOW'] },
+      },
+      select: { serverId: true },
+    });
+    const unhealthyIds = new Set(healthChecks.map(h => h.serverId));
+    const healthy = accessKeys.filter(k => !unhealthyIds.has(k.server.id));
+    if (healthy.length > 0) {
+      candidates = healthy;
+    }
+    // If all are unhealthy, keep the original list to avoid total blackout
   }
 
   const normalizedPreferences = normalizeDynamicRoutingPreferences({
@@ -710,7 +745,11 @@ export async function selectDynamicAccessKeyForClient(input: {
     sessionStickinessMode,
     drainGraceMinutes,
   });
-  const { items: preferredPool, resolution } = resolvePreferencePool(accessKeys, normalizedPreferences);
+  const { items: preferredPool, resolution } = resolvePreferencePool(
+    candidates,
+    normalizedPreferences,
+    { autoFallbackToPrefer, autoSkipUnhealthy },
+  );
 
   if (preferredPool.length === 0) {
     return null;

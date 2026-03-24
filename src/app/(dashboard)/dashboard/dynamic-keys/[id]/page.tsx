@@ -163,6 +163,10 @@ function EditDAKDialog({
     rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
     rotationUsageThresholdPercent: number;
     rotateOnHealthFailure: boolean;
+    autoClearStalePins: boolean;
+    autoFallbackToPrefer: boolean;
+    autoSkipUnhealthy: boolean;
+    routingAlertRules: string | null;
   };
   onSuccess: () => void;
 }) {
@@ -189,6 +193,10 @@ function EditDAKDialog({
     rotationTriggerMode: dakData.rotationTriggerMode || 'SCHEDULED',
     rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
     rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
+    autoClearStalePins: dakData.autoClearStalePins ?? true,
+    autoFallbackToPrefer: dakData.autoFallbackToPrefer ?? false,
+    autoSkipUnhealthy: dakData.autoSkipUnhealthy ?? false,
+    routingAlertRules: dakData.routingAlertRules || '',
   });
 
   useEffect(() => {
@@ -214,6 +222,10 @@ function EditDAKDialog({
       rotationTriggerMode: dakData.rotationTriggerMode || 'SCHEDULED',
       rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
       rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
+      autoClearStalePins: dakData.autoClearStalePins ?? true,
+      autoFallbackToPrefer: dakData.autoFallbackToPrefer ?? false,
+      autoSkipUnhealthy: dakData.autoSkipUnhealthy ?? false,
+      routingAlertRules: dakData.routingAlertRules || '',
     });
   }, [dakData]);
 
@@ -268,6 +280,10 @@ function EditDAKDialog({
       rotationTriggerMode: formData.rotationTriggerMode,
       rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
       rotateOnHealthFailure: formData.rotateOnHealthFailure,
+      autoClearStalePins: formData.autoClearStalePins,
+      autoFallbackToPrefer: formData.autoFallbackToPrefer,
+      autoSkipUnhealthy: formData.autoSkipUnhealthy,
+      routingAlertRules: formData.routingAlertRules || undefined,
     });
   };
 
@@ -471,6 +487,42 @@ function EditDAKDialog({
                 />
               </div>
             )}
+          </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold">Auto-Recovery Actions</h4>
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Clear Stale Pins</Label>
+                <p className="text-xs text-muted-foreground">Automatically remove operator pins that have expired.</p>
+              </div>
+              <Switch
+                checked={formData.autoClearStalePins}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Downgrade ONLY to PREFER</Label>
+                <p className="text-xs text-muted-foreground">If NO servers match the requirement, temporarily relax to PREFER.</p>
+              </div>
+              <Switch
+                checked={formData.autoFallbackToPrefer}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Skip Unhealthy Servers</Label>
+                <p className="text-xs text-muted-foreground">Automatically omit DOWN/SLOW preferred servers during selection.</p>
+              </div>
+              <Switch
+                checked={formData.autoSkipUnhealthy}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -1796,26 +1848,31 @@ function DynamicRoutingDiagnosticsCard({
   canPinCurrent,
   simulationResult,
   candidateTestResult,
+  onExportDiagnostics,
+  isExporting,
 }: {
   data?: DynamicRoutingDiagnostics;
   isLoading: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
-  onPinCurrent: (expiresInMinutes: number | null) => void;
+  isPinning: boolean;
+  onPinCurrent: (expiresInMinutes: number | null, operatorNote?: string) => void;
   onClearPin: () => void;
   onSimulateFailover: () => void;
   onTestCandidates: () => void;
-  isPinning: boolean;
   isClearingPin: boolean;
   isSimulating: boolean;
   isTesting: boolean;
   canPinCurrent: boolean;
   simulationResult?: DynamicRoutingSimulationResult | null;
   candidateTestResult?: DynamicRoutingCandidateTestResult | null;
+  onExportDiagnostics?: () => void;
+  isExporting?: boolean;
 }) {
   const { t } = useLocale();
   const [timelineFilter, setTimelineFilter] = useState<RoutingTimelineFilter>('ALL');
   const [pinExpiryValue, setPinExpiryValue] = useState<string>('never');
+  const [operatorNote, setOperatorNote] = useState<string>('');
   const filteredTimeline = useMemo(
     () => (data?.routingTimeline ?? []).filter((event) => matchesRoutingTimelineFilter(event.eventType, timelineFilter)),
     [data?.routingTimeline, timelineFilter],
@@ -1959,29 +2016,45 @@ function DynamicRoutingDiagnosticsCard({
               </Select>
             </div>
           </div>
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-3 dark:bg-white/[0.03] sm:col-span-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{t('dynamic_keys.routing.operator_note.label') || 'Operator Note'}</p>
+              <Input
+                placeholder={t('dynamic_keys.routing.operator_note.placeholder') || 'Reason for pinning... (optional)'}
+                className="h-10 rounded-xl"
+                value={operatorNote}
+                onChange={(e) => setOperatorNote(e.target.value)}
+              />
+            </div>
+          </div>
           <Button
             variant="outline"
-            className="justify-start"
+            className="justify-start truncate"
             onClick={() => {
               const selectedOption = PIN_EXPIRY_OPTIONS.find((option) => option.value === pinExpiryValue);
-              onPinCurrent(selectedOption?.minutes ?? null);
+              onPinCurrent(selectedOption?.minutes ?? null, operatorNote);
+              setOperatorNote('');
             }}
             disabled={!canPinCurrent || isPinning}
           >
-            {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pin className="mr-2 h-4 w-4" />}
-            {t('dynamic_keys.routing.action.pin_current')}
+            {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> : <Pin className="mr-2 h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{t('dynamic_keys.routing.action.pin_current')}</span>
           </Button>
-          <Button variant="outline" className="justify-start" onClick={onClearPin} disabled={!data?.pinnedBackend || isClearingPin}>
-            {isClearingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PinOff className="mr-2 h-4 w-4" />}
-            {t('dynamic_keys.routing.action.clear_pin')}
+          <Button variant="outline" className="justify-start truncate" onClick={onClearPin} disabled={!data?.pinnedBackend || isClearingPin}>
+            {isClearingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> : <PinOff className="mr-2 h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{t('dynamic_keys.routing.action.clear_pin')}</span>
           </Button>
-          <Button variant="outline" className="justify-start" onClick={onSimulateFailover} disabled={isSimulating}>
-            {isSimulating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-            {t('dynamic_keys.routing.action.simulate_failover')}
+          <Button variant="outline" className="justify-start truncate" onClick={onSimulateFailover} disabled={isSimulating}>
+            {isSimulating ? <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> : <ArrowRightLeft className="mr-2 h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{t('dynamic_keys.routing.action.simulate_failover')}</span>
           </Button>
-          <Button variant="outline" className="justify-start" onClick={onTestCandidates} disabled={isTesting}>
-            {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FlaskConical className="mr-2 h-4 w-4" />}
-            {t('dynamic_keys.routing.action.test_candidates')}
+          <Button variant="outline" className="justify-start truncate" onClick={onTestCandidates} disabled={isTesting}>
+            {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> : <FlaskConical className="mr-2 h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{t('dynamic_keys.routing.action.test_candidates')}</span>
+          </Button>
+          <Button variant="outline" className="justify-start truncate border-dashed" onClick={onExportDiagnostics} disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> : <Download className="mr-2 h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{t('dynamic_keys.routing.action.export_diagnostics') || 'Export Diagnostics'}</span>
           </Button>
         </div>
 
@@ -2581,6 +2654,7 @@ function AccessDistributionCard({
   accessKeys: any[];
 }) {
   const { t } = useLocale();
+  const { toast } = useToast();
   const [maxUses, setMaxUses] = useState<number | undefined>();
   const [expiresInHours, setExpiresInHours] = useState<number | undefined>();
   
@@ -2999,7 +3073,7 @@ export default function DynamicKeyDetailPage() {
     });
   };
 
-  const handlePinCurrentBackend = (expiresInMinutes: number | null) => {
+  const handlePinCurrentBackend = (expiresInMinutes: number | null, operatorNote?: string) => {
     if (!dak || !routingDiagnosticsQuery.data?.currentSelection) {
       toast({
         title: t('dynamic_keys.routing.toast.pin_failed'),
@@ -3015,7 +3089,39 @@ export default function DynamicKeyDetailPage() {
       accessKeyId: selection.keyId ?? undefined,
       serverId: selection.serverId ?? undefined,
       expiresInMinutes,
+      operatorNote,
     });
+  };
+
+  const exportDiagnosticsMutation = trpc.dynamicKeys.exportDiagnostics.useMutation({
+    onSuccess: (data: any) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `diagnostics-${dak?.name || 'dak'}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Diagnostics Exported',
+        description: 'The diagnostic report has been downloaded to your computer.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Export Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleExportDiagnostics = () => {
+    if (!dak) return;
+    exportDiagnosticsMutation.mutate({ id: dak.id });
   };
 
   const handleClearPinnedBackend = () => {
@@ -3579,6 +3685,8 @@ export default function DynamicKeyDetailPage() {
             canPinCurrent={Boolean(routingDiagnosticsQuery.data?.currentSelection?.serverId)}
             simulationResult={simulateFailoverMutation.data}
             candidateTestResult={testCandidatesMutation.data}
+            onExportDiagnostics={handleExportDiagnostics}
+            isExporting={exportDiagnosticsMutation.isPending}
           />
 
           <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
@@ -3751,6 +3859,10 @@ export default function DynamicKeyDetailPage() {
             rotationTriggerMode: (dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') ?? 'SCHEDULED',
             rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent ?? 85,
             rotateOnHealthFailure: dak.rotateOnHealthFailure ?? false,
+            autoClearStalePins: dak.autoClearStalePins ?? true,
+            autoFallbackToPrefer: dak.autoFallbackToPrefer ?? false,
+            autoSkipUnhealthy: dak.autoSkipUnhealthy ?? false,
+            routingAlertRules: dak.routingAlertRules ?? null,
           }}
           onSuccess={() => refetch()}
         />

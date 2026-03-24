@@ -322,6 +322,14 @@ model DynamicAccessKey {
   rotationCount    Int       @default(0) // Total rotations performed
   lastRoutingAlertAt DateTime?
 
+  autoClearStalePins   Boolean @default(true)
+  autoFallbackToPrefer Boolean @default(false)
+  autoSkipUnhealthy    Boolean @default(false)
+  routingAlertRules    String? // JSON configuration for per-alert channel delivery and cooldowns
+
+  // App Integration
+  welcomeMessage String?
+
   appliedTemplateId String?
   appliedTemplate DynamicKeyTemplate? @relation(fields: [appliedTemplateId], references: [id], onDelete: SetNull)
 
@@ -390,6 +398,7 @@ model DynamicRoutingEvent {
   toServerId String?
   toServerName String?
   metadata String?
+  operatorNote String?
   createdAt DateTime @default(now())
 
   @@index([dynamicAccessKeyId, createdAt])

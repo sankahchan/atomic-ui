@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
@@ -195,6 +196,10 @@ type DAKData = {
   rotationTriggerMode?: string;
   rotationUsageThresholdPercent?: number;
   rotateOnHealthFailure?: boolean;
+  autoClearStalePins?: boolean;
+  autoFallbackToPrefer?: boolean;
+  autoSkipUnhealthy?: boolean;
+  routingAlertRules?: string | null;
   appliedTemplateId?: string | null;
   expiresAt?: Date | null;
   durationDays?: number | null;
@@ -253,6 +258,11 @@ function CreateDAKDialog({
     rotationTriggerMode: 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED';
     rotationUsageThresholdPercent: number;
     rotateOnHealthFailure: boolean;
+    autoClearStalePins: boolean;
+    autoFallbackToPrefer: boolean;
+    autoSkipUnhealthy: boolean;
+    routingAlertRules: string;
+    serverTagIds: string[];
   }>({
     name: '',
     publicSlug: '',
@@ -268,6 +278,7 @@ function CreateDAKDialog({
     durationDays: '',
     method: 'chacha20-ietf-poly1305',
     loadBalancerAlgorithm: 'IP_HASH',
+    serverTagIds: [],
     preferredServerIds: [],
     preferredCountryCodes: [],
     preferredRegionMode: 'PREFER',
@@ -280,6 +291,10 @@ function CreateDAKDialog({
     rotationTriggerMode: 'SCHEDULED',
     rotationUsageThresholdPercent: 85,
     rotateOnHealthFailure: false,
+    autoClearStalePins: true,
+    autoFallbackToPrefer: false,
+    autoSkipUnhealthy: false,
+    routingAlertRules: '',
   });
   const [slugTouched, setSlugTouched] = useState(false);
   const [openPreviewAfterCreate, setOpenPreviewAfterCreate] = useState(false);
@@ -352,6 +367,7 @@ function CreateDAKDialog({
       durationDays: '',
       method: 'chacha20-ietf-poly1305',
       loadBalancerAlgorithm: 'IP_HASH',
+      serverTagIds: [],
       preferredServerIds: [],
       preferredCountryCodes: [],
       preferredRegionMode: 'PREFER',
@@ -364,6 +380,10 @@ function CreateDAKDialog({
       rotationTriggerMode: 'SCHEDULED',
       rotationUsageThresholdPercent: 85,
       rotateOnHealthFailure: false,
+      autoClearStalePins: true,
+      autoFallbackToPrefer: false,
+      autoSkipUnhealthy: false,
+      routingAlertRules: '',
     });
     setSlugTouched(false);
     setOpenPreviewAfterCreate(false);
@@ -545,6 +565,10 @@ function CreateDAKDialog({
       rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
       rotateOnHealthFailure: formData.rotateOnHealthFailure,
       appliedTemplateId: formData.appliedTemplateId || undefined,
+      autoClearStalePins: formData.autoClearStalePins,
+      autoFallbackToPrefer: formData.autoFallbackToPrefer,
+      autoSkipUnhealthy: formData.autoSkipUnhealthy,
+      routingAlertRules: formData.routingAlertRules || undefined,
     });
   };
 
@@ -742,6 +766,7 @@ function CreateDAKDialog({
             <Label>Preferred Routing Order</Label>
             <DynamicRoutingPreferencesEditor
               preferredRegionMode={formData.preferredRegionMode}
+              serverTagIds={formData.serverTagIds}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
               preferredServerWeights={formData.preferredServerWeights}
@@ -753,6 +778,7 @@ function CreateDAKDialog({
                 setFormData((current) => ({
                   ...current,
                   preferredRegionMode: next.preferredRegionMode,
+                  serverTagIds: next.serverTagIds,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
                   preferredServerWeights: next.preferredServerWeights,
@@ -1486,6 +1512,7 @@ function EditDAKDialog({
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+    serverTagIds: dakData.serverTagIds || [],
     preferredServerIds: dakData.preferredServerIds || [],
     preferredCountryCodes: dakData.preferredCountryCodes || [],
     preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
@@ -1496,6 +1523,10 @@ function EditDAKDialog({
     rotationTriggerMode: (dakData.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') || 'SCHEDULED',
     rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
     rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
+    autoClearStalePins: dakData.autoClearStalePins ?? true,
+    autoFallbackToPrefer: dakData.autoFallbackToPrefer ?? false,
+    autoSkipUnhealthy: dakData.autoSkipUnhealthy ?? false,
+    routingAlertRules: dakData.routingAlertRules || '',
   });
 
   useEffect(() => {
@@ -1510,6 +1541,7 @@ function EditDAKDialog({
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
+      serverTagIds: dakData.serverTagIds || [],
       preferredServerIds: dakData.preferredServerIds || [],
       preferredCountryCodes: dakData.preferredCountryCodes || [],
       preferredRegionMode: dakData.preferredRegionMode || 'PREFER',
@@ -1520,6 +1552,10 @@ function EditDAKDialog({
       rotationTriggerMode: (dakData.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED') || 'SCHEDULED',
       rotationUsageThresholdPercent: dakData.rotationUsageThresholdPercent || 85,
       rotateOnHealthFailure: dakData.rotateOnHealthFailure ?? false,
+      autoClearStalePins: dakData.autoClearStalePins ?? true,
+      autoFallbackToPrefer: dakData.autoFallbackToPrefer ?? false,
+      autoSkipUnhealthy: dakData.autoSkipUnhealthy ?? false,
+      routingAlertRules: dakData.routingAlertRules || '',
     });
   }, [dakData]);
 
@@ -1573,6 +1609,10 @@ function EditDAKDialog({
       rotationTriggerMode: formData.rotationTriggerMode,
       rotationUsageThresholdPercent: formData.rotationUsageThresholdPercent,
       rotateOnHealthFailure: formData.rotateOnHealthFailure,
+      autoClearStalePins: formData.autoClearStalePins,
+      autoFallbackToPrefer: formData.autoFallbackToPrefer,
+      autoSkipUnhealthy: formData.autoSkipUnhealthy,
+      routingAlertRules: formData.routingAlertRules || undefined,
     });
   };
 
@@ -1680,6 +1720,7 @@ function EditDAKDialog({
             <Label>Preferred Routing Order</Label>
             <DynamicRoutingPreferencesEditor
               preferredRegionMode={formData.preferredRegionMode}
+              serverTagIds={formData.serverTagIds}
               preferredServerIds={formData.preferredServerIds}
               preferredCountryCodes={formData.preferredCountryCodes}
               preferredServerWeights={formData.preferredServerWeights}
@@ -1691,6 +1732,7 @@ function EditDAKDialog({
                 setFormData((current) => ({
                   ...current,
                   preferredRegionMode: next.preferredRegionMode,
+                  serverTagIds: next.serverTagIds,
                   preferredServerIds: next.preferredServerIds,
                   preferredCountryCodes: next.preferredCountryCodes,
                   preferredServerWeights: next.preferredServerWeights,
@@ -1700,6 +1742,42 @@ function EditDAKDialog({
                 }))
               }
             />
+          </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold">Auto-Recovery Actions</h4>
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Clear Stale Pins</Label>
+                <p className="text-xs text-muted-foreground">Automatically remove operator pins that have expired.</p>
+              </div>
+              <Switch
+                checked={formData.autoClearStalePins}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Downgrade ONLY to PREFER</Label>
+                <p className="text-xs text-muted-foreground">If NO servers match the requirement, temporarily relax to PREFER.</p>
+              </div>
+              <Switch
+                checked={formData.autoFallbackToPrefer}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>Skip Unhealthy Servers</Label>
+                <p className="text-xs text-muted-foreground">Automatically omit DOWN/SLOW preferred servers during selection.</p>
+              </div>
+              <Switch
+                checked={formData.autoSkipUnhealthy}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

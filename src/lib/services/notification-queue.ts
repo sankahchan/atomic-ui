@@ -282,6 +282,7 @@ export async function enqueueNotificationDelivery({
   payloadMode = 'WRAPPED',
   cooldownKey,
   bypassCooldown = false,
+  cooldownMs,
 }: {
   channelId: string;
   event: string;
@@ -293,6 +294,7 @@ export async function enqueueNotificationDelivery({
   payloadMode?: WebhookPayloadMode;
   cooldownKey?: string;
   bypassCooldown?: boolean;
+  cooldownMs?: number;
 }) {
   const channel = await db.notificationChannel.findUnique({
     where: { id: channelId },
@@ -312,7 +314,7 @@ export async function enqueueNotificationDelivery({
   }
 
   const resolvedCooldownKey = cooldownKey ?? accessKeyId ?? null;
-  const cooldownMinutes = bypassCooldown ? 0 : getNotificationCooldownMinutes(parsedChannel, event);
+  const cooldownMinutes = bypassCooldown ? 0 : (cooldownMs ? cooldownMs / 60_000 : getNotificationCooldownMinutes(parsedChannel, event));
 
   if (cooldownMinutes > 0 && !isTestNotificationEvent(event)) {
     const cooldownWindowStart = new Date(Date.now() - cooldownMinutes * 60 * 1000);

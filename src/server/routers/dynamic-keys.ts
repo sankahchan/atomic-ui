@@ -95,6 +95,10 @@ const createDAKSchema = z.object({
   rotationUsageThresholdPercent: z.number().int().min(50).max(100).default(85),
   rotateOnHealthFailure: z.boolean().optional(),
   appliedTemplateId: z.string().optional().nullable(),
+  autoClearStalePins: z.boolean().optional(),
+  autoFallbackToPrefer: z.boolean().optional(),
+  autoSkipUnhealthy: z.boolean().optional(),
+  routingAlertRules: z.string().nullish(), // JSON string map of alerts to arrays or config objects
 });
 
 /**
@@ -141,6 +145,10 @@ const updateDAKSchema = z.object({
   rotationUsageThresholdPercent: z.number().int().min(50).max(100).optional(),
   rotateOnHealthFailure: z.boolean().optional(),
   appliedTemplateId: z.string().optional().nullable(),
+  autoClearStalePins: z.boolean().optional(),
+  autoFallbackToPrefer: z.boolean().optional(),
+  autoSkipUnhealthy: z.boolean().optional(),
+  routingAlertRules: z.string().nullish(),
 });
 
 const dynamicKeyTemplateSchema = z.object({
@@ -761,6 +769,10 @@ export const dynamicKeysRouter = router({
           tags: dak.tags,
           firstUsedAt: dak.firstUsedAt,
           lastTrafficAt: dak.lastTrafficAt,
+          autoClearStalePins: dak.autoClearStalePins,
+          autoFallbackToPrefer: dak.autoFallbackToPrefer,
+          autoSkipUnhealthy: dak.autoSkipUnhealthy,
+          routingAlertRules: dak.routingAlertRules,
         };
       });
 
@@ -897,6 +909,10 @@ export const dynamicKeysRouter = router({
         rotationTriggerMode: dak.rotationTriggerMode,
         rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
         rotateOnHealthFailure: dak.rotateOnHealthFailure,
+        autoClearStalePins: dak.autoClearStalePins,
+        autoFallbackToPrefer: dak.autoFallbackToPrefer,
+        autoSkipUnhealthy: dak.autoSkipUnhealthy,
+        routingAlertRules: dak.routingAlertRules,
         lastRotatedAt: dak.lastRotatedAt,
         nextRotationAt: dak.nextRotationAt,
         rotationCount: dak.rotationCount,
@@ -1467,6 +1483,7 @@ export const dynamicKeysRouter = router({
       accessKeyId: z.string().optional().nullable(),
       serverId: z.string().optional().nullable(),
       expiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional().nullable(),
+      operatorNote: z.string().max(500).optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const dak = await db.dynamicAccessKey.findUnique({
@@ -1586,6 +1603,7 @@ export const dynamicKeysRouter = router({
         fromKeyName,
         fromServerId,
         fromServerName,
+        operatorNote: input.operatorNote ?? null,
         metadata: {
           mode: dak.type,
           expiresInMinutes: input.expiresInMinutes ?? null,
@@ -2017,6 +2035,10 @@ export const dynamicKeysRouter = router({
           rotateOnHealthFailure: input.rotateOnHealthFailure ?? false,
           nextRotationAt,
           appliedTemplateId: input.appliedTemplateId,
+          autoClearStalePins: input.autoClearStalePins ?? true,
+          autoFallbackToPrefer: input.autoFallbackToPrefer ?? false,
+          autoSkipUnhealthy: input.autoSkipUnhealthy ?? false,
+          routingAlertRules: input.routingAlertRules,
         },
         include: {
           _count: {
@@ -2052,6 +2074,10 @@ export const dynamicKeysRouter = router({
         appliedTemplateId: dak.appliedTemplateId,
         attachedKeysCount: dak._count.accessKeys,
         createdAt: dak.createdAt,
+        autoClearStalePins: dak.autoClearStalePins,
+        autoFallbackToPrefer: dak.autoFallbackToPrefer,
+        autoSkipUnhealthy: dak.autoSkipUnhealthy,
+        routingAlertRules: dak.routingAlertRules,
       };
     }),
 
@@ -2092,6 +2118,10 @@ export const dynamicKeysRouter = router({
         rotationUsageThresholdPercent,
         rotateOnHealthFailure,
         appliedTemplateId,
+        autoClearStalePins,
+        autoFallbackToPrefer,
+        autoSkipUnhealthy,
+        routingAlertRules,
         ...data
       } = input;
 
@@ -2276,6 +2306,22 @@ export const dynamicKeysRouter = router({
 
       if (rotateOnHealthFailure !== undefined) {
         updateData.rotateOnHealthFailure = rotateOnHealthFailure;
+      }
+
+      if (autoClearStalePins !== undefined) {
+        updateData.autoClearStalePins = autoClearStalePins;
+      }
+
+      if (autoFallbackToPrefer !== undefined) {
+        updateData.autoFallbackToPrefer = autoFallbackToPrefer;
+      }
+
+      if (autoSkipUnhealthy !== undefined) {
+        updateData.autoSkipUnhealthy = autoSkipUnhealthy;
+      }
+
+      if (routingAlertRules !== undefined) {
+        updateData.routingAlertRules = routingAlertRules;
       }
 
       if (appliedTemplateId !== undefined) {
@@ -3343,7 +3389,7 @@ export const dynamicKeysRouter = router({
       }
 
       return db.accessDistributionLink.findMany({
-        where: { dynamicKeyId: input.dakId },
+        where: { dynamicAccessKeyId: input.dakId },
         orderBy: { createdAt: 'desc' },
       });
     }),
@@ -3375,12 +3421,15 @@ export const dynamicKeysRouter = router({
 
       const token = generateRandomString(32);
 
+      const defaultExpiresAt = new Date();
+      defaultExpiresAt.setHours(defaultExpiresAt.getHours() + 24);
+
       const link = await db.accessDistributionLink.create({
         data: {
-          dynamicKeyId: input.dakId,
+          dynamicAccessKeyId: input.dakId,
           token,
-          maxUses: input.maxUses || null,
-          expiresAt,
+          maxUses: input.maxUses || undefined,
+          expiresAt: expiresAt || defaultExpiresAt,
         },
       });
 
@@ -3395,10 +3444,10 @@ export const dynamicKeysRouter = router({
     .mutation(async ({ input, ctx }) => {
       const link = await db.accessDistributionLink.findUnique({
         where: { id: input.id },
-        include: { dynamicKey: { select: { userId: true } } },
+        include: { dynamicAccessKey: { select: { userId: true } } },
       });
 
-      if (!link || (ctx.user.role !== 'ADMIN' && link.dynamicKey.userId !== ctx.user.id)) {
+      if (!link || (ctx.user.role !== 'ADMIN' && link.dynamicAccessKey.userId !== ctx.user.id)) {
         throw new TRPCError({ code: 'NOT_FOUND' });
       }
 
@@ -3407,5 +3456,85 @@ export const dynamicKeysRouter = router({
       });
 
       return { success: true };
+    }),
+
+  /**
+   * Export diagnostics for troubleshooting
+   */
+  exportDiagnostics: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        include: {
+          accessKeys: {
+            include: {
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+          routingEvents: {
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          },
+        },
+      });
+
+      if (!dak) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      return {
+        id: dak.id,
+        name: dak.name,
+        type: dak.type,
+        status: dak.status,
+        routing: {
+          loadBalancerAlgorithm: dak.loadBalancerAlgorithm,
+          preferredServerIds: JSON.parse(dak.preferredServerIdsJson || '[]'),
+          preferredCountryCodes: JSON.parse(dak.preferredCountryCodesJson || '[]'),
+          preferredRegionMode: dak.preferredRegionMode,
+          sessionStickinessMode: dak.sessionStickinessMode,
+          drainGraceMinutes: dak.drainGraceMinutes,
+          autoClearStalePins: dak.autoClearStalePins,
+          autoFallbackToPrefer: dak.autoFallbackToPrefer,
+          autoSkipUnhealthy: dak.autoSkipUnhealthy,
+          routingAlertRules: dak.routingAlertRules,
+        },
+        state: {
+          pinnedAccessKeyId: dak.pinnedAccessKeyId,
+          pinnedServerId: dak.pinnedServerId,
+          pinnedAt: dak.pinnedAt,
+          pinExpiresAt: dak.pinExpiresAt,
+          lastSelectedKeyIndex: dak.lastSelectedKeyIndex,
+          usedBytes: dak.usedBytes.toString(),
+          dataLimitBytes: dak.dataLimitBytes?.toString(),
+        },
+        accessKeys: dak.accessKeys.map(k => ({
+          id: k.id,
+          name: k.name,
+          status: k.status,
+          serverName: k.server?.name,
+          serverId: k.server?.id,
+        })),
+        events: dak.routingEvents.map(e => ({
+          id: e.id,
+          eventType: e.eventType,
+          severity: e.severity,
+          reason: e.reason,
+          operatorNote: e.operatorNote,
+          createdAt: e.createdAt,
+          metadata: e.metadata ? JSON.parse(e.metadata) : null,
+        })),
+        exportedAt: new Date(),
+      };
     }),
 });
