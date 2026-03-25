@@ -537,7 +537,8 @@ EOF
 # Install management script globally
 install_management_script() {
     print_step "Installing management script..."
-    cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
+    cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui.tmp
+    mv /usr/local/bin/atomic-ui.tmp /usr/local/bin/atomic-ui
     chmod +x /usr/local/bin/atomic-ui
     print_success "Management script installed. Use 'atomic-ui' command to manage."
 }
@@ -1494,7 +1495,8 @@ update_service() {
     NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
     
     # Update management script
-    cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui
+    cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui.tmp
+    mv /usr/local/bin/atomic-ui.tmp /usr/local/bin/atomic-ui
     chmod +x /usr/local/bin/atomic-ui
     
     systemctl start ${SERVICE_NAME}
