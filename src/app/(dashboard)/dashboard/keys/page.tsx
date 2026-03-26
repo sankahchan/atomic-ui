@@ -795,6 +795,31 @@ function CreateKeyDialog({
                   )}
                 </div>
 
+                {slugAvailabilityQuery.data?.suggestions?.length ? (
+                  <div className="space-y-2">
+                    <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                      {locale === 'my' ? 'အကြံပြု slug များ' : 'Suggested Slugs'}
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {slugAvailabilityQuery.data.suggestions.map((suggestion) => (
+                        <Button
+                          key={suggestion}
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 rounded-full px-3 text-xs"
+                          onClick={() => {
+                            setSlugTouched(true);
+                            setFormData((current) => ({ ...current, publicSlug: suggestion }));
+                          }}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="grid gap-3">
                   <div className="space-y-1">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">

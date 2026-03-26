@@ -223,6 +223,7 @@ model AccessKey {
   sessions               ConnectionSession[]
   telegramLinkTokens     TelegramLinkToken[]
   subscriptionEvents     SubscriptionPageEvent[]
+  slugHistory            AccessKeySlugHistory[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -469,6 +470,16 @@ model AccessDistributionLink {
 
   @@index([dynamicAccessKeyId, expiresAt])
   @@index([token, expiresAt])
+}
+
+model AccessKeySlugHistory {
+  id          String    @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  slug        String    @unique
+  createdAt   DateTime  @default(now())
+
+  @@index([accessKeyId, createdAt])
 }
 
 model TrafficLog {

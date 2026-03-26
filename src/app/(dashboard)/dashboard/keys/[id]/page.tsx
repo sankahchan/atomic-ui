@@ -520,6 +520,7 @@ function SubscriptionShareCard({
   keyId,
   subscriptionToken,
   publicSlug,
+  slugHistory,
   keyName,
   currentTheme,
   currentCoverImage,
@@ -534,6 +535,7 @@ function SubscriptionShareCard({
   keyId: string;
   subscriptionToken: string | null;
   publicSlug: string | null;
+  slugHistory: Array<{ id: string; slug: string; createdAt: Date | string }>;
   keyName: string;
   currentTheme: string | null;
   currentCoverImage: string | null;
@@ -615,6 +617,22 @@ function SubscriptionShareCard({
     missingSlugDesc: isMyanmar ? 'သိမ်းမီ အနည်းဆုံး တရားဝင် စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 valid characters before saving.',
     generatingNewToken: isMyanmar ? 'Subscription token အသစ်ကို ဖန်တီးနေသည်...' : 'Generating new subscription token...',
     generatingToken: isMyanmar ? 'Subscription token ကို ဖန်တီးနေသည်...' : 'Generating subscription token...',
+    slugStatus: isMyanmar ? 'Short link အခြေအနေ' : 'Short link status',
+    slugChecking: isMyanmar ? 'စစ်ဆေးနေသည်...' : 'Checking availability...',
+    slugAvailable: isMyanmar ? 'အသုံးပြုနိုင်ပါသည်' : 'Available',
+    slugUnavailable: isMyanmar ? 'မရနိုင်ပါ' : 'Unavailable',
+    slugSuggestions: isMyanmar ? 'အကြံပြု slug များ' : 'Suggested slugs',
+    slugHistory: isMyanmar ? 'Slug အဟောင်းများ' : 'Slug history',
+    slugHistoryHelp: isMyanmar ? 'အောက်ပါ short links အဟောင်းများသည် လက်ရှိ link သို့ ပြန်ညွှန်မည်။' : 'Older short links below will redirect to the current link.',
+    deliveryUpdated: isMyanmar ? 'Public access controls ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Public access controls have been updated.',
+    sharePageToggle: isMyanmar ? 'Share page' : 'Share page',
+    sharePageToggleHelp: isMyanmar ? 'Public page ကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Public page availability.',
+    clientLinkToggle: isMyanmar ? 'Client URL' : 'Client URL',
+    clientLinkToggleHelp: isMyanmar ? 'Client import နှင့် fetch ကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow app imports and client fetches.',
+    telegramToggle: isMyanmar ? 'Telegram delivery' : 'Telegram delivery',
+    telegramToggleHelp: isMyanmar ? 'Telegram ပို့ခြင်းနှင့် connect link များကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow Telegram delivery and link generation.',
+    shareDisabled: isMyanmar ? 'Share page ကို ပိတ်ထားသည်' : 'Share page disabled',
+    clientDisabled: isMyanmar ? 'Client URL ကို ပိတ်ထားသည်' : 'Client URL disabled',
   };
   const getContactTypeLabel = (type: ContactLink['type']) =>
     locale === 'my'
@@ -640,6 +658,18 @@ function SubscriptionShareCard({
   const [telegramDeliveryEnabled, setTelegramDeliveryEnabled] = useState(currentTelegramDeliveryEnabled);
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
+  const normalizedSlugInput = normalizePublicSlug(slugInput);
+  const slugAvailabilityQuery = trpc.keys.checkPublicSlugAvailability.useQuery(
+    {
+      slug: normalizedSlugInput,
+      excludeId: keyId,
+    },
+    {
+      enabled: normalizedSlugInput.length >= 3,
+      retry: false,
+      staleTime: 5_000,
+    },
+  );
 
   const updateThemeMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
@@ -728,7 +758,7 @@ function SubscriptionShareCard({
     onSuccess: () => {
       toast({
         title: shareUi.updatedTitle,
-        description: 'Access controls updated.',
+        description: shareUi.deliveryUpdated,
       });
       onThemeChange();
     },
@@ -912,11 +942,23 @@ function SubscriptionShareCard({
   };
 
   const saveSlug = () => {
-    const normalizedSlug = normalizePublicSlug(slugInput);
+    const normalizedSlug = normalizedSlugInput;
     if (!normalizedSlug || normalizedSlug.length < 3) {
       toast({
         title: shareUi.missingSlug,
         description: shareUi.missingSlugDesc,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      slugAvailabilityQuery.data &&
+      (!slugAvailabilityQuery.data.valid || !slugAvailabilityQuery.data.available)
+    ) {
+      toast({
+        title: shareUi.slugUnavailable,
+        description: slugAvailabilityQuery.data.message,
         variant: 'destructive',
       });
       return;
@@ -968,8 +1010,8 @@ function SubscriptionShareCard({
               onCheckedChange={(checked) => handleToggleUpdate('sharePageEnabled', checked)}
             />
             <span className="space-y-1">
-              <span className="block text-sm font-medium">Share page</span>
-              <span className="block text-xs text-muted-foreground">Public page availability.</span>
+              <span className="block text-sm font-medium">{shareUi.sharePageToggle}</span>
+              <span className="block text-xs text-muted-foreground">{shareUi.sharePageToggleHelp}</span>
             </span>
           </label>
           <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
@@ -978,8 +1020,8 @@ function SubscriptionShareCard({
               onCheckedChange={(checked) => handleToggleUpdate('clientLinkEnabled', checked)}
             />
             <span className="space-y-1">
-              <span className="block text-sm font-medium">Client URL</span>
-              <span className="block text-xs text-muted-foreground">Allow app imports and client fetches.</span>
+              <span className="block text-sm font-medium">{shareUi.clientLinkToggle}</span>
+              <span className="block text-xs text-muted-foreground">{shareUi.clientLinkToggleHelp}</span>
             </span>
           </label>
           <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
@@ -988,8 +1030,8 @@ function SubscriptionShareCard({
               onCheckedChange={(checked) => handleToggleUpdate('telegramDeliveryEnabled', checked)}
             />
             <span className="space-y-1">
-              <span className="block text-sm font-medium">Telegram delivery</span>
-              <span className="block text-xs text-muted-foreground">Allow Telegram delivery and link generation.</span>
+              <span className="block text-sm font-medium">{shareUi.telegramToggle}</span>
+              <span className="block text-xs text-muted-foreground">{shareUi.telegramToggleHelp}</span>
             </span>
           </label>
         </div>
@@ -1035,7 +1077,12 @@ function SubscriptionShareCard({
               variant="outline"
               size="sm"
               onClick={saveSlug}
-              disabled={updateSlugMutation.isPending}
+              disabled={
+                updateSlugMutation.isPending ||
+                normalizedSlugInput.length < 3 ||
+                (slugAvailabilityQuery.isSuccess &&
+                  (!slugAvailabilityQuery.data.valid || !slugAvailabilityQuery.data.available))
+              }
             >
               {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : shareUi.save}
             </Button>
@@ -1052,6 +1099,61 @@ function SubscriptionShareCard({
           <p className="text-xs text-muted-foreground">
             {shareUi.slugHelp}
           </p>
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-foreground">{shareUi.slugStatus}:</span>
+              {normalizedSlugInput.length < 3 ? (
+                <span className="text-muted-foreground">{shareUi.missingSlugDesc}</span>
+              ) : slugAvailabilityQuery.isFetching ? (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {shareUi.slugChecking}
+                </span>
+              ) : slugAvailabilityQuery.data?.available ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {slugAvailabilityQuery.data.message || shareUi.slugAvailable}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <XCircle className="h-3.5 w-3.5" />
+                  {slugAvailabilityQuery.data?.message || shareUi.slugUnavailable}
+                </span>
+              )}
+            </div>
+            {slugAvailabilityQuery.data?.suggestions?.length ? (
+              <div className="mt-3 space-y-2">
+                <p className="font-medium text-foreground">{shareUi.slugSuggestions}</p>
+                <div className="flex flex-wrap gap-2">
+                  {slugAvailabilityQuery.data.suggestions.map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full px-3 text-xs"
+                      onClick={() => setSlugInput(suggestion)}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          {slugHistory.length > 0 ? (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
+              <p className="font-medium text-foreground">{shareUi.slugHistory}</p>
+              <p className="mt-1 text-muted-foreground">{shareUi.slugHistoryHelp}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {slugHistory.map((entry) => (
+                  <Badge key={entry.id} variant="outline" className="rounded-full px-3 py-1 text-[11px]">
+                    {entry.slug}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Background Image URL */}
@@ -1332,7 +1434,7 @@ function SubscriptionShareCard({
               : regenerateTokenMutation.isPending
                 ? shareUi.generatingNewToken
                 : shareUi.generatingToken
-              : 'Share page disabled'}
+              : shareUi.shareDisabled}
           </div>
           <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
             <p className="mb-1 font-medium text-foreground">{shareUi.clientUrl}</p>
@@ -1340,7 +1442,7 @@ function SubscriptionShareCard({
               ? subscriptionToken || slugInput.trim()
               ? getClientUrl()
               : `${shareUi.clientUrl}...`
-              : 'Client URL disabled'}
+              : shareUi.clientDisabled}
           </div>
         </div>
 
@@ -1366,6 +1468,372 @@ function SubscriptionShareCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SupportWorkflowCard({
+  keyId,
+  keyName,
+  telegramDeliveryEnabled,
+  supportActivity,
+  openIncidents,
+  onUpdated,
+}: {
+  keyId: string;
+  keyName: string;
+  telegramDeliveryEnabled: boolean;
+  supportActivity: Array<{
+    id: string;
+    action: string;
+    details: Record<string, unknown> | null;
+    createdAt: Date | string;
+  }>;
+  openIncidents: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    status: string;
+    openedAt: Date | string;
+    assignedUserEmail: string | null;
+  }>;
+  onUpdated: () => void;
+}) {
+  const { locale } = useLocale();
+  const { toast } = useToast();
+  const isMyanmar = locale === 'my';
+  const supportUi = {
+    title: isMyanmar ? 'ပံ့ပိုးကူညီမှု လုပ်ဆောင်ချက်' : 'Support Workflow',
+    description: isMyanmar ? `${keyName} အတွက် အသုံးပြုသူထံသို့ အကူအညီပို့ခြင်းနှင့် ပြဿနာတင်ပြမှုများကို တစ်နေရာတည်းကနေ စီမံပါ။` : `Resend access, send reminders, and report issues for ${keyName} from one place.`,
+    resend: isMyanmar ? 'Access ကို ထပ်ပို့မည်' : 'Resend Access',
+    renewal: isMyanmar ? 'Renewal သတိပေးပို့မည်' : 'Send Renewal Reminder',
+    support: isMyanmar ? 'Support message ပို့မည်' : 'Send Support Message',
+    report: isMyanmar ? 'ပြဿနာ တင်ပြမည်' : 'Report Problem',
+    disabledHint: isMyanmar ? 'Telegram delivery ကို ပိတ်ထားသဖြင့် Telegram လုပ်ဆောင်ချက်များ မရနိုင်ပါ။' : 'Telegram delivery is disabled for this key, so Telegram actions are unavailable.',
+    sentTitle: isMyanmar ? 'ပို့ပြီးပါပြီ' : 'Sent',
+    resendSuccess: isMyanmar ? 'Access link ကို Telegram မှတစ်ဆင့် ထပ်ပို့ပြီးပါပြီ။' : 'The access link has been resent through Telegram.',
+    renewalSuccess: isMyanmar ? 'Renewal reminder ကို ပို့ပြီးပါပြီ။' : 'The renewal reminder has been sent.',
+    supportSuccess: isMyanmar ? 'Support message ကို ပို့ပြီးပါပြီ။' : 'The support message has been sent.',
+    reportSuccess: isMyanmar ? 'ပြဿနာကို မှတ်တမ်းတင်ပြီးပါပြီ။' : 'The problem has been reported and logged.',
+    errorTitle: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
+    supportDialogTitle: isMyanmar ? 'Support message ပို့ရန်' : 'Send support message',
+    supportDialogDesc: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့မည့် support message ကို ရေးပါ။' : 'Write the support message to send to this user.',
+    supportPlaceholder: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့လိုသော message ကို ရေးပါ...' : 'Write the message you want to send to this user...',
+    supportRequired: isMyanmar ? 'Support message ကို ရေးပါ။' : 'Enter a support message.',
+    reportDialogTitle: isMyanmar ? 'ပြဿနာ တင်ပြရန်' : 'Report a problem',
+    reportDialogDesc: isMyanmar ? 'ဤ access key အတွက် ပြဿနာအသေးစိတ်ကို မှတ်တမ်းတင်ပါ။' : 'Capture the issue details for this access key.',
+    reportPlaceholder: isMyanmar ? 'ဥပမာ - အသုံးပြုသူက subscription fetch မရကြောင်း အကြောင်းကြားထားသည်...' : 'For example: User reported that subscription fetch is failing...',
+    reportRequired: isMyanmar ? 'ပြဿနာအကျဉ်းကို ရေးပါ။' : 'Enter a problem summary.',
+    severity: isMyanmar ? 'အရေးကြီးမှု' : 'Severity',
+    severityInfo: isMyanmar ? 'Info' : 'Info',
+    severityWarning: isMyanmar ? 'Warning' : 'Warning',
+    severityCritical: isMyanmar ? 'Critical' : 'Critical',
+    cancel: isMyanmar ? 'မလုပ်တော့' : 'Cancel',
+    send: isMyanmar ? 'ပို့မည်' : 'Send',
+    createIncident: isMyanmar ? 'Incident ဖန်တီးမည်' : 'Create Incident',
+    recentActivity: isMyanmar ? 'မကြာသေးမီ လုပ်ဆောင်ချက်' : 'Recent Activity',
+    openIncidents: isMyanmar ? 'ဖွင့်ထားသော Incident များ' : 'Open Incidents',
+    none: isMyanmar ? 'မရှိသေးပါ' : 'None yet',
+    assignedTo: isMyanmar ? 'တာဝန်ပေးထားသူ' : 'Assigned to',
+    actionResent: isMyanmar ? 'Access ကို ထပ်ပို့ခဲ့သည်' : 'Access resent',
+    actionRenewal: isMyanmar ? 'Renewal reminder ပို့ခဲ့သည်' : 'Renewal reminder sent',
+    actionSupport: isMyanmar ? 'Support message ပို့ခဲ့သည်' : 'Support message sent',
+    actionProblem: isMyanmar ? 'ပြဿနာ တင်ပြခဲ့သည်' : 'Problem reported',
+  };
+
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [supportMessage, setSupportMessage] = useState('');
+  const [problemSummary, setProblemSummary] = useState('');
+  const [problemSeverity, setProblemSeverity] = useState<'critical' | 'warning' | 'info'>('warning');
+
+  const resendAccessMutation = trpc.keys.resendAccess.useMutation({
+    onSuccess: () => {
+      toast({ title: supportUi.sentTitle, description: supportUi.resendSuccess });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({ title: supportUi.errorTitle, description: error.message, variant: 'destructive' });
+    },
+  });
+  const sendRenewalMutation = trpc.keys.sendRenewalReminder.useMutation({
+    onSuccess: () => {
+      toast({ title: supportUi.sentTitle, description: supportUi.renewalSuccess });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({ title: supportUi.errorTitle, description: error.message, variant: 'destructive' });
+    },
+  });
+  const sendSupportMutation = trpc.keys.sendSupportMessage.useMutation({
+    onSuccess: () => {
+      setSupportDialogOpen(false);
+      setSupportMessage('');
+      toast({ title: supportUi.sentTitle, description: supportUi.supportSuccess });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({ title: supportUi.errorTitle, description: error.message, variant: 'destructive' });
+    },
+  });
+  const reportProblemMutation = trpc.keys.reportProblem.useMutation({
+    onSuccess: () => {
+      setReportDialogOpen(false);
+      setProblemSummary('');
+      setProblemSeverity('warning');
+      toast({ title: supportUi.sentTitle, description: supportUi.reportSuccess });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({ title: supportUi.errorTitle, description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const activityLabel = (action: string) => {
+    switch (action) {
+      case 'ACCESS_KEY_ACCESS_RESENT':
+      case 'TELEGRAM_SHARE_SENT':
+        return supportUi.actionResent;
+      case 'ACCESS_KEY_RENEWAL_REMINDER_TRIGGERED':
+      case 'ACCESS_KEY_RENEWAL_REMINDER_SENT':
+        return supportUi.actionRenewal;
+      case 'ACCESS_KEY_SUPPORT_MESSAGE_TRIGGERED':
+      case 'ACCESS_KEY_SUPPORT_MESSAGE_SENT':
+        return supportUi.actionSupport;
+      case 'ACCESS_KEY_PROBLEM_REPORTED':
+        return supportUi.actionProblem;
+      default:
+        return action;
+    }
+  };
+
+  const submitSupportMessage = () => {
+    const message = supportMessage.trim();
+    if (!message) {
+      toast({ title: supportUi.errorTitle, description: supportUi.supportRequired, variant: 'destructive' });
+      return;
+    }
+
+    sendSupportMutation.mutate({
+      id: keyId,
+      message,
+    });
+  };
+
+  const submitProblemReport = () => {
+    const summary = problemSummary.trim();
+    if (!summary) {
+      toast({ title: supportUi.errorTitle, description: supportUi.reportRequired, variant: 'destructive' });
+      return;
+    }
+
+    reportProblemMutation.mutate({
+      id: keyId,
+      severity: problemSeverity,
+      summary,
+    });
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            {supportUi.title}
+          </CardTitle>
+          <CardDescription>{supportUi.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!telegramDeliveryEnabled ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-xs text-amber-700 dark:text-amber-300">
+              {supportUi.disabledHint}
+            </div>
+          ) : null}
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={!telegramDeliveryEnabled || resendAccessMutation.isPending}
+              onClick={() => resendAccessMutation.mutate({ id: keyId })}
+            >
+              {resendAccessMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="mr-2 h-4 w-4" />
+              )}
+              {supportUi.resend}
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={!telegramDeliveryEnabled || sendRenewalMutation.isPending}
+              onClick={() => sendRenewalMutation.mutate({ id: keyId })}
+            >
+              {sendRenewalMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {supportUi.renewal}
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={!telegramDeliveryEnabled}
+              onClick={() => setSupportDialogOpen(true)}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              {supportUi.support}
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => setReportDialogOpen(true)}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {supportUi.report}
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">{supportUi.recentActivity}</p>
+              {supportActivity.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {supportActivity.map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">{activityLabel(entry.action)}</p>
+                        <span className="text-xs text-muted-foreground">{formatRelativeTime(entry.createdAt)}</span>
+                      </div>
+                      {entry.details && typeof entry.details.message === 'string' ? (
+                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{entry.details.message}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{supportUi.none}</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-medium">{supportUi.openIncidents}</p>
+              {openIncidents.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {openIncidents.map((incident) => (
+                    <div key={incident.id} className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">{incident.title}</p>
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="rounded-full px-2 py-0.5 capitalize">
+                              {incident.severity}
+                            </Badge>
+                            <Badge variant="outline" className="rounded-full px-2 py-0.5 capitalize">
+                              {incident.status.toLowerCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{formatRelativeTime(incident.openedAt)}</span>
+                      </div>
+                      {incident.assignedUserEmail ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {supportUi.assignedTo}: {incident.assignedUserEmail}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{supportUi.none}</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{supportUi.supportDialogTitle}</DialogTitle>
+            <DialogDescription>{supportUi.supportDialogDesc}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={supportMessage}
+            onChange={(event) => setSupportMessage(event.target.value)}
+            placeholder={supportUi.supportPlaceholder}
+            className="min-h-[140px]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSupportDialogOpen(false)}>
+              {supportUi.cancel}
+            </Button>
+            <Button
+              onClick={submitSupportMessage}
+              disabled={sendSupportMutation.isPending}
+            >
+              {sendSupportMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <MessageSquare className="mr-2 h-4 w-4" />
+              )}
+              {supportUi.send}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{supportUi.reportDialogTitle}</DialogTitle>
+            <DialogDescription>{supportUi.reportDialogDesc}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{supportUi.severity}</Label>
+              <Select
+                value={problemSeverity}
+                onValueChange={(value) => setProblemSeverity(value as 'critical' | 'warning' | 'info')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">{supportUi.severityInfo}</SelectItem>
+                  <SelectItem value="warning">{supportUi.severityWarning}</SelectItem>
+                  <SelectItem value="critical">{supportUi.severityCritical}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              value={problemSummary}
+              onChange={(event) => setProblemSummary(event.target.value)}
+              placeholder={supportUi.reportPlaceholder}
+              className="min-h-[140px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
+              {supportUi.cancel}
+            </Button>
+            <Button
+              onClick={submitProblemReport}
+              disabled={reportProblemMutation.isPending}
+            >
+              {reportProblemMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <AlertTriangle className="mr-2 h-4 w-4" />
+              )}
+              {supportUi.createIncident}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1486,6 +1954,7 @@ export default function KeyDetailPage() {
   const status = key.status as keyof typeof statusConfig;
   const statusInfo = statusConfig[status] || statusConfig.ACTIVE;
   const StatusIcon = statusInfo.icon;
+  const keyRecord = key as any;
   const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl || '';
   const subscriptionApiUrl = key.publicSlug
     ? buildShortClientUrl(key.publicSlug, {
@@ -1510,7 +1979,9 @@ export default function KeyDetailPage() {
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
     : 0;
   const estimatedDevices = activitySnapshot?.estimatedDevices ?? Number((key as any).estimatedDevices || 0);
-  const activeSessions = activitySnapshot?.activeSessions ?? (key.sessions?.filter((session) => session.isActive).length || 0);
+  const activeSessions =
+    activitySnapshot?.activeSessions ??
+    (keyRecord.sessions?.filter((session: { isActive: boolean }) => session.isActive).length || 0);
   const lastTrafficAt = activitySnapshot?.lastTrafficAt
     ? new Date(activitySnapshot.lastTrafficAt)
     : key.lastTrafficAt
@@ -1601,7 +2072,7 @@ export default function KeyDetailPage() {
             <h1 className="text-3xl font-semibold tracking-tight">{key.name}</h1>
             <p className="text-sm text-muted-foreground">
               Created {formatRelativeTime(key.createdAt)}
-              {key.server ? ` on ${key.server.name}` : ''}
+              {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
             </p>
           </div>
 
@@ -1654,7 +2125,7 @@ export default function KeyDetailPage() {
               Edit
             </Button>
             <Button asChild variant="outline" className="h-11 rounded-full px-5">
-              <Link href={key.server ? `/dashboard/servers/${key.server.id}` : '/dashboard/servers'}>
+              <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
                 <Server className="w-4 h-4 mr-2" />
                 View Server
               </Link>
@@ -1711,7 +2182,7 @@ export default function KeyDetailPage() {
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{key.name}</h1>
                 <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                   Created {formatRelativeTime(key.createdAt)}
-                  {key.server ? ` on ${key.server.name}` : ''}
+                  {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
                 </p>
               </div>
             </div>
@@ -1722,7 +2193,7 @@ export default function KeyDetailPage() {
                 Edit
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-full px-5">
-                <Link href={key.server ? `/dashboard/servers/${key.server.id}` : '/dashboard/servers'}>
+                <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
                   <Server className="w-4 h-4 mr-2" />
                   View Server
                 </Link>
@@ -1801,20 +2272,20 @@ export default function KeyDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Server info */}
-              {key.server && (
+              {keyRecord.server && (
                 <div className="ops-row-card">
                   <div className="flex items-center gap-3">
-                    {key.server.countryCode && (
-                      <span className="text-xl">{getCountryFlag(key.server.countryCode)}</span>
+                    {keyRecord.server.countryCode && (
+                      <span className="text-xl">{getCountryFlag(keyRecord.server.countryCode)}</span>
                     )}
                     <div>
-                      <p className="font-medium">{key.server.name}</p>
-                      {key.server.location && (
-                        <p className="text-sm text-muted-foreground">{key.server.location}</p>
+                      <p className="font-medium">{keyRecord.server.name}</p>
+                      {keyRecord.server.location && (
+                        <p className="text-sm text-muted-foreground">{keyRecord.server.location}</p>
                       )}
                     </div>
                   </div>
-                  <Link href={`/dashboard/servers/${key.server.id}`}>
+                  <Link href={`/dashboard/servers/${keyRecord.server.id}`}>
                     <Button variant="ghost" size="sm" className="rounded-full">
                       View Server
                     </Button>
@@ -1953,7 +2424,9 @@ export default function KeyDetailPage() {
               {/* Real-time Graph */}
               <div className="border-t border-border/50 pt-4">
                 <p className="text-sm font-medium mb-2">Live Activity</p>
-                <TrafficGraph serverId={key.server.id} outlineKeyId={key.outlineKeyId} />
+                {keyRecord.server ? (
+                  <TrafficGraph serverId={keyRecord.server.id} outlineKeyId={key.outlineKeyId} />
+                ) : null}
               </div>
 
               {/* Historical Chart */}
@@ -2279,6 +2752,7 @@ export default function KeyDetailPage() {
             keyId={key.id}
             subscriptionToken={key.subscriptionToken}
             publicSlug={key.publicSlug}
+            slugHistory={(key as any).slugHistory ?? []}
             keyName={key.name}
             currentTheme={(key as any).subscriptionTheme}
             currentCoverImage={(key as any).coverImage}
@@ -2290,6 +2764,16 @@ export default function KeyDetailPage() {
             currentTelegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
             onThemeChange={() => refetch()}
           />
+          {isAdmin ? (
+            <SupportWorkflowCard
+              keyId={key.id}
+              keyName={key.name}
+              telegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
+              supportActivity={(key as any).supportActivity ?? []}
+              openIncidents={(key as any).openIncidents ?? []}
+              onUpdated={() => refetch()}
+            />
+          ) : null}
         </div>
       </div>
 

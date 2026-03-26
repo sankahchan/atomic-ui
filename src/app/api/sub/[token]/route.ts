@@ -34,6 +34,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
+import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 import {
   DYNAMIC_ROUTING_EVENT_TYPES,
   recordDynamicRoutingEvent,
@@ -695,17 +696,15 @@ export async function handleSubscriptionRequest(
     }
 
     // Fall back to regular access key lookup by subscriptionToken or short slug
-    const accessKey = await db.accessKey.findFirst({
-      where: {
-        OR: [
-          { subscriptionToken: token },
-          { publicSlug: token },
-        ],
-      },
-      include: {
-        server: true,
-      },
-    });
+    const resolvedAccessKey = await resolveAccessKeyPublicIdentifier(token);
+    const accessKey = resolvedAccessKey
+      ? await db.accessKey.findUnique({
+          where: { id: resolvedAccessKey.id },
+          include: {
+            server: true,
+          },
+        })
+      : null;
 
     if (!accessKey) {
       return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });

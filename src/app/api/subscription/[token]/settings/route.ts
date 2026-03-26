@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { defaultBranding, type SubscriptionBranding } from '@/lib/subscription-themes';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
+import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 
 export async function GET(
   request: NextRequest,
@@ -21,15 +22,13 @@ export async function GET(
 
   try {
     // Verify the token exists (don't expose settings if token is invalid)
-    const key = await db.accessKey.findFirst({
-      where: {
-        OR: [
-          { subscriptionToken: token },
-          { publicSlug: token },
-        ],
-      },
-      select: { id: true },
-    });
+    const resolvedAccessKey = await resolveAccessKeyPublicIdentifier(token);
+    const key = resolvedAccessKey
+      ? await db.accessKey.findUnique({
+          where: { id: resolvedAccessKey.id },
+          select: { id: true },
+        })
+      : null;
 
     let isValid = !!key;
 

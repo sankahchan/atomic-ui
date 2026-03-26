@@ -29,7 +29,13 @@ import {
   buildSubscriptionApiUrl,
 } from '@/lib/subscription-links';
 import { subscriptionThemeIds } from '@/lib/subscription-themes';
-import { isValidPublicSlug, normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
+import {
+  buildPublicSlugSuggestionCandidates,
+  isReservedPublicSlug,
+  isValidPublicSlug,
+  normalizePublicSlug,
+  slugifyPublicName,
+} from '@/lib/public-slug';
 import {
   collectTrafficActivity,
   isTrafficActive,
@@ -37,7 +43,9 @@ import {
 } from '@/lib/services/traffic-activity';
 import {
   createAccessKeyTelegramConnectLink,
+  sendAccessKeyRenewalReminder,
   sendAccessKeyLifecycleTelegramNotification,
+  sendAccessKeySupportMessage,
   sendAccessKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
 import {
@@ -50,6 +58,7 @@ import {
   stringifyQuotaAlertThresholds,
 } from '@/lib/access-key-policies';
 import { getGeoIpCountry } from '@/lib/security';
+import { writeAuditLog } from '@/lib/audit';
 
 /**
  * Validation schema for creating a new access key.
@@ -223,49 +232,128 @@ async function generateUniqueAccessKeySlug(name: string, excludeId?: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const suffix = attempt === 0 ? '' : String(attempt);
     const candidate = buildCandidate(suffix || undefined);
-    const [accessExisting, dynamicExisting] = await Promise.all([
-      db.accessKey.findFirst({
-        where: {
-          publicSlug: candidate,
-          ...(excludeId ? { NOT: { id: excludeId } } : {}),
-        },
-        select: { id: true },
-      }),
-      db.dynamicAccessKey.findFirst({
-        where: {
-          publicSlug: candidate,
-        },
-        select: { id: true },
-      }),
-    ]);
-
-    if (!accessExisting && !dynamicExisting) {
+    if (await isAccessKeySlugAvailable(candidate, excludeId)) {
       return candidate;
     }
   }
 
   while (true) {
     const candidate = buildCandidate(generateRandomString(6).toLowerCase());
-    const [accessExisting, dynamicExisting] = await Promise.all([
-      db.accessKey.findFirst({
-        where: {
-          publicSlug: candidate,
-          ...(excludeId ? { NOT: { id: excludeId } } : {}),
-        },
-        select: { id: true },
-      }),
-      db.dynamicAccessKey.findFirst({
-        where: {
-          publicSlug: candidate,
-        },
-        select: { id: true },
-      }),
-    ]);
-
-    if (!accessExisting && !dynamicExisting) {
+    if (await isAccessKeySlugAvailable(candidate, excludeId)) {
       return candidate;
     }
   }
+}
+
+async function findAccessKeySlugConflict(slug: string, excludeId?: string) {
+  const [accessExisting, dynamicExisting, historicalExisting] = await Promise.all([
+    db.accessKey.findFirst({
+      where: {
+        publicSlug: slug,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    }),
+    db.dynamicAccessKey.findFirst({
+      where: { publicSlug: slug },
+      select: { id: true },
+    }),
+    (db as any).accessKeySlugHistory.findUnique({
+      where: { slug },
+      select: { accessKeyId: true },
+    }),
+  ]);
+
+  if (accessExisting) {
+    return {
+      type: 'accessKey' as const,
+      ownerKeyId: accessExisting.id,
+    };
+  }
+
+  if (dynamicExisting) {
+    return {
+      type: 'dynamicKey' as const,
+      ownerKeyId: dynamicExisting.id,
+    };
+  }
+
+  if (historicalExisting && historicalExisting.accessKeyId !== excludeId) {
+    return {
+      type: 'historicalAccessKey' as const,
+      ownerKeyId: historicalExisting.accessKeyId,
+    };
+  }
+
+  return null;
+}
+
+async function isAccessKeySlugAvailable(slug: string, excludeId?: string) {
+  if (!slug || !isValidPublicSlug(slug) || isReservedPublicSlug(slug)) {
+    return false;
+  }
+
+  const conflict = await findAccessKeySlugConflict(slug, excludeId);
+  return !conflict;
+}
+
+async function buildAvailableAccessKeySlugSuggestions(
+  value: string,
+  excludeId?: string,
+  limit = 5,
+) {
+  const suggestions: string[] = [];
+
+  for (const candidate of buildPublicSlugSuggestionCandidates(value, 14)) {
+    if (suggestions.length >= limit) {
+      break;
+    }
+
+    if (await isAccessKeySlugAvailable(candidate, excludeId)) {
+      suggestions.push(candidate);
+    }
+  }
+
+  let suffix = 1;
+  const normalizedBase = normalizePublicSlug(value) || slugifyPublicName(value);
+  while (suggestions.length < limit && suffix <= 50) {
+    const candidate = normalizePublicSlug(`${normalizedBase}-${suffix}`);
+    suffix += 1;
+    if (!candidate || suggestions.includes(candidate)) {
+      continue;
+    }
+    if (await isAccessKeySlugAvailable(candidate, excludeId)) {
+      suggestions.push(candidate);
+    }
+  }
+
+  return suggestions;
+}
+
+async function recordAccessKeySlugHistory(
+  tx: Prisma.TransactionClient,
+  accessKeyId: string,
+  previousSlug: string | null | undefined,
+  nextSlug: string | null | undefined,
+) {
+  const normalizedPrevious = normalizePublicSlug(previousSlug ?? '');
+  const normalizedNext = normalizePublicSlug(nextSlug ?? '');
+
+  if (!normalizedPrevious || normalizedPrevious === normalizedNext) {
+    return;
+  }
+
+  await (tx as any).accessKeySlugHistory.upsert({
+    where: { slug: normalizedPrevious },
+    update: {
+      accessKeyId,
+      createdAt: new Date(),
+    },
+    create: {
+      accessKeyId,
+      slug: normalizedPrevious,
+    },
+  });
 }
 
 async function resolveAccessKeySlug(requestedSlug: string | null | undefined, name: string, excludeId?: string) {
@@ -281,26 +369,24 @@ async function resolveAccessKeySlug(requestedSlug: string | null | undefined, na
     });
   }
 
-  const [accessExisting, dynamicExisting] = await Promise.all([
-    db.accessKey.findFirst({
-      where: {
-        publicSlug: normalizedSlug,
-        ...(excludeId ? { NOT: { id: excludeId } } : {}),
-      },
-      select: { id: true },
-    }),
-    db.dynamicAccessKey.findFirst({
-      where: {
-        publicSlug: normalizedSlug,
-      },
-      select: { id: true },
-    }),
-  ]);
+  if (isReservedPublicSlug(normalizedSlug)) {
+    const suggestions = await buildAvailableAccessKeySlugSuggestions(normalizedSlug, excludeId, 3);
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: suggestions.length > 0
+        ? `That short link is reserved. Try: ${suggestions.join(', ')}`
+        : 'That short link is reserved.',
+    });
+  }
 
-  if (accessExisting || dynamicExisting) {
+  const conflict = await findAccessKeySlugConflict(normalizedSlug, excludeId);
+  if (conflict) {
+    const suggestions = await buildAvailableAccessKeySlugSuggestions(normalizedSlug, excludeId, 3);
     throw new TRPCError({
       code: 'CONFLICT',
-      message: 'That short link is already in use.',
+      message: suggestions.length > 0
+        ? `That short link is already in use. Try: ${suggestions.join(', ')}`
+        : 'That short link is already in use.',
     });
   }
 
@@ -323,31 +409,33 @@ export const keysRouter = router({
           normalizedSlug,
           available: false,
           valid: false,
+          reserved: false,
+          suggestions: [],
           message: 'Slug must be 3-32 characters and use only lowercase letters, numbers, and hyphens.',
         };
       }
 
-      const [accessExisting, dynamicExisting] = await Promise.all([
-        db.accessKey.findFirst({
-          where: {
-            publicSlug: normalizedSlug,
-            ...(input.excludeId ? { NOT: { id: input.excludeId } } : {}),
-          },
-          select: { id: true },
-        }),
-        db.dynamicAccessKey.findFirst({
-          where: {
-            publicSlug: normalizedSlug,
-          },
-          select: { id: true },
-        }),
-      ]);
+      const reserved = isReservedPublicSlug(normalizedSlug);
+      const conflict = reserved
+        ? { type: 'reserved' as const, ownerKeyId: null }
+        : await findAccessKeySlugConflict(normalizedSlug, input.excludeId);
+      const suggestions =
+        reserved || conflict
+          ? await buildAvailableAccessKeySlugSuggestions(normalizedSlug, input.excludeId)
+          : [];
 
       return {
         normalizedSlug,
-        available: !accessExisting && !dynamicExisting,
+        available: !reserved && !conflict,
         valid: true,
-        message: accessExisting || dynamicExisting ? 'That short link is already in use.' : 'This short link is available.',
+        reserved,
+        reclaimedFromHistory: conflict?.type === 'historicalAccessKey' && conflict.ownerKeyId === input.excludeId,
+        suggestions,
+        message: reserved
+          ? 'That short link is reserved.'
+          : conflict
+            ? 'That short link is already in use.'
+            : 'This short link is available.',
       };
     }),
 
@@ -519,8 +607,12 @@ export const keysRouter = router({
             take: 10,
             orderBy: { startedAt: 'desc' },
           },
+          slugHistory: {
+            take: 8,
+            orderBy: { createdAt: 'desc' },
+          },
         },
-      });
+      } as any);
 
       if (!key) {
         throw new TRPCError({
@@ -550,11 +642,62 @@ export const keysRouter = router({
         });
       }
 
+      const [supportActivity, openIncidents] = await Promise.all([
+        db.auditLog.findMany({
+          where: {
+            entity: 'ACCESS_KEY',
+            entityId: key.id,
+            action: {
+              in: [
+                'TELEGRAM_SHARE_SENT',
+                'ACCESS_KEY_RENEWAL_REMINDER_SENT',
+                'ACCESS_KEY_SUPPORT_MESSAGE_SENT',
+                'ACCESS_KEY_PROBLEM_REPORTED',
+              ],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          select: {
+            id: true,
+            action: true,
+            details: true,
+            createdAt: true,
+          },
+        }),
+        db.incident.findMany({
+          where: {
+            sourceType: 'MANUAL',
+            status: {
+              in: ['OPEN', 'ACKNOWLEDGED'],
+            },
+            metadata: {
+              contains: `"accessKeyId":"${key.id}"`,
+            },
+          },
+          orderBy: { openedAt: 'desc' },
+          take: 6,
+          select: {
+            id: true,
+            title: true,
+            severity: true,
+            status: true,
+            openedAt: true,
+            assignedUserEmail: true,
+          },
+        }),
+      ]);
+
       return {
         ...key,
         subscriptionToken: nextToken,
         publicSlug: nextPublicSlug,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+        supportActivity: supportActivity.map((entry) => ({
+          ...entry,
+          details: entry.details ? JSON.parse(entry.details) : null,
+        })),
+        openIncidents,
       };
     }),
 
@@ -790,6 +933,7 @@ export const keysRouter = router({
     .input(updateKeySchema)
     .mutation(async ({ input }) => {
       const { id, publicSlug, ...data } = input;
+      let resolvedPublicSlug: string | undefined;
 
       // Fetch the key with server info
       const existingKey = await db.accessKey.findUnique({
@@ -907,7 +1051,8 @@ export const keysRouter = router({
         }
 
         if (publicSlug !== undefined) {
-          updateData.publicSlug = await resolveAccessKeySlug(publicSlug, data.name || existingKey.name, id);
+          resolvedPublicSlug = await resolveAccessKeySlug(publicSlug, data.name || existingKey.name, id);
+          updateData.publicSlug = resolvedPublicSlug;
         }
 
         // Handle owner field
@@ -966,18 +1111,30 @@ export const keysRouter = router({
         }
 
         // Update the database record
-        const accessKey = await db.accessKey.update({
-          where: { id },
-          data: updateData,
-          include: {
-            server: {
-              select: {
-                id: true,
-                name: true,
-                countryCode: true,
+        const accessKey = await db.$transaction(async (tx) => {
+          if (resolvedPublicSlug && resolvedPublicSlug !== existingKey.publicSlug) {
+            await recordAccessKeySlugHistory(tx, id, existingKey.publicSlug, resolvedPublicSlug);
+            await (tx as any).accessKeySlugHistory.deleteMany({
+              where: {
+                accessKeyId: id,
+                slug: resolvedPublicSlug,
+              },
+            });
+          }
+
+          return tx.accessKey.update({
+            where: { id },
+            data: updateData,
+            include: {
+              server: {
+                select: {
+                  id: true,
+                  name: true,
+                  countryCode: true,
+                },
               },
             },
-          },
+          });
         });
 
         if (data.status && data.status !== existingKey.status) {
@@ -1854,6 +2011,7 @@ export const keysRouter = router({
           id: true,
           name: true,
           subscriptionToken: true,
+          publicSlug: true,
         },
       });
 
@@ -1865,14 +2023,24 @@ export const keysRouter = router({
       }
 
       const publicSlug = await generateUniqueAccessKeySlug(existing.name, existing.id);
-      const key = await db.accessKey.update({
-        where: { id: input.id },
-        data: { publicSlug },
-        select: {
-          id: true,
-          publicSlug: true,
-          subscriptionToken: true,
-        },
+      const key = await db.$transaction(async (tx) => {
+        await recordAccessKeySlugHistory(tx, existing.id, existing.publicSlug, publicSlug);
+        await (tx as any).accessKeySlugHistory.deleteMany({
+          where: {
+            accessKeyId: existing.id,
+            slug: publicSlug,
+          },
+        });
+
+        return tx.accessKey.update({
+          where: { id: input.id },
+          data: { publicSlug },
+          select: {
+            id: true,
+            publicSlug: true,
+            subscriptionToken: true,
+          },
+        });
       });
 
       return {
@@ -1966,6 +2134,228 @@ export const keysRouter = router({
           message: (error as Error).message,
         });
       }
+    }),
+
+  resendAccess: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        chatId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          telegramDeliveryEnabled: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (!key.telegramDeliveryEnabled) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram delivery is disabled for this key.',
+        });
+      }
+
+      try {
+        const result = await sendAccessKeySharePageToTelegram({
+          accessKeyId: input.id,
+          chatId: input.chatId,
+          reason: 'RESENT',
+          source: 'dashboard_support',
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_ACCESS_RESENT',
+          entity: 'ACCESS_KEY',
+          entityId: input.id,
+          details: {
+            destinationChatId: result.destinationChatId,
+            sharePageUrl: result.sharePageUrl,
+          },
+        });
+
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  sendRenewalReminder: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        chatId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await sendAccessKeyRenewalReminder({
+          accessKeyId: input.id,
+          chatId: input.chatId,
+          source: 'dashboard_support',
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_RENEWAL_REMINDER_TRIGGERED',
+          entity: 'ACCESS_KEY',
+          entityId: input.id,
+          details: {
+            destinationChatId: result.destinationChatId,
+          },
+        });
+
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  sendSupportMessage: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        message: z.string().trim().min(1).max(1500),
+        chatId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await sendAccessKeySupportMessage({
+          accessKeyId: input.id,
+          message: input.message,
+          chatId: input.chatId,
+          source: 'dashboard_support',
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_SUPPORT_MESSAGE_TRIGGERED',
+          entity: 'ACCESS_KEY',
+          entityId: input.id,
+          details: {
+            destinationChatId: result.destinationChatId,
+            message: input.message,
+          },
+        });
+
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  reportProblem: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        severity: z.enum(['critical', 'warning', 'info']).default('warning'),
+        summary: z.string().trim().min(1).max(1500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        include: {
+          server: {
+            select: {
+              id: true,
+              name: true,
+              countryCode: true,
+            },
+          },
+          user: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const metadata = {
+        accessKeyId: key.id,
+        accessKeyName: key.name,
+        serverId: key.serverId,
+        serverName: key.server?.name ?? null,
+        keyEmail: key.email,
+        userEmail: key.user?.email ?? null,
+      };
+
+      const incident = await db.incident.create({
+        data: {
+          sourceType: 'MANUAL',
+          serverId: key.serverId,
+          title: `Access key issue: ${key.name}`,
+          summary: input.summary,
+          severity: input.severity,
+          status: 'OPEN',
+          countryCode: key.server?.countryCode ?? null,
+          affectedKeyCount: 1,
+          affectedUserCount: key.email || key.user?.email ? 1 : 0,
+          metadata: JSON.stringify(metadata),
+        },
+      });
+
+      await db.incidentEvent.create({
+        data: {
+          incidentId: incident.id,
+          type: 'OPENED',
+          severity: input.severity,
+          title: `Problem reported for ${key.name}`,
+          message: input.summary,
+          details: JSON.stringify(metadata),
+          actorUserId: ctx.user.id,
+          actorEmail: ctx.user.email,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_PROBLEM_REPORTED',
+        entity: 'ACCESS_KEY',
+        entityId: key.id,
+        details: {
+          incidentId: incident.id,
+          severity: input.severity,
+          summary: input.summary,
+        },
+      });
+
+      return {
+        incidentId: incident.id,
+        status: incident.status,
+      };
     }),
 
   getSharePageAnalytics: protectedProcedure

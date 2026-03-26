@@ -13,6 +13,7 @@ import {
   recordSubscriptionPageEvent,
   SUBSCRIPTION_EVENT_TYPES,
 } from '@/lib/services/subscription-events';
+import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 
 function getClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
@@ -56,23 +57,21 @@ export async function GET(
 
   try {
     // Find the key by subscription token
-    const key = await db.accessKey.findFirst({
-      where: {
-        OR: [
-          { subscriptionToken: token },
-          { publicSlug: token },
-        ],
-      },
-      include: {
-        server: {
-          select: {
-            name: true,
-            countryCode: true,
-            location: true,
+    const resolvedAccessKey = await resolveAccessKeyPublicIdentifier(token);
+    const key = resolvedAccessKey
+      ? await db.accessKey.findUnique({
+          where: { id: resolvedAccessKey.id },
+          include: {
+            server: {
+              select: {
+                name: true,
+                countryCode: true,
+                location: true,
+              },
+            },
           },
-        },
-      },
-    });
+        })
+      : null;
 
     // If not found in AccessKey, check DynamicAccessKey
     if (!key) {
@@ -247,7 +246,7 @@ export async function GET(
     }
 
     const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
-    const outlineIdentifier = key.publicSlug || token;
+    const outlineIdentifier = key.publicSlug || resolvedAccessKey?.subscriptionToken || token;
     const outlineClientUrl = buildSubscriptionClientUrl(outlineIdentifier, key.name, {
       origin: request.nextUrl.origin,
       shortPath: Boolean(key.publicSlug),
@@ -263,6 +262,7 @@ export async function GET(
         platform,
         metadata: {
           token,
+          matchedBy: resolvedAccessKey?.matchedBy ?? 'dynamic',
           shortPath: Boolean(key.publicSlug),
           responseFormat: acceptHeader.includes('application/json') ? 'json' : 'plain',
         },

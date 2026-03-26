@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 
 export const SUBSCRIPTION_EVENT_TYPES = {
   PAGE_VIEW: 'PAGE_VIEW',
@@ -50,16 +51,15 @@ export async function recordSubscriptionPageEventByToken(input: {
   ip?: string | null;
   userAgent?: string | null;
 }) {
+  const resolvedAccessKey = await resolveAccessKeyPublicIdentifier(input.token);
+
   const [accessKey, dynamicKey] = await Promise.all([
-    db.accessKey.findFirst({
-      where: {
-        OR: [
-          { subscriptionToken: input.token },
-          { publicSlug: input.token },
-        ],
-      },
-      select: { id: true },
-    }),
+    resolvedAccessKey
+      ? db.accessKey.findUnique({
+          where: { id: resolvedAccessKey.id },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
     db.dynamicAccessKey.findUnique({
       where: { dynamicUrl: input.token },
       select: { id: true },

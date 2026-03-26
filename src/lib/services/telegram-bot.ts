@@ -1235,6 +1235,205 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
   };
 }
 
+export async function sendAccessKeyRenewalReminder(input: {
+  accessKeyId: string;
+  chatId?: string | number | null;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key) {
+    throw new Error('Access key not found.');
+  }
+
+  if (!key.telegramDeliveryEnabled) {
+    throw new Error('Telegram delivery is disabled for this key.');
+  }
+
+  const destinationChatId =
+    (input.chatId ? String(input.chatId) : null) || resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    throw new Error('This key is not linked to a Telegram chat yet.');
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = defaults.defaultLanguage;
+  const ui = getTelegramUi(locale);
+  const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'renewal_reminder', lang: locale })
+    : buildSharePageUrl(token, { source: input.source || 'renewal_reminder', lang: locale });
+  const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'renewal_reminder' });
+  const supportLink = defaults.supportLink;
+
+  const lines = locale === 'my'
+    ? [
+        '🔔 <b>သက်တမ်းတိုးခြင်း အသိပေးချက်</b>',
+        '',
+        `🔑 Key: <b>${escapeHtml(key.name)}</b>`,
+        `🖥 Server: ${escapeHtml(key.server.name)}`,
+        `⏳ လက်ရှိသက်တမ်း: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+        key.dataLimitBytes
+          ? `📦 အသုံးပြုမှု: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
+          : `📦 အသုံးပြုမှု: ${ui.unlimited}`,
+        '',
+        'သင့် key ကို ဆက်လက်အသုံးပြုလိုပါက administrator ထံ ဆက်သွယ်ပြီး သက်တမ်းတိုးနိုင်ပါသည်။',
+        '',
+        `🌐 Share page: ${sharePageUrl}`,
+        `🔄 Subscription URL: ${subscriptionUrl}`,
+      ]
+    : [
+        '🔔 <b>Renewal Reminder</b>',
+        '',
+        `🔑 Key: <b>${escapeHtml(key.name)}</b>`,
+        `🖥 Server: ${escapeHtml(key.server.name)}`,
+        `⏳ Current expiration: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+        key.dataLimitBytes
+          ? `📦 Usage: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
+          : `📦 Usage: ${ui.unlimited}`,
+        '',
+        'If you want to keep using this key, please contact your administrator to renew it.',
+        '',
+        `🌐 Share page: ${sharePageUrl}`,
+        `🔄 Subscription URL: ${subscriptionUrl}`,
+      ];
+
+  const inlineKeyboard: Array<Array<{ text: string; url: string }>> = [
+    [{ text: ui.openSharePage, url: sharePageUrl }],
+  ];
+
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+
+  await recordSubscriptionPageEvent({
+    accessKeyId: key.id,
+    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+    source: input.source || 'renewal_reminder',
+    metadata: {
+      destinationChatId,
+      notificationType: 'RENEWAL_REMINDER',
+    },
+  });
+
+  await writeAuditLog({
+    action: 'ACCESS_KEY_RENEWAL_REMINDER_SENT',
+    entity: 'ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      sharePageUrl,
+      subscriptionUrl,
+    },
+  });
+
+  return {
+    destinationChatId,
+    sharePageUrl,
+    subscriptionUrl,
+  };
+}
+
+export async function sendAccessKeySupportMessage(input: {
+  accessKeyId: string;
+  message: string;
+  chatId?: string | number | null;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key) {
+    throw new Error('Access key not found.');
+  }
+
+  if (!key.telegramDeliveryEnabled) {
+    throw new Error('Telegram delivery is disabled for this key.');
+  }
+
+  const trimmedMessage = input.message.trim();
+  if (!trimmedMessage) {
+    throw new Error('Support message cannot be empty.');
+  }
+
+  const destinationChatId =
+    (input.chatId ? String(input.chatId) : null) || resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    throw new Error('This key is not linked to a Telegram chat yet.');
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = defaults.defaultLanguage;
+  const ui = getTelegramUi(locale);
+  const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'support_message', lang: locale })
+    : buildSharePageUrl(token, { source: input.source || 'support_message', lang: locale });
+
+  const lines = locale === 'my'
+    ? [
+        '💬 <b>Administrator မှ စာပို့ထားပါသည်</b>',
+        '',
+        `🔑 Key: <b>${escapeHtml(key.name)}</b>`,
+        '',
+        escapeHtml(trimmedMessage),
+        '',
+        `🌐 Share page: ${sharePageUrl}`,
+      ]
+    : [
+        '💬 <b>Message from your administrator</b>',
+        '',
+        `🔑 Key: <b>${escapeHtml(key.name)}</b>`,
+        '',
+        escapeHtml(trimmedMessage),
+        '',
+        `🌐 Share page: ${sharePageUrl}`,
+      ];
+
+  await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: {
+      inline_keyboard: [[{ text: ui.openSharePage, url: sharePageUrl }]],
+    },
+  });
+
+  await recordSubscriptionPageEvent({
+    accessKeyId: key.id,
+    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+    source: input.source || 'support_message',
+    metadata: {
+      destinationChatId,
+      notificationType: 'SUPPORT_MESSAGE',
+    },
+  });
+
+  await writeAuditLog({
+    action: 'ACCESS_KEY_SUPPORT_MESSAGE_SENT',
+    entity: 'ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      message: trimmedMessage,
+      sharePageUrl,
+    },
+  });
+
+  return {
+    destinationChatId,
+    sharePageUrl,
+  };
+}
+
 export async function sendRenewalRequestToAdmins(input: {
   accessKeyId: string;
   requesterTelegramId: string;
