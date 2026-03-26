@@ -206,6 +206,8 @@ model AccessKey {
   sharePageEnabled           Boolean @default(true)
   clientLinkEnabled          Boolean @default(true)
   telegramDeliveryEnabled    Boolean @default(true)
+  sharePagePasswordHash      String?
+  sharePageAccessExpiresAt   DateTime?
 
   // Connection/device tracking
   estimatedDevices Int @default(0)
@@ -224,6 +226,7 @@ model AccessKey {
   telegramLinkTokens     TelegramLinkToken[]
   subscriptionEvents     SubscriptionPageEvent[]
   slugHistory            AccessKeySlugHistory[]
+  distributionLinks      AccessDistributionLink[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -460,14 +463,21 @@ model SubscriptionPageEvent {
 
 model AccessDistributionLink {
   id                 String           @id @default(cuid())
-  dynamicAccessKeyId String
-  dynamicAccessKey   DynamicAccessKey @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  accessKeyId        String?
+  accessKey          AccessKey?       @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  dynamicAccessKeyId String?
+  dynamicAccessKey   DynamicAccessKey? @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
   token              String           @unique
+  label              String?
+  note               String?
   expiresAt          DateTime
   maxUses            Int?
   currentUses        Int              @default(0)
+  lastOpenedAt       DateTime?
+  lastOpenedIp       String?
   createdAt          DateTime         @default(now())
 
+  @@index([accessKeyId, expiresAt])
   @@index([dynamicAccessKeyId, expiresAt])
   @@index([token, expiresAt])
 }

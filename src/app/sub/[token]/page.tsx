@@ -76,6 +76,7 @@ import {
 
 type Platform = 'android' | 'ios' | 'windows';
 const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
+const SHARE_PAGE_PASSWORD_KEY_PREFIX = 'atomic-share-password:';
 
 interface ContactLink {
   type: 'telegram' | 'discord' | 'whatsapp' | 'phone' | 'email' | 'website' | 'facebook';
@@ -318,6 +319,10 @@ export default function SubscriptionPage() {
   const [refreshingUsage, setRefreshingUsage] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [pageViewLogged, setPageViewLogged] = useState(false);
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [pageExpiredAt, setPageExpiredAt] = useState<string | null>(null);
+  const [sharePassword, setSharePassword] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
   const localeTag = locale === 'my' ? 'my-MM' : 'en-US';
   const t = useCallback(
     (key: string) => resolveTranslation(locale, key) ?? resolveTranslation(defaultLocale, key) ?? key,
@@ -328,6 +333,44 @@ export default function SubscriptionPage() {
       values ? fillTemplate(t(key), values) : t(key),
     [t],
   );
+  const shareGateCopy = useMemo(() => ({
+    title: locale === 'my' ? 'ဤစာမျက်နှာကို ဖွင့်ရန် စကားဝှက်လိုအပ်သည်' : 'This page requires a password',
+    description: locale === 'my'
+      ? 'ပိုင်ရှင်ပေးထားသော share page စကားဝှက်ကို ထည့်ပြီး ဆက်လက်ဝင်ရောက်ပါ။'
+      : 'Enter the share-page password provided by the owner to continue.',
+    inputLabel: locale === 'my' ? 'Share page စကားဝှက်' : 'Share page password',
+    inputPlaceholder: locale === 'my' ? 'စကားဝှက် ထည့်ပါ' : 'Enter password',
+    unlock: locale === 'my' ? 'ဖွင့်မည်' : 'Unlock',
+    wrongPassword: locale === 'my' ? 'စကားဝှက်မမှန်ပါ။ ထပ်စမ်းပါ။' : 'Incorrect password. Please try again.',
+    expiredTitle: locale === 'my' ? 'ဤ share page သက်တမ်းကုန်သွားပါပြီ' : 'This share page has expired',
+    expiredDescription: locale === 'my'
+      ? 'ဤ public share page ကို အသုံးပြုခွင့် သက်တမ်းကုန်သွားပါပြီ။ ပိုင်ရှင်နှင့် ဆက်သွယ်ပါ။'
+      : 'Public access to this share page has expired. Contact the owner for a new link.',
+    expiredAt: locale === 'my' ? 'သက်တမ်းကုန်ချိန်' : 'Expired at',
+  }), [locale]);
+
+  const getSharePasswordStorageKey = useCallback(
+    () => `${SHARE_PAGE_PASSWORD_KEY_PREFIX}${token}`,
+    [token],
+  );
+
+  const getStoredSharePassword = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+    return window.sessionStorage.getItem(getSharePasswordStorageKey()) || '';
+  }, [getSharePasswordStorageKey]);
+
+  const persistSharePassword = useCallback((value: string) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (value) {
+      window.sessionStorage.setItem(getSharePasswordStorageKey(), value);
+    } else {
+      window.sessionStorage.removeItem(getSharePasswordStorageKey());
+    }
+  }, [getSharePasswordStorageKey]);
 
   const persistLocale = useCallback((nextLocale: SupportedLocale) => {
     setLocale(nextLocale);
@@ -463,28 +506,146 @@ export default function SubscriptionPage() {
     }
   }
 
+  const fetchSubscriptionPageData = useCallback(
+    async (options?: { password?: string; cache?: RequestCache }) => {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const password = options?.password ?? getStoredSharePassword();
+      const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
+        headers: {
+          Accept: 'application/json',
+          ...(password ? { 'x-share-page-password': password } : {}),
+        },
+        cache: options?.cache,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          ok: false as const,
+          status: response.status,
+          error: errorData,
+        };
+      }
+
+      return {
+        ok: true as const,
+        data: await response.json(),
+        password,
+      };
+    },
+    [getStoredSharePassword, token],
+  );
+
+  const handleUnlockSharePage = useCallback(async () => {
+    const password = sharePassword.trim();
+    if (!password) {
+      setFeedback(shareGateCopy.wrongPassword);
+      return;
+    }
+
+    try {
+      setUnlocking(true);
+      const result = await fetchSubscriptionPageData({
+        password,
+        cache: 'no-store',
+      });
+
+      if (!result.ok) {
+        if (result.error?.code === 'PAGE_EXPIRED') {
+          setPageExpiredAt(result.error?.expiresAt || null);
+          setPasswordRequired(false);
+          persistSharePassword('');
+          setFeedback(null);
+          return;
+        }
+
+        setPasswordRequired(true);
+        setPageExpiredAt(result.error?.expiresAt || null);
+        setFeedback(shareGateCopy.wrongPassword);
+        return;
+      }
+
+      const data = result.data;
+      setKeyData(data);
+      setPasswordRequired(false);
+      setPageExpiredAt(null);
+      setError(null);
+      persistSharePassword(password);
+      setFeedback(null);
+
+      let settingsData: SettingsData = {};
+      try {
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+        const settingsRes = await fetch(`${basePath}/api/subscription/${token}/settings`, {
+          cache: 'no-store',
+        });
+        if (settingsRes.ok) {
+          settingsData = await settingsRes.json();
+          setSettings(settingsData);
+          if (settingsData.branding) {
+            setBranding({ ...defaultBranding, ...settingsData.branding });
+          }
+        }
+      } catch {
+        // Settings fetch failed, keep the existing defaults.
+      }
+
+      if (data.accessUrl) {
+        const logoUrl = settingsData.branding?.logoUrl || ATOMIC_LOGO_SVG;
+        const logoSize = settingsData.branding?.logoSize || 25;
+        await generateQRCode(data.accessUrl, logoUrl, logoSize);
+      }
+
+      setLastUpdatedAt(Date.now());
+    } finally {
+      setUnlocking(false);
+    }
+  }, [
+    fetchSubscriptionPageData,
+    persistSharePassword,
+    shareGateCopy.wrongPassword,
+    sharePassword,
+    token,
+  ]);
+
   // Fetch key data
   useEffect(() => {
     async function fetchData() {
       try {
-        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-        const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
-          headers: { Accept: 'application/json' },
-        });
+        const result = await fetchSubscriptionPageData();
+        if (!result.ok) {
+          if (result.error?.code === 'PASSWORD_REQUIRED') {
+            setPasswordRequired(true);
+            setPageExpiredAt(result.error?.expiresAt || null);
+            setError(null);
+            setLoading(false);
+            return;
+          }
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          setError(errorData.error || t('subscription.ui.load_failed'));
+          if (result.error?.code === 'PAGE_EXPIRED') {
+            setPageExpiredAt(result.error?.expiresAt || null);
+            setPasswordRequired(false);
+            persistSharePassword('');
+            setError(null);
+            setLoading(false);
+            return;
+          }
+
+          setError(result.error?.error || t('subscription.ui.load_failed'));
           setLoading(false);
           return;
         }
 
-        const data = await response.json();
+        const data = result.data;
         setKeyData(data);
+        setPasswordRequired(false);
+        setPageExpiredAt(null);
+        setError(null);
 
         // Fetch settings for support link, default theme, and branding
         let settingsData: SettingsData = {};
         try {
+          const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
           const settingsRes = await fetch(`${basePath}/api/subscription/${token}/settings`);
           if (settingsRes.ok) {
             settingsData = await settingsRes.json();
@@ -511,6 +672,9 @@ export default function SubscriptionPage() {
           await generateQRCode(data.accessUrl, logoUrl, logoSize);
         }
 
+        if (result.password) {
+          persistSharePassword(result.password);
+        }
         setLastUpdatedAt(Date.now());
         setLoading(false);
       } catch (err) {
@@ -520,7 +684,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [langParam, locale, persistLocale, t, token]);
+  }, [fetchSubscriptionPageData, langParam, locale, persistLocale, persistSharePassword, t, token]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -739,17 +903,11 @@ export default function SubscriptionPage() {
   const refreshUsage = async () => {
     try {
       setRefreshingUsage(true);
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-      const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
+      const result = await fetchSubscriptionPageData({ cache: 'no-store' });
+      if (!result.ok) {
         throw new Error('Failed to refresh subscription');
       }
-
-      const data = await response.json();
+      const data = result.data;
       setKeyData(data);
 
       if (data.accessUrl && data.accessUrl !== keyData?.accessUrl) {
@@ -819,6 +977,150 @@ export default function SubscriptionPage() {
           className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent"
           style={{ borderColor: theme.accent, borderTopColor: 'transparent' }}
         />
+      </div>
+    );
+  }
+
+  if (pageExpiredAt) {
+    return (
+      <div className="min-h-screen px-4 py-10 sm:px-6">
+        <div
+          className="mx-auto max-w-3xl overflow-hidden rounded-[2rem] border px-6 py-8 shadow-2xl backdrop-blur"
+          style={{
+            background: `linear-gradient(180deg, ${theme.bgSecondary}, ${theme.bgCard})`,
+            borderColor: `${theme.border}`,
+            color: theme.textPrimary,
+          }}
+        >
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-3">
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em]"
+                style={{
+                  backgroundColor: `${theme.warning}18`,
+                  color: theme.warning,
+                }}
+              >
+                {shareGateCopy.expiredTitle}
+              </span>
+              <div className="flex items-start gap-3">
+                <div
+                  className="rounded-2xl p-3"
+                  style={{ backgroundColor: `${theme.warning}15` }}
+                >
+                  <Clock3 className="h-6 w-6" style={{ color: theme.warning }} />
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-2xl font-semibold sm:text-3xl">{shareGateCopy.expiredTitle}</h1>
+                  <p className="max-w-xl text-sm leading-7 sm:text-base" style={{ color: theme.textMuted }}>
+                    {shareGateCopy.expiredDescription}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="mt-8 rounded-[1.5rem] border px-5 py-4"
+            style={{
+              borderColor: `${theme.border}`,
+              backgroundColor: `${theme.bgPrimary}`,
+            }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: theme.textMuted }}>
+              {shareGateCopy.expiredAt}
+            </p>
+            <p className="mt-2 text-lg font-semibold">
+              {formatLocalizedDate(pageExpiredAt)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (passwordRequired) {
+    return (
+      <div className="min-h-screen px-4 py-10 sm:px-6">
+        <div
+          className="mx-auto max-w-3xl overflow-hidden rounded-[2rem] border px-6 py-8 shadow-2xl backdrop-blur"
+          style={{
+            background: `linear-gradient(180deg, ${theme.bgSecondary}, ${theme.bgCard})`,
+            borderColor: `${theme.border}`,
+            color: theme.textPrimary,
+          }}
+        >
+          <div className="space-y-3">
+            <span
+              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em]"
+              style={{
+                backgroundColor: `${theme.accent}18`,
+                color: theme.accent,
+              }}
+            >
+              {shareGateCopy.title}
+            </span>
+            <h1 className="text-2xl font-semibold sm:text-3xl">{shareGateCopy.title}</h1>
+            <p className="max-w-xl text-sm leading-7 sm:text-base" style={{ color: theme.textMuted }}>
+              {shareGateCopy.description}
+            </p>
+          </div>
+
+          <div
+            className="mt-8 rounded-[1.5rem] border px-5 py-5"
+            style={{
+              borderColor: `${theme.border}`,
+              backgroundColor: `${theme.bgPrimary}`,
+            }}
+          >
+            <label className="block text-sm font-medium" style={{ color: theme.textPrimary }}>
+              {shareGateCopy.inputLabel}
+            </label>
+            <input
+              type="password"
+              value={sharePassword}
+              onChange={(event) => setSharePassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleUnlockSharePage();
+                }
+              }}
+              placeholder={shareGateCopy.inputPlaceholder}
+              className="mt-3 w-full rounded-2xl border px-4 py-3 text-sm outline-none transition"
+              style={{
+                borderColor: theme.border,
+                backgroundColor: theme.bgSecondary,
+                color: theme.textPrimary,
+              }}
+            />
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => void handleUnlockSharePage()}
+                disabled={unlocking}
+                className="inline-flex min-w-[160px] items-center justify-center rounded-2xl px-5 py-3 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.buttonGradientFrom}, ${theme.buttonGradientTo})`,
+                }}
+              >
+                {unlocking ? (
+                  <span className="inline-flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    {shareGateCopy.unlock}
+                  </span>
+                ) : (
+                  shareGateCopy.unlock
+                )}
+              </button>
+              {feedback ? (
+                <p className="text-sm" style={{ color: theme.warning }}>
+                  {feedback}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -952,6 +1254,11 @@ export default function SubscriptionPage() {
 
     downloadDataUrl(qrCode, qrDownloadFilename);
     setFeedback(t('subscription.feedback.qr_downloaded'));
+    void trackSubscriptionEvent(
+      SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_QR,
+      { file: qrDownloadFilename },
+      platform,
+    );
   };
 
   const handleDownloadConfig = () => {
@@ -962,6 +1269,11 @@ export default function SubscriptionPage() {
 
     downloadTextFile(`${actionFieldText}\n`, configDownloadFilename);
     setFeedback(t('subscription.feedback.config_downloaded'));
+    void trackSubscriptionEvent(
+      SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG,
+      { file: configDownloadFilename },
+      platform,
+    );
   };
 
   // Render animated background

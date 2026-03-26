@@ -50,6 +50,7 @@ import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import {
+  buildAccessDistributionLinkUrl,
   buildSharePageUrl,
   buildShortClientUrl,
   buildShortShareUrl,
@@ -92,6 +93,7 @@ import {
   Phone,
   Globe,
   RotateCw,
+  Shield,
 } from 'lucide-react';
 import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
@@ -582,7 +584,11 @@ function SubscriptionShareCard({
     sharePageUrl: isMyanmar ? 'Share Page URL' : 'Share Page URL',
     clientUrl: isMyanmar ? 'Client URL' : 'Client URL',
     pageViews: isMyanmar ? 'စာမျက်နှာကြည့်ရှုမှု' : 'Page Views',
+    inviteOpens: isMyanmar ? 'Invite ဖွင့်ထားမှု' : 'Invite Opens',
     copyClicks: isMyanmar ? 'Copy အကြိမ်ရေ' : 'Copy Clicks',
+    qrDownloads: isMyanmar ? 'QR download' : 'QR Downloads',
+    configDownloads: isMyanmar ? 'Config download' : 'Config Downloads',
+    clientFetches: isMyanmar ? 'Client fetches' : 'Client Fetches',
     telegramSends: isMyanmar ? 'Telegram ပို့ထားမှု' : 'Telegram Sends',
     lastViewed: isMyanmar ? 'နောက်ဆုံးကြည့်ရှုချိန်' : 'Last Viewed',
     never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
@@ -1452,8 +1458,24 @@ function SubscriptionShareCard({
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.pageViews ?? 0}</p>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.inviteOpens}</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.inviteOpens ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.copyClicks}</p>
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.copyClicks ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.qrDownloads}</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.qrDownloads ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.configDownloads}</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.configDownloads ?? 0}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.clientFetches}</p>
+            <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.clientFetches ?? 0}</p>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.telegramSends}</p>
@@ -1465,6 +1487,448 @@ function SubscriptionShareCard({
               {analyticsQuery.data?.lastViewedAt ? formatRelativeTime(analyticsQuery.data.lastViewedAt) : shareUi.never}
             </p>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AccessDistributionSecurityCard({
+  keyId,
+  keyName,
+  hasPassword,
+  accessExpiresAt,
+  distributionLinks,
+  auditTrail,
+  onUpdated,
+}: {
+  keyId: string;
+  keyName: string;
+  hasPassword: boolean;
+  accessExpiresAt: string | Date | null;
+  distributionLinks: Array<{
+    id: string;
+    token: string;
+    label?: string | null;
+    note?: string | null;
+    expiresAt: string | Date;
+    maxUses?: number | null;
+    currentUses: number;
+    createdAt: string | Date;
+    lastOpenedAt?: string | Date | null;
+    lastOpenedIp?: string | null;
+  }>;
+  auditTrail: Array<{
+    id: string;
+    action: string;
+    details: Record<string, unknown> | null;
+    ip?: string | null;
+    createdAt: string | Date;
+  }>;
+  onUpdated: () => void;
+}) {
+  const { locale } = useLocale();
+  const { toast } = useToast();
+  const isMyanmar = locale === 'my';
+  const ui = {
+    title: isMyanmar ? 'Share လုံခြုံရေးနှင့် Invite Link များ' : 'Share Protection & Invite Links',
+    description: isMyanmar ? 'Public share page ကို password, expiry, နှင့် invite links ဖြင့် ထိန်းချုပ်ပါ။' : 'Protect the public share page with a password, expiry, and one-time invite links.',
+    protection: isMyanmar ? 'Share page လုံခြုံရေး' : 'Share page protection',
+    protectionDesc: isMyanmar ? 'လိုအပ်လျှင် password တပ်ပြီး share page အသုံးပြုခွင့် သတ်မှတ်ချိန်တစ်ခု သတ်မှတ်နိုင်သည်။' : 'Add an optional password and access expiry for the public share page.',
+    password: isMyanmar ? 'Share page password' : 'Share page password',
+    passwordPlaceholder: isMyanmar ? 'အသစ်တစ်ခု သတ်မှတ်ရန် စကားဝှက် ထည့်ပါ' : 'Enter a password to protect the page',
+    expiresAt: isMyanmar ? 'Public access expiry' : 'Public access expiry',
+    saveProtection: isMyanmar ? 'လုံခြုံရေး သိမ်းမည်' : 'Save Protection',
+    clearPassword: isMyanmar ? 'Password ဖျက်မည်' : 'Clear Password',
+    protectedOn: isMyanmar ? 'Password ကာကွယ်မှု ဖွင့်ထားသည်' : 'Password protection enabled',
+    protectedOff: isMyanmar ? 'Password ကာကွယ်မှု မရှိပါ' : 'No password currently set',
+    inviteTitle: isMyanmar ? 'Invite link များ' : 'Invite links',
+    inviteDesc: isMyanmar ? 'သတ်မှတ်အသုံးပြုခွင့်ရှိသော invite links ဖန်တီးပြီး copy သို့မဟုတ် revoke လုပ်နိုင်သည်။' : 'Create limited invite links that can be copied or revoked anytime.',
+    label: isMyanmar ? 'Label' : 'Label',
+    labelPlaceholder: isMyanmar ? 'ဥပမာ - Reseller batch' : 'For example: Reseller batch',
+    note: isMyanmar ? 'Note' : 'Note',
+    notePlaceholder: isMyanmar ? 'လိုအပ်ပါက အသေးစိတ် မှတ်ချက် ထည့်ပါ' : 'Optional internal note',
+    inviteExpiry: isMyanmar ? 'Invite expiry' : 'Invite expiry',
+    maxUses: isMyanmar ? 'Max uses' : 'Max uses',
+    unlimited: isMyanmar ? 'အကန့်အသတ်မရှိ' : 'Unlimited',
+    createInvite: isMyanmar ? 'Invite ဖန်တီးမည်' : 'Create Invite',
+    copyInvite: isMyanmar ? 'Invite copy' : 'Copy Invite',
+    openInvite: isMyanmar ? 'Invite ဖွင့်မည်' : 'Open Invite',
+    revokeInvite: isMyanmar ? 'Revoke' : 'Revoke',
+    noInvites: isMyanmar ? 'Invite link မရှိသေးပါ' : 'No invite links yet',
+    inviteUses: isMyanmar ? 'အသုံးပြုပြီး' : 'Uses',
+    lastOpened: isMyanmar ? 'နောက်ဆုံးဖွင့်ထားချိန်' : 'Last opened',
+    never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
+    copySuccess: isMyanmar ? 'Invite link ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Invite link copied to clipboard.',
+    protectionSaved: isMyanmar ? 'Share page လုံခြုံရေးကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page protection has been updated.',
+    passwordCleared: isMyanmar ? 'Share page password ကို ဖျက်ပြီးပါပြီ။' : 'Share page password has been cleared.',
+    inviteCreated: isMyanmar ? 'Invite link အသစ် ဖန်တီးပြီးပါပြီ။' : 'New invite link created.',
+    inviteRevoked: isMyanmar ? 'Invite link ကို revoke လုပ်ပြီးပါပြီ။' : 'Invite link revoked.',
+    actionFailed: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
+    auditTitle: isMyanmar ? 'Audit trail' : 'Audit trail',
+    auditDesc: isMyanmar ? 'share, protection, နှင့် support လုပ်ဆောင်ချက်များ၏ လတ်တလော မှတ်တမ်း' : 'Recent share, protection, and support actions for this key.',
+    noAudit: isMyanmar ? 'Audit မှတ်တမ်း မရှိသေးပါ' : 'No audit entries yet',
+  };
+
+  const toDateTimeLocalValue = (value?: string | Date | null) => {
+    if (!value) return '';
+    const date = new Date(value);
+    const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+    return adjusted.toISOString().slice(0, 16);
+  };
+
+  const [passwordInput, setPasswordInput] = useState('');
+  const [hasPasswordProtection, setHasPasswordProtection] = useState(hasPassword);
+  const [accessExpiryInput, setAccessExpiryInput] = useState(toDateTimeLocalValue(accessExpiresAt));
+  const [linkLabel, setLinkLabel] = useState('');
+  const [linkNote, setLinkNote] = useState('');
+  const [linkExpiresAt, setLinkExpiresAt] = useState(toDateTimeLocalValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
+  const [linkMaxUses, setLinkMaxUses] = useState('');
+
+  useEffect(() => {
+    setHasPasswordProtection(hasPassword);
+    setAccessExpiryInput(toDateTimeLocalValue(accessExpiresAt));
+  }, [accessExpiresAt, hasPassword]);
+
+  const updateProtectionMutation = trpc.keys.updateShareProtection.useMutation({
+    onSuccess: (result) => {
+      setHasPasswordProtection(result.hasPassword);
+      setPasswordInput('');
+      toast({
+        title: ui.protection,
+        description: result.hasPassword ? ui.protectionSaved : ui.passwordCleared,
+      });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({
+        title: ui.actionFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const createInviteMutation = trpc.keys.createDistributionLink.useMutation({
+    onSuccess: async (result) => {
+      setLinkLabel('');
+      setLinkNote('');
+      setLinkMaxUses('');
+      setLinkExpiresAt(toDateTimeLocalValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
+      toast({
+        title: ui.inviteTitle,
+        description: ui.inviteCreated,
+      });
+      onUpdated();
+      await copyToClipboard(result.url, 'Copied!', ui.copySuccess);
+    },
+    onError: (error) => {
+      toast({
+        title: ui.actionFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const revokeInviteMutation = trpc.keys.revokeDistributionLink.useMutation({
+    onSuccess: () => {
+      toast({
+        title: ui.inviteTitle,
+        description: ui.inviteRevoked,
+      });
+      onUpdated();
+    },
+    onError: (error) => {
+      toast({
+        title: ui.actionFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSaveProtection = () => {
+    const payload: Record<string, unknown> = {
+      id: keyId,
+      accessExpiresAt: accessExpiryInput ? new Date(accessExpiryInput) : null,
+    };
+
+    if (passwordInput.trim()) {
+      payload.password = passwordInput.trim();
+    } else if (!hasPasswordProtection) {
+      payload.password = '';
+    }
+
+    updateProtectionMutation.mutate(payload as any);
+  };
+
+  const handleClearPassword = () => {
+    updateProtectionMutation.mutate({
+      id: keyId,
+      clearPassword: true,
+      accessExpiresAt: accessExpiryInput ? new Date(accessExpiryInput) : null,
+    });
+  };
+
+  const handleCreateInvite = () => {
+    if (!linkExpiresAt) {
+      toast({
+        title: ui.actionFailed,
+        description: ui.inviteExpiry,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createInviteMutation.mutate({
+      id: keyId,
+      label: linkLabel.trim() || null,
+      note: linkNote.trim() || null,
+      expiresAt: new Date(linkExpiresAt),
+      maxUses: linkMaxUses.trim() ? Number(linkMaxUses) : null,
+      lang: locale,
+    });
+  };
+
+  const formatAuditAction = (action: string) => {
+    switch (action) {
+      case 'ACCESS_KEY_SHARE_PROTECTION_UPDATED':
+        return isMyanmar ? 'Share protection အပ်ဒိတ်လုပ်ခဲ့သည်' : 'Updated share protection';
+      case 'ACCESS_KEY_DISTRIBUTION_LINK_CREATED':
+        return isMyanmar ? 'Invite link ဖန်တီးခဲ့သည်' : 'Created invite link';
+      case 'ACCESS_KEY_DISTRIBUTION_LINK_REVOKED':
+        return isMyanmar ? 'Invite link revoke လုပ်ခဲ့သည်' : 'Revoked invite link';
+      case 'ACCESS_KEY_SHARE_TOKEN_REGENERATED':
+        return isMyanmar ? 'Share token ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated share token';
+      case 'ACCESS_KEY_PUBLIC_SLUG_REGENERATED':
+        return isMyanmar ? 'Short slug ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated short slug';
+      case 'ACCESS_KEY_ACCESS_RESENT':
+      case 'TELEGRAM_SHARE_SENT':
+        return isMyanmar ? 'Access ကို ထပ်ပို့ခဲ့သည်' : 'Resent access';
+      case 'ACCESS_KEY_RENEWAL_REMINDER_SENT':
+      case 'ACCESS_KEY_RENEWAL_REMINDER_TRIGGERED':
+        return isMyanmar ? 'Renewal reminder ပို့ခဲ့သည်' : 'Sent renewal reminder';
+      case 'ACCESS_KEY_SUPPORT_MESSAGE_SENT':
+      case 'ACCESS_KEY_SUPPORT_MESSAGE_TRIGGERED':
+        return isMyanmar ? 'Support message ပို့ခဲ့သည်' : 'Sent support message';
+      case 'ACCESS_KEY_PROBLEM_REPORTED':
+        return isMyanmar ? 'ပြဿနာတင်ပြခဲ့သည်' : 'Reported a problem';
+      default:
+        return action.replaceAll('_', ' ').toLowerCase();
+    }
+  };
+
+  const getInviteUrl = (token: string) =>
+    buildAccessDistributionLinkUrl(token, {
+      origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+      lang: locale,
+    });
+
+  return (
+    <Card className="ops-detail-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="w-5 h-5 text-primary" />
+          {ui.title}
+        </CardTitle>
+        <CardDescription>{ui.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4 rounded-[1.5rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">{ui.protection}</h3>
+            <p className="text-sm text-muted-foreground">{ui.protectionDesc}</p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{ui.password}</Label>
+              <Input
+                type="password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+                placeholder={ui.passwordPlaceholder}
+              />
+              <p className="text-xs text-muted-foreground">
+                {hasPasswordProtection ? ui.protectedOn : ui.protectedOff}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>{ui.expiresAt}</Label>
+              <Input
+                type="datetime-local"
+                value={accessExpiryInput}
+                onChange={(event) => setAccessExpiryInput(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleSaveProtection} disabled={updateProtectionMutation.isPending}>
+              {updateProtectionMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Shield className="mr-2 h-4 w-4" />
+              )}
+              {ui.saveProtection}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleClearPassword}
+              disabled={!hasPasswordProtection || updateProtectionMutation.isPending}
+            >
+              {ui.clearPassword}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-[1.5rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">{ui.inviteTitle}</h3>
+            <p className="text-sm text-muted-foreground">{ui.inviteDesc}</p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{ui.label}</Label>
+              <Input
+                value={linkLabel}
+                onChange={(event) => setLinkLabel(event.target.value)}
+                placeholder={ui.labelPlaceholder}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{ui.maxUses}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={1000}
+                value={linkMaxUses}
+                onChange={(event) => setLinkMaxUses(event.target.value)}
+                placeholder={ui.unlimited}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{ui.inviteExpiry}</Label>
+              <Input
+                type="datetime-local"
+                value={linkExpiresAt}
+                onChange={(event) => setLinkExpiresAt(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2 lg:col-span-2">
+              <Label>{ui.note}</Label>
+              <Textarea
+                value={linkNote}
+                onChange={(event) => setLinkNote(event.target.value)}
+                placeholder={ui.notePlaceholder}
+                className="min-h-[88px]"
+              />
+            </div>
+          </div>
+
+          <Button onClick={handleCreateInvite} disabled={createInviteMutation.isPending}>
+            {createInviteMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            {ui.createInvite}
+          </Button>
+
+          <div className="space-y-3">
+            {distributionLinks.length === 0 ? (
+              <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                {ui.noInvites}
+              </div>
+            ) : (
+              distributionLinks.map((link) => {
+                const inviteUrl = getInviteUrl(link.token);
+                const usageLabel = link.maxUses ? `${link.currentUses}/${link.maxUses}` : `${link.currentUses}/${ui.unlimited}`;
+
+                return (
+                  <div key={link.id} className="rounded-[1.25rem] border border-border/60 bg-muted/20 p-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{link.label || keyName}</p>
+                          <Badge variant="outline" className="rounded-full">
+                            {ui.inviteUses}: {usageLabel}
+                          </Badge>
+                        </div>
+                        {link.note ? (
+                          <p className="text-sm text-muted-foreground">{link.note}</p>
+                        ) : null}
+                        <div className="rounded-lg border border-border/50 bg-background/70 p-3 text-xs break-all text-muted-foreground dark:bg-white/[0.03]">
+                          {inviteUrl}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          <span>{ui.inviteExpiry}: {formatDateTime(link.expiresAt)}</span>
+                          <span>{ui.lastOpened}: {link.lastOpenedAt ? formatRelativeTime(link.lastOpenedAt) : ui.never}</span>
+                          {link.lastOpenedIp ? <span>IP: {link.lastOpenedIp}</span> : null}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 xl:justify-end">
+                        <Button variant="outline" size="sm" onClick={() => void copyToClipboard(inviteUrl, 'Copied!', ui.copySuccess)}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          {ui.copyInvite}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => window.open(inviteUrl, '_blank')}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          {ui.openInvite}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => revokeInviteMutation.mutate({ id: keyId, linkId: link.id })}
+                          disabled={revokeInviteMutation.isPending}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {ui.revokeInvite}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-[1.5rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">{ui.auditTitle}</h3>
+            <p className="text-sm text-muted-foreground">{ui.auditDesc}</p>
+          </div>
+
+          {auditTrail.length === 0 ? (
+            <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+              {ui.noAudit}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {auditTrail.map((entry) => (
+                <div key={entry.id} className="flex flex-col gap-2 rounded-[1.1rem] border border-border/60 bg-muted/20 px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-1 min-w-0">
+                    <p className="font-medium">{formatAuditAction(entry.action)}</p>
+                    {entry.details ? (
+                      <p className="text-sm text-muted-foreground break-words">
+                        {Object.entries(entry.details)
+                          .slice(0, 3)
+                          .map(([key, value]) => `${key}: ${String(value)}`)
+                          .join(' · ')}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="text-xs text-muted-foreground lg:text-right">
+                    <p>{formatRelativeTime(entry.createdAt)}</p>
+                    {entry.ip ? <p className="mt-1 font-mono">{entry.ip}</p> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -2764,6 +3228,17 @@ export default function KeyDetailPage() {
             currentTelegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
             onThemeChange={() => refetch()}
           />
+          {isAdmin ? (
+            <AccessDistributionSecurityCard
+              keyId={key.id}
+              keyName={key.name}
+              hasPassword={Boolean((key as any).sharePagePasswordHash)}
+              accessExpiresAt={(key as any).sharePageAccessExpiresAt ?? null}
+              distributionLinks={(key as any).distributionLinks ?? []}
+              auditTrail={(key as any).auditTrail ?? []}
+              onUpdated={() => refetch()}
+            />
+          ) : null}
           {isAdmin ? (
             <SupportWorkflowCard
               keyId={key.id}

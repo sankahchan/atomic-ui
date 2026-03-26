@@ -19,6 +19,8 @@ import {
   Calendar,
   Clock,
   Copy,
+  Download,
+  ExternalLink,
   Gauge,
   Info,
   Key,
@@ -133,12 +135,18 @@ function getShareEventLabel(eventType: string) {
   switch (eventType) {
     case 'PAGE_VIEW':
       return 'Page view';
+    case 'INVITE_OPEN':
+      return 'Invite opened';
     case 'COPY_URL':
       return 'Copy URL';
     case 'OPEN_QR':
       return 'Open QR';
+    case 'DOWNLOAD_QR':
+      return 'QR downloaded';
     case 'OPEN_APP':
       return 'Open in app';
+    case 'DOWNLOAD_CONFIG':
+      return 'Config downloaded';
     case 'TELEGRAM_SENT':
       return 'Telegram send';
     case 'TELEGRAM_CONNECTED':
@@ -428,7 +436,7 @@ export default function AnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 px-0 pb-0">
-              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-9">
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public links</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.activePublicLinks || 0}</p>
@@ -438,6 +446,11 @@ export default function AnalyticsPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Page views</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.pageViews || 0}</p>
                   <p className="mt-1 text-sm text-muted-foreground">Share page opens in the selected range.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite opens</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.inviteOpens || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Distribution-link opens before the share page.</p>
                 </div>
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Copy clicks</p>
@@ -450,9 +463,19 @@ export default function AnalyticsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">Manual setup / QR-focused interactions.</p>
                 </div>
                 <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">QR downloads</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.qrDownloads || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">QR PNG files downloaded from public pages.</p>
+                </div>
+                <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">App opens</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.appOpens || 0}</p>
                   <p className="mt-1 text-sm text-muted-foreground">One-click import attempts from the share page.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Config downloads</p>
+                  <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.configDownloads || 0}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Client config files downloaded by users.</p>
                 </div>
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram sends</p>
@@ -491,7 +514,7 @@ export default function AnalyticsPage() {
                           <div className="ops-mini-tile">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Events</p>
                             <p className="mt-2 text-lg font-semibold">{link.metrics.totalEvents}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Copies {link.metrics.copyClicks} · App opens {link.metrics.appOpens}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Invites {link.metrics.inviteOpens} · Copies {link.metrics.copyClicks} · App opens {link.metrics.appOpens}</p>
                           </div>
                           <div className="ops-mini-tile">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last activity</p>
@@ -513,7 +536,9 @@ export default function AnalyticsPage() {
                         <TableRow>
                           <TableHead>Public link</TableHead>
                           <TableHead className="text-right">Views</TableHead>
+                          <TableHead className="text-right">Invites</TableHead>
                           <TableHead className="text-right">Copies</TableHead>
+                          <TableHead className="text-right">Downloads</TableHead>
                           <TableHead className="text-right">App opens</TableHead>
                           <TableHead className="text-right">Telegram</TableHead>
                           <TableHead>Last activity</TableHead>
@@ -537,7 +562,9 @@ export default function AnalyticsPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono">{link.metrics.pageViews}</TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.inviteOpens}</TableCell>
                             <TableCell className="text-right font-mono">{link.metrics.copyClicks}</TableCell>
+                            <TableCell className="text-right font-mono">{link.metrics.qrDownloads + link.metrics.configDownloads}</TableCell>
                             <TableCell className="text-right font-mono">{link.metrics.appOpens}</TableCell>
                             <TableCell className="text-right font-mono">{link.metrics.telegramSends}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
@@ -587,8 +614,12 @@ export default function AnalyticsPage() {
                 shareDashboard.recentEvents.map((event) => {
                   const icon = event.eventType === 'COPY_URL'
                     ? <Copy className="h-4 w-4" />
+                    : event.eventType === 'INVITE_OPEN'
+                      ? <ExternalLink className="h-4 w-4" />
                     : event.eventType === 'OPEN_QR'
                       ? <QrCode className="h-4 w-4" />
+                      : event.eventType === 'DOWNLOAD_QR' || event.eventType === 'DOWNLOAD_CONFIG'
+                        ? <Download className="h-4 w-4" />
                       : event.eventType === 'TELEGRAM_SENT' || event.eventType === 'TELEGRAM_CONNECTED'
                         ? <Send className="h-4 w-4" />
                         : <Share2 className="h-4 w-4" />;

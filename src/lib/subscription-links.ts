@@ -212,6 +212,28 @@ export function buildDynamicDistributionLinkUrl(
   return url.toString();
 }
 
+export function buildAccessDistributionLinkUrl(
+  token: string,
+  options?: {
+    origin?: string | null;
+    source?: string | null;
+    lang?: string | null;
+  },
+) {
+  const url = new URL(`${getPublicShareOrigin(options?.origin)}${getPublicBasePath()}/share/${token}`);
+
+  if (options?.source) {
+    url.searchParams.set('source', options.source);
+  }
+
+  const locale = coerceSupportedLocale(options?.lang);
+  if (locale) {
+    url.searchParams.set('lang', locale);
+  }
+
+  return url.toString();
+}
+
 export function buildDynamicSharePageUrl(
   token: string,
   options?: {

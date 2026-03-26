@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { buildDynamicOutlineUrl, buildSubscriptionClientUrl } from '@/lib/subscription-links';
+import { verifySharePagePassword } from '@/lib/share-page-protection';
 import {
   recordSubscriptionPageEvent,
   SUBSCRIPTION_EVENT_TYPES,
@@ -238,6 +239,31 @@ export async function GET(
       );
     }
 
+    if (isPageAudience && key.sharePageAccessExpiresAt && new Date() > key.sharePageAccessExpiresAt) {
+      return NextResponse.json(
+        {
+          error: 'Share page access expired',
+          code: 'PAGE_EXPIRED',
+          expiresAt: key.sharePageAccessExpiresAt.toISOString(),
+        },
+        { status: 410 },
+      );
+    }
+
+    if (isPageAudience && key.sharePagePasswordHash) {
+      const providedPassword = request.headers.get('x-share-page-password');
+      if (!providedPassword || !verifySharePagePassword(providedPassword, key.sharePagePasswordHash)) {
+        return NextResponse.json(
+          {
+            error: 'Password required',
+            code: 'PASSWORD_REQUIRED',
+            expiresAt: key.sharePageAccessExpiresAt?.toISOString() || null,
+          },
+          { status: 401 },
+        );
+      }
+    }
+
     if (!isPageAudience && !key.clientLinkEnabled) {
       return NextResponse.json(
         { error: 'Client URL is disabled' },
@@ -297,6 +323,7 @@ export async function GET(
         sharePageEnabled: key.sharePageEnabled,
         clientLinkEnabled: key.clientLinkEnabled,
         telegramDeliveryEnabled: key.telegramDeliveryEnabled,
+        sharePageAccessExpiresAt: key.sharePageAccessExpiresAt?.toISOString() || null,
       });
     }
 

@@ -3,9 +3,12 @@ import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identi
 
 export const SUBSCRIPTION_EVENT_TYPES = {
   PAGE_VIEW: 'PAGE_VIEW',
+  INVITE_OPEN: 'INVITE_OPEN',
   COPY_URL: 'COPY_URL',
   OPEN_QR: 'OPEN_QR',
+  DOWNLOAD_QR: 'DOWNLOAD_QR',
   OPEN_APP: 'OPEN_APP',
+  DOWNLOAD_CONFIG: 'DOWNLOAD_CONFIG',
   CLIENT_FETCH: 'CLIENT_FETCH',
   TELEGRAM_SENT: 'TELEGRAM_SENT',
   TELEGRAM_CONNECTED: 'TELEGRAM_CONNECTED',
@@ -164,9 +167,12 @@ export async function getAccessKeySubscriptionAnalytics(accessKeyId: string) {
   return {
     counts: {
       pageViews: counts[SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW] ?? 0,
+      inviteOpens: counts[SUBSCRIPTION_EVENT_TYPES.INVITE_OPEN] ?? 0,
       copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
       qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
+      qrDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_QR] ?? 0,
       appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+      configDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG] ?? 0,
       clientFetches: counts[SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH] ?? 0,
       telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
       telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
@@ -247,9 +253,12 @@ export async function getDynamicKeySubscriptionAnalytics(dynamicAccessKeyId: str
   return {
     counts: {
       pageViews: counts[SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW] ?? 0,
+      inviteOpens: counts[SUBSCRIPTION_EVENT_TYPES.INVITE_OPEN] ?? 0,
       copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
       qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
+      qrDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_QR] ?? 0,
       appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+      configDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG] ?? 0,
       clientFetches: counts[SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH] ?? 0,
       telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
       telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,

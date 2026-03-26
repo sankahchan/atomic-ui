@@ -3461,7 +3461,7 @@ export const dynamicKeysRouter = router({
         include: { dynamicAccessKey: { select: { userId: true } } },
       });
 
-      if (!link || (ctx.user.role !== 'ADMIN' && link.dynamicAccessKey.userId !== ctx.user.id)) {
+      if (!link || !link.dynamicAccessKey || (ctx.user.role !== 'ADMIN' && link.dynamicAccessKey.userId !== ctx.user.id)) {
         throw new TRPCError({ code: 'NOT_FOUND' });
       }
 

@@ -23,6 +23,7 @@ import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import {
+  buildAccessDistributionLinkUrl,
   buildSharePageUrl,
   buildShortClientUrl,
   buildShortShareUrl,
@@ -59,6 +60,10 @@ import {
 } from '@/lib/access-key-policies';
 import { getGeoIpCountry } from '@/lib/security';
 import { writeAuditLog } from '@/lib/audit';
+import {
+  hasSharePagePassword,
+  hashSharePagePassword,
+} from '@/lib/share-page-protection';
 
 /**
  * Validation schema for creating a new access key.
@@ -109,6 +114,8 @@ const createKeySchema = z.object({
   sharePageEnabled: z.boolean().optional(),
   clientLinkEnabled: z.boolean().optional(),
   telegramDeliveryEnabled: z.boolean().optional(),
+  sharePagePassword: z.string().max(128).optional().nullable(),
+  sharePageAccessExpiresAt: z.date().optional().nullable(),
   autoDisableOnLimit: z.boolean().optional(),
   autoDisableOnExpire: z.boolean().optional(),
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
@@ -143,6 +150,8 @@ const updateKeySchema = z.object({
   sharePageEnabled: z.boolean().optional(),
   clientLinkEnabled: z.boolean().optional(),
   telegramDeliveryEnabled: z.boolean().optional(),
+  sharePagePassword: z.string().max(128).optional().nullable(),
+  sharePageAccessExpiresAt: z.date().optional().nullable(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
@@ -186,6 +195,15 @@ const listKeysSchema = z.object({
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
+});
+
+const accessDistributionLinkSchema = z.object({
+  id: z.string(),
+  label: z.string().trim().max(80).optional().nullable(),
+  note: z.string().trim().max(280).optional().nullable(),
+  expiresAt: z.date(),
+  maxUses: z.number().int().min(1).max(1000).optional().nullable(),
+  lang: z.string().optional().nullable(),
 });
 
 // Helper function to convert GB to bytes
@@ -611,6 +629,10 @@ export const keysRouter = router({
             take: 8,
             orderBy: { createdAt: 'desc' },
           },
+          distributionLinks: {
+            take: 12,
+            orderBy: { createdAt: 'desc' },
+          },
         },
       } as any);
 
@@ -642,7 +664,7 @@ export const keysRouter = router({
         });
       }
 
-      const [supportActivity, openIncidents] = await Promise.all([
+      const [supportActivity, openIncidents, auditTrail] = await Promise.all([
         db.auditLog.findMany({
           where: {
             entity: 'ACCESS_KEY',
@@ -686,6 +708,22 @@ export const keysRouter = router({
             assignedUserEmail: true,
           },
         }),
+        db.auditLog.findMany({
+          where: {
+            entity: 'ACCESS_KEY',
+            entityId: key.id,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          select: {
+            id: true,
+            action: true,
+            details: true,
+            ip: true,
+            createdAt: true,
+            userId: true,
+          },
+        }),
       ]);
 
       return {
@@ -693,7 +731,12 @@ export const keysRouter = router({
         subscriptionToken: nextToken,
         publicSlug: nextPublicSlug,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+        distributionLinks: (key as any).distributionLinks ?? [],
         supportActivity: supportActivity.map((entry) => ({
+          ...entry,
+          details: entry.details ? JSON.parse(entry.details) : null,
+        })),
+        auditTrail: auditTrail.map((entry) => ({
           ...entry,
           details: entry.details ? JSON.parse(entry.details) : null,
         })),
@@ -790,7 +833,7 @@ export const keysRouter = router({
    */
   create: adminProcedure
     .input(createKeySchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       let targetServerId = input.serverId ?? null;
 
       if (input.assignmentMode === 'AUTO') {
@@ -886,6 +929,10 @@ export const keysRouter = router({
             sharePageEnabled: input.sharePageEnabled ?? true,
             clientLinkEnabled: input.clientLinkEnabled ?? true,
             telegramDeliveryEnabled: input.telegramDeliveryEnabled ?? true,
+            sharePagePasswordHash: hasSharePagePassword(input.sharePagePassword)
+              ? hashSharePagePassword(input.sharePagePassword!)
+              : null,
+            sharePageAccessExpiresAt: input.sharePageAccessExpiresAt ?? null,
             autoDisableOnLimit: input.autoDisableOnLimit ?? true,
             autoDisableOnExpire: input.autoDisableOnExpire ?? true,
             autoArchiveAfterDays: input.autoArchiveAfterDays ?? 0,
@@ -904,6 +951,21 @@ export const keysRouter = router({
                 countryCode: true,
               },
             },
+          },
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_CREATED',
+          entity: 'ACCESS_KEY',
+          entityId: accessKey.id,
+          details: {
+            serverId: targetServerId,
+            sharePageEnabled: accessKey.sharePageEnabled,
+            clientLinkEnabled: accessKey.clientLinkEnabled,
+            telegramDeliveryEnabled: accessKey.telegramDeliveryEnabled,
+            publicSlug: accessKey.publicSlug,
           },
         });
 
@@ -931,7 +993,7 @@ export const keysRouter = router({
    */
   update: adminProcedure
     .input(updateKeySchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, publicSlug, ...data } = input;
       let resolvedPublicSlug: string | undefined;
 
@@ -1103,6 +1165,16 @@ export const keysRouter = router({
           updateData.telegramDeliveryEnabled = data.telegramDeliveryEnabled;
         }
 
+        if (data.sharePagePassword !== undefined) {
+          updateData.sharePagePasswordHash = hasSharePagePassword(data.sharePagePassword)
+            ? hashSharePagePassword(data.sharePagePassword!)
+            : null;
+        }
+
+        if (data.sharePageAccessExpiresAt !== undefined) {
+          updateData.sharePageAccessExpiresAt = data.sharePageAccessExpiresAt ?? null;
+        }
+
         // Reset bandwidth alert flags when data limit changes
         if (data.dataLimitGB !== undefined) {
           updateData.bandwidthAlertAt80 = false;
@@ -1156,6 +1228,18 @@ export const keysRouter = router({
             });
           }
         }
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_UPDATED',
+          entity: 'ACCESS_KEY',
+          entityId: accessKey.id,
+          details: {
+            updatedFields: Object.keys(updateData),
+            publicSlug: accessKey.publicSlug,
+          },
+        });
 
         return accessKey;
       } catch (error) {
@@ -1967,6 +2051,176 @@ export const keysRouter = router({
       };
     }),
 
+  updateShareProtection: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        password: z.string().max(128).optional().nullable(),
+        clearPassword: z.boolean().optional(),
+        accessExpiresAt: z.date().optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          sharePagePasswordHash: true,
+          sharePageAccessExpiresAt: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const nextPasswordHash = input.clearPassword
+        ? null
+        : input.password !== undefined
+          ? (typeof input.password === 'string' && hasSharePagePassword(input.password)
+              ? hashSharePagePassword(input.password)
+              : null)
+          : existing.sharePagePasswordHash;
+      const nextExpiry = input.accessExpiresAt !== undefined
+        ? input.accessExpiresAt ?? null
+        : existing.sharePageAccessExpiresAt;
+
+      const updated = await db.accessKey.update({
+        where: { id: input.id },
+        data: {
+          sharePagePasswordHash: nextPasswordHash,
+          sharePageAccessExpiresAt: nextExpiry,
+        },
+        select: {
+          id: true,
+          sharePageAccessExpiresAt: true,
+          sharePagePasswordHash: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_SHARE_PROTECTION_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          passwordProtected: Boolean(updated.sharePagePasswordHash),
+          accessExpiresAt: updated.sharePageAccessExpiresAt?.toISOString() ?? null,
+          clearedPassword: Boolean(input.clearPassword),
+        },
+      });
+
+      return {
+        ...updated,
+        hasPassword: Boolean(updated.sharePagePasswordHash),
+      };
+    }),
+
+  createDistributionLink: adminProcedure
+    .input(accessDistributionLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const link = await db.accessDistributionLink.create({
+        data: {
+          accessKeyId: input.id,
+          token: generateRandomString(32),
+          label: input.label || null,
+          note: input.note || null,
+          expiresAt: input.expiresAt,
+          maxUses: input.maxUses ?? null,
+        },
+      });
+
+      const url = buildAccessDistributionLinkUrl(link.token, {
+        lang: input.lang,
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_DISTRIBUTION_LINK_CREATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          linkId: link.id,
+          label: link.label,
+          expiresAt: link.expiresAt.toISOString(),
+          maxUses: link.maxUses,
+          url,
+        },
+      });
+
+      return {
+        ...link,
+        url,
+      };
+    }),
+
+  revokeDistributionLink: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        linkId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const link = await db.accessDistributionLink.findFirst({
+        where: {
+          id: input.linkId,
+          accessKeyId: input.id,
+        },
+        select: {
+          id: true,
+          token: true,
+          label: true,
+        },
+      });
+
+      if (!link) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Distribution link not found',
+        });
+      }
+
+      await db.accessDistributionLink.delete({
+        where: { id: link.id },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_DISTRIBUTION_LINK_REVOKED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          linkId: link.id,
+          label: link.label,
+          token: link.token,
+        },
+      });
+
+      return { success: true };
+    }),
+
   /**
    * Regenerate the public subscription/share page token for a key.
    *
@@ -1974,7 +2228,7 @@ export const keysRouter = router({
    */
   regenerateSubscriptionToken: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.id },
         select: {
@@ -1996,6 +2250,15 @@ export const keysRouter = router({
         data: { subscriptionToken: token },
       });
 
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_SHARE_TOKEN_REGENERATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: { token },
+      });
+
       return {
         token,
         sharePageUrl: buildSharePageUrl(token),
@@ -2004,7 +2267,7 @@ export const keysRouter = router({
 
   regeneratePublicSlug: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const existing = await db.accessKey.findUnique({
         where: { id: input.id },
         select: {
@@ -2041,6 +2304,17 @@ export const keysRouter = router({
             subscriptionToken: true,
           },
         });
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_PUBLIC_SLUG_REGENERATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          publicSlug,
+        },
       });
 
       return {

@@ -713,9 +713,12 @@ export const analyticsRouter = router({
 
       type ShareMetrics = {
         pageViews: number;
+        inviteOpens: number;
         copyClicks: number;
         qrOpens: number;
+        qrDownloads: number;
         appOpens: number;
+        configDownloads: number;
         telegramSends: number;
         telegramConnects: number;
         totalEvents: number;
@@ -723,9 +726,12 @@ export const analyticsRouter = router({
 
       const emptyMetrics = (): ShareMetrics => ({
         pageViews: 0,
+        inviteOpens: 0,
         copyClicks: 0,
         qrOpens: 0,
+        qrDownloads: 0,
         appOpens: 0,
+        configDownloads: 0,
         telegramSends: 0,
         telegramConnects: 0,
         totalEvents: 0,
@@ -748,14 +754,23 @@ export const analyticsRouter = router({
             case SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW:
               next.pageViews += row._count.eventType;
               break;
+            case SUBSCRIPTION_EVENT_TYPES.INVITE_OPEN:
+              next.inviteOpens += row._count.eventType;
+              break;
             case SUBSCRIPTION_EVENT_TYPES.COPY_URL:
               next.copyClicks += row._count.eventType;
               break;
             case SUBSCRIPTION_EVENT_TYPES.OPEN_QR:
               next.qrOpens += row._count.eventType;
               break;
+            case SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_QR:
+              next.qrDownloads += row._count.eventType;
+              break;
             case SUBSCRIPTION_EVENT_TYPES.OPEN_APP:
               next.appOpens += row._count.eventType;
+              break;
+            case SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG:
+              next.configDownloads += row._count.eventType;
               break;
             case SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT:
               next.telegramSends += row._count.eventType;
@@ -836,9 +851,12 @@ export const analyticsRouter = router({
         range: input.range,
         summary: {
           pageViews: counts[SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW] ?? 0,
+          inviteOpens: counts[SUBSCRIPTION_EVENT_TYPES.INVITE_OPEN] ?? 0,
           copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
           qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
+          qrDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_QR] ?? 0,
           appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+          configDownloads: counts[SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG] ?? 0,
           telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
           telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
           activePublicLinks: activeAccessLinks + activeDynamicLinks,

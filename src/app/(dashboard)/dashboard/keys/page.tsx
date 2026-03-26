@@ -413,7 +413,7 @@ function CreateKeyDialog({
         title: t('keys.toast.created'),
         description: t('keys.toast.created_desc'),
       });
-      onSuccess(createdKey);
+      onSuccess(createdKey as CreatedKeySummary);
       onOpenChange(false);
       resetForm();
     },
