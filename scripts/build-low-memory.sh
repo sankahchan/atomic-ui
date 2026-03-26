@@ -13,14 +13,24 @@ echo "[build-low-memory] heap=${NODE_HEAP_MB}MB"
 
 export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB}"
 
-npx prisma generate >/dev/null
+npx prisma generate --schema prisma/schema.prisma >/dev/null
+rm -rf .next/standalone
 npx next build
 
 if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   echo "[build-low-memory] publishing standalone server bundle"
   mkdir -p .next/standalone/.next
   rm -rf .next/standalone/.next/static .next/standalone/public
+  rm -rf .next/standalone/node_modules/@prisma .next/standalone/node_modules/.prisma
   cp -r .next/static .next/standalone/.next/
+  if [[ -d node_modules/@prisma ]]; then
+    mkdir -p .next/standalone/node_modules
+    cp -r node_modules/@prisma .next/standalone/node_modules/
+  fi
+  if [[ -d node_modules/.prisma ]]; then
+    mkdir -p .next/standalone/node_modules
+    cp -r node_modules/.prisma .next/standalone/node_modules/
+  fi
   if [[ -d public ]]; then
     cp -r public .next/standalone/
   fi
