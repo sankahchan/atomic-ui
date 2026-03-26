@@ -453,7 +453,7 @@ model AccessDistributionLink {
   dynamicAccessKey   DynamicAccessKey @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
   token              String           @unique
   expiresAt          DateTime
-  maxUses            Int              @default(1)
+  maxUses            Int?
   currentUses        Int              @default(0)
   createdAt          DateTime         @default(now())
 

@@ -168,7 +168,7 @@ install_share_blocked_page() {
         <button class="primary" type="button" onclick="window.history.length > 1 ? history.back() : window.location.href='/'">Go Back</button>
         <button class="ghost" type="button" onclick="window.history.length > 1 ? history.back() : window.location.href='/'">ရှေ့စာမျက်နှာသို့ ပြန်သွားရန်</button>
       </div>
-      <p class="helper">Public links work only for subscription, share, and client import routes.<br />အများသုံးလင့်များသည် subscription, share နှင့် client import route များအတွက်သာ အသုံးပြုနိုင်ပါသည်။</p>
+      <p class="helper">Public links work only for subscription, invite, share, and client import routes.<br />အများသုံးလင့်များသည် subscription, invite, share နှင့် client import route များအတွက်သာ အသုံးပြုနိုင်ပါသည်။</p>
     </main>
   </body>
 </html>
@@ -318,12 +318,14 @@ EOF
     emit_share_proxy_location "${PANEL_PATH}/sub/"
     emit_share_proxy_location "${PANEL_PATH}/s/"
     emit_share_proxy_location "${PANEL_PATH}/c/"
+    emit_share_proxy_location "${PANEL_PATH}/share/"
     emit_share_proxy_location "${PANEL_PATH}/api/subscription/"
     emit_share_proxy_location "${PANEL_PATH}/api/sub/"
   else
     emit_share_proxy_location "/sub/"
     emit_share_proxy_location "/s/"
     emit_share_proxy_location "/c/"
+    emit_share_proxy_location "/share/"
     emit_share_proxy_location "/api/subscription/"
     emit_share_proxy_location "/api/sub/"
   fi

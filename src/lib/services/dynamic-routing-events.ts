@@ -28,6 +28,149 @@ const ALERT_EVENT_TYPES = new Set<string>([
   DYNAMIC_ROUTING_EVENT_TYPES.FLAPPING_ALERT,
 ]);
 
+const DEFAULT_ALERT_COOLDOWN_MS = 30 * 60_000;
+
+const ALERT_RULE_ALIASES: Record<string, string[]> = {
+  [DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH]: ['NO_MATCH', 'NO MATCH', 'no_match', 'noMatch', 'nomatch'],
+  [DYNAMIC_ROUTING_EVENT_TYPES.HEALTH_ALERT]: ['HEALTH_ALERT', 'health_alert', 'health', 'healthAlert'],
+  [DYNAMIC_ROUTING_EVENT_TYPES.QUOTA_ALERT]: ['QUOTA_ALERT', 'quota_alert', 'quota', 'usage'],
+  [DYNAMIC_ROUTING_EVENT_TYPES.FLAPPING_ALERT]: ['FLAPPING_ALERT', 'flapping_alert', 'flapping', 'flap'],
+};
+
+type DynamicRoutingAlertRuleConfig = {
+  enabled?: boolean;
+  cooldownMinutes?: number;
+  channels?: string[];
+};
+
+function normalizeRuleKey(value: string) {
+  return value.trim().replace(/[\s-]+/g, '_').replace(/[^\w]/g, '').toUpperCase();
+}
+
+function parseRuleChannelList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const channels = value
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
+
+  return channels.length > 0 ? channels : [];
+}
+
+function parseRuleConfig(value: unknown): DynamicRoutingAlertRuleConfig | null {
+  if (typeof value === 'boolean') {
+    return { enabled: value };
+  }
+
+  const channelsFromArray = parseRuleChannelList(value);
+  if (channelsFromArray) {
+    return { enabled: channelsFromArray.length > 0, channels: channelsFromArray };
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const channels =
+    parseRuleChannelList(record.channels) ??
+    parseRuleChannelList(record.notify) ??
+    undefined;
+
+  return {
+    enabled: typeof record.enabled === 'boolean' ? record.enabled : undefined,
+    cooldownMinutes:
+      typeof record.cooldownMinutes === 'number' && Number.isFinite(record.cooldownMinutes)
+        ? Math.max(0, Math.round(record.cooldownMinutes))
+        : undefined,
+    channels,
+  };
+}
+
+function mergeAlertRuleConfig(
+  base: DynamicRoutingAlertRuleConfig,
+  override: DynamicRoutingAlertRuleConfig | null,
+) {
+  if (!override) {
+    return base;
+  }
+
+  return {
+    enabled: override.enabled ?? base.enabled,
+    cooldownMinutes: override.cooldownMinutes ?? base.cooldownMinutes,
+    channels: override.channels ?? base.channels,
+  };
+}
+
+function resolveDynamicRoutingAlertConfig(
+  rawRules: string | null,
+  eventType: string,
+): Required<Pick<DynamicRoutingAlertRuleConfig, 'enabled'>> & {
+  cooldownMs: number;
+  channels?: string[];
+} {
+  if (!rawRules) {
+    return {
+      enabled: true,
+      cooldownMs: DEFAULT_ALERT_COOLDOWN_MS,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(rawRules) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        enabled: true,
+        cooldownMs: DEFAULT_ALERT_COOLDOWN_MS,
+      };
+    }
+
+    let merged: DynamicRoutingAlertRuleConfig = {
+      enabled: true,
+      cooldownMinutes:
+        typeof parsed.cooldownMinutes === 'number' && Number.isFinite(parsed.cooldownMinutes)
+          ? Math.max(0, Math.round(parsed.cooldownMinutes))
+          : DEFAULT_ALERT_COOLDOWN_MS / 60_000,
+    };
+
+    merged = mergeAlertRuleConfig(merged, parseRuleConfig(parsed.default));
+
+    const normalizedEntries = new Map(
+      Object.entries(parsed).map(([key, value]) => [normalizeRuleKey(key), value] as const),
+    );
+
+    for (const alias of ALERT_RULE_ALIASES[eventType] ?? [eventType]) {
+      merged = mergeAlertRuleConfig(merged, parseRuleConfig(normalizedEntries.get(normalizeRuleKey(alias))));
+    }
+
+    return {
+      enabled: merged.enabled !== false,
+      cooldownMs: Math.max(0, (merged.cooldownMinutes ?? DEFAULT_ALERT_COOLDOWN_MS / 60_000) * 60_000),
+      ...(merged.channels ? { channels: merged.channels } : {}),
+    };
+  } catch {
+    return {
+      enabled: true,
+      cooldownMs: DEFAULT_ALERT_COOLDOWN_MS,
+    };
+  }
+}
+
+function channelMatchesAlertRule(
+  channel: { id: string; name: string; type: string },
+  allowedChannels: string[],
+) {
+  const channelKeys = new Set([
+    normalizeRuleKey(channel.id),
+    normalizeRuleKey(channel.name),
+    normalizeRuleKey(channel.type),
+  ]);
+
+  return allowedChannels.some((value) => channelKeys.has(normalizeRuleKey(value)));
+}
+
 function parseMetadata(value: string | null) {
   if (!value) {
     return null;
@@ -96,18 +239,14 @@ async function dispatchDynamicRoutingAlert(input: {
     .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
     .filter((channel) => channelSupportsEvent(channel, 'DYNAMIC_ROUTING_ALERT'));
 
-  // Parse per-DAK routing alert rules for custom cooldowns
-  let cooldownMs = 30 * 60_000; // Default 30-minute cooldown
-  if (dynamicKey.routingAlertRules) {
-    try {
-      const rules = JSON.parse(dynamicKey.routingAlertRules) as Record<string, unknown>;
-      if (rules.cooldownMinutes && typeof rules.cooldownMinutes === 'number') {
-        cooldownMs = rules.cooldownMinutes * 60_000;
-      }
-    } catch {
-      // Use default cooldown
-    }
+  const alertConfig = resolveDynamicRoutingAlertConfig(dynamicKey.routingAlertRules, input.eventType);
+  if (!alertConfig.enabled) {
+    return;
   }
+
+  const deliveryChannels = alertConfig.channels?.length
+    ? activeChannels.filter((channel) => channelMatchesAlertRule(channel, alertConfig.channels!))
+    : activeChannels;
 
   const cooldownKey = `dynamic-routing:${dynamicKey.id}:${input.eventType}`;
   const message = `[Dynamic Routing][${input.severity}] ${dynamicKey.name}: ${input.reason}`;
@@ -123,7 +262,7 @@ async function dispatchDynamicRoutingAlert(input: {
     metadata: input.metadata ?? null,
   };
 
-  for (const channel of activeChannels) {
+  for (const channel of deliveryChannels) {
     await enqueueNotificationDelivery({
       channelId: channel.id,
       event: 'DYNAMIC_ROUTING_ALERT',
@@ -131,11 +270,11 @@ async function dispatchDynamicRoutingAlert(input: {
       payload,
       payloadMode: channel.type === 'WEBHOOK' ? 'RAW' : 'WRAPPED',
       cooldownKey,
-      cooldownMs,
+      cooldownMs: alertConfig.cooldownMs,
     });
   }
 
-  if (!activeChannels.some((channel) => channel.type === 'TELEGRAM')) {
+  if (!alertConfig.channels?.length && !deliveryChannels.some((channel) => channel.type === 'TELEGRAM')) {
     await sendAdminAlert(
       `Dynamic routing alert\nKey: ${dynamicKey.name}\nSeverity: ${input.severity}\nReason: ${input.reason}`,
     );

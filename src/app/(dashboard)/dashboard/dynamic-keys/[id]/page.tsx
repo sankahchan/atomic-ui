@@ -31,6 +31,7 @@ import { buildDownloadFilename, downloadDataUrl, downloadTextFile } from '@/lib/
 import { normalizePublicSlug } from '@/lib/public-slug';
 import {
   buildDynamicOutlineUrl,
+  buildDynamicDistributionLinkUrl,
   buildDynamicShortClientUrl,
   buildDynamicShortShareUrl,
   buildDynamicSharePageUrl,
@@ -170,6 +171,7 @@ function EditDAKDialog({
   };
   onSuccess: () => void;
 }) {
+  const { t } = useLocale();
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: dakData.name,
@@ -232,15 +234,15 @@ function EditDAKDialog({
   const updateMutation = trpc.dynamicKeys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Dynamic Key updated',
-        description: 'The dynamic access key has been updated successfully.',
+        title: t('dynamic_keys.toast.updated_title'),
+        description: t('dynamic_keys.toast.updated_desc'),
       });
       onSuccess();
       onOpenChange(false);
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: t('dynamic_keys.toast.update_failed'),
         description: error.message,
         variant: 'destructive',
       });
@@ -252,8 +254,8 @@ function EditDAKDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a name.',
+        title: t('dynamic_keys.toast.validation_error'),
+        description: t('dynamic_keys.toast.name_required'),
         variant: 'destructive',
       });
       return;
@@ -490,11 +492,11 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-            <h4 className="text-sm font-semibold">Auto-Recovery Actions</h4>
+            <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Clear Stale Pins</Label>
-                <p className="text-xs text-muted-foreground">Automatically remove operator pins that have expired.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoClearStalePins}
@@ -504,8 +506,8 @@ function EditDAKDialog({
             
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Downgrade ONLY to PREFER</Label>
-                <p className="text-xs text-muted-foreground">If NO servers match the requirement, temporarily relax to PREFER.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoFallbackToPrefer}
@@ -515,8 +517,8 @@ function EditDAKDialog({
             
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Skip Unhealthy Servers</Label>
-                <p className="text-xs text-muted-foreground">Automatically omit DOWN/SLOW preferred servers during selection.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoSkipUnhealthy}
@@ -536,11 +538,11 @@ function EditDAKDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('dynamic_keys.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              {t('dynamic_keys.dialog.save_changes')}
             </Button>
           </DialogFooter>
         </form>
@@ -1961,7 +1963,7 @@ function DynamicRoutingDiagnosticsCard({
             </div>
             <div className="ops-inline-stat">
               <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.drain_grace')}</p>
-              <p className="font-medium">{data.drainGraceMinutes} min</p>
+              <p className="font-medium">{data.drainGraceMinutes} {t('dynamic_keys.routing.minutes_short')}</p>
             </div>
           </div>
         ) : null}
@@ -1971,7 +1973,7 @@ function DynamicRoutingDiagnosticsCard({
             <div className="col-span-2 space-y-3 rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
               <p className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400">
                 <AlertTriangle className="h-4 w-4" />
-                Active Alerts
+                {t('dynamic_keys.routing.active_alerts')}
               </p>
               <div className="space-y-2">
                 {data.routingAlerts.map((alert) => (
@@ -2666,17 +2668,21 @@ function AccessDistributionCard({
       utils.dynamicKeys.listDistributionLinks.invalidate({ dakId });
       setMaxUses(undefined);
       setExpiresInHours(undefined);
-      toast({ title: 'Distribution link created' });
+      toast({ title: t('dynamic_keys.distribution.toast.created') });
     },
     onError: (error) => {
-      toast({ title: 'Failed to create link', description: error.message, variant: 'destructive' });
+      toast({
+        title: t('dynamic_keys.distribution.toast.create_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   });
 
   const deleteMutation = trpc.dynamicKeys.deleteDistributionLink.useMutation({
     onSuccess: () => {
       utils.dynamicKeys.listDistributionLinks.invalidate({ dakId });
-      toast({ title: 'Distribution link deleted' });
+      toast({ title: t('dynamic_keys.distribution.toast.deleted') });
     },
   });
 
@@ -2685,8 +2691,10 @@ function AccessDistributionCard({
   };
 
   const handleCopyLink = (token: string) => {
-    const url = `${window.location.origin}/share/${token}`;
-    copyToClipboard(url, 'Link copied', 'Distribution link copied to clipboard');
+    const url = buildDynamicDistributionLinkUrl(token, {
+      origin: typeof window !== 'undefined' ? window.location.origin : null,
+    });
+    copyToClipboard(url, t('dynamic_keys.distribution.toast.copied_title'), t('dynamic_keys.distribution.toast.copied_desc'));
   };
 
   const handleDownloadBundle = () => {
@@ -2703,7 +2711,7 @@ function AccessDistributionCard({
       }))
     };
     downloadTextFile(JSON.stringify(bundle, null, 2), `${dakName}-bundle.json`);
-    toast({ title: 'Bundle downloaded' });
+    toast({ title: t('dynamic_keys.distribution.toast.bundle_downloaded') });
   };
 
   return (
@@ -2711,19 +2719,19 @@ function AccessDistributionCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Share2 className="w-5 h-5 text-primary" />
-          Distribution & Sharing
+          {t('dynamic_keys.distribution.title')}
         </CardTitle>
-        <CardDescription>Create expiring invite links or download raw configuration bundles.</CardDescription>
+        <CardDescription>{t('dynamic_keys.distribution.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
-          <p className="text-sm font-medium">Create Invite Link</p>
+          <p className="text-sm font-medium">{t('dynamic_keys.distribution.create_link')}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Max Uses (Optional)</Label>
+              <Label className="text-xs text-muted-foreground">{t('dynamic_keys.distribution.max_uses')}</Label>
               <Input
                 type="number"
-                placeholder="Unlimited"
+                placeholder={t('dynamic_keys.distribution.unlimited')}
                 value={maxUses || ''}
                 onChange={(e) => setMaxUses(e.target.value ? parseInt(e.target.value) : undefined)}
                 min={1}
@@ -2731,10 +2739,10 @@ function AccessDistributionCard({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Expires In Hours (Optional)</Label>
+              <Label className="text-xs text-muted-foreground">{t('dynamic_keys.distribution.expires_in_hours')}</Label>
               <Input
                 type="number"
-                placeholder="Never"
+                placeholder={t('dynamic_keys.distribution.default_24h')}
                 value={expiresInHours || ''}
                 onChange={(e) => setExpiresInHours(e.target.value ? parseInt(e.target.value) : undefined)}
                 min={1}
@@ -2744,29 +2752,46 @@ function AccessDistributionCard({
           </div>
           <Button onClick={handleCreate} disabled={createMutation.isPending}>
             {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Generate Link
+            {t('dynamic_keys.distribution.generate')}
           </Button>
         </div>
 
         {links.length > 0 && (
           <div className="space-y-3">
-            <p className="text-sm font-medium">Active Links</p>
+            <p className="text-sm font-medium">{t('dynamic_keys.distribution.active_links')}</p>
             <div className="space-y-2">
               {links.map((link) => (
                 <div key={link.id} className="flex flex-col gap-2 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1 font-mono text-xs max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
-                    {link.token}
+                    {buildDynamicDistributionLinkUrl(link.token, {
+                      origin: typeof window !== 'undefined' ? window.location.origin : null,
+                    })}
                   </div>
                   <div className="flex shrink-0 items-center justify-between sm:justify-end gap-2 text-xs text-muted-foreground">
                     <span>
-                      {link.maxUses ? `${link.currentUses}/${link.maxUses} uses` : `${link.currentUses} uses`}
-                      {link.expiresAt && ` · Exp: ${formatRelativeTime(link.expiresAt)}`}
+                      {link.maxUses !== null
+                        ? `${link.currentUses}/${link.maxUses} ${t('dynamic_keys.distribution.uses')}`
+                        : `${link.currentUses} ${t('dynamic_keys.distribution.uses')}`}
+                      {link.expiresAt && ` · ${t('dynamic_keys.distribution.expires_prefix')} ${formatRelativeTime(link.expiresAt)}`}
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button variant="outline" size="icon" onClick={() => handleCopyLink(link.token)} className="h-7 w-7">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleCopyLink(link.token)}
+                        className="h-7 w-7"
+                        title={t('dynamic_keys.distribution.copy_link')}
+                      >
                         <Copy className="h-3 w-3" />
                       </Button>
-                      <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate({ id: link.id })} disabled={deleteMutation.isPending} className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate({ id: link.id })}
+                        disabled={deleteMutation.isPending}
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title={t('dynamic_keys.distribution.delete_link')}
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -2780,12 +2805,12 @@ function AccessDistributionCard({
         <div className="border-t pt-4 space-y-3">
           <div>
             <p className="text-sm font-medium flex items-center gap-2">
-              <FlaskConical className="h-4 w-4" /> Power User Tools
+              <FlaskConical className="h-4 w-4" /> {t('dynamic_keys.distribution.power_tools')}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Download raw connection details for all backends</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('dynamic_keys.distribution.bundle_desc')}</p>
           </div>
           <Button variant="secondary" onClick={handleDownloadBundle}>
-            <Download className="mr-2 h-4 w-4" /> Download config bundle (.json)
+            <Download className="mr-2 h-4 w-4" /> {t('dynamic_keys.distribution.download_bundle')}
           </Button>
         </div>
       </CardContent>

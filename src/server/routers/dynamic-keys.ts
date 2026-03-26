@@ -3388,9 +3388,22 @@ export const dynamicKeysRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND' });
       }
 
-      return db.accessDistributionLink.findMany({
+      const now = new Date();
+      const links = await db.accessDistributionLink.findMany({
         where: { dynamicAccessKeyId: input.dakId },
         orderBy: { createdAt: 'desc' },
+      });
+
+      return links.filter((link) => {
+        if (link.expiresAt <= now) {
+          return false;
+        }
+
+        if (link.maxUses !== null && link.currentUses >= link.maxUses) {
+          return false;
+        }
+
+        return true;
       });
     }),
 
@@ -3421,15 +3434,16 @@ export const dynamicKeysRouter = router({
 
       const token = generateRandomString(32);
 
-      const defaultExpiresAt = new Date();
-      defaultExpiresAt.setHours(defaultExpiresAt.getHours() + 24);
-
       const link = await db.accessDistributionLink.create({
         data: {
           dynamicAccessKeyId: input.dakId,
           token,
-          maxUses: input.maxUses || undefined,
-          expiresAt: expiresAt || defaultExpiresAt,
+          maxUses: input.maxUses ?? null,
+          expiresAt: expiresAt || (() => {
+            const defaultExpiresAt = new Date();
+            defaultExpiresAt.setHours(defaultExpiresAt.getHours() + 24);
+            return defaultExpiresAt;
+          })(),
         },
       });
 

@@ -1745,11 +1745,11 @@ function EditDAKDialog({
           </div>
 
           <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-            <h4 className="text-sm font-semibold">Auto-Recovery Actions</h4>
+            <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Clear Stale Pins</Label>
-                <p className="text-xs text-muted-foreground">Automatically remove operator pins that have expired.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoClearStalePins}
@@ -1759,8 +1759,8 @@ function EditDAKDialog({
             
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Downgrade ONLY to PREFER</Label>
-                <p className="text-xs text-muted-foreground">If NO servers match the requirement, temporarily relax to PREFER.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoFallbackToPrefer}
@@ -1770,8 +1770,8 @@ function EditDAKDialog({
             
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label>Skip Unhealthy Servers</Label>
-                <p className="text-xs text-muted-foreground">Automatically omit DOWN/SLOW preferred servers during selection.</p>
+                <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
               </div>
               <Switch
                 checked={formData.autoSkipUnhealthy}

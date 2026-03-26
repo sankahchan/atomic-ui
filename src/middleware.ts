@@ -31,6 +31,7 @@ const publicRoutes = [
   '/verify-2fa',
   '/sub/',                  // Subscription URLs (Pages)
   '/s/',                    // Short subscription URLs (Pages)
+  '/share/',                // Expiring public invite links
   '/c/',                    // Short client URLs
   '/api/subscription/',     // Subscription API (Bypass auth)
   '/api/sub/',              // Alternative Subscription API
@@ -49,6 +50,7 @@ const publicRoutes = [
 const shareDomainRoutes = [
   '/sub/',
   '/s/',
+  '/share/',
   '/c/',
   '/api/subscription/',
   '/api/sub/',
