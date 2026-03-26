@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
@@ -239,6 +240,15 @@ function CreateKeyDialog({
     subscriptionTheme: string;
     coverImageUrl: string;
     subscriptionWelcomeMessage: string;
+    sharePageEnabled: boolean;
+    clientLinkEnabled: boolean;
+    telegramDeliveryEnabled: boolean;
+    autoDisableOnLimit: boolean;
+    autoDisableOnExpire: boolean;
+    autoArchiveAfterDays: string;
+    quotaAlertThresholds: string;
+    autoRenewPolicy: 'NONE' | 'EXTEND_DURATION';
+    autoRenewDurationDays: string;
   }>({
     serverId: 'auto',
     name: '',
@@ -257,6 +267,15 @@ function CreateKeyDialog({
     subscriptionTheme: 'default',
     coverImageUrl: '',
     subscriptionWelcomeMessage: '',
+    sharePageEnabled: true,
+    clientLinkEnabled: true,
+    telegramDeliveryEnabled: true,
+    autoDisableOnLimit: true,
+    autoDisableOnExpire: true,
+    autoArchiveAfterDays: '0',
+    quotaAlertThresholds: '70,85,95',
+    autoRenewPolicy: 'NONE',
+    autoRenewDurationDays: '',
   });
   const [slugTouched, setSlugTouched] = useState(false);
   const [shareContacts, setShareContacts] = useState<CreateContactLink[]>([]);
@@ -313,6 +332,17 @@ function CreateKeyDialog({
         : { ...current, publicSlug: nextSlug }
     ));
   }, [formData.name, slugTouched]);
+
+  useEffect(() => {
+    if (!formData.sharePageEnabled) {
+      setOpenPreviewAfterCreate(false);
+      setCopyShareLinkAfterCreate(false);
+    }
+
+    if (!formData.telegramDeliveryEnabled) {
+      setSendSharePageViaTelegramAfterCreate(false);
+    }
+  }, [formData.sharePageEnabled, formData.telegramDeliveryEnabled]);
 
   const previewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const previewClientUrl = hasPreviewSlug
@@ -425,6 +455,15 @@ function CreateKeyDialog({
       subscriptionTheme: 'default',
       coverImageUrl: '',
       subscriptionWelcomeMessage: '',
+      sharePageEnabled: true,
+      clientLinkEnabled: true,
+      telegramDeliveryEnabled: true,
+      autoDisableOnLimit: true,
+      autoDisableOnExpire: true,
+      autoArchiveAfterDays: '0',
+      quotaAlertThresholds: '70,85,95',
+      autoRenewPolicy: 'NONE',
+      autoRenewDurationDays: '',
     });
     setSlugTouched(false);
     setShareContacts([]);
@@ -478,11 +517,22 @@ function CreateKeyDialog({
   }, [open]);
 
   const applyTemplate = (template: any) => {
-    setFormData(prev => ({
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const generatedName = template.namePrefix ? `${template.namePrefix}${randomSuffix}` : null;
+    const generatedSlug = normalizePublicSlug(
+      template.slugPrefix
+        ? `${template.slugPrefix}-${randomSuffix}`
+        : generatedName
+          ? slugifyPublicName(generatedName)
+          : template.publicSlug || '',
+    );
+
+    setSlugTouched(Boolean(template.slugPrefix));
+    setFormData((prev) => ({
       ...prev,
-      namePrefix: template.namePrefix || prev.name, // We'll handle prefix logic in render or submission if needed, but for now just storing it might be tricky. Actually, if it's a prefix, we might want to auto-generate a name.
-      // Let's just update the fields that map directly
-      dataLimitGB: template.dataLimitGB ? (Number(template.dataLimitBytes) / (1024 * 1024 * 1024)).toString() : '',
+      name: generatedName || prev.name,
+      publicSlug: template.slugPrefix ? generatedSlug : prev.publicSlug,
+      dataLimitGB: template.dataLimitBytes ? (Number(template.dataLimitBytes) / (1024 * 1024 * 1024)).toString() : '',
       dataLimitResetStrategy: template.dataLimitResetStrategy as any,
       expirationType: template.expirationType as any,
       expiresAt: template.expiresAt ? new Date(template.expiresAt).toISOString().split('T')[0] : '',
@@ -490,14 +540,18 @@ function CreateKeyDialog({
       method: template.method,
       notes: template.notes || '',
       serverId: template.serverId || prev.serverId,
+      subscriptionTheme: template.subscriptionTheme || 'default',
+      subscriptionWelcomeMessage: template.subscriptionWelcomeMessage || '',
+      sharePageEnabled: template.sharePageEnabled ?? true,
+      clientLinkEnabled: template.clientLinkEnabled ?? true,
+      telegramDeliveryEnabled: template.telegramDeliveryEnabled ?? true,
+      autoDisableOnLimit: template.autoDisableOnLimit ?? true,
+      autoDisableOnExpire: template.autoDisableOnExpire ?? true,
+      autoArchiveAfterDays: String(template.autoArchiveAfterDays ?? 0),
+      quotaAlertThresholds: template.quotaAlertThresholds || '70,85,95',
+      autoRenewPolicy: template.autoRenewPolicy || 'NONE',
+      autoRenewDurationDays: template.autoRenewDurationDays?.toString() || '',
     }));
-
-    // Auto-generate name if prefix exists
-    if (template.namePrefix) {
-      // Simple random suffix for now, user can edit
-      const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      setFormData(prev => ({ ...prev, name: `${template.namePrefix}${randomSuffix}` }));
-    }
   };
 
   const handleTemplateChange = (templateId: string) => {
@@ -587,6 +641,18 @@ function CreateKeyDialog({
       coverImageType: formData.coverImageUrl.trim() ? 'url' : undefined,
       contactLinks: shareContacts.length > 0 ? JSON.stringify(shareContacts) : undefined,
       subscriptionWelcomeMessage: formData.subscriptionWelcomeMessage.trim() || undefined,
+      sharePageEnabled: formData.sharePageEnabled,
+      clientLinkEnabled: formData.clientLinkEnabled,
+      telegramDeliveryEnabled: formData.telegramDeliveryEnabled,
+      autoDisableOnLimit: formData.autoDisableOnLimit,
+      autoDisableOnExpire: formData.autoDisableOnExpire,
+      autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
+      quotaAlertThresholds: formData.quotaAlertThresholds,
+      autoRenewPolicy: formData.autoRenewPolicy,
+      autoRenewDurationDays:
+        formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
+          ? Number.parseInt(formData.autoRenewDurationDays, 10)
+          : undefined,
     });
   };
 
@@ -837,24 +903,52 @@ function CreateKeyDialog({
 
           {/* Data Limit Reset Strategy */}
           {formData.dataLimitGB && (
-            <div className="space-y-2">
-              <Label>{t('keys.form.reset_strategy')}</Label>
-              <Select
-                value={formData.dataLimitResetStrategy}
-                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
-                  setFormData({ ...formData, dataLimitResetStrategy: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
-                  <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
-                  <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
-                  <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+              <div className="space-y-2">
+                <Label>{t('keys.form.reset_strategy')}</Label>
+                <Select
+                  value={formData.dataLimitResetStrategy}
+                  onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                    setFormData({ ...formData, dataLimitResetStrategy: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
+                    <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
+                    <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
+                    <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quotaThresholds">Quota alert thresholds (%)</Label>
+                <Input
+                  id="quotaThresholds"
+                  placeholder="70,85,95"
+                  value={formData.quotaAlertThresholds}
+                  onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated usage thresholds that trigger alerts.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Auto-disable on limit</p>
+                  <p className="text-xs text-muted-foreground">
+                    Disable the key and schedule archiving when the quota is fully consumed.
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.autoDisableOnLimit}
+                  onCheckedChange={(checked) => setFormData({ ...formData, autoDisableOnLimit: checked })}
+                />
+              </div>
             </div>
           )}
 
@@ -908,6 +1002,78 @@ function CreateKeyDialog({
               </div>
             )}
 
+          <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">Automation Policy</p>
+              <p className="text-xs text-muted-foreground">
+                Control how the key behaves when it expires or crosses quota thresholds.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Auto-disable when expired</p>
+                <p className="text-xs text-muted-foreground">
+                  Remove the key from Outline immediately after its expiry date passes.
+                </p>
+              </div>
+              <Switch
+                checked={formData.autoDisableOnExpire}
+                onCheckedChange={(checked) => setFormData({ ...formData, autoDisableOnExpire: checked })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
+              <Input
+                id="autoArchiveAfterDays"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={formData.autoArchiveAfterDays}
+                onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use 0 to archive immediately after the key becomes expired or depleted.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Auto-renew policy</Label>
+              <Select
+                value={formData.autoRenewPolicy}
+                onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
+                  setFormData({ ...formData, autoRenewPolicy: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Do not auto-renew</SelectItem>
+                  <SelectItem value="EXTEND_DURATION">Extend by a fixed number of days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.autoRenewPolicy === 'EXTEND_DURATION' && (
+              <div className="space-y-2">
+                <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
+                <Input
+                  id="autoRenewDurationDays"
+                  type="number"
+                  min="1"
+                  placeholder={formData.durationDays || '30'}
+                  value={formData.autoRenewDurationDays}
+                  onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to reuse the same duration configured for this key.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">{t('keys.form.notes')}</Label>
@@ -930,6 +1096,45 @@ function CreateKeyDialog({
               <p className="text-xs text-muted-foreground">
                 These settings apply to the subscription page generated with this key right after creation.
               </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                <Switch
+                  checked={formData.sharePageEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, sharePageEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Share page</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Public preview and short share URL.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                <Switch
+                  checked={formData.clientLinkEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, clientLinkEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Client URL</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Allow compatible clients to fetch the config.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                <Switch
+                  checked={formData.telegramDeliveryEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, telegramDeliveryEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Telegram delivery</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Permit send-via-Telegram and lifecycle pushes.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -1067,6 +1272,7 @@ function CreateKeyDialog({
                         checked={openPreviewAfterCreate}
                         onCheckedChange={(checked) => setOpenPreviewAfterCreate(checked === true)}
                         className="mt-0.5"
+                        disabled={!formData.sharePageEnabled}
                       />
                       <span className="space-y-1">
                         <span className="block text-sm font-medium">Open preview after create</span>
@@ -1080,6 +1286,7 @@ function CreateKeyDialog({
                         checked={copyShareLinkAfterCreate}
                         onCheckedChange={(checked) => setCopyShareLinkAfterCreate(checked === true)}
                         className="mt-0.5"
+                        disabled={!formData.sharePageEnabled}
                       />
                       <span className="space-y-1">
                         <span className="block text-sm font-medium">Copy share page link after create</span>
@@ -1093,6 +1300,7 @@ function CreateKeyDialog({
                         checked={sendSharePageViaTelegramAfterCreate}
                         onCheckedChange={(checked) => setSendSharePageViaTelegramAfterCreate(checked === true)}
                         className="mt-0.5"
+                        disabled={!formData.telegramDeliveryEnabled}
                       />
                       <span className="space-y-1">
                         <span className="block text-sm font-medium">Send share page via Telegram after create</span>
@@ -1169,6 +1377,9 @@ function CreateKeyDialog({
 
                     <div className="space-y-1 text-xs" style={{ color: formData.coverImageUrl ? 'rgba(255,255,255,0.78)' : selectedShareTheme.textMuted }}>
                       <p>Contact shortcuts: {shareContacts.length}</p>
+                      <p>{formData.sharePageEnabled ? 'Share page enabled' : 'Share page disabled'}</p>
+                      <p>{formData.clientLinkEnabled ? 'Client URL enabled' : 'Client URL disabled'}</p>
+                      <p>{formData.telegramDeliveryEnabled ? 'Telegram delivery enabled' : 'Telegram delivery disabled'}</p>
                       <p>{formData.coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
                       <p>{formData.subscriptionWelcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
                     </div>

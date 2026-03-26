@@ -165,11 +165,18 @@ model AccessKey {
   bandwidthAlertAt80 Boolean @default(false) // true if 80% alert already sent
   bandwidthAlertAt90 Boolean @default(false) // true if 90% alert already sent
   autoDisableOnLimit Boolean @default(true) // auto-disable when 100% reached
+  quotaAlertThresholds String @default("70,85,95") // CSV thresholds for quota notifications
+  quotaAlertsSent      String @default("[]") // JSON array of thresholds already sent
 
   // Disable tracking - when DISABLED, key is deleted from Outline server
   // but kept in DB for potential re-enabling
   disabledAt           DateTime?
   disabledOutlineKeyId String? // Original Outline key ID when disabled (for reference)
+  autoDisableOnExpire  Boolean @default(true)
+  autoArchiveAfterDays Int     @default(0)
+  archiveAfterAt       DateTime?
+  autoRenewPolicy      String  @default("NONE") // NONE, EXTEND_DURATION
+  autoRenewDurationDays Int?
 
   // Dynamic key association
   dynamicKeyId String?
@@ -196,6 +203,9 @@ model AccessKey {
   // Valid types: telegram, discord, whatsapp, phone, email, website, facebook
   contactLinks               String?
   subscriptionWelcomeMessage String?
+  sharePageEnabled           Boolean @default(true)
+  clientLinkEnabled          Boolean @default(true)
+  telegramDeliveryEnabled    Boolean @default(true)
 
   // Connection/device tracking
   estimatedDevices Int @default(0)
@@ -780,11 +790,23 @@ model KeyTemplate {
 
   // Key Configuration
   namePrefix             String? // Prefix for generated keys
+  slugPrefix             String?
   dataLimitBytes         BigInt?
   dataLimitResetStrategy String  @default("NEVER")
   expirationType         String  @default("NEVER")
   durationDays           Int? // For DURATION_FROM_CREATION or START_ON_FIRST_USE
   method                 String  @default("chacha20-ietf-poly1305")
+  subscriptionTheme      String?
+  subscriptionWelcomeMessage String?
+  sharePageEnabled       Boolean @default(true)
+  clientLinkEnabled      Boolean @default(true)
+  telegramDeliveryEnabled Boolean @default(true)
+  autoDisableOnLimit     Boolean @default(true)
+  autoDisableOnExpire    Boolean @default(true)
+  autoArchiveAfterDays   Int     @default(0)
+  quotaAlertThresholds   String  @default("70,85,95")
+  autoRenewPolicy        String  @default("NONE")
+  autoRenewDurationDays  Int?
 
   // Customization
   notes String? // Default notes

@@ -8,6 +8,12 @@
  */
 
 import { db } from '@/lib/db';
+import {
+    computeArchiveAfterAt,
+    parseQuotaAlertsSent,
+    parseQuotaAlertThresholds,
+    serializeQuotaAlertsSent,
+} from '@/lib/access-key-policies';
 import { createOutlineClient } from '@/lib/outline-api';
 import { getTelegramConfig } from '@/lib/services/telegram-bot';
 import { sendTelegramMessage } from '@/lib/telegram';
@@ -54,7 +60,11 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                 email: true,
                 bandwidthAlertAt80: true,
                 bandwidthAlertAt90: true,
+                quotaAlertThresholds: true,
+                quotaAlertsSent: true,
                 autoDisableOnLimit: true,
+                autoArchiveAfterDays: true,
+                telegramDeliveryEnabled: true,
                 serverId: true,
                 server: {
                     select: {
@@ -72,6 +82,8 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
             const usedBytes = Number(key.usedBytes);
             const limitBytes = Number(key.dataLimitBytes);
             const usagePercent = (usedBytes / limitBytes) * 100;
+            const thresholds = parseQuotaAlertThresholds(key.quotaAlertThresholds);
+            const sentThresholds = parseQuotaAlertsSent(key.quotaAlertsSent);
 
             try {
                 // --- 100% Check: Auto-disable ---
@@ -80,7 +92,7 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     result.autoDisabled++;
 
                     // Notify about auto-disable
-                    if (telegramConfig) {
+                    if (telegramConfig && key.telegramDeliveryEnabled) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             key,
@@ -92,47 +104,42 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     continue; // Skip lower threshold checks
                 }
 
-                // --- 90% Check ---
-                if (usagePercent >= 90 && !key.bandwidthAlertAt90) {
+                const crossedThresholds = thresholds.filter((threshold) => usagePercent >= threshold);
+                const newlyCrossed = crossedThresholds.filter((threshold) => !sentThresholds.includes(threshold));
+
+                if (newlyCrossed.length > 0) {
+                    const highestThreshold = newlyCrossed[newlyCrossed.length - 1];
+
                     await db.accessKey.update({
                         where: { id: key.id },
-                        data: { bandwidthAlertAt90: true },
+                        data: {
+                            quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
+                            bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
+                            bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
+                        },
                     });
 
-                    if (telegramConfig) {
+                    if (telegramConfig && key.telegramDeliveryEnabled) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             key,
                             usagePercent,
-                            '90',
+                            highestThreshold,
                             telegramConfig.adminChatIds
                         );
                     }
 
-                    await logNotification(key.id, 'BANDWIDTH_90', `Key "${key.name}" reached ${usagePercent.toFixed(1)}% of data limit`);
-                    result.alertsSent90++;
-                    continue; // Don't also send 80% if we just sent 90%
-                }
+                    await logNotification(
+                        key.id,
+                        `BANDWIDTH_${highestThreshold}`,
+                        `Key "${key.name}" reached ${usagePercent.toFixed(1)}% of data limit`
+                    );
 
-                // --- 80% Check ---
-                if (usagePercent >= 80 && !key.bandwidthAlertAt80) {
-                    await db.accessKey.update({
-                        where: { id: key.id },
-                        data: { bandwidthAlertAt80: true },
-                    });
-
-                    if (telegramConfig) {
-                        await sendBandwidthNotification(
-                            telegramConfig.botToken,
-                            key,
-                            usagePercent,
-                            '80',
-                            telegramConfig.adminChatIds
-                        );
+                    if (highestThreshold >= 90) {
+                        result.alertsSent90++;
+                    } else {
+                        result.alertsSent80++;
                     }
-
-                    await logNotification(key.id, 'BANDWIDTH_80', `Key "${key.name}" reached ${usagePercent.toFixed(1)}% of data limit`);
-                    result.alertsSent80++;
                 }
             } catch (keyError) {
                 result.errors.push(`Key ${key.name}: ${(keyError as Error).message}`);
@@ -153,6 +160,7 @@ async function autoDisableKey(key: {
     id: string;
     outlineKeyId: string;
     name: string;
+    autoArchiveAfterDays: number;
     server: { apiUrl: string; apiCertSha256: string };
 }) {
     try {
@@ -172,6 +180,7 @@ async function autoDisableKey(key: {
                 disabledAt: new Date(),
                 disabledOutlineKeyId: key.outlineKeyId,
                 estimatedDevices: 0,
+                archiveAfterAt: computeArchiveAfterAt(new Date(), key.autoArchiveAfterDays),
             },
         });
 
@@ -206,7 +215,7 @@ async function sendBandwidthNotification(
         server: { name: string };
     },
     usagePercent: number,
-    level: '80' | '90' | 'DISABLED',
+    level: number | 'DISABLED',
     adminChatIds: string[]
 ) {
     const used = formatBytes(key.usedBytes);
@@ -215,25 +224,30 @@ async function sendBandwidthNotification(
         ? formatBytes(BigInt(Math.max(0, Number(key.dataLimitBytes) - Number(key.usedBytes))))
         : 'N/A';
 
-    let emoji: string;
-    let title: string;
-    let statusLine: string;
+    let emoji = '⚠️';
+    let title = 'Data Usage Warning';
+    let statusLine = `📊 Usage: <b>${usagePercent.toFixed(1)}%</b>`;
 
     switch (level) {
-        case '80':
+        case 70:
+        case 80:
+        case 85:
             emoji = '⚠️';
-            title = 'Data Usage Warning (80%)';
+            title = `Data Usage Warning (${level}%)`;
             statusLine = `📊 Usage: <b>${usagePercent.toFixed(1)}%</b>`;
             break;
-        case '90':
+        case 90:
+        case 95:
             emoji = '🔴';
-            title = 'Data Usage Critical (90%)';
+            title = `Data Usage Critical (${level}%)`;
             statusLine = `📊 Usage: <b>${usagePercent.toFixed(1)}%</b>`;
             break;
         case 'DISABLED':
             emoji = '🚫';
             title = 'Key Auto-Disabled (100%)';
             statusLine = '📊 Data limit reached — key has been disabled';
+            break;
+        default:
             break;
     }
 
@@ -249,7 +263,7 @@ async function sendBandwidthNotification(
         '',
         level === 'DISABLED'
             ? '⚡ This key has been automatically disabled. Contact admin to re-enable.'
-            : level === '90'
+            : typeof level === 'number' && level >= 90
                 ? '⚡ Please reduce usage or contact admin to extend your limit.'
                 : '💡 Consider monitoring your usage to avoid interruption.',
     ].filter(Boolean).join('\n');
@@ -289,6 +303,7 @@ export async function resetBandwidthAlerts(keyId: string) {
         data: {
             bandwidthAlertAt80: false,
             bandwidthAlertAt90: false,
+            quotaAlertsSent: '[]',
         },
     });
 }

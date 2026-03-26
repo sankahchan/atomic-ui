@@ -5,6 +5,7 @@ export const SUBSCRIPTION_EVENT_TYPES = {
   COPY_URL: 'COPY_URL',
   OPEN_QR: 'OPEN_QR',
   OPEN_APP: 'OPEN_APP',
+  CLIENT_FETCH: 'CLIENT_FETCH',
   TELEGRAM_SENT: 'TELEGRAM_SENT',
   TELEGRAM_CONNECTED: 'TELEGRAM_CONNECTED',
 } as const;
@@ -104,7 +105,7 @@ export async function getAccessKeySubscriptionAnalytics(accessKeyId: string) {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const [aggregate, recentEvents, lastViewedAt, lastCopiedAt, lastTelegramSentAt] = await Promise.all([
+  const [aggregate, recentEvents, lastViewedAt, lastCopiedAt, lastTelegramSentAt, lastQrScanAt, lastClientFetchAt] = await Promise.all([
     db.subscriptionPageEvent.groupBy({
       by: ['eventType'],
       where: { accessKeyId },
@@ -138,6 +139,16 @@ export async function getAccessKeySubscriptionAnalytics(accessKeyId: string) {
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     }),
+    db.subscriptionPageEvent.findFirst({
+      where: { accessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.OPEN_QR },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    db.subscriptionPageEvent.findFirst({
+      where: { accessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
   ]);
 
   const counts = Object.fromEntries(aggregate.map((row) => [row.eventType, row._count.eventType]));
@@ -156,12 +167,15 @@ export async function getAccessKeySubscriptionAnalytics(accessKeyId: string) {
       copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
       qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
       appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+      clientFetches: counts[SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH] ?? 0,
       telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
       telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
       last7dEvents: last7dCount,
     },
     lastViewedAt: lastViewedAt?.createdAt ?? null,
     lastCopiedAt: lastCopiedAt?.createdAt ?? null,
+    lastQrScanAt: lastQrScanAt?.createdAt ?? null,
+    lastClientFetchAt: lastClientFetchAt?.createdAt ?? null,
     lastTelegramSentAt: lastTelegramSentAt?.createdAt ?? null,
     recentEvents: recentEvents.map((event) => ({
       ...event,
@@ -174,7 +188,7 @@ export async function getDynamicKeySubscriptionAnalytics(dynamicAccessKeyId: str
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const [aggregate, recentEvents, lastViewedAt, lastCopiedAt, lastTelegramSentAt] = await Promise.all([
+  const [aggregate, recentEvents, lastViewedAt, lastCopiedAt, lastTelegramSentAt, lastQrScanAt, lastClientFetchAt] = await Promise.all([
     db.subscriptionPageEvent.groupBy({
       by: ['eventType'],
       where: { dynamicAccessKeyId },
@@ -208,6 +222,16 @@ export async function getDynamicKeySubscriptionAnalytics(dynamicAccessKeyId: str
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     }),
+    db.subscriptionPageEvent.findFirst({
+      where: { dynamicAccessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.OPEN_QR },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    db.subscriptionPageEvent.findFirst({
+      where: { dynamicAccessKeyId, eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
   ]);
 
   const counts = Object.fromEntries(aggregate.map((row) => [row.eventType, row._count.eventType]));
@@ -226,12 +250,15 @@ export async function getDynamicKeySubscriptionAnalytics(dynamicAccessKeyId: str
       copyClicks: counts[SUBSCRIPTION_EVENT_TYPES.COPY_URL] ?? 0,
       qrOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_QR] ?? 0,
       appOpens: counts[SUBSCRIPTION_EVENT_TYPES.OPEN_APP] ?? 0,
+      clientFetches: counts[SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH] ?? 0,
       telegramSends: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT] ?? 0,
       telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
       last7dEvents: last7dCount,
     },
     lastViewedAt: lastViewedAt?.createdAt ?? null,
     lastCopiedAt: lastCopiedAt?.createdAt ?? null,
+    lastQrScanAt: lastQrScanAt?.createdAt ?? null,
+    lastClientFetchAt: lastClientFetchAt?.createdAt ?? null,
     lastTelegramSentAt: lastTelegramSentAt?.createdAt ?? null,
     recentEvents: recentEvents.map((event) => ({
       ...event,

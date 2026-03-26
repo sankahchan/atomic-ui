@@ -11,6 +11,7 @@
  */
 
 import { db } from '@/lib/db';
+import { computeArchiveAfterAt, resolveAutoRenewDays } from '@/lib/access-key-policies';
 import { createOutlineClient } from '@/lib/outline-api';
 import { sendAccessKeyLifecycleTelegramNotification } from '@/lib/services/telegram-bot';
 
@@ -103,28 +104,86 @@ export async function checkExpirations(): Promise<ExpirationResult> {
                     lte: now,
                 },
             },
-            select: {
-                id: true,
+            include: {
+                server: true,
             },
         });
-
-        // Step 1: Find and mark expired keys (expiresAt has passed)
-        const expiredResult = await db.accessKey.updateMany({
-            where: {
-                status: { in: ['ACTIVE', 'PENDING'] },
-                expiresAt: {
-                    not: null,
-                    lte: now,
-                },
-            },
-            data: {
-                status: 'EXPIRED',
-            },
-        });
-        result.expiredKeys = expiredResult.count;
 
         for (const key of keysAboutToExpire) {
             try {
+                const renewDays = resolveAutoRenewDays({
+                    autoRenewPolicy: key.autoRenewPolicy,
+                    autoRenewDurationDays: key.autoRenewDurationDays,
+                    durationDays: key.durationDays,
+                });
+
+                if (renewDays) {
+                    const renewedUntil = new Date(now);
+                    renewedUntil.setDate(renewedUntil.getDate() + renewDays);
+
+                    await db.accessKey.update({
+                        where: { id: key.id },
+                        data: {
+                            status: key.status === 'PENDING' ? 'PENDING' : 'ACTIVE',
+                            expiresAt: renewedUntil,
+                            archiveAfterAt: null,
+                            expirationWarningStage: null,
+                            lastWarningSentAt: null,
+                        },
+                    });
+
+                    await db.notificationLog.create({
+                        data: {
+                            event: 'KEY_AUTO_RENEWED',
+                            message: `Auto-renewed until ${renewedUntil.toISOString()}`,
+                            status: 'SUCCESS',
+                            accessKeyId: key.id,
+                        },
+                    });
+
+                    continue;
+                }
+
+                let disabledAt = key.disabledAt;
+                let disabledOutlineKeyId = key.disabledOutlineKeyId;
+
+                if (key.autoDisableOnExpire && !key.disabledAt) {
+                    const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+                    try {
+                        await client.deleteAccessKey(key.outlineKeyId);
+                    } catch (outlineError) {
+                        console.warn(`Failed to disable expired key ${key.name}:`, outlineError);
+                    }
+
+                    disabledAt = now;
+                    disabledOutlineKeyId = key.outlineKeyId;
+
+                    await db.connectionSession.updateMany({
+                        where: {
+                            accessKeyId: key.id,
+                            isActive: true,
+                        },
+                        data: {
+                            isActive: false,
+                            endedAt: now,
+                            endedReason: 'KEY_EXPIRED',
+                        },
+                    });
+                }
+
+                await db.accessKey.update({
+                    where: { id: key.id },
+                    data: {
+                        status: 'EXPIRED',
+                        disabledAt,
+                        disabledOutlineKeyId,
+                        estimatedDevices: key.autoDisableOnExpire ? 0 : undefined,
+                        archiveAfterAt: key.archiveAfterAt ?? computeArchiveAfterAt(now, key.autoArchiveAfterDays),
+                    },
+                });
+
+                result.expiredKeys++;
+
                 await sendAccessKeyLifecycleTelegramNotification({
                     accessKeyId: key.id,
                     type: 'EXPIRED',
@@ -149,20 +208,65 @@ export async function checkExpirations(): Promise<ExpirationResult> {
                 status: 'ACTIVE',
                 dataLimitBytes: { not: null },
             },
-            select: {
-                id: true,
-                usedBytes: true,
-                dataLimitBytes: true,
+            include: {
+                server: true,
             },
         });
 
         for (const key of keysToCheckDepletion) {
             if (key.dataLimitBytes && key.usedBytes >= key.dataLimitBytes) {
-                await db.accessKey.update({
-                    where: { id: key.id },
-                    data: { status: 'DEPLETED' },
-                });
-                result.depletedKeys++;
+                try {
+                    let disabledAt = key.disabledAt;
+                    let disabledOutlineKeyId = key.disabledOutlineKeyId;
+
+                    if (key.autoDisableOnLimit && !key.disabledAt) {
+                        const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+                        try {
+                            await client.deleteAccessKey(key.outlineKeyId);
+                        } catch (outlineError) {
+                            console.warn(`Failed to disable depleted key ${key.name}:`, outlineError);
+                        }
+
+                        disabledAt = now;
+                        disabledOutlineKeyId = key.outlineKeyId;
+
+                        await db.connectionSession.updateMany({
+                            where: {
+                                accessKeyId: key.id,
+                                isActive: true,
+                            },
+                            data: {
+                                isActive: false,
+                                endedAt: now,
+                                endedReason: 'KEY_DEPLETED',
+                            },
+                        });
+                    }
+
+                    await db.accessKey.update({
+                        where: { id: key.id },
+                        data: {
+                            status: 'DEPLETED',
+                            disabledAt,
+                            disabledOutlineKeyId,
+                            estimatedDevices: key.autoDisableOnLimit ? 0 : undefined,
+                            archiveAfterAt: key.archiveAfterAt ?? computeArchiveAfterAt(now, key.autoArchiveAfterDays),
+                        },
+                    });
+
+                    await db.notificationLog.create({
+                        data: {
+                            event: 'TRAFFIC_DEPLETED',
+                            message: 'Data limit reached',
+                            status: 'SUCCESS',
+                            accessKeyId: key.id,
+                        },
+                    });
+
+                    result.depletedKeys++;
+                } catch (depletionError) {
+                    result.errors.push(`Depleted key ${key.id}: ${(depletionError as Error).message}`);
+                }
             }
         }
 
@@ -170,6 +274,10 @@ export async function checkExpirations(): Promise<ExpirationResult> {
         const keysToArchive = await db.accessKey.findMany({
             where: {
                 status: { in: ['EXPIRED', 'DEPLETED'] },
+                OR: [
+                    { archiveAfterAt: null },
+                    { archiveAfterAt: { lte: now } },
+                ],
             },
             include: {
                 server: true,

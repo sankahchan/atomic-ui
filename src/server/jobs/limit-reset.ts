@@ -70,6 +70,7 @@ export async function checkPeriodicLimits() {
                             status: key.status === 'DEPLETED' ? 'ACTIVE' : undefined, // Reactivate if depleted
                             bandwidthAlertAt80: false,
                             bandwidthAlertAt90: false,
+                            quotaAlertsSent: '[]',
                         }
                     });
 

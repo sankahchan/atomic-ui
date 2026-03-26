@@ -859,6 +859,10 @@ export async function sendAccessKeySharePageToTelegram(input: {
     throw new Error('Access key not found.');
   }
 
+  if (!key.telegramDeliveryEnabled) {
+    throw new Error('Telegram delivery is disabled for this key.');
+  }
+
   const destinationChatId =
     (input.chatId ? String(input.chatId) : null) || resolveTelegramChatIdForKey(key);
   if (!destinationChatId) {
@@ -1132,6 +1136,10 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
 
   const key = await loadAccessKeyForMessaging(input.accessKeyId);
   if (!key) {
+    return null;
+  }
+
+  if (!key.telegramDeliveryEnabled) {
     return null;
   }
 

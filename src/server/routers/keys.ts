@@ -40,7 +40,16 @@ import {
   sendAccessKeyLifecycleTelegramNotification,
   sendAccessKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
-import { getAccessKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
+import {
+  getAccessKeySubscriptionAnalytics,
+  SUBSCRIPTION_EVENT_TYPES,
+} from '@/lib/services/subscription-events';
+import {
+  computeArchiveAfterAt,
+  parseQuotaAlertThresholds,
+  stringifyQuotaAlertThresholds,
+} from '@/lib/access-key-policies';
+import { getGeoIpCountry } from '@/lib/security';
 
 /**
  * Validation schema for creating a new access key.
@@ -88,6 +97,15 @@ const createKeySchema = z.object({
   contactLinks: z.string().optional().nullable(),
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
+  sharePageEnabled: z.boolean().optional(),
+  clientLinkEnabled: z.boolean().optional(),
+  telegramDeliveryEnabled: z.boolean().optional(),
+  autoDisableOnLimit: z.boolean().optional(),
+  autoDisableOnExpire: z.boolean().optional(),
+  autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
+  quotaAlertThresholds: z.string().optional().nullable(),
+  autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
+  autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
 
 /**
@@ -113,11 +131,19 @@ const updateKeySchema = z.object({
   contactLinks: z.string().optional().nullable(), // JSON string of contact links
   subscriptionWelcomeMessage: z.string().max(500).optional().nullable(),
   publicSlug: z.string().min(3).max(32).optional().nullable(),
+  sharePageEnabled: z.boolean().optional(),
+  clientLinkEnabled: z.boolean().optional(),
+  telegramDeliveryEnabled: z.boolean().optional(),
   // New fields for tags and owner
   owner: z.string().max(100).optional().nullable(),
   tags: z.string().max(500).optional().nullable(), // Comma-separated tags, will be normalized
   // Bandwidth alert settings
   autoDisableOnLimit: z.boolean().optional(),
+  autoDisableOnExpire: z.boolean().optional(),
+  autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
+  quotaAlertThresholds: z.string().optional().nullable(),
+  autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
+  autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
 
 /**
@@ -714,6 +740,16 @@ export const keysRouter = router({
             coverImageType: input.coverImageType,
             contactLinks: input.contactLinks,
             subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
+            sharePageEnabled: input.sharePageEnabled ?? true,
+            clientLinkEnabled: input.clientLinkEnabled ?? true,
+            telegramDeliveryEnabled: input.telegramDeliveryEnabled ?? true,
+            autoDisableOnLimit: input.autoDisableOnLimit ?? true,
+            autoDisableOnExpire: input.autoDisableOnExpire ?? true,
+            autoArchiveAfterDays: input.autoArchiveAfterDays ?? 0,
+            quotaAlertThresholds: stringifyQuotaAlertThresholds(input.quotaAlertThresholds),
+            quotaAlertsSent: '[]',
+            autoRenewPolicy: input.autoRenewPolicy ?? 'NONE',
+            autoRenewDurationDays: input.autoRenewDurationDays ?? null,
             subscriptionToken: generateRandomString(32),
             publicSlug,
           },
@@ -889,10 +925,44 @@ export const keysRouter = router({
           updateData.autoDisableOnLimit = data.autoDisableOnLimit;
         }
 
+        if (data.autoDisableOnExpire !== undefined) {
+          updateData.autoDisableOnExpire = data.autoDisableOnExpire;
+        }
+
+        if (data.autoArchiveAfterDays !== undefined) {
+          updateData.autoArchiveAfterDays = data.autoArchiveAfterDays ?? 0;
+        }
+
+        if (data.quotaAlertThresholds !== undefined) {
+          updateData.quotaAlertThresholds = stringifyQuotaAlertThresholds(data.quotaAlertThresholds);
+          updateData.quotaAlertsSent = '[]';
+        }
+
+        if (data.autoRenewPolicy !== undefined) {
+          updateData.autoRenewPolicy = data.autoRenewPolicy;
+        }
+
+        if (data.autoRenewDurationDays !== undefined) {
+          updateData.autoRenewDurationDays = data.autoRenewDurationDays;
+        }
+
+        if (data.sharePageEnabled !== undefined) {
+          updateData.sharePageEnabled = data.sharePageEnabled;
+        }
+
+        if (data.clientLinkEnabled !== undefined) {
+          updateData.clientLinkEnabled = data.clientLinkEnabled;
+        }
+
+        if (data.telegramDeliveryEnabled !== undefined) {
+          updateData.telegramDeliveryEnabled = data.telegramDeliveryEnabled;
+        }
+
         // Reset bandwidth alert flags when data limit changes
         if (data.dataLimitGB !== undefined) {
           updateData.bandwidthAlertAt80 = false;
           updateData.bandwidthAlertAt90 = false;
+          updateData.quotaAlertsSent = '[]';
         }
 
         // Update the database record
@@ -1819,6 +1889,7 @@ export const keysRouter = router({
         where: { id: input.id },
         select: {
           id: true,
+          telegramDeliveryEnabled: true,
         },
       });
 
@@ -1826,6 +1897,13 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found',
+        });
+      }
+
+      if (!key.telegramDeliveryEnabled) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram delivery is disabled for this key.',
         });
       }
 
@@ -1853,6 +1931,28 @@ export const keysRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          telegramDeliveryEnabled: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (!key.telegramDeliveryEnabled) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram delivery is disabled for this key.',
+        });
+      }
+
       try {
         return await sendAccessKeySharePageToTelegram({
           accessKeyId: input.id,
@@ -1894,6 +1994,82 @@ export const keysRouter = router({
       }
 
       return getAccessKeySubscriptionAnalytics(input.id);
+    }),
+
+  getHealthDiagnostics: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          lastTrafficAt: true,
+          lastUsedAt: true,
+          usedBytes: true,
+          estimatedDevices: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
+        });
+      }
+
+      const [analytics, activeSessionCount, latestDeviceEvent] = await Promise.all([
+        getAccessKeySubscriptionAnalytics(input.id),
+        db.connectionSession.count({
+          where: {
+            accessKeyId: input.id,
+            isActive: true,
+          },
+        }),
+        db.subscriptionPageEvent.findFirst({
+          where: {
+            accessKeyId: input.id,
+            ip: { not: null },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            ip: true,
+            platform: true,
+            userAgent: true,
+            createdAt: true,
+          },
+        }),
+      ]);
+
+      const geo = await getGeoIpCountry(latestDeviceEvent?.ip);
+      const active = activeSessionCount > 0 || isTrafficActive(key.lastTrafficAt, new Date());
+
+      return {
+        lastClientFetchAt: analytics.lastClientFetchAt,
+        lastQrScanAt: analytics.lastQrScanAt,
+        lastSharePageVisitAt: analytics.lastViewedAt,
+        lastTelegramSendAt: analytics.lastTelegramSentAt,
+        lastCopyAt: analytics.lastCopiedAt,
+        lastSeenIp: geo.ip,
+        lastSeenCountryCode: geo.countryCode,
+        lastSeenPlatform: latestDeviceEvent?.platform ?? null,
+        lastSeenUserAgent: latestDeviceEvent?.userAgent ?? null,
+        activeSessionCount,
+        estimatedDevices: key.estimatedDevices,
+        lastTrafficAt: key.lastTrafficAt,
+        lastUsedAt: key.lastUsedAt,
+        usedBytes: key.usedBytes.toString(),
+        status: key.status,
+        isActivelyUsed: active,
+      };
     }),
 
   /**
@@ -2217,11 +2393,53 @@ export const keysRouter = router({
         };
       });
 
+      const subscriptionEvents = await db.subscriptionPageEvent.findMany({
+        where: {
+          accessKeyId: input.keyId,
+          ip: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: {
+          ip: true,
+          userAgent: true,
+          createdAt: true,
+          platform: true,
+        },
+      });
+
+      const uniqueDevices = new Map<
+        string,
+        {
+          ip: string | null;
+          userAgent: string | null;
+          platform: string | null;
+          lastSeenAt: Date;
+          countryCode: string | null;
+        }
+      >();
+
+      for (const event of subscriptionEvents) {
+        if (!event.ip || uniqueDevices.has(event.ip)) {
+          continue;
+        }
+
+        const geo = await getGeoIpCountry(event.ip);
+        uniqueDevices.set(event.ip, {
+          ip: geo.ip,
+          userAgent: event.userAgent,
+          platform: event.platform,
+          lastSeenAt: event.createdAt,
+          countryCode: geo.countryCode,
+        });
+      }
+
       return {
         sessions: sessionsWithDuration,
         activeCount: sessions.filter((s) => s.isActive).length,
         estimatedDevices: key.estimatedDevices,
         peakDevices: key.peakDevices,
+        subscriberDevices: Array.from(uniqueDevices.values()),
       };
     }),
 

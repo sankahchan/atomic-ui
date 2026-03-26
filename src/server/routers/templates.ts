@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
+import { stringifyQuotaAlertThresholds } from '@/lib/access-key-policies';
 
 // Helper function to convert GB to bytes
 const gbToBytes = (gb: number): bigint => BigInt(Math.floor(gb * 1024 * 1024 * 1024));
@@ -14,6 +15,7 @@ const createTemplateSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
     description: z.string().max(200).optional(),
     namePrefix: z.string().max(16).optional().nullable(),
+    slugPrefix: z.string().max(40).optional().nullable(),
     dataLimitGB: z.number().positive().optional().nullable(),
     dataLimitResetStrategy: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'NEVER']).default('NEVER'),
     expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
@@ -21,6 +23,17 @@ const createTemplateSchema = z.object({
     method: z.string().default('chacha20-ietf-poly1305'),
     notes: z.string().max(500).optional().nullable(),
     serverId: z.string().optional().nullable(),
+    subscriptionTheme: z.string().optional().nullable(),
+    subscriptionWelcomeMessage: z.string().max(400).optional().nullable(),
+    sharePageEnabled: z.boolean().default(true),
+    clientLinkEnabled: z.boolean().default(true),
+    telegramDeliveryEnabled: z.boolean().default(true),
+    autoDisableOnLimit: z.boolean().default(true),
+    autoDisableOnExpire: z.boolean().default(true),
+    autoArchiveAfterDays: z.number().int().min(0).max(365).default(0),
+    quotaAlertThresholds: z.string().optional().nullable(),
+    autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).default('NONE'),
+    autoRenewDurationDays: z.number().int().positive().optional().nullable(),
 });
 
 const updateTemplateSchema = createTemplateSchema.extend({
@@ -58,6 +71,7 @@ export const templatesRouter = router({
                 data: {
                     ...rest,
                     dataLimitBytes: dataLimitGB ? gbToBytes(dataLimitGB) : null,
+                    quotaAlertThresholds: stringifyQuotaAlertThresholds(input.quotaAlertThresholds),
                 },
             });
         }),
@@ -75,6 +89,7 @@ export const templatesRouter = router({
                 data: {
                     ...data,
                     dataLimitBytes: dataLimitGB ? gbToBytes(dataLimitGB) : null,
+                    quotaAlertThresholds: stringifyQuotaAlertThresholds(input.quotaAlertThresholds),
                 },
             });
         }),

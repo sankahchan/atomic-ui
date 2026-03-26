@@ -158,6 +158,11 @@ function EditKeyDialog({
     expiresAt: Date | null;
     expirationType: string | null;
     autoDisableOnLimit: boolean;
+    autoDisableOnExpire: boolean;
+    autoArchiveAfterDays: number;
+    quotaAlertThresholds: string | null;
+    autoRenewPolicy: string | null;
+    autoRenewDurationDays: number | null;
   };
   onSuccess: () => void;
 }) {
@@ -174,6 +179,11 @@ function EditKeyDialog({
     durationDays: keyData.durationDays?.toString() || '',
     expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
     autoDisableOnLimit: keyData.autoDisableOnLimit ?? true,
+    autoDisableOnExpire: keyData.autoDisableOnExpire ?? true,
+    autoArchiveAfterDays: String(keyData.autoArchiveAfterDays ?? 0),
+    quotaAlertThresholds: keyData.quotaAlertThresholds || '70,85,95',
+    autoRenewPolicy: (keyData.autoRenewPolicy as 'NONE' | 'EXTEND_DURATION') || 'NONE',
+    autoRenewDurationDays: keyData.autoRenewDurationDays?.toString() || '',
   });
 
   const updateMutation = trpc.keys.update.useMutation({
@@ -217,6 +227,14 @@ function EditKeyDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       autoDisableOnLimit: formData.autoDisableOnLimit,
+      autoDisableOnExpire: formData.autoDisableOnExpire,
+      autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
+      quotaAlertThresholds: formData.quotaAlertThresholds,
+      autoRenewPolicy: formData.autoRenewPolicy,
+      autoRenewDurationDays:
+        formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
+          ? Number.parseInt(formData.autoRenewDurationDays, 10)
+          : undefined,
     } as any);
   };
 
@@ -309,6 +327,16 @@ function EditKeyDialog({
                   }
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editQuotaThresholds">Quota alert thresholds (%)</Label>
+                <Input
+                  id="editQuotaThresholds"
+                  placeholder="70,85,95"
+                  value={formData.quotaAlertThresholds}
+                  onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
+                />
+              </div>
             </>
           )}
 
@@ -339,6 +367,64 @@ function EditKeyDialog({
               Or set a specific expiration date directly.
             </p>
           </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="autoDisableOnExpire" className="text-sm font-medium">Auto-disable on expiry</Label>
+              <p className="text-xs text-muted-foreground">
+                Remove the key from Outline after it expires.
+              </p>
+            </div>
+            <Switch
+              id="autoDisableOnExpire"
+              checked={formData.autoDisableOnExpire}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, autoDisableOnExpire: checked })
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
+            <Input
+              id="autoArchiveAfterDays"
+              type="number"
+              min="0"
+              value={formData.autoArchiveAfterDays}
+              onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Auto-renew policy</Label>
+            <Select
+              value={formData.autoRenewPolicy}
+              onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
+                setFormData({ ...formData, autoRenewPolicy: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Do not auto-renew</SelectItem>
+                <SelectItem value="EXTEND_DURATION">Extend by fixed duration</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {formData.autoRenewPolicy === 'EXTEND_DURATION' ? (
+            <div className="space-y-2">
+              <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
+              <Input
+                id="autoRenewDurationDays"
+                type="number"
+                min="1"
+                value={formData.autoRenewDurationDays}
+                onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="editNotes">Notes</Label>
@@ -440,6 +526,9 @@ function SubscriptionShareCard({
   currentCoverImageType,
   currentContactLinks,
   currentWelcomeMessage,
+  currentSharePageEnabled,
+  currentClientLinkEnabled,
+  currentTelegramDeliveryEnabled,
   onThemeChange,
 }: {
   keyId: string;
@@ -451,6 +540,9 @@ function SubscriptionShareCard({
   currentCoverImageType: string | null;
   currentContactLinks: ContactLink[] | null;
   currentWelcomeMessage: string | null;
+  currentSharePageEnabled: boolean;
+  currentClientLinkEnabled: boolean;
+  currentTelegramDeliveryEnabled: boolean;
   onThemeChange: () => void;
 }) {
   const { locale } = useLocale();
@@ -543,6 +635,9 @@ function SubscriptionShareCard({
   const [slugInput, setSlugInput] = useState(publicSlug || '');
   const [contacts, setContacts] = useState<ContactLink[]>(currentContactLinks || []);
   const [welcomeMessage, setWelcomeMessage] = useState(currentWelcomeMessage || '');
+  const [sharePageEnabled, setSharePageEnabled] = useState(currentSharePageEnabled);
+  const [clientLinkEnabled, setClientLinkEnabled] = useState(currentClientLinkEnabled);
+  const [telegramDeliveryEnabled, setTelegramDeliveryEnabled] = useState(currentTelegramDeliveryEnabled);
   const [newContactType, setNewContactType] = useState<string>('telegram');
   const [newContactValue, setNewContactValue] = useState('');
 
@@ -618,6 +713,22 @@ function SubscriptionShareCard({
       toast({
         title: shareUi.welcomeUpdatedTitle,
         description: shareUi.welcomeUpdatedDesc,
+      });
+      onThemeChange();
+    },
+    onError: (error) => {
+      toast({
+        title: shareUi.updateFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const updateDeliveryMutation = trpc.keys.update.useMutation({
+    onSuccess: () => {
+      toast({
+        title: shareUi.updatedTitle,
+        description: 'Access controls updated.',
       });
       onThemeChange();
     },
@@ -820,6 +931,24 @@ function SubscriptionShareCard({
 
   const theme = getTheme(selectedTheme);
 
+  const handleToggleUpdate = (
+    field: 'sharePageEnabled' | 'clientLinkEnabled' | 'telegramDeliveryEnabled',
+    checked: boolean,
+  ) => {
+    if (field === 'sharePageEnabled') {
+      setSharePageEnabled(checked);
+    } else if (field === 'clientLinkEnabled') {
+      setClientLinkEnabled(checked);
+    } else {
+      setTelegramDeliveryEnabled(checked);
+    }
+
+    updateDeliveryMutation.mutate({
+      id: keyId,
+      [field]: checked,
+    } as any);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -832,6 +961,39 @@ function SubscriptionShareCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+            <Switch
+              checked={sharePageEnabled}
+              onCheckedChange={(checked) => handleToggleUpdate('sharePageEnabled', checked)}
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">Share page</span>
+              <span className="block text-xs text-muted-foreground">Public page availability.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+            <Switch
+              checked={clientLinkEnabled}
+              onCheckedChange={(checked) => handleToggleUpdate('clientLinkEnabled', checked)}
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">Client URL</span>
+              <span className="block text-xs text-muted-foreground">Allow app imports and client fetches.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+            <Switch
+              checked={telegramDeliveryEnabled}
+              onCheckedChange={(checked) => handleToggleUpdate('telegramDeliveryEnabled', checked)}
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">Telegram delivery</span>
+              <span className="block text-xs text-muted-foreground">Allow Telegram delivery and link generation.</span>
+            </span>
+          </label>
+        </div>
+
         {/* Theme Selector */}
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground flex items-center gap-2">
@@ -1094,7 +1256,7 @@ function SubscriptionShareCard({
           <Button
             variant="outline"
             className="w-full min-w-0 text-xs sm:text-sm"
-            disabled={!subscriptionToken && !slugInput.trim()}
+            disabled={!sharePageEnabled || (!subscriptionToken && !slugInput.trim())}
             onClick={() => {
               const url = getSubscriptionPageUrl();
               if (url) window.open(url, '_blank');
@@ -1106,7 +1268,7 @@ function SubscriptionShareCard({
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copySubscriptionPageUrl}
-            disabled={!subscriptionToken && !slugInput.trim()}
+            disabled={!sharePageEnabled || (!subscriptionToken && !slugInput.trim())}
           >
             <Copy className="w-4 h-4 mr-2" />
             {shareUi.copyLink}
@@ -1115,7 +1277,7 @@ function SubscriptionShareCard({
             variant="outline"
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={copyClientUrl}
-            disabled={!subscriptionToken && !slugInput.trim()}
+            disabled={!clientLinkEnabled || (!subscriptionToken && !slugInput.trim())}
           >
             <Link2 className="w-4 h-4 mr-2" />
             {shareUi.copyClientUrl}
@@ -1124,7 +1286,7 @@ function SubscriptionShareCard({
             variant="outline"
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={() => connectLinkMutation.mutate({ id: keyId })}
-            disabled={connectLinkMutation.isPending}
+            disabled={!telegramDeliveryEnabled || connectLinkMutation.isPending}
           >
             {connectLinkMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1136,7 +1298,7 @@ function SubscriptionShareCard({
           <Button
             className="w-full min-w-0 text-xs sm:text-sm"
             onClick={() => sendSharePageMutation.mutate({ id: keyId, reason: 'RESENT' })}
-            disabled={sendSharePageMutation.isPending}
+            disabled={!telegramDeliveryEnabled || sendSharePageMutation.isPending}
           >
             {sendSharePageMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1149,7 +1311,7 @@ function SubscriptionShareCard({
             variant="outline"
             className="w-full min-w-0 text-xs sm:col-span-2 sm:text-sm"
             onClick={() => regenerateTokenMutation.mutate({ id: keyId })}
-            disabled={regenerateTokenMutation.isPending}
+            disabled={!sharePageEnabled || regenerateTokenMutation.isPending}
           >
             {regenerateTokenMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1164,17 +1326,21 @@ function SubscriptionShareCard({
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
             <p className="mb-1 font-medium text-foreground">{shareUi.sharePageUrl}</p>
-            {subscriptionToken || slugInput.trim()
+            {sharePageEnabled
+              ? subscriptionToken || slugInput.trim()
               ? getSubscriptionPageUrl()
               : regenerateTokenMutation.isPending
                 ? shareUi.generatingNewToken
-                : shareUi.generatingToken}
+                : shareUi.generatingToken
+              : 'Share page disabled'}
           </div>
           <div className="text-xs text-muted-foreground break-all p-2 bg-muted rounded">
             <p className="mb-1 font-medium text-foreground">{shareUi.clientUrl}</p>
-            {subscriptionToken || slugInput.trim()
+            {clientLinkEnabled
+              ? subscriptionToken || slugInput.trim()
               ? getClientUrl()
-              : `${shareUi.clientUrl}...`}
+              : `${shareUi.clientUrl}...`
+              : 'Client URL disabled'}
           </div>
         </div>
 
@@ -1233,6 +1399,14 @@ export default function KeyDetailPage() {
     {
       enabled: !!keyId,
       refetchInterval: 5000,
+      refetchIntervalInBackground: false,
+    },
+  );
+  const { data: healthDiagnostics } = trpc.keys.getHealthDiagnostics.useQuery(
+    { id: keyId },
+    {
+      enabled: !!keyId,
+      refetchInterval: 30_000,
       refetchIntervalInBackground: false,
     },
   );
@@ -1932,6 +2106,85 @@ export default function KeyDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
+                Key Health
+              </CardTitle>
+              <CardDescription>
+                Recent share, client, and delivery activity for this key.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="ops-row-card">
+                <div>
+                  <p className="text-sm text-muted-foreground">Usage state</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {healthDiagnostics?.isActivelyUsed ? 'Recently active' : 'Idle'}
+                  </p>
+                </div>
+                <Badge variant="outline" className={cn(
+                  'rounded-full',
+                  healthDiagnostics?.isActivelyUsed
+                    ? 'border-emerald-500/30 text-emerald-500'
+                    : 'border-muted-foreground/30 text-muted-foreground',
+                )}>
+                  {healthDiagnostics?.isActivelyUsed ? 'In use' : 'Inactive'}
+                </Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">Last client fetch</p>
+                  <p className="font-medium">
+                    {healthDiagnostics?.lastClientFetchAt ? formatRelativeTime(healthDiagnostics.lastClientFetchAt) : 'Never'}
+                  </p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">Last QR scan</p>
+                  <p className="font-medium">
+                    {healthDiagnostics?.lastQrScanAt ? formatRelativeTime(healthDiagnostics.lastQrScanAt) : 'Never'}
+                  </p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">Last share page visit</p>
+                  <p className="font-medium">
+                    {healthDiagnostics?.lastSharePageVisitAt ? formatRelativeTime(healthDiagnostics.lastSharePageVisitAt) : 'Never'}
+                  </p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-sm text-muted-foreground">Last Telegram send</p>
+                  <p className="font-medium">
+                    {healthDiagnostics?.lastTelegramSendAt ? formatRelativeTime(healthDiagnostics.lastTelegramSendAt) : 'Never'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last seen device</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">IP</span>
+                    <span className="font-mono">{healthDiagnostics?.lastSeenIp || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Country</span>
+                    <span>{healthDiagnostics?.lastSeenCountryCode ? `${getCountryFlag(healthDiagnostics.lastSeenCountryCode)} ${healthDiagnostics.lastSeenCountryCode}` : '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Platform</span>
+                    <span>{healthDiagnostics?.lastSeenPlatform || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Active sessions</span>
+                    <span>{healthDiagnostics?.activeSessionCount ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
                 {t('keys.activity.title')}
               </CardTitle>
               <CardDescription>{t('keys.activity.description')}</CardDescription>
@@ -2032,6 +2285,9 @@ export default function KeyDetailPage() {
             currentCoverImageType={(key as any).coverImageType}
             currentContactLinks={(key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null}
             currentWelcomeMessage={(key as any).subscriptionWelcomeMessage}
+            currentSharePageEnabled={(key as any).sharePageEnabled ?? true}
+            currentClientLinkEnabled={(key as any).clientLinkEnabled ?? true}
+            currentTelegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
             onThemeChange={() => refetch()}
           />
         </div>
@@ -2054,6 +2310,11 @@ export default function KeyDetailPage() {
             expiresAt: key.expiresAt,
             expirationType: (key as any).expirationType,
             autoDisableOnLimit: (key as any).autoDisableOnLimit ?? true,
+            autoDisableOnExpire: (key as any).autoDisableOnExpire ?? true,
+            autoArchiveAfterDays: (key as any).autoArchiveAfterDays ?? 0,
+            quotaAlertThresholds: (key as any).quotaAlertThresholds ?? '70,85,95',
+            autoRenewPolicy: (key as any).autoRenewPolicy ?? 'NONE',
+            autoRenewDurationDays: (key as any).autoRenewDurationDays ?? null,
           }}
           onSuccess={() => refetch()}
         />
@@ -2272,7 +2533,35 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           </div>
         )}
 
-        {(!data?.sessions || data.sessions.length === 0) && (
+        {data?.subscriberDevices && data.subscriberDevices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Recent Client Devices</p>
+            <div className="space-y-2">
+              {data.subscriberDevices.slice(0, 5).map((device, index) => (
+                <div
+                  key={`${device.ip || 'unknown'}-${index}`}
+                  className="rounded-lg border border-border/60 bg-background/45 px-3 py-2 text-sm dark:bg-white/[0.03]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-xs">{device.ip || 'Unknown IP'}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {device.lastSeenAt ? formatRelativeTime(device.lastSeenAt) : 'Never'}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>
+                      {device.countryCode ? `${getCountryFlag(device.countryCode)} ${device.countryCode}` : 'Unknown country'}
+                    </span>
+                    <span>{device.platform || 'Unknown platform'}</span>
+                    {device.userAgent ? <span className="truncate">{device.userAgent}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(!data?.sessions || data.sessions.length === 0) && (!data?.subscriberDevices || data.subscriberDevices.length === 0) && (
           <div className="text-center py-4 text-muted-foreground text-sm">
             No connection sessions recorded yet
           </div>

@@ -93,6 +93,30 @@ async function getGeoIpLookup(): Promise<GeoIpLookupFn | null> {
     return geoIpLookupPromise;
 }
 
+export async function getGeoIpCountry(ip: string | null | undefined) {
+    const normalizedIp = normalizeIpAddress(ip);
+    if (!normalizedIp) {
+        return {
+            ip: null,
+            countryCode: null,
+        };
+    }
+
+    const geoIpLookup = await getGeoIpLookup();
+    if (!geoIpLookup) {
+        return {
+            ip: normalizedIp,
+            countryCode: null,
+        };
+    }
+
+    const geo = geoIpLookup(normalizedIp);
+    return {
+        ip: normalizedIp,
+        countryCode: geo?.country ?? null,
+    };
+}
+
 /**
  * Checks if an IP address is allowed based on the active Security Rules.
  * 

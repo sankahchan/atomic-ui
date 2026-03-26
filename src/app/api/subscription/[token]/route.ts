@@ -9,6 +9,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { buildDynamicOutlineUrl, buildSubscriptionClientUrl } from '@/lib/subscription-links';
+import {
+  recordSubscriptionPageEvent,
+  SUBSCRIPTION_EVENT_TYPES,
+} from '@/lib/services/subscription-events';
+
+function getClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+
+  const clientIp = request.headers.get('x-client-ip');
+  if (clientIp) {
+    return clientIp;
+  }
+
+  return '127.0.0.1';
+}
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +39,13 @@ export async function GET(
 ) {
   const { token } = await params;
   const audience = request.nextUrl.searchParams.get('audience');
+  const isPageAudience = audience === 'page';
+  const acceptHeader = request.headers.get('accept') || '';
+  const clientIp = getClientIp(request);
+  const userAgent = request.headers.get('user-agent');
+  const platformHeader = request.headers.get('sec-ch-ua-platform');
+  const platform = request.nextUrl.searchParams.get('platform')
+    || (platformHeader ? platformHeader.replace(/"/g, '') : null);
 
   if (!token) {
     return NextResponse.json(
@@ -100,19 +130,35 @@ export async function GET(
         );
       }
 
-      if (audience === 'page' && !dak.sharePageEnabled) {
+      if (isPageAudience && !dak.sharePageEnabled) {
         return NextResponse.json(
           { error: 'Share page is disabled' },
           { status: 403 }
         );
       }
 
-      const acceptHeader = request.headers.get('accept') || '';
       const dynamicIdentifier = dak.publicSlug || dak.dynamicUrl || token;
       const ssConfUrl = buildDynamicOutlineUrl(dynamicIdentifier, dak.name, {
         origin: request.nextUrl.origin,
         shortPath: Boolean(dak.publicSlug),
       });
+      const acceptHeader = request.headers.get('accept') || '';
+
+      if (!isPageAudience) {
+        await recordSubscriptionPageEvent({
+          dynamicAccessKeyId: dak.id,
+          eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH,
+          source: request.nextUrl.searchParams.get('source'),
+          platform,
+          metadata: {
+            token,
+            shortPath: Boolean(dak.publicSlug),
+            responseFormat: acceptHeader.includes('application/json') ? 'json' : 'sip002',
+          },
+          ip: clientIp,
+          userAgent,
+        });
+      }
 
       if (acceptHeader.includes('application/json')) {
         return NextResponse.json({
@@ -186,6 +232,20 @@ export async function GET(
       );
     }
 
+    if (isPageAudience && !key.sharePageEnabled) {
+      return NextResponse.json(
+        { error: 'Share page is disabled' },
+        { status: 403 }
+      );
+    }
+
+    if (!isPageAudience && !key.clientLinkEnabled) {
+      return NextResponse.json(
+        { error: 'Client URL is disabled' },
+        { status: 403 }
+      );
+    }
+
     const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
     const outlineIdentifier = key.publicSlug || token;
     const outlineClientUrl = buildSubscriptionClientUrl(outlineIdentifier, key.name, {
@@ -193,8 +253,23 @@ export async function GET(
       shortPath: Boolean(key.publicSlug),
     });
 
-    // Check Accept header to determine response format
     const acceptHeader = request.headers.get('accept') || '';
+
+    if (!isPageAudience) {
+      await recordSubscriptionPageEvent({
+        accessKeyId: key.id,
+        eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH,
+        source: request.nextUrl.searchParams.get('source'),
+        platform,
+        metadata: {
+          token,
+          shortPath: Boolean(key.publicSlug),
+          responseFormat: acceptHeader.includes('application/json') ? 'json' : 'plain',
+        },
+        ip: clientIp,
+        userAgent,
+      });
+    }
 
     // If client wants JSON (default for browsers/programmatic access)
     if (acceptHeader.includes('application/json')) {
@@ -219,6 +294,9 @@ export async function GET(
         port: key.port || null,
         contactLinks: (key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null,
         subscriptionWelcomeMessage: (key as any).subscriptionWelcomeMessage || null,
+        sharePageEnabled: key.sharePageEnabled,
+        clientLinkEnabled: key.clientLinkEnabled,
+        telegramDeliveryEnabled: key.telegramDeliveryEnabled,
       });
     }
 

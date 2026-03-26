@@ -12,10 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { formatBytes } from '@/lib/utils';
 import { Edit2, FileText, Key, Loader2, Plus, Search, Server, Trash2 } from 'lucide-react';
+import { themeList } from '@/lib/subscription-themes';
 
 function TemplateDialog({
   open,
@@ -35,6 +38,7 @@ function TemplateDialog({
     name: template?.name || '',
     description: template?.description || '',
     namePrefix: template?.namePrefix || '',
+    slugPrefix: template?.slugPrefix || '',
     dataLimitGB: template?.dataLimitGB?.toString() || '',
     dataLimitResetStrategy: template?.dataLimitResetStrategy || 'NEVER',
     expirationType: template?.expirationType || 'NEVER',
@@ -42,6 +46,17 @@ function TemplateDialog({
     method: template?.method || 'chacha20-ietf-poly1305',
     notes: template?.notes || '',
     serverId: template?.serverId || 'unassigned',
+    subscriptionTheme: template?.subscriptionTheme || 'dark',
+    subscriptionWelcomeMessage: template?.subscriptionWelcomeMessage || '',
+    sharePageEnabled: template?.sharePageEnabled ?? true,
+    clientLinkEnabled: template?.clientLinkEnabled ?? true,
+    telegramDeliveryEnabled: template?.telegramDeliveryEnabled ?? true,
+    autoDisableOnLimit: template?.autoDisableOnLimit ?? true,
+    autoDisableOnExpire: template?.autoDisableOnExpire ?? true,
+    autoArchiveAfterDays: String(template?.autoArchiveAfterDays ?? 0),
+    quotaAlertThresholds: template?.quotaAlertThresholds || '70,85,95',
+    autoRenewPolicy: template?.autoRenewPolicy || 'NONE',
+    autoRenewDurationDays: template?.autoRenewDurationDays?.toString() || '',
   });
 
   const { data: servers } = trpc.servers.list.useQuery();
@@ -72,6 +87,7 @@ function TemplateDialog({
       name: formData.name,
       description: formData.description || undefined,
       namePrefix: formData.namePrefix || undefined,
+      slugPrefix: formData.slugPrefix || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
@@ -79,6 +95,20 @@ function TemplateDialog({
       method: formData.method,
       notes: formData.notes || undefined,
       serverId: formData.serverId === 'unassigned' ? null : formData.serverId,
+      subscriptionTheme: formData.subscriptionTheme || undefined,
+      subscriptionWelcomeMessage: formData.subscriptionWelcomeMessage || undefined,
+      sharePageEnabled: formData.sharePageEnabled,
+      clientLinkEnabled: formData.clientLinkEnabled,
+      telegramDeliveryEnabled: formData.telegramDeliveryEnabled,
+      autoDisableOnLimit: formData.autoDisableOnLimit,
+      autoDisableOnExpire: formData.autoDisableOnExpire,
+      autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
+      quotaAlertThresholds: formData.quotaAlertThresholds,
+      autoRenewPolicy: formData.autoRenewPolicy,
+      autoRenewDurationDays:
+        formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
+          ? Number.parseInt(formData.autoRenewDurationDays, 10)
+          : undefined,
     };
 
     if (isEditing) {
@@ -92,7 +122,7 @@ function TemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Template' : 'Create Template'}</DialogTitle>
           <DialogDescription>
@@ -132,6 +162,18 @@ function TemplateDialog({
                 onChange={(e) => setFormData({ ...formData, namePrefix: e.target.value })}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="slugPrefix">Short Slug Prefix</Label>
+              <Input
+                id="slugPrefix"
+                placeholder="premium"
+                value={formData.slugPrefix}
+                onChange={(e) => setFormData({ ...formData, slugPrefix: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Default Server</Label>
               <Select value={formData.serverId} onValueChange={(val) => setFormData({ ...formData, serverId: val })}>
@@ -201,6 +243,157 @@ function TemplateDialog({
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Share defaults</p>
+              <p className="text-xs text-muted-foreground">Theme and delivery defaults for keys created from this template.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Page Theme</Label>
+              <Select
+                value={formData.subscriptionTheme}
+                onValueChange={(value) => setFormData({ ...formData, subscriptionTheme: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {themeList.map((theme) => (
+                    <SelectItem key={theme.id} value={theme.id}>
+                      {theme.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateWelcome">Welcome Message</Label>
+              <Textarea
+                id="templateWelcome"
+                className="min-h-[96px]"
+                placeholder="Optional per-key welcome message"
+                value={formData.subscriptionWelcomeMessage}
+                onChange={(e) => setFormData({ ...formData, subscriptionWelcomeMessage: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3">
+                <Switch
+                  checked={formData.sharePageEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, sharePageEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Share Page</span>
+                  <span className="block text-xs text-muted-foreground">Public page visibility.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3">
+                <Switch
+                  checked={formData.clientLinkEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, clientLinkEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Client URL</span>
+                  <span className="block text-xs text-muted-foreground">Allow client imports.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3">
+                <Switch
+                  checked={formData.telegramDeliveryEnabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, telegramDeliveryEnabled: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Telegram</span>
+                  <span className="block text-xs text-muted-foreground">Enable Telegram delivery.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Automation defaults</p>
+              <p className="text-xs text-muted-foreground">Control expiry, quota alerts, archiving, and renewal behavior.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateThresholds">Quota Alert Thresholds (%)</Label>
+              <Input
+                id="templateThresholds"
+                placeholder="70,85,95"
+                value={formData.quotaAlertThresholds}
+                onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3">
+                <Switch
+                  checked={formData.autoDisableOnLimit}
+                  onCheckedChange={(checked) => setFormData({ ...formData, autoDisableOnLimit: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Auto-disable on limit</span>
+                  <span className="block text-xs text-muted-foreground">Disable keys when quota is exhausted.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3">
+                <Switch
+                  checked={formData.autoDisableOnExpire}
+                  onCheckedChange={(checked) => setFormData({ ...formData, autoDisableOnExpire: checked })}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Auto-disable on expire</span>
+                  <span className="block text-xs text-muted-foreground">Disable keys when they expire.</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateArchiveDays">Auto-archive after (days)</Label>
+              <Input
+                id="templateArchiveDays"
+                type="number"
+                min="0"
+                value={formData.autoArchiveAfterDays}
+                onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Auto-renew policy</Label>
+                <Select
+                  value={formData.autoRenewPolicy}
+                  onValueChange={(value) => setFormData({ ...formData, autoRenewPolicy: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Do not auto-renew</SelectItem>
+                    <SelectItem value="EXTEND_DURATION">Extend by fixed duration</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.autoRenewPolicy === 'EXTEND_DURATION' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="templateAutoRenewDays">Auto-renew duration (days)</Label>
+                  <Input
+                    id="templateAutoRenewDays"
+                    type="number"
+                    min="1"
+                    value={formData.autoRenewDurationDays}
+                    onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <DialogFooter>
@@ -474,6 +667,31 @@ export default function TemplatesPage() {
                             : template.expirationType === 'NEVER'
                               ? 'No expiry applied'
                               : 'Fixed duration from creation'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Automation</p>
+                        <p className="mt-2 text-sm font-medium">
+                          {template.autoDisableOnExpire ? 'Disable on expiry' : 'Expiry stays readable'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Archive after {template.autoArchiveAfterDays ?? 0} day(s)
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sharing</p>
+                        <p className="mt-2 text-sm font-medium">
+                          {template.subscriptionTheme || 'dark'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {[
+                            template.sharePageEnabled ? 'Share page' : null,
+                            template.clientLinkEnabled ? 'Client URL' : null,
+                            template.telegramDeliveryEnabled ? 'Telegram' : null,
+                          ].filter(Boolean).join(' • ') || 'All delivery disabled'}
                         </p>
                       </div>
                     </div>
