@@ -20,6 +20,34 @@ interface SessionProviderProps {
 // Events to track activity
 const EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
 
+function normalizePathname(pathname: string | null) {
+    const currentPath = pathname || '/';
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+    if (!basePath) {
+        return currentPath;
+    }
+
+    if (currentPath === basePath) {
+        return '/';
+    }
+
+    return currentPath.startsWith(`${basePath}/`)
+        ? currentPath.slice(basePath.length) || '/'
+        : currentPath;
+}
+
+function isPublicSharePath(pathname: string | null) {
+    const normalizedPath = normalizePathname(pathname);
+
+    return (
+        normalizedPath.startsWith('/sub/') ||
+        normalizedPath.startsWith('/s/') ||
+        normalizedPath.startsWith('/share/') ||
+        normalizedPath.startsWith('/c/')
+    );
+}
+
 export function SessionProvider({
     children,
     timeoutMinutes = 15
@@ -29,6 +57,7 @@ export function SessionProvider({
     const { toast } = useToast();
     const lastActivityRef = useRef(Date.now());
     const isLoggingOutRef = useRef(false);
+    const publicSharePath = isPublicSharePath(pathname);
 
     const resetTimer = () => {
         lastActivityRef.current = Date.now();
@@ -51,6 +80,10 @@ export function SessionProvider({
     }, [router, toast]);
 
     useEffect(() => {
+        if (publicSharePath) {
+            return;
+        }
+
         // Check periodically if timeout has been reached
         const checkTimeout = () => {
             const now = Date.now();
@@ -97,7 +130,7 @@ export function SessionProvider({
                 window.removeEventListener(event, throttledHandler);
             });
         };
-    }, [pathname, timeoutMinutes, logout]);
+    }, [publicSharePath, pathname, timeoutMinutes, logout]);
 
     return (
         <SessionContext.Provider value={{ lastActivity: lastActivityRef.current }}>
