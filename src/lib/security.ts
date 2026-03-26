@@ -3,6 +3,7 @@ import ipRangeCheck from 'ip-range-check';
 import fs from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
+import { getAdminLoginRestrictionStatus } from '@/lib/services/admin-login-protection';
 
 export function normalizeIpAddress(rawIp: string | null | undefined): string | null {
     if (!rawIp) {
@@ -171,6 +172,14 @@ export async function checkIpAllowed(ip: string): Promise<{ allowed: boolean; re
         if (!matched) {
             return { allowed: false, reason: 'Access denied: not in whitelist' };
         }
+    }
+
+    const loginRestriction = await getAdminLoginRestrictionStatus(ip);
+    if (loginRestriction.blocked) {
+        return {
+            allowed: false,
+            reason: loginRestriction.reason,
+        };
     }
 
     return { allowed: true };

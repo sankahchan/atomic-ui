@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -485,6 +487,325 @@ function SecuritySummaryCards() {
     );
 }
 
+function LoginProtectionCard() {
+    const { toast } = useToast();
+    const { data: overview, isLoading, refetch } = trpc.security.getAdminLoginAbuseOverview.useQuery();
+    const saveMutation = trpc.security.updateAdminLoginProtectionConfig.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Login protection updated', description: 'The admin login abuse policy has been saved.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to save login protection', description: error.message, variant: 'destructive' });
+        },
+    });
+    const unbanMutation = trpc.security.unbanAdminLoginIp.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'IP restriction cleared', description: 'The IP has been released from the admin login ban list.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to unban IP', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const [form, setForm] = useState({
+        enabled: true,
+        softLockThreshold: 5,
+        softLockWindowMinutes: 10,
+        softLockDurationMinutes: 15,
+        banThreshold: 8,
+        banWindowMinutes: 10,
+        banDurationMinutes: 720,
+        telegramAlertEnabled: true,
+        fail2banLogEnabled: true,
+        trustedIpRanges: '',
+    });
+
+    useEffect(() => {
+        if (!overview?.config) {
+            return;
+        }
+
+        setForm({
+            enabled: overview.config.enabled,
+            softLockThreshold: overview.config.softLockThreshold,
+            softLockWindowMinutes: overview.config.softLockWindowMinutes,
+            softLockDurationMinutes: overview.config.softLockDurationMinutes,
+            banThreshold: overview.config.banThreshold,
+            banWindowMinutes: overview.config.banWindowMinutes,
+            banDurationMinutes: overview.config.banDurationMinutes,
+            telegramAlertEnabled: overview.config.telegramAlertEnabled,
+            fail2banLogEnabled: overview.config.fail2banLogEnabled,
+            trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
+        });
+    }, [overview]);
+
+    if (isLoading || !overview) {
+        return (
+            <Card className="ops-panel">
+                <CardHeader className="px-0 pt-0">
+                    <CardTitle>Admin login abuse protection</CardTitle>
+                    <CardDescription>
+                        Loading current thresholds, trusted IPs, and recent failed login activity.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="px-0 pb-0">
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((index) => (
+                            <div key={index} className="h-20 rounded-[1.25rem] bg-muted/60 animate-pulse" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Failed last hour</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className="text-2xl font-bold">{overview.summary.failuresLastHour}</div>
+                        <p className="text-xs text-muted-foreground">failed admin login attempts</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Failed last 24h</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className="text-2xl font-bold">{overview.summary.failuresLastDay}</div>
+                        <p className="text-xs text-muted-foreground">recent login failures</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Active restrictions</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className="text-2xl font-bold">{overview.summary.activeRestrictions}</div>
+                        <p className="text-xs text-muted-foreground">IPs currently locked or banned</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Active bans</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${overview.summary.activeBans > 0 ? 'text-red-500' : ''}`}>
+                            {overview.summary.activeBans}
+                        </div>
+                        <p className="text-xs text-muted-foreground">harder blocks now in effect</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="ops-panel">
+                <CardHeader className="px-0 pt-0">
+                    <CardTitle>Policy</CardTitle>
+                    <CardDescription>
+                        Automatic lock and ban thresholds for repeated failed admin logins. Telegram alerts use the configured admin chat IDs.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 px-0 pb-0">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="ops-detail-card flex items-center justify-between gap-4">
+                            <div>
+                                <p className="font-medium">Enable login abuse protection</p>
+                                <p className="text-sm text-muted-foreground">Create temporary locks and bans from repeated failed logins.</p>
+                            </div>
+                            <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+                        </div>
+                        <div className="ops-detail-card flex items-center justify-between gap-4">
+                            <div>
+                                <p className="font-medium">Telegram admin alerts</p>
+                                <p className="text-sm text-muted-foreground">Send the source IP and attempted email to the configured Telegram admin chats.</p>
+                            </div>
+                            <Switch checked={form.telegramAlertEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, telegramAlertEnabled: checked }))} />
+                        </div>
+                        <div className="ops-detail-card flex items-center justify-between gap-4 md:col-span-2">
+                            <div>
+                                <p className="font-medium">Write fail2ban auth log</p>
+                                <p className="text-sm text-muted-foreground">Mirror failed admin logins to the dedicated fail2ban file so the server can hard-ban the IP too.</p>
+                            </div>
+                            <Switch checked={form.fail2banLogEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, fail2banLogEnabled: checked }))} />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label>Soft lock threshold</Label>
+                            <Input type="number" min={1} value={form.softLockThreshold} onChange={(event) => setForm((current) => ({ ...current, softLockThreshold: Number(event.target.value) || 1 }))} />
+                            <p className="text-xs text-muted-foreground">Wrong-password attempts before a temporary app lock starts.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Soft lock window (minutes)</Label>
+                            <Input type="number" min={1} value={form.softLockWindowMinutes} onChange={(event) => setForm((current) => ({ ...current, softLockWindowMinutes: Number(event.target.value) || 1 }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Soft lock duration (minutes)</Label>
+                            <Input type="number" min={1} value={form.softLockDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, softLockDurationMinutes: Number(event.target.value) || 1 }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Ban threshold</Label>
+                            <Input type="number" min={1} value={form.banThreshold} onChange={(event) => setForm((current) => ({ ...current, banThreshold: Number(event.target.value) || 1 }))} />
+                            <p className="text-xs text-muted-foreground">When reached, the IP is fully denied by the app and also logged for fail2ban.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Ban window (minutes)</Label>
+                            <Input type="number" min={1} value={form.banWindowMinutes} onChange={(event) => setForm((current) => ({ ...current, banWindowMinutes: Number(event.target.value) || 1 }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Ban duration (minutes)</Label>
+                            <Input type="number" min={1} value={form.banDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, banDurationMinutes: Number(event.target.value) || 1 }))} />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Trusted IPs or CIDRs</Label>
+                        <Textarea
+                            value={form.trustedIpRanges}
+                            onChange={(event) => setForm((current) => ({ ...current, trustedIpRanges: event.target.value }))}
+                            placeholder={'203.0.113.10\n198.51.100.0/24'}
+                            className="min-h-[110px]"
+                        />
+                        <p className="text-xs text-muted-foreground">These addresses are exempt from automatic login bans. Use one IP or CIDR per line.</p>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={() => saveMutation.mutate({
+                                ...form,
+                                trustedIpRanges: form.trustedIpRanges
+                                    .split(/[\n,]/)
+                                    .map((value) => value.trim())
+                                    .filter(Boolean),
+                            })}
+                            disabled={saveMutation.isPending}
+                        >
+                            {saveMutation.isPending ? 'Saving…' : 'Save protection policy'}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+                <Card className="ops-panel">
+                    <CardHeader className="px-0 pt-0">
+                        <CardTitle>Recent failed admin logins</CardTitle>
+                        <CardDescription>
+                            Most recent bad-password attempts recorded by the app.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        {overview.recentFailures.length === 0 ? (
+                            <div className="ops-chart-empty py-8 text-muted-foreground">No recent failed admin login attempts.</div>
+                        ) : (
+                            <div className="space-y-3">
+                                {overview.recentFailures.map((failure) => (
+                                    <div key={failure.id} className="ops-row-card flex items-center justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{failure.ip || 'Unknown IP'}</span>
+                                                {failure.countryCode && <Badge variant="outline">{failure.countryCode}</Badge>}
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">{failure.email || 'Unknown email'}</p>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            {formatDistanceToNow(new Date(failure.createdAt), { addSuffix: true })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-6">
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Top offender IPs</CardTitle>
+                            <CardDescription>
+                                Highest failure counts over the last 24 hours.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {overview.topOffenders.length === 0 ? (
+                                <div className="ops-chart-empty py-8 text-muted-foreground">No offender IPs recorded yet.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {overview.topOffenders.map((offender) => (
+                                        <div key={offender.ip} className="ops-row-card flex items-center justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <p className="font-medium">{offender.ip}</p>
+                                                <p className="text-xs text-muted-foreground">{offender.email || 'Unknown email'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-semibold">{offender.count}</p>
+                                                <p className="text-xs text-muted-foreground">attempts</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Active restrictions</CardTitle>
+                            <CardDescription>
+                                IPs currently locked or banned by the app.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {overview.activeRestrictions.length === 0 ? (
+                                <div className="ops-chart-empty py-8 text-muted-foreground">No active login bans or locks.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {overview.activeRestrictions.map((restriction) => (
+                                        <div key={restriction.id} className="ops-row-card space-y-3">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">{restriction.ip}</span>
+                                                        <Badge variant={restriction.restrictionType === 'BAN' ? 'destructive' : 'secondary'}>
+                                                            {restriction.restrictionType}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground">{restriction.attemptedEmail || 'Unknown email'}</p>
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => unbanMutation.mutate({ ip: restriction.ip })}
+                                                    disabled={unbanMutation.isPending}
+                                                >
+                                                    <Unlock className="mr-2 h-4 w-4" />
+                                                    Unban
+                                                </Button>
+                                            </div>
+                                            <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+                                                <span>Failures: {restriction.failureCount}</span>
+                                                <span>Last hit: {formatDistanceToNow(new Date(restriction.lastFailedAt), { addSuffix: true })}</span>
+                                                <span>Expires: {formatDistanceToNow(new Date(restriction.expiresAt), { addSuffix: true })}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function SecurityPage() {
     const { toast } = useToast();
     const [createOpen, setCreateOpen] = useState(false);
@@ -592,6 +913,7 @@ export default function SecurityPage() {
                 <TabsList className="ops-command-bar h-auto w-full justify-start gap-2 rounded-[1.5rem] border-0 bg-transparent p-0 md:w-fit">
                     <TabsTrigger value="status">Security Status</TabsTrigger>
                     <TabsTrigger value="rules">Access Rules</TabsTrigger>
+                    <TabsTrigger value="login">Login Protection</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="status" className="space-y-6 mt-6">
@@ -724,6 +1046,10 @@ export default function SecurityPage() {
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="login" className="space-y-6 mt-6">
+                    <LoginProtectionCard />
                 </TabsContent>
             </Tabs>
 

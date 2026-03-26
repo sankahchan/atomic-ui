@@ -19,7 +19,10 @@ LOGIN_LIMIT_BURST="${LOGIN_LIMIT_BURST:-12}"
 AUTH_LIMIT_BURST="${AUTH_LIMIT_BURST:-15}"
 HARDEN_CONF="/etc/nginx/conf.d/${SITE_NAME}-hardening.conf"
 FAIL2BAN_FILTER="/etc/fail2ban/filter.d/${SITE_NAME}-login-abuse.conf"
+FAIL2BAN_AUTH_FILTER="/etc/fail2ban/filter.d/${SITE_NAME}-auth-login.conf"
 FAIL2BAN_JAIL="/etc/fail2ban/jail.d/${SITE_NAME}.local"
+ADMIN_LOGIN_FAIL2BAN_LOG="${ADMIN_LOGIN_FAIL2BAN_LOG:-/tmp/atomic-ui-admin-login.log}"
+ADMIN_LOGIN_FAIL2BAN_JAIL="${ADMIN_LOGIN_FAIL2BAN_JAIL:-${SITE_NAME}-auth-login}"
 SHARE_STATIC_DIR="/var/www/atomic-ui/share"
 SHARE_BLOCKED_FILE="${SHARE_STATIC_DIR}/blocked.html"
 
@@ -419,15 +422,26 @@ systemctl enable nginx >/dev/null 2>&1 || true
 systemctl restart nginx
 systemctl is-active nginx >/dev/null
 
-if [[ "${ENABLE_FAIL2BAN}" == "true" && -n "${PANEL_PATH}" ]]; then
+if [[ "${ENABLE_FAIL2BAN}" == "true" ]]; then
   apt-get install -y -qq fail2ban >/dev/null
   mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
-  cat >"${FAIL2BAN_FILTER}" <<EOF
+  if [[ -n "${PANEL_PATH}" ]]; then
+    cat >"${FAIL2BAN_FILTER}" <<EOF
 [Definition]
 failregex = ^<HOST> - - \[[^\]]+\] "(?:GET|POST) ${PANEL_PATH}/login\?(?:[^"]*)(?:%%7Bphp%%7D|system\(|/proc/1/environ|%%2Fproc%%2F1%%2Fenviron|%%252Fproc%%252F1%%252Fenviron)(?:[^"]*) HTTP/.*" 200 .*$
 ignoreregex =
 EOF
-  cat >"${FAIL2BAN_JAIL}" <<EOF
+  fi
+  cat >"${FAIL2BAN_AUTH_FILTER}" <<EOF
+[Definition]
+failregex = ^\S+\s+ip=<HOST>\s+event=AUTH_LOGIN_FAILED\s+email=.*$
+ignoreregex =
+EOF
+  touch "${ADMIN_LOGIN_FAIL2BAN_LOG}"
+  chmod 0644 "${ADMIN_LOGIN_FAIL2BAN_LOG}"
+  {
+    if [[ -n "${PANEL_PATH}" ]]; then
+      cat <<EOF
 [${SITE_NAME}-login-abuse]
 enabled = true
 filter = ${SITE_NAME}-login-abuse
@@ -438,6 +452,20 @@ maxretry = 4
 bantime = 12h
 backend = auto
 EOF
+    fi
+    cat <<EOF
+[${ADMIN_LOGIN_FAIL2BAN_JAIL}]
+enabled = true
+filter = ${SITE_NAME}-auth-login
+port = http,https
+logpath = ${ADMIN_LOGIN_FAIL2BAN_LOG}
+findtime = 10m
+maxretry = 8
+bantime = 12h
+backend = auto
+EOF
+  } >"${FAIL2BAN_JAIL}"
+fi
   systemctl enable fail2ban >/dev/null 2>&1 || true
   systemctl restart fail2ban
 fi

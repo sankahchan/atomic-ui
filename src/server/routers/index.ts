@@ -51,6 +51,7 @@ import {
 } from '@/lib/auth';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import { writeAuditLog } from '@/lib/audit';
+import { recordFailedAdminLogin } from '@/lib/services/admin-login-protection';
 
 /**
  * Auth Router
@@ -85,6 +86,11 @@ const authRouter = router({
           details: {
             email: input.email,
           },
+        });
+
+        await recordFailedAdminLogin({
+          ip: ctx.clientIp,
+          email: input.email,
         });
 
         throw new TRPCError({

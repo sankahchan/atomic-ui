@@ -7,6 +7,12 @@ import * as QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
+import {
+    getAdminLoginAbuseOverview,
+    getAdminLoginProtectionConfig,
+    saveAdminLoginProtectionConfig,
+    unbanAdminLoginIp,
+} from '@/lib/services/admin-login-protection';
 
 // Create TOTP instance
 const totp = new TOTP();
@@ -155,6 +161,48 @@ export const securityRouter = router({
             return db.securityRule.delete({
                 where: { id: input.id },
             });
+        }),
+
+    getAdminLoginProtectionConfig: adminProcedure.query(async () => {
+        return getAdminLoginProtectionConfig();
+    }),
+
+    updateAdminLoginProtectionConfig: adminProcedure
+        .input(
+            z.object({
+                enabled: z.boolean(),
+                softLockThreshold: z.number().int().min(1).max(100),
+                softLockWindowMinutes: z.number().int().min(1).max(1440),
+                softLockDurationMinutes: z.number().int().min(1).max(10080),
+                banThreshold: z.number().int().min(1).max(200),
+                banWindowMinutes: z.number().int().min(1).max(1440),
+                banDurationMinutes: z.number().int().min(1).max(10080),
+                telegramAlertEnabled: z.boolean(),
+                fail2banLogEnabled: z.boolean(),
+                trustedIpRanges: z.array(z.string()),
+            }),
+        )
+        .mutation(async ({ input }) => {
+            return saveAdminLoginProtectionConfig(input);
+        }),
+
+    getAdminLoginAbuseOverview: adminProcedure.query(async () => {
+        return getAdminLoginAbuseOverview();
+    }),
+
+    unbanAdminLoginIp: adminProcedure
+        .input(z.object({ ip: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+            const result = await unbanAdminLoginIp(input.ip);
+
+            if (!result.success) {
+                throw new TRPCError({
+                    code: 'NOT_FOUND',
+                    message: 'No active ban found for that IP address.',
+                });
+            }
+
+            return result;
         }),
 
     // ============================================
