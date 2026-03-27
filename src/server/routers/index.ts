@@ -51,7 +51,10 @@ import {
 } from '@/lib/auth';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import { writeAuditLog } from '@/lib/audit';
-import { recordFailedAdminLogin } from '@/lib/services/admin-login-protection';
+import {
+  getAdminLoginChallengeDecision,
+  recordFailedAdminLogin,
+} from '@/lib/services/admin-login-protection';
 
 /**
  * Auth Router
@@ -103,6 +106,8 @@ const authRouter = router({
         });
       }
 
+      const challengeDecision = await getAdminLoginChallengeDecision(ctx.clientIp, input.email);
+
       // Check if user has 2FA enabled
       const totpSecret = await db.totpSecret.findUnique({
         where: { userId: user.id },
@@ -115,6 +120,30 @@ const authRouter = router({
       });
 
       const has2FA = (totpSecret?.verified || false) || webAuthnCredentials.length > 0;
+
+      if (challengeDecision.mode === 'BLOCK' || (challengeDecision.mode === 'REQUIRE_2FA' && !has2FA)) {
+        await writeAuditLog({
+          userId: user.id,
+          ip: ctx.clientIp,
+          action: 'AUTH_LOGIN_RISK_BLOCKED',
+          entity: 'AUTH',
+          entityId: user.id,
+          details: {
+            email: user.email,
+            host: ctx.requestHost,
+            path: ctx.requestPath,
+            challengeMode: challengeDecision.mode,
+            riskLevel: challengeDecision.level,
+            riskScore: challengeDecision.score,
+            has2FA,
+          },
+        });
+
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Additional verification is required for this sign-in.',
+        });
+      }
 
       if (has2FA) {
         // Create a temporary pre-2FA session token
@@ -134,6 +163,11 @@ const authRouter = router({
           entityId: user.id,
           details: {
             email: user.email,
+            host: ctx.requestHost,
+            path: ctx.requestPath,
+            riskChallenge: challengeDecision.mode === 'REQUIRE_2FA',
+            riskLevel: challengeDecision.level,
+            riskScore: challengeDecision.score,
           },
         });
 

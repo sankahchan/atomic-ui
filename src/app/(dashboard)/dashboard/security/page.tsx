@@ -15,10 +15,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
+import { downloadTextFile } from '@/lib/download';
 import {
     ShieldCheck, Plus, Trash2, Power, Globe, AlertTriangle,
     Lock, Unlock, CheckCircle, XCircle, AlertCircle, Server,
-    RefreshCw, Shield, Clock, ExternalLink, Loader2
+    RefreshCw, Shield, Clock, ExternalLink, Loader2, Download
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BackButton } from '@/components/ui/back-button';
@@ -524,9 +525,75 @@ function reputationLevelClasses(level: string) {
     }
 }
 
+const riskLevels = ['LOW', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
+const alertRuleLabels: Record<string, { title: string; description: string }> = {
+    threshold: {
+        title: 'Threshold reached',
+        description: 'Early warning before the soft lock policy starts firing.',
+    },
+    lock: {
+        title: 'Lock applied',
+        description: 'Temporary app-layer lock after repeated failed logins.',
+    },
+    ban: {
+        title: 'Ban applied',
+        description: 'Harder restriction after the ban threshold is crossed.',
+    },
+    repeatedOffender: {
+        title: 'Repeated offender',
+        description: 'Longer-running noisy IP that keeps retrying over the daily window.',
+    },
+    unban: {
+        title: 'Unban',
+        description: 'Manual release of an app or fail2ban restriction.',
+    },
+    fail2banUnavailable: {
+        title: 'fail2ban unavailable',
+        description: 'Server-side jail is unavailable and only app-level protection remains.',
+    },
+};
+
+function HistoryBars({
+    label,
+    value,
+    max,
+    className,
+}: {
+    label: string;
+    value: number;
+    max: number;
+    className?: string;
+}) {
+    const height = max > 0 ? Math.max(8, Math.round((value / max) * 100)) : 8;
+
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <div className="flex h-28 w-7 items-end rounded-full bg-muted/40 px-1.5 py-1">
+                <div
+                    className={`w-full rounded-full ${className || 'bg-primary/80'}`}
+                    style={{ height: `${height}%` }}
+                />
+            </div>
+            <div className="text-center text-[10px] leading-tight text-muted-foreground">
+                <div>{label}</div>
+                <div className="font-semibold text-foreground">{value}</div>
+            </div>
+        </div>
+    );
+}
+
 function LoginProtectionCard() {
     const { toast } = useToast();
     const { data: overview, isLoading, refetch } = trpc.security.getAdminLoginAbuseOverview.useQuery();
+    const exportMutation = trpc.security.exportAdminLoginIncidents.useMutation({
+        onSuccess: (result) => {
+            downloadTextFile(result.content, result.filename, result.type);
+            toast({ title: 'Incident export downloaded', description: result.filename });
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to export incidents', description: error.message, variant: 'destructive' });
+        },
+    });
     const saveMutation = trpc.security.updateAdminLoginProtectionConfig.useMutation({
         onSuccess: async () => {
             toast({ title: 'Login protection updated', description: 'The admin login abuse policy has been saved.' });
@@ -546,7 +613,33 @@ function LoginProtectionCard() {
         },
     });
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<{
+        enabled: boolean;
+        softLockThreshold: number;
+        softLockWindowMinutes: number;
+        softLockDurationMinutes: number;
+        banThreshold: number;
+        banWindowMinutes: number;
+        banDurationMinutes: number;
+        telegramAlertEnabled: boolean;
+        alertOnRepeatedOffender: boolean;
+        repeatedOffenderThreshold: number;
+        alertOnUnban: boolean;
+        fail2banLogEnabled: boolean;
+        repeatedBanLookbackDays: number;
+        repeatedBanDurationMinutes: number;
+        challengeMode: 'OFF' | 'REQUIRE_2FA' | 'BLOCK';
+        challengeMinimumReputationLevel: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+        alertRules: Record<
+            'threshold' | 'lock' | 'ban' | 'repeatedOffender' | 'unban' | 'fail2banUnavailable',
+            {
+                enabled: boolean;
+                cooldownMinutes: number;
+                minimumReputationLevel: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+            }
+        >;
+        trustedIpRanges: string;
+    }>({
         enabled: true,
         softLockThreshold: 5,
         softLockWindowMinutes: 10,
@@ -561,6 +654,16 @@ function LoginProtectionCard() {
         fail2banLogEnabled: true,
         repeatedBanLookbackDays: 7,
         repeatedBanDurationMinutes: 2880,
+        challengeMode: 'OFF' as 'OFF' | 'REQUIRE_2FA' | 'BLOCK',
+        challengeMinimumReputationLevel: 'HIGH' as 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL',
+        alertRules: {
+            threshold: { enabled: true, cooldownMinutes: 30, minimumReputationLevel: 'ELEVATED' as const },
+            lock: { enabled: true, cooldownMinutes: 60, minimumReputationLevel: 'ELEVATED' as const },
+            ban: { enabled: true, cooldownMinutes: 60, minimumReputationLevel: 'HIGH' as const },
+            repeatedOffender: { enabled: true, cooldownMinutes: 360, minimumReputationLevel: 'HIGH' as const },
+            unban: { enabled: true, cooldownMinutes: 60, minimumReputationLevel: 'LOW' as const },
+            fail2banUnavailable: { enabled: true, cooldownMinutes: 360, minimumReputationLevel: 'LOW' as const },
+        },
         trustedIpRanges: '',
     });
 
@@ -584,6 +687,9 @@ function LoginProtectionCard() {
             fail2banLogEnabled: overview.config.fail2banLogEnabled,
             repeatedBanLookbackDays: overview.config.repeatedBanLookbackDays,
             repeatedBanDurationMinutes: overview.config.repeatedBanDurationMinutes,
+            challengeMode: overview.config.challengeMode,
+            challengeMinimumReputationLevel: overview.config.challengeMinimumReputationLevel,
+            alertRules: overview.config.alertRules,
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
     }, [overview]);
@@ -779,6 +885,142 @@ function LoginProtectionCard() {
                             <Label>Escalated ban duration (minutes)</Label>
                             <Input type="number" min={1} value={form.repeatedBanDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, repeatedBanDurationMinutes: Number(event.target.value) || 1 }))} />
                             <p className="text-xs text-muted-foreground">Default production value is 2880 minutes (48 hours).</p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>Challenge mode for risky IPs</Label>
+                            <Select
+                                value={form.challengeMode}
+                                onValueChange={(value) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        challengeMode: value as 'OFF' | 'REQUIRE_2FA' | 'BLOCK',
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="OFF">Off</SelectItem>
+                                    <SelectItem value="REQUIRE_2FA">Require 2FA if the account supports it</SelectItem>
+                                    <SelectItem value="BLOCK">Block risky IPs after password verification</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Use risk reputation to add an extra hurdle after the password step.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Challenge minimum reputation</Label>
+                            <Select
+                                value={form.challengeMinimumReputationLevel}
+                                onValueChange={(value) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        challengeMinimumReputationLevel: value as 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL',
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {riskLevels.map((level) => (
+                                        <SelectItem key={level} value={level}>{level}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Only IPs at or above this reputation level will trigger the challenge mode.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div>
+                            <Label>Telegram alert rules</Label>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Fine-tune which security events send Telegram alerts and how noisy they’re allowed to be.
+                            </p>
+                        </div>
+                        <div className="grid gap-4 xl:grid-cols-2">
+                            {Object.entries(form.alertRules).map(([eventKey, rule]) => {
+                                const meta = alertRuleLabels[eventKey] || { title: eventKey, description: eventKey };
+                                return (
+                                    <div key={eventKey} className="ops-detail-card space-y-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <p className="font-medium">{meta.title}</p>
+                                                <p className="text-sm text-muted-foreground">{meta.description}</p>
+                                            </div>
+                                            <Switch
+                                                checked={rule.enabled}
+                                                onCheckedChange={(checked) =>
+                                                    setForm((current) => ({
+                                                        ...current,
+                                                        alertRules: {
+                                                            ...current.alertRules,
+                                                            [eventKey]: { ...current.alertRules[eventKey as keyof typeof current.alertRules], enabled: checked },
+                                                        },
+                                                    }))
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label>Cooldown (minutes)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    value={rule.cooldownMinutes}
+                                                    onChange={(event) =>
+                                                        setForm((current) => ({
+                                                            ...current,
+                                                            alertRules: {
+                                                                ...current.alertRules,
+                                                                [eventKey]: {
+                                                                    ...current.alertRules[eventKey as keyof typeof current.alertRules],
+                                                                    cooldownMinutes: Number(event.target.value) || 1,
+                                                                },
+                                                            },
+                                                        }))
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Minimum reputation</Label>
+                                                <Select
+                                                    value={rule.minimumReputationLevel}
+                                                    onValueChange={(value) =>
+                                                        setForm((current) => ({
+                                                            ...current,
+                                                            alertRules: {
+                                                                ...current.alertRules,
+                                                                [eventKey]: {
+                                                                    ...current.alertRules[eventKey as keyof typeof current.alertRules],
+                                                                    minimumReputationLevel: value as 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL',
+                                                                },
+                                                            },
+                                                        }))
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {riskLevels.map((level) => (
+                                                            <SelectItem key={level} value={level}>{level}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -981,10 +1223,44 @@ function LoginProtectionCard() {
             <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                 <Card className="ops-panel">
                     <CardHeader className="px-0 pt-0">
-                        <CardTitle>Incident timeline</CardTitle>
-                        <CardDescription>
-                            Grouped bursts of failed admin logins so you can see what escalated, what was contained, and what is still active.
-                        </CardDescription>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <CardTitle>Incident timeline</CardTitle>
+                                <CardDescription>
+                                    Grouped bursts of failed admin logins so you can see what escalated, what was contained, and what is still active.
+                                </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-full"
+                                    disabled={exportMutation.isPending}
+                                    onClick={() => exportMutation.mutate({ format: 'csv' })}
+                                >
+                                    {exportMutation.isPending ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Download className="mr-2 h-4 w-4" />
+                                    )}
+                                    Export CSV
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-full"
+                                    disabled={exportMutation.isPending}
+                                    onClick={() => exportMutation.mutate({ format: 'json' })}
+                                >
+                                    {exportMutation.isPending ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Download className="mr-2 h-4 w-4" />
+                                    )}
+                                    Export JSON
+                                </Button>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         {overview.securityIncidents.length === 0 ? (
@@ -1099,6 +1375,90 @@ function LoginProtectionCard() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="ops-panel">
+                <CardHeader className="px-0 pt-0">
+                    <CardTitle>Reputation history</CardTitle>
+                    <CardDescription>
+                        Fourteen-day pressure trend showing failed logins, high-risk IP activity, and daily peak reputation.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5 px-0 pb-0">
+                    <div className="grid gap-3 md:grid-cols-3">
+                        <div className="ops-detail-card">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Failures (14d)</p>
+                            <p className="mt-2 text-2xl font-semibold">
+                                {overview.reputationHistory.reduce((total, point) => total + point.failures, 0)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">all failed admin login attempts recorded in the last 14 days</p>
+                        </div>
+                        <div className="ops-detail-card">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">High-risk IPs (peak day)</p>
+                            <p className="mt-2 text-2xl font-semibold">
+                                {Math.max(...overview.reputationHistory.map((point) => point.highRiskIps), 0)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">maximum daily count of high-risk IPs in the current window</p>
+                        </div>
+                        <div className="ops-detail-card">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Peak reputation</p>
+                            <p className="mt-2 text-2xl font-semibold">
+                                {Math.max(...overview.reputationHistory.map((point) => point.peakScore), 0)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">highest single-IP daily score inside the current 14-day window</p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+                        <div className="ops-detail-card space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="font-medium">Failed logins by day</p>
+                                    <p className="text-sm text-muted-foreground">Bars scale to the highest daily failure count in the last two weeks.</p>
+                                </div>
+                                <Badge variant="outline">
+                                    Max {Math.max(...overview.reputationHistory.map((point) => point.failures), 0)}
+                                </Badge>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <div className="flex min-w-[760px] items-end justify-between gap-3">
+                                    {overview.reputationHistory.map((point) => (
+                                        <HistoryBars
+                                            key={point.date}
+                                            label={point.label}
+                                            value={point.failures}
+                                            max={Math.max(...overview.reputationHistory.map((entry) => entry.failures), 1)}
+                                            className={point.highRiskIps > 0 ? 'bg-orange-500/85' : 'bg-primary/85'}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="ops-detail-card space-y-3">
+                            <p className="font-medium">Daily risk detail</p>
+                            <div className="space-y-3">
+                                {overview.reputationHistory.slice(-5).reverse().map((point) => (
+                                    <div
+                                        key={point.date}
+                                        className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-3 text-sm dark:bg-white/[0.02]"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-medium">{point.label}</p>
+                                            <Badge variant="outline">{point.peakScore}</Badge>
+                                        </div>
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                            {point.failures} failures · {point.highRiskIps} high-risk IPs · {point.uniqueIps} unique IPs
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {point.bans} bans · {point.locks} locks · {point.repeatedAlerts} repeat alerts
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import {
+    exportAdminLoginIncidents,
     getAdminLoginAbuseOverview,
     getAdminLoginProtectionConfig,
     saveAdminLoginProtectionConfig,
@@ -184,6 +185,40 @@ export const securityRouter = router({
                 fail2banLogEnabled: z.boolean(),
                 repeatedBanLookbackDays: z.number().int().min(1).max(365),
                 repeatedBanDurationMinutes: z.number().int().min(1).max(43200),
+                challengeMode: z.enum(['OFF', 'REQUIRE_2FA', 'BLOCK']),
+                challengeMinimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                alertRules: z.object({
+                    threshold: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    lock: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    ban: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    repeatedOffender: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    unban: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    fail2banUnavailable: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                }),
                 trustedIpRanges: z.array(z.string()),
             }),
         )
@@ -194,6 +229,12 @@ export const securityRouter = router({
     getAdminLoginAbuseOverview: adminProcedure.query(async () => {
         return getAdminLoginAbuseOverview();
     }),
+
+    exportAdminLoginIncidents: adminProcedure
+        .input(z.object({ format: z.enum(['csv', 'json']) }))
+        .mutation(async ({ input }) => {
+            return exportAdminLoginIncidents(input.format);
+        }),
 
     unbanAdminLoginIp: adminProcedure
         .input(z.object({ ip: z.string().min(1) }))
