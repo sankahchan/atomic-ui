@@ -74,6 +74,7 @@ import {
   DynamicRoutingPreferencesEditor,
   type DynamicRoutingPreferenceMode,
 } from '@/components/dynamic-keys/dynamic-routing-preferences-editor';
+import { DynamicRoutingAlertRulesEditor } from '@/components/dynamic-keys/dynamic-routing-alert-rules-editor';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
@@ -894,6 +895,48 @@ function CreateDAKDialog({
               </div>
             ) : null}
           </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
+              </div>
+              <Switch
+                checked={formData.autoClearStalePins}
+                onCheckedChange={(checked) => setFormData((current) => ({ ...current, autoClearStalePins: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
+              </div>
+              <Switch
+                checked={formData.autoFallbackToPrefer}
+                onCheckedChange={(checked) => setFormData((current) => ({ ...current, autoFallbackToPrefer: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
+                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
+              </div>
+              <Switch
+                checked={formData.autoSkipUnhealthy}
+                onCheckedChange={(checked) => setFormData((current) => ({ ...current, autoSkipUnhealthy: checked }))}
+              />
+            </div>
+          </div>
+
+          <DynamicRoutingAlertRulesEditor
+            value={formData.routingAlertRules}
+            onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
+            compact
+          />
 
           {/* Contact info */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1779,6 +1822,12 @@ function EditDAKDialog({
               />
             </div>
           </div>
+
+          <DynamicRoutingAlertRulesEditor
+            value={formData.routingAlertRules}
+            onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
+            compact
+          />
 
           <div className="space-y-2">
             <Label htmlFor="editNotes">{t('dynamic_keys.dialog.notes')}</Label>

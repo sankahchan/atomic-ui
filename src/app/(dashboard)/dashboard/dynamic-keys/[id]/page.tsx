@@ -92,6 +92,11 @@ import {
   DynamicRoutingPreferencesEditor,
   type DynamicRoutingPreferenceMode,
 } from '@/components/dynamic-keys/dynamic-routing-preferences-editor';
+import {
+  DYNAMIC_ROUTING_ALERT_RULE_DEFINITIONS,
+  DynamicRoutingAlertRulesEditor,
+  parseDynamicRoutingAlertRules,
+} from '@/components/dynamic-keys/dynamic-routing-alert-rules-editor';
 
 // Contact type options for subscription page
 const CONTACT_TYPES = [
@@ -526,6 +531,12 @@ function EditDAKDialog({
               />
             </div>
           </div>
+
+          <DynamicRoutingAlertRulesEditor
+            value={formData.routingAlertRules}
+            onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
+            compact
+          />
 
           <div className="space-y-2">
             <Label htmlFor="editNotes">Notes</Label>
@@ -1725,6 +1736,10 @@ type DynamicRoutingDiagnostics = {
   rotationTriggerMode: string;
   rotationUsageThresholdPercent: number;
   rotateOnHealthFailure: boolean;
+  autoClearStalePins: boolean;
+  autoFallbackToPrefer: boolean;
+  autoSkipUnhealthy: boolean;
+  routingAlertRules: string | null;
   appliedTemplate: {
     id: string;
     name: string;
@@ -1879,6 +1894,10 @@ function DynamicRoutingDiagnosticsCard({
     () => (data?.routingTimeline ?? []).filter((event) => matchesRoutingTimelineFilter(event.eventType, timelineFilter)),
     [data?.routingTimeline, timelineFilter],
   );
+  const parsedAlertRules = useMemo(
+    () => parseDynamicRoutingAlertRules(data?.routingAlertRules),
+    [data?.routingAlertRules],
+  );
 
   if (isLoading && !data) {
     return (
@@ -1930,6 +1949,75 @@ function DynamicRoutingDiagnosticsCard({
 
         {data?.algorithmHint ? (
           <p className="text-sm text-muted-foreground">{data.algorithmHint}</p>
+        ) : null}
+
+        {data ? (
+          <div className="grid gap-3 xl:grid-cols-2">
+            <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Recovery workflow
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="ops-inline-stat">
+                  <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</p>
+                  <p className="font-medium">{data.autoClearStalePins ? 'Enabled' : 'Disabled'}</p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only')}</p>
+                  <p className="font-medium">{data.autoFallbackToPrefer ? 'Enabled' : 'Disabled'}</p>
+                </div>
+                <div className="ops-inline-stat">
+                  <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</p>
+                  <p className="font-medium">{data.autoSkipUnhealthy ? 'Enabled' : 'Disabled'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Alert delivery rules
+              </p>
+              <div className="mt-3 space-y-3">
+                <div className="ops-inline-stat">
+                  <p className="text-xs text-muted-foreground">Default cooldown</p>
+                  <p className="font-medium">{parsedAlertRules.defaultCooldownMinutes} min</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {DYNAMIC_ROUTING_ALERT_RULE_DEFINITIONS.map((definition) => {
+                    const rule = parsedAlertRules.rules[definition.key];
+                    const channels = rule.channels.trim()
+                      ? rule.channels
+                          .split(',')
+                          .map((entry) => entry.trim())
+                          .filter(Boolean)
+                          .join(', ')
+                      : 'All channels';
+
+                    return (
+                      <div
+                        key={definition.key}
+                        className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">{definition.label}</p>
+                            <p className="text-xs text-muted-foreground">{definition.description}</p>
+                          </div>
+                          <Badge variant={rule.enabled ? 'default' : 'secondary'}>
+                            {rule.enabled ? 'Enabled' : 'Muted'}
+                          </Badge>
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                          <p>Cooldown: {rule.cooldownMinutes} min</p>
+                          <p>Channels: {channels}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">

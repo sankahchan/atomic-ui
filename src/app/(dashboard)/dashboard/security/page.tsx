@@ -518,6 +518,9 @@ function LoginProtectionCard() {
         banWindowMinutes: 10,
         banDurationMinutes: 720,
         telegramAlertEnabled: true,
+        alertOnRepeatedOffender: true,
+        repeatedOffenderThreshold: 12,
+        alertOnUnban: true,
         fail2banLogEnabled: true,
         trustedIpRanges: '',
     });
@@ -536,6 +539,9 @@ function LoginProtectionCard() {
             banWindowMinutes: overview.config.banWindowMinutes,
             banDurationMinutes: overview.config.banDurationMinutes,
             telegramAlertEnabled: overview.config.telegramAlertEnabled,
+            alertOnRepeatedOffender: overview.config.alertOnRepeatedOffender,
+            repeatedOffenderThreshold: overview.config.repeatedOffenderThreshold,
+            alertOnUnban: overview.config.alertOnUnban,
             fail2banLogEnabled: overview.config.fail2banLogEnabled,
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
@@ -627,6 +633,20 @@ function LoginProtectionCard() {
                             </div>
                             <Switch checked={form.telegramAlertEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, telegramAlertEnabled: checked }))} />
                         </div>
+                        <div className="ops-detail-card flex items-center justify-between gap-4">
+                            <div>
+                                <p className="font-medium">Alert on repeated offenders</p>
+                                <p className="text-sm text-muted-foreground">Send an extra Telegram alert when the same IP keeps failing logins over a full-day window.</p>
+                            </div>
+                            <Switch checked={form.alertOnRepeatedOffender} onCheckedChange={(checked) => setForm((current) => ({ ...current, alertOnRepeatedOffender: checked }))} />
+                        </div>
+                        <div className="ops-detail-card flex items-center justify-between gap-4">
+                            <div>
+                                <p className="font-medium">Alert on unban</p>
+                                <p className="text-sm text-muted-foreground">Notify Telegram admins when a ban or lock is manually cleared from the panel.</p>
+                            </div>
+                            <Switch checked={form.alertOnUnban} onCheckedChange={(checked) => setForm((current) => ({ ...current, alertOnUnban: checked }))} />
+                        </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4 md:col-span-2">
                             <div>
                                 <p className="font-medium">Write fail2ban auth log</p>
@@ -662,6 +682,11 @@ function LoginProtectionCard() {
                         <div className="space-y-2">
                             <Label>Ban duration (minutes)</Label>
                             <Input type="number" min={1} value={form.banDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, banDurationMinutes: Number(event.target.value) || 1 }))} />
+                        </div>
+                        <div className="space-y-2 md:col-span-3">
+                            <Label>Repeated offender threshold (24h)</Label>
+                            <Input type="number" min={1} value={form.repeatedOffenderThreshold} onChange={(event) => setForm((current) => ({ ...current, repeatedOffenderThreshold: Number(event.target.value) || 1 }))} />
+                            <p className="text-xs text-muted-foreground">Telegram sends an extra offender alert when the same IP reaches this many failed admin logins in the last 24 hours.</p>
                         </div>
                     </div>
 

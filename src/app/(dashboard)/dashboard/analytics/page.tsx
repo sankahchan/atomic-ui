@@ -484,6 +484,85 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Access-key invites</p>
+                    <h3 className="mt-2 text-lg font-semibold">Invite-link performance</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Track how access-key invite links are opened before users reach the public share page.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active invites</p>
+                      <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.activeInviteLinks || 0}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Currently usable access-key invite links.</p>
+                    </div>
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tracked keys</p>
+                      <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.trackedAccessKeys || 0}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Access keys with invite links configured.</p>
+                    </div>
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite opens</p>
+                      <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.inviteOpens || 0}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Invite redirects recorded in the selected range.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {loadingShareDashboard ? (
+                  <div className="mt-4 space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-16 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                    ))}
+                  </div>
+                ) : shareDashboard && shareDashboard.topAccessInviteKeys.length > 0 ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {shareDashboard.topAccessInviteKeys.map((key) => (
+                      <div key={key.id} className="rounded-[1.2rem] border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <Link href={`/dashboard/keys/${key.id}`} className="truncate font-medium hover:text-primary">
+                              {key.name}
+                            </Link>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {key.publicSlug ? `/s/${key.publicSlug}` : 'Token share link'}
+                            </p>
+                          </div>
+                          <Badge variant="outline">{key.inviteOpens} opens</Badge>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Active links</p>
+                            <p className="mt-2 text-lg font-semibold">{key.activeInviteLinks}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{key.totalInviteLinks} total</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last invite open</p>
+                            <p className="mt-2 text-sm font-medium">
+                              {key.lastInviteOpenAt ? formatRelativeTime(key.lastInviteOpenAt) : 'No invite hits yet'}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">{key.pageViews} share-page views</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="ops-chart-empty mt-4">
+                    <div className="space-y-2 text-center">
+                      <ExternalLink className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                      <p className="font-medium text-foreground">No access-key invite activity yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Create invite links on an access-key detail page to start tracking opens and conversions here.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {loadingShareDashboard ? (
                 <div className="space-y-3">
                   {[...Array(4)].map((_, i) => (

@@ -14,6 +14,7 @@ export const ADMIN_LOGIN_FAIL2BAN_LOG =
   process.env.ADMIN_LOGIN_FAIL2BAN_LOG || '/tmp/atomic-ui-admin-login.log';
 export const ADMIN_LOGIN_FAIL2BAN_JAIL =
   process.env.ADMIN_LOGIN_FAIL2BAN_JAIL || 'atomic-ui-auth-login';
+const REPEATED_OFFENDER_ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
 
 const adminLoginProtectionConfigSchema = z.object({
   enabled: z.boolean().default(true),
@@ -24,6 +25,9 @@ const adminLoginProtectionConfigSchema = z.object({
   banWindowMinutes: z.number().int().min(1).max(1440).default(10),
   banDurationMinutes: z.number().int().min(1).max(10080).default(720),
   telegramAlertEnabled: z.boolean().default(true),
+  alertOnRepeatedOffender: z.boolean().default(true),
+  repeatedOffenderThreshold: z.number().int().min(1).max(500).default(12),
+  alertOnUnban: z.boolean().default(true),
   fail2banLogEnabled: z.boolean().default(true),
   trustedIpRanges: z.array(z.string()).default([]),
 });
@@ -184,6 +188,50 @@ async function sendRestrictionAlert(
   );
 }
 
+async function sendRepeatedOffenderAlert(
+  ip: string,
+  email: string,
+  failureCount: number,
+  lastAttemptAt: Date,
+) {
+  const { countryCode } = await getGeoIpCountry(ip);
+  const countryPart = countryCode ? `\nCountry: ${countryCode}` : '';
+
+  await sendAdminAlert(
+    [
+      '🛡️ <b>Repeated admin login offender detected</b>',
+      '',
+      `IP: <code>${ip}</code>${countryPart}`,
+      `Email: <code>${email}</code>`,
+      `Failures in last 24h: <b>${failureCount}</b>`,
+      `Last attempt: <b>${lastAttemptAt.toISOString()}</b>`,
+    ].join('\n'),
+    { parseMode: 'HTML' },
+  );
+}
+
+async function sendUnbanAlert(
+  ip: string,
+  restrictionType: string,
+  attemptedEmail: string | null,
+  fail2banUnbanned: boolean,
+) {
+  const { countryCode } = await getGeoIpCountry(ip);
+  const countryPart = countryCode ? `\nCountry: ${countryCode}` : '';
+
+  await sendAdminAlert(
+    [
+      '✅ <b>Admin login IP restriction cleared</b>',
+      '',
+      `IP: <code>${ip}</code>${countryPart}`,
+      `Restriction: <b>${restrictionType}</b>`,
+      `Email: <code>${attemptedEmail || 'unknown'}</code>`,
+      `fail2ban sync: <b>${fail2banUnbanned ? 'removed' : 'not found'}</b>`,
+    ].join('\n'),
+    { parseMode: 'HTML' },
+  );
+}
+
 export async function getAdminLoginProtectionConfig(): Promise<AdminLoginProtectionConfig> {
   const setting = await db.settings.findUnique({
     where: { key: ADMIN_LOGIN_PROTECTION_SETTINGS_KEY },
@@ -289,8 +337,10 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
   const now = new Date();
   const softWindowStart = new Date(now.getTime() - config.softLockWindowMinutes * 60_000);
   const banWindowStart = new Date(now.getTime() - config.banWindowMinutes * 60_000);
+  const repeatedWindowStart = new Date(now.getTime() - 24 * 60 * 60_000);
+  const repeatedAlertCooldownStart = new Date(now.getTime() - REPEATED_OFFENDER_ALERT_COOLDOWN_MS);
 
-  const [softFailures, banFailures, existing] = await Promise.all([
+  const [softFailures, banFailures, repeatedFailures, existing, recentRepeatedAlert] = await Promise.all([
     db.auditLog.count({
       where: {
         action: 'AUTH_LOGIN_FAILED',
@@ -305,8 +355,24 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
         createdAt: { gte: banWindowStart },
       },
     }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: repeatedWindowStart },
+      },
+    }),
     db.adminLoginRestriction.findUnique({
       where: { ip: normalizedIp },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT',
+        ip: normalizedIp,
+        createdAt: { gte: repeatedAlertCooldownStart },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
     }),
   ]);
 
@@ -387,6 +453,32 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
     }
   }
 
+  if (
+    config.telegramAlertEnabled &&
+    config.alertOnRepeatedOffender &&
+    repeatedFailures >= config.repeatedOffenderThreshold &&
+    !recentRepeatedAlert &&
+    !(shouldAlert && restrictionType)
+  ) {
+    try {
+      await sendRepeatedOffenderAlert(normalizedIp, input.email, repeatedFailures, now);
+      await writeAuditLog({
+        action: 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT',
+        entity: 'AUTH',
+        entityId: restriction.id,
+        ip: normalizedIp,
+        details: {
+          email: input.email,
+          failureCount: repeatedFailures,
+          threshold: config.repeatedOffenderThreshold,
+          lastAttemptAt: now.toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to send repeated offender alert:', error);
+    }
+  }
+
   return restriction;
 }
 
@@ -421,6 +513,23 @@ export async function unbanAdminLoginIp(ip: string) {
   }
 
   const fail2banUnbanned = tryFail2banUnban(normalizedIp);
+
+  if (existing) {
+    const config = await getAdminLoginProtectionConfig();
+    if (config.telegramAlertEnabled && config.alertOnUnban) {
+      try {
+        await sendUnbanAlert(
+          normalizedIp,
+          existing.restrictionType,
+          existing.attemptedEmail,
+          fail2banUnbanned,
+        );
+      } catch (error) {
+        console.error('Failed to send unban alert:', error);
+      }
+    }
+  }
+
   return {
     success: Boolean(existing) || fail2banUnbanned,
     unbanned: Boolean(existing),

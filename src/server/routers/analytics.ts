@@ -609,6 +609,7 @@ export const analyticsRouter = router({
         recentEvents,
         activeAccessLinks,
         activeDynamicLinks,
+        accessDistributionLinks,
       ] = await Promise.all([
         db.subscriptionPageEvent.groupBy({
           by: ['eventType'],
@@ -705,6 +706,21 @@ export const analyticsRouter = router({
             ],
           },
         }),
+        db.accessDistributionLink.findMany({
+          where: {
+            accessKeyId: { not: null },
+          },
+          select: {
+            id: true,
+            accessKeyId: true,
+            label: true,
+            expiresAt: true,
+            maxUses: true,
+            currentUses: true,
+            lastOpenedAt: true,
+            createdAt: true,
+          },
+        }),
       ]);
 
       const counts = Object.fromEntries(
@@ -788,6 +804,41 @@ export const analyticsRouter = router({
 
       const accessMetrics = reduceMetrics(accessAggregates, 'accessKeyId');
       const dynamicMetrics = reduceMetrics(dynamicAggregates, 'dynamicAccessKeyId');
+      const accessInviteLinkState = new Map<
+        string,
+        {
+          activeLinks: number;
+          totalLinks: number;
+          lastOpenedAt: Date | null;
+        }
+      >();
+
+      const now = new Date();
+      for (const link of accessDistributionLinks) {
+        if (!link.accessKeyId) {
+          continue;
+        }
+
+        const current = accessInviteLinkState.get(link.accessKeyId) ?? {
+          activeLinks: 0,
+          totalLinks: 0,
+          lastOpenedAt: null,
+        };
+
+        const isActive =
+          link.expiresAt > now &&
+          (link.maxUses === null || link.currentUses < link.maxUses);
+
+        current.totalLinks += 1;
+        if (isActive) {
+          current.activeLinks += 1;
+        }
+        if (!current.lastOpenedAt || (link.lastOpenedAt && link.lastOpenedAt > current.lastOpenedAt)) {
+          current.lastOpenedAt = link.lastOpenedAt;
+        }
+
+        accessInviteLinkState.set(link.accessKeyId, current);
+      }
 
       const combinedLinks = [
         ...accessKeys.map((key) => ({
@@ -847,6 +898,39 @@ export const analyticsRouter = router({
         }),
       );
 
+      const topAccessInviteKeys = accessKeys
+        .map((key) => {
+          const inviteState = accessInviteLinkState.get(key.id) ?? {
+            activeLinks: 0,
+            totalLinks: 0,
+            lastOpenedAt: null,
+          };
+          const metrics = accessMetrics.get(key.id) ?? emptyMetrics();
+
+          return {
+            id: key.id,
+            name: key.name,
+            publicSlug: key.publicSlug,
+            status: key.status,
+            activeInviteLinks: inviteState.activeLinks,
+            totalInviteLinks: inviteState.totalLinks,
+            inviteOpens: metrics.inviteOpens,
+            pageViews: metrics.pageViews,
+            lastInviteOpenAt: inviteState.lastOpenedAt,
+          };
+        })
+        .filter((item) => item.activeInviteLinks > 0 || item.inviteOpens > 0)
+        .sort((left, right) => {
+          if (right.inviteOpens !== left.inviteOpens) {
+            return right.inviteOpens - left.inviteOpens;
+          }
+          if (right.activeInviteLinks !== left.activeInviteLinks) {
+            return right.activeInviteLinks - left.activeInviteLinks;
+          }
+          return (right.lastInviteOpenAt?.getTime() ?? 0) - (left.lastInviteOpenAt?.getTime() ?? 0);
+        })
+        .slice(0, Math.min(input.limit, 6));
+
       return {
         range: input.range,
         summary: {
@@ -861,6 +945,12 @@ export const analyticsRouter = router({
           telegramConnects: counts[SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED] ?? 0,
           activePublicLinks: activeAccessLinks + activeDynamicLinks,
         },
+        accessInviteSummary: {
+          activeInviteLinks: Array.from(accessInviteLinkState.values()).reduce((sum, item) => sum + item.activeLinks, 0),
+          trackedAccessKeys: Array.from(accessInviteLinkState.values()).filter((item) => item.activeLinks > 0 || item.totalLinks > 0).length,
+          inviteOpens: Array.from(accessMetrics.values()).reduce((sum, metrics) => sum + metrics.inviteOpens, 0),
+        },
+        topAccessInviteKeys,
         topLinks,
         recentEvents: recentEvents.map((event) => ({
           id: event.id,

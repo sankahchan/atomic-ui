@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
+import { useToast } from '@/hooks/use-toast';
 import {
   Activity,
   AlertTriangle,
@@ -25,7 +26,9 @@ import {
   Plus,
   RefreshCw,
   Server,
+  Shield,
   TrendingUp,
+  Unlock,
   Zap,
 } from 'lucide-react';
 
@@ -376,6 +379,182 @@ function TrafficOverviewPanel({
   );
 }
 
+function SecurityAlertsSummaryCard() {
+  const { toast } = useToast();
+  const {
+    data: overview,
+    isLoading,
+    refetch,
+  } = trpc.security.getAdminLoginAbuseOverview.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
+
+  const unbanMutation = trpc.security.unbanAdminLoginIp.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'IP restriction cleared',
+        description: 'The IP was removed from the active admin login restriction list.',
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to unban IP',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="ops-panel space-y-4">
+        <div className="space-y-2">
+          <p className="ops-section-heading">Security alerts</p>
+          <div className="h-6 w-40 animate-pulse rounded-full bg-muted" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-20 animate-pulse rounded-[1.2rem] bg-muted/60" />
+          <div className="h-20 animate-pulse rounded-[1.2rem] bg-muted/60" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!overview) {
+    return null;
+  }
+
+  const activeBans = overview.activeRestrictions.filter((restriction) => restriction.restrictionType === 'BAN');
+  const displayedRestrictions = overview.activeRestrictions.slice(0, 3);
+  const displayedFailures = overview.recentFailures.slice(0, 3);
+
+  return (
+    <div className="ops-panel space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="ops-section-heading">Security alerts</p>
+          <h2 className="mt-2 text-xl font-semibold">Admin login protection</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Keep an eye on failed-login IPs, active bans, and one-click unban actions.
+          </p>
+        </div>
+        <Badge
+          variant="outline"
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold',
+            activeBans.length > 0
+              ? 'border-rose-500/25 bg-rose-500/10 text-rose-500'
+              : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
+          )}
+        >
+          <Shield className="mr-1 h-3.5 w-3.5" />
+          {activeBans.length > 0 ? `${activeBans.length} active bans` : 'Monitoring'}
+        </Badge>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="ops-mini-tile">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Failed last hour</p>
+          <p className="mt-2 text-2xl font-semibold">{overview.summary.failuresLastHour}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Recent bad-password attempts against the admin panel.</p>
+        </div>
+        <div className="ops-mini-tile">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active restrictions</p>
+          <p className="mt-2 text-2xl font-semibold">{overview.summary.activeRestrictions}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{overview.summary.activeBans} bans · {overview.summary.activeRestrictions - overview.summary.activeBans} soft locks</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Currently restricted IPs</p>
+            <Badge variant="outline">{overview.activeRestrictions.length}</Badge>
+          </div>
+          <div className="mt-3 space-y-3">
+            {displayedRestrictions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active bans or locks.</p>
+            ) : (
+              displayedRestrictions.map((restriction) => (
+                <div key={restriction.id} className="rounded-[1rem] border border-border/50 bg-background/70 p-3 dark:bg-white/[0.02]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium">{restriction.ip}</span>
+                        <Badge variant={restriction.restrictionType === 'BAN' ? 'destructive' : 'secondary'}>
+                          {restriction.restrictionType}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {restriction.attemptedEmail || 'Unknown email'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={unbanMutation.isPending}
+                      onClick={() => unbanMutation.mutate({ ip: restriction.ip })}
+                    >
+                      <Unlock className="mr-2 h-3.5 w-3.5" />
+                      Unban
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {restriction.failureCount} failures · expires {formatRelativeTime(restriction.expiresAt)}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Recent failed IPs</p>
+            <Badge variant="outline">{overview.recentFailures.length}</Badge>
+          </div>
+          <div className="mt-3 space-y-3">
+            {displayedFailures.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No failed admin logins in the last 24 hours.</p>
+            ) : (
+              displayedFailures.map((failure) => (
+                <div key={failure.id} className="rounded-[1rem] border border-border/50 bg-background/70 p-3 dark:bg-white/[0.02]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium">{failure.ip || 'Unknown IP'}</span>
+                        {failure.countryCode ? <Badge variant="outline">{failure.countryCode}</Badge> : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {failure.email || 'Unknown email'}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatRelativeTime(failure.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Link href="/dashboard/security" className="ops-action-tile">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Open security center</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Review full history, tune thresholds, and manage trusted IPs.
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
+    </div>
+  );
+}
+
 function ServerRow({
   server,
 }: {
@@ -716,6 +895,8 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
+              <SecurityAlertsSummaryCard />
+
               <div className="ops-panel space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -900,6 +1081,8 @@ export default function DashboardPage() {
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
             </div>
+
+            <SecurityAlertsSummaryCard />
 
             <div className="ops-panel space-y-4">
               <div className="space-y-2">

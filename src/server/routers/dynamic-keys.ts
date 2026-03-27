@@ -991,6 +991,10 @@ export const dynamicKeysRouter = router({
           rotationTriggerMode: true,
           rotationUsageThresholdPercent: true,
           rotateOnHealthFailure: true,
+          autoClearStalePins: true,
+          autoFallbackToPrefer: true,
+          autoSkipUnhealthy: true,
+          routingAlertRules: true,
           appliedTemplate: {
             select: {
               id: true,
@@ -1469,6 +1473,10 @@ export const dynamicKeysRouter = router({
         rotationTriggerMode: dak.rotationTriggerMode,
         rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
         rotateOnHealthFailure: dak.rotateOnHealthFailure,
+        autoClearStalePins: dak.autoClearStalePins,
+        autoFallbackToPrefer: dak.autoFallbackToPrefer,
+        autoSkipUnhealthy: dak.autoSkipUnhealthy,
+        routingAlertRules: dak.routingAlertRules,
         appliedTemplate: dak.appliedTemplate,
         lastSharePageViewAt: analytics.lastViewedAt?.toISOString() ?? null,
         lastSharePageCopyAt: analytics.lastCopiedAt?.toISOString() ?? null,
