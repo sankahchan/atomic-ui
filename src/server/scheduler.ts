@@ -31,6 +31,7 @@ import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
+import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
 
 let isSchedulerRunning = false;
 
@@ -201,6 +202,20 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Telegram digest cycle failed', error);
+        }
+    });
+
+    // 13. Admin login incident digest delivery (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runAdminLoginIncidentDigestCycle();
+            if (!result.skipped) {
+                logger.info(
+                    `Admin login incident digest delivered to ${result.adminChats} admin chat(s) for ${result.incidentCount} incident(s)`,
+                );
+            }
+        } catch (error) {
+            logger.error('Admin login incident digest cycle failed', error);
         }
     });
 

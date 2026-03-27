@@ -512,6 +512,17 @@ function incidentStatusClasses(status: string) {
     }
 }
 
+function workflowStatusClasses(status: string) {
+    switch (status) {
+        case 'ACKNOWLEDGED':
+            return 'border-blue-500/40 bg-blue-500/10 text-blue-500';
+        case 'RESOLVED':
+            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500';
+        default:
+            return 'border-border/60 bg-background/70 text-muted-foreground';
+    }
+}
+
 function reputationLevelClasses(level: string) {
     switch (level) {
         case 'CRITICAL':
@@ -612,6 +623,71 @@ function LoginProtectionCard() {
             toast({ title: 'Failed to unban IP', description: error.message, variant: 'destructive' });
         },
     });
+    const acknowledgeMutation = trpc.security.acknowledgeAdminLoginIncident.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Incident acknowledged', description: 'The incident is now marked as being handled.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to acknowledge incident', description: error.message, variant: 'destructive' });
+        },
+    });
+    const resolveMutation = trpc.security.resolveAdminLoginIncident.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Incident resolved', description: 'The incident has been marked as resolved.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to resolve incident', description: error.message, variant: 'destructive' });
+        },
+    });
+    const noteMutation = trpc.security.addAdminLoginIncidentNote.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Note added', description: 'The incident note has been saved.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to save note', description: error.message, variant: 'destructive' });
+        },
+    });
+    const blockMutation = trpc.security.blockAdminLoginIp.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Permanent block added', description: 'The IP now has an active permanent block rule.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to block IP', description: error.message, variant: 'destructive' });
+        },
+    });
+    const allowlistMutation = trpc.security.allowlistAdminLoginIp.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'IP allowlisted', description: 'The IP has been added to the allowlist and active bans were cleared.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to allowlist IP', description: error.message, variant: 'destructive' });
+        },
+    });
+    const promoteMutation = trpc.security.promoteAdminLoginIpToPermanentRule.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Permanent rule created', description: 'The IP was promoted to a permanent block rule.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to promote IP', description: error.message, variant: 'destructive' });
+        },
+    });
+    const digestMutation = trpc.security.runAdminLoginIncidentDigestNow.useMutation({
+        onSuccess: (result) => {
+            toast({
+                title: 'Incident digest sent',
+                description: `Delivered to ${result.adminChats} admin chat(s) for ${result.incidentCount} incident(s).`,
+            });
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to send digest', description: error.message, variant: 'destructive' });
+        },
+    });
 
     const [form, setForm] = useState<{
         enabled: boolean;
@@ -630,6 +706,10 @@ function LoginProtectionCard() {
         repeatedBanDurationMinutes: number;
         challengeMode: 'OFF' | 'REQUIRE_2FA' | 'BLOCK';
         challengeMinimumReputationLevel: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+        incidentDigestEnabled: boolean;
+        incidentDigestHour: number;
+        incidentDigestMinute: number;
+        incidentDigestLookbackHours: number;
         alertRules: Record<
             'threshold' | 'lock' | 'ban' | 'repeatedOffender' | 'unban' | 'fail2banUnavailable',
             {
@@ -656,6 +736,10 @@ function LoginProtectionCard() {
         repeatedBanDurationMinutes: 2880,
         challengeMode: 'OFF' as 'OFF' | 'REQUIRE_2FA' | 'BLOCK',
         challengeMinimumReputationLevel: 'HIGH' as 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL',
+        incidentDigestEnabled: false,
+        incidentDigestHour: 9,
+        incidentDigestMinute: 30,
+        incidentDigestLookbackHours: 24,
         alertRules: {
             threshold: { enabled: true, cooldownMinutes: 30, minimumReputationLevel: 'ELEVATED' as const },
             lock: { enabled: true, cooldownMinutes: 60, minimumReputationLevel: 'ELEVATED' as const },
@@ -689,6 +773,10 @@ function LoginProtectionCard() {
             repeatedBanDurationMinutes: overview.config.repeatedBanDurationMinutes,
             challengeMode: overview.config.challengeMode,
             challengeMinimumReputationLevel: overview.config.challengeMinimumReputationLevel,
+            incidentDigestEnabled: overview.config.incidentDigestEnabled,
+            incidentDigestHour: overview.config.incidentDigestHour,
+            incidentDigestMinute: overview.config.incidentDigestMinute,
+            incidentDigestLookbackHours: overview.config.incidentDigestLookbackHours,
             alertRules: overview.config.alertRules,
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
@@ -697,6 +785,50 @@ function LoginProtectionCard() {
     const activeIncidentCount = overview?.securityIncidents.filter((incident) => incident.status === 'ACTIVE').length ?? 0;
     const highRiskIpCount =
         overview?.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length ?? 0;
+
+    const requestNote = (title: string) => {
+        const value = window.prompt(title, '');
+        if (value == null) {
+            return null;
+        }
+
+        return value.trim();
+    };
+
+    const handleIncidentAcknowledge = (incidentId: string) => {
+        const note = requestNote('Optional incident note');
+        if (note === null) return;
+        acknowledgeMutation.mutate({ incidentId, note: note || undefined });
+    };
+
+    const handleIncidentResolve = (incidentId: string) => {
+        const note = requestNote('Resolution note');
+        if (note === null) return;
+        resolveMutation.mutate({ incidentId, note: note || undefined });
+    };
+
+    const handleIncidentNote = (incidentId: string) => {
+        const note = requestNote('Add an incident note');
+        if (!note) return;
+        noteMutation.mutate({ incidentId, note });
+    };
+
+    const handleBlockIp = (ip: string, promote = false) => {
+        const note = requestNote(promote ? 'Optional promotion note' : 'Optional block note');
+        if (note === null) return;
+        if (promote) {
+            promoteMutation.mutate({ ip, note: note || undefined });
+            return;
+        }
+
+        blockMutation.mutate({ ip, note: note || undefined });
+    };
+
+    const handleAllowlistIp = (ip: string) => {
+        const note = requestNote('Optional allowlist note');
+        if (note === null) return;
+        allowlistMutation.mutate({ ip, note: note || undefined });
+    };
 
     if (isLoading || !overview) {
         return (
@@ -1024,6 +1156,94 @@ function LoginProtectionCard() {
                         </div>
                     </div>
 
+                    <div className="grid gap-4 md:grid-cols-[1.05fr_0.95fr]">
+                        <div className="ops-detail-card space-y-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <p className="font-medium">Daily incident digest</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Send a daily security summary to Telegram admin chats with current incidents and high-risk IPs.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={form.incidentDigestEnabled}
+                                    onCheckedChange={(checked) =>
+                                        setForm((current) => ({ ...current, incidentDigestEnabled: checked }))
+                                    }
+                                />
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="space-y-2">
+                                    <Label>Digest hour</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={23}
+                                        value={form.incidentDigestHour}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                incidentDigestHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)),
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Digest minute</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={59}
+                                        value={form.incidentDigestMinute}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                incidentDigestMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)),
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Lookback hours</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={168}
+                                        value={form.incidentDigestLookbackHours}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                incidentDigestLookbackHours: Math.min(168, Math.max(1, Number(event.target.value) || 1)),
+                                            }))
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="ops-detail-card space-y-4">
+                            <div className="space-y-1">
+                                <p className="font-medium">Instant digest</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Push the current security incident summary to Telegram immediately without waiting for the scheduled digest.
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="w-full rounded-full"
+                                disabled={digestMutation.isPending}
+                                onClick={() => digestMutation.mutate()}
+                            >
+                                {digestMutation.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                )}
+                                Send security digest now
+                            </Button>
+                        </div>
+                    </div>
+
                     <div className="space-y-2">
                         <Label>Trusted IPs or CIDRs</Label>
                         <Textarea
@@ -1280,6 +1500,9 @@ function LoginProtectionCard() {
                                                     <Badge variant="outline" className={incidentStatusClasses(incident.status)}>
                                                         {incident.status}
                                                     </Badge>
+                                                    <Badge variant="outline" className={workflowStatusClasses(incident.workflowStatus)}>
+                                                        {incident.workflowStatus}
+                                                    </Badge>
                                                     {incident.activeRestrictionType && (
                                                         <Badge variant="outline">{incident.activeRestrictionType}</Badge>
                                                     )}
@@ -1291,6 +1514,38 @@ function LoginProtectionCard() {
                                                 <p>Last seen {formatDistanceToNow(new Date(incident.endedAt), { addSuffix: true })}</p>
                                             </div>
                                         </div>
+                                        {(incident.notesPreview || incident.enrichment.reverseDns.length > 0 || incident.enrichment.asn || incident.enrichment.isp || incident.enrichment.organization) && (
+                                            <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-2">
+                                                <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                    <p className="font-medium text-foreground">Workflow</p>
+                                                    <p className="mt-1">
+                                                        {incident.workflowStatus === 'ACKNOWLEDGED' && incident.acknowledgedAt
+                                                            ? `Acknowledged ${formatDistanceToNow(new Date(incident.acknowledgedAt), { addSuffix: true })}${incident.acknowledgedByEmail ? ` by ${incident.acknowledgedByEmail}` : ''}`
+                                                            : incident.workflowStatus === 'RESOLVED' && incident.resolvedAt
+                                                                ? `Resolved ${formatDistanceToNow(new Date(incident.resolvedAt), { addSuffix: true })}${incident.resolvedByEmail ? ` by ${incident.resolvedByEmail}` : ''}`
+                                                                : 'Open incident'}
+                                                    </p>
+                                                    {incident.notesPreview && (
+                                                        <p className="mt-2 break-words text-muted-foreground">{incident.notesPreview}</p>
+                                                    )}
+                                                </div>
+                                                <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                    <p className="font-medium text-foreground">Network enrichment</p>
+                                                    <div className="mt-1 space-y-1">
+                                                        <p>
+                                                            {incident.enrichment.asn || incident.enrichment.organization || incident.enrichment.isp
+                                                                ? [incident.enrichment.asn, incident.enrichment.organization, incident.enrichment.isp].filter(Boolean).join(' · ')
+                                                                : 'No ASN / ISP data'}
+                                                        </p>
+                                                        <p className="break-all">
+                                                            {incident.enrichment.reverseDns.length > 0
+                                                                ? incident.enrichment.reverseDns.join(', ')
+                                                                : 'No reverse DNS'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
                                                 <p className="font-medium text-foreground">Attempts</p>
@@ -1310,6 +1565,72 @@ function LoginProtectionCard() {
                                                     {(incident.hosts[0] || 'unknown host')}{incident.paths[0] ? ` · ${incident.paths[0]}` : ''}
                                                 </p>
                                             </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {incident.workflowStatus === 'OPEN' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={acknowledgeMutation.isPending}
+                                                    onClick={() => handleIncidentAcknowledge(incident.id)}
+                                                >
+                                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                                    Acknowledge
+                                                </Button>
+                                            )}
+                                            {incident.workflowStatus !== 'RESOLVED' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={resolveMutation.isPending}
+                                                    onClick={() => handleIncidentResolve(incident.id)}
+                                                >
+                                                    <ShieldCheck className="mr-2 h-4 w-4" />
+                                                    Resolve
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={noteMutation.isPending}
+                                                onClick={() => handleIncidentNote(incident.id)}
+                                            >
+                                                <AlertCircle className="mr-2 h-4 w-4" />
+                                                Add note
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={blockMutation.isPending}
+                                                onClick={() => handleBlockIp(incident.ip)}
+                                            >
+                                                <Lock className="mr-2 h-4 w-4" />
+                                                Block IP
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={allowlistMutation.isPending}
+                                                onClick={() => handleAllowlistIp(incident.ip)}
+                                            >
+                                                <Shield className="mr-2 h-4 w-4" />
+                                                Allowlist IP
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={promoteMutation.isPending}
+                                                onClick={() => handleBlockIp(incident.ip, true)}
+                                            >
+                                                <ExternalLink className="mr-2 h-4 w-4" />
+                                                Promote permanent rule
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}
@@ -1365,9 +1686,52 @@ function LoginProtectionCard() {
                                                 </p>
                                             </div>
                                         </div>
+                                        {(entry.enrichment.reverseDns.length > 0 || entry.enrichment.asn || entry.enrichment.isp || entry.enrichment.organization) && (
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Network enrichment</p>
+                                                <p className="mt-1">
+                                                    {[entry.enrichment.asn, entry.enrichment.organization, entry.enrichment.isp].filter(Boolean).join(' · ') || 'No ASN / ISP data'}
+                                                </p>
+                                                <p className="mt-1 break-all">
+                                                    {entry.enrichment.reverseDns.length > 0 ? entry.enrichment.reverseDns.join(', ') : 'No reverse DNS'}
+                                                </p>
+                                            </div>
+                                        )}
                                         <p className="text-xs text-muted-foreground">
                                             Last seen {formatDistanceToNow(new Date(entry.lastSeenAt), { addSuffix: true })}
                                         </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={blockMutation.isPending}
+                                                onClick={() => handleBlockIp(entry.ip)}
+                                            >
+                                                <Lock className="mr-2 h-4 w-4" />
+                                                Block IP
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={allowlistMutation.isPending}
+                                                onClick={() => handleAllowlistIp(entry.ip)}
+                                            >
+                                                <Shield className="mr-2 h-4 w-4" />
+                                                Allowlist IP
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={promoteMutation.isPending}
+                                                onClick={() => handleBlockIp(entry.ip, true)}
+                                            >
+                                                <ExternalLink className="mr-2 h-4 w-4" />
+                                                Promote permanent rule
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

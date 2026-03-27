@@ -8,9 +8,16 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import {
+    acknowledgeAdminLoginIncident,
+    addAdminLoginIncidentNote,
+    allowlistAdminLoginIp,
+    blockAdminLoginIpPermanently,
     exportAdminLoginIncidents,
     getAdminLoginAbuseOverview,
     getAdminLoginProtectionConfig,
+    promoteAdminLoginIpToPermanentRule,
+    resolveAdminLoginIncident,
+    runAdminLoginIncidentDigestCycle,
     saveAdminLoginProtectionConfig,
     unbanAdminLoginIp,
 } from '@/lib/services/admin-login-protection';
@@ -187,6 +194,10 @@ export const securityRouter = router({
                 repeatedBanDurationMinutes: z.number().int().min(1).max(43200),
                 challengeMode: z.enum(['OFF', 'REQUIRE_2FA', 'BLOCK']),
                 challengeMinimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                incidentDigestEnabled: z.boolean(),
+                incidentDigestHour: z.number().int().min(0).max(23),
+                incidentDigestMinute: z.number().int().min(0).max(59),
+                incidentDigestLookbackHours: z.number().int().min(1).max(168),
                 alertRules: z.object({
                     threshold: z.object({
                         enabled: z.boolean(),
@@ -235,6 +246,55 @@ export const securityRouter = router({
         .mutation(async ({ input }) => {
             return exportAdminLoginIncidents(input.format);
         }),
+
+    acknowledgeAdminLoginIncident: adminProcedure
+        .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().max(2000).optional() }))
+        .mutation(async ({ ctx, input }) => {
+            return acknowledgeAdminLoginIncident(input.incidentId, ctx.user.email, input.note);
+        }),
+
+    resolveAdminLoginIncident: adminProcedure
+        .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().max(2000).optional() }))
+        .mutation(async ({ ctx, input }) => {
+            return resolveAdminLoginIncident(input.incidentId, ctx.user.email, input.note);
+        }),
+
+    addAdminLoginIncidentNote: adminProcedure
+        .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().min(1).max(2000) }))
+        .mutation(async ({ ctx, input }) => {
+            return addAdminLoginIncidentNote(input.incidentId, ctx.user.email, input.note);
+        }),
+
+    blockAdminLoginIp: adminProcedure
+        .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
+        .mutation(async ({ ctx, input }) => {
+            return blockAdminLoginIpPermanently(input.ip, ctx.user.email, input.note);
+        }),
+
+    allowlistAdminLoginIp: adminProcedure
+        .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
+        .mutation(async ({ ctx, input }) => {
+            return allowlistAdminLoginIp(input.ip, ctx.user.email, input.note);
+        }),
+
+    promoteAdminLoginIpToPermanentRule: adminProcedure
+        .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
+        .mutation(async ({ ctx, input }) => {
+            return promoteAdminLoginIpToPermanentRule(input.ip, ctx.user.email, input.note);
+        }),
+
+    runAdminLoginIncidentDigestNow: adminProcedure.mutation(async () => {
+        const result = await runAdminLoginIncidentDigestCycle({ force: true });
+
+        if (result.skipped) {
+            throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Security incident digest skipped: ${result.reason}`,
+            });
+        }
+
+        return result;
+    }),
 
     unbanAdminLoginIp: adminProcedure
         .input(z.object({ ip: z.string().min(1) }))

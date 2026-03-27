@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import ipRangeCheck from 'ip-range-check';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
-import { sendAdminAlert } from '@/lib/services/telegram-bot';
+import { getTelegramConfig, sendAdminAlert } from '@/lib/services/telegram-bot';
 import { getGeoIpCountry } from '@/lib/security';
 
 export const ADMIN_LOGIN_PROTECTION_SETTINGS_KEY = 'admin_login_protection';
@@ -15,9 +16,15 @@ export const ADMIN_LOGIN_FAIL2BAN_LOG =
 export const ADMIN_LOGIN_FAIL2BAN_JAIL =
   process.env.ADMIN_LOGIN_FAIL2BAN_JAIL || 'atomic-ui-auth-login';
 export const GENERIC_ADMIN_LOGIN_BLOCK_MESSAGE = 'Too many failed attempts. Try again later.';
+export const ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY = 'admin_login_incident_workflow';
+export const ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY = 'admin_login_incident_digest_last_run';
 const REPEATED_OFFENDER_ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
 const DEFAULT_REPEAT_BAN_LOOKBACK_DAYS = 7;
 const DEFAULT_REPEAT_BAN_DURATION_MINUTES = 48 * 60;
+const ADMIN_LOGIN_INCIDENT_DIGEST_HOUR = 9;
+const ADMIN_LOGIN_INCIDENT_DIGEST_MINUTE = 30;
+const ADMIN_LOGIN_INCIDENT_DIGEST_LOOKBACK_HOURS = 24;
+const IP_ENRICHMENT_TTL_MS = 6 * 60 * 60_000;
 const ADMIN_LOGIN_RISK_LEVELS = ['LOW', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
 const ADMIN_LOGIN_CHALLENGE_MODES = ['OFF', 'REQUIRE_2FA', 'BLOCK'] as const;
 const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
@@ -31,6 +38,7 @@ const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
 
 const adminLoginRiskLevelSchema = z.enum(ADMIN_LOGIN_RISK_LEVELS);
 const adminLoginChallengeModeSchema = z.enum(ADMIN_LOGIN_CHALLENGE_MODES);
+const adminLoginIncidentWorkflowStatusSchema = z.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']);
 const adminLoginAlertRuleSchema = z.object({
   enabled: z.boolean().default(true),
   cooldownMinutes: z.number().int().min(1).max(10080).default(60),
@@ -86,11 +94,30 @@ const adminLoginProtectionConfigSchema = z.object({
   repeatedBanDurationMinutes: z.number().int().min(1).max(43200).default(DEFAULT_REPEAT_BAN_DURATION_MINUTES),
   challengeMode: adminLoginChallengeModeSchema.default('OFF'),
   challengeMinimumReputationLevel: adminLoginRiskLevelSchema.default('HIGH'),
+  incidentDigestEnabled: z.boolean().default(false),
+  incidentDigestHour: z.number().int().min(0).max(23).default(ADMIN_LOGIN_INCIDENT_DIGEST_HOUR),
+  incidentDigestMinute: z.number().int().min(0).max(59).default(ADMIN_LOGIN_INCIDENT_DIGEST_MINUTE),
+  incidentDigestLookbackHours: z.number().int().min(1).max(168).default(ADMIN_LOGIN_INCIDENT_DIGEST_LOOKBACK_HOURS),
   alertRules: adminLoginAlertRulesSchema.default({}),
   trustedIpRanges: z.array(z.string()).default([]),
 });
 
+const adminLoginIncidentWorkflowEntrySchema = z.object({
+  status: adminLoginIncidentWorkflowStatusSchema.default('OPEN'),
+  notes: z.string().default(''),
+  acknowledgedAt: z.string().nullable().optional(),
+  acknowledgedByEmail: z.string().nullable().optional(),
+  resolvedAt: z.string().nullable().optional(),
+  resolvedByEmail: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+  updatedByEmail: z.string().nullable().optional(),
+});
+
+const adminLoginIncidentWorkflowMapSchema = z.record(z.string(), adminLoginIncidentWorkflowEntrySchema);
+
 export type AdminLoginProtectionConfig = z.infer<typeof adminLoginProtectionConfigSchema>;
+export type AdminLoginIncidentWorkflowStatus = z.infer<typeof adminLoginIncidentWorkflowStatusSchema>;
+type AdminLoginIncidentWorkflowEntry = z.infer<typeof adminLoginIncidentWorkflowEntrySchema>;
 
 export type AdminLoginRestrictionInfo = {
   id: string;
@@ -160,6 +187,14 @@ type AdminLoginIncidentStatus = 'ACTIVE' | 'CONTAINED' | 'RESOLVED';
 type AdminLoginIncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type AdminLoginReputationLevel = 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
 
+type AdminLoginIpEnrichment = {
+  reverseDns: string[];
+  asn: string | null;
+  isp: string | null;
+  organization: string | null;
+  source: string | null;
+};
+
 type AdminLoginIncident = {
   id: string;
   ip: string;
@@ -179,7 +214,28 @@ type AdminLoginIncident = {
   status: AdminLoginIncidentStatus;
   severity: AdminLoginIncidentSeverity;
   summary: string;
+  workflowStatus: AdminLoginIncidentWorkflowStatus;
+  notes: string | null;
+  notesPreview: string | null;
+  acknowledgedAt: Date | null;
+  acknowledgedByEmail: string | null;
+  resolvedAt: Date | null;
+  resolvedByEmail: string | null;
+  enrichment: AdminLoginIpEnrichment;
 };
+
+type RawAdminLoginIncident = Omit<
+  AdminLoginIncident,
+  | 'countryCode'
+  | 'workflowStatus'
+  | 'notes'
+  | 'notesPreview'
+  | 'acknowledgedAt'
+  | 'acknowledgedByEmail'
+  | 'resolvedAt'
+  | 'resolvedByEmail'
+  | 'enrichment'
+>;
 
 type AdminLoginIpReputation = {
   ip: string;
@@ -198,6 +254,7 @@ type AdminLoginIpReputation = {
   lastSeenAt: Date;
   currentlyRestricted: boolean;
   currentlyBanned: boolean;
+  enrichment: AdminLoginIpEnrichment;
 };
 
 type AdminLoginReputationHistoryPoint = {
@@ -235,6 +292,10 @@ type AdminLoginChallengeDecision = {
   level: AdminLoginReputationLevel;
 };
 
+type AdminLoginIncidentDigestResult =
+  | { skipped: true; reason: string }
+  | { skipped: false; incidentCount: number; adminChats: number; lookbackHours: number };
+
 const INCIDENT_LOOKBACK_MS = 7 * 24 * 60 * 60_000;
 const REPUTATION_LOOKBACK_MS = 30 * 24 * 60 * 60_000;
 const INCIDENT_IDLE_GAP_MS = 45 * 60_000;
@@ -246,6 +307,11 @@ const INCIDENT_ACTIONS = [
   'AUTH_LOGIN_REPEATED_OFFENDER_ALERT',
   'AUTH_LOGIN_UNBANNED',
 ] as const;
+
+const ipEnrichmentCache = new Map<
+  string,
+  { expiresAt: number; value: AdminLoginIpEnrichment }
+>();
 
 function normalizeIpAddress(rawIp: string | null | undefined): string | null {
   if (!rawIp) {
@@ -512,7 +578,7 @@ function buildSecurityIncidents(
     now: Date;
   },
 ) {
-  const incidents: Array<Omit<AdminLoginIncident, 'countryCode'>> = [];
+  const incidents: RawAdminLoginIncident[] = [];
   const groupedLogs = new Map<string, AdminLoginAuditEvent[]>();
 
   for (const log of logs) {
@@ -654,7 +720,7 @@ function buildSecurityIncidents(
 
 function buildIpReputation(
   logs: AdminLoginAuditEvent[],
-  incidents: Array<Omit<AdminLoginIncident, 'countryCode'>>,
+  incidents: RawAdminLoginIncident[],
   {
     activeRestrictionByIp,
     fail2banBannedIps,
@@ -920,6 +986,180 @@ function parseConfig(rawValue: string | null | undefined): AdminLoginProtectionC
   } catch {
     return adminLoginProtectionConfigSchema.parse({});
   }
+}
+
+function parseWorkflowMap(rawValue: string | null | undefined) {
+  if (!rawValue) {
+    return {} as Record<string, AdminLoginIncidentWorkflowEntry>;
+  }
+
+  try {
+    return adminLoginIncidentWorkflowMapSchema.parse(JSON.parse(rawValue));
+  } catch {
+    return {} as Record<string, AdminLoginIncidentWorkflowEntry>;
+  }
+}
+
+function parseStoredDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function appendIncidentNote(existingNotes: string | undefined, actorEmail: string, note: string) {
+  const trimmed = note.trim();
+  if (!trimmed) {
+    return existingNotes?.trim() || '';
+  }
+
+  const line = `[${new Date().toISOString()}] ${actorEmail}: ${trimmed}`;
+  return existingNotes?.trim() ? `${existingNotes.trim()}\n${line}` : line;
+}
+
+async function getIncidentWorkflowMap() {
+  const setting = await db.settings.findUnique({
+    where: { key: ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY },
+    select: { value: true },
+  });
+
+  return parseWorkflowMap(setting?.value);
+}
+
+async function saveIncidentWorkflowMap(map: Record<string, AdminLoginIncidentWorkflowEntry>) {
+  await db.settings.upsert({
+    where: { key: ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY },
+    update: { value: JSON.stringify(map) },
+    create: {
+      key: ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY,
+      value: JSON.stringify(map),
+    },
+  });
+}
+
+async function updateIncidentWorkflowEntry(
+  incidentId: string,
+  updater: (current: AdminLoginIncidentWorkflowEntry | null) => AdminLoginIncidentWorkflowEntry,
+) {
+  const workflowMap = await getIncidentWorkflowMap();
+  const nextEntry = updater(workflowMap[incidentId] ?? null);
+  workflowMap[incidentId] = nextEntry;
+  await saveIncidentWorkflowMap(workflowMap);
+  return nextEntry;
+}
+
+function deriveWorkflowStatus(
+  incident: Pick<RawAdminLoginIncident, 'endedAt' | 'status'>,
+  entry: AdminLoginIncidentWorkflowEntry | null,
+): AdminLoginIncidentWorkflowStatus {
+  if (!entry) {
+    return incident.status === 'RESOLVED' ? 'RESOLVED' : 'OPEN';
+  }
+
+  if (entry.status === 'RESOLVED') {
+    const resolvedAt = parseStoredDate(entry.resolvedAt);
+    if (resolvedAt && incident.endedAt.getTime() > resolvedAt.getTime()) {
+      return 'OPEN';
+    }
+  }
+
+  return entry.status;
+}
+
+async function lookupReverseDns(ip: string) {
+  try {
+    const result = await Promise.race([
+      dns.reverse(ip),
+      new Promise<string[]>((_, reject) => {
+        setTimeout(() => reject(new Error('reverse-dns-timeout')), 1500);
+      }),
+    ]);
+
+    return Array.isArray(result) ? result.slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function lookupIpWhois(ip: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+
+  try {
+    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    if (data.success === false) {
+      return null;
+    }
+
+    const connection =
+      data.connection && typeof data.connection === 'object'
+        ? (data.connection as Record<string, unknown>)
+        : null;
+
+    return {
+      asn:
+        typeof connection?.asn === 'number'
+          ? `AS${connection.asn}`
+          : typeof connection?.asn === 'string' && connection.asn.trim()
+            ? connection.asn
+            : null,
+      isp:
+        typeof connection?.isp === 'string' && connection.isp.trim() ? connection.isp : null,
+      organization:
+        typeof connection?.org === 'string' && connection.org.trim() ? connection.org : null,
+      source: 'ipwho.is',
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function getIpEnrichment(ip: string): Promise<AdminLoginIpEnrichment> {
+  if (isLocalOrPrivateIp(ip)) {
+    return {
+      reverseDns: [],
+      asn: null,
+      isp: null,
+      organization: null,
+      source: null,
+    };
+  }
+
+  const cached = ipEnrichmentCache.get(ip);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const [reverseDns, whois] = await Promise.all([lookupReverseDns(ip), lookupIpWhois(ip)]);
+  const enrichment: AdminLoginIpEnrichment = {
+    reverseDns,
+    asn: whois?.asn ?? null,
+    isp: whois?.isp ?? null,
+    organization: whois?.organization ?? null,
+    source: whois?.source ?? null,
+  };
+
+  ipEnrichmentCache.set(ip, {
+    expiresAt: Date.now() + IP_ENRICHMENT_TTL_MS,
+    value: enrichment,
+  });
+
+  return enrichment;
 }
 
 function buildAlertStateKey(event: AdminLoginAlertEventType, scope: string) {
@@ -1932,6 +2172,385 @@ export async function unbanAdminLoginIp(ip: string) {
   };
 }
 
+async function getSecurityIncidentOrThrow(incidentId: string) {
+  const overview = await getAdminLoginAbuseOverview();
+  const incident = overview.securityIncidents.find((entry) => entry.id === incidentId);
+  if (!incident) {
+    throw new Error('Admin login incident not found');
+  }
+
+  return incident;
+}
+
+function buildSecurityRuleDescription(prefix: string, actorEmail: string, note?: string | null) {
+  const suffix = note?.trim() ? ` — ${note.trim()}` : '';
+  return `${prefix} by ${actorEmail}${suffix}`.slice(0, 255);
+}
+
+async function upsertSecurityRuleForIp(
+  type: 'ALLOW' | 'BLOCK',
+  ip: string,
+  description: string,
+) {
+  const existing = await db.securityRule.findFirst({
+    where: {
+      type,
+      targetType: 'IP',
+      targetValue: ip,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (existing) {
+    return db.securityRule.update({
+      where: { id: existing.id },
+      data: {
+        description,
+        isActive: true,
+      },
+    });
+  }
+
+  return db.securityRule.create({
+    data: {
+      type,
+      targetType: 'IP',
+      targetValue: ip,
+      description,
+      isActive: true,
+    },
+  });
+}
+
+async function disableConflictingSecurityRules(ip: string, type: 'ALLOW' | 'BLOCK') {
+  const conflictingType = type === 'ALLOW' ? 'BLOCK' : 'ALLOW';
+  await db.securityRule.updateMany({
+    where: {
+      type: conflictingType,
+      targetType: 'IP',
+      targetValue: ip,
+      isActive: true,
+    },
+    data: {
+      isActive: false,
+    },
+  });
+}
+
+export async function acknowledgeAdminLoginIncident(
+  incidentId: string,
+  actorEmail: string,
+  note?: string | null,
+) {
+  const incident = await getSecurityIncidentOrThrow(incidentId);
+  const now = new Date();
+  const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
+    status: 'ACKNOWLEDGED',
+    notes: appendIncidentNote(current?.notes, actorEmail, note || ''),
+    acknowledgedAt: current?.acknowledgedAt ?? now.toISOString(),
+    acknowledgedByEmail: current?.acknowledgedByEmail ?? actorEmail,
+    resolvedAt: current?.resolvedAt ?? null,
+    resolvedByEmail: current?.resolvedByEmail ?? null,
+    updatedAt: now.toISOString(),
+    updatedByEmail: actorEmail,
+  }));
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_INCIDENT_ACKNOWLEDGED',
+    entity: 'AUTH',
+    entityId: incidentId,
+    ip: incident.ip,
+    details: {
+      actorEmail,
+      note: note?.trim() || null,
+      status: entry.status,
+    },
+  });
+
+  return incident;
+}
+
+export async function resolveAdminLoginIncident(
+  incidentId: string,
+  actorEmail: string,
+  note?: string | null,
+) {
+  const incident = await getSecurityIncidentOrThrow(incidentId);
+  const now = new Date();
+  const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
+    status: 'RESOLVED',
+    notes: appendIncidentNote(current?.notes, actorEmail, note || ''),
+    acknowledgedAt: current?.acknowledgedAt ?? null,
+    acknowledgedByEmail: current?.acknowledgedByEmail ?? null,
+    resolvedAt: now.toISOString(),
+    resolvedByEmail: actorEmail,
+    updatedAt: now.toISOString(),
+    updatedByEmail: actorEmail,
+  }));
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_INCIDENT_RESOLVED',
+    entity: 'AUTH',
+    entityId: incidentId,
+    ip: incident.ip,
+    details: {
+      actorEmail,
+      note: note?.trim() || null,
+      status: entry.status,
+    },
+  });
+
+  return incident;
+}
+
+export async function addAdminLoginIncidentNote(
+  incidentId: string,
+  actorEmail: string,
+  note: string,
+) {
+  const incident = await getSecurityIncidentOrThrow(incidentId);
+  const now = new Date();
+  const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
+    status: current?.status ?? 'OPEN',
+    notes: appendIncidentNote(current?.notes, actorEmail, note),
+    acknowledgedAt: current?.acknowledgedAt ?? null,
+    acknowledgedByEmail: current?.acknowledgedByEmail ?? null,
+    resolvedAt: current?.resolvedAt ?? null,
+    resolvedByEmail: current?.resolvedByEmail ?? null,
+    updatedAt: now.toISOString(),
+    updatedByEmail: actorEmail,
+  }));
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_INCIDENT_NOTE_ADDED',
+    entity: 'AUTH',
+    entityId: incidentId,
+    ip: incident.ip,
+    details: {
+      actorEmail,
+      note: note.trim(),
+      status: entry.status,
+    },
+  });
+
+  return incident;
+}
+
+export async function blockAdminLoginIpPermanently(
+  ip: string,
+  actorEmail: string,
+  note?: string | null,
+) {
+  const normalizedIp = normalizeIpAddress(ip);
+  if (!normalizedIp) {
+    throw new Error('Invalid IP address');
+  }
+
+  await disableConflictingSecurityRules(normalizedIp, 'BLOCK');
+  const rule = await upsertSecurityRuleForIp(
+    'BLOCK',
+    normalizedIp,
+    buildSecurityRuleDescription('Permanent admin-login block', actorEmail, note),
+  );
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_PERMANENT_BLOCK_RULE',
+    entity: 'AUTH',
+    entityId: rule.id,
+    ip: normalizedIp,
+    details: {
+      actorEmail,
+      note: note?.trim() || null,
+    },
+  });
+
+  return rule;
+}
+
+export async function allowlistAdminLoginIp(
+  ip: string,
+  actorEmail: string,
+  note?: string | null,
+) {
+  const normalizedIp = normalizeIpAddress(ip);
+  if (!normalizedIp) {
+    throw new Error('Invalid IP address');
+  }
+
+  await disableConflictingSecurityRules(normalizedIp, 'ALLOW');
+  const rule = await upsertSecurityRuleForIp(
+    'ALLOW',
+    normalizedIp,
+    buildSecurityRuleDescription('Admin-login allowlist', actorEmail, note),
+  );
+
+  await unbanAdminLoginIp(normalizedIp);
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_ALLOWLIST_RULE',
+    entity: 'AUTH',
+    entityId: rule.id,
+    ip: normalizedIp,
+    details: {
+      actorEmail,
+      note: note?.trim() || null,
+    },
+  });
+
+  return rule;
+}
+
+export async function promoteAdminLoginIpToPermanentRule(
+  ip: string,
+  actorEmail: string,
+  note?: string | null,
+) {
+  return blockAdminLoginIpPermanently(ip, actorEmail, note || 'Promoted from security incident');
+}
+
+function isSameLocalDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+export async function sendAdminLoginIncidentDigest(options?: {
+  now?: Date;
+  lookbackHours?: number;
+  includeResolved?: boolean;
+}) {
+  const now = options?.now ?? new Date();
+  const lookbackHours = Math.max(1, options?.lookbackHours ?? ADMIN_LOGIN_INCIDENT_DIGEST_LOOKBACK_HOURS);
+  const includeResolved = options?.includeResolved ?? false;
+  const overview = await getAdminLoginAbuseOverview();
+  const config = await getTelegramConfig();
+
+  if (!config || config.adminChatIds.length === 0) {
+    return { sent: false as const, reason: 'telegram-not-configured' };
+  }
+
+  const windowStart = now.getTime() - lookbackHours * 60 * 60_000;
+  const incidents = overview.securityIncidents.filter((incident) => {
+    if (!includeResolved && incident.workflowStatus === 'RESOLVED') {
+      return false;
+    }
+    return incident.endedAt.getTime() >= windowStart;
+  });
+
+  const topIncidents = incidents.slice(0, 5);
+  const lines = [
+    '🛡️ <b>Admin login security digest</b>',
+    '',
+    `Window: last ${lookbackHours} hour(s)`,
+    `Incidents: <b>${incidents.length}</b>`,
+    `High-risk IPs: <b>${overview.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length}</b>`,
+    `Active restrictions: <b>${overview.summary.activeRestrictions}</b>`,
+    `fail2ban currently banned: <b>${overview.fail2banStatus.currentlyBanned}</b>`,
+  ];
+
+  if (topIncidents.length > 0) {
+    lines.push('', '<b>Top incidents</b>');
+    for (const incident of topIncidents) {
+      lines.push(
+        `• <code>${incident.ip}</code> ${incident.countryCode ? `(${incident.countryCode}) ` : ''}- ${incident.summary}`,
+      );
+      lines.push(
+        `  Status: ${incident.workflowStatus} · Severity: ${incident.severity} · Last seen: ${incident.endedAt.toISOString()}`,
+      );
+    }
+  } else {
+    lines.push('', 'No matching incidents in the selected window.');
+  }
+
+  await sendAdminAlert(lines.join('\n'), { parseMode: 'HTML' });
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_INCIDENT_DIGEST_SENT',
+    entity: 'AUTH',
+    details: {
+      lookbackHours,
+      incidentCount: incidents.length,
+      includeResolved,
+    },
+  });
+
+  return {
+    sent: true as const,
+    incidentCount: incidents.length,
+    adminChats: config.adminChatIds.length,
+    lookbackHours,
+  };
+}
+
+export async function runAdminLoginIncidentDigestCycle(input?: {
+  force?: boolean;
+  now?: Date;
+}): Promise<AdminLoginIncidentDigestResult> {
+  const force = input?.force ?? false;
+  const now = input?.now ?? new Date();
+  const config = await getAdminLoginProtectionConfig();
+
+  if (!force && !config.incidentDigestEnabled) {
+    return { skipped: true, reason: 'disabled' };
+  }
+
+  const telegramConfig = await getTelegramConfig();
+  if (!telegramConfig || telegramConfig.adminChatIds.length === 0) {
+    return { skipped: true, reason: 'telegram-not-configured' };
+  }
+
+  const lastRun = await db.settings.findUnique({
+    where: { key: ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY },
+    select: { value: true },
+  });
+
+  if (!force) {
+    const scheduled = new Date(now);
+    scheduled.setHours(config.incidentDigestHour, config.incidentDigestMinute, 0, 0);
+
+    if (now.getTime() < scheduled.getTime()) {
+      return { skipped: true, reason: 'scheduled-time-not-reached' };
+    }
+
+    if (lastRun?.value) {
+      const lastRunAt = new Date(lastRun.value);
+      if (!Number.isNaN(lastRunAt.getTime()) && isSameLocalDay(lastRunAt, now)) {
+        return { skipped: true, reason: 'already-ran-today' };
+      }
+    }
+  }
+
+  const result = await sendAdminLoginIncidentDigest({
+    now,
+    lookbackHours: config.incidentDigestLookbackHours,
+    includeResolved: false,
+  });
+
+  if (!result.sent) {
+    return { skipped: true, reason: result.reason };
+  }
+
+  await db.settings.upsert({
+    where: { key: ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY },
+    create: {
+      key: ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY,
+      value: now.toISOString(),
+    },
+    update: {
+      value: now.toISOString(),
+    },
+  });
+
+  return {
+    skipped: false,
+    incidentCount: result.incidentCount,
+    adminChats: result.adminChats,
+    lookbackHours: result.lookbackHours,
+  };
+}
+
 export async function getAdminLoginAbuseOverview() {
   const config = await getAdminLoginProtectionConfig();
   const now = new Date();
@@ -1953,6 +2572,7 @@ export async function getAdminLoginAbuseOverview() {
     failuresLastDay,
     incidentLogs,
     reputationLogs,
+    workflowMap,
   ] = await Promise.all([
     db.adminLoginRestriction.findMany({
       where: {
@@ -2012,6 +2632,7 @@ export async function getAdminLoginAbuseOverview() {
         createdAt: true,
       },
     }),
+    getIncidentWorkflowMap(),
   ]);
 
   const fail2banStatus = getFail2banStatus();
@@ -2032,12 +2653,12 @@ export async function getAdminLoginAbuseOverview() {
 
     return geoIpCache.get(ip)!;
   };
-  const securityIncidents = buildSecurityIncidents(incidentLogs, {
+  const rawSecurityIncidents = buildSecurityIncidents(incidentLogs, {
     activeRestrictionByIp,
     fail2banBannedIps,
     now,
   });
-  const ipReputation = buildIpReputation(reputationLogs, securityIncidents, {
+  const ipReputation = buildIpReputation(reputationLogs, rawSecurityIncidents, {
     activeRestrictionByIp,
     fail2banBannedIps,
     now,
@@ -2079,6 +2700,37 @@ export async function getAdminLoginAbuseOverview() {
     }
   }
 
+  const securityIncidents = await Promise.all(
+    rawSecurityIncidents.map(async (incident) => {
+      const workflow = workflowMap[incident.id] ?? null;
+      const acknowledgedAt = parseStoredDate(workflow?.acknowledgedAt);
+      const resolvedAt = parseStoredDate(workflow?.resolvedAt);
+      const notes = workflow?.notes?.trim() || null;
+      const geo = await getCachedGeo(incident.ip);
+      const enrichment = await getIpEnrichment(incident.ip);
+      return {
+        ...incident,
+        countryCode: geo.countryCode,
+        workflowStatus: deriveWorkflowStatus(incident, workflow),
+        notes,
+        notesPreview: notes ? notes.split('\n').slice(-1)[0] : null,
+        acknowledgedAt,
+        acknowledgedByEmail: workflow?.acknowledgedByEmail ?? null,
+        resolvedAt,
+        resolvedByEmail: workflow?.resolvedByEmail ?? null,
+        enrichment,
+      };
+    }),
+  );
+
+  const enrichedReputation = await Promise.all(
+    ipReputation.map(async (entry) => ({
+      ...entry,
+      countryCode: (await getCachedGeo(entry.ip)).countryCode,
+      enrichment: await getIpEnrichment(entry.ip),
+    })),
+  );
+
   return {
     config,
     summary: {
@@ -2092,18 +2744,8 @@ export async function getAdminLoginAbuseOverview() {
     topOffenders: Array.from(topOffenders.values())
       .sort((a, b) => b.count - a.count || b.lastAttemptAt.getTime() - a.lastAttemptAt.getTime())
       .slice(0, 20),
-    securityIncidents: await Promise.all(
-      securityIncidents.map(async (incident) => ({
-        ...incident,
-        countryCode: (await getCachedGeo(incident.ip)).countryCode,
-      })),
-    ),
-    ipReputation: await Promise.all(
-      ipReputation.map(async (entry) => ({
-        ...entry,
-        countryCode: (await getCachedGeo(entry.ip)).countryCode,
-      })),
-    ),
+    securityIncidents,
+    ipReputation: enrichedReputation,
     reputationHistory,
     fail2banStatus,
   };
