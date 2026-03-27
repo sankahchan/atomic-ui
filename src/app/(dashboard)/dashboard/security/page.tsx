@@ -487,6 +487,43 @@ function SecuritySummaryCards() {
     );
 }
 
+function incidentSeverityClasses(severity: string) {
+    switch (severity) {
+        case 'CRITICAL':
+            return 'border-red-500/40 bg-red-500/10 text-red-500';
+        case 'HIGH':
+            return 'border-orange-500/40 bg-orange-500/10 text-orange-500';
+        case 'MEDIUM':
+            return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-500';
+        default:
+            return 'border-border/60 bg-background/70 text-muted-foreground';
+    }
+}
+
+function incidentStatusClasses(status: string) {
+    switch (status) {
+        case 'ACTIVE':
+            return 'border-red-500/40 bg-red-500/10 text-red-500';
+        case 'CONTAINED':
+            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500';
+        default:
+            return 'border-border/60 bg-background/70 text-muted-foreground';
+    }
+}
+
+function reputationLevelClasses(level: string) {
+    switch (level) {
+        case 'CRITICAL':
+            return 'border-red-500/40 bg-red-500/10 text-red-500';
+        case 'HIGH':
+            return 'border-orange-500/40 bg-orange-500/10 text-orange-500';
+        case 'ELEVATED':
+            return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-500';
+        default:
+            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500';
+    }
+}
+
 function LoginProtectionCard() {
     const { toast } = useToast();
     const { data: overview, isLoading, refetch } = trpc.security.getAdminLoginAbuseOverview.useQuery();
@@ -550,6 +587,10 @@ function LoginProtectionCard() {
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
     }, [overview]);
+
+    const activeIncidentCount = overview?.securityIncidents.filter((incident) => incident.status === 'ACTIVE').length ?? 0;
+    const highRiskIpCount =
+        overview?.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length ?? 0;
 
     if (isLoading || !overview) {
         return (
@@ -625,6 +666,28 @@ function LoginProtectionCard() {
                                 ? `${overview.fail2banStatus.jail} currently banned`
                                 : 'fail2ban status unavailable'}
                         </p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Active incidents</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${activeIncidentCount > 0 ? 'text-orange-500' : ''}`}>
+                            {activeIncidentCount}
+                        </div>
+                        <p className="text-xs text-muted-foreground">ongoing abuse bursts still worth watching</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">High-risk IPs</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${highRiskIpCount > 0 ? 'text-red-500' : ''}`}>
+                            {highRiskIpCount}
+                        </div>
+                        <p className="text-xs text-muted-foreground">reputation score 50 or higher</p>
                     </CardContent>
                 </Card>
             </div>
@@ -913,6 +976,128 @@ function LoginProtectionCard() {
                         </CardContent>
                     </Card>
                 </div>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                <Card className="ops-panel">
+                    <CardHeader className="px-0 pt-0">
+                        <CardTitle>Incident timeline</CardTitle>
+                        <CardDescription>
+                            Grouped bursts of failed admin logins so you can see what escalated, what was contained, and what is still active.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        {overview.securityIncidents.length === 0 ? (
+                            <div className="ops-chart-empty py-8 text-muted-foreground">No login abuse incidents recorded yet.</div>
+                        ) : (
+                            <div className="space-y-3">
+                                {overview.securityIncidents.map((incident) => (
+                                    <div key={incident.id} className="ops-row-card space-y-3">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="space-y-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-medium">{incident.ip}</span>
+                                                    {incident.countryCode && <Badge variant="outline">{incident.countryCode}</Badge>}
+                                                    <Badge variant="outline" className={incidentSeverityClasses(incident.severity)}>
+                                                        {incident.severity}
+                                                    </Badge>
+                                                    <Badge variant="outline" className={incidentStatusClasses(incident.status)}>
+                                                        {incident.status}
+                                                    </Badge>
+                                                    {incident.activeRestrictionType && (
+                                                        <Badge variant="outline">{incident.activeRestrictionType}</Badge>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{incident.summary}</p>
+                                            </div>
+                                            <div className="text-right text-xs text-muted-foreground">
+                                                <p>Started {formatDistanceToNow(new Date(incident.startedAt), { addSuffix: true })}</p>
+                                                <p>Last seen {formatDistanceToNow(new Date(incident.endedAt), { addSuffix: true })}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Attempts</p>
+                                                <p className="mt-1">
+                                                    {incident.failureCount} failures · {incident.lockCount} locks · {incident.banCount} bans
+                                                </p>
+                                            </div>
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Attempted emails</p>
+                                                <p className="mt-1 break-all">
+                                                    {incident.attemptedEmails.length > 0 ? incident.attemptedEmails.join(', ') : 'Unknown'}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Host / path</p>
+                                                <p className="mt-1 break-all">
+                                                    {(incident.hosts[0] || 'unknown host')}{incident.paths[0] ? ` · ${incident.paths[0]}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="ops-panel">
+                    <CardHeader className="px-0 pt-0">
+                        <CardTitle>IP reputation</CardTitle>
+                        <CardDescription>
+                            Rolling risk score per IP based on recent failures, enforcement actions, and repeat-offender behavior.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        {overview.ipReputation.length === 0 ? (
+                            <div className="ops-chart-empty py-8 text-muted-foreground">No abusive IP reputation data yet.</div>
+                        ) : (
+                            <div className="space-y-3">
+                                {overview.ipReputation.map((entry) => (
+                                    <div key={entry.ip} className="ops-row-card space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div className="space-y-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-medium">{entry.ip}</span>
+                                                    {entry.countryCode && <Badge variant="outline">{entry.countryCode}</Badge>}
+                                                    <Badge variant="outline" className={reputationLevelClasses(entry.level)}>
+                                                        {entry.level}
+                                                    </Badge>
+                                                    {entry.currentlyBanned && <Badge variant="destructive">Banned now</Badge>}
+                                                    {!entry.currentlyBanned && entry.currentlyRestricted && <Badge variant="secondary">Restricted now</Badge>}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground break-all">{entry.topEmail || 'Unknown email'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-2xl font-semibold">{entry.score}</p>
+                                                <p className="text-xs text-muted-foreground">risk score</p>
+                                            </div>
+                                        </div>
+                                        <Progress value={entry.score} className="h-2" />
+                                        <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Recent pressure</p>
+                                                <p className="mt-1">
+                                                    {entry.failures24h} in 24h · {entry.failures7d} in 7d · {entry.failures30d} in 30d
+                                                </p>
+                                            </div>
+                                            <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                <p className="font-medium text-foreground">Enforcement history</p>
+                                                <p className="mt-1">
+                                                    {entry.bans7d} bans · {entry.locks7d} locks · {entry.incidents7d} incidents
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Last seen {formatDistanceToNow(new Date(entry.lastSeenAt), { addSuffix: true })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

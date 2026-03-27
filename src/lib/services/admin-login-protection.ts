@@ -81,6 +81,79 @@ type FailureSnapshot = {
   lastSeenAt: Date | null;
 };
 
+type AdminLoginAuditEvent = {
+  id: string;
+  action: string;
+  ip: string | null;
+  details: string | null;
+  createdAt: Date;
+};
+
+type ParsedAuditDetails = {
+  email: string | null;
+  host: string | null;
+  path: string | null;
+  restrictionType: string | null;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+};
+
+type AdminLoginIncidentStatus = 'ACTIVE' | 'CONTAINED' | 'RESOLVED';
+type AdminLoginIncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type AdminLoginReputationLevel = 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+
+type AdminLoginIncident = {
+  id: string;
+  ip: string;
+  countryCode: string | null;
+  startedAt: Date;
+  endedAt: Date;
+  failureCount: number;
+  lockCount: number;
+  banCount: number;
+  repeatedOffenderCount: number;
+  unbanCount: number;
+  attemptedEmails: string[];
+  hosts: string[];
+  paths: string[];
+  activeRestrictionType: string | null;
+  currentlyBanned: boolean;
+  status: AdminLoginIncidentStatus;
+  severity: AdminLoginIncidentSeverity;
+  summary: string;
+};
+
+type AdminLoginIpReputation = {
+  ip: string;
+  countryCode: string | null;
+  score: number;
+  level: AdminLoginReputationLevel;
+  failures24h: number;
+  failures7d: number;
+  failures30d: number;
+  bans7d: number;
+  locks7d: number;
+  repeatedAlerts30d: number;
+  incidents7d: number;
+  attemptedEmails: string[];
+  topEmail: string | null;
+  lastSeenAt: Date;
+  currentlyRestricted: boolean;
+  currentlyBanned: boolean;
+};
+
+const INCIDENT_LOOKBACK_MS = 7 * 24 * 60 * 60_000;
+const REPUTATION_LOOKBACK_MS = 30 * 24 * 60 * 60_000;
+const INCIDENT_IDLE_GAP_MS = 45 * 60_000;
+const INCIDENT_ACTIVE_WINDOW_MS = 30 * 60_000;
+const INCIDENT_ACTIONS = [
+  'AUTH_LOGIN_FAILED',
+  'AUTH_LOGIN_LOCKED',
+  'AUTH_LOGIN_BANNED',
+  'AUTH_LOGIN_REPEATED_OFFENDER_ALERT',
+  'AUTH_LOGIN_UNBANNED',
+] as const;
+
 function normalizeIpAddress(rawIp: string | null | undefined): string | null {
   if (!rawIp) {
     return null;
@@ -153,6 +226,427 @@ function buildFailureSnapshot(
     firstSeenAt,
     lastSeenAt,
   };
+}
+
+function parseAuditDetails(rawValue: string | null | undefined): ParsedAuditDetails {
+  if (!rawValue) {
+    return {
+      email: null,
+      host: null,
+      path: null,
+      restrictionType: null,
+      firstSeenAt: null,
+      lastSeenAt: null,
+    };
+  }
+
+  try {
+    const details = JSON.parse(rawValue) as Record<string, unknown>;
+    const asDate = (value: unknown) => {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    return {
+      email: typeof details.email === 'string' ? details.email : null,
+      host: typeof details.host === 'string' ? details.host : null,
+      path: typeof details.path === 'string' ? details.path : null,
+      restrictionType:
+        typeof details.restrictionType === 'string' ? details.restrictionType : null,
+      firstSeenAt: asDate(details.firstSeenAt),
+      lastSeenAt: asDate(details.lastSeenAt ?? details.lastAttemptAt),
+    };
+  } catch {
+    return {
+      email: null,
+      host: null,
+      path: null,
+      restrictionType: null,
+      firstSeenAt: null,
+      lastSeenAt: null,
+    };
+  }
+}
+
+function buildIncidentSummary(incident: {
+  failureCount: number;
+  lockCount: number;
+  banCount: number;
+  repeatedOffenderCount: number;
+  unbanCount: number;
+}) {
+  const parts = [`${incident.failureCount} failed login${incident.failureCount === 1 ? '' : 's'}`];
+
+  if (incident.lockCount > 0) {
+    parts.push(`${incident.lockCount} lock${incident.lockCount === 1 ? '' : 's'}`);
+  }
+
+  if (incident.banCount > 0) {
+    parts.push(`${incident.banCount} ban${incident.banCount === 1 ? '' : 's'}`);
+  }
+
+  if (incident.repeatedOffenderCount > 0) {
+    parts.push(
+      `${incident.repeatedOffenderCount} repeat alert${incident.repeatedOffenderCount === 1 ? '' : 's'}`,
+    );
+  }
+
+  if (incident.unbanCount > 0) {
+    parts.push(`${incident.unbanCount} unban${incident.unbanCount === 1 ? '' : 's'}`);
+  }
+
+  return parts.join(', ');
+}
+
+function buildIncidentStatus(
+  endedAt: Date,
+  now: Date,
+  activeRestrictionType: string | null,
+  currentlyBanned: boolean,
+  lockCount: number,
+  banCount: number,
+): AdminLoginIncidentStatus {
+  if (currentlyBanned || activeRestrictionType) {
+    return 'ACTIVE';
+  }
+
+  if (now.getTime() - endedAt.getTime() <= INCIDENT_ACTIVE_WINDOW_MS) {
+    return 'ACTIVE';
+  }
+
+  if (lockCount > 0 || banCount > 0) {
+    return 'CONTAINED';
+  }
+
+  return 'RESOLVED';
+}
+
+function buildIncidentSeverity(incident: {
+  failureCount: number;
+  lockCount: number;
+  banCount: number;
+  repeatedOffenderCount: number;
+  currentlyBanned: boolean;
+}): AdminLoginIncidentSeverity {
+  if (incident.currentlyBanned || incident.banCount > 0) {
+    return 'CRITICAL';
+  }
+
+  if (incident.repeatedOffenderCount > 0 || incident.lockCount > 0 || incident.failureCount >= 10) {
+    return 'HIGH';
+  }
+
+  if (incident.failureCount >= 5) {
+    return 'MEDIUM';
+  }
+
+  return 'LOW';
+}
+
+function buildReputationLevel(score: number): AdminLoginReputationLevel {
+  if (score >= 75) {
+    return 'CRITICAL';
+  }
+
+  if (score >= 50) {
+    return 'HIGH';
+  }
+
+  if (score >= 20) {
+    return 'ELEVATED';
+  }
+
+  return 'LOW';
+}
+
+function buildSecurityIncidents(
+  logs: AdminLoginAuditEvent[],
+  {
+    activeRestrictionByIp,
+    fail2banBannedIps,
+    now,
+  }: {
+    activeRestrictionByIp: Map<string, AdminLoginRestrictionInfo>;
+    fail2banBannedIps: Set<string>;
+    now: Date;
+  },
+) {
+  const incidents: Array<Omit<AdminLoginIncident, 'countryCode'>> = [];
+  const groupedLogs = new Map<string, AdminLoginAuditEvent[]>();
+
+  for (const log of logs) {
+    if (!log.ip) {
+      continue;
+    }
+
+    const ipLogs = groupedLogs.get(log.ip) ?? [];
+    ipLogs.push(log);
+    groupedLogs.set(log.ip, ipLogs);
+  }
+
+  for (const [ip, ipLogs] of Array.from(groupedLogs.entries())) {
+    const sortedLogs = [...ipLogs].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    let cursor:
+      | {
+          startedAt: Date;
+          endedAt: Date;
+          failureCount: number;
+          lockCount: number;
+          banCount: number;
+          repeatedOffenderCount: number;
+          unbanCount: number;
+          attemptedEmails: Set<string>;
+          hosts: Set<string>;
+          paths: Set<string>;
+        }
+      | null = null;
+
+    const flush = () => {
+      if (!cursor) {
+        return;
+      }
+
+      const activeRestriction = activeRestrictionByIp.get(ip);
+      const currentlyBanned =
+        fail2banBannedIps.has(ip) || activeRestriction?.restrictionType === 'BAN';
+      const activeRestrictionType = activeRestriction?.restrictionType ?? null;
+
+      const incident = {
+        id: `${ip}:${cursor.startedAt.getTime()}`,
+        ip,
+        startedAt: cursor.startedAt,
+        endedAt: cursor.endedAt,
+        failureCount: cursor.failureCount,
+        lockCount: cursor.lockCount,
+        banCount: cursor.banCount,
+        repeatedOffenderCount: cursor.repeatedOffenderCount,
+        unbanCount: cursor.unbanCount,
+        attemptedEmails: Array.from(cursor.attemptedEmails).slice(0, 5),
+        hosts: Array.from(cursor.hosts).slice(0, 3),
+        paths: Array.from(cursor.paths).slice(0, 3),
+        activeRestrictionType,
+        currentlyBanned,
+        status: buildIncidentStatus(
+          cursor.endedAt,
+          now,
+          activeRestrictionType,
+          currentlyBanned,
+          cursor.lockCount,
+          cursor.banCount,
+        ),
+        severity: buildIncidentSeverity({
+          failureCount: cursor.failureCount,
+          lockCount: cursor.lockCount,
+          banCount: cursor.banCount,
+          repeatedOffenderCount: cursor.repeatedOffenderCount,
+          currentlyBanned,
+        }),
+        summary: buildIncidentSummary(cursor),
+      };
+
+      incidents.push(incident);
+      cursor = null;
+    };
+
+    for (const log of sortedLogs) {
+      const details = parseAuditDetails(log.details);
+
+      if (!cursor || log.createdAt.getTime() - cursor.endedAt.getTime() > INCIDENT_IDLE_GAP_MS) {
+        flush();
+        cursor = {
+          startedAt: details.firstSeenAt ?? log.createdAt,
+          endedAt: details.lastSeenAt ?? log.createdAt,
+          failureCount: 0,
+          lockCount: 0,
+          banCount: 0,
+          repeatedOffenderCount: 0,
+          unbanCount: 0,
+          attemptedEmails: new Set<string>(),
+          hosts: new Set<string>(),
+          paths: new Set<string>(),
+        };
+      }
+
+      cursor.endedAt = new Date(
+        Math.max(cursor.endedAt.getTime(), (details.lastSeenAt ?? log.createdAt).getTime()),
+      );
+      cursor.startedAt = new Date(
+        Math.min(cursor.startedAt.getTime(), (details.firstSeenAt ?? log.createdAt).getTime()),
+      );
+
+      if (details.email) {
+        cursor.attemptedEmails.add(details.email);
+      }
+      if (details.host) {
+        cursor.hosts.add(details.host);
+      }
+      if (details.path) {
+        cursor.paths.add(details.path);
+      }
+
+      switch (log.action) {
+        case 'AUTH_LOGIN_FAILED':
+          cursor.failureCount += 1;
+          break;
+        case 'AUTH_LOGIN_LOCKED':
+          cursor.lockCount += 1;
+          break;
+        case 'AUTH_LOGIN_BANNED':
+          cursor.banCount += 1;
+          break;
+        case 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT':
+          cursor.repeatedOffenderCount += 1;
+          break;
+        case 'AUTH_LOGIN_UNBANNED':
+          cursor.unbanCount += 1;
+          break;
+        default:
+          break;
+      }
+    }
+
+    flush();
+  }
+
+  return incidents.sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime()).slice(0, 20);
+}
+
+function buildIpReputation(
+  logs: AdminLoginAuditEvent[],
+  incidents: Array<Omit<AdminLoginIncident, 'countryCode'>>,
+  {
+    activeRestrictionByIp,
+    fail2banBannedIps,
+    now,
+  }: {
+    activeRestrictionByIp: Map<string, AdminLoginRestrictionInfo>;
+    fail2banBannedIps: Set<string>;
+    now: Date;
+  },
+) {
+  const dayAgo = now.getTime() - 24 * 60 * 60_000;
+  const weekAgo = now.getTime() - 7 * 24 * 60 * 60_000;
+  const ipMap = new Map<
+    string,
+    {
+      failures24h: number;
+      failures7d: number;
+      failures30d: number;
+      bans7d: number;
+      locks7d: number;
+      repeatedAlerts30d: number;
+      lastSeenAt: Date;
+      attemptedEmails: Set<string>;
+      emailCounts: Map<string, number>;
+    }
+  >();
+
+  for (const log of logs) {
+    if (!log.ip) {
+      continue;
+    }
+
+    const details = parseAuditDetails(log.details);
+    const current = ipMap.get(log.ip) ?? {
+      failures24h: 0,
+      failures7d: 0,
+      failures30d: 0,
+      bans7d: 0,
+      locks7d: 0,
+      repeatedAlerts30d: 0,
+      lastSeenAt: log.createdAt,
+      attemptedEmails: new Set<string>(),
+      emailCounts: new Map<string, number>(),
+    };
+
+    current.lastSeenAt = current.lastSeenAt > log.createdAt ? current.lastSeenAt : log.createdAt;
+
+    if (details.email) {
+      current.attemptedEmails.add(details.email);
+      current.emailCounts.set(details.email, (current.emailCounts.get(details.email) ?? 0) + 1);
+    }
+
+    if (log.action === 'AUTH_LOGIN_FAILED') {
+      current.failures30d += 1;
+      if (log.createdAt.getTime() >= weekAgo) {
+        current.failures7d += 1;
+      }
+      if (log.createdAt.getTime() >= dayAgo) {
+        current.failures24h += 1;
+      }
+    }
+
+    if (log.action === 'AUTH_LOGIN_BANNED' && log.createdAt.getTime() >= weekAgo) {
+      current.bans7d += 1;
+    }
+
+    if (log.action === 'AUTH_LOGIN_LOCKED' && log.createdAt.getTime() >= weekAgo) {
+      current.locks7d += 1;
+    }
+
+    if (log.action === 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT') {
+      current.repeatedAlerts30d += 1;
+    }
+
+    ipMap.set(log.ip, current);
+  }
+
+  const incidents7dByIp = new Map<string, number>();
+  for (const incident of incidents) {
+    if (incident.startedAt.getTime() >= weekAgo) {
+      incidents7dByIp.set(incident.ip, (incidents7dByIp.get(incident.ip) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(ipMap.entries())
+    .map(([ip, value]) => {
+      const currentlyRestricted = activeRestrictionByIp.has(ip);
+      const currentlyBanned =
+        fail2banBannedIps.has(ip) || activeRestrictionByIp.get(ip)?.restrictionType === 'BAN';
+      const score = Math.min(
+        100,
+        value.failures24h * 4 +
+          Math.max(0, value.failures7d - value.failures24h) * 2 +
+          value.bans7d * 22 +
+          value.locks7d * 10 +
+          value.repeatedAlerts30d * 14 +
+          (incidents7dByIp.get(ip) ?? 0) * 3 +
+          (currentlyBanned ? 18 : currentlyRestricted ? 8 : 0),
+      );
+
+      let topEmail: string | null = null;
+      let topEmailCount = -1;
+      for (const [email, count] of Array.from(value.emailCounts.entries())) {
+        if (count > topEmailCount) {
+          topEmail = email;
+          topEmailCount = count;
+        }
+      }
+
+      return {
+        ip,
+        countryCode: null,
+        score,
+        level: buildReputationLevel(score),
+        failures24h: value.failures24h,
+        failures7d: value.failures7d,
+        failures30d: value.failures30d,
+        bans7d: value.bans7d,
+        locks7d: value.locks7d,
+        repeatedAlerts30d: value.repeatedAlerts30d,
+        incidents7d: incidents7dByIp.get(ip) ?? 0,
+        attemptedEmails: Array.from(value.attemptedEmails).slice(0, 5),
+        topEmail,
+        lastSeenAt: value.lastSeenAt,
+        currentlyRestricted,
+        currentlyBanned,
+      };
+    })
+    .sort((a, b) => b.score - a.score || b.lastSeenAt.getTime() - a.lastSeenAt.getTime())
+    .slice(0, 20);
 }
 
 function isTrustedIp(ip: string, config: AdminLoginProtectionConfig) {
@@ -842,6 +1336,8 @@ export async function unbanAdminLoginIp(ip: string) {
 export async function getAdminLoginAbuseOverview() {
   const config = await getAdminLoginProtectionConfig();
   const now = new Date();
+  const incidentWindowStart = new Date(now.getTime() - INCIDENT_LOOKBACK_MS);
+  const reputationWindowStart = new Date(now.getTime() - REPUTATION_LOOKBACK_MS);
 
   await db.adminLoginRestriction.updateMany({
     where: {
@@ -851,7 +1347,14 @@ export async function getAdminLoginAbuseOverview() {
     data: { isActive: false },
   });
 
-  const [activeRestrictions, recentFailures, failuresLastHour, failuresLastDay] = await Promise.all([
+  const [
+    activeRestrictions,
+    recentFailures,
+    failuresLastHour,
+    failuresLastDay,
+    incidentLogs,
+    reputationLogs,
+  ] = await Promise.all([
     db.adminLoginRestriction.findMany({
       where: {
         isActive: true,
@@ -880,26 +1383,70 @@ export async function getAdminLoginAbuseOverview() {
         createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
       },
     }),
+    db.auditLog.findMany({
+      where: {
+        action: { in: [...INCIDENT_ACTIONS] },
+        ip: { not: null },
+        createdAt: { gte: incidentWindowStart },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        action: true,
+        ip: true,
+        details: true,
+        createdAt: true,
+      },
+    }),
+    db.auditLog.findMany({
+      where: {
+        action: { in: [...INCIDENT_ACTIONS] },
+        ip: { not: null },
+        createdAt: { gte: reputationWindowStart },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        action: true,
+        ip: true,
+        details: true,
+        createdAt: true,
+      },
+    }),
   ]);
+
+  const fail2banStatus = getFail2banStatus();
+  const fail2banBannedIps = new Set(fail2banStatus.bannedIps);
+  const activeRestrictionByIp = new Map(
+    activeRestrictions.map((restriction) => [restriction.ip, restriction as AdminLoginRestrictionInfo]),
+  );
+  const geoIpCache = new Map<string, ReturnType<typeof getGeoIpCountry>>();
+  const getCachedGeo = (ip: string) => {
+    if (!geoIpCache.has(ip)) {
+      geoIpCache.set(ip, getGeoIpCountry(ip));
+    }
+
+    return geoIpCache.get(ip)!;
+  };
+  const securityIncidents = buildSecurityIncidents(incidentLogs, {
+    activeRestrictionByIp,
+    fail2banBannedIps,
+    now,
+  });
+  const ipReputation = buildIpReputation(reputationLogs, securityIncidents, {
+    activeRestrictionByIp,
+    fail2banBannedIps,
+    now,
+  });
 
   const recentFailuresWithGeo = await Promise.all(
     recentFailures.map(async (failure) => {
-      let email: string | null = null;
-
-      if (failure.details) {
-        try {
-          const details = JSON.parse(failure.details) as { email?: string };
-          email = details.email || null;
-        } catch {
-          email = null;
-        }
-      }
-
-      const geo = await getGeoIpCountry(failure.ip);
+      const details = parseAuditDetails(failure.details);
+      const geo = failure.ip ? await getCachedGeo(failure.ip) : { countryCode: null };
       return {
         id: failure.id,
         ip: failure.ip,
-        email,
+        email: details.email,
         createdAt: failure.createdAt,
         countryCode: geo.countryCode,
       };
@@ -940,6 +1487,18 @@ export async function getAdminLoginAbuseOverview() {
     topOffenders: Array.from(topOffenders.values())
       .sort((a, b) => b.count - a.count || b.lastAttemptAt.getTime() - a.lastAttemptAt.getTime())
       .slice(0, 20),
-    fail2banStatus: getFail2banStatus(),
+    securityIncidents: await Promise.all(
+      securityIncidents.map(async (incident) => ({
+        ...incident,
+        countryCode: (await getCachedGeo(incident.ip)).countryCode,
+      })),
+    ),
+    ipReputation: await Promise.all(
+      ipReputation.map(async (entry) => ({
+        ...entry,
+        countryCode: (await getCachedGeo(entry.ip)).countryCode,
+      })),
+    ),
+    fail2banStatus,
   };
 }
