@@ -522,6 +522,8 @@ function LoginProtectionCard() {
         repeatedOffenderThreshold: 12,
         alertOnUnban: true,
         fail2banLogEnabled: true,
+        repeatedBanLookbackDays: 7,
+        repeatedBanDurationMinutes: 2880,
         trustedIpRanges: '',
     });
 
@@ -543,6 +545,8 @@ function LoginProtectionCard() {
             repeatedOffenderThreshold: overview.config.repeatedOffenderThreshold,
             alertOnUnban: overview.config.alertOnUnban,
             fail2banLogEnabled: overview.config.fail2banLogEnabled,
+            repeatedBanLookbackDays: overview.config.repeatedBanLookbackDays,
+            repeatedBanDurationMinutes: overview.config.repeatedBanDurationMinutes,
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
     }, [overview]);
@@ -606,6 +610,21 @@ function LoginProtectionCard() {
                             {overview.summary.activeBans}
                         </div>
                         <p className="text-xs text-muted-foreground">harder blocks now in effect</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">fail2ban jail</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${overview.fail2banStatus.available ? '' : 'text-yellow-500'}`}>
+                            {overview.fail2banStatus.available ? overview.fail2banStatus.currentlyBanned : 'N/A'}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {overview.fail2banStatus.available
+                                ? `${overview.fail2banStatus.jail} currently banned`
+                                : 'fail2ban status unavailable'}
+                        </p>
                     </CardContent>
                 </Card>
             </div>
@@ -688,6 +707,16 @@ function LoginProtectionCard() {
                             <Input type="number" min={1} value={form.repeatedOffenderThreshold} onChange={(event) => setForm((current) => ({ ...current, repeatedOffenderThreshold: Number(event.target.value) || 1 }))} />
                             <p className="text-xs text-muted-foreground">Telegram sends an extra offender alert when the same IP reaches this many failed admin logins in the last 24 hours.</p>
                         </div>
+                        <div className="space-y-2">
+                            <Label>Repeat-ban lookback (days)</Label>
+                            <Input type="number" min={1} value={form.repeatedBanLookbackDays} onChange={(event) => setForm((current) => ({ ...current, repeatedBanLookbackDays: Number(event.target.value) || 1 }))} />
+                            <p className="text-xs text-muted-foreground">If the same IP is banned again inside this window, the ban duration escalates.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Escalated ban duration (minutes)</Label>
+                            <Input type="number" min={1} value={form.repeatedBanDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, repeatedBanDurationMinutes: Number(event.target.value) || 1 }))} />
+                            <p className="text-xs text-muted-foreground">Default production value is 2880 minutes (48 hours).</p>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -751,6 +780,64 @@ function LoginProtectionCard() {
                 </Card>
 
                 <div className="space-y-6">
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Server fail2ban status</CardTitle>
+                            <CardDescription>
+                                Live jail state from the server-side auth jail that hard-bans abusive admin login IPs.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 px-0 pb-0">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="ops-detail-card">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Jail</p>
+                                    <p className="mt-2 font-semibold">{overview.fail2banStatus.jail}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {overview.fail2banStatus.available ? 'Connected to fail2ban' : overview.fail2banStatus.error || 'Unavailable'}
+                                    </p>
+                                </div>
+                                <div className="ops-detail-card">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Currently banned</p>
+                                    <p className="mt-2 text-2xl font-semibold">{overview.fail2banStatus.currentlyBanned}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {overview.fail2banStatus.totalBanned} total bans recorded
+                                    </p>
+                                </div>
+                                <div className="ops-detail-card">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Currently failed</p>
+                                    <p className="mt-2 text-2xl font-semibold">{overview.fail2banStatus.currentlyFailed}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {overview.fail2banStatus.totalFailed} total failed hits seen by the jail
+                                    </p>
+                                </div>
+                                <div className="ops-detail-card">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Banned IP list</p>
+                                    <div className="mt-2 space-y-2">
+                                        {overview.fail2banStatus.bannedIps.length > 0 ? (
+                                            overview.fail2banStatus.bannedIps.slice(0, 8).map((ip) => (
+                                                <div key={ip} className="flex items-center justify-between gap-3 rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
+                                                    <Badge variant="outline">{ip}</Badge>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 rounded-full px-3"
+                                                        disabled={unbanMutation.isPending}
+                                                        onClick={() => unbanMutation.mutate({ ip })}
+                                                    >
+                                                        <Unlock className="mr-2 h-3.5 w-3.5" />
+                                                        Unban
+                                                    </Button>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">No IPs currently banned by fail2ban.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
                             <CardTitle>Top offender IPs</CardTitle>

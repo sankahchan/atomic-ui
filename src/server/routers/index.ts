@@ -85,12 +85,16 @@ const authRouter = router({
           entity: 'AUTH',
           details: {
             email: input.email,
+            host: ctx.requestHost,
+            path: ctx.requestPath,
           },
         });
 
         await recordFailedAdminLogin({
           ip: ctx.clientIp,
           email: input.email,
+          host: ctx.requestHost,
+          path: ctx.requestPath,
         });
 
         throw new TRPCError({

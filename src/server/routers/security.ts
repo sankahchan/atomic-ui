@@ -182,6 +182,8 @@ export const securityRouter = router({
                 repeatedOffenderThreshold: z.number().int().min(1).max(500),
                 alertOnUnban: z.boolean(),
                 fail2banLogEnabled: z.boolean(),
+                repeatedBanLookbackDays: z.number().int().min(1).max(365),
+                repeatedBanDurationMinutes: z.number().int().min(1).max(43200),
                 trustedIpRanges: z.array(z.string()),
             }),
         )

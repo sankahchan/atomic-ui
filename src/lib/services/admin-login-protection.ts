@@ -14,7 +14,10 @@ export const ADMIN_LOGIN_FAIL2BAN_LOG =
   process.env.ADMIN_LOGIN_FAIL2BAN_LOG || '/tmp/atomic-ui-admin-login.log';
 export const ADMIN_LOGIN_FAIL2BAN_JAIL =
   process.env.ADMIN_LOGIN_FAIL2BAN_JAIL || 'atomic-ui-auth-login';
+export const GENERIC_ADMIN_LOGIN_BLOCK_MESSAGE = 'Too many failed attempts. Try again later.';
 const REPEATED_OFFENDER_ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
+const DEFAULT_REPEAT_BAN_LOOKBACK_DAYS = 7;
+const DEFAULT_REPEAT_BAN_DURATION_MINUTES = 48 * 60;
 
 const adminLoginProtectionConfigSchema = z.object({
   enabled: z.boolean().default(true),
@@ -29,6 +32,8 @@ const adminLoginProtectionConfigSchema = z.object({
   repeatedOffenderThreshold: z.number().int().min(1).max(500).default(12),
   alertOnUnban: z.boolean().default(true),
   fail2banLogEnabled: z.boolean().default(true),
+  repeatedBanLookbackDays: z.number().int().min(1).max(365).default(DEFAULT_REPEAT_BAN_LOOKBACK_DAYS),
+  repeatedBanDurationMinutes: z.number().int().min(1).max(43200).default(DEFAULT_REPEAT_BAN_DURATION_MINUTES),
   trustedIpRanges: z.array(z.string()).default([]),
 });
 
@@ -54,6 +59,26 @@ export type AdminLoginRestrictionInfo = {
 type RecordFailedAdminLoginInput = {
   ip: string | null | undefined;
   email: string;
+  host?: string | null | undefined;
+  path?: string | null | undefined;
+};
+
+type Fail2banStatus = {
+  available: boolean;
+  jail: string;
+  currentlyFailed: number;
+  totalFailed: number;
+  currentlyBanned: number;
+  totalBanned: number;
+  bannedIps: string[];
+  error: string | null;
+};
+
+type FailureSnapshot = {
+  ipCount: number;
+  pairCount: number;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
 };
 
 function normalizeIpAddress(rawIp: string | null | undefined): string | null {
@@ -112,6 +137,24 @@ function normalizeTrustedIpRanges(values: string[] | null | undefined) {
   ));
 }
 
+function buildAuditEmailNeedle(email: string) {
+  return `"email":${JSON.stringify(email)}`;
+}
+
+function buildFailureSnapshot(
+  ipCount: number,
+  pairCount: number,
+  firstSeenAt: Date | null,
+  lastSeenAt: Date | null,
+): FailureSnapshot {
+  return {
+    ipCount,
+    pairCount,
+    firstSeenAt,
+    lastSeenAt,
+  };
+}
+
 function isTrustedIp(ip: string, config: AdminLoginProtectionConfig) {
   return normalizeTrustedIpRanges(config.trustedIpRanges).some((range) => {
     if (range === ip) {
@@ -164,16 +207,89 @@ function tryFail2banUnban(ip: string) {
   }
 }
 
+function parseFail2banMetric(output: string, label: string) {
+  const match = output.match(new RegExp(`${label}:\\s*(\\d+)`));
+  return match ? Number(match[1]) : 0;
+}
+
+function parseFail2banBannedIps(output: string) {
+  const match = output.match(/Banned IP list:\s*(.*)/);
+  if (!match?.[1]) {
+    return [];
+  }
+
+  return match[1]
+    .trim()
+    .split(/\s+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+export function getFail2banStatus(): Fail2banStatus {
+  try {
+    const output = execFileSync('fail2ban-client', ['status', ADMIN_LOGIN_FAIL2BAN_JAIL], {
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+
+    return {
+      available: true,
+      jail: ADMIN_LOGIN_FAIL2BAN_JAIL,
+      currentlyFailed: parseFail2banMetric(output, 'Currently failed'),
+      totalFailed: parseFail2banMetric(output, 'Total failed'),
+      currentlyBanned: parseFail2banMetric(output, 'Currently banned'),
+      totalBanned: parseFail2banMetric(output, 'Total banned'),
+      bannedIps: parseFail2banBannedIps(output),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      jail: ADMIN_LOGIN_FAIL2BAN_JAIL,
+      currentlyFailed: 0,
+      totalFailed: 0,
+      currentlyBanned: 0,
+      totalBanned: 0,
+      bannedIps: [],
+      error: error instanceof Error ? error.message : 'fail2ban unavailable',
+    };
+  }
+}
+
 async function sendRestrictionAlert(
   type: 'LOCK' | 'BAN',
-  ip: string,
-  email: string,
-  failureCount: number,
-  expiresAt: Date,
+  {
+    ip,
+    email,
+    failureCount,
+    pairFailureCount,
+    expiresAt,
+    firstSeenAt,
+    lastSeenAt,
+    host,
+    path,
+    escalated,
+  }: {
+    ip: string;
+    email: string;
+    failureCount: number;
+    pairFailureCount: number;
+    expiresAt: Date;
+    firstSeenAt: Date | null;
+    lastSeenAt: Date | null;
+    host?: string | null;
+    path?: string | null;
+    escalated?: boolean;
+  },
 ) {
   const { countryCode } = await getGeoIpCountry(ip);
   const countryPart = countryCode ? `\nCountry: ${countryCode}` : '';
   const durationMinutes = Math.max(1, Math.round((expiresAt.getTime() - Date.now()) / 60000));
+  const hostPart = host ? `\nHost: <code>${host}</code>` : '';
+  const pathPart = path ? `\nPath: <code>${path}</code>` : '';
+  const firstSeenPart = firstSeenAt ? `\nFirst seen: <b>${firstSeenAt.toISOString()}</b>` : '';
+  const lastSeenPart = lastSeenAt ? `\nLast seen: <b>${lastSeenAt.toISOString()}</b>` : '';
+  const escalatedPart = escalated ? '\nEscalation: <b>repeat offender window triggered</b>' : '';
 
   await sendAdminAlert(
     [
@@ -181,21 +297,41 @@ async function sendRestrictionAlert(
       '',
       `IP: <code>${ip}</code>${countryPart}`,
       `Email: <code>${email}</code>`,
-      `Failures: <b>${failureCount}</b>`,
+      `Failures (IP window): <b>${failureCount}</b>`,
+      `Failures (email+IP window): <b>${pairFailureCount}</b>`,
       `Active for: <b>${durationMinutes} min</b>`,
+      `${firstSeenPart}${lastSeenPart}${hostPart}${pathPart}${escalatedPart}`,
     ].join('\n'),
     { parseMode: 'HTML' },
   );
 }
 
 async function sendRepeatedOffenderAlert(
-  ip: string,
-  email: string,
-  failureCount: number,
-  lastAttemptAt: Date,
+  {
+    ip,
+    email,
+    failureCount,
+    pairFailureCount,
+    firstSeenAt,
+    lastAttemptAt,
+    host,
+    path,
+  }: {
+    ip: string;
+    email: string;
+    failureCount: number;
+    pairFailureCount: number;
+    firstSeenAt: Date | null;
+    lastAttemptAt: Date;
+    host?: string | null;
+    path?: string | null;
+  },
 ) {
   const { countryCode } = await getGeoIpCountry(ip);
   const countryPart = countryCode ? `\nCountry: ${countryCode}` : '';
+  const firstSeenPart = firstSeenAt ? `\nFirst seen: <b>${firstSeenAt.toISOString()}</b>` : '';
+  const hostPart = host ? `\nHost: <code>${host}</code>` : '';
+  const pathPart = path ? `\nPath: <code>${path}</code>` : '';
 
   await sendAdminAlert(
     [
@@ -204,7 +340,9 @@ async function sendRepeatedOffenderAlert(
       `IP: <code>${ip}</code>${countryPart}`,
       `Email: <code>${email}</code>`,
       `Failures in last 24h: <b>${failureCount}</b>`,
+      `Failures for same email+IP: <b>${pairFailureCount}</b>`,
       `Last attempt: <b>${lastAttemptAt.toISOString()}</b>`,
+      `${firstSeenPart}${hostPart}${pathPart}`,
     ].join('\n'),
     { parseMode: 'HTML' },
   );
@@ -311,7 +449,8 @@ export async function getAdminLoginRestrictionStatus(ip: string | null | undefin
   return {
     blocked: true as const,
     restriction,
-    reason:
+    reason: GENERIC_ADMIN_LOGIN_BLOCK_MESSAGE,
+    internalReason:
       restriction.restrictionType === 'BAN'
         ? `Access temporarily banned after repeated failed admin logins until ${restriction.expiresAt.toISOString()}`
         : `Access temporarily locked after repeated failed admin logins until ${restriction.expiresAt.toISOString()}`,
@@ -338,15 +477,58 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
   const softWindowStart = new Date(now.getTime() - config.softLockWindowMinutes * 60_000);
   const banWindowStart = new Date(now.getTime() - config.banWindowMinutes * 60_000);
   const repeatedWindowStart = new Date(now.getTime() - 24 * 60 * 60_000);
+  const repeatBanWindowStart = new Date(now.getTime() - config.repeatedBanLookbackDays * 24 * 60 * 60_000);
   const repeatedAlertCooldownStart = new Date(now.getTime() - REPEATED_OFFENDER_ALERT_COOLDOWN_MS);
+  const emailNeedle = buildAuditEmailNeedle(input.email);
 
-  const [softFailures, banFailures, repeatedFailures, existing, recentRepeatedAlert] = await Promise.all([
+  const [
+    softFailures,
+    softPairFailures,
+    softFirstSeen,
+    softLastSeen,
+    banFailures,
+    banPairFailures,
+    banFirstSeen,
+    banLastSeen,
+    repeatedFailures,
+    repeatedPairFailures,
+    repeatedFirstSeen,
+    existing,
+    repeatBanCount,
+    recentRepeatedAlert,
+  ] = await Promise.all([
     db.auditLog.count({
       where: {
         action: 'AUTH_LOGIN_FAILED',
         ip: normalizedIp,
         createdAt: { gte: softWindowStart },
       },
+    }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: softWindowStart },
+        details: { contains: emailNeedle },
+      },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: softWindowStart },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: softWindowStart },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
     }),
     db.auditLog.count({
       where: {
@@ -359,11 +541,61 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
       where: {
         action: 'AUTH_LOGIN_FAILED',
         ip: normalizedIp,
+        createdAt: { gte: banWindowStart },
+        details: { contains: emailNeedle },
+      },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: banWindowStart },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: banWindowStart },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
         createdAt: { gte: repeatedWindowStart },
       },
     }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: repeatedWindowStart },
+        details: { contains: emailNeedle },
+      },
+    }),
+    db.auditLog.findFirst({
+      where: {
+        action: 'AUTH_LOGIN_FAILED',
+        ip: normalizedIp,
+        createdAt: { gte: repeatedWindowStart },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
     db.adminLoginRestriction.findUnique({
       where: { ip: normalizedIp },
+    }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_BANNED',
+        ip: normalizedIp,
+        createdAt: { gte: repeatBanWindowStart },
+      },
     }),
     db.auditLog.findFirst({
       where: {
@@ -376,18 +608,54 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
     }),
   ]);
 
-  let restrictionType: 'LOCK' | 'BAN' | null = null;
-  let failureCount = softFailures;
-  let expiresAt: Date | null = null;
+  const softSnapshot = buildFailureSnapshot(
+    softFailures,
+    softPairFailures,
+    softFirstSeen?.createdAt ?? null,
+    softLastSeen?.createdAt ?? now,
+  );
+  const banSnapshot = buildFailureSnapshot(
+    banFailures,
+    banPairFailures,
+    banFirstSeen?.createdAt ?? null,
+    banLastSeen?.createdAt ?? now,
+  );
+  const repeatedSnapshot = buildFailureSnapshot(
+    repeatedFailures,
+    repeatedPairFailures,
+    repeatedFirstSeen?.createdAt ?? null,
+    now,
+  );
 
-  if (banFailures >= config.banThreshold) {
+  let restrictionType: 'LOCK' | 'BAN' | null = null;
+  let failureCount = softSnapshot.ipCount;
+  let pairFailureCount = softSnapshot.pairCount;
+  let expiresAt: Date | null = null;
+  let firstSeenAt: Date | null = softSnapshot.firstSeenAt;
+  let lastSeenAt: Date | null = softSnapshot.lastSeenAt;
+  let escalatedRepeatBan = false;
+
+  if (banSnapshot.ipCount >= config.banThreshold) {
     restrictionType = 'BAN';
-    failureCount = banFailures;
+    failureCount = banSnapshot.ipCount;
+    pairFailureCount = banSnapshot.pairCount;
     expiresAt = new Date(now.getTime() + config.banDurationMinutes * 60_000);
-  } else if (softFailures >= config.softLockThreshold) {
+    firstSeenAt = banSnapshot.firstSeenAt;
+    lastSeenAt = banSnapshot.lastSeenAt;
+    if (repeatBanCount > 0) {
+      const escalatedExpiresAt = new Date(now.getTime() + config.repeatedBanDurationMinutes * 60_000);
+      if (escalatedExpiresAt > expiresAt) {
+        expiresAt = escalatedExpiresAt;
+        escalatedRepeatBan = true;
+      }
+    }
+  } else if (softSnapshot.ipCount >= config.softLockThreshold) {
     restrictionType = 'LOCK';
-    failureCount = softFailures;
+    failureCount = softSnapshot.ipCount;
+    pairFailureCount = softSnapshot.pairCount;
     expiresAt = new Date(now.getTime() + config.softLockDurationMinutes * 60_000);
+    firstSeenAt = softSnapshot.firstSeenAt;
+    lastSeenAt = softSnapshot.lastSeenAt;
   }
 
   if (!restrictionType || !expiresAt) {
@@ -401,7 +669,9 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
       attemptedEmail: input.email,
       failureCount,
       firstFailedAt:
-        existing?.isActive && existing.firstFailedAt < softWindowStart ? existing.firstFailedAt : softWindowStart,
+        existing?.isActive && existing.firstFailedAt < (firstSeenAt ?? softWindowStart)
+          ? existing.firstFailedAt
+          : (firstSeenAt ?? softWindowStart),
       lastFailedAt: now,
       expiresAt,
       isActive: true,
@@ -412,7 +682,7 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
       restrictionType,
       attemptedEmail: input.email,
       failureCount,
-      firstFailedAt: restrictionType === 'BAN' ? banWindowStart : softWindowStart,
+      firstFailedAt: firstSeenAt ?? (restrictionType === 'BAN' ? banWindowStart : softWindowStart),
       lastFailedAt: now,
       expiresAt,
       isActive: true,
@@ -424,7 +694,8 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
     !existing ||
     !existing.isActive ||
     existing.restrictionType !== restrictionType ||
-    existing.expiresAt <= now;
+    existing.expiresAt <= now ||
+    existing.expiresAt < expiresAt;
 
   if (shouldAlert) {
     await writeAuditLog({
@@ -435,14 +706,32 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
       details: {
         email: input.email,
         failureCount,
+        pairFailureCount,
         restrictionType,
         expiresAt: expiresAt.toISOString(),
+        firstSeenAt: firstSeenAt?.toISOString() ?? null,
+        lastSeenAt: lastSeenAt?.toISOString() ?? null,
+        host: input.host ?? null,
+        path: input.path ?? null,
+        repeatBanCount,
+        escalatedRepeatBan,
       },
     });
 
     if (config.telegramAlertEnabled) {
       try {
-        await sendRestrictionAlert(restrictionType, normalizedIp, input.email, failureCount, expiresAt);
+        await sendRestrictionAlert(restrictionType, {
+          ip: normalizedIp,
+          email: input.email,
+          failureCount,
+          pairFailureCount,
+          expiresAt,
+          firstSeenAt,
+          lastSeenAt,
+          host: input.host,
+          path: input.path,
+          escalated: escalatedRepeatBan,
+        });
         await db.adminLoginRestriction.update({
           where: { ip: normalizedIp },
           data: { lastAlertSentAt: new Date() },
@@ -456,12 +745,21 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
   if (
     config.telegramAlertEnabled &&
     config.alertOnRepeatedOffender &&
-    repeatedFailures >= config.repeatedOffenderThreshold &&
+    repeatedSnapshot.ipCount >= config.repeatedOffenderThreshold &&
     !recentRepeatedAlert &&
     !(shouldAlert && restrictionType)
   ) {
     try {
-      await sendRepeatedOffenderAlert(normalizedIp, input.email, repeatedFailures, now);
+      await sendRepeatedOffenderAlert({
+        ip: normalizedIp,
+        email: input.email,
+        failureCount: repeatedSnapshot.ipCount,
+        pairFailureCount: repeatedSnapshot.pairCount,
+        firstSeenAt: repeatedSnapshot.firstSeenAt,
+        lastAttemptAt: now,
+        host: input.host,
+        path: input.path,
+      });
       await writeAuditLog({
         action: 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT',
         entity: 'AUTH',
@@ -469,9 +767,13 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
         ip: normalizedIp,
         details: {
           email: input.email,
-          failureCount: repeatedFailures,
+          failureCount: repeatedSnapshot.ipCount,
+          pairFailureCount: repeatedSnapshot.pairCount,
           threshold: config.repeatedOffenderThreshold,
+          firstSeenAt: repeatedSnapshot.firstSeenAt?.toISOString() ?? null,
           lastAttemptAt: now.toISOString(),
+          host: input.host ?? null,
+          path: input.path ?? null,
         },
       });
     } catch (error) {
@@ -638,5 +940,6 @@ export async function getAdminLoginAbuseOverview() {
     topOffenders: Array.from(topOffenders.values())
       .sort((a, b) => b.count - a.count || b.lastAttemptAt.getTime() - a.lastAttemptAt.getTime())
       .slice(0, 20),
+    fail2banStatus: getFail2banStatus(),
   };
 }

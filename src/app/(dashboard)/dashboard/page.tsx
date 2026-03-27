@@ -542,6 +542,20 @@ function SecurityAlertsSummaryCard() {
         </div>
       </div>
 
+      <div className="rounded-[1.2rem] border border-border/60 bg-background/55 px-4 py-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
+        {overview.fail2banStatus.available ? (
+          <span>
+            Server jail <span className="font-medium text-foreground">{overview.fail2banStatus.jail}</span> is active with{' '}
+            <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyBanned}</span> banned IPs and{' '}
+            <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyFailed}</span> recent failed hits.
+          </span>
+        ) : (
+          <span>
+            Server jail status is unavailable right now{overview.fail2banStatus.error ? `: ${overview.fail2banStatus.error}` : '.'}
+          </span>
+        )}
+      </div>
+
       <Link href="/dashboard/security" className="ops-action-tile">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Open security center</p>

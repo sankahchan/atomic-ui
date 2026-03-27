@@ -30,6 +30,8 @@ import { type FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 export interface Context {
   user: AuthUser | null;
   clientIp: string | null;
+  requestHost: string | null;
+  requestPath: string | null;
 }
 
 /**
@@ -43,8 +45,22 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
   const user = await getCurrentUser();
 
   let clientIp: string | null = null;
+  let requestHost: string | null = null;
+  let requestPath: string | null = null;
 
   if (opts?.req) {
+    requestHost =
+      opts.req.headers.get('x-forwarded-host') ||
+      opts.req.headers.get('host') ||
+      null;
+    requestPath = (() => {
+      try {
+        return new URL(opts.req.url).pathname;
+      } catch {
+        return null;
+      }
+    })();
+
     const forwardedFor = opts.req.headers.get('x-forwarded-for');
     const { normalizeIpAddress } = await import('@/lib/security');
     if (forwardedFor) {
@@ -81,7 +97,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
     }
   }
 
-  return { user, clientIp };
+  return { user, clientIp, requestHost, requestPath };
 }
 
 /**
