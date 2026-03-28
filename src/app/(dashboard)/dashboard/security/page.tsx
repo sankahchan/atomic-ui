@@ -650,6 +650,14 @@ const alertRuleLabels: Record<string, { title: string; description: string }> = 
         title: 'fail2ban unavailable',
         description: 'Server-side jail is unavailable and only app-level protection remains.',
     },
+    newDevice: {
+        title: 'New device sign-in',
+        description: 'Alert when an admin signs in from a device fingerprint not seen before.',
+    },
+    newCountry: {
+        title: 'New country sign-in',
+        description: 'Alert when an admin signs in from a country not seen before for that account.',
+    },
 };
 
 function HistoryBars({
@@ -864,7 +872,7 @@ function LoginProtectionCard() {
         incidentDigestMinute: number;
         incidentDigestLookbackHours: number;
         alertRules: Record<
-            'threshold' | 'lock' | 'ban' | 'repeatedOffender' | 'unban' | 'fail2banUnavailable',
+            'threshold' | 'lock' | 'ban' | 'repeatedOffender' | 'unban' | 'fail2banUnavailable' | 'newDevice' | 'newCountry',
             {
                 enabled: boolean;
                 cooldownMinutes: number;
@@ -900,6 +908,8 @@ function LoginProtectionCard() {
             repeatedOffender: { enabled: true, cooldownMinutes: 360, minimumReputationLevel: 'HIGH' as const },
             unban: { enabled: true, cooldownMinutes: 60, minimumReputationLevel: 'LOW' as const },
             fail2banUnavailable: { enabled: true, cooldownMinutes: 360, minimumReputationLevel: 'LOW' as const },
+            newDevice: { enabled: true, cooldownMinutes: 720, minimumReputationLevel: 'LOW' as const },
+            newCountry: { enabled: true, cooldownMinutes: 1440, minimumReputationLevel: 'LOW' as const },
         },
         trustedIpRanges: '',
     });
@@ -1016,6 +1026,12 @@ function LoginProtectionCard() {
     const activeIncidentCount = overview?.securityIncidents.filter((incident) => incident.status === 'ACTIVE').length ?? 0;
     const highRiskIpCount =
         overview?.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length ?? 0;
+    const newDeviceCount = overview?.summary.newDeviceLoginsLastDay ?? 0;
+    const newCountryCount = overview?.summary.newCountryLoginsLastDay ?? 0;
+    const recentAdminLogins = useMemo(
+        () => (overview?.recentAdminLogins ?? []).filter(Boolean),
+        [overview?.recentAdminLogins],
+    );
     const currentOperatorEmail = overview?.currentOperatorEmail?.trim().toLowerCase() || '';
 
     const requestNote = (title: string) => {
@@ -1525,6 +1541,28 @@ function LoginProtectionCard() {
                         <p className="text-xs text-muted-foreground">reputation score 50 or higher</p>
                     </CardContent>
                 </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">New devices (24h)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${newDeviceCount > 0 ? 'text-sky-500' : ''}`}>
+                            {newDeviceCount}
+                        </div>
+                        <p className="text-xs text-muted-foreground">admin sign-ins from unfamiliar devices</p>
+                    </CardContent>
+                </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">New countries (24h)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${newCountryCount > 0 ? 'text-violet-500' : ''}`}>
+                            {newCountryCount}
+                        </div>
+                        <p className="text-xs text-muted-foreground">admin sign-ins from new geographies</p>
+                    </CardContent>
+                </Card>
             </div>
 
             <Card className="ops-panel">
@@ -1870,36 +1908,97 @@ function LoginProtectionCard() {
             </Card>
 
             <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                <Card className="ops-panel">
-                    <CardHeader className="px-0 pt-0">
-                        <CardTitle>Recent failed admin logins</CardTitle>
-                        <CardDescription>
-                            Most recent bad-password attempts recorded by the app.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-0 pb-0">
-                        {overview.recentFailures.length === 0 ? (
-                            <div className="ops-chart-empty py-8 text-muted-foreground">No recent failed admin login attempts.</div>
-                        ) : (
-                            <div className="space-y-3">
-                                {overview.recentFailures.map((failure) => (
-                                    <div key={failure.id} className="ops-row-card flex items-center justify-between gap-4">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium">{failure.ip || 'Unknown IP'}</span>
-                                                {failure.countryCode && <Badge variant="outline">{failure.countryCode}</Badge>}
+                <div className="space-y-6">
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Recent failed admin logins</CardTitle>
+                            <CardDescription>
+                                Most recent bad-password attempts recorded by the app.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {overview.recentFailures.length === 0 ? (
+                                <div className="ops-chart-empty py-8 text-muted-foreground">No recent failed admin login attempts.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {overview.recentFailures.map((failure) => (
+                                        <div key={failure.id} className="ops-row-card flex items-center justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{failure.ip || 'Unknown IP'}</span>
+                                                    {failure.countryCode && <Badge variant="outline">{failure.countryCode}</Badge>}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{failure.email || 'Unknown email'}</p>
                                             </div>
-                                            <p className="text-sm text-muted-foreground">{failure.email || 'Unknown email'}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatDistanceToNow(new Date(failure.createdAt), { addSuffix: true })}
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatDistanceToNow(new Date(failure.createdAt), { addSuffix: true })}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Recent admin sign-ins</CardTitle>
+                            <CardDescription>
+                                Successful admin logins with device and country-change review.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {recentAdminLogins.length === 0 ? (
+                                <div className="ops-chart-empty py-8 text-muted-foreground">No recent successful admin sign-ins recorded yet.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {recentAdminLogins.map((login) => (
+                                        <div key={login.id} className="ops-row-card flex flex-wrap items-start justify-between gap-4">
+                                            <div className="min-w-0 space-y-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-medium">{login.email || 'Unknown admin'}</span>
+                                                    {login.countryCode && <Badge variant="outline">{login.countryCode}</Badge>}
+                                                    {login.newDevice && <Badge className="bg-sky-500/10 text-sky-600 dark:text-sky-300">New device</Badge>}
+                                                    {login.newCountry && <Badge className="bg-violet-500/10 text-violet-600 dark:text-violet-300">New country</Badge>}
+                                                    {login.via2FA && <Badge variant="secondary">2FA</Badge>}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                                    <span>{login.ip || 'Unknown IP'}</span>
+                                                    <span>•</span>
+                                                    <span>{login.deviceLabel || 'Unknown device'}</span>
+                                                    {login.host && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span>{login.host}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                    {login.browser && <span>{login.browser}</span>}
+                                                    {login.os && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span>{login.os}</span>
+                                                        </>
+                                                    )}
+                                                    {login.path && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span>{login.path}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatDistanceToNow(new Date(login.createdAt), { addSuffix: true })}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
 
                 <div className="space-y-6">
                     <Card className="ops-panel">

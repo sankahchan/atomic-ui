@@ -274,6 +274,16 @@ export const securityRouter = router({
                         cooldownMinutes: z.number().int().min(1).max(10080),
                         minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
                     }),
+                    newDevice: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
+                    newCountry: z.object({
+                        enabled: z.boolean(),
+                        cooldownMinutes: z.number().int().min(1).max(10080),
+                        minimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                    }),
                 }),
                 trustedIpRanges: z.array(z.string()),
             }),

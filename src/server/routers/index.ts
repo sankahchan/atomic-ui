@@ -60,6 +60,7 @@ import { writeAuditLog } from '@/lib/audit';
 import {
   getAdminLoginChallengeDecision,
   recordFailedAdminLogin,
+  recordSuccessfulAdminLogin,
 } from '@/lib/services/admin-login-protection';
 import { isAdmin2FARequired } from '@/lib/admin-2fa-policy';
 
@@ -254,16 +255,14 @@ const authRouter = router({
       });
       await setSessionCookie(token);
 
-      await writeAuditLog({
+      await recordSuccessfulAdminLogin({
         userId: user.id,
+        email: user.email,
+        role: user.role,
         ip: ctx.clientIp,
-        action: 'AUTH_LOGIN_SUCCESS',
-        entity: 'AUTH',
-        entityId: user.id,
-        details: {
-          email: user.email,
-          role: user.role,
-        },
+        userAgent: ctx.userAgent,
+        host: ctx.requestHost,
+        path: ctx.requestPath,
       });
 
       return {
@@ -396,18 +395,16 @@ const authRouter = router({
       });
       await setSessionCookie(token);
 
-      await writeAuditLog({
+      await recordSuccessfulAdminLogin({
         userId: authData.userId,
+        email: authData.email,
+        role: authData.role,
         ip: ctx.clientIp,
-        action: 'AUTH_LOGIN_SUCCESS',
-        entity: 'AUTH',
-        entityId: authData.userId,
-        details: {
-          email: authData.email,
-          role: authData.role,
-          via2FA: true,
-          method: 'WEBAUTHN',
-        },
+        userAgent: ctx.userAgent,
+        host: ctx.requestHost,
+        path: ctx.requestPath,
+        via2FA: true,
+        method: 'WEBAUTHN',
       });
 
       return {
@@ -535,17 +532,16 @@ const authRouter = router({
       });
       await setSessionCookie(token);
 
-      await writeAuditLog({
+      await recordSuccessfulAdminLogin({
         userId,
+        email,
+        role,
         ip: ctx.clientIp,
-        action: 'AUTH_LOGIN_SUCCESS',
-        entity: 'AUTH',
-        entityId: userId,
-        details: {
-          email,
-          role,
-          via2FA: true,
-        },
+        userAgent: ctx.userAgent,
+        host: ctx.requestHost,
+        path: ctx.requestPath,
+        via2FA: true,
+        method: input.recoveryCode ? 'RECOVERY_CODE' : 'TOTP',
       });
 
       return {

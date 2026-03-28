@@ -36,6 +36,8 @@ const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
   'repeatedOffender',
   'unban',
   'fail2banUnavailable',
+  'newDevice',
+  'newCountry',
 ] as const;
 
 const adminLoginRiskLevelSchema = z.enum(ADMIN_LOGIN_RISK_LEVELS);
@@ -76,6 +78,16 @@ const adminLoginAlertRulesSchema = z.object({
   fail2banUnavailable: adminLoginAlertRuleSchema.default({
     enabled: true,
     cooldownMinutes: 360,
+    minimumReputationLevel: 'LOW',
+  }),
+  newDevice: adminLoginAlertRuleSchema.default({
+    enabled: true,
+    cooldownMinutes: 720,
+    minimumReputationLevel: 'LOW',
+  }),
+  newCountry: adminLoginAlertRuleSchema.default({
+    enabled: true,
+    cooldownMinutes: 1440,
     minimumReputationLevel: 'LOW',
   }),
 });
@@ -214,11 +226,55 @@ type AdminLoginAuditEvent = {
 
 type ParsedAuditDetails = {
   email: string | null;
+  role: string | null;
   host: string | null;
   path: string | null;
   restrictionType: string | null;
+  countryCode: string | null;
+  deviceFingerprint: string | null;
+  deviceLabel: string | null;
+  browser: string | null;
+  os: string | null;
+  deviceType: string | null;
+  via2FA: boolean;
+  method: string | null;
+  newDevice: boolean;
+  newCountry: boolean;
   firstSeenAt: Date | null;
   lastSeenAt: Date | null;
+};
+
+type RecordSuccessfulAdminLoginInput = {
+  userId: string;
+  email: string;
+  role: string;
+  ip: string | null | undefined;
+  userAgent?: string | null | undefined;
+  host?: string | null | undefined;
+  path?: string | null | undefined;
+  via2FA?: boolean;
+  method?: string | null;
+};
+
+type AdminLoginSignInEntry = {
+  id: string;
+  userId: string | null;
+  email: string | null;
+  role: string | null;
+  ip: string | null;
+  countryCode: string | null;
+  deviceFingerprint: string | null;
+  deviceLabel: string | null;
+  browser: string | null;
+  os: string | null;
+  deviceType: string | null;
+  host: string | null;
+  path: string | null;
+  via2FA: boolean;
+  method: string | null;
+  newDevice: boolean;
+  newCountry: boolean;
+  createdAt: Date;
 };
 
 type AdminLoginIncidentStatus = 'ACTIVE' | 'CONTAINED' | 'RESOLVED';
@@ -476,9 +532,20 @@ function parseAuditDetails(rawValue: string | null | undefined): ParsedAuditDeta
   if (!rawValue) {
     return {
       email: null,
+      role: null,
       host: null,
       path: null,
       restrictionType: null,
+      countryCode: null,
+      deviceFingerprint: null,
+      deviceLabel: null,
+      browser: null,
+      os: null,
+      deviceType: null,
+      via2FA: false,
+      method: null,
+      newDevice: false,
+      newCountry: false,
       firstSeenAt: null,
       lastSeenAt: null,
     };
@@ -496,23 +563,101 @@ function parseAuditDetails(rawValue: string | null | undefined): ParsedAuditDeta
 
     return {
       email: typeof details.email === 'string' ? details.email : null,
+      role: typeof details.role === 'string' ? details.role : null,
       host: typeof details.host === 'string' ? details.host : null,
       path: typeof details.path === 'string' ? details.path : null,
       restrictionType:
         typeof details.restrictionType === 'string' ? details.restrictionType : null,
+      countryCode:
+        typeof details.countryCode === 'string' && details.countryCode.trim()
+          ? details.countryCode
+          : null,
+      deviceFingerprint:
+        typeof details.deviceFingerprint === 'string' && details.deviceFingerprint.trim()
+          ? details.deviceFingerprint
+          : null,
+      deviceLabel:
+        typeof details.deviceLabel === 'string' && details.deviceLabel.trim()
+          ? details.deviceLabel
+          : null,
+      browser:
+        typeof details.browser === 'string' && details.browser.trim() ? details.browser : null,
+      os: typeof details.os === 'string' && details.os.trim() ? details.os : null,
+      deviceType:
+        typeof details.deviceType === 'string' && details.deviceType.trim()
+          ? details.deviceType
+          : null,
+      via2FA: details.via2FA === true,
+      method: typeof details.method === 'string' ? details.method : null,
+      newDevice: details.newDevice === true,
+      newCountry: details.newCountry === true,
       firstSeenAt: asDate(details.firstSeenAt),
       lastSeenAt: asDate(details.lastSeenAt ?? details.lastAttemptAt),
     };
   } catch {
     return {
       email: null,
+      role: null,
       host: null,
       path: null,
       restrictionType: null,
+      countryCode: null,
+      deviceFingerprint: null,
+      deviceLabel: null,
+      browser: null,
+      os: null,
+      deviceType: null,
+      via2FA: false,
+      method: null,
+      newDevice: false,
+      newCountry: false,
       firstSeenAt: null,
       lastSeenAt: null,
     };
   }
+}
+
+function parseAdminLoginUserAgent(userAgent: string | null | undefined) {
+  const source = (userAgent ?? '').trim();
+  const lower = source.toLowerCase();
+
+  let browser = 'Unknown browser';
+  if (lower.includes('edg/')) browser = 'Microsoft Edge';
+  else if (lower.includes('opr/') || lower.includes('opera')) browser = 'Opera';
+  else if (lower.includes('samsungbrowser')) browser = 'Samsung Internet';
+  else if (lower.includes('chrome/') && !lower.includes('edg/')) browser = 'Google Chrome';
+  else if (lower.includes('firefox/')) browser = 'Mozilla Firefox';
+  else if (lower.includes('safari/') && !lower.includes('chrome/')) browser = 'Safari';
+
+  let os = 'Unknown OS';
+  if (lower.includes('iphone') || lower.includes('ipad') || lower.includes('ios')) os = 'iOS';
+  else if (lower.includes('android')) os = 'Android';
+  else if (lower.includes('mac os x') || lower.includes('macintosh')) os = 'macOS';
+  else if (lower.includes('windows')) os = 'Windows';
+  else if (lower.includes('linux')) os = 'Linux';
+
+  let deviceType = 'Desktop';
+  if (lower.includes('ipad') || lower.includes('tablet')) deviceType = 'Tablet';
+  else if (lower.includes('iphone') || lower.includes('android') || lower.includes('mobile')) {
+    deviceType = 'Mobile';
+  }
+
+  const label = `${deviceType} · ${browser}`;
+  return {
+    browser,
+    os,
+    deviceType,
+    label,
+    fingerprint: `${deviceType}:${os}:${browser}`,
+  };
+}
+
+function buildSuccessfulLoginAlertScope(
+  event: 'newDevice' | 'newCountry',
+  userId: string,
+  fingerprintOrCountry: string,
+) {
+  return `${event}:${userId}:${fingerprintOrCountry}`;
 }
 
 function buildIncidentSummary(incident: {
@@ -1173,6 +1318,10 @@ function getAdminLoginEventLabel(action: string) {
       return 'Unbanned';
     case 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT':
       return 'Repeated offender alert';
+    case 'AUTH_LOGIN_NEW_DEVICE':
+      return 'New device sign-in';
+    case 'AUTH_LOGIN_NEW_COUNTRY':
+      return 'New country sign-in';
     case 'AUTH_LOGIN_INCIDENT_ACKNOWLEDGED':
       return 'Incident acknowledged';
     case 'AUTH_LOGIN_INCIDENT_RESOLVED':
@@ -1898,6 +2047,55 @@ async function sendUnbanAlert(
   );
 }
 
+async function sendSuccessfulLoginAlert(
+  event: 'newDevice' | 'newCountry',
+  {
+    ip,
+    email,
+    countryCode,
+    host,
+    path,
+    deviceLabel,
+    browser,
+    os,
+    via2FA,
+    method,
+  }: {
+    ip: string;
+    email: string;
+    countryCode: string | null;
+    host?: string | null;
+    path?: string | null;
+    deviceLabel: string;
+    browser: string;
+    os: string;
+    via2FA?: boolean;
+    method?: string | null;
+  },
+) {
+  const countryPart = countryCode ? `\nCountry: ${countryCode}` : '';
+  const hostPart = host ? `\nHost: <code>${host}</code>` : '';
+  const pathPart = path ? `\nPath: <code>${path}</code>` : '';
+  const authPart = via2FA
+    ? `\nVerification: <b>${method === 'WEBAUTHN' ? 'Passkey' : '2FA'}</b>`
+    : '\nVerification: <b>Password only</b>';
+
+  await sendAdminAlert(
+    [
+      event === 'newDevice'
+        ? '🆕 <b>Admin sign-in from a new device</b>'
+        : '🌍 <b>Admin sign-in from a new country</b>',
+      '',
+      `Email: <code>${email}</code>`,
+      `IP: <code>${ip}</code>${countryPart}`,
+      `Device: <b>${deviceLabel}</b>`,
+      `Browser / OS: <b>${browser}</b> / <b>${os}</b>`,
+      `${authPart}${hostPart}${pathPart}`,
+    ].join('\n'),
+    { parseMode: 'HTML' },
+  );
+}
+
 export async function getAdminLoginProtectionConfig(): Promise<AdminLoginProtectionConfig> {
   const setting = await db.settings.findUnique({
     where: { key: ADMIN_LOGIN_PROTECTION_SETTINGS_KEY },
@@ -1982,6 +2180,203 @@ export async function getAdminLoginRestrictionStatus(ip: string | null | undefin
       restriction.restrictionType === 'BAN'
         ? `Access temporarily banned after repeated failed admin logins until ${restriction.expiresAt.toISOString()}`
         : `Access temporarily locked after repeated failed admin logins until ${restriction.expiresAt.toISOString()}`,
+  };
+}
+
+export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLoginInput) {
+  const normalizedIp = normalizeIpAddress(input.ip);
+  const parsedUserAgent = parseAdminLoginUserAgent(input.userAgent);
+  const countryCode = normalizedIp ? (await getGeoIpCountry(normalizedIp)).countryCode : null;
+
+  const detailsBase = {
+    email: input.email,
+    role: input.role,
+    host: input.host ?? null,
+    path: input.path ?? null,
+    countryCode,
+    deviceFingerprint: parsedUserAgent.fingerprint,
+    deviceLabel: parsedUserAgent.label,
+    browser: parsedUserAgent.browser,
+    os: parsedUserAgent.os,
+    deviceType: parsedUserAgent.deviceType,
+    via2FA: input.via2FA === true,
+    method: input.method ?? null,
+  };
+
+  if (input.role !== 'ADMIN') {
+    await writeAuditLog({
+      userId: input.userId,
+      ip: normalizedIp,
+      action: 'AUTH_LOGIN_SUCCESS',
+      entity: 'AUTH',
+      entityId: input.userId,
+      details: detailsBase,
+    });
+    return {
+      newDevice: false,
+      newCountry: false,
+      countryCode,
+      deviceLabel: parsedUserAgent.label,
+    };
+  }
+
+  const previousLogins = await db.auditLog.findMany({
+    where: {
+      action: 'AUTH_LOGIN_SUCCESS',
+      userId: input.userId,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: {
+      id: true,
+      details: true,
+    },
+  });
+
+  const knownDeviceFingerprints = new Set(
+    previousLogins
+      .map((entry) => parseAuditDetails(entry.details).deviceFingerprint)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const knownCountries = new Set(
+    previousLogins
+      .map((entry) => parseAuditDetails(entry.details).countryCode)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const newDevice =
+    knownDeviceFingerprints.size > 0 && !knownDeviceFingerprints.has(parsedUserAgent.fingerprint);
+  const newCountry =
+    Boolean(countryCode) && knownCountries.size > 0 && !knownCountries.has(countryCode!);
+
+  await writeAuditLog({
+    userId: input.userId,
+    ip: normalizedIp,
+    action: 'AUTH_LOGIN_SUCCESS',
+    entity: 'AUTH',
+    entityId: input.userId,
+    details: {
+      ...detailsBase,
+      newDevice,
+      newCountry,
+    },
+  });
+
+  if (!normalizedIp) {
+    return {
+      newDevice,
+      newCountry,
+      countryCode,
+      deviceLabel: parsedUserAgent.label,
+    };
+  }
+
+  const config = await getAdminLoginProtectionConfig();
+  if (
+    !config.enabled ||
+    !config.telegramAlertEnabled ||
+    isLocalOrPrivateIp(normalizedIp) ||
+    isTrustedIp(normalizedIp, config)
+  ) {
+    return {
+      newDevice,
+      newCountry,
+      countryCode,
+      deviceLabel: parsedUserAgent.label,
+    };
+  }
+
+  const riskSnapshot = await getRealtimeRiskSnapshot(normalizedIp, { email: input.email });
+  const suppression = await findActiveAlertSuppression({ ip: normalizedIp });
+  const emittedAt = new Date();
+
+  if (newDevice) {
+    await writeAuditLog({
+      userId: input.userId,
+      ip: normalizedIp,
+      action: 'AUTH_LOGIN_NEW_DEVICE',
+      entity: 'AUTH',
+      entityId: input.userId,
+      details: {
+        ...detailsBase,
+        newDevice: true,
+      },
+    });
+
+    if (!suppression) {
+      const scope = buildSuccessfulLoginAlertScope('newDevice', input.userId, parsedUserAgent.fingerprint);
+      const shouldAlert = await shouldSendAlertForEvent(config, 'newDevice', {
+        scope,
+        level: riskSnapshot.level,
+      });
+      if (shouldAlert) {
+        try {
+          await sendSuccessfulLoginAlert('newDevice', {
+            ip: normalizedIp,
+            email: input.email,
+            countryCode,
+            host: input.host,
+            path: input.path,
+            deviceLabel: parsedUserAgent.label,
+            browser: parsedUserAgent.browser,
+            os: parsedUserAgent.os,
+            via2FA: input.via2FA,
+            method: input.method,
+          });
+          await markAlertSent('newDevice', scope, emittedAt);
+        } catch (error) {
+          console.error('Failed to send new-device admin login alert:', error);
+        }
+      }
+    }
+  }
+
+  if (newCountry) {
+    await writeAuditLog({
+      userId: input.userId,
+      ip: normalizedIp,
+      action: 'AUTH_LOGIN_NEW_COUNTRY',
+      entity: 'AUTH',
+      entityId: input.userId,
+      details: {
+        ...detailsBase,
+        newCountry: true,
+      },
+    });
+
+    if (!suppression && countryCode) {
+      const scope = buildSuccessfulLoginAlertScope('newCountry', input.userId, countryCode);
+      const shouldAlert = await shouldSendAlertForEvent(config, 'newCountry', {
+        scope,
+        level: riskSnapshot.level,
+      });
+      if (shouldAlert) {
+        try {
+          await sendSuccessfulLoginAlert('newCountry', {
+            ip: normalizedIp,
+            email: input.email,
+            countryCode,
+            host: input.host,
+            path: input.path,
+            deviceLabel: parsedUserAgent.label,
+            browser: parsedUserAgent.browser,
+            os: parsedUserAgent.os,
+            via2FA: input.via2FA,
+            method: input.method,
+          });
+          await markAlertSent('newCountry', scope, emittedAt);
+        } catch (error) {
+          console.error('Failed to send new-country admin login alert:', error);
+        }
+      }
+    }
+  }
+
+  return {
+    newDevice,
+    newCountry,
+    countryCode,
+    deviceLabel: parsedUserAgent.label,
   };
 }
 
@@ -3224,6 +3619,9 @@ export async function getAdminLoginAbuseOverview() {
     recentFailures,
     failuresLastHour,
     failuresLastDay,
+    newDeviceLoginsLastDay,
+    newCountryLoginsLastDay,
+    recentAdminLogins,
     incidentLogs,
     reputationLogs,
     workflowMap,
@@ -3256,6 +3654,34 @@ export async function getAdminLoginAbuseOverview() {
       where: {
         action: 'AUTH_LOGIN_FAILED',
         createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
+      },
+    }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_NEW_DEVICE',
+        createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
+      },
+    }),
+    db.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_NEW_COUNTRY',
+        createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
+      },
+    }),
+    db.auditLog.findMany({
+      where: {
+        action: 'AUTH_LOGIN_SUCCESS',
+        userId: { not: null },
+        createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60_000) },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: {
+        id: true,
+        userId: true,
+        ip: true,
+        details: true,
+        createdAt: true,
       },
     }),
     db.auditLog.findMany({
@@ -3350,6 +3776,38 @@ export async function getAdminLoginAbuseOverview() {
     }),
   );
 
+  const recentAdminLoginsWithGeo = (
+    await Promise.all(
+      recentAdminLogins.map(async (entry) => {
+        const details = parseAuditDetails(entry.details);
+        if (details.role !== 'ADMIN') {
+          return null;
+        }
+        const geo = entry.ip ? await getCachedGeo(entry.ip) : { countryCode: null };
+        return {
+          id: entry.id,
+          userId: entry.userId,
+          email: details.email,
+          role: details.role,
+          ip: entry.ip,
+          countryCode: details.countryCode ?? geo.countryCode,
+          deviceFingerprint: details.deviceFingerprint,
+          deviceLabel: details.deviceLabel,
+          browser: details.browser,
+          os: details.os,
+          deviceType: details.deviceType,
+          host: details.host,
+          path: details.path,
+          via2FA: details.via2FA,
+          method: details.method,
+          newDevice: details.newDevice,
+          newCountry: details.newCountry,
+          createdAt: entry.createdAt,
+        };
+      }),
+    )
+  ).filter(Boolean) as AdminLoginSignInEntry[];
+
   const topOffenders = new Map<string, { ip: string; count: number; lastAttemptAt: Date; email: string | null }>();
   for (const failure of recentFailuresWithGeo) {
     const key = failure.ip || 'unknown';
@@ -3418,9 +3876,12 @@ export async function getAdminLoginAbuseOverview() {
       failuresLastDay,
       activeRestrictions: activeRestrictions.length,
       activeBans: activeRestrictions.filter((item) => item.restrictionType === 'BAN').length,
+      newDeviceLoginsLastDay,
+      newCountryLoginsLastDay,
     },
     activeRestrictions,
     recentFailures: recentFailuresWithGeo,
+    recentAdminLogins: recentAdminLoginsWithGeo,
     topOffenders: Array.from(topOffenders.values())
       .sort((a, b) => b.count - a.count || b.lastAttemptAt.getTime() - a.lastAttemptAt.getTime())
       .slice(0, 20),
