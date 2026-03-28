@@ -11,6 +11,7 @@ import {
     acknowledgeAdminLoginIncident,
     addAdminLoginIncidentNote,
     allowlistAdminLoginIp,
+    assignAdminLoginIncident,
     blockAdminLoginIpPermanently,
     bulkUpdateAdminLoginIncidents,
     bulkUpdateAdminLoginIps,
@@ -244,8 +245,12 @@ export const securityRouter = router({
             return saveAdminLoginProtectionConfig(input);
         }),
 
-    getAdminLoginAbuseOverview: adminProcedure.query(async () => {
-        return getAdminLoginAbuseOverview();
+    getAdminLoginAbuseOverview: adminProcedure.query(async ({ ctx }) => {
+        const overview = await getAdminLoginAbuseOverview();
+        return {
+            ...overview,
+            currentOperatorEmail: ctx.user.email,
+        };
     }),
 
     saveAdminLoginSavedView: adminProcedure
@@ -258,6 +263,7 @@ export const securityRouter = router({
                 workflowStatus: z.enum(['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED']),
                 severity: z.enum(['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
                 country: z.string(),
+                assignee: z.string(),
                 reputation: z.enum(['ALL', 'LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
                 timeWindowHours: z.number().int().min(1).max(720).nullable(),
             }),
@@ -304,9 +310,10 @@ export const securityRouter = router({
     bulkUpdateAdminLoginIncidents: adminProcedure
         .input(z.object({
             incidentIds: z.array(z.string().min(1)).min(1).max(100),
-            action: z.enum(['ACKNOWLEDGE', 'RESOLVE', 'MUTE', 'UNMUTE']),
+            action: z.enum(['ACKNOWLEDGE', 'RESOLVE', 'MUTE', 'UNMUTE', 'ASSIGN', 'UNASSIGN']),
             note: z.string().trim().max(2000).optional(),
             durationMinutes: z.number().int().min(1).max(43200).optional(),
+            assignedToEmail: z.string().email().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             return bulkUpdateAdminLoginIncidents({
@@ -357,6 +364,21 @@ export const securityRouter = router({
         .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().min(1).max(2000) }))
         .mutation(async ({ ctx, input }) => {
             return addAdminLoginIncidentNote(input.incidentId, ctx.user.email, input.note);
+        }),
+
+    assignAdminLoginIncident: adminProcedure
+        .input(z.object({
+            incidentId: z.string().min(1),
+            assignedToEmail: z.string().email().nullable().optional(),
+            note: z.string().trim().max(2000).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return assignAdminLoginIncident({
+                incidentId: input.incidentId,
+                actorEmail: ctx.user.email,
+                assignedToEmail: input.assignedToEmail ?? null,
+                note: input.note,
+            });
         }),
 
     blockAdminLoginIp: adminProcedure

@@ -21,7 +21,7 @@ import {
     ShieldCheck, Plus, Trash2, Power, Globe, AlertTriangle,
     Lock, Unlock, CheckCircle, XCircle, AlertCircle, Server,
     RefreshCw, Shield, Clock, ExternalLink, Loader2, Download,
-    Eye, Star, BellOff, ListFilter, Ban
+    Eye, Star, BellOff, ListFilter, Ban, User, UserX
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BackButton } from '@/components/ui/back-button';
@@ -542,12 +542,14 @@ const riskLevels = ['LOW', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
 const incidentStatuses = ['ALL', 'ACTIVE', 'CONTAINED', 'RESOLVED'] as const;
 const workflowStatuses = ['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED'] as const;
 const incidentSeverities = ['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+const INCIDENT_ASSIGNEE_UNASSIGNED_VALUE = '__UNASSIGNED__';
 type IncidentFilters = {
     search: string;
     status: (typeof incidentStatuses)[number];
     workflowStatus: (typeof workflowStatuses)[number];
     severity: (typeof incidentSeverities)[number];
     country: string;
+    assignee: string;
     reputation: (typeof riskLevels)[number] | 'ALL';
     timeWindowHours: number | null;
 };
@@ -558,6 +560,7 @@ const defaultIncidentFilters: IncidentFilters = {
     workflowStatus: 'ALL' as const,
     severity: 'ALL' as const,
     country: 'ALL',
+    assignee: 'ALL',
     reputation: 'ALL' as const,
     timeWindowHours: 24 as number | null,
 };
@@ -595,6 +598,12 @@ function parseIncidentFiltersFromSearch(search: string): { filters: IncidentFilt
     const country = params.get('country');
     if (country) {
         next.country = country;
+        hasValues = true;
+    }
+
+    const assignee = params.get('assignee');
+    if (assignee) {
+        next.assignee = assignee;
         hasValues = true;
     }
 
@@ -813,6 +822,15 @@ function LoginProtectionCard() {
             toast({ title: 'Bulk incident action failed', description: error.message, variant: 'destructive' });
         },
     });
+    const assignIncidentMutation = trpc.security.assignAdminLoginIncident.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Incident assignment updated', description: 'The operator assignment has been saved.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to update assignment', description: error.message, variant: 'destructive' });
+        },
+    });
     const bulkIpMutation = trpc.security.bulkUpdateAdminLoginIps.useMutation({
         onSuccess: async (result) => {
             toast({ title: 'Bulk IP action complete', description: `${result.processed} IP entries updated.` });
@@ -987,6 +1005,7 @@ function LoginProtectionCard() {
         setOrDelete('workflow', incidentFilters.workflowStatus);
         setOrDelete('severity', incidentFilters.severity);
         setOrDelete('country', incidentFilters.country === 'ALL' ? null : incidentFilters.country);
+        setOrDelete('assignee', incidentFilters.assignee === 'ALL' ? null : incidentFilters.assignee);
         setOrDelete('reputation', incidentFilters.reputation);
         setOrDelete('hours', incidentFilters.timeWindowHours === null ? 'all' : String(incidentFilters.timeWindowHours));
         setOrDelete('view', activeSavedViewId === 'all' ? null : activeSavedViewId);
@@ -997,6 +1016,7 @@ function LoginProtectionCard() {
     const activeIncidentCount = overview?.securityIncidents.filter((incident) => incident.status === 'ACTIVE').length ?? 0;
     const highRiskIpCount =
         overview?.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length ?? 0;
+    const currentOperatorEmail = overview?.currentOperatorEmail?.trim().toLowerCase() || '';
 
     const requestNote = (title: string) => {
         const value = window.prompt(title, '');
@@ -1023,6 +1043,32 @@ function LoginProtectionCard() {
         const note = requestNote('Add an incident note');
         if (!note) return;
         noteMutation.mutate({ incidentId, note });
+    };
+
+    const requestAssignee = () => {
+        const value = window.prompt('Assign incident to which admin email?', currentOperatorEmail || '');
+        if (value == null) {
+            return null;
+        }
+
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) {
+            toast({ title: 'Assignment required', description: 'Enter an admin email to assign the incident.', variant: 'destructive' });
+            return null;
+        }
+
+        return normalized;
+    };
+
+    const handleAssignIncident = (incidentId: string, assignedToEmail?: string | null) => {
+        const note = requestNote(assignedToEmail ? 'Optional assignment note' : 'Optional unassign note');
+        if (note === null) return;
+
+        assignIncidentMutation.mutate({
+            incidentId,
+            assignedToEmail: assignedToEmail ?? null,
+            note: note || undefined,
+        });
     };
 
     const handleBlockIp = (ip: string, promote = false) => {
@@ -1157,13 +1203,13 @@ function LoginProtectionCard() {
     };
 
     const handleBulkIncidentAction = (
-        action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE',
+        action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE' | 'ASSIGN' | 'UNASSIGN',
     ) => {
         if (selectedIncidentIds.length === 0) {
             return;
         }
         const note =
-            action === 'MUTE'
+            action === 'MUTE' || action === 'ASSIGN' || action === 'UNASSIGN'
                 ? undefined
                 : requestNote(
                     action === 'ACKNOWLEDGE'
@@ -1180,12 +1226,17 @@ function LoginProtectionCard() {
         if (action === 'MUTE' && !suppression) {
             return;
         }
+        const assignedToEmail = action === 'ASSIGN' ? requestAssignee() : undefined;
+        if (action === 'ASSIGN' && !assignedToEmail) {
+            return;
+        }
 
         bulkIncidentMutation.mutate({
             incidentIds: selectedIncidentIds,
             action,
             note: note || undefined,
             durationMinutes: suppression?.durationMinutes,
+            assignedToEmail: assignedToEmail || undefined,
         });
     };
 
@@ -1245,6 +1296,15 @@ function LoginProtectionCard() {
             if (incidentFilters.country !== 'ALL' && (incident.countryCode || 'UNKNOWN') !== incidentFilters.country) {
                 return false;
             }
+            if (incidentFilters.assignee !== 'ALL') {
+                if (incidentFilters.assignee === INCIDENT_ASSIGNEE_UNASSIGNED_VALUE) {
+                    if (incident.assignedToEmail) {
+                        return false;
+                    }
+                } else if ((incident.assignedToEmail || '').toLowerCase() !== incidentFilters.assignee.toLowerCase()) {
+                    return false;
+                }
+            }
             if (incidentFilters.reputation !== 'ALL') {
                 const reputation = overview.ipReputation.find((entry) => entry.ip === incident.ip);
                 if (!reputation || reputation.level !== incidentFilters.reputation) {
@@ -1270,6 +1330,7 @@ function LoginProtectionCard() {
                 incident.attemptedEmails.join(' '),
                 incident.hosts.join(' '),
                 incident.paths.join(' '),
+                incident.assignedToEmail || '',
                 incident.notesPreview || '',
                 incident.enrichment.organization || '',
                 incident.enrichment.isp || '',
@@ -1314,7 +1375,12 @@ function LoginProtectionCard() {
                     return false;
                 }
             }
-            if (incidentFilters.status !== 'ALL' || incidentFilters.workflowStatus !== 'ALL' || incidentFilters.severity !== 'ALL') {
+            if (
+                incidentFilters.status !== 'ALL' ||
+                incidentFilters.workflowStatus !== 'ALL' ||
+                incidentFilters.severity !== 'ALL' ||
+                incidentFilters.assignee !== 'ALL'
+            ) {
                 return incidentIpSet.has(entry.ip);
             }
             return true;
@@ -1331,6 +1397,18 @@ function LoginProtectionCard() {
         }
         for (const entry of overview.ipReputation) {
             if (entry.countryCode) values.add(entry.countryCode);
+        }
+        return Array.from(values).sort();
+    }, [overview]);
+    const availableAssignees = useMemo(() => {
+        if (!overview) {
+            return [] as string[];
+        }
+        const values = new Set<string>();
+        for (const incident of overview.securityIncidents) {
+            if (incident.assignedToEmail) {
+                values.add(incident.assignedToEmail);
+            }
         }
         return Array.from(values).sort();
     }, [overview]);
@@ -2090,6 +2168,29 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
+                                        <Label>Assignee</Label>
+                                        <Select
+                                            value={incidentFilters.assignee}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({ ...current, assignee: value }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                {currentOperatorEmail && (
+                                                    <SelectItem value={currentOperatorEmail}>Assigned to me</SelectItem>
+                                                )}
+                                                <SelectItem value={INCIDENT_ASSIGNEE_UNASSIGNED_VALUE}>Unassigned</SelectItem>
+                                                {availableAssignees
+                                                    .filter((email) => email !== currentOperatorEmail)
+                                                    .map((email) => (
+                                                        <SelectItem key={email} value={email}>{email}</SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
                                         <Label>Reputation</Label>
                                         <Select
                                             value={incidentFilters.reputation}
@@ -2159,13 +2260,15 @@ function LoginProtectionCard() {
                                         variant="outline"
                                         size="sm"
                                         className="rounded-full"
+                                        disabled={!currentOperatorEmail}
                                         onClick={() => {
                                             setActiveSavedViewId('all');
                                             setIncidentFilters({
                                                 ...defaultIncidentFilters,
                                                 status: 'ACTIVE',
-                                                workflowStatus: 'OPEN',
-                                                timeWindowHours: 24,
+                                                workflowStatus: 'ALL',
+                                                assignee: currentOperatorEmail || 'ALL',
+                                                timeWindowHours: 168,
                                             });
                                         }}
                                     >
@@ -2342,6 +2445,14 @@ function LoginProtectionCard() {
                                         <Unlock className="mr-2 h-4 w-4" />
                                         Unmute
                                     </Button>
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('ASSIGN')}>
+                                        <User className="mr-2 h-4 w-4" />
+                                        Assign
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('UNASSIGN')}>
+                                        <UserX className="mr-2 h-4 w-4" />
+                                        Unassign
+                                    </Button>
                                 </div>
                             </div>
                         )}
@@ -2394,6 +2505,12 @@ function LoginProtectionCard() {
                                                     {incident.activeRestrictionType && (
                                                         <Badge variant="outline">{incident.activeRestrictionType}</Badge>
                                                     )}
+                                                    {incident.assignedToEmail && (
+                                                        <Badge variant="outline" className="gap-1">
+                                                            <User className="h-3 w-3" />
+                                                            {incident.assignedToEmail}
+                                                        </Badge>
+                                                    )}
                                                     {incident.alertSuppression && (
                                                         <Badge variant="outline">Muted for {incident.alertSuppression.remainingMinutes} min</Badge>
                                                     )}
@@ -2415,7 +2532,7 @@ function LoginProtectionCard() {
                                                 </Button>
                                             </div>
                                         </div>
-                                        {(incident.notesPreview || incident.enrichment.reverseDns.length > 0 || incident.enrichment.asn || incident.enrichment.isp || incident.enrichment.organization) && (
+                                        {(incident.notesPreview || incident.assignedToEmail || incident.enrichment.reverseDns.length > 0 || incident.enrichment.asn || incident.enrichment.isp || incident.enrichment.organization) && (
                                             <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-2">
                                                 <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
                                                     <p className="font-medium text-foreground">Workflow</p>
@@ -2426,6 +2543,15 @@ function LoginProtectionCard() {
                                                                 ? `Resolved ${formatDistanceToNow(new Date(incident.resolvedAt), { addSuffix: true })}${incident.resolvedByEmail ? ` by ${incident.resolvedByEmail}` : ''}`
                                                                 : 'Open incident'}
                                                     </p>
+                                                    {incident.assignedToEmail && (
+                                                        <p className="mt-2 text-muted-foreground">
+                                                            Assigned to {incident.assignedToEmail}
+                                                            {incident.assignedAt
+                                                                ? ` ${formatDistanceToNow(new Date(incident.assignedAt), { addSuffix: true })}`
+                                                                : ''}
+                                                            {incident.assignedByEmail ? ` by ${incident.assignedByEmail}` : ''}
+                                                        </p>
+                                                    )}
                                                     {incident.notesPreview && (
                                                         <p className="mt-2 break-words text-muted-foreground">{incident.notesPreview}</p>
                                                     )}
@@ -2502,6 +2628,33 @@ function LoginProtectionCard() {
                                                 <AlertCircle className="mr-2 h-4 w-4" />
                                                 Add note
                                             </Button>
+                                            {incident.assignedToEmail ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={assignIncidentMutation.isPending}
+                                                    onClick={() => handleAssignIncident(incident.id, null)}
+                                                >
+                                                    <UserX className="mr-2 h-4 w-4" />
+                                                    Unassign
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={assignIncidentMutation.isPending}
+                                                    onClick={() => {
+                                                        const assignedToEmail = requestAssignee();
+                                                        if (!assignedToEmail) return;
+                                                        handleAssignIncident(incident.id, assignedToEmail);
+                                                    }}
+                                                >
+                                                    <User className="mr-2 h-4 w-4" />
+                                                    Assign
+                                                </Button>
+                                            )}
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -2883,6 +3036,17 @@ function LoginProtectionCard() {
                                             ? `Muted for ${incidentDetailQuery.data.incident.alertSuppression.remainingMinutes} min`
                                             : 'Alerts active'}
                                     </p>
+                                    {incidentDetailQuery.data.incident.assignedToEmail && (
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                            Assigned to {incidentDetailQuery.data.incident.assignedToEmail}
+                                            {incidentDetailQuery.data.incident.assignedAt
+                                                ? ` ${formatDistanceToNow(new Date(incidentDetailQuery.data.incident.assignedAt), { addSuffix: true })}`
+                                                : ''}
+                                            {incidentDetailQuery.data.incident.assignedByEmail
+                                                ? ` by ${incidentDetailQuery.data.incident.assignedByEmail}`
+                                                : ''}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Reputation</p>
@@ -2895,6 +3059,48 @@ function LoginProtectionCard() {
 
                             <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
                                 <div className="space-y-4">
+                                    <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-medium">Ownership</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Assign or clear the current operator for this incident.
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline">
+                                                {incidentDetailQuery.data.incident.assignedToEmail || 'Unassigned'}
+                                            </Badge>
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                                disabled={assignIncidentMutation.isPending}
+                                                onClick={() => {
+                                                    const assignedToEmail = requestAssignee();
+                                                    if (!assignedToEmail) return;
+                                                    handleAssignIncident(incidentDetailQuery.data!.incident.id, assignedToEmail);
+                                                }}
+                                            >
+                                                <User className="mr-2 h-4 w-4" />
+                                                Assign
+                                            </Button>
+                                            {incidentDetailQuery.data.incident.assignedToEmail && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={assignIncidentMutation.isPending}
+                                                    onClick={() => handleAssignIncident(incidentDetailQuery.data!.incident.id, null)}
+                                                >
+                                                    <UserX className="mr-2 h-4 w-4" />
+                                                    Unassign
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="font-medium">Notes timeline</p>

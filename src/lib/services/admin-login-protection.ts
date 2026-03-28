@@ -108,6 +108,9 @@ const adminLoginProtectionConfigSchema = z.object({
 const adminLoginIncidentWorkflowEntrySchema = z.object({
   status: adminLoginIncidentWorkflowStatusSchema.default('OPEN'),
   notes: z.string().default(''),
+  assignedToEmail: z.string().nullable().optional(),
+  assignedAt: z.string().nullable().optional(),
+  assignedByEmail: z.string().nullable().optional(),
   acknowledgedAt: z.string().nullable().optional(),
   acknowledgedByEmail: z.string().nullable().optional(),
   resolvedAt: z.string().nullable().optional(),
@@ -133,6 +136,7 @@ const adminLoginSavedViewFiltersSchema = z.object({
   workflowStatus: z.enum(['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED']).default('ALL'),
   severity: z.enum(['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('ALL'),
   country: z.string().default('ALL'),
+  assignee: z.string().default('ALL'),
   reputation: z.enum(['ALL', 'LOW', 'ELEVATED', 'HIGH', 'CRITICAL']).default('ALL'),
   timeWindowHours: z.number().int().min(1).max(720).nullable().default(24),
 });
@@ -262,6 +266,9 @@ type AdminLoginIncident = {
   workflowStatus: AdminLoginIncidentWorkflowStatus;
   notes: string | null;
   notesPreview: string | null;
+  assignedToEmail: string | null;
+  assignedAt: Date | null;
+  assignedByEmail: string | null;
   acknowledgedAt: Date | null;
   acknowledgedByEmail: string | null;
   resolvedAt: Date | null;
@@ -276,6 +283,9 @@ type RawAdminLoginIncident = Omit<
   | 'workflowStatus'
   | 'notes'
   | 'notesPreview'
+  | 'assignedToEmail'
+  | 'assignedAt'
+  | 'assignedByEmail'
   | 'acknowledgedAt'
   | 'acknowledgedByEmail'
   | 'resolvedAt'
@@ -316,6 +326,13 @@ type AdminLoginIncidentDetailEvent = {
   restrictionType: string | null;
   ip: string | null;
   details: string | null;
+};
+
+type AssignAdminLoginIncidentInput = {
+  incidentId: string;
+  actorEmail: string;
+  assignedToEmail?: string | null;
+  note?: string | null;
 };
 
 type AdminLoginIncidentNoteEntry = {
@@ -1162,6 +1179,10 @@ function getAdminLoginEventLabel(action: string) {
       return 'Incident resolved';
     case 'AUTH_LOGIN_INCIDENT_NOTE_ADDED':
       return 'Incident note added';
+    case 'AUTH_LOGIN_INCIDENT_ASSIGNED':
+      return 'Incident assigned';
+    case 'AUTH_LOGIN_INCIDENT_UNASSIGNED':
+      return 'Incident unassigned';
     case 'AUTH_LOGIN_ALERT_SUPPRESSED':
       return 'Alerts muted';
     case 'AUTH_LOGIN_ALERT_UNSUPPRESSED':
@@ -2520,6 +2541,9 @@ export async function acknowledgeAdminLoginIncident(
   const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
     status: 'ACKNOWLEDGED',
     notes: appendIncidentNote(current?.notes, actorEmail, note || ''),
+    assignedToEmail: current?.assignedToEmail ?? null,
+    assignedAt: current?.assignedAt ?? null,
+    assignedByEmail: current?.assignedByEmail ?? null,
     acknowledgedAt: current?.acknowledgedAt ?? now.toISOString(),
     acknowledgedByEmail: current?.acknowledgedByEmail ?? actorEmail,
     resolvedAt: current?.resolvedAt ?? null,
@@ -2553,6 +2577,9 @@ export async function resolveAdminLoginIncident(
   const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
     status: 'RESOLVED',
     notes: appendIncidentNote(current?.notes, actorEmail, note || ''),
+    assignedToEmail: current?.assignedToEmail ?? null,
+    assignedAt: current?.assignedAt ?? null,
+    assignedByEmail: current?.assignedByEmail ?? null,
     acknowledgedAt: current?.acknowledgedAt ?? null,
     acknowledgedByEmail: current?.acknowledgedByEmail ?? null,
     resolvedAt: now.toISOString(),
@@ -2586,6 +2613,9 @@ export async function addAdminLoginIncidentNote(
   const entry = await updateIncidentWorkflowEntry(incidentId, (current) => ({
     status: current?.status ?? 'OPEN',
     notes: appendIncidentNote(current?.notes, actorEmail, note),
+    assignedToEmail: current?.assignedToEmail ?? null,
+    assignedAt: current?.assignedAt ?? null,
+    assignedByEmail: current?.assignedByEmail ?? null,
     acknowledgedAt: current?.acknowledgedAt ?? null,
     acknowledgedByEmail: current?.acknowledgedByEmail ?? null,
     resolvedAt: current?.resolvedAt ?? null,
@@ -2602,6 +2632,47 @@ export async function addAdminLoginIncidentNote(
     details: {
       actorEmail,
       note: note.trim(),
+      status: entry.status,
+    },
+  });
+
+  return incident;
+}
+
+export async function assignAdminLoginIncident(input: AssignAdminLoginIncidentInput) {
+  const incident = await getSecurityIncidentOrThrow(input.incidentId);
+  const now = new Date();
+  const normalizedAssignee = input.assignedToEmail?.trim().toLowerCase() || null;
+  const assignmentMessage = normalizedAssignee
+    ? `Assigned incident to ${normalizedAssignee}`
+    : 'Cleared incident assignee';
+  const entry = await updateIncidentWorkflowEntry(input.incidentId, (current) => ({
+    status: current?.status ?? 'OPEN',
+    notes: appendIncidentNote(
+      current?.notes,
+      input.actorEmail,
+      input.note?.trim() ? `${assignmentMessage}. ${input.note.trim()}` : assignmentMessage,
+    ),
+    assignedToEmail: normalizedAssignee,
+    assignedAt: normalizedAssignee ? now.toISOString() : null,
+    assignedByEmail: normalizedAssignee ? input.actorEmail : null,
+    acknowledgedAt: current?.acknowledgedAt ?? null,
+    acknowledgedByEmail: current?.acknowledgedByEmail ?? null,
+    resolvedAt: current?.resolvedAt ?? null,
+    resolvedByEmail: current?.resolvedByEmail ?? null,
+    updatedAt: now.toISOString(),
+    updatedByEmail: input.actorEmail,
+  }));
+
+  await writeAuditLog({
+    action: normalizedAssignee ? 'AUTH_LOGIN_INCIDENT_ASSIGNED' : 'AUTH_LOGIN_INCIDENT_UNASSIGNED',
+    entity: 'AUTH',
+    entityId: input.incidentId,
+    ip: incident.ip,
+    details: {
+      actorEmail: input.actorEmail,
+      note: input.note?.trim() || null,
+      assignedToEmail: normalizedAssignee,
       status: entry.status,
     },
   });
@@ -2788,10 +2859,11 @@ export async function removeAdminLoginAlertSuppression(input: {
 
 export async function bulkUpdateAdminLoginIncidents(input: {
   incidentIds: string[];
-  action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE';
+  action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE' | 'ASSIGN' | 'UNASSIGN';
   actorEmail: string;
   note?: string | null;
   durationMinutes?: number | null;
+  assignedToEmail?: string | null;
 }) {
   const incidentIds = Array.from(new Set(input.incidentIds.map((id) => id.trim()).filter(Boolean)));
   if (incidentIds.length === 0) {
@@ -2820,6 +2892,22 @@ export async function bulkUpdateAdminLoginIncidents(input: {
           scopeType: 'INCIDENT',
           scopeValue: incidentId,
           actorEmail: input.actorEmail,
+        });
+        break;
+      case 'ASSIGN':
+        await assignAdminLoginIncident({
+          incidentId,
+          actorEmail: input.actorEmail,
+          assignedToEmail: input.assignedToEmail,
+          note: input.note,
+        });
+        break;
+      case 'UNASSIGN':
+        await assignAdminLoginIncident({
+          incidentId,
+          actorEmail: input.actorEmail,
+          assignedToEmail: null,
+          note: input.note,
         });
         break;
     }
@@ -3286,6 +3374,7 @@ export async function getAdminLoginAbuseOverview() {
   const securityIncidents = await Promise.all(
     rawSecurityIncidents.map(async (incident) => {
       const workflow = workflowMap[incident.id] ?? null;
+      const assignedAt = parseStoredDate(workflow?.assignedAt);
       const acknowledgedAt = parseStoredDate(workflow?.acknowledgedAt);
       const resolvedAt = parseStoredDate(workflow?.resolvedAt);
       const notes = workflow?.notes?.trim() || null;
@@ -3297,6 +3386,9 @@ export async function getAdminLoginAbuseOverview() {
         workflowStatus: deriveWorkflowStatus(incident, workflow),
         notes,
         notesPreview: notes ? notes.split('\n').slice(-1)[0] : null,
+        assignedToEmail: workflow?.assignedToEmail?.trim() || null,
+        assignedAt,
+        assignedByEmail: workflow?.assignedByEmail?.trim() || null,
         acknowledgedAt,
         acknowledgedByEmail: workflow?.acknowledgedByEmail ?? null,
         resolvedAt,
@@ -3369,6 +3461,7 @@ export async function exportAdminLoginIncidents(format: 'csv' | 'json') {
     hosts: incident.hosts.join('; '),
     paths: incident.paths.join('; '),
     summary: incident.summary,
+    assignedToEmail: incident.assignedToEmail || '',
   }));
 
   if (format === 'json') {
