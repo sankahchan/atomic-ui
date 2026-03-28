@@ -9,7 +9,7 @@
  * - Register/manage WebAuthn passkeys
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,16 +20,17 @@ import { CodePromptDialog } from '@/components/ui/code-prompt-dialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
+import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
 import {
     Shield, Smartphone, Key, QrCode, Copy, CheckCircle, AlertTriangle,
-    Trash2, Edit, Loader2, RefreshCw, ArrowLeft, Plus
+    Trash2, Loader2, RefreshCw, ArrowLeft, Plus, Monitor, LogOut, ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import { useRouter } from 'next/navigation';
+import { startRegistration } from '@simplewebauthn/browser';
 
 function TotpSetupDialog({
     open,
@@ -304,7 +305,6 @@ function DisableTotpDialog({
 
 function WebAuthnSection() {
     const { toast } = useToast();
-    const utils = trpc.useUtils();
     const [deletingCredentialId, setDeletingCredentialId] = useState<string | null>(null);
     const [credentialToDelete, setCredentialToDelete] = useState<{ id: string; name: string } | null>(null);
 
@@ -444,6 +444,7 @@ function WebAuthnSection() {
 }
 
 export default function AccountSecurityPage() {
+    const router = useRouter();
     const { toast } = useToast();
 
     const [setupDialogOpen, setSetupDialogOpen] = useState(false);
@@ -453,6 +454,48 @@ export default function AccountSecurityPage() {
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 
     const { data: status, isLoading, refetch } = trpc.security.get2FAStatus.useQuery();
+    const sessionsQuery = trpc.security.listAccountSessions.useQuery();
+
+    const updateAdminPolicyMutation = trpc.security.updateAdmin2FAPolicy.useMutation({
+        onSuccess: () => {
+            toast({
+                title: 'Admin policy updated',
+                description: 'Admin two-factor authentication requirements have been saved.',
+            });
+            refetch();
+        },
+        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+    });
+
+    const revokeSessionMutation = trpc.security.revokeAccountSession.useMutation({
+        onSuccess: (data) => {
+            sessionsQuery.refetch();
+            toast({
+                title: data.revokedCurrent ? 'Session revoked' : 'Session removed',
+                description: data.revokedCurrent
+                    ? 'The current session was revoked. Please sign in again.'
+                    : 'The selected session has been revoked.',
+            });
+
+            if (data.revokedCurrent) {
+                router.push('/login?reason=session_revoked');
+            }
+        },
+        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+    });
+
+    const revokeOtherSessionsMutation = trpc.security.revokeOtherAccountSessions.useMutation({
+        onSuccess: (data) => {
+            sessionsQuery.refetch();
+            toast({
+                title: 'Other sessions revoked',
+                description: data.revokedCount > 0
+                    ? `${data.revokedCount} session${data.revokedCount === 1 ? '' : 's'} removed.`
+                    : 'No other active sessions were found.',
+            });
+        },
+        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+    });
 
     const regenerateCodesMutation = trpc.security.regenerateRecoveryCodes.useMutation({
         onSuccess: (data) => {
@@ -468,6 +511,12 @@ export default function AccountSecurityPage() {
         setRecoveryCodesDialogOpen(true);
         refetch();
     };
+
+    const adminPolicy = status?.adminPolicy ?? null;
+    const currentSession = useMemo(
+        () => sessionsQuery.data?.find((session) => session.isCurrent) ?? null,
+        [sessionsQuery.data],
+    );
 
     if (isLoading) {
         return (
@@ -554,6 +603,47 @@ export default function AccountSecurityPage() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {status?.currentUserRole === 'ADMIN' && adminPolicy && (
+                            <Card className="ops-panel">
+                                <CardContent className="space-y-4 px-0 py-0">
+                                    <div className="space-y-1">
+                                        <p className="ops-section-heading">Admin policy</p>
+                                        <h2 className="text-xl font-semibold">Require 2FA for admins</h2>
+                                        <p className="text-sm leading-6 text-muted-foreground">
+                                            Enforce at least one second factor for every administrator before they can sign in.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between rounded-[1.25rem] border border-border/60 bg-background/55 p-4">
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium">Mandatory admin 2FA</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {adminPolicy.protectedAdminCount} of {adminPolicy.adminCount} admin accounts protected
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={adminPolicy.required}
+                                            disabled={updateAdminPolicyMutation.isPending || (!adminPolicy.required && !adminPolicy.canEnable)}
+                                            onCheckedChange={(checked) => updateAdminPolicyMutation.mutate({ required: checked })}
+                                        />
+                                    </div>
+
+                                    {!adminPolicy.canEnable && !adminPolicy.required && (
+                                        <div className="rounded-[1.25rem] border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-muted-foreground">
+                                            Enablement is blocked until every admin has at least one second factor. Missing coverage:
+                                            <ul className="mt-2 space-y-1">
+                                                {adminPolicy.unprotectedAdmins.map((admin) => (
+                                                    <li key={admin.id} className="font-medium text-foreground/85">
+                                                        {admin.email}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
 
                         <Card className="ops-panel">
                             <CardContent className="space-y-3 px-0 py-0">
@@ -679,6 +769,87 @@ export default function AccountSecurityPage() {
             <WebAuthnSection />
                 </div>
             </div>
+
+            <Card className="ops-panel">
+                <CardHeader className="px-0 pt-0">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Monitor className="h-5 w-5" />
+                                Active Sessions
+                            </CardTitle>
+                            <CardDescription>
+                                Review where this account is signed in and revoke sessions you no longer trust.
+                            </CardDescription>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => revokeOtherSessionsMutation.mutate()}
+                            disabled={revokeOtherSessionsMutation.isPending || !sessionsQuery.data?.some((session) => !session.isCurrent)}
+                        >
+                            {revokeOtherSessionsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Revoke Other Sessions
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4 px-0 pb-0">
+                    {currentSession && (
+                        <div className="rounded-[1.25rem] border border-primary/20 bg-primary/10 p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                                    <ShieldCheck className="mr-2 h-3.5 w-3.5" />
+                                    Current Session
+                                </Badge>
+                                <span className="text-sm font-medium">{currentSession.label}</span>
+                                <span className="text-sm text-muted-foreground">{currentSession.ip ?? 'IP unavailable'}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {sessionsQuery.isLoading ? (
+                        <SurfaceSkeleton className="min-h-[180px]" lines={4} />
+                    ) : sessionsQuery.data && sessionsQuery.data.length > 0 ? (
+                        <div className="space-y-3">
+                            {sessionsQuery.data.map((session) => (
+                                <div
+                                    key={session.id}
+                                    className="flex flex-col gap-4 rounded-[1.25rem] border border-border/60 bg-background/55 p-4 lg:flex-row lg:items-center lg:justify-between"
+                                >
+                                    <div className="space-y-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="font-medium">{session.label}</p>
+                                            {session.isCurrent && <Badge>Current</Badge>}
+                                            <Badge variant="outline">{session.os}</Badge>
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            <p>{session.ip ?? 'IP unavailable'}</p>
+                                            <p>Created {new Date(session.createdAt).toLocaleString()}</p>
+                                            <p>Expires {new Date(session.expiresAt).toLocaleString()}</p>
+                                            {session.userAgent && (
+                                                <p className="truncate max-w-[48rem]">{session.userAgent}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        variant={session.isCurrent ? 'destructive' : 'outline'}
+                                        onClick={() => revokeSessionMutation.mutate({ sessionId: session.id })}
+                                        disabled={revokeSessionMutation.isPending}
+                                    >
+                                        {revokeSessionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Revoke Session
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-[1.25rem] border border-border/60 bg-background/55 p-6 text-sm text-muted-foreground">
+                            No active sessions found for this account.
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Dialogs */}
             <TotpSetupDialog

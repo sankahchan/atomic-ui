@@ -35,6 +35,11 @@ export interface AuthUser {
   role: string;
 }
 
+export interface SessionMetadata {
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
 /**
  * Hash a password using bcrypt
  * The cost factor of 12 provides good security while maintaining reasonable performance
@@ -55,7 +60,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Create a new JWT session token
  * The token contains the user's ID, email, and role for authorization
  */
-export async function createSession(userId: string, email: string, role: string): Promise<string> {
+export async function createSession(
+  userId: string,
+  email: string,
+  role: string,
+  metadata?: SessionMetadata,
+): Promise<string> {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
   const jwtSecret = getJwtSecretBytes();
@@ -76,6 +86,8 @@ export async function createSession(userId: string, email: string, role: string)
     data: {
       userId,
       token,
+      ip: metadata?.ip ?? null,
+      userAgent: metadata?.userAgent ?? null,
       expiresAt,
     },
   });

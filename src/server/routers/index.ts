@@ -39,6 +39,12 @@ import crypto from 'crypto';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import {
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+  type AuthenticationResponseJSON,
+  type AuthenticatorTransportFuture,
+} from '@simplewebauthn/server';
+import {
   authenticateUser,
   createSession,
   setSessionCookie,
@@ -55,6 +61,43 @@ import {
   getAdminLoginChallengeDecision,
   recordFailedAdminLogin,
 } from '@/lib/services/admin-login-protection';
+import { isAdmin2FARequired } from '@/lib/admin-2fa-policy';
+
+const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
+const RP_ORIGIN = process.env.NEXTAUTH_URL || process.env.APP_URL || 'http://localhost:3000';
+const TEMP_AUTH_MAX_AGE_MS = 5 * 60 * 1000;
+
+type TempAuthSessionData = {
+  userId: string;
+  email: string;
+  role: string;
+  timestamp: number;
+};
+
+async function getValidTempAuthSession(tempToken: string): Promise<TempAuthSessionData> {
+  const tempAuth = await db.settings.findUnique({
+    where: { key: `temp_auth_${tempToken}` },
+  });
+
+  if (!tempAuth) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Invalid or expired session. Please login again.',
+    });
+  }
+
+  const authData = JSON.parse(tempAuth.value) as TempAuthSessionData;
+  if (Date.now() - authData.timestamp > TEMP_AUTH_MAX_AGE_MS) {
+    await db.settings.delete({ where: { key: `temp_auth_${tempToken}` } }).catch(() => undefined);
+    await db.settings.delete({ where: { key: `temp_auth_webauthn_${tempToken}` } }).catch(() => undefined);
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Session expired. Please login again.',
+    });
+  }
+
+  return authData;
+}
 
 /**
  * Auth Router
@@ -120,6 +163,28 @@ const authRouter = router({
       });
 
       const has2FA = (totpSecret?.verified || false) || webAuthnCredentials.length > 0;
+      const admin2FARequired = user.role === 'ADMIN' ? await isAdmin2FARequired() : false;
+
+      if (admin2FARequired && !has2FA) {
+        await writeAuditLog({
+          userId: user.id,
+          ip: ctx.clientIp,
+          action: 'AUTH_LOGIN_2FA_REQUIRED',
+          entity: 'AUTH',
+          entityId: user.id,
+          details: {
+            email: user.email,
+            host: ctx.requestHost,
+            path: ctx.requestPath,
+            role: user.role,
+          },
+        });
+
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Two-factor authentication is required for admin accounts. Enable an authenticator or passkey from an existing session first.',
+        });
+      }
 
       if (challengeDecision.mode === 'BLOCK' || (challengeDecision.mode === 'REQUIRE_2FA' && !has2FA)) {
         await writeAuditLog({
@@ -183,7 +248,10 @@ const authRouter = router({
       }
 
       // No 2FA - create session and set cookie
-      const token = await createSession(user.id, user.email, user.role);
+      const token = await createSession(user.id, user.email, user.role, {
+        ip: ctx.clientIp,
+        userAgent: ctx.userAgent,
+      });
       await setSessionCookie(token);
 
       await writeAuditLog({
@@ -206,6 +274,149 @@ const authRouter = router({
       };
     }),
 
+  generateWebAuthnLoginOptions: publicProcedure
+    .input(z.object({ tempToken: z.string() }))
+    .mutation(async ({ input }) => {
+      const authData = await getValidTempAuthSession(input.tempToken);
+
+      const credentials = await db.webAuthnCredential.findMany({
+        where: { userId: authData.userId },
+        select: { credentialId: true, transports: true },
+      });
+
+      if (credentials.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No passkeys registered for this account.',
+        });
+      }
+
+      const options = await generateAuthenticationOptions({
+        rpID: RP_ID,
+        allowCredentials: credentials.map((cred) => ({
+          id: cred.credentialId,
+          transports: cred.transports ? JSON.parse(cred.transports) as AuthenticatorTransportFuture[] : undefined,
+        })),
+        userVerification: 'preferred',
+      });
+
+      await db.settings.upsert({
+        where: { key: `temp_auth_webauthn_${input.tempToken}` },
+        update: { value: JSON.stringify({ challenge: options.challenge, timestamp: Date.now() }) },
+        create: { key: `temp_auth_webauthn_${input.tempToken}`, value: JSON.stringify({ challenge: options.challenge, timestamp: Date.now() }) },
+      });
+
+      return options;
+    }),
+
+  verifyWebAuthnLogin: publicProcedure
+    .input(z.object({
+      tempToken: z.string(),
+      response: z.custom<AuthenticationResponseJSON>(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const authData = await getValidTempAuthSession(input.tempToken);
+      const challengeRecord = await db.settings.findUnique({
+        where: { key: `temp_auth_webauthn_${input.tempToken}` },
+      });
+
+      if (!challengeRecord) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No passkey challenge found. Please try again.',
+        });
+      }
+
+      const { challenge, timestamp } = JSON.parse(challengeRecord.value) as { challenge: string; timestamp: number };
+      if (Date.now() - timestamp > TEMP_AUTH_MAX_AGE_MS) {
+        await db.settings.delete({ where: { key: `temp_auth_webauthn_${input.tempToken}` } }).catch(() => undefined);
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Challenge expired. Please try again.',
+        });
+      }
+
+      const credential = await db.webAuthnCredential.findUnique({
+        where: { credentialId: input.response.id },
+      });
+
+      if (!credential || credential.userId !== authData.userId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Unknown passkey credential.',
+        });
+      }
+
+      const verification = await verifyAuthenticationResponse({
+        response: input.response,
+        expectedChallenge: challenge,
+        expectedOrigin: RP_ORIGIN,
+        expectedRPID: RP_ID,
+        credential: {
+          id: credential.credentialId,
+          publicKey: new Uint8Array(Buffer.from(credential.publicKey, 'base64url')),
+          counter: credential.counter,
+          transports: credential.transports ? JSON.parse(credential.transports) : undefined,
+        },
+      });
+
+      if (!verification.verified) {
+        await writeAuditLog({
+          userId: authData.userId,
+          ip: ctx.clientIp,
+          action: 'AUTH_2FA_FAILED',
+          entity: 'AUTH',
+          entityId: authData.userId,
+          details: {
+            email: authData.email,
+            method: 'WEBAUTHN',
+          },
+        });
+
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Passkey verification failed.',
+        });
+      }
+
+      await db.webAuthnCredential.update({
+        where: { id: credential.id },
+        data: {
+          counter: verification.authenticationInfo.newCounter,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      await db.settings.delete({ where: { key: `temp_auth_webauthn_${input.tempToken}` } }).catch(() => undefined);
+      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } }).catch(() => undefined);
+
+      const token = await createSession(authData.userId, authData.email, authData.role, {
+        ip: ctx.clientIp,
+        userAgent: ctx.userAgent,
+      });
+      await setSessionCookie(token);
+
+      await writeAuditLog({
+        userId: authData.userId,
+        ip: ctx.clientIp,
+        action: 'AUTH_LOGIN_SUCCESS',
+        entity: 'AUTH',
+        entityId: authData.userId,
+        details: {
+          email: authData.email,
+          role: authData.role,
+          via2FA: true,
+          method: 'WEBAUTHN',
+        },
+      });
+
+      return {
+        id: authData.userId,
+        email: authData.email,
+        role: authData.role,
+      };
+    }),
+
   /**
    * Verify TOTP code after initial login (2FA step 2)
    */
@@ -218,30 +429,7 @@ const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Get temp auth data
-      const tempAuth = await db.settings.findUnique({
-        where: { key: `temp_auth_${input.tempToken}` },
-      });
-
-      if (!tempAuth) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid or expired session. Please login again.',
-        });
-      }
-
-      const authData = JSON.parse(tempAuth.value);
-
-      // Check if temp token is expired (5 minutes)
-      if (Date.now() - authData.timestamp > 5 * 60 * 1000) {
-        await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } });
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Session expired. Please login again.',
-        });
-      }
-
-      const { userId, email, role } = authData;
+      const { userId, email, role } = await getValidTempAuthSession(input.tempToken);
 
       // Try TOTP verification
       if (input.totpCode) {
@@ -338,9 +526,13 @@ const authRouter = router({
       }
 
       // 2FA verified - clean up temp token and create real session
-      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } });
+      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } }).catch(() => undefined);
+      await db.settings.delete({ where: { key: `temp_auth_webauthn_${input.tempToken}` } }).catch(() => undefined);
 
-      const token = await createSession(userId, email, role);
+      const token = await createSession(userId, email, role, {
+        ip: ctx.clientIp,
+        userAgent: ctx.userAgent,
+      });
       await setSessionCookie(token);
 
       await writeAuditLog({

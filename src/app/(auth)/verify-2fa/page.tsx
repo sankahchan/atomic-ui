@@ -20,8 +20,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { Loader2, Shield, KeyRound, ArrowLeft } from 'lucide-react';
+import { Loader2, Shield, KeyRound, ArrowLeft, Fingerprint } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { startAuthentication } from '@simplewebauthn/browser';
 
 function redirectAfterLogin(target: string) {
   if (typeof window !== 'undefined') {
@@ -37,10 +38,13 @@ function Verify2FAContent() {
   const tempToken = searchParams.get('token');
   const totpEnabled = searchParams.get('totp') === 'true';
   const webAuthnEnabled = searchParams.get('webauthn') === 'true';
+  const recoveryEnabled = totpEnabled;
 
   const [totpCode, setTotpCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
-  const [activeTab, setActiveTab] = useState<'totp' | 'recovery'>(totpEnabled ? 'totp' : 'recovery');
+  const [activeTab, setActiveTab] = useState<'totp' | 'passkey' | 'recovery'>(
+    totpEnabled ? 'totp' : webAuthnEnabled ? 'passkey' : 'recovery',
+  );
 
   useEffect(() => {
     router.prefetch('/dashboard');
@@ -73,6 +77,38 @@ function Verify2FAContent() {
       toast({
         title: 'Verification failed',
         description: error.message || 'Invalid code. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const verifyWebAuthnLoginMutation = trpc.auth.verifyWebAuthnLogin.useMutation({
+    onSuccess: (data) => {
+      toast({
+        title: 'Welcome back!',
+        description: 'Passkey verification successful.',
+      });
+
+      if (data.role === 'ADMIN') {
+        redirectAfterLogin('/dashboard');
+      } else {
+        redirectAfterLogin('/portal');
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: 'Verification failed',
+        description: error.message || 'Passkey verification failed. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const generateWebAuthnLoginOptionsMutation = trpc.auth.generateWebAuthnLoginOptions.useMutation({
+    onError: (error) => {
+      toast({
+        title: 'Passkey unavailable',
+        description: error.message || 'Unable to start passkey verification.',
         variant: 'destructive',
       });
     },
@@ -122,6 +158,31 @@ function Verify2FAContent() {
     router.push('/login');
   };
 
+  const handlePasskeyVerification = async () => {
+    if (!tempToken) return;
+
+    try {
+      const options = await generateWebAuthnLoginOptionsMutation.mutateAsync({ tempToken });
+      const response = await startAuthentication({ optionsJSON: options });
+      await verifyWebAuthnLoginMutation.mutateAsync({
+        tempToken,
+        response,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'NotAllowedError') {
+        return;
+      }
+
+      if (error instanceof Error) {
+        toast({
+          title: 'Passkey verification failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
   if (!tempToken) {
     return null;
   }
@@ -169,16 +230,31 @@ function Verify2FAContent() {
         </CardHeader>
 
         <CardContent className="pb-8">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'totp' | 'recovery')}>
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="totp" disabled={!totpEnabled}>
-                <KeyRound className="h-4 w-4 mr-2" />
-                Authenticator
-              </TabsTrigger>
-              <TabsTrigger value="recovery">
-                <Shield className="h-4 w-4 mr-2" />
-                Recovery Code
-              </TabsTrigger>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'totp' | 'passkey' | 'recovery')}>
+            <TabsList
+              className={cn(
+                'grid w-full mb-6',
+                totpEnabled && webAuthnEnabled ? 'grid-cols-3' : totpEnabled || webAuthnEnabled ? 'grid-cols-2' : 'grid-cols-1',
+              )}
+            >
+              {totpEnabled && (
+                <TabsTrigger value="totp">
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Authenticator
+                </TabsTrigger>
+              )}
+              {webAuthnEnabled && (
+                <TabsTrigger value="passkey">
+                  <Fingerprint className="h-4 w-4 mr-2" />
+                  Passkey
+                </TabsTrigger>
+              )}
+              {recoveryEnabled && (
+                <TabsTrigger value="recovery">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Recovery Code
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="totp">
@@ -235,6 +311,44 @@ function Verify2FAContent() {
                   )}
                 </Button>
               </form>
+            </TabsContent>
+
+            <TabsContent value="passkey">
+              <div className="space-y-5">
+                <div className="space-y-2 text-center">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Passkey Verification
+                  </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Use the passkey already registered on this account to complete sign-in.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  className={cn(
+                    'w-full h-12 rounded-[30px]',
+                    'bg-blue-500 hover:bg-blue-600',
+                    'text-white font-medium',
+                    'shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40',
+                    'transition-all duration-200'
+                  )}
+                  disabled={generateWebAuthnLoginOptionsMutation.isPending || verifyWebAuthnLoginMutation.isPending}
+                  onClick={handlePasskeyVerification}
+                >
+                  {generateWebAuthnLoginOptionsMutation.isPending || verifyWebAuthnLoginMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="mr-2 h-5 w-5" />
+                      Verify with Passkey
+                    </>
+                  )}
+                </Button>
+              </div>
             </TabsContent>
 
             <TabsContent value="recovery">

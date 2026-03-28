@@ -29,6 +29,12 @@ import {
     suppressAdminLoginAlerts,
     unbanAdminLoginIp,
 } from '@/lib/services/admin-login-protection';
+import {
+    canRemoveAdminSecondFactor,
+    getAdmin2FAPolicyOverview,
+    setAdmin2FARequired,
+} from '@/lib/admin-2fa-policy';
+import { getSessionToken, invalidateSession } from '@/lib/auth';
 
 // Create TOTP instance
 const totp = new TOTP();
@@ -91,6 +97,37 @@ function generateRecoveryCodes(count: number = 10): string[] {
         codes.push(`${part1}-${part2}`);
     }
     return codes;
+}
+
+function parseSessionUserAgent(userAgent: string | null) {
+    const source = userAgent ?? '';
+    const lower = source.toLowerCase();
+
+    let browser = 'Unknown browser';
+    if (lower.includes('edg/')) browser = 'Microsoft Edge';
+    else if (lower.includes('opr/') || lower.includes('opera')) browser = 'Opera';
+    else if (lower.includes('samsungbrowser')) browser = 'Samsung Internet';
+    else if (lower.includes('chrome/') && !lower.includes('edg/')) browser = 'Google Chrome';
+    else if (lower.includes('firefox/')) browser = 'Mozilla Firefox';
+    else if (lower.includes('safari/') && !lower.includes('chrome/')) browser = 'Safari';
+
+    let os = 'Unknown OS';
+    if (lower.includes('iphone') || lower.includes('ipad') || lower.includes('ios')) os = 'iOS';
+    else if (lower.includes('android')) os = 'Android';
+    else if (lower.includes('mac os x') || lower.includes('macintosh')) os = 'macOS';
+    else if (lower.includes('windows')) os = 'Windows';
+    else if (lower.includes('linux')) os = 'Linux';
+
+    let device = 'Desktop';
+    if (lower.includes('ipad') || lower.includes('tablet')) device = 'Tablet';
+    else if (lower.includes('iphone') || lower.includes('android') || lower.includes('mobile')) device = 'Mobile';
+
+    return {
+        browser,
+        os,
+        device,
+        label: `${device} · ${browser}`,
+    };
 }
 
 export const securityRouter = router({
@@ -437,22 +474,24 @@ export const securityRouter = router({
     get2FAStatus: protectedProcedure.query(async ({ ctx }) => {
         const userId = ctx.user.id;
 
-        const totpSecret = await db.totpSecret.findUnique({
-            where: { userId },
-            select: { verified: true, createdAt: true },
-        });
-
-        const webAuthnCredentials = await db.webAuthnCredential.findMany({
-            where: { userId },
-            select: { id: true, name: true, createdAt: true, lastUsedAt: true },
-        });
-
-        const recoveryCodes = await db.recoveryCode.findMany({
-            where: { userId, usedAt: null },
-            select: { id: true },
-        });
+        const [totpSecret, webAuthnCredentials, recoveryCodes, adminPolicy] = await Promise.all([
+            db.totpSecret.findUnique({
+                where: { userId },
+                select: { verified: true, createdAt: true },
+            }),
+            db.webAuthnCredential.findMany({
+                where: { userId },
+                select: { id: true, name: true, createdAt: true, lastUsedAt: true },
+            }),
+            db.recoveryCode.findMany({
+                where: { userId, usedAt: null },
+                select: { id: true },
+            }),
+            ctx.user.role === 'ADMIN' ? getAdmin2FAPolicyOverview() : Promise.resolve(null),
+        ]);
 
         return {
+            currentUserRole: ctx.user.role,
             totpEnabled: totpSecret?.verified || false,
             totpSetupStarted: !!totpSecret && !totpSecret.verified,
             webAuthnEnabled: webAuthnCredentials.length > 0,
@@ -464,6 +503,91 @@ export const securityRouter = router({
             })),
             recoveryCodesRemaining: recoveryCodes.length,
             has2FA: (totpSecret?.verified || false) || webAuthnCredentials.length > 0,
+            adminPolicy,
+        };
+    }),
+
+    updateAdmin2FAPolicy: adminProcedure
+        .input(z.object({
+            required: z.boolean(),
+        }))
+        .mutation(async ({ input, ctx }) => {
+            if (input.required) {
+                const overview = await getAdmin2FAPolicyOverview();
+                if (!overview.canEnable) {
+                    throw new TRPCError({
+                        code: 'BAD_REQUEST',
+                        message: 'All admin accounts must have at least one second factor before this policy can be enabled.',
+                    });
+                }
+            }
+
+            await setAdmin2FARequired(input.required);
+
+            return getAdmin2FAPolicyOverview();
+        }),
+
+    listAccountSessions: protectedProcedure.query(async ({ ctx }) => {
+        const currentToken = await getSessionToken();
+        const sessions = await db.session.findMany({
+            where: {
+                userId: ctx.user.id,
+                expiresAt: { gt: new Date() },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const mapped = sessions.map((session) => ({
+            id: session.id,
+            ip: session.ip,
+            userAgent: session.userAgent,
+            createdAt: session.createdAt,
+            expiresAt: session.expiresAt,
+            isCurrent: session.token === currentToken,
+            ...parseSessionUserAgent(session.userAgent),
+        }));
+
+        return mapped.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent));
+    }),
+
+    revokeAccountSession: protectedProcedure
+        .input(z.object({ sessionId: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+            const currentToken = await getSessionToken();
+            const session = await db.session.findFirst({
+                where: {
+                    id: input.sessionId,
+                    userId: ctx.user.id,
+                },
+            });
+
+            if (!session) {
+                throw new TRPCError({
+                    code: 'NOT_FOUND',
+                    message: 'Session not found.',
+                });
+            }
+
+            await invalidateSession(session.token);
+
+            return {
+                success: true,
+                revokedCurrent: currentToken === session.token,
+            };
+        }),
+
+    revokeOtherAccountSessions: protectedProcedure.mutation(async ({ ctx }) => {
+        const currentToken = await getSessionToken();
+        const result = await db.session.deleteMany({
+            where: {
+                userId: ctx.user.id,
+                ...(currentToken ? { token: { not: currentToken } } : {}),
+            },
+        });
+
+        return {
+            success: true,
+            revokedCount: result.count,
         };
     }),
 
@@ -680,6 +804,19 @@ export const securityRouter = router({
                 throw new TRPCError({
                     code: 'UNAUTHORIZED',
                     message: 'Invalid verification code.',
+                });
+            }
+
+            const removalCheck = await canRemoveAdminSecondFactor({
+                userId,
+                role: ctx.user.role,
+                removeTotp: true,
+            });
+
+            if (!removalCheck.allowed) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: removalCheck.reason,
                 });
             }
 
@@ -1073,6 +1210,19 @@ export const securityRouter = router({
 
             if (!credential) {
                 throw new TRPCError({ code: 'NOT_FOUND' });
+            }
+
+            const removalCheck = await canRemoveAdminSecondFactor({
+                userId,
+                role: ctx.user.role,
+                removeWebAuthnCount: 1,
+            });
+
+            if (!removalCheck.allowed) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: removalCheck.reason,
+                });
             }
 
             await db.webAuthnCredential.delete({

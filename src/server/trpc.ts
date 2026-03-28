@@ -32,6 +32,7 @@ export interface Context {
   clientIp: string | null;
   requestHost: string | null;
   requestPath: string | null;
+  userAgent: string | null;
 }
 
 /**
@@ -47,6 +48,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
   let clientIp: string | null = null;
   let requestHost: string | null = null;
   let requestPath: string | null = null;
+  let userAgent: string | null = null;
 
   if (opts?.req) {
     requestHost =
@@ -60,6 +62,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
         return null;
       }
     })();
+    userAgent = opts.req.headers.get('user-agent');
 
     const forwardedFor = opts.req.headers.get('x-forwarded-for');
     const { normalizeIpAddress } = await import('@/lib/security');
@@ -97,7 +100,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
     }
   }
 
-  return { user, clientIp, requestHost, requestPath };
+  return { user, clientIp, requestHost, requestPath, userAgent };
 }
 
 /**
@@ -160,6 +163,9 @@ const enforceAuth = t.middleware(({ ctx, next }) => {
     ctx: {
       user: ctx.user,
       clientIp: ctx.clientIp,
+      requestHost: ctx.requestHost,
+      requestPath: ctx.requestPath,
+      userAgent: ctx.userAgent,
     },
   });
 });
@@ -190,6 +196,9 @@ const enforceAdmin = t.middleware(({ ctx, next }) => {
     ctx: {
       user: ctx.user,
       clientIp: ctx.clientIp,
+      requestHost: ctx.requestHost,
+      requestPath: ctx.requestPath,
+      userAgent: ctx.userAgent,
     },
   });
 });
