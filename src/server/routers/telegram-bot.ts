@@ -11,6 +11,15 @@ import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
+import {
+  TELEGRAM_SALES_SETTING_KEY,
+  normalizeTelegramSalesSettings,
+  telegramSalesSettingsSchema,
+} from '@/lib/services/telegram-sales';
+import {
+  approveTelegramOrder,
+  rejectTelegramOrder,
+} from '@/lib/services/telegram-bot';
 
 /**
  * Telegram Bot Settings Schema
@@ -108,6 +117,149 @@ export const telegramBotRouter = router({
       });
 
       return { success: true };
+    }),
+
+  getSalesConfig: adminProcedure.query(async () => {
+    const settings = await db.settings.findUnique({
+      where: { key: TELEGRAM_SALES_SETTING_KEY },
+      select: { value: true },
+    });
+
+    if (!settings) {
+      return normalizeTelegramSalesSettings(null);
+    }
+
+    try {
+      return normalizeTelegramSalesSettings(JSON.parse(settings.value));
+    } catch {
+      return normalizeTelegramSalesSettings(null);
+    }
+  }),
+
+  updateSalesConfig: adminProcedure
+    .input(telegramSalesSettingsSchema)
+    .mutation(async ({ input }) => {
+      const normalized = normalizeTelegramSalesSettings(input);
+
+      await db.settings.upsert({
+        where: { key: TELEGRAM_SALES_SETTING_KEY },
+        create: {
+          key: TELEGRAM_SALES_SETTING_KEY,
+          value: JSON.stringify(normalized),
+        },
+        update: {
+          value: JSON.stringify(normalized),
+        },
+      });
+
+      return normalized;
+    }),
+
+  listOrders: adminProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(100).default(25),
+          statuses: z.array(z.string()).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 25;
+      const statuses = input?.statuses?.filter(Boolean);
+
+      const orders = await db.telegramOrder.findMany({
+        where: statuses?.length
+          ? {
+              status: {
+                in: statuses,
+              },
+            }
+          : undefined,
+        orderBy: [{ createdAt: 'desc' }],
+        take: limit,
+        include: {
+          reviewedBy: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      const relatedKeyIds = Array.from(
+        new Set(
+          orders.flatMap((order) =>
+            [order.targetAccessKeyId, order.approvedAccessKeyId].filter(
+              (value): value is string => Boolean(value),
+            ),
+          ),
+        ),
+      );
+
+      const keys = relatedKeyIds.length
+        ? await db.accessKey.findMany({
+            where: {
+              id: {
+                in: relatedKeyIds,
+              },
+            },
+            select: {
+              id: true,
+              name: true,
+              publicSlug: true,
+              subscriptionToken: true,
+            },
+          })
+        : [];
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+
+      return orders.map((order) => ({
+        ...order,
+        dataLimitBytes: order.dataLimitBytes?.toString() ?? null,
+        targetAccessKeyName: order.targetAccessKeyId
+          ? keysById.get(order.targetAccessKeyId)?.name ?? null
+          : null,
+        approvedAccessKeyName: order.approvedAccessKeyId
+          ? keysById.get(order.approvedAccessKeyId)?.name ?? null
+          : null,
+        approvedAccessKeySlug: order.approvedAccessKeyId
+          ? keysById.get(order.approvedAccessKeyId)?.publicSlug ?? null
+          : null,
+      }));
+    }),
+
+  approveOrder: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return approveTelegramOrder({
+        orderId: input.orderId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+      });
+    }),
+
+  rejectOrder: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return rejectTelegramOrder({
+        orderId: input.orderId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+      });
     }),
 
   /**

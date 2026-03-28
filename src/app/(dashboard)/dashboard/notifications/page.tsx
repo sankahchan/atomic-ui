@@ -49,6 +49,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Save,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 
@@ -177,6 +178,127 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   dailyDigestHour: 9,
   dailyDigestMinute: 0,
   digestLookbackHours: 24,
+};
+
+type TelegramSalesPlanCode = '1m_150gb' | '2m_300gb' | '3plus_unlimited';
+
+type TelegramSalesPlanForm = {
+  code: TelegramSalesPlanCode;
+  enabled: boolean;
+  label: string;
+  localizedLabels: {
+    en: string;
+    my: string;
+  };
+  priceLabel: string;
+  localizedPriceLabels: {
+    en: string;
+    my: string;
+  };
+  templateId?: string | null;
+  fixedDurationMonths?: number | null;
+  minDurationMonths?: number | null;
+  dataLimitGB?: number | null;
+  unlimitedQuota: boolean;
+};
+
+type TelegramSalesSettingsForm = {
+  enabled: boolean;
+  allowRenewals: boolean;
+  paymentInstructions: string;
+  localizedPaymentInstructions: {
+    en: string;
+    my: string;
+  };
+  plans: TelegramSalesPlanForm[];
+};
+
+type TelegramOrderRow = {
+  id: string;
+  orderCode: string;
+  kind: string;
+  status: string;
+  telegramChatId: string;
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  locale: string;
+  requestedName?: string | null;
+  requestedEmail?: string | null;
+  planCode?: string | null;
+  planName?: string | null;
+  priceLabel?: string | null;
+  durationMonths?: number | null;
+  dataLimitBytes?: string | null;
+  unlimitedQuota: boolean;
+  templateId?: string | null;
+  targetAccessKeyId?: string | null;
+  targetAccessKeyName?: string | null;
+  approvedAccessKeyId?: string | null;
+  approvedAccessKeyName?: string | null;
+  paymentProofType?: string | null;
+  paymentSubmittedAt?: Date | null;
+  paymentCaption?: string | null;
+  adminNote?: string | null;
+  reviewedAt?: Date | null;
+  fulfilledAt?: Date | null;
+  rejectedAt?: Date | null;
+  createdAt: Date;
+  reviewedBy?: {
+    id: string;
+    email?: string | null;
+  } | null;
+};
+
+const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
+  enabled: false,
+  allowRenewals: true,
+  paymentInstructions:
+    'After payment, send the screenshot here as a photo or document. Your order will stay pending until the admin approves it.',
+  localizedPaymentInstructions: {
+    en: 'After payment, send the screenshot here as a photo or document. Your order will stay pending until the admin approves it.',
+    my: 'ငွေပေးချေပြီးပါက screenshot ကို ဤနေရာတွင် photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။',
+  },
+  plans: [
+    {
+      code: '1m_150gb',
+      enabled: true,
+      label: '1 Month / 150 GB',
+      localizedLabels: { en: '1 Month / 150 GB', my: '၁ လ / 150 GB' },
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      templateId: null,
+      fixedDurationMonths: 1,
+      minDurationMonths: null,
+      dataLimitGB: 150,
+      unlimitedQuota: false,
+    },
+    {
+      code: '2m_300gb',
+      enabled: true,
+      label: '2 Months / 300 GB',
+      localizedLabels: { en: '2 Months / 300 GB', my: '၂ လ / 300 GB' },
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      templateId: null,
+      fixedDurationMonths: 2,
+      minDurationMonths: null,
+      dataLimitGB: 300,
+      unlimitedQuota: false,
+    },
+    {
+      code: '3plus_unlimited',
+      enabled: true,
+      label: '3+ Months / Unlimited',
+      localizedLabels: { en: '3+ Months / Unlimited', my: '၃ လနှင့်အထက် / Unlimited' },
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      templateId: null,
+      fixedDurationMonths: null,
+      minDurationMonths: 3,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+  ],
 };
 
 function getEventLabel(eventId: string, t: (key: string) => string) {
@@ -1487,6 +1609,636 @@ function ChannelCard({
   );
 }
 
+function TelegramSalesWorkflowCard() {
+  const { toast } = useToast();
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
+  const utils = trpc.useUtils();
+  const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
+  const ordersQuery = trpc.telegramBot.listOrders.useQuery({ limit: 30 });
+  const templatesQuery = trpc.templates.list.useQuery();
+  const [form, setForm] = useState<TelegramSalesSettingsForm>(DEFAULT_TELEGRAM_SALES_SETTINGS);
+  const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
+
+  const salesUi = {
+    title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
+    desc: isMyanmar
+      ? 'အသုံးပြုသူများက bot မှတစ်ဆင့် plan ရွေးခြင်း၊ payment proof ပို့ခြင်းနှင့် admin အတည်ပြုချက်ဖြင့် key ရယူနိုင်ပါသည်။'
+      : 'Let users pick a plan, upload payment proof, and wait for admin approval before a key is delivered.',
+    enableOrders: isMyanmar ? 'Telegram order flow ကို ဖွင့်မည်' : 'Enable Telegram order flow',
+    allowRenewals: isMyanmar ? 'Renewal order များကို ခွင့်ပြုမည်' : 'Allow renewal orders',
+    paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
+    englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
+    burmeseInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
+    planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
+    planLabel: isMyanmar ? 'Plan အမည်' : 'Plan label',
+    burmeseLabel: isMyanmar ? 'မြန်မာ label' : 'Burmese label',
+    priceLabel: isMyanmar ? 'စျေးနှုန်း label' : 'Price label',
+    burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
+    template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
+    noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
+    behavior: isMyanmar ? 'Plan behavior' : 'Plan behavior',
+    enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
+    disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
+    unlimited: isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
+    months: (count: number) => (isMyanmar ? `${count} လ` : `${count} month${count === 1 ? '' : 's'}`),
+    minMonths: (count: number) => (isMyanmar ? `အနည်းဆုံး ${count} လ` : `Minimum ${count} months`),
+    dataLimit: (gb: number | null | undefined) =>
+      gb ? (isMyanmar ? `${gb} GB limit` : `${gb} GB limit`) : isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
+    saveConfig: isMyanmar ? 'Order settings သိမ်းမည်' : 'Save order settings',
+    saved: isMyanmar ? 'Telegram order settings သိမ်းပြီးပါပြီ' : 'Telegram order settings saved',
+    savedDesc: isMyanmar ? 'Plan configuration နှင့် payment instructions ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Plan configuration and payment instructions were updated.',
+    pendingTitle: isMyanmar ? 'Pending review orders' : 'Pending review orders',
+    reviewQueue: isMyanmar ? 'Review queue' : 'Review queue',
+    noOrders: isMyanmar ? 'အော်ဒါ မရှိသေးပါ။' : 'No Telegram orders yet.',
+    user: isMyanmar ? 'User' : 'User',
+    order: isMyanmar ? 'Order' : 'Order',
+    proof: isMyanmar ? 'Payment proof' : 'Payment proof',
+    target: isMyanmar ? 'Target key' : 'Target key',
+    submitted: isMyanmar ? 'Submitted' : 'Submitted',
+    status: isMyanmar ? 'Status' : 'Status',
+    approve: isMyanmar ? 'အတည်ပြုမည်' : 'Approve',
+    reject: isMyanmar ? 'ပယ်မည်' : 'Reject',
+    adminNote: isMyanmar ? 'Admin note' : 'Admin note',
+    approveSuccess: isMyanmar ? 'အော်ဒါကို အတည်ပြုပြီး key ပေးပြီးပါပြီ' : 'Order approved and key delivered',
+    rejectSuccess: isMyanmar ? 'အော်ဒါကို ပယ်ပြီး Telegram သို့ အသိပေးပြီးပါပြီ' : 'Order rejected and user notified',
+    deliveryWarning: isMyanmar ? 'Key ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
+    markForReview: isMyanmar ? 'Payment proof ကို admin များ Telegram chat တွင် စစ်ဆေးပါ။' : 'Review the payment proof from your Telegram admin chat before approving.',
+    awaitingProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
+    fulfilled: isMyanmar ? 'Fulfilled' : 'Fulfilled',
+    rejected: isMyanmar ? 'Rejected' : 'Rejected',
+    pending: isMyanmar ? 'Pending review' : 'Pending review',
+  };
+
+  useEffect(() => {
+    if (!settingsQuery.data) {
+      return;
+    }
+
+    setForm({
+      enabled: settingsQuery.data.enabled ?? false,
+      allowRenewals: settingsQuery.data.allowRenewals ?? true,
+      paymentInstructions: settingsQuery.data.paymentInstructions || DEFAULT_TELEGRAM_SALES_SETTINGS.paymentInstructions,
+      localizedPaymentInstructions: {
+        en:
+          settingsQuery.data.localizedPaymentInstructions?.en ||
+          settingsQuery.data.paymentInstructions ||
+          DEFAULT_TELEGRAM_SALES_SETTINGS.localizedPaymentInstructions.en,
+        my:
+          settingsQuery.data.localizedPaymentInstructions?.my ||
+          DEFAULT_TELEGRAM_SALES_SETTINGS.localizedPaymentInstructions.my,
+      },
+      plans: DEFAULT_TELEGRAM_SALES_SETTINGS.plans.map((fallbackPlan) => {
+        const override = settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code);
+        return {
+          ...fallbackPlan,
+          ...override,
+          localizedLabels: {
+            en: override?.localizedLabels?.en || override?.label || fallbackPlan.localizedLabels.en,
+            my: override?.localizedLabels?.my || fallbackPlan.localizedLabels.my,
+          },
+          localizedPriceLabels: {
+            en: override?.localizedPriceLabels?.en || override?.priceLabel || fallbackPlan.localizedPriceLabels.en,
+            my: override?.localizedPriceLabels?.my || fallbackPlan.localizedPriceLabels.my,
+          },
+          templateId: override?.templateId ?? fallbackPlan.templateId,
+        };
+      }),
+    });
+  }, [settingsQuery.data]);
+
+  const saveConfigMutation = trpc.telegramBot.updateSalesConfig.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.getSalesConfig.invalidate(),
+        utils.telegramBot.listOrders.invalidate(),
+      ]);
+      toast({
+        title: salesUi.saved,
+        description: salesUi.savedDesc,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram sales settings failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const approveOrderMutation = trpc.telegramBot.approveOrder.useMutation({
+    onSuccess: async (result) => {
+      await utils.telegramBot.listOrders.invalidate();
+      setReviewTarget(null);
+      setReviewNote('');
+      toast({
+        title: salesUi.approveSuccess,
+        description: result.deliveryError || result.sharePageUrl || result.accessKeyName,
+        variant: result.deliveryError ? 'destructive' : 'default',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Approval failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rejectOrderMutation = trpc.telegramBot.rejectOrder.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listOrders.invalidate();
+      setReviewTarget(null);
+      setReviewNote('');
+      toast({
+        title: salesUi.rejectSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Rejection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updatePlan = (
+    planCode: TelegramSalesPlanCode,
+    updater: (plan: TelegramSalesPlanForm) => TelegramSalesPlanForm,
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      plans: prev.plans.map((plan) => (plan.code === planCode ? updater(plan) : plan)),
+    }));
+  };
+
+  const handleSaveConfig = () => {
+    saveConfigMutation.mutate({
+      enabled: form.enabled,
+      allowRenewals: form.allowRenewals,
+      paymentInstructions: form.paymentInstructions.trim(),
+      localizedPaymentInstructions: {
+        en: form.localizedPaymentInstructions.en.trim(),
+        my: form.localizedPaymentInstructions.my.trim(),
+      },
+      plans: form.plans.map((plan) => ({
+        code: plan.code,
+        enabled: plan.enabled,
+        label: plan.label.trim(),
+        localizedLabels: {
+          en: plan.localizedLabels.en.trim(),
+          my: plan.localizedLabels.my.trim(),
+        },
+        priceLabel: plan.priceLabel.trim(),
+        localizedPriceLabels: {
+          en: plan.localizedPriceLabels.en.trim(),
+          my: plan.localizedPriceLabels.my.trim(),
+        },
+        templateId: plan.templateId || null,
+        fixedDurationMonths: plan.fixedDurationMonths ?? null,
+        minDurationMonths: plan.minDurationMonths ?? null,
+        dataLimitGB: plan.dataLimitGB ?? null,
+        unlimitedQuota: plan.unlimitedQuota,
+      })),
+    });
+  };
+
+  const pendingOrders = ((ordersQuery.data || []).filter(
+    (order) => order.status === 'PENDING_REVIEW',
+  ) as TelegramOrderRow[]);
+
+  return (
+    <>
+      <Card className="border-violet-500/20 bg-violet-500/[0.04] dark:bg-violet-500/[0.06]">
+        <CardHeader className="space-y-2">
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-violet-500" />
+            {salesUi.title}
+          </CardTitle>
+          <CardDescription>{salesUi.desc}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.enableOrders}</p>
+                <p className="text-xs text-muted-foreground">{salesUi.markForReview}</p>
+              </div>
+              <Switch
+                checked={form.enabled}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, enabled: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.allowRenewals}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar ? 'ရှိပြီးသော key များကို Telegram မှ renewal အော်ဒါတင်နိုင်ပါသည်။' : 'Allow Telegram users to place renewal orders for existing keys.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.allowRenewals}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, allowRenewals: checked }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{salesUi.englishInstructions}</Label>
+              <Textarea
+                value={form.localizedPaymentInstructions.en}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    paymentInstructions: event.target.value,
+                    localizedPaymentInstructions: {
+                      ...prev.localizedPaymentInstructions,
+                      en: event.target.value,
+                    },
+                  }))
+                }
+                rows={5}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{salesUi.burmeseInstructions}</Label>
+              <Textarea
+                value={form.localizedPaymentInstructions.my}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    localizedPaymentInstructions: {
+                      ...prev.localizedPaymentInstructions,
+                      my: event.target.value,
+                    },
+                  }))
+                }
+                rows={5}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{salesUi.planConfig}</p>
+              <p className="text-xs text-muted-foreground">
+                {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, price label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, price labels, and templates used by the Telegram bot.'}
+              </p>
+            </div>
+            <div className="space-y-3">
+              {form.plans.map((plan) => (
+                <div key={plan.code} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{plan.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {plan.fixedDurationMonths
+                          ? `${salesUi.months(plan.fixedDurationMonths)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
+                          : `${salesUi.minMonths(plan.minDurationMonths ?? 3)} • ${salesUi.unlimited}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={plan.enabled ? 'default' : 'secondary'}>
+                        {plan.enabled ? salesUi.enabled : salesUi.disabled}
+                      </Badge>
+                      <Switch
+                        checked={plan.enabled}
+                        onCheckedChange={(checked) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            enabled: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>{salesUi.planLabel}</Label>
+                      <Input
+                        value={plan.label}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            label: event.target.value,
+                            localizedLabels: {
+                              ...current.localizedLabels,
+                              en: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.burmeseLabel}</Label>
+                      <Input
+                        value={plan.localizedLabels.my}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            localizedLabels: {
+                              ...current.localizedLabels,
+                              my: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.priceLabel}</Label>
+                      <Input
+                        value={plan.priceLabel}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            priceLabel: event.target.value,
+                            localizedPriceLabels: {
+                              ...current.localizedPriceLabels,
+                              en: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.burmesePriceLabel}</Label>
+                      <Input
+                        value={plan.localizedPriceLabels.my}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            localizedPriceLabels: {
+                              ...current.localizedPriceLabels,
+                              my: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <Label>{salesUi.template}</Label>
+                      <Select
+                        value={plan.templateId || 'none'}
+                        onValueChange={(value) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            templateId: value === 'none' ? null : value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={salesUi.noTemplate} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
+                          {(templatesQuery.data || []).map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSaveConfig} disabled={saveConfigMutation.isPending}>
+              {saveConfigMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              {salesUi.saveConfig}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500/20 bg-amber-500/[0.03] dark:bg-amber-500/[0.05]">
+        <CardHeader className="space-y-2">
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-amber-500" />
+            {salesUi.reviewQueue}
+          </CardTitle>
+          <CardDescription>{salesUi.markForReview}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={pendingOrders.length > 0 ? 'default' : 'secondary'}>
+              {salesUi.pendingTitle}: {pendingOrders.length}
+            </Badge>
+            <Badge variant="outline">
+              {isMyanmar ? `စုစုပေါင်း ${ordersQuery.data?.length || 0} ခု` : `Total ${ordersQuery.data?.length || 0} orders`}
+            </Badge>
+          </div>
+
+          {ordersQuery.isLoading ? (
+            <div className="flex items-center gap-2 rounded-2xl border border-border/60 p-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {isMyanmar ? 'Telegram orders များကို ရယူနေသည်…' : 'Loading Telegram orders…'}
+            </div>
+          ) : !ordersQuery.data?.length ? (
+            <div className="rounded-2xl border border-dashed border-border/60 p-6 text-sm text-muted-foreground">
+              {salesUi.noOrders}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {ordersQuery.data.map((order) => (
+                <div key={order.id} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{order.orderCode}</p>
+                        <Badge
+                          variant={
+                            order.status === 'PENDING_REVIEW'
+                              ? 'default'
+                              : order.status === 'FULFILLED'
+                                ? 'secondary'
+                                : 'outline'
+                          }
+                        >
+                          {order.status === 'PENDING_REVIEW'
+                            ? salesUi.pending
+                            : order.status === 'FULFILLED'
+                              ? salesUi.fulfilled
+                              : order.status === 'REJECTED'
+                                ? salesUi.rejected
+                                : order.status}
+                        </Badge>
+                        <Badge variant="outline">{order.kind}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {salesUi.user}: @{order.telegramUsername || 'unknown'} · {order.telegramUserId}
+                      </p>
+                    </div>
+                    {order.status === 'PENDING_REVIEW' ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setReviewTarget({ orderId: order.id, mode: 'approve' });
+                            setReviewNote(order.adminNote || '');
+                          }}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          {salesUi.approve}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setReviewTarget({ orderId: order.id, mode: 'reject' });
+                            setReviewNote(order.adminNote || '');
+                          }}
+                        >
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          {salesUi.reject}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.order}
+                      </p>
+                      <p className="mt-2 text-sm font-medium">{order.planName || order.planCode || '—'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {order.requestedName || order.targetAccessKeyName || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.proof}
+                      </p>
+                      <p className="mt-2 text-sm font-medium">
+                        {order.paymentProofType || salesUi.awaitingProof}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {order.paymentSubmittedAt ? formatDateTime(order.paymentSubmittedAt) : '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.target}
+                      </p>
+                      <p className="mt-2 text-sm font-medium">{order.targetAccessKeyName || 'New key'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {order.approvedAccessKeyName || order.reviewedBy?.email || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.submitted}
+                      </p>
+                      <p className="mt-2 text-sm font-medium">{formatRelativeTime(order.createdAt)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDateTime(order.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {order.adminNote ? (
+                    <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.adminNote}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{order.adminNote}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={Boolean(reviewTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReviewTarget(null);
+            setReviewNote('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
+            </DialogTitle>
+            <DialogDescription>{salesUi.markForReview}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="telegram-order-review-note">{salesUi.adminNote}</Label>
+            <Textarea
+              id="telegram-order-review-note"
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+              rows={5}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReviewTarget(null);
+                setReviewNote('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!reviewTarget) {
+                  return;
+                }
+
+                if (reviewTarget.mode === 'approve') {
+                  approveOrderMutation.mutate({
+                    orderId: reviewTarget.orderId,
+                    adminNote: reviewNote.trim() || undefined,
+                  });
+                  return;
+                }
+
+                rejectOrderMutation.mutate({
+                  orderId: reviewTarget.orderId,
+                  adminNote: reviewNote.trim() || undefined,
+                });
+              }}
+              disabled={approveOrderMutation.isPending || rejectOrderMutation.isPending}
+            >
+              {approveOrderMutation.isPending || rejectOrderMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : reviewTarget?.mode === 'approve' ? (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              ) : (
+                <AlertTriangle className="mr-2 h-4 w-4" />
+              )}
+              {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 /**
  * KeyAlertsCard Component
  *
@@ -2430,6 +3182,7 @@ export default function NotificationsPage() {
       </Card>
 
       <TelegramBotSetupCard />
+      <TelegramSalesWorkflowCard />
 
       {/* Channels grid */}
       {isChannelsLoading ? (

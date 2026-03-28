@@ -38,6 +38,7 @@ model User {
   accessKeys         AccessKey[]
   dynamicAccessKeys  DynamicAccessKey[]
   telegramLinkTokens TelegramLinkToken[]
+  reviewedTelegramOrders TelegramOrder[]
   sessions           Session[]
 }
 
@@ -234,6 +235,46 @@ model AccessKey {
   @@index([expiresAt])
   @@index([userId])
   @@index([serverId])
+}
+
+model TelegramOrder {
+  id                   String   @id @default(cuid())
+  orderCode            String   @unique
+  kind                 String
+  status               String
+  telegramChatId       String
+  telegramUserId       String
+  telegramUsername     String?
+  locale               String   @default("en")
+  requestedName        String?
+  requestedEmail       String?
+  planCode             String?
+  planName             String?
+  priceLabel           String?
+  durationMonths       Int?
+  dataLimitBytes       BigInt?
+  unlimitedQuota       Boolean  @default(false)
+  templateId           String?
+  targetAccessKeyId    String?
+  approvedAccessKeyId  String?
+  paymentProofFileId   String?
+  paymentProofType     String?
+  paymentMessageId     Int?
+  paymentCaption       String?
+  paymentSubmittedAt   DateTime?
+  adminNote            String?
+  reviewedByUserId     String?
+  reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt           DateTime?
+  fulfilledAt          DateTime?
+  rejectedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([telegramChatId, status, createdAt])
+  @@index([telegramUserId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([reviewedByUserId, status])
 }
 
 model DynamicAccessKey {
