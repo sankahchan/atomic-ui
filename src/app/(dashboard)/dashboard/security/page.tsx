@@ -13,13 +13,15 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { downloadTextFile } from '@/lib/download';
 import {
     ShieldCheck, Plus, Trash2, Power, Globe, AlertTriangle,
     Lock, Unlock, CheckCircle, XCircle, AlertCircle, Server,
-    RefreshCw, Shield, Clock, ExternalLink, Loader2, Download
+    RefreshCw, Shield, Clock, ExternalLink, Loader2, Download,
+    Eye, Star, BellOff, ListFilter, Ban
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BackButton } from '@/components/ui/back-button';
@@ -559,6 +561,61 @@ const defaultIncidentFilters: IncidentFilters = {
     reputation: 'ALL' as const,
     timeWindowHours: 24 as number | null,
 };
+const SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY = 'security.defaultSavedViewId';
+
+function parseIncidentFiltersFromSearch(search: string): { filters: IncidentFilters; viewId: string; hasValues: boolean } {
+    const params = new URLSearchParams(search);
+    const next: IncidentFilters = { ...defaultIncidentFilters };
+    let hasValues = false;
+
+    const searchValue = params.get('search');
+    if (searchValue) {
+        next.search = searchValue;
+        hasValues = true;
+    }
+
+    const status = params.get('status');
+    if (status && incidentStatuses.includes(status as (typeof incidentStatuses)[number])) {
+        next.status = status as (typeof incidentStatuses)[number];
+        hasValues = true;
+    }
+
+    const workflowStatus = params.get('workflow');
+    if (workflowStatus && workflowStatuses.includes(workflowStatus as (typeof workflowStatuses)[number])) {
+        next.workflowStatus = workflowStatus as (typeof workflowStatuses)[number];
+        hasValues = true;
+    }
+
+    const severity = params.get('severity');
+    if (severity && incidentSeverities.includes(severity as (typeof incidentSeverities)[number])) {
+        next.severity = severity as (typeof incidentSeverities)[number];
+        hasValues = true;
+    }
+
+    const country = params.get('country');
+    if (country) {
+        next.country = country;
+        hasValues = true;
+    }
+
+    const reputation = params.get('reputation');
+    if (reputation && (reputation === 'ALL' || riskLevels.includes(reputation as (typeof riskLevels)[number]))) {
+        next.reputation = reputation as IncidentFilters['reputation'];
+        hasValues = true;
+    }
+
+    const timeWindow = params.get('hours');
+    if (timeWindow) {
+        next.timeWindowHours = timeWindow === 'all' ? null : Number(timeWindow);
+        hasValues = true;
+    }
+
+    return {
+        filters: next,
+        viewId: params.get('view') || 'all',
+        hasValues,
+    };
+}
 const alertRuleLabels: Record<string, { title: string; description: string }> = {
     threshold: {
         title: 'Threshold reached',
@@ -746,6 +803,26 @@ function LoginProtectionCard() {
             toast({ title: 'Failed to remove mute', description: error.message, variant: 'destructive' });
         },
     });
+    const bulkIncidentMutation = trpc.security.bulkUpdateAdminLoginIncidents.useMutation({
+        onSuccess: async (result) => {
+            toast({ title: 'Bulk incident action complete', description: `${result.processed} incidents updated.` });
+            setSelectedIncidentIds([]);
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Bulk incident action failed', description: error.message, variant: 'destructive' });
+        },
+    });
+    const bulkIpMutation = trpc.security.bulkUpdateAdminLoginIps.useMutation({
+        onSuccess: async (result) => {
+            toast({ title: 'Bulk IP action complete', description: `${result.processed} IP entries updated.` });
+            setSelectedIps([]);
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Bulk IP action failed', description: error.message, variant: 'destructive' });
+        },
+    });
 
     const [form, setForm] = useState<{
         enabled: boolean;
@@ -810,6 +887,15 @@ function LoginProtectionCard() {
     });
     const [incidentFilters, setIncidentFilters] = useState<IncidentFilters>(defaultIncidentFilters);
     const [activeSavedViewId, setActiveSavedViewId] = useState<string>('all');
+    const [defaultSavedViewId, setDefaultSavedViewId] = useState<string>('all');
+    const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
+    const [selectedIps, setSelectedIps] = useState<string[]>([]);
+    const [incidentDetailId, setIncidentDetailId] = useState<string | null>(null);
+    const [filtersBootstrapped, setFiltersBootstrapped] = useState(false);
+    const incidentDetailQuery = trpc.security.getAdminLoginIncidentDetail.useQuery(
+        { incidentId: incidentDetailId || '' },
+        { enabled: Boolean(incidentDetailId) },
+    );
 
     useEffect(() => {
         if (!overview?.config) {
@@ -841,6 +927,72 @@ function LoginProtectionCard() {
             trustedIpRanges: (overview.config.trustedIpRanges || []).join('\n'),
         });
     }, [overview]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const stored = window.localStorage.getItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY);
+        if (stored) {
+            setDefaultSavedViewId(stored);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!overview || filtersBootstrapped || typeof window === 'undefined') {
+            return;
+        }
+
+        const parsed = parseIncidentFiltersFromSearch(window.location.search);
+        if (parsed.hasValues) {
+            setIncidentFilters(parsed.filters);
+            setActiveSavedViewId(parsed.viewId);
+            setFiltersBootstrapped(true);
+            return;
+        }
+
+        const storedDefault = window.localStorage.getItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY) || defaultSavedViewId;
+        if (storedDefault !== 'all') {
+            const savedView = overview.savedViews.find((view) => view.id === storedDefault);
+            if (savedView) {
+                setActiveSavedViewId(savedView.id);
+                setIncidentFilters(savedView.filters);
+            } else {
+                window.localStorage.removeItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY);
+                setDefaultSavedViewId('all');
+            }
+        }
+
+        setFiltersBootstrapped(true);
+    }, [defaultSavedViewId, filtersBootstrapped, overview]);
+
+    useEffect(() => {
+        if (!filtersBootstrapped || typeof window === 'undefined') {
+            return;
+        }
+
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+
+        const setOrDelete = (key: string, value: string | null) => {
+            if (!value || value === 'ALL') {
+                params.delete(key);
+                return;
+            }
+            params.set(key, value);
+        };
+
+        setOrDelete('search', incidentFilters.search.trim() || null);
+        setOrDelete('status', incidentFilters.status);
+        setOrDelete('workflow', incidentFilters.workflowStatus);
+        setOrDelete('severity', incidentFilters.severity);
+        setOrDelete('country', incidentFilters.country === 'ALL' ? null : incidentFilters.country);
+        setOrDelete('reputation', incidentFilters.reputation);
+        setOrDelete('hours', incidentFilters.timeWindowHours === null ? 'all' : String(incidentFilters.timeWindowHours));
+        setOrDelete('view', activeSavedViewId === 'all' ? null : activeSavedViewId);
+
+        window.history.replaceState({}, '', url.toString());
+    }, [activeSavedViewId, filtersBootstrapped, incidentFilters]);
 
     const activeIncidentCount = overview?.securityIncidents.filter((incident) => incident.status === 'ACTIVE').length ?? 0;
     const highRiskIpCount =
@@ -936,6 +1088,25 @@ function LoginProtectionCard() {
             setActiveSavedViewId('all');
             setIncidentFilters(defaultIncidentFilters);
         }
+        if (defaultSavedViewId === viewId && typeof window !== 'undefined') {
+            window.localStorage.removeItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY);
+            setDefaultSavedViewId('all');
+        }
+    };
+
+    const handleSetDefaultSavedView = (viewId: string) => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        if (viewId === 'all') {
+            window.localStorage.removeItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY);
+            setDefaultSavedViewId('all');
+            toast({ title: 'Default view cleared', description: 'The security page will open with standard filters.' });
+            return;
+        }
+        window.localStorage.setItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY, viewId);
+        setDefaultSavedViewId(viewId);
+        toast({ title: 'Default view saved', description: 'This view will be applied when the security page opens.' });
     };
 
     const requestSuppressionInput = (title: string) => {
@@ -971,6 +1142,89 @@ function LoginProtectionCard() {
 
     const handleUnmuteScope = (scopeType: 'IP' | 'INCIDENT', scopeValue: string) => {
         unsuppressMutation.mutate({ scopeType, scopeValue });
+    };
+
+    const toggleIncidentSelection = (incidentId: string, checked: boolean) => {
+        setSelectedIncidentIds((current) =>
+            checked ? Array.from(new Set([...current, incidentId])) : current.filter((value) => value !== incidentId),
+        );
+    };
+
+    const toggleIpSelection = (ip: string, checked: boolean) => {
+        setSelectedIps((current) =>
+            checked ? Array.from(new Set([...current, ip])) : current.filter((value) => value !== ip),
+        );
+    };
+
+    const handleBulkIncidentAction = (
+        action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE',
+    ) => {
+        if (selectedIncidentIds.length === 0) {
+            return;
+        }
+        const note =
+            action === 'MUTE'
+                ? undefined
+                : requestNote(
+                    action === 'ACKNOWLEDGE'
+                        ? 'Optional note for bulk acknowledge'
+                        : 'Optional note for bulk resolve',
+                );
+        if (note === null) {
+            return;
+        }
+        const suppression =
+            action === 'MUTE'
+                ? requestSuppressionInput('Mute selected incident alerts for how many hours?')
+                : null;
+        if (action === 'MUTE' && !suppression) {
+            return;
+        }
+
+        bulkIncidentMutation.mutate({
+            incidentIds: selectedIncidentIds,
+            action,
+            note: note || undefined,
+            durationMinutes: suppression?.durationMinutes,
+        });
+    };
+
+    const handleBulkIpAction = (
+        action: 'BLOCK' | 'ALLOWLIST' | 'PROMOTE' | 'MUTE' | 'UNMUTE' | 'UNBAN',
+    ) => {
+        if (selectedIps.length === 0) {
+            return;
+        }
+        const note =
+            action === 'MUTE' || action === 'UNBAN'
+                ? undefined
+                : requestNote(
+                    action === 'BLOCK'
+                        ? 'Optional note for bulk block'
+                        : action === 'ALLOWLIST'
+                            ? 'Optional note for bulk allowlist'
+                            : 'Optional note for bulk promote',
+                );
+        if (note === null) {
+            return;
+        }
+        const suppression =
+            action === 'MUTE'
+                ? requestSuppressionInput('Mute selected IP alerts for how many hours?')
+                : null;
+        if (action === 'MUTE' && !suppression) {
+            return;
+        }
+        if (action === 'UNBAN' && !window.confirm(`Unban ${selectedIps.length} IPs?`)) {
+            return;
+        }
+
+        bulkIpMutation.mutate({
+            ips: selectedIps,
+            action,
+            note: note || undefined,
+            durationMinutes: suppression?.durationMinutes,
+        });
     };
 
     const filteredIncidents = useMemo(() => {
@@ -1080,6 +1334,20 @@ function LoginProtectionCard() {
         }
         return Array.from(values).sort();
     }, [overview]);
+    const allVisibleIncidentsSelected =
+        filteredIncidents.length > 0 && filteredIncidents.every((incident) => selectedIncidentIds.includes(incident.id));
+    const allVisibleIpsSelected =
+        filteredReputation.length > 0 && filteredReputation.every((entry) => selectedIps.includes(entry.ip));
+
+    useEffect(() => {
+        const visibleIncidentIds = new Set(filteredIncidents.map((incident) => incident.id));
+        setSelectedIncidentIds((current) => current.filter((id) => visibleIncidentIds.has(id)));
+    }, [filteredIncidents]);
+
+    useEffect(() => {
+        const visibleIps = new Set(filteredReputation.map((entry) => entry.ip));
+        setSelectedIps((current) => current.filter((ip) => visibleIps.has(ip)));
+    }, [filteredReputation]);
 
     if (isLoading || !overview) {
         return (
@@ -1887,6 +2155,39 @@ function LoginProtectionCard() {
                                         <RefreshCw className="mr-2 h-4 w-4" />
                                         Reset filters
                                     </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-full"
+                                        onClick={() => {
+                                            setActiveSavedViewId('all');
+                                            setIncidentFilters({
+                                                ...defaultIncidentFilters,
+                                                status: 'ACTIVE',
+                                                workflowStatus: 'OPEN',
+                                                timeWindowHours: 24,
+                                            });
+                                        }}
+                                    >
+                                        <ListFilter className="mr-2 h-4 w-4" />
+                                        My active work
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-full"
+                                        onClick={() => {
+                                            setActiveSavedViewId('all');
+                                            setIncidentFilters({
+                                                ...defaultIncidentFilters,
+                                                reputation: 'HIGH',
+                                                timeWindowHours: 168,
+                                            });
+                                        }}
+                                    >
+                                        <AlertTriangle className="mr-2 h-4 w-4" />
+                                        High-risk week
+                                    </Button>
                                 </div>
                             </div>
                             <div className="ops-detail-card space-y-3">
@@ -1906,6 +2207,15 @@ function LoginProtectionCard() {
                                     >
                                         All incidents
                                     </Button>
+                                    <Button
+                                        variant={defaultSavedViewId === 'all' ? 'secondary' : 'ghost'}
+                                        size="sm"
+                                        className="w-full justify-start rounded-full"
+                                        onClick={() => handleSetDefaultSavedView('all')}
+                                    >
+                                        <Star className="mr-2 h-4 w-4" />
+                                        {defaultSavedViewId === 'all' ? 'Default view' : 'Set current default'}
+                                    </Button>
                                     {overview.savedViews.map((view) => (
                                         <div key={view.id} className="flex items-center gap-2">
                                             <Button
@@ -1915,6 +2225,14 @@ function LoginProtectionCard() {
                                                 onClick={() => handleApplySavedView(view.id)}
                                             >
                                                 {view.name}
+                                            </Button>
+                                            <Button
+                                                variant={defaultSavedViewId === view.id ? 'secondary' : 'ghost'}
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full"
+                                                onClick={() => handleSetDefaultSavedView(view.id)}
+                                            >
+                                                <Star className="h-4 w-4" />
                                             </Button>
                                             <Button
                                                 variant="ghost"
@@ -1930,6 +2248,103 @@ function LoginProtectionCard() {
                                 </div>
                             </div>
                         </div>
+                        <div className="ops-detail-card space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="font-medium">Alert suppressions</p>
+                                    <p className="text-sm text-muted-foreground">Review muted incidents and IPs without opening each card.</p>
+                                </div>
+                                <Badge variant="outline">{overview.activeAlertSuppressions.length}</Badge>
+                            </div>
+                            {overview.activeAlertSuppressions.length === 0 ? (
+                                <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-4 text-sm text-muted-foreground">
+                                    No active suppressions.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {overview.activeAlertSuppressions.map((suppression) => {
+                                        const relatedIncident = suppression.scopeType === 'INCIDENT'
+                                            ? overview.securityIncidents.find((entry) => entry.id === suppression.scopeValue)
+                                            : null;
+                                        return (
+                                            <div
+                                                key={suppression.id}
+                                                className="rounded-[1rem] border border-border/50 bg-background/65 px-3 py-3 dark:bg-white/[0.02]"
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <div className="space-y-1">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <Badge variant="outline">{suppression.scopeType}</Badge>
+                                                            <span className="text-sm font-medium break-all">{suppression.scopeValue}</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {suppression.reason || 'No reason provided'} · expires {formatDistanceToNow(new Date(suppression.expiresAt), { addSuffix: true })}
+                                                        </p>
+                                                        {relatedIncident && (
+                                                            <p className="text-xs text-muted-foreground">{relatedIncident.summary}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {relatedIncident && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="rounded-full"
+                                                                onClick={() => setIncidentDetailId(relatedIncident.id)}
+                                                            >
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                View
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="rounded-full"
+                                                            disabled={unsuppressMutation.isPending}
+                                                            onClick={() => handleUnmuteScope(suppression.scopeType, suppression.scopeValue)}
+                                                        >
+                                                            <Unlock className="mr-2 h-4 w-4" />
+                                                            Unmute
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        {selectedIncidentIds.length > 0 && (
+                            <div className="ops-detail-card space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="font-medium">{selectedIncidentIds.length} incidents selected</p>
+                                        <p className="text-sm text-muted-foreground">Apply the same workflow or mute action to all selected incidents.</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedIncidentIds([])}>
+                                        Clear selection
+                                    </Button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('ACKNOWLEDGE')}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Acknowledge
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('RESOLVE')}>
+                                        <ShieldCheck className="mr-2 h-4 w-4" />
+                                        Resolve
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('MUTE')}>
+                                        <BellOff className="mr-2 h-4 w-4" />
+                                        Mute
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('UNMUTE')}>
+                                        <Unlock className="mr-2 h-4 w-4" />
+                                        Unmute
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                         {filteredIncidents.length === 0 ? (
                             <div className="ops-chart-empty py-8 text-muted-foreground">
                                 {overview.securityIncidents.length === 0
@@ -1938,10 +2353,32 @@ function LoginProtectionCard() {
                             </div>
                         ) : (
                             <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/50 bg-background/60 px-4 py-3 text-sm dark:bg-white/[0.02]">
+                                    <div className="flex items-center gap-3">
+                                        <Checkbox
+                                            checked={allVisibleIncidentsSelected}
+                                            onCheckedChange={(checked) =>
+                                                setSelectedIncidentIds(
+                                                    checked ? filteredIncidents.map((incident) => incident.id) : [],
+                                                )
+                                            }
+                                        />
+                                        <span className="text-muted-foreground">Select all visible incidents</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                        {selectedIncidentIds.length} selected
+                                    </span>
+                                </div>
                                 {filteredIncidents.map((incident) => (
                                     <div key={incident.id} className="ops-row-card space-y-3">
                                         <div className="flex flex-wrap items-start justify-between gap-3">
-                                            <div className="space-y-2">
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    checked={selectedIncidentIds.includes(incident.id)}
+                                                    onCheckedChange={(checked) => toggleIncidentSelection(incident.id, Boolean(checked))}
+                                                    className="mt-1"
+                                                />
+                                                <div className="space-y-2">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="font-medium">{incident.ip}</span>
                                                     {incident.countryCode && <Badge variant="outline">{incident.countryCode}</Badge>}
@@ -1962,10 +2399,20 @@ function LoginProtectionCard() {
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">{incident.summary}</p>
+                                                </div>
                                             </div>
                                             <div className="text-right text-xs text-muted-foreground">
                                                 <p>Started {formatDistanceToNow(new Date(incident.startedAt), { addSuffix: true })}</p>
                                                 <p>Last seen {formatDistanceToNow(new Date(incident.endedAt), { addSuffix: true })}</p>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="mt-2 rounded-full"
+                                                    onClick={() => setIncidentDetailId(incident.id)}
+                                                >
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Details
+                                                </Button>
                                             </div>
                                         </div>
                                         {(incident.notesPreview || incident.enrichment.reverseDns.length > 0 || incident.enrichment.asn || incident.enrichment.isp || incident.enrichment.organization) && (
@@ -2149,10 +2596,67 @@ function LoginProtectionCard() {
                             </div>
                         ) : (
                             <div className="space-y-3">
+                                {selectedIps.length > 0 && (
+                                    <div className="ops-detail-card space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-medium">{selectedIps.length} IPs selected</p>
+                                                <p className="text-sm text-muted-foreground">Run response and mute actions across all selected IPs.</p>
+                                            </div>
+                                            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedIps([])}>
+                                                Clear selection
+                                            </Button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('BLOCK')}>
+                                                <Lock className="mr-2 h-4 w-4" />
+                                                Block
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('ALLOWLIST')}>
+                                                <Shield className="mr-2 h-4 w-4" />
+                                                Allowlist
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('PROMOTE')}>
+                                                <ExternalLink className="mr-2 h-4 w-4" />
+                                                Promote
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('MUTE')}>
+                                                <BellOff className="mr-2 h-4 w-4" />
+                                                Mute
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('UNMUTE')}>
+                                                <Unlock className="mr-2 h-4 w-4" />
+                                                Unmute
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('UNBAN')}>
+                                                <Ban className="mr-2 h-4 w-4" />
+                                                Unban
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/50 bg-background/60 px-4 py-3 text-sm dark:bg-white/[0.02]">
+                                    <div className="flex items-center gap-3">
+                                        <Checkbox
+                                            checked={allVisibleIpsSelected}
+                                            onCheckedChange={(checked) =>
+                                                setSelectedIps(checked ? filteredReputation.map((entry) => entry.ip) : [])
+                                            }
+                                        />
+                                        <span className="text-muted-foreground">Select all visible IPs</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{selectedIps.length} selected</span>
+                                </div>
                                 {filteredReputation.map((entry) => (
                                     <div key={entry.ip} className="ops-row-card space-y-3">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <div className="space-y-1">
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    checked={selectedIps.includes(entry.ip)}
+                                                    onCheckedChange={(checked) => toggleIpSelection(entry.ip, Boolean(checked))}
+                                                    className="mt-1"
+                                                />
+                                                <div className="space-y-1">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="font-medium">{entry.ip}</span>
                                                     {entry.countryCode && <Badge variant="outline">{entry.countryCode}</Badge>}
@@ -2166,6 +2670,7 @@ function LoginProtectionCard() {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground break-all">{entry.topEmail || 'Unknown email'}</p>
+                                                </div>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-2xl font-semibold">{entry.score}</p>
@@ -2347,6 +2852,142 @@ function LoginProtectionCard() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={Boolean(incidentDetailId)} onOpenChange={(open) => !open && setIncidentDetailId(null)}>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>Incident detail</DialogTitle>
+                        <DialogDescription>
+                            Full workflow, audit events, and suppression context for this login-abuse incident.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {incidentDetailQuery.isLoading || !incidentDetailQuery.data ? (
+                        <div className="space-y-3 py-4">
+                            {[1, 2, 3].map((index) => (
+                                <div key={index} className="h-20 rounded-[1rem] bg-muted/60 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-2">
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Incident</p>
+                                    <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.incident.ip}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{incidentDetailQuery.data.incident.summary}</p>
+                                </div>
+                                <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Workflow</p>
+                                    <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.incident.workflowStatus}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {incidentDetailQuery.data.incident.alertSuppression
+                                            ? `Muted for ${incidentDetailQuery.data.incident.alertSuppression.remainingMinutes} min`
+                                            : 'Alerts active'}
+                                    </p>
+                                </div>
+                                <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Reputation</p>
+                                    <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.reputation?.level || 'Unknown'}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Score {incidentDetailQuery.data.reputation?.score ?? 0}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                                <div className="space-y-4">
+                                    <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-medium">Notes timeline</p>
+                                            <Badge variant="outline">{incidentDetailQuery.data.noteEntries.length}</Badge>
+                                        </div>
+                                        {incidentDetailQuery.data.noteEntries.length === 0 ? (
+                                            <p className="mt-3 text-sm text-muted-foreground">No workflow notes recorded for this incident.</p>
+                                        ) : (
+                                            <div className="mt-3 space-y-3">
+                                                {incidentDetailQuery.data.noteEntries.map((entry, index) => (
+                                                    <div key={`${entry.raw}-${index}`} className="rounded-[0.9rem] border border-border/40 bg-background/70 px-3 py-3 text-sm dark:bg-white/[0.02]">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <span className="font-medium">{entry.actorEmail || 'Unknown actor'}</span>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {entry.timestamp ? formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true }) : 'unknown time'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{entry.body}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-medium">Restrictions and enrichment</p>
+                                            <Badge variant="outline">{incidentDetailQuery.data.relatedRestrictions.length}</Badge>
+                                        </div>
+                                        <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                                            <p>
+                                                {(incidentDetailQuery.data.reputation?.enrichment.organization || incidentDetailQuery.data.reputation?.enrichment.isp || incidentDetailQuery.data.reputation?.enrichment.asn)
+                                                    ? [
+                                                        incidentDetailQuery.data.reputation?.enrichment.asn,
+                                                        incidentDetailQuery.data.reputation?.enrichment.organization,
+                                                        incidentDetailQuery.data.reputation?.enrichment.isp,
+                                                    ].filter(Boolean).join(' · ')
+                                                    : 'No ASN or ISP enrichment'}
+                                            </p>
+                                            <p className="break-all">
+                                                {incidentDetailQuery.data.reputation?.enrichment.reverseDns?.length
+                                                    ? incidentDetailQuery.data.reputation.enrichment.reverseDns.join(', ')
+                                                    : 'No reverse DNS'}
+                                            </p>
+                                            {incidentDetailQuery.data.relatedRestrictions.map((restriction) => (
+                                                <div key={restriction.id} className="rounded-[0.9rem] border border-border/40 bg-background/70 px-3 py-3 dark:bg-white/[0.02]">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className="font-medium text-foreground">{restriction.restrictionType}</span>
+                                                        <span className="text-xs">{formatDistanceToNow(new Date(restriction.expiresAt), { addSuffix: true })}</span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs">Attempted email: {restriction.attemptedEmail || 'Unknown'}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="font-medium">Event timeline</p>
+                                        <Badge variant="outline">{incidentDetailQuery.data.events.length}</Badge>
+                                    </div>
+                                    <div className="mt-3 space-y-3">
+                                        {incidentDetailQuery.data.events.map((event) => (
+                                            <div key={event.id} className="rounded-[0.9rem] border border-border/40 bg-background/70 px-3 py-3 text-sm dark:bg-white/[0.02]">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="space-y-1">
+                                                        <p className="font-medium">{event.label}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant="outline">{event.action}</Badge>
+                                                </div>
+                                                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                                    {event.email && <p>Email: {event.email}</p>}
+                                                    {event.host && <p className="break-all">Host: {event.host}</p>}
+                                                    {event.path && <p className="break-all">Path: {event.path}</p>}
+                                                    {event.restrictionType && <p>Restriction: {event.restrictionType}</p>}
+                                                    {event.details && <p className="whitespace-pre-wrap break-all">Detail: {event.details}</p>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIncidentDetailId(null)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -12,8 +12,11 @@ import {
     addAdminLoginIncidentNote,
     allowlistAdminLoginIp,
     blockAdminLoginIpPermanently,
+    bulkUpdateAdminLoginIncidents,
+    bulkUpdateAdminLoginIps,
     deleteAdminLoginSavedView,
     exportAdminLoginIncidents,
+    getAdminLoginIncidentDetail,
     getAdminLoginAbuseOverview,
     getAdminLoginProtectionConfig,
     promoteAdminLoginIpToPermanentRule,
@@ -296,6 +299,40 @@ export const securityRouter = router({
                 ...input,
                 actorEmail: ctx.user.email,
             });
+        }),
+
+    bulkUpdateAdminLoginIncidents: adminProcedure
+        .input(z.object({
+            incidentIds: z.array(z.string().min(1)).min(1).max(100),
+            action: z.enum(['ACKNOWLEDGE', 'RESOLVE', 'MUTE', 'UNMUTE']),
+            note: z.string().trim().max(2000).optional(),
+            durationMinutes: z.number().int().min(1).max(43200).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return bulkUpdateAdminLoginIncidents({
+                ...input,
+                actorEmail: ctx.user.email,
+            });
+        }),
+
+    bulkUpdateAdminLoginIps: adminProcedure
+        .input(z.object({
+            ips: z.array(z.string().min(1)).min(1).max(100),
+            action: z.enum(['BLOCK', 'ALLOWLIST', 'PROMOTE', 'MUTE', 'UNMUTE', 'UNBAN']),
+            note: z.string().trim().max(2000).optional(),
+            durationMinutes: z.number().int().min(1).max(43200).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return bulkUpdateAdminLoginIps({
+                ...input,
+                actorEmail: ctx.user.email,
+            });
+        }),
+
+    getAdminLoginIncidentDetail: adminProcedure
+        .input(z.object({ incidentId: z.string().min(1) }))
+        .query(async ({ input }) => {
+            return getAdminLoginIncidentDetail(input.incidentId);
         }),
 
     exportAdminLoginIncidents: adminProcedure

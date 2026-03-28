@@ -305,6 +305,26 @@ type AdminLoginIpReputation = {
   alertSuppression: AdminLoginAlertSuppression | null;
 };
 
+type AdminLoginIncidentDetailEvent = {
+  id: string;
+  action: string;
+  label: string;
+  createdAt: Date;
+  email: string | null;
+  host: string | null;
+  path: string | null;
+  restrictionType: string | null;
+  ip: string | null;
+  details: string | null;
+};
+
+type AdminLoginIncidentNoteEntry = {
+  timestamp: Date | null;
+  actorEmail: string | null;
+  body: string;
+  raw: string;
+};
+
 type AdminLoginReputationHistoryPoint = {
   date: string;
   label: string;
@@ -1089,6 +1109,70 @@ function appendIncidentNote(existingNotes: string | undefined, actorEmail: strin
 
   const line = `[${new Date().toISOString()}] ${actorEmail}: ${trimmed}`;
   return existingNotes?.trim() ? `${existingNotes.trim()}\n${line}` : line;
+}
+
+function parseIncidentNotes(notes: string | null | undefined): AdminLoginIncidentNoteEntry[] {
+  if (!notes?.trim()) {
+    return [];
+  }
+
+  return notes
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^\[([^\]]+)\]\s+([^:]+):\s+([\s\S]+)$/);
+      if (!match) {
+        return {
+          timestamp: null,
+          actorEmail: null,
+          body: line,
+          raw: line,
+        };
+      }
+
+      const [, timestamp, actorEmail, body] = match;
+      const parsedTimestamp = new Date(timestamp);
+      return {
+        timestamp: Number.isNaN(parsedTimestamp.getTime()) ? null : parsedTimestamp,
+        actorEmail: actorEmail.trim() || null,
+        body: body.trim(),
+        raw: line,
+      };
+    });
+}
+
+function getAdminLoginEventLabel(action: string) {
+  switch (action) {
+    case 'AUTH_LOGIN_FAILED':
+      return 'Failed login';
+    case 'AUTH_LOGIN_THRESHOLD_ALERT':
+      return 'Threshold alert';
+    case 'AUTH_LOGIN_LOCKED':
+      return 'Temporary lock applied';
+    case 'AUTH_LOGIN_BANNED':
+      return 'Ban applied';
+    case 'AUTH_LOGIN_UNBANNED':
+      return 'Unbanned';
+    case 'AUTH_LOGIN_REPEATED_OFFENDER_ALERT':
+      return 'Repeated offender alert';
+    case 'AUTH_LOGIN_INCIDENT_ACKNOWLEDGED':
+      return 'Incident acknowledged';
+    case 'AUTH_LOGIN_INCIDENT_RESOLVED':
+      return 'Incident resolved';
+    case 'AUTH_LOGIN_INCIDENT_NOTE_ADDED':
+      return 'Incident note added';
+    case 'AUTH_LOGIN_ALERT_SUPPRESSED':
+      return 'Alerts muted';
+    case 'AUTH_LOGIN_ALERT_UNSUPPRESSED':
+      return 'Alerts unmuted';
+    case 'AUTH_LOGIN_PERMANENT_BLOCK_RULE':
+      return 'Permanent block rule';
+    case 'AUTH_LOGIN_ALLOWLIST_RULE':
+      return 'Allowlist rule';
+    default:
+      return action;
+  }
 }
 
 async function getIncidentWorkflowMap() {
@@ -2700,6 +2784,191 @@ export async function removeAdminLoginAlertSuppression(input: {
   });
 
   return { success: active.length !== next.length };
+}
+
+export async function bulkUpdateAdminLoginIncidents(input: {
+  incidentIds: string[];
+  action: 'ACKNOWLEDGE' | 'RESOLVE' | 'MUTE' | 'UNMUTE';
+  actorEmail: string;
+  note?: string | null;
+  durationMinutes?: number | null;
+}) {
+  const incidentIds = Array.from(new Set(input.incidentIds.map((id) => id.trim()).filter(Boolean)));
+  if (incidentIds.length === 0) {
+    return { success: true, processed: 0 };
+  }
+
+  for (const incidentId of incidentIds) {
+    switch (input.action) {
+      case 'ACKNOWLEDGE':
+        await acknowledgeAdminLoginIncident(incidentId, input.actorEmail, input.note);
+        break;
+      case 'RESOLVE':
+        await resolveAdminLoginIncident(incidentId, input.actorEmail, input.note);
+        break;
+      case 'MUTE':
+        await suppressAdminLoginAlerts({
+          scopeType: 'INCIDENT',
+          scopeValue: incidentId,
+          durationMinutes: Math.max(1, input.durationMinutes ?? 60),
+          actorEmail: input.actorEmail,
+          reason: input.note,
+        });
+        break;
+      case 'UNMUTE':
+        await removeAdminLoginAlertSuppression({
+          scopeType: 'INCIDENT',
+          scopeValue: incidentId,
+          actorEmail: input.actorEmail,
+        });
+        break;
+    }
+  }
+
+  return { success: true, processed: incidentIds.length };
+}
+
+export async function bulkUpdateAdminLoginIps(input: {
+  ips: string[];
+  action: 'BLOCK' | 'ALLOWLIST' | 'PROMOTE' | 'MUTE' | 'UNMUTE' | 'UNBAN';
+  actorEmail: string;
+  note?: string | null;
+  durationMinutes?: number | null;
+}) {
+  const ips = Array.from(new Set(input.ips.map((ip) => normalizeIpAddress(ip)).filter(Boolean))) as string[];
+  if (ips.length === 0) {
+    return { success: true, processed: 0 };
+  }
+
+  for (const ip of ips) {
+    switch (input.action) {
+      case 'BLOCK':
+        await blockAdminLoginIpPermanently(ip, input.actorEmail, input.note);
+        break;
+      case 'ALLOWLIST':
+        await allowlistAdminLoginIp(ip, input.actorEmail, input.note);
+        break;
+      case 'PROMOTE':
+        await promoteAdminLoginIpToPermanentRule(ip, input.actorEmail, input.note);
+        break;
+      case 'MUTE':
+        await suppressAdminLoginAlerts({
+          scopeType: 'IP',
+          scopeValue: ip,
+          durationMinutes: Math.max(1, input.durationMinutes ?? 60),
+          actorEmail: input.actorEmail,
+          reason: input.note,
+        });
+        break;
+      case 'UNMUTE':
+        await removeAdminLoginAlertSuppression({
+          scopeType: 'IP',
+          scopeValue: ip,
+          actorEmail: input.actorEmail,
+        });
+        break;
+      case 'UNBAN':
+        await unbanAdminLoginIp(ip);
+        break;
+    }
+  }
+
+  return { success: true, processed: ips.length };
+}
+
+export async function getAdminLoginIncidentDetail(incidentId: string) {
+  const overview = await getAdminLoginAbuseOverview();
+  const incident = overview.securityIncidents.find((entry) => entry.id === incidentId);
+  if (!incident) {
+    throw new Error('Admin login incident not found');
+  }
+
+  const detailWindowStart = new Date(incident.startedAt.getTime() - 30 * 60_000);
+  const detailWindowEnd = new Date(Math.max(Date.now(), incident.endedAt.getTime() + 30 * 60_000));
+  const relevantActions = [
+    ...INCIDENT_ACTIONS,
+    'AUTH_LOGIN_THRESHOLD_ALERT',
+    'AUTH_LOGIN_INCIDENT_ACKNOWLEDGED',
+    'AUTH_LOGIN_INCIDENT_RESOLVED',
+    'AUTH_LOGIN_INCIDENT_NOTE_ADDED',
+    'AUTH_LOGIN_ALERT_SUPPRESSED',
+    'AUTH_LOGIN_ALERT_UNSUPPRESSED',
+    'AUTH_LOGIN_PERMANENT_BLOCK_RULE',
+    'AUTH_LOGIN_ALLOWLIST_RULE',
+  ];
+
+  const rawEvents = await db.auditLog.findMany({
+    where: {
+      action: { in: relevantActions },
+      OR: [
+        {
+          ip: incident.ip,
+          createdAt: {
+            gte: detailWindowStart,
+            lte: detailWindowEnd,
+          },
+        },
+        {
+          entity: 'AUTH',
+          entityId: incident.id,
+        },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      action: true,
+      ip: true,
+      details: true,
+      createdAt: true,
+    },
+    take: 100,
+  });
+
+  const events: AdminLoginIncidentDetailEvent[] = rawEvents.map((event) => {
+    const details = parseAuditDetails(event.details);
+    let freeformDetails: string | null = null;
+
+    if (event.details) {
+      try {
+        const parsed = JSON.parse(event.details) as Record<string, unknown>;
+        freeformDetails =
+          typeof parsed.note === 'string'
+            ? parsed.note
+            : typeof parsed.reason === 'string'
+              ? parsed.reason
+              : typeof parsed.status === 'string'
+                ? parsed.status
+                : null;
+      } catch {
+        freeformDetails = null;
+      }
+    }
+
+    return {
+      id: event.id,
+      action: event.action,
+      label: getAdminLoginEventLabel(event.action),
+      createdAt: event.createdAt,
+      email: details.email,
+      host: details.host,
+      path: details.path,
+      restrictionType: details.restrictionType,
+      ip: event.ip,
+      details: freeformDetails,
+    };
+  });
+
+  const relatedRestrictions = overview.activeRestrictions.filter((entry) => entry.ip === incident.ip);
+  const reputation = overview.ipReputation.find((entry) => entry.ip === incident.ip) ?? null;
+
+  return {
+    incident,
+    noteEntries: parseIncidentNotes(incident.notes),
+    events,
+    relatedRestrictions,
+    reputation,
+  };
 }
 
 function isSameLocalDay(left: Date, right: Date) {
