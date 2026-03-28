@@ -163,6 +163,8 @@ type TelegramSettings = {
   dailyDigestHour: number;
   dailyDigestMinute: number;
   digestLookbackHours: number;
+  defaultLanguage: 'en' | 'my';
+  showLanguageSelectorOnStart: boolean;
 };
 
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
@@ -178,6 +180,8 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   dailyDigestHour: 9,
   dailyDigestMinute: 0,
   digestLookbackHours: 24,
+  defaultLanguage: 'en',
+  showLanguageSelectorOnStart: true,
 };
 
 type TelegramSalesPlanCode = '1m_150gb' | '2m_300gb' | '3plus_unlimited';
@@ -458,6 +462,16 @@ function TelegramBotSetupCard() {
     disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
     botUsername: isMyanmar ? 'ဘော့ Username' : 'Bot Username',
     botUsernamePlaceholder: '@yourbot',
+    defaultLanguage: isMyanmar ? 'ဘော့ မူရင်းဘာသာစကား' : 'Bot default language',
+    defaultLanguageDesc: isMyanmar
+      ? 'အသုံးပြုသူက ဘာသာစကား မရွေးထားသေးပါက ဤဘာသာစကားကို သုံးမည်။'
+      : 'Use this language until a user chooses their own bot language.',
+    languageSelectorOnStart: isMyanmar ? 'ပထမဆုံး /start မှာ ဘာသာစကား ရွေးခိုင်းမည်' : 'Show language selector on first /start',
+    languageSelectorOnStartDesc: isMyanmar
+      ? 'အသုံးပြုသူအသစ်များသည် English / မြန်မာ ကို ရွေးပြီး welcome flow ကို ဆက်လုပ်မည်။'
+      : 'New users choose English or Burmese before the welcome flow continues.',
+    englishLanguage: 'English',
+    burmeseLanguage: isMyanmar ? 'မြန်မာ' : 'Burmese',
     enableBot: isMyanmar ? 'Telegram bot ကို ဖွင့်မည်' : 'Enable Telegram bot',
     enableBotDesc: isMyanmar ? 'အသုံးပြုသူများက key ကို ချိတ်ဆက်နိုင်ခြင်း၊ share page ရယူနိုင်ခြင်းနှင့် self-service command များ အသုံးပြုနိုင်ခြင်းကို ခွင့်ပြုမည်။' : 'Allow users to link keys, receive share pages, and run self-service bot commands.',
     dailyDigest: isMyanmar ? 'Admin digest ကို နေ့စဉ် ပို့မည်' : 'Daily admin digest',
@@ -521,6 +535,8 @@ function TelegramBotSetupCard() {
       dailyDigestHour: settingsQuery.data.dailyDigestHour ?? 9,
       dailyDigestMinute: settingsQuery.data.dailyDigestMinute ?? 0,
       digestLookbackHours: settingsQuery.data.digestLookbackHours ?? 24,
+      defaultLanguage: settingsQuery.data.defaultLanguage === 'my' ? 'my' : 'en',
+      showLanguageSelectorOnStart: settingsQuery.data.showLanguageSelectorOnStart ?? true,
     });
     setAdminChatIdsInput((settingsQuery.data.adminChatIds || []).join(', '));
   }, [settingsQuery.data, t]);
@@ -646,6 +662,8 @@ function TelegramBotSetupCard() {
       dailyDigestHour: form.dailyDigestHour,
       dailyDigestMinute: form.dailyDigestMinute,
       digestLookbackHours: form.digestLookbackHours,
+      defaultLanguage: form.defaultLanguage,
+      showLanguageSelectorOnStart: form.showLanguageSelectorOnStart,
     });
   };
 
@@ -746,6 +764,42 @@ function TelegramBotSetupCard() {
                   value={adminChatIdsInput}
                   onChange={(event) => setAdminChatIdsInput(event.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{telegramUi.defaultLanguage}</Label>
+                <Select
+                  value={form.defaultLanguage}
+                  onValueChange={(value: 'en' | 'my') =>
+                    setForm((prev) => ({ ...prev, defaultLanguage: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">{telegramUi.englishLanguage}</SelectItem>
+                    <SelectItem value="my">{telegramUi.burmeseLanguage}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{telegramUi.defaultLanguageDesc}</p>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{telegramUi.languageSelectorOnStart}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {telegramUi.languageSelectorOnStartDesc}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.showLanguageSelectorOnStart}
+                    onCheckedChange={(checked) =>
+                      setForm((prev) => ({ ...prev, showLanguageSelectorOnStart: checked }))
+                    }
+                  />
+                </div>
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -988,7 +1042,8 @@ function TelegramBotSetupCard() {
               <p className="text-sm font-medium">{telegramUi.commandSurface}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {telegramUi.userCommands}: <code>/start</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
-                <code>/usage</code>, <code>/server</code>, <code>/renew</code>, <code>/support</code>
+                <code>/usage</code>, <code>/server</code>, <code>/renew</code>, <code>/support</code>,{' '}
+                <code>/language</code>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}

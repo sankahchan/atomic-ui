@@ -277,6 +277,18 @@ model TelegramOrder {
   @@index([reviewedByUserId, status])
 }
 
+model TelegramUserProfile {
+  telegramUserId String   @id
+  telegramChatId String?
+  username       String?
+  displayName    String?
+  locale         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([telegramChatId])
+}
+
 model DynamicAccessKey {
   id   String @id @default(cuid())
   name String

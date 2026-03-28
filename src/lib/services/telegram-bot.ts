@@ -102,9 +102,27 @@ export interface TelegramUpdate {
       file_size?: number;
     };
   };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      chat: {
+        id: number;
+        type: string;
+      };
+    };
+    data?: string;
+  };
 }
 
 type TelegramMessage = NonNullable<TelegramUpdate['message']>;
+type TelegramCallbackQuery = NonNullable<TelegramUpdate['callback_query']>;
 
 export interface TelegramConfig {
   botToken: string;
@@ -118,6 +136,8 @@ export interface TelegramConfig {
   dailyDigestHour?: number;
   dailyDigestMinute?: number;
   digestLookbackHours?: number;
+  defaultLanguage?: SupportedLocale;
+  showLanguageSelectorOnStart?: boolean;
 }
 
 interface SendMessageOptions {
@@ -140,7 +160,8 @@ function getCommandKeyboard(isAdmin: boolean) {
     [{ text: '/buy' }, { text: '/renew' }],
     [{ text: '/usage' }, { text: '/mykeys' }],
     [{ text: '/sub' }, { text: '/support' }],
-    [{ text: '/cancel' }, { text: '/help' }],
+    [{ text: '/cancel' }, { text: '/language' }],
+    [{ text: '/help' }],
   ];
 
   if (isAdmin) {
@@ -155,6 +176,60 @@ function getCommandKeyboard(isAdmin: boolean) {
   };
 }
 
+const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
+
+type TelegramLocaleSelectorContext = 'start' | 'switch';
+
+function buildTelegramLocaleSelectorKeyboard(
+  context: TelegramLocaleSelectorContext,
+  startArgs?: string,
+) {
+  const suffix = startArgs ? `:${startArgs}` : '';
+  return {
+    inline_keyboard: [[
+      { text: 'English', callback_data: `${TELEGRAM_LOCALE_CALLBACK_PREFIX}:en:${context}${suffix}` },
+      { text: 'မြန်မာ', callback_data: `${TELEGRAM_LOCALE_CALLBACK_PREFIX}:my:${context}${suffix}` },
+    ]],
+  };
+}
+
+function buildTelegramLocaleSelectorMessage(context: TelegramLocaleSelectorContext) {
+  if (context === 'switch') {
+    return '🌐 Choose your language / ဘာသာစကား ရွေးချယ်ပါ';
+  }
+
+  return [
+    '👋 Welcome to Atomic-UI Telegram Bot',
+    '🌐 Choose your language to continue.',
+    '',
+    '👋 Atomic-UI Telegram bot မှ ကြိုဆိုပါတယ်',
+    '🌐 ဆက်လုပ်ရန် ဘာသာစကား ရွေးချယ်ပါ။',
+  ].join('\n');
+}
+
+function parseTelegramLocaleCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_LOCALE_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const locale = coerceSupportedLocale(parts[1]);
+  const context = parts[2] === 'switch' ? 'switch' : parts[2] === 'start' ? 'start' : null;
+  if (!locale || !context) {
+    return null;
+  }
+
+  return {
+    locale,
+    context,
+    startArgs: parts.slice(3).join(':').trim(),
+  } as const;
+}
+
 function getFlagEmoji(countryCode: string) {
   const codePoints = countryCode
     .toUpperCase()
@@ -164,12 +239,142 @@ function getFlagEmoji(countryCode: string) {
 }
 
 async function getTelegramDefaultLocale(): Promise<SupportedLocale> {
-  const setting = await db.settings.findUnique({
-    where: { key: 'defaultLanguage' },
-    select: { value: true },
+  const [botSetting, appSetting] = await Promise.all([
+    db.settings.findUnique({
+      where: { key: 'telegram_bot' },
+      select: { value: true },
+    }),
+    db.settings.findUnique({
+      where: { key: 'defaultLanguage' },
+      select: { value: true },
+    }),
+  ]);
+
+  if (botSetting?.value) {
+    try {
+      const parsed = JSON.parse(botSetting.value) as Record<string, unknown>;
+      const configured = coerceSupportedLocale(
+        typeof parsed.defaultLanguage === 'string' ? parsed.defaultLanguage : undefined,
+      );
+      if (configured) {
+        return configured;
+      }
+    } catch {
+      // Ignore malformed bot settings and fall back to the app default.
+    }
+  }
+
+  return coerceSupportedLocale(appSetting?.value) || 'en';
+}
+
+async function getTelegramUserProfile(
+  telegramUserId: string,
+  telegramChatId?: string | null,
+) {
+  return db.telegramUserProfile.findFirst({
+    where: {
+      OR: [
+        { telegramUserId },
+        ...(telegramChatId ? [{ telegramChatId }] : []),
+      ],
+    },
+  });
+}
+
+async function upsertTelegramUserProfile(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  username?: string | null;
+  displayName?: string | null;
+  locale?: SupportedLocale | null;
+}) {
+  const existing = await db.telegramUserProfile.findUnique({
+    where: { telegramUserId: input.telegramUserId },
+    select: { telegramUserId: true },
   });
 
-  return coerceSupportedLocale(setting?.value) || 'en';
+  if (!existing) {
+    return db.telegramUserProfile.create({
+      data: {
+        telegramUserId: input.telegramUserId,
+        telegramChatId: input.telegramChatId || null,
+        username: input.username || null,
+        displayName: input.displayName || null,
+        locale: input.locale || null,
+      },
+    });
+  }
+
+  return db.telegramUserProfile.update({
+    where: { telegramUserId: input.telegramUserId },
+    data: {
+      telegramChatId: input.telegramChatId || null,
+      username: input.username || null,
+      displayName: input.displayName || null,
+      ...(input.locale ? { locale: input.locale } : {}),
+    },
+  });
+}
+
+async function setTelegramUserLocale(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  username?: string | null;
+  displayName?: string | null;
+  locale: SupportedLocale;
+}) {
+  await upsertTelegramUserProfile(input);
+  await db.telegramOrder.updateMany({
+    where: {
+      telegramUserId: input.telegramUserId,
+      ...(input.telegramChatId ? { telegramChatId: input.telegramChatId } : {}),
+      status: {
+        in: [...TELEGRAM_ORDER_ACTIVE_STATUSES],
+      },
+    },
+    data: {
+      locale: input.locale,
+    },
+  });
+}
+
+async function getTelegramConversationLocale(input: {
+  telegramUserId: string | number;
+  telegramChatId?: string | number | null;
+}) {
+  const profile = await getTelegramUserProfile(
+    String(input.telegramUserId),
+    input.telegramChatId ? String(input.telegramChatId) : null,
+  );
+
+  return (
+    coerceSupportedLocale(profile?.locale) ||
+    (await getTelegramDefaultLocale())
+  );
+}
+
+async function resolveTelegramLocaleForRecipient(input: {
+  telegramUserId?: string | null;
+  telegramChatId?: string | null;
+  fallbackLocale?: SupportedLocale;
+}) {
+  if (input.telegramUserId || input.telegramChatId) {
+    const profile = input.telegramUserId
+      ? await getTelegramUserProfile(input.telegramUserId, input.telegramChatId || null)
+      : input.telegramChatId
+        ? await db.telegramUserProfile.findFirst({
+            where: {
+              telegramChatId: input.telegramChatId,
+            },
+          })
+        : null;
+    const locale = coerceSupportedLocale(profile?.locale);
+    if (locale) {
+      return locale;
+    }
+  }
+
+  return input.fallbackLocale || (await getTelegramDefaultLocale());
 }
 
 function getTelegramUi(locale: SupportedLocale) {
@@ -249,6 +454,17 @@ function getTelegramUi(locale: SupportedLocale) {
     welcomeBack: (username: string) => isMyanmar ? `✅ ပြန်လည်ကြိုဆိုပါသည်၊ <b>${username}</b>!\n\nသင့် account သည် ချိတ်ဆက်ပြီးဖြစ်သည်။ /usage သို့မဟုတ် /mykeys ကို အချိန်မရွေး အသုံးပြုနိုင်ပါသည်။` : `✅ Welcome back, <b>${username}</b>!\n\nYour account is already linked. Use /usage or /mykeys any time.`,
     accountLinked: (username: string) => isMyanmar ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\nကြိုဆိုပါသည်၊ <b>${username}</b>! /usage သို့မဟုတ် /mykeys ကို အသုံးပြုနိုင်ပါသည်။` : `✅ Account linked successfully!\n\nWelcome, <b>${username}</b>! Use /usage or /mykeys to fetch your keys.`,
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
+    languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
+    languagePromptDesc: isMyanmar
+      ? 'လိုအပ်သည့် message များကို သင့်ရွေးချယ်ထားသော ဘာသာစကားဖြင့် ပို့ပေးပါမည်။'
+      : 'The bot will continue in your selected language.',
+    languageChanged: (languageName: string) =>
+      isMyanmar
+        ? `✅ ဘာသာစကားကို <b>${languageName}</b> သို့ ပြောင်းပြီးပါပြီ။`
+        : `✅ Language updated to <b>${languageName}</b>.`,
+    languageCommandHelp: isMyanmar
+      ? '/language - ဘော့ ဘာသာစကားကို ပြောင်းမည်'
+      : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
         ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
@@ -662,8 +878,8 @@ async function handleBuyCommand(
   chatId: number,
   telegramUserId: number,
   username: string,
+  locale: SupportedLocale,
 ): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
   const ui = getTelegramUi(locale);
   const settings = await getTelegramSalesSettings();
 
@@ -704,8 +920,8 @@ async function handleRenewOrderCommand(
   chatId: number,
   telegramUserId: number,
   username: string,
+  locale: SupportedLocale,
 ): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
   const ui = getTelegramUi(locale);
   const settings = await getTelegramSalesSettings();
 
@@ -1051,6 +1267,14 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.dailyDigestMinute === 'number' ? config.dailyDigestMinute : 0,
           digestLookbackHours:
             typeof config.digestLookbackHours === 'number' ? config.digestLookbackHours : 24,
+          defaultLanguage:
+            coerceSupportedLocale(
+              typeof config.defaultLanguage === 'string' ? config.defaultLanguage : undefined,
+            ) || (await getTelegramDefaultLocale()),
+          showLanguageSelectorOnStart:
+            typeof config.showLanguageSelectorOnStart === 'boolean'
+              ? config.showLanguageSelectorOnStart
+              : true,
         };
       }
     } catch {
@@ -1093,6 +1317,8 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           dailyDigestHour: 9,
           dailyDigestMinute: 0,
           digestLookbackHours: 24,
+          defaultLanguage: await getTelegramDefaultLocale(),
+          showLanguageSelectorOnStart: true,
         };
       }
     } catch {
@@ -1133,6 +1359,28 @@ export async function sendTelegramMessage(
     return response.ok;
   } catch (error) {
     console.error('Failed to send Telegram message:', error);
+    return false;
+  }
+}
+
+async function answerTelegramCallbackQuery(
+  botToken: string,
+  callbackQueryId: string,
+  text?: string,
+) {
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text,
+      }),
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to answer Telegram callback query:', error);
     return false;
   }
 }
@@ -2089,6 +2337,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
     | 'SUBSCRIPTION_REQUEST';
   source?: string | null;
   includeQr?: boolean;
+  locale?: SupportedLocale;
 }) {
   const config = await getTelegramConfig();
   if (!config) {
@@ -2112,7 +2361,11 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
   const defaults = await getSubscriptionDefaults();
-  const locale = defaults.defaultLanguage;
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: input.locale || defaults.defaultLanguage,
+  });
   const ui = getTelegramUi(locale);
   const sharePageUrl = key.publicSlug
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram', lang: locale })
@@ -2213,6 +2466,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     | 'SUBSCRIPTION_REQUEST';
   source?: string | null;
   includeQr?: boolean;
+  locale?: SupportedLocale;
 }) {
   const config = await getTelegramConfig();
   if (!config) {
@@ -2231,7 +2485,11 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   }
 
   const defaults = await getSubscriptionDefaults();
-  const locale = defaults.defaultLanguage;
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: input.locale || defaults.defaultLanguage,
+  });
   const ui = getTelegramUi(locale);
   const { sharePageUrl, subscriptionUrl, outlineClientUrl } = getDynamicKeyMessagingUrls(
     key,
@@ -2390,7 +2648,12 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
   }
 
   const { supportLink, defaultLanguage } = await getSubscriptionDefaults();
-  const ui = getTelegramUi(defaultLanguage);
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
   const includeSharePage = input.type === 'EXPIRING_7D' || input.type === 'EXPIRING_1D';
   const token = includeSharePage
     ? await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken)
@@ -2398,8 +2661,8 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
   const sharePageUrl = token
     ? (
         key.publicSlug
-          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_notification', lang: defaultLanguage })
-          : buildSharePageUrl(token, { source: 'telegram_notification', lang: defaultLanguage })
+          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_notification', lang: locale })
+          : buildSharePageUrl(token, { source: 'telegram_notification', lang: locale })
       )
     : null;
 
@@ -2502,7 +2765,11 @@ export async function sendAccessKeyRenewalReminder(input: {
   }
 
   const defaults = await getSubscriptionDefaults();
-  const locale = defaults.defaultLanguage;
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
   const ui = getTelegramUi(locale);
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
   const sharePageUrl = key.publicSlug
@@ -2615,7 +2882,11 @@ export async function sendAccessKeySupportMessage(input: {
   }
 
   const defaults = await getSubscriptionDefaults();
-  const locale = defaults.defaultLanguage;
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
   const ui = getTelegramUi(locale);
   const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
   const sharePageUrl = key.publicSlug
@@ -3038,9 +3309,33 @@ async function handleStartCommand(
   isAdmin: boolean,
   botToken: string,
   argsText: string,
+  localeOverride?: SupportedLocale,
 ): Promise<string | null> {
   const trimmedArgs = argsText.trim();
-  const locale = await getTelegramDefaultLocale();
+  const config = await getTelegramConfig();
+  const profile = await getTelegramUserProfile(String(telegramUserId), String(chatId));
+
+  if (
+    config?.showLanguageSelectorOnStart !== false &&
+    !localeOverride &&
+    !coerceSupportedLocale(profile?.locale)
+  ) {
+    await sendTelegramMessage(
+      botToken,
+      chatId,
+      buildTelegramLocaleSelectorMessage('start'),
+      {
+        replyMarkup: buildTelegramLocaleSelectorKeyboard('start', trimmedArgs || undefined),
+      },
+    );
+    return null;
+  }
+
+  const locale =
+    localeOverride ||
+    coerceSupportedLocale(profile?.locale) ||
+    config?.defaultLanguage ||
+    (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
 
   if (trimmedArgs) {
@@ -3138,7 +3433,6 @@ async function handleStartCommand(
     return null;
   }
 
-  const config = await getTelegramConfig();
   const adminMsg = isAdmin ? ui.adminRecognized : '';
   const welcomeMessage = resolveTelegramTemplate(
     config?.localizedWelcomeMessages,
@@ -3157,8 +3451,12 @@ async function handleStartCommand(
   return null;
 }
 
-async function handleEmailLink(chatId: number, telegramUserId: number, email: string) {
-  const locale = await getTelegramDefaultLocale();
+async function handleEmailLink(
+  chatId: number,
+  telegramUserId: number,
+  email: string,
+  locale: SupportedLocale,
+) {
   const ui = getTelegramUi(locale);
   const keys = await db.accessKey.findMany({
     where: {
@@ -3191,8 +3489,8 @@ async function handleUsageCommand(
   chatId: number,
   telegramUserId: number,
   botToken: string,
+  locale: SupportedLocale,
 ): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
   const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, false);
 
@@ -3239,8 +3537,11 @@ async function handleUsageCommand(
   return response;
 }
 
-async function handleMyKeysCommand(chatId: number, telegramUserId: number): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleMyKeysCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+): Promise<string> {
   const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
@@ -3271,8 +3572,8 @@ async function handleMyKeysCommand(chatId: number, telegramUserId: number): Prom
 async function handleSubscriptionLinksCommand(
   chatId: number,
   telegramUserId: number,
+  locale: SupportedLocale,
 ): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
   const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, false);
 
@@ -3297,8 +3598,7 @@ async function handleSubscriptionLinksCommand(
   return ui.subSent(keys.length);
 }
 
-async function handleSupportCommand(): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleSupportCommand(locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
   const { supportLink } = await getSubscriptionDefaults();
 
@@ -3309,8 +3609,11 @@ async function handleSupportCommand(): Promise<string> {
   return `${ui.supportLabel}: ${supportLink}`;
 }
 
-async function handleUserServerCommand(chatId: number, telegramUserId: number): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleUserServerCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+): Promise<string> {
   const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
@@ -3350,8 +3653,7 @@ async function handleUserServerCommand(chatId: number, telegramUserId: number): 
   return lines.join('\n');
 }
 
-async function handleStatusCommand(): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleStatusCommand(locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
   const servers = await db.server.findMany({
     where: { isActive: true },
@@ -3379,8 +3681,7 @@ async function handleStatusCommand(): Promise<string> {
   return response;
 }
 
-async function handleExpiringCommand(argsText: string): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleExpiringCommand(argsText: string, locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
   const requestedDays = Number.parseInt(argsText.trim(), 10);
   const days = Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(requestedDays, 30) : 7;
@@ -3422,8 +3723,7 @@ async function handleExpiringCommand(argsText: string): Promise<string> {
   return lines.join('\n');
 }
 
-async function handleFindCommand(argsText: string): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleFindCommand(argsText: string, locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
@@ -3472,8 +3772,8 @@ async function handleFindCommand(argsText: string): Promise<string> {
 async function handleAdminToggleCommand(
   argsText: string,
   enable: boolean,
+  locale: SupportedLocale,
 ): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
   const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
@@ -3513,8 +3813,7 @@ async function handleAdminToggleCommand(
     : ui.keyDisabled(escapeHtml(updatedKey.name));
 }
 
-async function handleResendCommand(argsText: string): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleResendCommand(argsText: string, locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
   const query = argsText.trim();
   if (!query) {
@@ -3548,8 +3847,11 @@ async function handleResendCommand(argsText: string): Promise<string> {
   return ui.resendSuccess(escapeHtml(result.key.name));
 }
 
-async function handleSysInfoCommand(chatId: number, botToken: string): Promise<string> {
-  const locale = await getTelegramDefaultLocale();
+async function handleSysInfoCommand(
+  chatId: number,
+  botToken: string,
+  locale: SupportedLocale,
+): Promise<string> {
   const ui = getTelegramUi(locale);
   await sendTelegramMessage(botToken, chatId, ui.sysinfoGathering);
 
@@ -3579,8 +3881,11 @@ async function handleSysInfoCommand(chatId: number, botToken: string): Promise<s
   }
 }
 
-async function handleBackupCommand(chatId: number, botToken: string): Promise<string | null> {
-  const locale = await getTelegramDefaultLocale();
+async function handleBackupCommand(
+  chatId: number,
+  botToken: string,
+  locale: SupportedLocale,
+): Promise<string | null> {
   const ui = getTelegramUi(locale);
   await sendTelegramMessage(botToken, chatId, ui.backupCreating);
 
@@ -3636,13 +3941,14 @@ async function handleHelpCommand(
   chatId: number,
   botToken: string,
   isAdmin: boolean,
+  locale: SupportedLocale,
 ): Promise<null> {
-  const locale = await getTelegramDefaultLocale();
   const isMyanmar = locale === 'my';
   let message = isMyanmar
     ? `📚 <b>အသုံးပြုနိုင်သော Command များ</b>
 
 /start - Telegram account ကို ချိတ်ဆက်မည်
+/language - ဘာသာစကား ပြောင်းမည်
 /buy - Plan ရွေးပြီး key အသစ် မှာယူမည်
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
@@ -3655,6 +3961,7 @@ async function handleHelpCommand(
     : `📚 <b>Available Commands</b>
 
 /start - Link your Telegram account
+/language - Change the bot language
 /buy - Start a new key order
 /usage - Fetch your usage and QR/setup info
 /mykeys - List linked keys and IDs
@@ -3698,10 +4005,106 @@ async function handleHelpCommand(
   return null;
 }
 
+async function handleLanguageCommand(
+  chatId: number,
+  botToken: string,
+): Promise<null> {
+  await sendTelegramMessage(
+    botToken,
+    chatId,
+    buildTelegramLocaleSelectorMessage('switch'),
+    {
+      replyMarkup: buildTelegramLocaleSelectorKeyboard('switch'),
+    },
+  );
+
+  return null;
+}
+
+async function handleTelegramCallbackQuery(
+  callbackQuery: TelegramCallbackQuery,
+  config: TelegramConfig,
+) {
+  const parsed = parseTelegramLocaleCallbackData(callbackQuery.data);
+  if (!parsed) {
+    return null;
+  }
+
+  const chatId = callbackQuery.message?.chat.id;
+  if (!chatId) {
+    await answerTelegramCallbackQuery(
+      config.botToken,
+      callbackQuery.id,
+      'Unsupported action',
+    );
+    return null;
+  }
+
+  const isAdmin =
+    config.adminChatIds.includes(String(callbackQuery.from.id)) ||
+    config.adminChatIds.includes(String(chatId));
+
+  await setTelegramUserLocale({
+    telegramUserId: String(callbackQuery.from.id),
+    telegramChatId: String(chatId),
+    username: callbackQuery.from.username || null,
+    displayName: callbackQuery.from.first_name || null,
+    locale: parsed.locale,
+  });
+
+  const ui = getTelegramUi(parsed.locale);
+  const languageName = parsed.locale === 'my' ? 'မြန်မာ' : 'English';
+  await answerTelegramCallbackQuery(
+    config.botToken,
+    callbackQuery.id,
+    parsed.context === 'switch'
+      ? parsed.locale === 'my'
+        ? 'ဘာသာစကား ပြောင်းပြီးပါပြီ'
+        : 'Language updated'
+      : undefined,
+  );
+
+  if (parsed.context === 'switch') {
+    await sendTelegramMessage(
+      config.botToken,
+      chatId,
+      [
+        ui.languageChanged(escapeHtml(languageName)),
+        '',
+        ui.languagePromptDesc,
+      ].join('\n'),
+      {
+        replyMarkup: getCommandKeyboard(isAdmin),
+      },
+    );
+    return null;
+  }
+
+  return handleStartCommand(
+    chatId,
+    callbackQuery.from.id,
+    callbackQuery.from.username || callbackQuery.from.first_name,
+    isAdmin,
+    config.botToken,
+    parsed.startArgs || '',
+    parsed.locale,
+  );
+}
+
 /**
  * Handle incoming Telegram message.
  */
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<string | null> {
+  const callbackQuery = update.callback_query;
+  if (callbackQuery) {
+    const config = await getTelegramConfig();
+    if (!config) {
+      return null;
+    }
+
+    return handleTelegramCallbackQuery(callbackQuery, config);
+  }
+
   const message = update.message;
   if (!message) return null;
 
@@ -3712,7 +4115,16 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
   const config = await getTelegramConfig();
   if (!config) return null;
-  const locale = await getTelegramDefaultLocale();
+  await upsertTelegramUserProfile({
+    telegramUserId: String(telegramUserId),
+    telegramChatId: String(chatId),
+    username: message.from.username || null,
+    displayName: message.from.first_name || null,
+  });
+  const locale = await getTelegramConversationLocale({
+    telegramUserId,
+    telegramChatId: chatId,
+  });
   const ui = getTelegramUi(locale);
 
   if (message.photo?.length || message.document) {
@@ -3734,7 +4146,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
   const activeOrder = await getActiveTelegramOrder(chatId, telegramUserId);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!activeOrder && emailRegex.test(text)) {
-    return handleEmailLink(chatId, telegramUserId, text);
+    return handleEmailLink(chatId, telegramUserId, text, locale);
   }
 
   const commandMatch = text.match(/^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/);
@@ -3766,22 +4178,26 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         config.botToken,
         argsText,
       );
+    case 'language':
+      return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
-      return handleBuyCommand(chatId, telegramUserId, username);
+      return handleBuyCommand(chatId, telegramUserId, username, locale);
     case 'usage':
     case 'mykey':
     case 'key':
-      return handleUsageCommand(chatId, telegramUserId, config.botToken);
+      return handleUsageCommand(chatId, telegramUserId, config.botToken, locale);
     case 'mykeys':
-      return handleMyKeysCommand(chatId, telegramUserId);
+      return handleMyKeysCommand(chatId, telegramUserId, locale);
     case 'sub':
-      return handleSubscriptionLinksCommand(chatId, telegramUserId);
+      return handleSubscriptionLinksCommand(chatId, telegramUserId, locale);
     case 'support':
-      return handleSupportCommand();
+      return handleSupportCommand(locale);
     case 'server':
-      return isAdmin && !argsText.trim() ? handleStatusCommand() : handleUserServerCommand(chatId, telegramUserId);
+      return isAdmin && !argsText.trim()
+        ? handleStatusCommand(locale)
+        : handleUserServerCommand(chatId, telegramUserId, locale);
     case 'renew':
-      return handleRenewOrderCommand(chatId, telegramUserId, username);
+      return handleRenewOrderCommand(chatId, telegramUserId, username, locale);
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
       if (!currentOrder) {
@@ -3802,23 +4218,23 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return ui.orderCancelled(currentOrder.orderCode);
     }
     case 'status':
-      return isAdmin ? handleStatusCommand() : ui.adminOnly;
+      return isAdmin ? handleStatusCommand(locale) : ui.adminOnly;
     case 'expiring':
-      return isAdmin ? handleExpiringCommand(argsText) : ui.adminOnly;
+      return isAdmin ? handleExpiringCommand(argsText, locale) : ui.adminOnly;
     case 'find':
-      return isAdmin ? handleFindCommand(argsText) : ui.adminOnly;
+      return isAdmin ? handleFindCommand(argsText, locale) : ui.adminOnly;
     case 'disable':
-      return isAdmin ? handleAdminToggleCommand(argsText, false) : ui.adminOnly;
+      return isAdmin ? handleAdminToggleCommand(argsText, false, locale) : ui.adminOnly;
     case 'enable':
-      return isAdmin ? handleAdminToggleCommand(argsText, true) : ui.adminOnly;
+      return isAdmin ? handleAdminToggleCommand(argsText, true, locale) : ui.adminOnly;
     case 'resend':
-      return isAdmin ? handleResendCommand(argsText) : ui.adminOnly;
+      return isAdmin ? handleResendCommand(argsText, locale) : ui.adminOnly;
     case 'sysinfo':
-      return isAdmin ? handleSysInfoCommand(chatId, config.botToken) : ui.adminOnly;
+      return isAdmin ? handleSysInfoCommand(chatId, config.botToken, locale) : ui.adminOnly;
     case 'backup':
-      return isAdmin ? handleBackupCommand(chatId, config.botToken) : ui.adminOnly;
+      return isAdmin ? handleBackupCommand(chatId, config.botToken, locale) : ui.adminOnly;
     case 'help':
-      return handleHelpCommand(chatId, config.botToken, isAdmin);
+      return handleHelpCommand(chatId, config.botToken, isAdmin, locale);
     default:
       return ui.unknownCommand;
   }

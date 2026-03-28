@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
+import { coerceSupportedLocale } from '@/lib/i18n/config';
 import {
   TELEGRAM_SALES_SETTING_KEY,
   normalizeTelegramSalesSettings,
@@ -37,6 +38,8 @@ const telegramSettingsSchema = z.object({
   dailyDigestHour: z.number().int().min(0).max(23).default(9),
   dailyDigestMinute: z.number().int().min(0).max(59).default(0),
   digestLookbackHours: z.number().int().min(1).max(168).default(24),
+  defaultLanguage: z.enum(['en', 'my']).default('en'),
+  showLanguageSelectorOnStart: z.boolean().default(true),
 });
 
 export const telegramBotRouter = router({
@@ -62,6 +65,8 @@ export const telegramBotRouter = router({
         dailyDigestHour: 9,
         dailyDigestMinute: 0,
         digestLookbackHours: 24,
+        defaultLanguage: 'en',
+        showLanguageSelectorOnStart: true,
       };
     }
 
@@ -80,6 +85,8 @@ export const telegramBotRouter = router({
         dailyDigestHour: parsed.dailyDigestHour ?? 9,
         dailyDigestMinute: parsed.dailyDigestMinute ?? 0,
         digestLookbackHours: parsed.digestLookbackHours ?? 24,
+        defaultLanguage: coerceSupportedLocale(parsed.defaultLanguage) || 'en',
+        showLanguageSelectorOnStart: parsed.showLanguageSelectorOnStart ?? true,
       };
     } catch {
       return {
@@ -95,6 +102,8 @@ export const telegramBotRouter = router({
         dailyDigestHour: 9,
         dailyDigestMinute: 0,
         digestLookbackHours: 24,
+        defaultLanguage: 'en',
+        showLanguageSelectorOnStart: true,
       };
     }
   }),
