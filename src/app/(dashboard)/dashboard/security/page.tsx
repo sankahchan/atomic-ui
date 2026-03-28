@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -537,6 +537,28 @@ function reputationLevelClasses(level: string) {
 }
 
 const riskLevels = ['LOW', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
+const incidentStatuses = ['ALL', 'ACTIVE', 'CONTAINED', 'RESOLVED'] as const;
+const workflowStatuses = ['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED'] as const;
+const incidentSeverities = ['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+type IncidentFilters = {
+    search: string;
+    status: (typeof incidentStatuses)[number];
+    workflowStatus: (typeof workflowStatuses)[number];
+    severity: (typeof incidentSeverities)[number];
+    country: string;
+    reputation: (typeof riskLevels)[number] | 'ALL';
+    timeWindowHours: number | null;
+};
+
+const defaultIncidentFilters: IncidentFilters = {
+    search: '',
+    status: 'ALL' as const,
+    workflowStatus: 'ALL' as const,
+    severity: 'ALL' as const,
+    country: 'ALL',
+    reputation: 'ALL' as const,
+    timeWindowHours: 24 as number | null,
+};
 const alertRuleLabels: Record<string, { title: string; description: string }> = {
     threshold: {
         title: 'Threshold reached',
@@ -688,6 +710,42 @@ function LoginProtectionCard() {
             toast({ title: 'Failed to send digest', description: error.message, variant: 'destructive' });
         },
     });
+    const saveViewMutation = trpc.security.saveAdminLoginSavedView.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Saved view updated', description: 'The security view filters are saved.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to save view', description: error.message, variant: 'destructive' });
+        },
+    });
+    const deleteViewMutation = trpc.security.deleteAdminLoginSavedView.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Saved view removed', description: 'The saved filter view has been deleted.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to delete view', description: error.message, variant: 'destructive' });
+        },
+    });
+    const suppressMutation = trpc.security.suppressAdminLoginAlerts.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Alerts muted', description: 'Security alerts were suppressed for the selected scope.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to mute alerts', description: error.message, variant: 'destructive' });
+        },
+    });
+    const unsuppressMutation = trpc.security.removeAdminLoginAlertSuppression.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Alert mute removed', description: 'Alerts are active again for the selected scope.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to remove mute', description: error.message, variant: 'destructive' });
+        },
+    });
 
     const [form, setForm] = useState<{
         enabled: boolean;
@@ -750,6 +808,8 @@ function LoginProtectionCard() {
         },
         trustedIpRanges: '',
     });
+    const [incidentFilters, setIncidentFilters] = useState<IncidentFilters>(defaultIncidentFilters);
+    const [activeSavedViewId, setActiveSavedViewId] = useState<string>('all');
 
     useEffect(() => {
         if (!overview?.config) {
@@ -829,6 +889,197 @@ function LoginProtectionCard() {
         if (note === null) return;
         allowlistMutation.mutate({ ip, note: note || undefined });
     };
+
+    const handleSaveCurrentView = () => {
+        if (!overview) {
+            return;
+        }
+        const name = window.prompt('Saved view name', activeSavedViewId !== 'all'
+            ? overview.savedViews.find((view) => view.id === activeSavedViewId)?.name || ''
+            : '');
+        if (!name?.trim()) {
+            return;
+        }
+
+        saveViewMutation.mutate({
+            id: activeSavedViewId === 'all' ? undefined : activeSavedViewId,
+            name: name.trim(),
+            filters: incidentFilters,
+        });
+    };
+
+    const handleApplySavedView = (viewId: string) => {
+        if (!overview) {
+            return;
+        }
+        if (viewId === 'all') {
+            setActiveSavedViewId('all');
+            setIncidentFilters(defaultIncidentFilters);
+            return;
+        }
+
+        const view = overview.savedViews.find((entry) => entry.id === viewId);
+        if (!view) {
+            return;
+        }
+
+        setActiveSavedViewId(view.id);
+        setIncidentFilters(view.filters);
+    };
+
+    const handleDeleteSavedView = (viewId: string) => {
+        if (!window.confirm('Delete this saved view?')) {
+            return;
+        }
+        deleteViewMutation.mutate({ id: viewId });
+        if (activeSavedViewId === viewId) {
+            setActiveSavedViewId('all');
+            setIncidentFilters(defaultIncidentFilters);
+        }
+    };
+
+    const requestSuppressionInput = (title: string) => {
+        const hours = window.prompt(title, '24');
+        if (hours == null) {
+            return null;
+        }
+        const parsed = Number(hours);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            toast({ title: 'Invalid duration', description: 'Enter a positive number of hours.', variant: 'destructive' });
+            return null;
+        }
+        const reason = window.prompt('Optional mute reason', '') ?? '';
+        return {
+            durationMinutes: Math.round(parsed * 60),
+            reason: reason.trim() || undefined,
+        };
+    };
+
+    const handleMuteScope = (scopeType: 'IP' | 'INCIDENT', scopeValue: string, label: string) => {
+        const payload = requestSuppressionInput(`Mute ${label} alerts for how many hours?`);
+        if (!payload) {
+            return;
+        }
+
+        suppressMutation.mutate({
+            scopeType,
+            scopeValue,
+            durationMinutes: payload.durationMinutes,
+            reason: payload.reason,
+        });
+    };
+
+    const handleUnmuteScope = (scopeType: 'IP' | 'INCIDENT', scopeValue: string) => {
+        unsuppressMutation.mutate({ scopeType, scopeValue });
+    };
+
+    const filteredIncidents = useMemo(() => {
+        if (!overview) {
+            return [];
+        }
+        const now = Date.now();
+        return overview.securityIncidents.filter((incident) => {
+            if (incidentFilters.status !== 'ALL' && incident.status !== incidentFilters.status) {
+                return false;
+            }
+            if (incidentFilters.workflowStatus !== 'ALL' && incident.workflowStatus !== incidentFilters.workflowStatus) {
+                return false;
+            }
+            if (incidentFilters.severity !== 'ALL' && incident.severity !== incidentFilters.severity) {
+                return false;
+            }
+            if (incidentFilters.country !== 'ALL' && (incident.countryCode || 'UNKNOWN') !== incidentFilters.country) {
+                return false;
+            }
+            if (incidentFilters.reputation !== 'ALL') {
+                const reputation = overview.ipReputation.find((entry) => entry.ip === incident.ip);
+                if (!reputation || reputation.level !== incidentFilters.reputation) {
+                    return false;
+                }
+            }
+            if (incidentFilters.timeWindowHours) {
+                const threshold = now - incidentFilters.timeWindowHours * 60 * 60 * 1000;
+                if (incident.endedAt.getTime() < threshold) {
+                    return false;
+                }
+            }
+
+            const searchNeedle = incidentFilters.search.trim().toLowerCase();
+            if (!searchNeedle) {
+                return true;
+            }
+
+            const haystack = [
+                incident.ip,
+                incident.countryCode || '',
+                incident.summary,
+                incident.attemptedEmails.join(' '),
+                incident.hosts.join(' '),
+                incident.paths.join(' '),
+                incident.notesPreview || '',
+                incident.enrichment.organization || '',
+                incident.enrichment.isp || '',
+                incident.enrichment.asn || '',
+                incident.enrichment.reverseDns.join(' '),
+            ].join(' ').toLowerCase();
+            return haystack.includes(searchNeedle);
+        });
+    }, [incidentFilters, overview]);
+
+    const filteredReputation = useMemo(() => {
+        if (!overview) {
+            return [];
+        }
+        const incidentIpSet = new Set(filteredIncidents.map((incident) => incident.ip));
+        return overview.ipReputation.filter((entry) => {
+            if (incidentFilters.reputation !== 'ALL' && entry.level !== incidentFilters.reputation) {
+                return false;
+            }
+            if (incidentFilters.country !== 'ALL' && (entry.countryCode || 'UNKNOWN') !== incidentFilters.country) {
+                return false;
+            }
+            if (incidentFilters.timeWindowHours) {
+                const threshold = Date.now() - incidentFilters.timeWindowHours * 60 * 60 * 1000;
+                if (entry.lastSeenAt.getTime() < threshold) {
+                    return false;
+                }
+            }
+            if (incidentFilters.search.trim()) {
+                const needle = incidentFilters.search.trim().toLowerCase();
+                const haystack = [
+                    entry.ip,
+                    entry.countryCode || '',
+                    entry.topEmail || '',
+                    entry.attemptedEmails.join(' '),
+                    entry.enrichment.organization || '',
+                    entry.enrichment.isp || '',
+                    entry.enrichment.asn || '',
+                    entry.enrichment.reverseDns.join(' '),
+                ].join(' ').toLowerCase();
+                if (!haystack.includes(needle)) {
+                    return false;
+                }
+            }
+            if (incidentFilters.status !== 'ALL' || incidentFilters.workflowStatus !== 'ALL' || incidentFilters.severity !== 'ALL') {
+                return incidentIpSet.has(entry.ip);
+            }
+            return true;
+        });
+    }, [filteredIncidents, incidentFilters, overview]);
+
+    const availableCountries = useMemo(() => {
+        if (!overview) {
+            return [] as string[];
+        }
+        const values = new Set<string>();
+        for (const incident of overview.securityIncidents) {
+            if (incident.countryCode) values.add(incident.countryCode);
+        }
+        for (const entry of overview.ipReputation) {
+            if (entry.countryCode) values.add(entry.countryCode);
+        }
+        return Array.from(values).sort();
+    }, [overview]);
 
     if (isLoading || !overview) {
         return (
@@ -1482,12 +1733,212 @@ function LoginProtectionCard() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="px-0 pb-0">
-                        {overview.securityIncidents.length === 0 ? (
-                            <div className="ops-chart-empty py-8 text-muted-foreground">No login abuse incidents recorded yet.</div>
+                    <CardContent className="space-y-4 px-0 pb-0">
+                        <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr]">
+                            <div className="ops-detail-card space-y-3">
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    <div className="space-y-2">
+                                        <Label>Search</Label>
+                                        <Input
+                                            value={incidentFilters.search}
+                                            onChange={(event) =>
+                                                setIncidentFilters((current) => ({ ...current, search: event.target.value }))
+                                            }
+                                            placeholder="IP, email, host, ASN..."
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Status</Label>
+                                        <Select
+                                            value={incidentFilters.status}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({
+                                                    ...current,
+                                                    status: value as (typeof incidentStatuses)[number],
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {incidentStatuses.map((status) => (
+                                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Workflow</Label>
+                                        <Select
+                                            value={incidentFilters.workflowStatus}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({
+                                                    ...current,
+                                                    workflowStatus: value as (typeof workflowStatuses)[number],
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {workflowStatuses.map((status) => (
+                                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Severity</Label>
+                                        <Select
+                                            value={incidentFilters.severity}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({
+                                                    ...current,
+                                                    severity: value as (typeof incidentSeverities)[number],
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {incidentSeverities.map((severity) => (
+                                                    <SelectItem key={severity} value={severity}>{severity}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Country</Label>
+                                        <Select
+                                            value={incidentFilters.country}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({ ...current, country: value }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                {availableCountries.map((country) => (
+                                                    <SelectItem key={country} value={country}>{country}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Reputation</Label>
+                                        <Select
+                                            value={incidentFilters.reputation}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({
+                                                    ...current,
+                                                    reputation: value as (typeof riskLevels)[number] | 'ALL',
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                {riskLevels.map((level) => (
+                                                    <SelectItem key={level} value={level}>{level}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Time window</Label>
+                                        <Select
+                                            value={incidentFilters.timeWindowHours === null ? 'all' : String(incidentFilters.timeWindowHours)}
+                                            onValueChange={(value) =>
+                                                setIncidentFilters((current) => ({
+                                                    ...current,
+                                                    timeWindowHours: value === 'all' ? null : Number(value),
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="1">Last 1 hour</SelectItem>
+                                                <SelectItem value="6">Last 6 hours</SelectItem>
+                                                <SelectItem value="24">Last 24 hours</SelectItem>
+                                                <SelectItem value="72">Last 72 hours</SelectItem>
+                                                <SelectItem value="168">Last 7 days</SelectItem>
+                                                <SelectItem value="all">All available</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-full"
+                                        disabled={saveViewMutation.isPending}
+                                        onClick={handleSaveCurrentView}
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Save current view
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-full"
+                                        onClick={() => {
+                                            setActiveSavedViewId('all');
+                                            setIncidentFilters(defaultIncidentFilters);
+                                        }}
+                                    >
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Reset filters
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="ops-detail-card space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p className="font-medium">Saved views</p>
+                                        <p className="text-sm text-muted-foreground">Reuse common incident and reputation filters.</p>
+                                    </div>
+                                    <Badge variant="outline">{overview.savedViews.length}</Badge>
+                                </div>
+                                <div className="space-y-2">
+                                    <Button
+                                        variant={activeSavedViewId === 'all' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="w-full justify-start rounded-full"
+                                        onClick={() => handleApplySavedView('all')}
+                                    >
+                                        All incidents
+                                    </Button>
+                                    {overview.savedViews.map((view) => (
+                                        <div key={view.id} className="flex items-center gap-2">
+                                            <Button
+                                                variant={activeSavedViewId === view.id ? 'default' : 'outline'}
+                                                size="sm"
+                                                className="flex-1 justify-start rounded-full"
+                                                onClick={() => handleApplySavedView(view.id)}
+                                            >
+                                                {view.name}
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full"
+                                                disabled={deleteViewMutation.isPending}
+                                                onClick={() => handleDeleteSavedView(view.id)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        {filteredIncidents.length === 0 ? (
+                            <div className="ops-chart-empty py-8 text-muted-foreground">
+                                {overview.securityIncidents.length === 0
+                                    ? 'No login abuse incidents recorded yet.'
+                                    : 'No incidents match the current filters.'}
+                            </div>
                         ) : (
                             <div className="space-y-3">
-                                {overview.securityIncidents.map((incident) => (
+                                {filteredIncidents.map((incident) => (
                                     <div key={incident.id} className="ops-row-card space-y-3">
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div className="space-y-2">
@@ -1505,6 +1956,9 @@ function LoginProtectionCard() {
                                                     </Badge>
                                                     {incident.activeRestrictionType && (
                                                         <Badge variant="outline">{incident.activeRestrictionType}</Badge>
+                                                    )}
+                                                    {incident.alertSuppression && (
+                                                        <Badge variant="outline">Muted for {incident.alertSuppression.remainingMinutes} min</Badge>
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">{incident.summary}</p>
@@ -1631,6 +2085,46 @@ function LoginProtectionCard() {
                                                 <ExternalLink className="mr-2 h-4 w-4" />
                                                 Promote permanent rule
                                             </Button>
+                                            {incident.alertSuppression ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={unsuppressMutation.isPending}
+                                                    onClick={() =>
+                                                        handleUnmuteScope(
+                                                            incident.alertSuppression!.scopeType,
+                                                            incident.alertSuppression!.scopeValue,
+                                                        )
+                                                    }
+                                                >
+                                                    <Unlock className="mr-2 h-4 w-4" />
+                                                    Unmute alerts
+                                                </Button>
+                                            ) : (
+                                                <>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="rounded-full"
+                                                        disabled={suppressMutation.isPending}
+                                                        onClick={() => handleMuteScope('INCIDENT', incident.id, 'incident')}
+                                                    >
+                                                        <AlertTriangle className="mr-2 h-4 w-4" />
+                                                        Mute incident alerts
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="rounded-full"
+                                                        disabled={suppressMutation.isPending}
+                                                        onClick={() => handleMuteScope('IP', incident.ip, 'IP')}
+                                                    >
+                                                        <AlertTriangle className="mr-2 h-4 w-4" />
+                                                        Mute IP alerts
+                                                    </Button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -1647,11 +2141,15 @@ function LoginProtectionCard() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
-                        {overview.ipReputation.length === 0 ? (
-                            <div className="ops-chart-empty py-8 text-muted-foreground">No abusive IP reputation data yet.</div>
+                        {filteredReputation.length === 0 ? (
+                            <div className="ops-chart-empty py-8 text-muted-foreground">
+                                {overview.ipReputation.length === 0
+                                    ? 'No abusive IP reputation data yet.'
+                                    : 'No IP reputation entries match the current filters.'}
+                            </div>
                         ) : (
                             <div className="space-y-3">
-                                {overview.ipReputation.map((entry) => (
+                                {filteredReputation.map((entry) => (
                                     <div key={entry.ip} className="ops-row-card space-y-3">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div className="space-y-1">
@@ -1663,6 +2161,9 @@ function LoginProtectionCard() {
                                                     </Badge>
                                                     {entry.currentlyBanned && <Badge variant="destructive">Banned now</Badge>}
                                                     {!entry.currentlyBanned && entry.currentlyRestricted && <Badge variant="secondary">Restricted now</Badge>}
+                                                    {entry.alertSuppression && (
+                                                        <Badge variant="outline">Muted for {entry.alertSuppression.remainingMinutes} min</Badge>
+                                                    )}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground break-all">{entry.topEmail || 'Unknown email'}</p>
                                             </div>
@@ -1731,6 +2232,29 @@ function LoginProtectionCard() {
                                                 <ExternalLink className="mr-2 h-4 w-4" />
                                                 Promote permanent rule
                                             </Button>
+                                            {entry.alertSuppression ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={unsuppressMutation.isPending}
+                                                    onClick={() => handleUnmuteScope('IP', entry.ip)}
+                                                >
+                                                    <Unlock className="mr-2 h-4 w-4" />
+                                                    Unmute alerts
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-full"
+                                                    disabled={suppressMutation.isPending}
+                                                    onClick={() => handleMuteScope('IP', entry.ip, 'IP')}
+                                                >
+                                                    <AlertTriangle className="mr-2 h-4 w-4" />
+                                                    Mute IP alerts
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

@@ -18,6 +18,8 @@ export const ADMIN_LOGIN_FAIL2BAN_JAIL =
 export const GENERIC_ADMIN_LOGIN_BLOCK_MESSAGE = 'Too many failed attempts. Try again later.';
 export const ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY = 'admin_login_incident_workflow';
 export const ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY = 'admin_login_incident_digest_last_run';
+export const ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY = 'admin_login_alert_suppressions';
+export const ADMIN_LOGIN_SAVED_VIEWS_SETTINGS_KEY = 'admin_login_saved_views';
 const REPEATED_OFFENDER_ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
 const DEFAULT_REPEAT_BAN_LOOKBACK_DAYS = 7;
 const DEFAULT_REPEAT_BAN_DURATION_MINUTES = 48 * 60;
@@ -39,6 +41,7 @@ const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
 const adminLoginRiskLevelSchema = z.enum(ADMIN_LOGIN_RISK_LEVELS);
 const adminLoginChallengeModeSchema = z.enum(ADMIN_LOGIN_CHALLENGE_MODES);
 const adminLoginIncidentWorkflowStatusSchema = z.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']);
+const adminLoginAlertSuppressionScopeSchema = z.enum(['IP', 'INCIDENT']);
 const adminLoginAlertRuleSchema = z.object({
   enabled: z.boolean().default(true),
   cooldownMinutes: z.number().int().min(1).max(10080).default(60),
@@ -114,10 +117,41 @@ const adminLoginIncidentWorkflowEntrySchema = z.object({
 });
 
 const adminLoginIncidentWorkflowMapSchema = z.record(z.string(), adminLoginIncidentWorkflowEntrySchema);
+const adminLoginAlertSuppressionEntrySchema = z.object({
+  id: z.string(),
+  scopeType: adminLoginAlertSuppressionScopeSchema,
+  scopeValue: z.string(),
+  reason: z.string().default(''),
+  createdAt: z.string(),
+  createdByEmail: z.string(),
+  expiresAt: z.string(),
+});
+const adminLoginAlertSuppressionsSchema = z.array(adminLoginAlertSuppressionEntrySchema);
+const adminLoginSavedViewFiltersSchema = z.object({
+  search: z.string().default(''),
+  status: z.enum(['ALL', 'ACTIVE', 'CONTAINED', 'RESOLVED']).default('ALL'),
+  workflowStatus: z.enum(['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED']).default('ALL'),
+  severity: z.enum(['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('ALL'),
+  country: z.string().default('ALL'),
+  reputation: z.enum(['ALL', 'LOW', 'ELEVATED', 'HIGH', 'CRITICAL']).default('ALL'),
+  timeWindowHours: z.number().int().min(1).max(720).nullable().default(24),
+});
+const adminLoginSavedViewSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(80),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  createdByEmail: z.string(),
+  filters: adminLoginSavedViewFiltersSchema,
+});
+const adminLoginSavedViewsSchema = z.array(adminLoginSavedViewSchema);
 
 export type AdminLoginProtectionConfig = z.infer<typeof adminLoginProtectionConfigSchema>;
 export type AdminLoginIncidentWorkflowStatus = z.infer<typeof adminLoginIncidentWorkflowStatusSchema>;
 type AdminLoginIncidentWorkflowEntry = z.infer<typeof adminLoginIncidentWorkflowEntrySchema>;
+export type AdminLoginAlertSuppressionScope = z.infer<typeof adminLoginAlertSuppressionScopeSchema>;
+type AdminLoginAlertSuppressionEntry = z.infer<typeof adminLoginAlertSuppressionEntrySchema>;
+export type AdminLoginSavedView = z.infer<typeof adminLoginSavedViewSchema>;
 
 export type AdminLoginRestrictionInfo = {
   id: string;
@@ -195,6 +229,17 @@ type AdminLoginIpEnrichment = {
   source: string | null;
 };
 
+type AdminLoginAlertSuppression = {
+  id: string;
+  scopeType: AdminLoginAlertSuppressionScope;
+  scopeValue: string;
+  reason: string | null;
+  createdAt: Date;
+  createdByEmail: string;
+  expiresAt: Date;
+  remainingMinutes: number;
+};
+
 type AdminLoginIncident = {
   id: string;
   ip: string;
@@ -222,6 +267,7 @@ type AdminLoginIncident = {
   resolvedAt: Date | null;
   resolvedByEmail: string | null;
   enrichment: AdminLoginIpEnrichment;
+  alertSuppression: AdminLoginAlertSuppression | null;
 };
 
 type RawAdminLoginIncident = Omit<
@@ -235,6 +281,7 @@ type RawAdminLoginIncident = Omit<
   | 'resolvedAt'
   | 'resolvedByEmail'
   | 'enrichment'
+  | 'alertSuppression'
 >;
 
 type AdminLoginIpReputation = {
@@ -255,6 +302,7 @@ type AdminLoginIpReputation = {
   currentlyRestricted: boolean;
   currentlyBanned: boolean;
   enrichment: AdminLoginIpEnrichment;
+  alertSuppression: AdminLoginAlertSuppression | null;
 };
 
 type AdminLoginReputationHistoryPoint = {
@@ -1000,6 +1048,30 @@ function parseWorkflowMap(rawValue: string | null | undefined) {
   }
 }
 
+function parseAlertSuppressions(rawValue: string | null | undefined) {
+  if (!rawValue) {
+    return [] as AdminLoginAlertSuppressionEntry[];
+  }
+
+  try {
+    return adminLoginAlertSuppressionsSchema.parse(JSON.parse(rawValue));
+  } catch {
+    return [] as AdminLoginAlertSuppressionEntry[];
+  }
+}
+
+function parseSavedViews(rawValue: string | null | undefined) {
+  if (!rawValue) {
+    return [] as AdminLoginSavedView[];
+  }
+
+  try {
+    return adminLoginSavedViewsSchema.parse(JSON.parse(rawValue));
+  } catch {
+    return [] as AdminLoginSavedView[];
+  }
+}
+
 function parseStoredDate(value: string | null | undefined) {
   if (!value) {
     return null;
@@ -1035,6 +1107,82 @@ async function saveIncidentWorkflowMap(map: Record<string, AdminLoginIncidentWor
     create: {
       key: ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY,
       value: JSON.stringify(map),
+    },
+  });
+}
+
+function normalizeAlertSuppressionEntry(entry: AdminLoginAlertSuppressionEntry): AdminLoginAlertSuppression | null {
+  const createdAt = parseStoredDate(entry.createdAt);
+  const expiresAt = parseStoredDate(entry.expiresAt);
+  if (!createdAt || !expiresAt || expiresAt.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return {
+    id: entry.id,
+    scopeType: entry.scopeType,
+    scopeValue: entry.scopeValue,
+    reason: entry.reason.trim() || null,
+    createdAt,
+    createdByEmail: entry.createdByEmail,
+    expiresAt,
+    remainingMinutes: Math.max(1, Math.round((expiresAt.getTime() - Date.now()) / 60_000)),
+  };
+}
+
+async function getAlertSuppressionsMap() {
+  const setting = await db.settings.findUnique({
+    where: { key: ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY },
+    select: { value: true },
+  });
+
+  const parsed = parseAlertSuppressions(setting?.value);
+  const active = parsed.filter((entry) => {
+    const expiresAt = parseStoredDate(entry.expiresAt);
+    return Boolean(expiresAt && expiresAt.getTime() > Date.now());
+  });
+
+  if (active.length !== parsed.length) {
+    await db.settings.upsert({
+      where: { key: ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY },
+      update: { value: JSON.stringify(active) },
+      create: {
+        key: ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY,
+        value: JSON.stringify(active),
+      },
+    });
+  }
+
+  return active;
+}
+
+async function saveAlertSuppressions(entries: AdminLoginAlertSuppressionEntry[]) {
+  await db.settings.upsert({
+    where: { key: ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY },
+    update: { value: JSON.stringify(entries) },
+    create: {
+      key: ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY,
+      value: JSON.stringify(entries),
+    },
+  });
+}
+
+async function getSavedViews() {
+  const setting = await db.settings.findUnique({
+    where: { key: ADMIN_LOGIN_SAVED_VIEWS_SETTINGS_KEY },
+    select: { value: true },
+  });
+
+  return parseSavedViews(setting?.value);
+}
+
+async function saveSavedViews(views: AdminLoginSavedView[]) {
+  await db.settings.upsert({
+    where: { key: ADMIN_LOGIN_SAVED_VIEWS_SETTINGS_KEY },
+    update: { value: JSON.stringify(views) },
+    create: {
+      key: ADMIN_LOGIN_SAVED_VIEWS_SETTINGS_KEY,
+      value: JSON.stringify(views),
     },
   });
 }
@@ -1164,6 +1312,32 @@ async function getIpEnrichment(ip: string): Promise<AdminLoginIpEnrichment> {
 
 function buildAlertStateKey(event: AdminLoginAlertEventType, scope: string) {
   return `admin_login_alert_state:${event}:${scope}`;
+}
+
+function buildIncidentId(ip: string, startedAt: Date | null) {
+  if (!startedAt) {
+    return null;
+  }
+
+  return `${ip}:${startedAt.getTime()}`;
+}
+
+async function findActiveAlertSuppression(options: {
+  ip?: string | null;
+  incidentId?: string | null;
+}) {
+  const active = await getAlertSuppressionsMap();
+  const match = active.find((entry) => {
+    if (options.incidentId && entry.scopeType === 'INCIDENT' && entry.scopeValue === options.incidentId) {
+      return true;
+    }
+    if (options.ip && entry.scopeType === 'IP' && entry.scopeValue === options.ip) {
+      return true;
+    }
+    return false;
+  });
+
+  return match ? normalizeAlertSuppressionEntry(match) : null;
 }
 
 async function getRealtimeRiskSnapshot(
@@ -1924,11 +2098,16 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
       softSnapshot.ipCount < config.softLockThreshold;
     if (thresholdTrigger) {
       try {
+        const thresholdIncidentId = buildIncidentId(normalizedIp, softSnapshot.firstSeenAt);
+        const suppression = await findActiveAlertSuppression({
+          ip: normalizedIp,
+          incidentId: thresholdIncidentId,
+        });
         const shouldThresholdAlert = await shouldSendAlertForEvent(config, 'threshold', {
           scope: normalizedIp,
           level: riskSnapshot.level,
         });
-        if (shouldThresholdAlert) {
+        if (shouldThresholdAlert && !suppression) {
           await sendThresholdAlert({
             ip: normalizedIp,
             email: input.email,
@@ -2022,6 +2201,11 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
 
     if (config.telegramAlertEnabled) {
       try {
+        const restrictionIncidentId = buildIncidentId(normalizedIp, firstSeenAt);
+        const suppression = await findActiveAlertSuppression({
+          ip: normalizedIp,
+          incidentId: restrictionIncidentId,
+        });
         const shouldRestrictionAlert = await shouldSendAlertForEvent(
           config,
           restrictionType === 'BAN' ? 'ban' : 'lock',
@@ -2030,7 +2214,7 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
             level: riskSnapshot.level,
           },
         );
-        if (shouldRestrictionAlert) {
+        if (shouldRestrictionAlert && !suppression) {
           await sendRestrictionAlert(restrictionType, {
             ip: normalizedIp,
             email: input.email,
@@ -2063,11 +2247,16 @@ export async function recordFailedAdminLogin(input: RecordFailedAdminLoginInput)
     !(shouldAlert && restrictionType)
   ) {
     try {
+      const repeatedIncidentId = buildIncidentId(normalizedIp, repeatedSnapshot.firstSeenAt);
+      const suppression = await findActiveAlertSuppression({
+        ip: normalizedIp,
+        incidentId: repeatedIncidentId,
+      });
       const shouldRepeatedOffenderAlert = await shouldSendAlertForEvent(config, 'repeatedOffender', {
         scope: normalizedIp,
         level: riskSnapshot.level,
       });
-      if (shouldRepeatedOffenderAlert) {
+      if (shouldRepeatedOffenderAlert && !suppression) {
         await sendRepeatedOffenderAlert({
           ip: normalizedIp,
           email: input.email,
@@ -2408,6 +2597,111 @@ export async function promoteAdminLoginIpToPermanentRule(
   return blockAdminLoginIpPermanently(ip, actorEmail, note || 'Promoted from security incident');
 }
 
+export async function saveAdminLoginSavedView(input: {
+  id?: string | null;
+  name: string;
+  filters: AdminLoginSavedView['filters'];
+  actorEmail: string;
+}) {
+  const now = new Date().toISOString();
+  const existing = await getSavedViews();
+  const id = input.id?.trim() || `view_${Date.now().toString(36)}`;
+  const nextView = adminLoginSavedViewSchema.parse({
+    id,
+    name: input.name.trim(),
+    createdAt: existing.find((view) => view.id === id)?.createdAt ?? now,
+    updatedAt: now,
+    createdByEmail: existing.find((view) => view.id === id)?.createdByEmail ?? input.actorEmail,
+    filters: input.filters,
+  });
+
+  const updated = [
+    ...existing.filter((view) => view.id !== id),
+    nextView,
+  ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+
+  await saveSavedViews(updated);
+  return nextView;
+}
+
+export async function deleteAdminLoginSavedView(id: string) {
+  const existing = await getSavedViews();
+  const next = existing.filter((view) => view.id !== id);
+  await saveSavedViews(next);
+  return { success: existing.length !== next.length };
+}
+
+export async function suppressAdminLoginAlerts(input: {
+  scopeType: AdminLoginAlertSuppressionScope;
+  scopeValue: string;
+  durationMinutes: number;
+  actorEmail: string;
+  reason?: string | null;
+}) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + Math.max(1, input.durationMinutes) * 60_000);
+  const active = await getAlertSuppressionsMap();
+  const nextEntry = adminLoginAlertSuppressionEntrySchema.parse({
+    id: `${input.scopeType}:${input.scopeValue}`,
+    scopeType: input.scopeType,
+    scopeValue: input.scopeValue,
+    reason: input.reason?.trim() || '',
+    createdAt: now.toISOString(),
+    createdByEmail: input.actorEmail,
+    expiresAt: expiresAt.toISOString(),
+  });
+
+  const next = [
+    ...active.filter(
+      (entry) => !(entry.scopeType === input.scopeType && entry.scopeValue === input.scopeValue),
+    ),
+    nextEntry,
+  ];
+  await saveAlertSuppressions(next);
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_ALERT_SUPPRESSED',
+    entity: 'AUTH',
+    entityId: nextEntry.id,
+    ip: input.scopeType === 'IP' ? input.scopeValue : null,
+    details: {
+      actorEmail: input.actorEmail,
+      scopeType: input.scopeType,
+      scopeValue: input.scopeValue,
+      reason: input.reason?.trim() || null,
+      expiresAt: expiresAt.toISOString(),
+    },
+  });
+
+  return normalizeAlertSuppressionEntry(nextEntry);
+}
+
+export async function removeAdminLoginAlertSuppression(input: {
+  scopeType: AdminLoginAlertSuppressionScope;
+  scopeValue: string;
+  actorEmail: string;
+}) {
+  const active = await getAlertSuppressionsMap();
+  const next = active.filter(
+    (entry) => !(entry.scopeType === input.scopeType && entry.scopeValue === input.scopeValue),
+  );
+  await saveAlertSuppressions(next);
+
+  await writeAuditLog({
+    action: 'AUTH_LOGIN_ALERT_UNSUPPRESSED',
+    entity: 'AUTH',
+    entityId: `${input.scopeType}:${input.scopeValue}`,
+    ip: input.scopeType === 'IP' ? input.scopeValue : null,
+    details: {
+      actorEmail: input.actorEmail,
+      scopeType: input.scopeType,
+      scopeValue: input.scopeValue,
+    },
+  });
+
+  return { success: active.length !== next.length };
+}
+
 function isSameLocalDay(left: Date, right: Date) {
   return (
     left.getFullYear() === right.getFullYear() &&
@@ -2434,6 +2728,9 @@ export async function sendAdminLoginIncidentDigest(options?: {
   const windowStart = now.getTime() - lookbackHours * 60 * 60_000;
   const incidents = overview.securityIncidents.filter((incident) => {
     if (!includeResolved && incident.workflowStatus === 'RESOLVED') {
+      return false;
+    }
+    if (incident.alertSuppression) {
       return false;
     }
     return incident.endedAt.getTime() >= windowStart;
@@ -2573,6 +2870,8 @@ export async function getAdminLoginAbuseOverview() {
     incidentLogs,
     reputationLogs,
     workflowMap,
+    alertSuppressions,
+    savedViews,
   ] = await Promise.all([
     db.adminLoginRestriction.findMany({
       where: {
@@ -2633,6 +2932,8 @@ export async function getAdminLoginAbuseOverview() {
       },
     }),
     getIncidentWorkflowMap(),
+    getAlertSuppressionsMap(),
+    getSavedViews(),
   ]);
 
   const fail2banStatus = getFail2banStatus();
@@ -2658,6 +2959,19 @@ export async function getAdminLoginAbuseOverview() {
     fail2banBannedIps,
     now,
   });
+  const normalizedSuppressions = alertSuppressions
+    .map((entry) => normalizeAlertSuppressionEntry(entry))
+    .filter((entry): entry is AdminLoginAlertSuppression => Boolean(entry));
+  const suppressionByIp = new Map(
+    normalizedSuppressions
+      .filter((entry) => entry.scopeType === 'IP')
+      .map((entry) => [entry.scopeValue, entry]),
+  );
+  const suppressionByIncidentId = new Map(
+    normalizedSuppressions
+      .filter((entry) => entry.scopeType === 'INCIDENT')
+      .map((entry) => [entry.scopeValue, entry]),
+  );
   const ipReputation = buildIpReputation(reputationLogs, rawSecurityIncidents, {
     activeRestrictionByIp,
     fail2banBannedIps,
@@ -2719,6 +3033,10 @@ export async function getAdminLoginAbuseOverview() {
         resolvedAt,
         resolvedByEmail: workflow?.resolvedByEmail ?? null,
         enrichment,
+        alertSuppression:
+          suppressionByIncidentId.get(incident.id) ??
+          suppressionByIp.get(incident.ip) ??
+          null,
       };
     }),
   );
@@ -2728,6 +3046,7 @@ export async function getAdminLoginAbuseOverview() {
       ...entry,
       countryCode: (await getCachedGeo(entry.ip)).countryCode,
       enrichment: await getIpEnrichment(entry.ip),
+      alertSuppression: suppressionByIp.get(entry.ip) ?? null,
     })),
   );
 
@@ -2748,6 +3067,8 @@ export async function getAdminLoginAbuseOverview() {
     ipReputation: enrichedReputation,
     reputationHistory,
     fail2banStatus,
+    activeAlertSuppressions: normalizedSuppressions,
+    savedViews,
   };
 }
 

@@ -12,13 +12,17 @@ import {
     addAdminLoginIncidentNote,
     allowlistAdminLoginIp,
     blockAdminLoginIpPermanently,
+    deleteAdminLoginSavedView,
     exportAdminLoginIncidents,
     getAdminLoginAbuseOverview,
     getAdminLoginProtectionConfig,
     promoteAdminLoginIpToPermanentRule,
+    removeAdminLoginAlertSuppression,
     resolveAdminLoginIncident,
     runAdminLoginIncidentDigestCycle,
     saveAdminLoginProtectionConfig,
+    saveAdminLoginSavedView,
+    suppressAdminLoginAlerts,
     unbanAdminLoginIp,
 } from '@/lib/services/admin-login-protection';
 
@@ -240,6 +244,59 @@ export const securityRouter = router({
     getAdminLoginAbuseOverview: adminProcedure.query(async () => {
         return getAdminLoginAbuseOverview();
     }),
+
+    saveAdminLoginSavedView: adminProcedure
+        .input(z.object({
+            id: z.string().min(1).optional(),
+            name: z.string().trim().min(1).max(80),
+            filters: z.object({
+                search: z.string(),
+                status: z.enum(['ALL', 'ACTIVE', 'CONTAINED', 'RESOLVED']),
+                workflowStatus: z.enum(['ALL', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED']),
+                severity: z.enum(['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+                country: z.string(),
+                reputation: z.enum(['ALL', 'LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                timeWindowHours: z.number().int().min(1).max(720).nullable(),
+            }),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return saveAdminLoginSavedView({
+                ...input,
+                actorEmail: ctx.user.email,
+            });
+        }),
+
+    deleteAdminLoginSavedView: adminProcedure
+        .input(z.object({ id: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+            return deleteAdminLoginSavedView(input.id);
+        }),
+
+    suppressAdminLoginAlerts: adminProcedure
+        .input(z.object({
+            scopeType: z.enum(['IP', 'INCIDENT']),
+            scopeValue: z.string().min(1),
+            durationMinutes: z.number().int().min(1).max(43200),
+            reason: z.string().trim().max(500).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return suppressAdminLoginAlerts({
+                ...input,
+                actorEmail: ctx.user.email,
+            });
+        }),
+
+    removeAdminLoginAlertSuppression: adminProcedure
+        .input(z.object({
+            scopeType: z.enum(['IP', 'INCIDENT']),
+            scopeValue: z.string().min(1),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return removeAdminLoginAlertSuppression({
+                ...input,
+                actorEmail: ctx.user.email,
+            });
+        }),
 
     exportAdminLoginIncidents: adminProcedure
         .input(z.object({ format: z.enum(['csv', 'json']) }))
