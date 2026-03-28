@@ -59,6 +59,10 @@ import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import { writeAuditLog } from '@/lib/audit';
 import {
   getAdminLoginChallengeDecision,
+  getAdminLoginApprovalDecision,
+  createAdminLoginApprovalRequest,
+  getAdminLoginApprovalStatusByTempToken,
+  completeAdminLoginApproval as markAdminLoginApprovalCompleted,
   recordFailedAdminLogin,
   recordSuccessfulAdminLogin,
 } from '@/lib/services/admin-login-protection';
@@ -73,7 +77,31 @@ type TempAuthSessionData = {
   email: string;
   role: string;
   timestamp: number;
+  expiresAt?: number;
+  approvalReady?: boolean;
+  approvalId?: string | null;
+  requestedIp?: string | null;
+  requestedUserAgent?: string | null;
+  requestedHost?: string | null;
+  requestedPath?: string | null;
+  via2FA?: boolean;
+  authMethod?: string | null;
 };
+
+async function saveTempAuthSession(tempToken: string, authData: TempAuthSessionData) {
+  await db.settings.upsert({
+    where: { key: `temp_auth_${tempToken}` },
+    update: { value: JSON.stringify(authData) },
+    create: { key: `temp_auth_${tempToken}`, value: JSON.stringify(authData) },
+  });
+}
+
+async function deleteTempAuthArtifacts(tempToken: string, options?: { keepAuth?: boolean }) {
+  if (!options?.keepAuth) {
+    await db.settings.delete({ where: { key: `temp_auth_${tempToken}` } }).catch(() => undefined);
+  }
+  await db.settings.delete({ where: { key: `temp_auth_webauthn_${tempToken}` } }).catch(() => undefined);
+}
 
 async function getValidTempAuthSession(tempToken: string): Promise<TempAuthSessionData> {
   const tempAuth = await db.settings.findUnique({
@@ -88,9 +116,11 @@ async function getValidTempAuthSession(tempToken: string): Promise<TempAuthSessi
   }
 
   const authData = JSON.parse(tempAuth.value) as TempAuthSessionData;
-  if (Date.now() - authData.timestamp > TEMP_AUTH_MAX_AGE_MS) {
-    await db.settings.delete({ where: { key: `temp_auth_${tempToken}` } }).catch(() => undefined);
-    await db.settings.delete({ where: { key: `temp_auth_webauthn_${tempToken}` } }).catch(() => undefined);
+  const expiresAt = typeof authData.expiresAt === 'number'
+    ? authData.expiresAt
+    : authData.timestamp + TEMP_AUTH_MAX_AGE_MS;
+  if (Date.now() > expiresAt) {
+    await deleteTempAuthArtifacts(tempToken);
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'Session expired. Please login again.',
@@ -215,10 +245,19 @@ const authRouter = router({
         // Create a temporary pre-2FA session token
         // This is stored in Settings temporarily and deleted after 2FA verification
         const tempToken = crypto.randomUUID();
-        await db.settings.upsert({
-          where: { key: `temp_auth_${tempToken}` },
-          update: { value: JSON.stringify({ userId: user.id, email: user.email, role: user.role, timestamp: Date.now() }) },
-          create: { key: `temp_auth_${tempToken}`, value: JSON.stringify({ userId: user.id, email: user.email, role: user.role, timestamp: Date.now() }) },
+        await saveTempAuthSession(tempToken, {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          timestamp: Date.now(),
+          requestedIp: ctx.clientIp ?? null,
+          requestedUserAgent: ctx.userAgent ?? null,
+          requestedHost: ctx.requestHost ?? null,
+          requestedPath: ctx.requestPath ?? null,
+          approvalReady: false,
+          approvalId: null,
+          via2FA: false,
+          authMethod: null,
         });
 
         await writeAuditLog({
@@ -242,6 +281,79 @@ const authRouter = router({
           tempToken,
           totpEnabled: totpSecret?.verified || false,
           webAuthnEnabled: webAuthnCredentials.length > 0,
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        };
+      }
+
+      const approvalDecision = await getAdminLoginApprovalDecision({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        ip: ctx.clientIp,
+        userAgent: ctx.userAgent,
+      });
+      if (approvalDecision.required && approvalDecision.assessment.normalizedIp) {
+        const tempToken = crypto.randomUUID();
+        const expiresAt = Date.now() + approvalDecision.config.unusualLoginApprovalDurationMinutes * 60_000;
+        await saveTempAuthSession(tempToken, {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          timestamp: Date.now(),
+          expiresAt,
+          approvalReady: true,
+          approvalId: null,
+          requestedIp: ctx.clientIp ?? null,
+          requestedUserAgent: ctx.userAgent ?? null,
+          requestedHost: ctx.requestHost ?? null,
+          requestedPath: ctx.requestPath ?? null,
+          via2FA: false,
+          authMethod: 'PASSWORD',
+        });
+
+        const approval = await createAdminLoginApprovalRequest({
+          tempToken,
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          ip: approvalDecision.assessment.normalizedIp,
+          host: ctx.requestHost,
+          path: ctx.requestPath,
+          via2FA: false,
+          method: 'PASSWORD',
+          assessment: approvalDecision.assessment,
+          expiresAt: new Date(expiresAt),
+        });
+        if (!approval) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create admin login approval request.',
+          });
+        }
+
+        await saveTempAuthSession(tempToken, {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          timestamp: Date.now(),
+          expiresAt,
+          approvalReady: true,
+          approvalId: approval.id,
+          requestedIp: ctx.clientIp ?? null,
+          requestedUserAgent: ctx.userAgent ?? null,
+          requestedHost: ctx.requestHost ?? null,
+          requestedPath: ctx.requestPath ?? null,
+          via2FA: false,
+          authMethod: 'PASSWORD',
+        });
+
+        return {
+          requires2FA: false,
+          requiresApproval: true,
+          tempToken,
+          approvalId: approval.id,
           id: user.id,
           email: user.email,
           role: user.role,
@@ -386,8 +498,57 @@ const authRouter = router({
         },
       });
 
-      await db.settings.delete({ where: { key: `temp_auth_webauthn_${input.tempToken}` } }).catch(() => undefined);
-      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } }).catch(() => undefined);
+      const approvalDecision = await getAdminLoginApprovalDecision({
+        userId: authData.userId,
+        email: authData.email,
+        role: authData.role,
+        ip: authData.requestedIp ?? ctx.clientIp,
+        userAgent: authData.requestedUserAgent ?? ctx.userAgent,
+      });
+
+      if (approvalDecision.required && approvalDecision.assessment.normalizedIp) {
+        const expiresAt = Date.now() + approvalDecision.config.unusualLoginApprovalDurationMinutes * 60_000;
+        const approval = await createAdminLoginApprovalRequest({
+          tempToken: input.tempToken,
+          userId: authData.userId,
+          email: authData.email,
+          role: authData.role,
+          ip: approvalDecision.assessment.normalizedIp,
+          host: authData.requestedHost ?? ctx.requestHost,
+          path: authData.requestedPath ?? ctx.requestPath,
+          via2FA: true,
+          method: 'WEBAUTHN',
+          assessment: approvalDecision.assessment,
+          expiresAt: new Date(expiresAt),
+        });
+        if (!approval) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create admin login approval request.',
+          });
+        }
+        await saveTempAuthSession(input.tempToken, {
+          ...authData,
+          timestamp: Date.now(),
+          expiresAt,
+          approvalReady: true,
+          approvalId: approval.id,
+          via2FA: true,
+          authMethod: 'WEBAUTHN',
+        });
+        await deleteTempAuthArtifacts(input.tempToken, { keepAuth: true });
+
+        return {
+          requiresApproval: true,
+          tempToken: input.tempToken,
+          approvalId: approval.id,
+          id: authData.userId,
+          email: authData.email,
+          role: authData.role,
+        };
+      }
+
+      await deleteTempAuthArtifacts(input.tempToken);
 
       const token = await createSession(authData.userId, authData.email, authData.role, {
         ip: ctx.clientIp,
@@ -426,7 +587,8 @@ const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { userId, email, role } = await getValidTempAuthSession(input.tempToken);
+      const authData = await getValidTempAuthSession(input.tempToken);
+      const { userId, email, role } = authData;
 
       // Try TOTP verification
       if (input.totpCode) {
@@ -522,9 +684,59 @@ const authRouter = router({
         });
       }
 
+      const method = input.recoveryCode ? 'RECOVERY_CODE' : 'TOTP';
+      const approvalDecision = await getAdminLoginApprovalDecision({
+        userId,
+        email,
+        role,
+        ip: authData.requestedIp ?? ctx.clientIp,
+        userAgent: authData.requestedUserAgent ?? ctx.userAgent,
+      });
+
+      if (approvalDecision.required && approvalDecision.assessment.normalizedIp) {
+        const expiresAt = Date.now() + approvalDecision.config.unusualLoginApprovalDurationMinutes * 60_000;
+        const approval = await createAdminLoginApprovalRequest({
+          tempToken: input.tempToken,
+          userId,
+          email,
+          role,
+          ip: approvalDecision.assessment.normalizedIp,
+          host: authData.requestedHost ?? ctx.requestHost,
+          path: authData.requestedPath ?? ctx.requestPath,
+          via2FA: true,
+          method,
+          assessment: approvalDecision.assessment,
+          expiresAt: new Date(expiresAt),
+        });
+        if (!approval) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create admin login approval request.',
+          });
+        }
+        await saveTempAuthSession(input.tempToken, {
+          ...authData,
+          timestamp: Date.now(),
+          expiresAt,
+          approvalReady: true,
+          approvalId: approval.id,
+          via2FA: true,
+          authMethod: method,
+        });
+        await deleteTempAuthArtifacts(input.tempToken, { keepAuth: true });
+
+        return {
+          requiresApproval: true,
+          tempToken: input.tempToken,
+          approvalId: approval.id,
+          id: userId,
+          email,
+          role,
+        };
+      }
+
       // 2FA verified - clean up temp token and create real session
-      await db.settings.delete({ where: { key: `temp_auth_${input.tempToken}` } }).catch(() => undefined);
-      await db.settings.delete({ where: { key: `temp_auth_webauthn_${input.tempToken}` } }).catch(() => undefined);
+      await deleteTempAuthArtifacts(input.tempToken);
 
       const token = await createSession(userId, email, role, {
         ip: ctx.clientIp,
@@ -541,13 +753,71 @@ const authRouter = router({
         host: ctx.requestHost,
         path: ctx.requestPath,
         via2FA: true,
-        method: input.recoveryCode ? 'RECOVERY_CODE' : 'TOTP',
+        method,
       });
 
       return {
         id: userId,
         email,
         role,
+      };
+    }),
+
+  getAdminLoginApprovalStatus: publicProcedure
+    .input(z.object({ tempToken: z.string().min(1) }))
+    .query(async ({ input }) => {
+      return getAdminLoginApprovalStatusByTempToken(input.tempToken);
+    }),
+
+  completeAdminLoginApproval: publicProcedure
+    .input(z.object({ tempToken: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const authData = await getValidTempAuthSession(input.tempToken);
+      if (!authData.approvalReady) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This sign-in does not require approval.',
+        });
+      }
+
+      const approvalStatus = await getAdminLoginApprovalStatusByTempToken(input.tempToken);
+      if (approvalStatus.status !== 'APPROVED' || !approvalStatus.approval) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: approvalStatus.status === 'REJECTED'
+            ? 'This login approval request was rejected.'
+            : approvalStatus.status === 'EXPIRED'
+              ? 'This login approval request expired.'
+              : 'This login approval request is still pending.',
+        });
+      }
+
+      await markAdminLoginApprovalCompleted(input.tempToken);
+
+      const token = await createSession(authData.userId, authData.email, authData.role, {
+        ip: authData.requestedIp ?? ctx.clientIp,
+        userAgent: authData.requestedUserAgent ?? ctx.userAgent,
+      });
+      await setSessionCookie(token);
+
+      await recordSuccessfulAdminLogin({
+        userId: authData.userId,
+        email: authData.email,
+        role: authData.role,
+        ip: authData.requestedIp ?? ctx.clientIp,
+        userAgent: authData.requestedUserAgent ?? ctx.userAgent,
+        host: authData.requestedHost ?? ctx.requestHost,
+        path: authData.requestedPath ?? ctx.requestPath,
+        via2FA: authData.via2FA === true,
+        method: authData.authMethod ?? (authData.via2FA ? '2FA' : 'PASSWORD'),
+      });
+
+      await deleteTempAuthArtifacts(input.tempToken);
+
+      return {
+        id: authData.userId,
+        email: authData.email,
+        role: authData.role,
       };
     }),
 

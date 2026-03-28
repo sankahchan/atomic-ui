@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import ipRangeCheck from 'ip-range-check';
@@ -20,15 +21,18 @@ export const ADMIN_LOGIN_INCIDENT_WORKFLOW_SETTINGS_KEY = 'admin_login_incident_
 export const ADMIN_LOGIN_INCIDENT_DIGEST_STATE_KEY = 'admin_login_incident_digest_last_run';
 export const ADMIN_LOGIN_ALERT_SUPPRESSIONS_SETTINGS_KEY = 'admin_login_alert_suppressions';
 export const ADMIN_LOGIN_SAVED_VIEWS_SETTINGS_KEY = 'admin_login_saved_views';
+export const ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY = 'admin_login_pending_approvals';
 const REPEATED_OFFENDER_ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
 const DEFAULT_REPEAT_BAN_LOOKBACK_DAYS = 7;
 const DEFAULT_REPEAT_BAN_DURATION_MINUTES = 48 * 60;
 const ADMIN_LOGIN_INCIDENT_DIGEST_HOUR = 9;
 const ADMIN_LOGIN_INCIDENT_DIGEST_MINUTE = 30;
 const ADMIN_LOGIN_INCIDENT_DIGEST_LOOKBACK_HOURS = 24;
+const ADMIN_LOGIN_APPROVAL_DURATION_MINUTES = 30;
 const IP_ENRICHMENT_TTL_MS = 6 * 60 * 60_000;
 const ADMIN_LOGIN_RISK_LEVELS = ['LOW', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
 const ADMIN_LOGIN_CHALLENGE_MODES = ['OFF', 'REQUIRE_2FA', 'BLOCK'] as const;
+const ADMIN_LOGIN_APPROVAL_REQUIREMENTS = ['NEW_DEVICE', 'NEW_COUNTRY', 'EITHER', 'BOTH'] as const;
 const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
   'threshold',
   'lock',
@@ -42,8 +46,16 @@ const ADMIN_LOGIN_ALERT_EVENT_TYPES = [
 
 const adminLoginRiskLevelSchema = z.enum(ADMIN_LOGIN_RISK_LEVELS);
 const adminLoginChallengeModeSchema = z.enum(ADMIN_LOGIN_CHALLENGE_MODES);
+const adminLoginApprovalRequirementSchema = z.enum(ADMIN_LOGIN_APPROVAL_REQUIREMENTS);
 const adminLoginIncidentWorkflowStatusSchema = z.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED']);
 const adminLoginAlertSuppressionScopeSchema = z.enum(['IP', 'INCIDENT']);
+const adminLoginApprovalStatusSchema = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'EXPIRED',
+  'COMPLETED',
+] as const);
 const adminLoginAlertRuleSchema = z.object({
   enabled: z.boolean().default(true),
   cooldownMinutes: z.number().int().min(1).max(10080).default(60),
@@ -109,6 +121,9 @@ const adminLoginProtectionConfigSchema = z.object({
   repeatedBanDurationMinutes: z.number().int().min(1).max(43200).default(DEFAULT_REPEAT_BAN_DURATION_MINUTES),
   challengeMode: adminLoginChallengeModeSchema.default('OFF'),
   challengeMinimumReputationLevel: adminLoginRiskLevelSchema.default('HIGH'),
+  unusualLoginApprovalEnabled: z.boolean().default(false),
+  unusualLoginApprovalRequireFor: adminLoginApprovalRequirementSchema.default('EITHER'),
+  unusualLoginApprovalDurationMinutes: z.number().int().min(5).max(1440).default(ADMIN_LOGIN_APPROVAL_DURATION_MINUTES),
   incidentDigestEnabled: z.boolean().default(false),
   incidentDigestHour: z.number().int().min(0).max(23).default(ADMIN_LOGIN_INCIDENT_DIGEST_HOUR),
   incidentDigestMinute: z.number().int().min(0).max(59).default(ADMIN_LOGIN_INCIDENT_DIGEST_MINUTE),
@@ -161,13 +176,46 @@ const adminLoginSavedViewSchema = z.object({
   filters: adminLoginSavedViewFiltersSchema,
 });
 const adminLoginSavedViewsSchema = z.array(adminLoginSavedViewSchema);
+const adminLoginPendingApprovalEntrySchema = z.object({
+  id: z.string(),
+  tempToken: z.string(),
+  userId: z.string(),
+  email: z.string(),
+  role: z.string(),
+  ip: z.string(),
+  host: z.string().nullable().optional(),
+  path: z.string().nullable().optional(),
+  countryCode: z.string().nullable().optional(),
+  deviceFingerprint: z.string().nullable().optional(),
+  deviceLabel: z.string().default('Unknown device'),
+  browser: z.string().default('Unknown browser'),
+  os: z.string().default('Unknown OS'),
+  deviceType: z.string().default('Unknown'),
+  via2FA: z.boolean().default(false),
+  method: z.string().nullable().optional(),
+  newDevice: z.boolean().default(false),
+  newCountry: z.boolean().default(false),
+  status: adminLoginApprovalStatusSchema.default('PENDING'),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  approvedAt: z.string().nullable().optional(),
+  approvedByEmail: z.string().nullable().optional(),
+  rejectedAt: z.string().nullable().optional(),
+  rejectedByEmail: z.string().nullable().optional(),
+  rejectionReason: z.string().nullable().optional(),
+  completedAt: z.string().nullable().optional(),
+});
+const adminLoginPendingApprovalsSchema = z.array(adminLoginPendingApprovalEntrySchema);
 
 export type AdminLoginProtectionConfig = z.infer<typeof adminLoginProtectionConfigSchema>;
 export type AdminLoginIncidentWorkflowStatus = z.infer<typeof adminLoginIncidentWorkflowStatusSchema>;
 type AdminLoginIncidentWorkflowEntry = z.infer<typeof adminLoginIncidentWorkflowEntrySchema>;
 export type AdminLoginAlertSuppressionScope = z.infer<typeof adminLoginAlertSuppressionScopeSchema>;
+export type AdminLoginApprovalRequirement = z.infer<typeof adminLoginApprovalRequirementSchema>;
+export type AdminLoginApprovalStatus = z.infer<typeof adminLoginApprovalStatusSchema>;
 type AdminLoginAlertSuppressionEntry = z.infer<typeof adminLoginAlertSuppressionEntrySchema>;
 export type AdminLoginSavedView = z.infer<typeof adminLoginSavedViewSchema>;
+type AdminLoginPendingApprovalEntry = z.infer<typeof adminLoginPendingApprovalEntrySchema>;
 
 export type AdminLoginRestrictionInfo = {
   id: string;
@@ -297,6 +345,50 @@ type AdminLoginAlertSuppression = {
   createdAt: Date;
   createdByEmail: string;
   expiresAt: Date;
+  remainingMinutes: number;
+};
+
+type AdminLoginApprovalAssessment = {
+  required: boolean;
+  normalizedIp: string | null;
+  countryCode: string | null;
+  deviceFingerprint: string;
+  deviceLabel: string;
+  browser: string;
+  os: string;
+  deviceType: string;
+  newDevice: boolean;
+  newCountry: boolean;
+};
+
+type AdminLoginPendingApproval = {
+  id: string;
+  tempToken: string;
+  userId: string;
+  email: string;
+  role: string;
+  ip: string;
+  host: string | null;
+  path: string | null;
+  countryCode: string | null;
+  deviceFingerprint: string | null;
+  deviceLabel: string;
+  browser: string;
+  os: string;
+  deviceType: string;
+  via2FA: boolean;
+  method: string | null;
+  newDevice: boolean;
+  newCountry: boolean;
+  status: AdminLoginApprovalStatus;
+  createdAt: Date;
+  expiresAt: Date;
+  approvedAt: Date | null;
+  approvedByEmail: string | null;
+  rejectedAt: Date | null;
+  rejectedByEmail: string | null;
+  rejectionReason: string | null;
+  completedAt: Date | null;
   remainingMinutes: number;
 };
 
@@ -658,6 +750,90 @@ function buildSuccessfulLoginAlertScope(
   fingerprintOrCountry: string,
 ) {
   return `${event}:${userId}:${fingerprintOrCountry}`;
+}
+
+function shouldRequireApprovalForAssessment(
+  requirement: AdminLoginApprovalRequirement,
+  assessment: Pick<AdminLoginApprovalAssessment, 'newDevice' | 'newCountry'>,
+) {
+  switch (requirement) {
+    case 'NEW_DEVICE':
+      return assessment.newDevice;
+    case 'NEW_COUNTRY':
+      return assessment.newCountry;
+    case 'BOTH':
+      return assessment.newDevice && assessment.newCountry;
+    case 'EITHER':
+    default:
+      return assessment.newDevice || assessment.newCountry;
+  }
+}
+
+async function assessAdminLoginApproval(
+  input: Pick<
+    RecordSuccessfulAdminLoginInput,
+    'userId' | 'role' | 'ip' | 'userAgent'
+  >,
+): Promise<AdminLoginApprovalAssessment> {
+  const normalizedIp = normalizeIpAddress(input.ip);
+  const parsedUserAgent = parseAdminLoginUserAgent(input.userAgent);
+  const countryCode = normalizedIp ? (await getGeoIpCountry(normalizedIp)).countryCode : null;
+
+  if (input.role !== 'ADMIN') {
+    return {
+      required: false,
+      normalizedIp,
+      countryCode,
+      deviceFingerprint: parsedUserAgent.fingerprint,
+      deviceLabel: parsedUserAgent.label,
+      browser: parsedUserAgent.browser,
+      os: parsedUserAgent.os,
+      deviceType: parsedUserAgent.deviceType,
+      newDevice: false,
+      newCountry: false,
+    };
+  }
+
+  const previousLogins = await db.auditLog.findMany({
+    where: {
+      action: 'AUTH_LOGIN_SUCCESS',
+      userId: input.userId,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: {
+      details: true,
+    },
+  });
+
+  const knownDeviceFingerprints = new Set(
+    previousLogins
+      .map((entry) => parseAuditDetails(entry.details).deviceFingerprint)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const knownCountries = new Set(
+    previousLogins
+      .map((entry) => parseAuditDetails(entry.details).countryCode)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const newDevice =
+    knownDeviceFingerprints.size > 0 && !knownDeviceFingerprints.has(parsedUserAgent.fingerprint);
+  const newCountry =
+    Boolean(countryCode) && knownCountries.size > 0 && !knownCountries.has(countryCode!);
+
+  return {
+    required: false,
+    normalizedIp,
+    countryCode,
+    deviceFingerprint: parsedUserAgent.fingerprint,
+    deviceLabel: parsedUserAgent.label,
+    browser: parsedUserAgent.browser,
+    os: parsedUserAgent.os,
+    deviceType: parsedUserAgent.deviceType,
+    newDevice,
+    newCountry,
+  };
 }
 
 function buildIncidentSummary(incident: {
@@ -1254,6 +1430,18 @@ function parseSavedViews(rawValue: string | null | undefined) {
   }
 }
 
+function parsePendingApprovals(rawValue: string | null | undefined) {
+  if (!rawValue) {
+    return [] as AdminLoginPendingApprovalEntry[];
+  }
+
+  try {
+    return adminLoginPendingApprovalsSchema.parse(JSON.parse(rawValue));
+  } catch {
+    return [] as AdminLoginPendingApprovalEntry[];
+  }
+}
+
 function parseStoredDate(value: string | null | undefined) {
   if (!value) {
     return null;
@@ -1261,6 +1449,56 @@ function parseStoredDate(value: string | null | undefined) {
 
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizePendingApprovalEntry(
+  entry: AdminLoginPendingApprovalEntry,
+): AdminLoginPendingApproval | null {
+  const createdAt = parseStoredDate(entry.createdAt);
+  const expiresAt = parseStoredDate(entry.expiresAt);
+  const approvedAt = parseStoredDate(entry.approvedAt);
+  const rejectedAt = parseStoredDate(entry.rejectedAt);
+  const completedAt = parseStoredDate(entry.completedAt);
+
+  if (!createdAt || !expiresAt) {
+    return null;
+  }
+
+  let status = entry.status;
+  if (status === 'PENDING' && expiresAt.getTime() <= Date.now()) {
+    status = 'EXPIRED';
+  }
+
+  return {
+    id: entry.id,
+    tempToken: entry.tempToken,
+    userId: entry.userId,
+    email: entry.email,
+    role: entry.role,
+    ip: entry.ip,
+    host: entry.host?.trim() || null,
+    path: entry.path?.trim() || null,
+    countryCode: entry.countryCode?.trim() || null,
+    deviceFingerprint: entry.deviceFingerprint?.trim() || null,
+    deviceLabel: entry.deviceLabel,
+    browser: entry.browser,
+    os: entry.os,
+    deviceType: entry.deviceType,
+    via2FA: entry.via2FA,
+    method: entry.method?.trim() || null,
+    newDevice: entry.newDevice,
+    newCountry: entry.newCountry,
+    status,
+    createdAt,
+    expiresAt,
+    approvedAt,
+    approvedByEmail: entry.approvedByEmail?.trim() || null,
+    rejectedAt,
+    rejectedByEmail: entry.rejectedByEmail?.trim() || null,
+    rejectionReason: entry.rejectionReason?.trim() || null,
+    completedAt,
+    remainingMinutes: Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 60_000)),
+  };
 }
 
 function appendIncidentNote(existingNotes: string | undefined, actorEmail: string, note: string) {
@@ -1322,6 +1560,14 @@ function getAdminLoginEventLabel(action: string) {
       return 'New device sign-in';
     case 'AUTH_LOGIN_NEW_COUNTRY':
       return 'New country sign-in';
+    case 'AUTH_LOGIN_APPROVAL_REQUESTED':
+      return 'Approval requested';
+    case 'AUTH_LOGIN_APPROVAL_APPROVED':
+      return 'Approval approved';
+    case 'AUTH_LOGIN_APPROVAL_REJECTED':
+      return 'Approval rejected';
+    case 'AUTH_LOGIN_APPROVAL_COMPLETED':
+      return 'Approval completed';
     case 'AUTH_LOGIN_INCIDENT_ACKNOWLEDGED':
       return 'Incident acknowledged';
     case 'AUTH_LOGIN_INCIDENT_RESOLVED':
@@ -1441,6 +1687,26 @@ async function saveSavedViews(views: AdminLoginSavedView[]) {
   });
 }
 
+async function getPendingApprovalsMap() {
+  const setting = await db.settings.findUnique({
+    where: { key: ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY },
+    select: { value: true },
+  });
+
+  return parsePendingApprovals(setting?.value);
+}
+
+async function savePendingApprovals(entries: AdminLoginPendingApprovalEntry[]) {
+  await db.settings.upsert({
+    where: { key: ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY },
+    update: { value: JSON.stringify(entries) },
+    create: {
+      key: ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY,
+      value: JSON.stringify(entries),
+    },
+  });
+}
+
 async function updateIncidentWorkflowEntry(
   incidentId: string,
   updater: (current: AdminLoginIncidentWorkflowEntry | null) => AdminLoginIncidentWorkflowEntry,
@@ -1450,6 +1716,38 @@ async function updateIncidentWorkflowEntry(
   workflowMap[incidentId] = nextEntry;
   await saveIncidentWorkflowMap(workflowMap);
   return nextEntry;
+}
+
+async function getAdminLoginPendingApprovalsInternal() {
+  const stored = await getPendingApprovalsMap();
+  let changed = false;
+  const normalized = stored
+    .map((entry) => {
+      const parsed = normalizePendingApprovalEntry(entry);
+      if (!parsed) {
+        changed = true;
+        return null;
+      }
+
+      if (parsed.status !== entry.status) {
+        changed = true;
+        return {
+          ...entry,
+          status: parsed.status,
+        } satisfies AdminLoginPendingApprovalEntry;
+      }
+
+      return entry;
+    })
+    .filter(Boolean) as AdminLoginPendingApprovalEntry[];
+
+  if (changed) {
+    await savePendingApprovals(normalized);
+  }
+
+  return normalized
+    .map((entry) => normalizePendingApprovalEntry(entry))
+    .filter((entry): entry is AdminLoginPendingApproval => Boolean(entry));
 }
 
 function deriveWorkflowStatus(
@@ -1818,6 +2116,285 @@ export async function getAdminLoginChallengeDecision(
   };
 }
 
+export async function getAdminLoginApprovalDecision(input: {
+  userId: string;
+  email: string;
+  role: string;
+  ip: string | null | undefined;
+  userAgent?: string | null | undefined;
+}) {
+  const config = await getAdminLoginProtectionConfig();
+  const assessment = await assessAdminLoginApproval(input);
+
+  if (
+    input.role !== 'ADMIN' ||
+    !config.enabled ||
+    !config.unusualLoginApprovalEnabled ||
+    !assessment.normalizedIp ||
+    isLocalOrPrivateIp(assessment.normalizedIp) ||
+    isTrustedIp(assessment.normalizedIp, config)
+  ) {
+    return {
+      required: false,
+      config,
+      assessment,
+    };
+  }
+
+  return {
+    required: shouldRequireApprovalForAssessment(config.unusualLoginApprovalRequireFor, assessment),
+    config,
+    assessment,
+  };
+}
+
+export async function createAdminLoginApprovalRequest(input: {
+  tempToken: string;
+  userId: string;
+  email: string;
+  role: string;
+  ip: string;
+  host?: string | null;
+  path?: string | null;
+  via2FA?: boolean;
+  method?: string | null;
+  assessment: AdminLoginApprovalAssessment;
+  expiresAt: Date;
+}) {
+  const approvals = await getPendingApprovalsMap();
+  const now = new Date();
+  const existingIndex = approvals.findIndex((entry) => entry.tempToken === input.tempToken);
+  const nextEntry = adminLoginPendingApprovalEntrySchema.parse({
+    id: existingIndex >= 0 ? approvals[existingIndex]?.id : randomUUID(),
+    tempToken: input.tempToken,
+    userId: input.userId,
+    email: input.email,
+    role: input.role,
+    ip: input.ip,
+    host: input.host ?? null,
+    path: input.path ?? null,
+    countryCode: input.assessment.countryCode,
+    deviceFingerprint: input.assessment.deviceFingerprint,
+    deviceLabel: input.assessment.deviceLabel,
+    browser: input.assessment.browser,
+    os: input.assessment.os,
+    deviceType: input.assessment.deviceType,
+    via2FA: input.via2FA === true,
+    method: input.method ?? null,
+    newDevice: input.assessment.newDevice,
+    newCountry: input.assessment.newCountry,
+    status: 'PENDING',
+    createdAt: existingIndex >= 0 ? approvals[existingIndex]?.createdAt : now.toISOString(),
+    expiresAt: input.expiresAt.toISOString(),
+    approvedAt: null,
+    approvedByEmail: null,
+    rejectedAt: null,
+    rejectedByEmail: null,
+    rejectionReason: null,
+    completedAt: null,
+  });
+
+  const next = [...approvals];
+  if (existingIndex >= 0) {
+    next[existingIndex] = nextEntry;
+  } else {
+    next.push(nextEntry);
+  }
+  await savePendingApprovals(next);
+
+  await writeAuditLog({
+    userId: input.userId,
+    ip: input.ip,
+    action: 'AUTH_LOGIN_APPROVAL_REQUESTED',
+    entity: 'AUTH',
+    entityId: nextEntry.id,
+    details: {
+      email: input.email,
+      role: input.role,
+      host: input.host ?? null,
+      path: input.path ?? null,
+      countryCode: input.assessment.countryCode,
+      deviceFingerprint: input.assessment.deviceFingerprint,
+      deviceLabel: input.assessment.deviceLabel,
+      browser: input.assessment.browser,
+      os: input.assessment.os,
+      deviceType: input.assessment.deviceType,
+      via2FA: input.via2FA === true,
+      method: input.method ?? null,
+      newDevice: input.assessment.newDevice,
+      newCountry: input.assessment.newCountry,
+      expiresAt: input.expiresAt.toISOString(),
+    },
+  });
+
+  try {
+    const countryPart = input.assessment.countryCode ? `\nCountry: ${input.assessment.countryCode}` : '';
+    const hostPart = input.host ? `\nHost: <code>${input.host}</code>` : '';
+    const pathPart = input.path ? `\nPath: <code>${input.path}</code>` : '';
+    const reasonParts = [
+      input.assessment.newDevice ? 'new device' : null,
+      input.assessment.newCountry ? 'new country' : null,
+    ].filter(Boolean);
+    await sendAdminAlert(
+      [
+        '⏳ <b>Admin sign-in approval required</b>',
+        '',
+        `Email: <code>${input.email}</code>`,
+        `IP: <code>${input.ip}</code>${countryPart}`,
+        `Device: <b>${input.assessment.deviceLabel}</b>`,
+        `Reason: <b>${reasonParts.join(' + ') || 'unusual login'}</b>`,
+        `Approval expires: <b>${input.expiresAt.toISOString()}</b>`,
+        `${hostPart}${pathPart}`,
+      ].join('\n'),
+      { parseMode: 'HTML' },
+    );
+  } catch (error) {
+    console.error('Failed to send admin login approval alert:', error);
+  }
+
+  return normalizePendingApprovalEntry(nextEntry);
+}
+
+export async function getAdminLoginApprovalStatusByTempToken(tempToken: string) {
+  const approvals = await getAdminLoginPendingApprovalsInternal();
+  const approval = approvals.find((entry) => entry.tempToken === tempToken);
+  if (!approval) {
+    return {
+      status: 'EXPIRED' as AdminLoginApprovalStatus,
+      approval: null,
+    };
+  }
+
+  return {
+    status: approval.status,
+    approval,
+  };
+}
+
+export async function approveAdminLoginApproval(input: {
+  approvalId: string;
+  actorEmail: string;
+}) {
+  const approvals = await getPendingApprovalsMap();
+  const index = approvals.findIndex((entry) => entry.id === input.approvalId);
+  if (index < 0) {
+    throw new Error('Admin login approval not found');
+  }
+
+  const current = normalizePendingApprovalEntry(approvals[index]!);
+  if (!current) {
+    throw new Error('Admin login approval not found');
+  }
+  if (current.status !== 'PENDING') {
+    return current;
+  }
+
+  const now = new Date();
+  const updated = adminLoginPendingApprovalEntrySchema.parse({
+    ...approvals[index],
+    status: 'APPROVED',
+    approvedAt: now.toISOString(),
+    approvedByEmail: input.actorEmail,
+  });
+  approvals[index] = updated;
+  await savePendingApprovals(approvals);
+
+  await writeAuditLog({
+    userId: current.userId,
+    ip: current.ip,
+    action: 'AUTH_LOGIN_APPROVAL_APPROVED',
+    entity: 'AUTH',
+    entityId: current.id,
+    details: {
+      email: current.email,
+      actorEmail: input.actorEmail,
+    },
+  });
+
+  return normalizePendingApprovalEntry(updated);
+}
+
+export async function rejectAdminLoginApproval(input: {
+  approvalId: string;
+  actorEmail: string;
+  note?: string | null;
+}) {
+  const approvals = await getPendingApprovalsMap();
+  const index = approvals.findIndex((entry) => entry.id === input.approvalId);
+  if (index < 0) {
+    throw new Error('Admin login approval not found');
+  }
+
+  const current = normalizePendingApprovalEntry(approvals[index]!);
+  if (!current) {
+    throw new Error('Admin login approval not found');
+  }
+
+  const now = new Date();
+  const updated = adminLoginPendingApprovalEntrySchema.parse({
+    ...approvals[index],
+    status: 'REJECTED',
+    rejectedAt: now.toISOString(),
+    rejectedByEmail: input.actorEmail,
+    rejectionReason: input.note?.trim() || null,
+  });
+  approvals[index] = updated;
+  await savePendingApprovals(approvals);
+
+  await writeAuditLog({
+    userId: current.userId,
+    ip: current.ip,
+    action: 'AUTH_LOGIN_APPROVAL_REJECTED',
+    entity: 'AUTH',
+    entityId: current.id,
+    details: {
+      email: current.email,
+      actorEmail: input.actorEmail,
+      note: input.note?.trim() || null,
+    },
+  });
+
+  return normalizePendingApprovalEntry(updated);
+}
+
+export async function completeAdminLoginApproval(tempToken: string) {
+  const approvals = await getPendingApprovalsMap();
+  const index = approvals.findIndex((entry) => entry.tempToken === tempToken);
+  if (index < 0) {
+    throw new Error('Admin login approval not found');
+  }
+
+  const current = normalizePendingApprovalEntry(approvals[index]!);
+  if (!current) {
+    throw new Error('Admin login approval not found');
+  }
+  if (current.status !== 'APPROVED') {
+    return current;
+  }
+
+  const updated = adminLoginPendingApprovalEntrySchema.parse({
+    ...approvals[index],
+    status: 'COMPLETED',
+    completedAt: new Date().toISOString(),
+  });
+  approvals[index] = updated;
+  await savePendingApprovals(approvals);
+
+  await writeAuditLog({
+    userId: current.userId,
+    ip: current.ip,
+    action: 'AUTH_LOGIN_APPROVAL_COMPLETED',
+    entity: 'AUTH',
+    entityId: current.id,
+    details: {
+      email: current.email,
+      approvedByEmail: current.approvedByEmail,
+    },
+  });
+
+  return normalizePendingApprovalEntry(updated);
+}
+
 function ensureLogDir(filePath: string) {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -2184,21 +2761,20 @@ export async function getAdminLoginRestrictionStatus(ip: string | null | undefin
 }
 
 export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLoginInput) {
-  const normalizedIp = normalizeIpAddress(input.ip);
-  const parsedUserAgent = parseAdminLoginUserAgent(input.userAgent);
-  const countryCode = normalizedIp ? (await getGeoIpCountry(normalizedIp)).countryCode : null;
+  const assessment = await assessAdminLoginApproval(input);
+  const normalizedIp = assessment.normalizedIp;
 
   const detailsBase = {
     email: input.email,
     role: input.role,
     host: input.host ?? null,
     path: input.path ?? null,
-    countryCode,
-    deviceFingerprint: parsedUserAgent.fingerprint,
-    deviceLabel: parsedUserAgent.label,
-    browser: parsedUserAgent.browser,
-    os: parsedUserAgent.os,
-    deviceType: parsedUserAgent.deviceType,
+    countryCode: assessment.countryCode,
+    deviceFingerprint: assessment.deviceFingerprint,
+    deviceLabel: assessment.deviceLabel,
+    browser: assessment.browser,
+    os: assessment.os,
+    deviceType: assessment.deviceType,
     via2FA: input.via2FA === true,
     method: input.method ?? null,
   };
@@ -2215,39 +2791,12 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
     return {
       newDevice: false,
       newCountry: false,
-      countryCode,
-      deviceLabel: parsedUserAgent.label,
+      countryCode: assessment.countryCode,
+      deviceLabel: assessment.deviceLabel,
     };
   }
-
-  const previousLogins = await db.auditLog.findMany({
-    where: {
-      action: 'AUTH_LOGIN_SUCCESS',
-      userId: input.userId,
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    select: {
-      id: true,
-      details: true,
-    },
-  });
-
-  const knownDeviceFingerprints = new Set(
-    previousLogins
-      .map((entry) => parseAuditDetails(entry.details).deviceFingerprint)
-      .filter((value): value is string => Boolean(value)),
-  );
-  const knownCountries = new Set(
-    previousLogins
-      .map((entry) => parseAuditDetails(entry.details).countryCode)
-      .filter((value): value is string => Boolean(value)),
-  );
-
-  const newDevice =
-    knownDeviceFingerprints.size > 0 && !knownDeviceFingerprints.has(parsedUserAgent.fingerprint);
-  const newCountry =
-    Boolean(countryCode) && knownCountries.size > 0 && !knownCountries.has(countryCode!);
+  const newDevice = assessment.newDevice;
+  const newCountry = assessment.newCountry;
 
   await writeAuditLog({
     userId: input.userId,
@@ -2266,8 +2815,8 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
     return {
       newDevice,
       newCountry,
-      countryCode,
-      deviceLabel: parsedUserAgent.label,
+      countryCode: assessment.countryCode,
+      deviceLabel: assessment.deviceLabel,
     };
   }
 
@@ -2281,8 +2830,8 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
     return {
       newDevice,
       newCountry,
-      countryCode,
-      deviceLabel: parsedUserAgent.label,
+      countryCode: assessment.countryCode,
+      deviceLabel: assessment.deviceLabel,
     };
   }
 
@@ -2304,7 +2853,7 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
     });
 
     if (!suppression) {
-      const scope = buildSuccessfulLoginAlertScope('newDevice', input.userId, parsedUserAgent.fingerprint);
+      const scope = buildSuccessfulLoginAlertScope('newDevice', input.userId, assessment.deviceFingerprint);
       const shouldAlert = await shouldSendAlertForEvent(config, 'newDevice', {
         scope,
         level: riskSnapshot.level,
@@ -2314,12 +2863,12 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
           await sendSuccessfulLoginAlert('newDevice', {
             ip: normalizedIp,
             email: input.email,
-            countryCode,
+            countryCode: assessment.countryCode,
             host: input.host,
             path: input.path,
-            deviceLabel: parsedUserAgent.label,
-            browser: parsedUserAgent.browser,
-            os: parsedUserAgent.os,
+            deviceLabel: assessment.deviceLabel,
+            browser: assessment.browser,
+            os: assessment.os,
             via2FA: input.via2FA,
             method: input.method,
           });
@@ -2344,8 +2893,8 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
       },
     });
 
-    if (!suppression && countryCode) {
-      const scope = buildSuccessfulLoginAlertScope('newCountry', input.userId, countryCode);
+    if (!suppression && assessment.countryCode) {
+      const scope = buildSuccessfulLoginAlertScope('newCountry', input.userId, assessment.countryCode);
       const shouldAlert = await shouldSendAlertForEvent(config, 'newCountry', {
         scope,
         level: riskSnapshot.level,
@@ -2355,12 +2904,12 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
           await sendSuccessfulLoginAlert('newCountry', {
             ip: normalizedIp,
             email: input.email,
-            countryCode,
+            countryCode: assessment.countryCode,
             host: input.host,
             path: input.path,
-            deviceLabel: parsedUserAgent.label,
-            browser: parsedUserAgent.browser,
-            os: parsedUserAgent.os,
+            deviceLabel: assessment.deviceLabel,
+            browser: assessment.browser,
+            os: assessment.os,
             via2FA: input.via2FA,
             method: input.method,
           });
@@ -2375,8 +2924,8 @@ export async function recordSuccessfulAdminLogin(input: RecordSuccessfulAdminLog
   return {
     newDevice,
     newCountry,
-    countryCode,
-    deviceLabel: parsedUserAgent.label,
+    countryCode: assessment.countryCode,
+    deviceLabel: assessment.deviceLabel,
   };
 }
 
@@ -3726,6 +4275,9 @@ export async function getAdminLoginAbuseOverview() {
     console.error('Failed to send fail2ban overview alert:', error);
   }
   const fail2banBannedIps = new Set(fail2banStatus.bannedIps);
+  const pendingApprovals = (await getAdminLoginPendingApprovalsInternal())
+    .filter((entry) => entry.status === 'PENDING')
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const activeRestrictionByIp = new Map(
     activeRestrictions.map((restriction) => [restriction.ip, restriction as AdminLoginRestrictionInfo]),
   );
@@ -3878,8 +4430,10 @@ export async function getAdminLoginAbuseOverview() {
       activeBans: activeRestrictions.filter((item) => item.restrictionType === 'BAN').length,
       newDeviceLoginsLastDay,
       newCountryLoginsLastDay,
+      pendingApprovals: pendingApprovals.length,
     },
     activeRestrictions,
+    pendingApprovals,
     recentFailures: recentFailuresWithGeo,
     recentAdminLogins: recentAdminLoginsWithGeo,
     topOffenders: Array.from(topOffenders.values())

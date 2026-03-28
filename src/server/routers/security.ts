@@ -11,6 +11,7 @@ import {
     acknowledgeAdminLoginIncident,
     addAdminLoginIncidentNote,
     allowlistAdminLoginIp,
+    approveAdminLoginApproval,
     assignAdminLoginIncident,
     blockAdminLoginIpPermanently,
     bulkUpdateAdminLoginIncidents,
@@ -21,6 +22,7 @@ import {
     getAdminLoginAbuseOverview,
     getAdminLoginProtectionConfig,
     promoteAdminLoginIpToPermanentRule,
+    rejectAdminLoginApproval,
     removeAdminLoginAlertSuppression,
     resolveAdminLoginIncident,
     runAdminLoginIncidentDigestCycle,
@@ -239,6 +241,9 @@ export const securityRouter = router({
                 repeatedBanDurationMinutes: z.number().int().min(1).max(43200),
                 challengeMode: z.enum(['OFF', 'REQUIRE_2FA', 'BLOCK']),
                 challengeMinimumReputationLevel: z.enum(['LOW', 'ELEVATED', 'HIGH', 'CRITICAL']),
+                unusualLoginApprovalEnabled: z.boolean(),
+                unusualLoginApprovalRequireFor: z.enum(['NEW_DEVICE', 'NEW_COUNTRY', 'EITHER', 'BOTH']),
+                unusualLoginApprovalDurationMinutes: z.number().int().min(5).max(1440),
                 incidentDigestEnabled: z.boolean(),
                 incidentDigestHour: z.number().int().min(0).max(23),
                 incidentDigestMinute: z.number().int().min(0).max(59),
@@ -290,6 +295,28 @@ export const securityRouter = router({
         )
         .mutation(async ({ input }) => {
             return saveAdminLoginProtectionConfig(input);
+        }),
+
+    approveAdminLoginApproval: adminProcedure
+        .input(z.object({ approvalId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+            return approveAdminLoginApproval({
+                approvalId: input.approvalId,
+                actorEmail: ctx.user.email,
+            });
+        }),
+
+    rejectAdminLoginApproval: adminProcedure
+        .input(z.object({
+            approvalId: z.string().min(1),
+            note: z.string().trim().max(2000).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return rejectAdminLoginApproval({
+                approvalId: input.approvalId,
+                actorEmail: ctx.user.email,
+                note: input.note,
+            });
         }),
 
     getAdminLoginAbuseOverview: adminProcedure.query(async ({ ctx }) => {

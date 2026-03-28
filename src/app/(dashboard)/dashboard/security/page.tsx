@@ -849,6 +849,24 @@ function LoginProtectionCard() {
             toast({ title: 'Bulk IP action failed', description: error.message, variant: 'destructive' });
         },
     });
+    const approveLoginApprovalMutation = trpc.security.approveAdminLoginApproval.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Login approved', description: 'The pending admin sign-in can now complete.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to approve sign-in', description: error.message, variant: 'destructive' });
+        },
+    });
+    const rejectLoginApprovalMutation = trpc.security.rejectAdminLoginApproval.useMutation({
+        onSuccess: async () => {
+            toast({ title: 'Login rejected', description: 'The pending admin sign-in was rejected.' });
+            await refetch();
+        },
+        onError: (error) => {
+            toast({ title: 'Failed to reject sign-in', description: error.message, variant: 'destructive' });
+        },
+    });
 
     const [form, setForm] = useState<{
         enabled: boolean;
@@ -867,6 +885,9 @@ function LoginProtectionCard() {
         repeatedBanDurationMinutes: number;
         challengeMode: 'OFF' | 'REQUIRE_2FA' | 'BLOCK';
         challengeMinimumReputationLevel: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+        unusualLoginApprovalEnabled: boolean;
+        unusualLoginApprovalRequireFor: 'NEW_DEVICE' | 'NEW_COUNTRY' | 'EITHER' | 'BOTH';
+        unusualLoginApprovalDurationMinutes: number;
         incidentDigestEnabled: boolean;
         incidentDigestHour: number;
         incidentDigestMinute: number;
@@ -897,6 +918,9 @@ function LoginProtectionCard() {
         repeatedBanDurationMinutes: 2880,
         challengeMode: 'OFF' as 'OFF' | 'REQUIRE_2FA' | 'BLOCK',
         challengeMinimumReputationLevel: 'HIGH' as 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL',
+        unusualLoginApprovalEnabled: false,
+        unusualLoginApprovalRequireFor: 'EITHER' as 'NEW_DEVICE' | 'NEW_COUNTRY' | 'EITHER' | 'BOTH',
+        unusualLoginApprovalDurationMinutes: 30,
         incidentDigestEnabled: false,
         incidentDigestHour: 9,
         incidentDigestMinute: 30,
@@ -947,6 +971,9 @@ function LoginProtectionCard() {
             repeatedBanDurationMinutes: overview.config.repeatedBanDurationMinutes,
             challengeMode: overview.config.challengeMode,
             challengeMinimumReputationLevel: overview.config.challengeMinimumReputationLevel,
+            unusualLoginApprovalEnabled: overview.config.unusualLoginApprovalEnabled,
+            unusualLoginApprovalRequireFor: overview.config.unusualLoginApprovalRequireFor,
+            unusualLoginApprovalDurationMinutes: overview.config.unusualLoginApprovalDurationMinutes,
             incidentDigestEnabled: overview.config.incidentDigestEnabled,
             incidentDigestHour: overview.config.incidentDigestHour,
             incidentDigestMinute: overview.config.incidentDigestMinute,
@@ -1028,6 +1055,7 @@ function LoginProtectionCard() {
         overview?.ipReputation.filter((entry) => entry.level === 'HIGH' || entry.level === 'CRITICAL').length ?? 0;
     const newDeviceCount = overview?.summary.newDeviceLoginsLastDay ?? 0;
     const newCountryCount = overview?.summary.newCountryLoginsLastDay ?? 0;
+    const pendingApprovalCount = overview?.summary.pendingApprovals ?? 0;
     const recentAdminLogins = useMemo(
         () => (overview?.recentAdminLogins ?? []).filter(Boolean),
         [overview?.recentAdminLogins],
@@ -1102,6 +1130,16 @@ function LoginProtectionCard() {
         const note = requestNote('Optional allowlist note');
         if (note === null) return;
         allowlistMutation.mutate({ ip, note: note || undefined });
+    };
+
+    const handleApproveLoginApproval = (approvalId: string) => {
+        approveLoginApprovalMutation.mutate({ approvalId });
+    };
+
+    const handleRejectLoginApproval = (approvalId: string) => {
+        const note = requestNote('Optional rejection reason');
+        if (note === null) return;
+        rejectLoginApprovalMutation.mutate({ approvalId, note: note || undefined });
     };
 
     const handleSaveCurrentView = () => {
@@ -1563,6 +1601,17 @@ function LoginProtectionCard() {
                         <p className="text-xs text-muted-foreground">admin sign-ins from new geographies</p>
                     </CardContent>
                 </Card>
+                <Card className="ops-kpi-tile">
+                    <CardHeader className="px-0 pb-2 pt-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Pending approvals</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pb-0">
+                        <div className={`text-2xl font-bold ${pendingApprovalCount > 0 ? 'text-amber-500' : ''}`}>
+                            {pendingApprovalCount}
+                        </div>
+                        <p className="text-xs text-muted-foreground">unusual admin sign-ins waiting for review</p>
+                    </CardContent>
+                </Card>
             </div>
 
             <Card className="ops-panel">
@@ -1608,6 +1657,16 @@ function LoginProtectionCard() {
                                 <p className="text-sm text-muted-foreground">Mirror failed admin logins to the dedicated fail2ban file so the server can hard-ban the IP too.</p>
                             </div>
                             <Switch checked={form.fail2banLogEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, fail2banLogEnabled: checked }))} />
+                        </div>
+                        <div className="ops-detail-card flex items-center justify-between gap-4 md:col-span-2">
+                            <div>
+                                <p className="font-medium">Require approval for unusual admin sign-ins</p>
+                                <p className="text-sm text-muted-foreground">Hold new device or new country admin logins until another admin approves them.</p>
+                            </div>
+                            <Switch
+                                checked={form.unusualLoginApprovalEnabled}
+                                onCheckedChange={(checked) => setForm((current) => ({ ...current, unusualLoginApprovalEnabled: checked }))}
+                            />
                         </div>
                     </div>
 
@@ -1702,6 +1761,49 @@ function LoginProtectionCard() {
                             </Select>
                             <p className="text-xs text-muted-foreground">
                                 Only IPs at or above this reputation level will trigger the challenge mode.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Approval trigger</Label>
+                            <Select
+                                value={form.unusualLoginApprovalRequireFor}
+                                onValueChange={(value) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        unusualLoginApprovalRequireFor: value as 'NEW_DEVICE' | 'NEW_COUNTRY' | 'EITHER' | 'BOTH',
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NEW_DEVICE">New device only</SelectItem>
+                                    <SelectItem value="NEW_COUNTRY">New country only</SelectItem>
+                                    <SelectItem value="EITHER">New device or new country</SelectItem>
+                                    <SelectItem value="BOTH">Require both signals</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Choose which unusual sign-in pattern should require a manual admin approval.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Approval window (minutes)</Label>
+                            <Input
+                                type="number"
+                                min={5}
+                                max={1440}
+                                value={form.unusualLoginApprovalDurationMinutes}
+                                onChange={(event) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        unusualLoginApprovalDurationMinutes: Math.min(1440, Math.max(5, Number(event.target.value) || 5)),
+                                    }))
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                How long an unusual sign-in can wait in the pending queue before it expires.
                             </p>
                         </div>
                     </div>
@@ -1909,6 +2011,66 @@ function LoginProtectionCard() {
 
             <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 <div className="space-y-6">
+                    <Card className="ops-panel">
+                        <CardHeader className="px-0 pt-0">
+                            <CardTitle>Pending unusual sign-ins</CardTitle>
+                            <CardDescription>
+                                Admin logins from new devices or countries can wait here until another admin approves them.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {overview.pendingApprovals.length === 0 ? (
+                                <div className="ops-chart-empty py-8 text-muted-foreground">No admin sign-ins are waiting for approval.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {overview.pendingApprovals.map((approval) => (
+                                        <div key={approval.id} className="ops-row-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                            <div className="space-y-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="font-medium">{approval.email}</p>
+                                                    <Badge variant={approval.status === 'PENDING' ? 'secondary' : 'outline'}>
+                                                        {approval.status}
+                                                    </Badge>
+                                                    {approval.newDevice ? <Badge variant="outline">New device</Badge> : null}
+                                                    {approval.newCountry ? <Badge variant="outline">New country</Badge> : null}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">
+                                                    {approval.ip}
+                                                    {approval.countryCode ? ` • ${approval.countryCode}` : ''}
+                                                    {approval.host ? ` • ${approval.host}` : ''}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">
+                                                    {approval.deviceLabel}
+                                                    {approval.method ? ` • ${approval.method}` : approval.via2FA ? ' • 2FA' : ' • password only'}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Requested {formatDistanceToNow(approval.createdAt, { addSuffix: true })} • expires in about {approval.remainingMinutes} min
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    className="rounded-full"
+                                                    onClick={() => handleRejectLoginApproval(approval.id)}
+                                                    disabled={rejectLoginApprovalMutation.isPending || approval.status !== 'PENDING'}
+                                                >
+                                                    Reject
+                                                </Button>
+                                                <Button
+                                                    className="rounded-full"
+                                                    onClick={() => handleApproveLoginApproval(approval.id)}
+                                                    disabled={approveLoginApprovalMutation.isPending || approval.status !== 'PENDING'}
+                                                >
+                                                    Approve
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
                             <CardTitle>Recent failed admin logins</CardTitle>

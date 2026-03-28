@@ -138,6 +138,7 @@ export default function LoginPage() {
     router.prefetch('/dashboard');
     router.prefetch('/portal');
     router.prefetch('/verify-2fa');
+    router.prefetch('/login-approval');
   }, [router]);
 
   // Login mutation using tRPC
@@ -152,6 +153,11 @@ export default function LoginPage() {
           webauthn: data.webAuthnEnabled ? 'true' : 'false',
         });
         router.push(`/verify-2fa?${params.toString()}`);
+        return;
+      }
+
+      if (data.requiresApproval && data.tempToken) {
+        router.push(`/login-approval?token=${encodeURIComponent(data.tempToken)}`);
         return;
       }
 

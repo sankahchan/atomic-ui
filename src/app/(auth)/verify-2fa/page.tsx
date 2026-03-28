@@ -50,6 +50,7 @@ function Verify2FAContent() {
     router.prefetch('/dashboard');
     router.prefetch('/portal');
     router.prefetch('/login');
+    router.prefetch('/login-approval');
   }, [router]);
 
   // Redirect if no temp token
@@ -62,6 +63,11 @@ function Verify2FAContent() {
   // 2FA verification mutation
   const verify2FAMutation = trpc.auth.verify2FA.useMutation({
     onSuccess: (data) => {
+      if (data.requiresApproval && data.tempToken) {
+        router.push(`/login-approval?token=${encodeURIComponent(data.tempToken)}`);
+        return;
+      }
+
       toast({
         title: 'Welcome back!',
         description: 'Two-factor authentication successful.',
@@ -84,6 +90,11 @@ function Verify2FAContent() {
 
   const verifyWebAuthnLoginMutation = trpc.auth.verifyWebAuthnLogin.useMutation({
     onSuccess: (data) => {
+      if (data.requiresApproval && data.tempToken) {
+        router.push(`/login-approval?token=${encodeURIComponent(data.tempToken)}`);
+        return;
+      }
+
       toast({
         title: 'Welcome back!',
         description: 'Passkey verification successful.',

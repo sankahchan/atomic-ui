@@ -28,6 +28,7 @@ import { getJwtSecretString } from '@/lib/session-secret';
  */
 const publicRoutes = [
   '/login',
+  '/login-approval',
   '/verify-2fa',
   '/sub/',                  // Subscription URLs (Pages)
   '/s/',                    // Short subscription URLs (Pages)
@@ -39,6 +40,10 @@ const publicRoutes = [
   '/api/health-check',      // Background server checks (cron/manual secret)
   '/api/telegram/webhook',  // Telegram webhook from external service
   '/api/trpc/auth.login',   // Login API endpoint
+  '/api/trpc/auth.getAdminLoginApprovalStatus',
+  '/api/trpc/auth.completeAdminLoginApproval',
+  '/api/trpc/auth.generateWebAuthnLoginOptions',
+  '/api/trpc/auth.verifyWebAuthnLogin',
   '/api/trpc/auth.verify2FA', // 2FA verification endpoint
   '/api/trpc/auth.logout',  // Logout API endpoint
   '/api/tasks/',            // Background tasks (cron jobs)
