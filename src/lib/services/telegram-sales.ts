@@ -63,9 +63,9 @@ export type TelegramOrderActiveStatus = (typeof TELEGRAM_ORDER_ACTIVE_STATUSES)[
 export type TelegramOrderTerminalStatus = (typeof TELEGRAM_ORDER_TERMINAL_STATUSES)[number];
 
 const DEFAULT_PAYMENT_INSTRUCTIONS_EN =
-  'After payment, send the screenshot here as a photo or document. Your order will stay pending until the admin approves it.';
+  'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.';
 const DEFAULT_PAYMENT_INSTRUCTIONS_MY =
-  'ငွေပေးချေပြီးပါက screenshot ကို ဤနေရာတွင် photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။';
+  'ငွေပေးချေပြီးပါက payment screenshot ကို ဤ chat ထဲသို့ photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။';
 
 function defaultPlans(): TelegramSalesPlan[] {
   return [

@@ -13,6 +13,11 @@ import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
 import {
+  buildDefaultTelegramTemplateMap,
+  DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+  DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+} from '@/lib/services/telegram-copy';
+import {
   TELEGRAM_SALES_SETTING_KEY,
   normalizeTelegramSalesSettings,
   telegramSalesSettingsSchema,
@@ -55,10 +60,12 @@ export const telegramBotRouter = router({
       return {
         botToken: '',
         botUsername: '',
-        welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
-        keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
-        localizedWelcomeMessages: {},
-        localizedKeyNotFoundMessages: {},
+        welcomeMessage: DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
+        keyNotFoundMessage: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+        localizedWelcomeMessages: buildDefaultTelegramTemplateMap(DEFAULT_TELEGRAM_WELCOME_MESSAGES),
+        localizedKeyNotFoundMessages: buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+        ),
         isEnabled: false,
         adminChatIds: [],
         dailyDigestEnabled: false,
@@ -75,10 +82,16 @@ export const telegramBotRouter = router({
       return {
         botToken: parsed.botToken || '',
         botUsername: parsed.botUsername || '',
-        welcomeMessage: parsed.welcomeMessage || 'Welcome! Send your Telegram ID or email to get your VPN key.',
-        keyNotFoundMessage: parsed.keyNotFoundMessage || 'No key found for your account. Please contact the administrator.',
-        localizedWelcomeMessages: normalizeLocalizedTemplateMap(parsed.localizedWelcomeMessages),
-        localizedKeyNotFoundMessages: normalizeLocalizedTemplateMap(parsed.localizedKeyNotFoundMessages),
+        welcomeMessage: parsed.welcomeMessage || DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
+        keyNotFoundMessage: parsed.keyNotFoundMessage || DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+        localizedWelcomeMessages: buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+          parsed.localizedWelcomeMessages,
+        ),
+        localizedKeyNotFoundMessages: buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+          parsed.localizedKeyNotFoundMessages,
+        ),
         isEnabled: parsed.isEnabled ?? false,
         adminChatIds: parsed.adminChatIds || [],
         dailyDigestEnabled: parsed.dailyDigestEnabled ?? false,
@@ -92,10 +105,12 @@ export const telegramBotRouter = router({
       return {
         botToken: '',
         botUsername: '',
-        welcomeMessage: 'Welcome! Send your Telegram ID or email to get your VPN key.',
-        keyNotFoundMessage: 'No key found for your account. Please contact the administrator.',
-        localizedWelcomeMessages: {},
-        localizedKeyNotFoundMessages: {},
+        welcomeMessage: DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
+        keyNotFoundMessage: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+        localizedWelcomeMessages: buildDefaultTelegramTemplateMap(DEFAULT_TELEGRAM_WELCOME_MESSAGES),
+        localizedKeyNotFoundMessages: buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+        ),
         isEnabled: false,
         adminChatIds: [],
         dailyDigestEnabled: false,

@@ -170,10 +170,18 @@ type TelegramSettings = {
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   botToken: '',
   botUsername: '',
-  welcomeMessage: 'Welcome! Use /mykeys to view your linked VPN keys.',
-  keyNotFoundMessage: 'No linked keys were found. Please contact support to connect your Telegram account.',
-  localizedWelcomeMessages: {},
-  localizedKeyNotFoundMessages: {},
+  welcomeMessage:
+    'Welcome to Atomic-UI. Use /buy to order a new key, /renew to extend an existing key, or send your email address to link a current key.',
+  keyNotFoundMessage:
+    'No active key is linked to this account yet. Send your email address to link an existing key, or use /buy to place a new order.',
+  localizedWelcomeMessages: {
+    en: 'Welcome to Atomic-UI. Use /buy to order a new key, /renew to extend an existing key, or send your email address to link a current key.',
+    my: 'Atomic-UI မှ ကြိုဆိုပါတယ်။ /buy ဖြင့် key အသစ်မှာယူနိုင်သည်၊ /renew ဖြင့် လက်ရှိ key ကို သက်တမ်းတိုးနိုင်သည်၊ သို့မဟုတ် သင့် email ကို ပို့ပြီး လက်ရှိ key ကို ချိတ်ဆက်နိုင်သည်။',
+  },
+  localizedKeyNotFoundMessages: {
+    en: 'No active key is linked to this account yet. Send your email address to link an existing key, or use /buy to place a new order.',
+    my: 'ဤ account နှင့် ချိတ်ထားသော active key မရှိသေးပါ။ လက်ရှိ key ကို ချိတ်ရန် သင့် email ကို ပို့ပါ၊ သို့မဟုတ် key အသစ်မှာယူရန် /buy ကို အသုံးပြုပါ။',
+  },
   isEnabled: false,
   adminChatIds: [],
   dailyDigestEnabled: false,
@@ -257,10 +265,10 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
   allowRenewals: true,
   paymentInstructions:
-    'After payment, send the screenshot here as a photo or document. Your order will stay pending until the admin approves it.',
+    'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
   localizedPaymentInstructions: {
-    en: 'After payment, send the screenshot here as a photo or document. Your order will stay pending until the admin approves it.',
-    my: 'ငွေပေးချေပြီးပါက screenshot ကို ဤနေရာတွင် photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။',
+    en: 'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
+    my: 'ငွေပေးချေပြီးပါက payment screenshot ကို ဤနေရာတွင် photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။',
   },
   plans: [
     {

@@ -41,6 +41,11 @@ import {
   type LocalizedTemplateMap,
 } from '@/lib/localized-templates';
 import {
+  buildDefaultTelegramTemplateMap,
+  DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+  DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+} from '@/lib/services/telegram-copy';
+import {
   TELEGRAM_ORDER_ACTIVE_STATUSES,
   TELEGRAM_ORDER_TERMINAL_STATUSES,
   formatTelegramSalesPlanSummary,
@@ -456,8 +461,8 @@ function getTelegramUi(locale: SupportedLocale) {
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
     languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
     languagePromptDesc: isMyanmar
-      ? 'လိုအပ်သည့် message များကို သင့်ရွေးချယ်ထားသော ဘာသာစကားဖြင့် ပို့ပေးပါမည်။'
-      : 'The bot will continue in your selected language.',
+      ? 'ဆက်သွယ်မှုများ၊ order flow နှင့် key ပို့ပေးခြင်းတို့ကို သင့်ရွေးချယ်ထားသော ဘာသာစကားဖြင့် ဆက်လုပ်ပေးပါမည်။'
+      : 'The bot will continue in your selected language for orders, support, and key delivery.',
     languageChanged: (languageName: string) =>
       isMyanmar
         ? `✅ ဘာသာစကားကို <b>${languageName}</b> သို့ ပြောင်းပြီးပါပြီ။`
@@ -467,12 +472,12 @@ function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
-    defaultWelcome: isMyanmar ? 'သင့် email ကို ပို့ပါ၊ သို့မဟုတ် admin ကို Telegram connect link ဖန်တီးပေးရန် တောင်းဆိုပါ။' : 'Send your email address, or ask your admin to generate a Telegram connect link from your key.',
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /renew - renew an existing key\n• /mykeys - view your linked keys\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+    defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
-    emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\n/access အသေးစိတ်ရရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your access details.`,
-    keyNotFoundDefault: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော VPN key မရှိသေးပါ။\n\nသင့် email ကို ပို့ပါ သို့မဟုတ် admin ထံမှ Telegram connect link အသုံးပြုပါ။' : '❌ No VPN keys are linked to this Telegram account yet.\n\nSend your email address or use a Telegram connect link from the admin.',
+    emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
+    keyNotFoundDefault: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES[locale],
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
     myKeysEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိပါ။' : '❌ No linked keys found for this Telegram account.',
     myKeysTitle: isMyanmar ? '🗂 <b>သင့်နှင့် ချိတ်ထားသော key များ</b>' : '🗂 <b>Your linked keys</b>',
@@ -503,57 +508,57 @@ function getTelegramUi(locale: SupportedLocale) {
     renewDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ renewal မလုပ်နိုင်သေးပါ။' : 'ℹ️ Renewals are not available through Telegram right now.',
     activeOrderPendingReview: (code: string) =>
       isMyanmar
-        ? `⏳ Order <b>${code}</b> ကို review စောင့်နေဆဲဖြစ်ပါသည်။ Screenshot အသစ် မပို့ပါနှင့်။ Admin အတည်ပြုပြီးနောက် key ကို ပို့ပေးပါမည်။`
-        : `⏳ Order <b>${code}</b> is still waiting for review. Do not send another screenshot yet. Your key will be delivered after admin approval.`,
+        ? `⏳ Order <b>${code}</b> ကို review စောင့်နေဆဲဖြစ်ပါသည်။ Screenshot အသစ် မပို့ပါနှင့်။ Admin အတည်ပြုပြီးနောက် access ကို ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
+        : `⏳ Order <b>${code}</b> is still waiting for review. Do not send another screenshot yet. Your access details will be delivered here after admin approval.`,
     orderCancelled: (code: string) =>
       isMyanmar
         ? `🛑 Order <b>${code}</b> ကို ပယ်ဖျက်ပြီးပါပြီ။`
         : `🛑 Order <b>${code}</b> has been cancelled.`,
     noOrderToCancel: isMyanmar ? 'ℹ️ ပယ်ဖျက်ရန် pending Telegram order မရှိပါ။' : 'ℹ️ There is no pending Telegram order to cancel.',
     paymentProofRequired: isMyanmar
-      ? '🧾 ငွေပေးချေပြီး screenshot ကို photo သို့မဟုတ် document အဖြစ် ဤ chat ထဲပို့ပေးပါ။'
-      : '🧾 After payment, send the screenshot here as a photo or document.',
+      ? '🧾 ငွေပေးချေပြီး payment screenshot ကို photo သို့မဟုတ် document အဖြစ် ဤ chat ထဲပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။'
+      : '🧾 After payment, send the payment screenshot here as a photo or document. Make sure the amount, transfer ID, and time are clearly visible.',
     orderPlanPrompt: (code: string) =>
       isMyanmar
-        ? `🛒 <b>Order ${code}</b>\n\nလိုချင်သော plan ကို ရွေးရန် 1, 2, သို့မဟုတ် 3 ဟု reply လုပ်ပါ။`
-        : `🛒 <b>Order ${code}</b>\n\nReply with 1, 2, or 3 to choose a plan.`,
+        ? `🛒 <b>Order ${code}</b>\n\nအောက်ပါ plan စာရင်းမှ လိုချင်သော plan ကို ရွေးရန် 1, 2, သို့မဟုတ် 3 ဟု reply လုပ်ပါ။`
+        : `🛒 <b>Order ${code}</b>\n\nReply with 1, 2, or 3 to choose one of the plans below.`,
     orderMonthsPrompt: isMyanmar
-      ? '📆 Unlimited plan အတွက် လအရေအတွက်ကို ပို့ပါ (အနည်းဆုံး 3 လ)।'
-      : '📆 Send the number of months for the unlimited plan (minimum 3 months).',
+      ? '📆 Unlimited plan အတွက် လအရေအတွက်ကို ပို့ပါ။ အနည်းဆုံး 3 လ ဖြစ်ရပါမည်။'
+      : '📆 Send the number of months for the unlimited plan. The minimum is 3 months.',
     orderNamePrompt: isMyanmar
-      ? '✍️ Key တွင် ပြမည့် အမည်ကို ပို့ပါ။ ဥပမာ: John iPhone'
-      : '✍️ Send the name that should appear on the key. Example: John iPhone',
+      ? '✍️ Key တွင် ပြမည့် အမည်ကို ပို့ပါ။ ဥပမာ - John iPhone 15'
+      : '✍️ Send the name that should appear on the key. Example: John iPhone 15',
     renewTargetPrompt: (code: string) =>
       isMyanmar
         ? `🔄 <b>Renewal ${code}</b>\n\nသက်တမ်းတိုးလိုသော key ကို အောက်ပါစာရင်းမှ နံပါတ်ဖြင့် reply လုပ်ပါ။`
-        : `🔄 <b>Renewal ${code}</b>\n\nReply with the number of the key you want to renew.`,
+        : `🔄 <b>Renewal ${code}</b>\n\nReply with the number of the key you want to renew from the list below.`,
     invalidPlanChoice: isMyanmar ? '❌ Plan အတွက် 1, 2, သို့မဟုတ် 3 ကိုသာ ပို့ပေးပါ။' : '❌ Reply with 1, 2, or 3 for the plan.',
     invalidMonths: isMyanmar ? '❌ လအရေအတွက်ကို 3 နှင့်အထက် ဂဏန်းဖြင့် ပို့ပေးပါ။' : '❌ Send a number of months that is 3 or greater.',
     invalidRenewChoice: isMyanmar ? '❌ စာရင်းထဲက key နံပါတ်ကို ပို့ပေးပါ။' : '❌ Reply with one of the key numbers from the list.',
     invalidOrderName: isMyanmar ? '❌ Key အမည်ကို စာလုံး 2 လုံးမှ 100 လုံးအတွင်း ပို့ပေးပါ။' : '❌ Send a key name between 2 and 100 characters.',
     orderProofPending: (code: string) =>
       isMyanmar
-        ? `📨 Order <b>${code}</b> အတွက် screenshot ကို လက်ခံပြီးပါပြီ။ Admin review စောင့်နေပါသည်။`
-        : `📨 Payment proof received for order <b>${code}</b>. It is now waiting for admin review.`,
+        ? `📨 Order <b>${code}</b> အတွက် payment proof ကို လက်ခံပြီးပါပြီ။ Admin review စောင့်နေပါသည်။ အတည်ပြုပြီးနောက် key ကို ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
+        : `📨 Payment proof received for order <b>${code}</b>. It is now waiting for admin review. Your key will be delivered here after approval.`,
     orderRejected: (code: string, note?: string | null) =>
       isMyanmar
-        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${note ? `\n\nမှတ်ချက်: ${note}` : ''}`
-        : `❌ Order <b>${code}</b> was rejected.${note ? `\n\nNote: ${note}` : ''}`,
+        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${note ? `\n\nမှတ်ချက်: ${note}` : ''}\n\nလိုအပ်ပါက screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကို ပြန်စနိုင်ပါသည်။`
+        : `❌ Order <b>${code}</b> was rejected.${note ? `\n\nNote: ${note}` : ''}\n\nIf needed, you can start again with /buy or /renew and send a new screenshot.`,
     orderApproved: (code: string) =>
       isMyanmar
-        ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Key ကို ယခု ပို့ပေးပါမည်။`
-        : `✅ Order <b>${code}</b> has been approved. Your key will be delivered now.`,
+        ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Access details ကို ယခု ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
+        : `✅ Order <b>${code}</b> has been approved. Your access details will be delivered in the next message.`,
     orderSupportHint: isMyanmar
-      ? 'မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
-      : 'You can cancel the current order at any time with /cancel.',
-    orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order review လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
-    orderReviewPanelLabel: isMyanmar ? 'Review in panel' : 'Review in panel',
+      ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
+      : 'Before approval, you can cancel the current order at any time with /cancel.',
+    orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order ကို စစ်ဆေးရန် လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
+    orderReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးရန်' : 'Review in panel',
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
     paymentProofLabel: isMyanmar ? 'Proof' : 'Proof',
-    requestedNameLabel: isMyanmar ? 'Requested name' : 'Requested name',
-    renewalTargetLabel: isMyanmar ? 'Renew target' : 'Renew target',
+    requestedNameLabel: isMyanmar ? 'တောင်းဆိုထားသော အမည်' : 'Requested name',
+    renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
     statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
     statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
     statusLabel: isMyanmar ? 'အခြေအနေ' : 'Status',
@@ -1235,6 +1240,15 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
     try {
       const config = JSON.parse(settings.value) as Record<string, unknown>;
       if (config.isEnabled && typeof config.botToken === 'string' && config.botToken.trim()) {
+        const localizedWelcomeMessages = buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+          config.localizedWelcomeMessages,
+        );
+        const localizedKeyNotFoundMessages = buildDefaultTelegramTemplateMap(
+          DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+          config.localizedKeyNotFoundMessages,
+        );
+
         return {
           botToken: config.botToken,
           botUsername:
@@ -1249,17 +1263,13 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           welcomeMessage:
             typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
               ? config.welcomeMessage
-              : undefined,
+              : DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
           keyNotFoundMessage:
             typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
               ? config.keyNotFoundMessage
-              : undefined,
-          localizedWelcomeMessages: normalizeLocalizedTemplateMap(
-            config.localizedWelcomeMessages,
-          ),
-          localizedKeyNotFoundMessages: normalizeLocalizedTemplateMap(
-            config.localizedKeyNotFoundMessages,
-          ),
+              : DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+          localizedWelcomeMessages,
+          localizedKeyNotFoundMessages,
           dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
           dailyDigestHour:
             typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
