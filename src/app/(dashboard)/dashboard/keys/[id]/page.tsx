@@ -947,6 +947,9 @@ function SubscriptionShareCard({
     await copyToClipboard(url, shareUi.copied, shareUi.copiedClientUrl);
   };
 
+  const shareActionButtonClassName =
+    'h-auto min-w-0 justify-start whitespace-normal px-4 py-3 text-left text-sm leading-5';
+
   const saveSlug = () => {
     const normalizedSlug = normalizedSlugInput;
     if (!normalizedSlug || normalizedSlug.length < 3) {
@@ -1009,36 +1012,42 @@ function SubscriptionShareCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
-            <Switch
-              checked={sharePageEnabled}
-              onCheckedChange={(checked) => handleToggleUpdate('sharePageEnabled', checked)}
-            />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">{shareUi.sharePageToggle}</span>
-              <span className="block text-xs text-muted-foreground">{shareUi.sharePageToggleHelp}</span>
-            </span>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <label className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 space-y-1">
+                <span className="block text-sm font-medium">{shareUi.sharePageToggle}</span>
+                <span className="block text-xs leading-5 text-muted-foreground">{shareUi.sharePageToggleHelp}</span>
+              </span>
+              <Switch
+                checked={sharePageEnabled}
+                onCheckedChange={(checked) => handleToggleUpdate('sharePageEnabled', checked)}
+              />
+            </div>
           </label>
-          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
-            <Switch
-              checked={clientLinkEnabled}
-              onCheckedChange={(checked) => handleToggleUpdate('clientLinkEnabled', checked)}
-            />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">{shareUi.clientLinkToggle}</span>
-              <span className="block text-xs text-muted-foreground">{shareUi.clientLinkToggleHelp}</span>
-            </span>
+          <label className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 space-y-1">
+                <span className="block text-sm font-medium">{shareUi.clientLinkToggle}</span>
+                <span className="block text-xs leading-5 text-muted-foreground">{shareUi.clientLinkToggleHelp}</span>
+              </span>
+              <Switch
+                checked={clientLinkEnabled}
+                onCheckedChange={(checked) => handleToggleUpdate('clientLinkEnabled', checked)}
+              />
+            </div>
           </label>
-          <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
-            <Switch
-              checked={telegramDeliveryEnabled}
-              onCheckedChange={(checked) => handleToggleUpdate('telegramDeliveryEnabled', checked)}
-            />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">{shareUi.telegramToggle}</span>
-              <span className="block text-xs text-muted-foreground">{shareUi.telegramToggleHelp}</span>
-            </span>
+          <label className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 space-y-1">
+                <span className="block text-sm font-medium">{shareUi.telegramToggle}</span>
+                <span className="block text-xs leading-5 text-muted-foreground">{shareUi.telegramToggleHelp}</span>
+              </span>
+              <Switch
+                checked={telegramDeliveryEnabled}
+                onCheckedChange={(checked) => handleToggleUpdate('telegramDeliveryEnabled', checked)}
+              />
+            </div>
           </label>
         </div>
 
@@ -1073,34 +1082,38 @@ function SubscriptionShareCard({
             <Link2 className="w-4 h-4" />
             {shareUi.shortSlug}
           </Label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               placeholder={shareUi.slugPlaceholder}
               value={slugInput}
               onChange={(e) => setSlugInput(normalizePublicSlug(e.target.value))}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={saveSlug}
-              disabled={
-                updateSlugMutation.isPending ||
-                normalizedSlugInput.length < 3 ||
-                (slugAvailabilityQuery.isSuccess &&
-                  (!slugAvailabilityQuery.data.valid || !slugAvailabilityQuery.data.available))
-              }
-            >
-              {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : shareUi.save}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => regenerateSlugMutation.mutate({ id: keyId })}
-              disabled={regenerateSlugMutation.isPending}
-              title={shareUi.regenerateShortSlug}
-            >
-              {regenerateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-            </Button>
+            <div className="flex gap-2 sm:shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={saveSlug}
+                disabled={
+                  updateSlugMutation.isPending ||
+                  normalizedSlugInput.length < 3 ||
+                  (slugAvailabilityQuery.isSuccess &&
+                    (!slugAvailabilityQuery.data.valid || !slugAvailabilityQuery.data.available))
+                }
+              >
+                {updateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : shareUi.save}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => regenerateSlugMutation.mutate({ id: keyId })}
+                disabled={regenerateSlugMutation.isPending}
+                title={shareUi.regenerateShortSlug}
+              >
+                {regenerateSlugMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             {shareUi.slugHelp}
@@ -1168,7 +1181,7 @@ function SubscriptionShareCard({
             <ImageIcon className="w-4 h-4" />
             {shareUi.backgroundImage}
           </Label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               placeholder="https://example.com/image.jpg"
               value={coverImageUrl}
@@ -1177,6 +1190,7 @@ function SubscriptionShareCard({
             <Button
               variant="outline"
               size="sm"
+              className="sm:shrink-0"
               onClick={handleCoverImageSave}
               disabled={updateCoverMutation.isPending}
             >
@@ -1205,10 +1219,10 @@ function SubscriptionShareCard({
               {contacts.map((contact, index) => {
                 const contactType = CONTACT_TYPES.find(t => t.value === contact.type);
                 return (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                  <div key={index} className="flex min-w-0 items-center gap-2 rounded bg-muted p-2">
                     <span>{contactType?.icon}</span>
                     <span className="text-sm font-medium">{contactType ? getContactTypeLabel(contact.type) : contact.type}</span>
-                    <span className="text-sm text-muted-foreground truncate flex-1">{contact.value}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{contact.value}</span>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -1225,9 +1239,9 @@ function SubscriptionShareCard({
 
           {/* Add new contact */}
           {contacts.length < 3 && (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Select value={newContactType} onValueChange={setNewContactType}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1250,6 +1264,7 @@ function SubscriptionShareCard({
               <Button
                 variant="outline"
                 size="icon"
+                className="sm:shrink-0"
                 onClick={handleAddContact}
                 disabled={updateContactsMutation.isPending}
               >
@@ -1360,10 +1375,10 @@ function SubscriptionShareCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           <Button
             variant="outline"
-            className="w-full min-w-0 text-xs sm:text-sm"
+            className={cn('w-full', shareActionButtonClassName)}
             disabled={!sharePageEnabled || (!subscriptionToken && !slugInput.trim())}
             onClick={() => {
               const url = getSubscriptionPageUrl();
@@ -1374,7 +1389,7 @@ function SubscriptionShareCard({
             {shareUi.preview}
           </Button>
           <Button
-            className="w-full min-w-0 text-xs sm:text-sm"
+            className={cn('w-full', shareActionButtonClassName)}
             onClick={copySubscriptionPageUrl}
             disabled={!sharePageEnabled || (!subscriptionToken && !slugInput.trim())}
           >
@@ -1383,7 +1398,7 @@ function SubscriptionShareCard({
           </Button>
           <Button
             variant="outline"
-            className="w-full min-w-0 text-xs sm:text-sm"
+            className={cn('w-full', shareActionButtonClassName)}
             onClick={copyClientUrl}
             disabled={!clientLinkEnabled || (!subscriptionToken && !slugInput.trim())}
           >
@@ -1392,7 +1407,7 @@ function SubscriptionShareCard({
           </Button>
           <Button
             variant="outline"
-            className="w-full min-w-0 text-xs sm:text-sm"
+            className={cn('w-full', shareActionButtonClassName)}
             onClick={() => connectLinkMutation.mutate({ id: keyId })}
             disabled={!telegramDeliveryEnabled || connectLinkMutation.isPending}
           >
@@ -1404,7 +1419,7 @@ function SubscriptionShareCard({
             {shareUi.connectTelegram}
           </Button>
           <Button
-            className="w-full min-w-0 text-xs sm:text-sm"
+            className={cn('w-full', shareActionButtonClassName)}
             onClick={() => sendSharePageMutation.mutate({ id: keyId, reason: 'RESENT' })}
             disabled={!telegramDeliveryEnabled || sendSharePageMutation.isPending}
           >
@@ -1417,7 +1432,7 @@ function SubscriptionShareCard({
           </Button>
           <Button
             variant="outline"
-            className="w-full min-w-0 text-xs sm:col-span-2 sm:text-sm"
+            className={cn('w-full md:col-span-2', shareActionButtonClassName)}
             onClick={() => regenerateTokenMutation.mutate({ id: keyId })}
             disabled={!sharePageEnabled || regenerateTokenMutation.isPending}
           >
@@ -1452,7 +1467,7 @@ function SubscriptionShareCard({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
           <div className="rounded-lg border bg-muted/40 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{shareUi.pageViews}</p>
             <p className="mt-2 text-xl font-semibold">{analyticsQuery.data?.counts.pageViews ?? 0}</p>
@@ -1725,6 +1740,39 @@ function AccessDistributionSecurityCard({
       lang: locale,
     });
 
+  const formatAuditDetails = (details: Record<string, unknown> | null) => {
+    if (!details) {
+      return [];
+    }
+
+    const preferredOrder = [
+      'reason',
+      'summary',
+      'message',
+      'destinationChatId',
+      'sharePageUrl',
+      'clientUrl',
+      'source',
+      'lang',
+    ];
+
+    return Object.entries(details)
+      .sort(([left], [right]) => {
+        const leftIndex = preferredOrder.indexOf(left);
+        const rightIndex = preferredOrder.indexOf(right);
+        return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
+          - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
+      })
+      .slice(0, 4)
+      .map(([key, value]) => {
+        const label = key
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replace(/_/g, ' ')
+          .replace(/^./, (char) => char.toUpperCase());
+        return `${label}: ${String(value)}`;
+      });
+  };
+
   return (
     <Card className="ops-detail-card">
       <CardHeader>
@@ -1869,18 +1917,19 @@ function AccessDistributionSecurityCard({
                           {link.lastOpenedIp ? <span>IP: {link.lastOpenedIp}</span> : null}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 xl:justify-end">
-                        <Button variant="outline" size="sm" onClick={() => void copyToClipboard(inviteUrl, 'Copied!', ui.copySuccess)}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
+                        <Button variant="outline" size="sm" className="h-auto justify-start whitespace-normal px-4 py-2 text-left" onClick={() => void copyToClipboard(inviteUrl, 'Copied!', ui.copySuccess)}>
                           <Copy className="mr-2 h-4 w-4" />
                           {ui.copyInvite}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => window.open(inviteUrl, '_blank')}>
+                        <Button variant="outline" size="sm" className="h-auto justify-start whitespace-normal px-4 py-2 text-left" onClick={() => window.open(inviteUrl, '_blank')}>
                           <ExternalLink className="mr-2 h-4 w-4" />
                           {ui.openInvite}
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
+                          className="h-auto justify-start whitespace-normal px-4 py-2 text-left"
                           onClick={() => revokeInviteMutation.mutate({ id: keyId, linkId: link.id })}
                           disabled={revokeInviteMutation.isPending}
                         >
@@ -1913,12 +1962,13 @@ function AccessDistributionSecurityCard({
                   <div className="space-y-1 min-w-0">
                     <p className="font-medium">{formatAuditAction(entry.action)}</p>
                     {entry.details ? (
-                      <p className="text-sm text-muted-foreground break-words">
-                        {Object.entries(entry.details)
-                          .slice(0, 3)
-                          .map(([key, value]) => `${key}: ${String(value)}`)
-                          .join(' · ')}
-                      </p>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        {formatAuditDetails(entry.details).map((line) => (
+                          <p key={line} className="break-all leading-5">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                   <div className="text-xs text-muted-foreground lg:text-right">
@@ -2114,10 +2164,10 @@ function SupportWorkflowCard({
             </div>
           ) : null}
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <Button
               variant="outline"
-              className="justify-start"
+              className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
               disabled={!telegramDeliveryEnabled || resendAccessMutation.isPending}
               onClick={() => resendAccessMutation.mutate({ id: keyId })}
             >
@@ -2130,7 +2180,7 @@ function SupportWorkflowCard({
             </Button>
             <Button
               variant="outline"
-              className="justify-start"
+              className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
               disabled={!telegramDeliveryEnabled || sendRenewalMutation.isPending}
               onClick={() => sendRenewalMutation.mutate({ id: keyId })}
             >
@@ -2143,7 +2193,7 @@ function SupportWorkflowCard({
             </Button>
             <Button
               variant="outline"
-              className="justify-start"
+              className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
               disabled={!telegramDeliveryEnabled}
               onClick={() => setSupportDialogOpen(true)}
             >
@@ -2152,7 +2202,7 @@ function SupportWorkflowCard({
             </Button>
             <Button
               variant="outline"
-              className="justify-start"
+              className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
               onClick={() => setReportDialogOpen(true)}
             >
               <AlertTriangle className="mr-2 h-4 w-4" />
@@ -2583,12 +2633,12 @@ export default function KeyDetailPage() {
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <Button variant="outline" className="h-auto justify-start rounded-full px-5 py-3 text-left" onClick={() => setEditDialogOpen(true)}>
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </Button>
-            <Button asChild variant="outline" className="h-11 rounded-full px-5">
+            <Button asChild variant="outline" className="h-auto justify-start rounded-full px-5 py-3 text-left">
               <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
                 <Server className="w-4 h-4 mr-2" />
                 View Server
@@ -2596,7 +2646,7 @@ export default function KeyDetailPage() {
             </Button>
             <Button
               variant="destructive"
-              className="h-11 rounded-full px-5"
+              className="h-auto justify-start rounded-full px-5 py-3 text-left"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
             >
@@ -2990,20 +3040,20 @@ export default function KeyDetailPage() {
                 </div>
               )}
 
-              <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 md:grid-cols-2">
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="h-auto w-full justify-start px-4 py-3 text-left"
                   onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL
                 </Button>
-                <Button variant="outline" className="w-full" onClick={handleDownloadQr}>
+                <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left" onClick={handleDownloadQr}>
                   <QrCode className="w-4 h-4 mr-2" />
                   Download QR
                 </Button>
-                <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadConfig}>
+                <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left md:col-span-2" onClick={handleDownloadConfig}>
                   <Download className="w-4 h-4 mr-2" />
                   Download Config
                 </Button>

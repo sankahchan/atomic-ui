@@ -168,11 +168,12 @@ function escapeHtml(value: string) {
 
 function getCommandKeyboard(isAdmin: boolean) {
   const keyboard = [
-    [{ text: '/buy' }, { text: '/renew' }],
-    [{ text: '/orders' }, { text: '/mykeys' }],
-    [{ text: '/usage' }, { text: '/sub' }],
-    [{ text: '/support' }, { text: '/language' }],
-    [{ text: '/cancel' }, { text: '/help' }],
+    [{ text: '/buy' }, { text: '/trial' }],
+    [{ text: '/renew' }, { text: '/orders' }],
+    [{ text: '/mykeys' }, { text: '/usage' }],
+    [{ text: '/sub' }, { text: '/support' }],
+    [{ text: '/language' }, { text: '/cancel' }],
+    [{ text: '/help' }],
   ];
 
   if (isAdmin) {
@@ -549,8 +550,8 @@ function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
@@ -1886,6 +1887,85 @@ async function handleBuyCommand(
     replyMarkup: buildTelegramPlanSelectionKeyboard({
       orderId: order.id,
       plans: enabledPlans,
+      locale,
+    }),
+  });
+
+  return sent ? null : message;
+}
+
+async function handleTrialCommand(
+  chatId: number,
+  telegramUserId: number,
+  username: string,
+  locale: SupportedLocale,
+  botToken: string,
+): Promise<string | null> {
+  const ui = getTelegramUi(locale);
+  const settings = await getTelegramSalesSettings();
+
+  if (!settings.enabled) {
+    return ui.buyDisabled;
+  }
+
+  const trialPlan = resolveTelegramSalesPlan(settings, 'trial_1d_3gb');
+  if (!trialPlan?.enabled) {
+    return ui.freeTrialUnavailable;
+  }
+
+  if (!(await isEligibleForTelegramFreeTrial(chatId, telegramUserId))) {
+    return ui.freeTrialUnavailable;
+  }
+
+  const existing = await getActiveTelegramOrder(chatId, telegramUserId);
+  if (existing?.status === 'PENDING_REVIEW') {
+    return ui.activeOrderPendingReview(existing.orderCode);
+  }
+
+  await cancelStaleTelegramConversationOrders(chatId, telegramUserId);
+
+  const planLabel = resolveTelegramSalesPlanLabel(trialPlan, locale);
+  const priceLabel = resolveTelegramSalesPriceLabel(trialPlan, locale);
+  const dataLimitBytes = trialPlan.dataLimitGB
+    ? BigInt(trialPlan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
+    : null;
+
+  const order = await db.telegramOrder.create({
+    data: {
+      orderCode: await generateTelegramOrderCode(),
+      kind: 'NEW',
+      status: 'AWAITING_SERVER_SELECTION',
+      ...buildTelegramOrderPaymentStageFields({
+        nextStatus: 'AWAITING_SERVER_SELECTION',
+      }),
+      telegramChatId: String(chatId),
+      telegramUserId: String(telegramUserId),
+      telegramUsername: username,
+      locale,
+      planCode: trialPlan.code,
+      planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+      priceAmount: trialPlan.priceAmount ?? null,
+      priceCurrency: trialPlan.priceCurrency || null,
+      priceLabel: priceLabel || null,
+      templateId: trialPlan.templateId || null,
+      durationMonths: trialPlan.fixedDurationMonths ?? null,
+      durationDays: trialPlan.fixedDurationDays ?? 1,
+      dataLimitBytes,
+      unlimitedQuota: trialPlan.unlimitedQuota,
+    },
+  });
+
+  const servers = await listAssignableTelegramOrderServers();
+  const message = buildTelegramServerSelectionPromptText({
+    orderCode: order.orderCode,
+    locale,
+    servers,
+  });
+
+  const sent = await sendTelegramMessage(botToken, chatId, message, {
+    replyMarkup: buildTelegramServerSelectionKeyboard({
+      orderId: order.id,
+      servers,
       locale,
     }),
   });
@@ -5652,6 +5732,7 @@ async function handleHelpCommand(
 /start - Telegram account ကို ချိတ်ဆက်မည်
 /language - ဘာသာစကား ပြောင်းမည်
 /buy - Plan ရွေးပြီး key အသစ် မှာယူမည်
+/trial - ၁ ရက် 3 GB free trial ရယူမည်
 /orders - မိမိ order များကို ကြည့်မည်
 /order [code] - order အခြေအနေ အသေးစိတ်ကြည့်မည်
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
@@ -5667,6 +5748,7 @@ async function handleHelpCommand(
 /start - Link your Telegram account
 /language - Change the bot language
 /buy - Start a new key order
+/trial - Claim the 1-day 3 GB free trial
 /orders - Show your recent orders
 /order [code] - Show one order status
 /usage - Fetch your usage and QR/setup info
@@ -6636,6 +6718,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken);
+    case 'trial':
+      return handleTrialCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'orders':
       return handleOrdersCommand(chatId, telegramUserId, locale, config.botToken);
     case 'order':

@@ -334,10 +334,6 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Footer text */}
-          <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
-            {mounted ? t('login.default_credentials') : 'Default credentials: admin / admin123'}
-          </p>
         </CardContent>
       </Card>
 

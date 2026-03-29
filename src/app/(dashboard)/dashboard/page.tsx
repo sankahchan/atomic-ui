@@ -7,21 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrafficChart } from '@/components/ui/traffic-chart';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Activity,
   AlertTriangle,
   BarChart3,
   CheckCircle2,
   ChevronRight,
-  Clock,
-  Gauge,
   Globe2,
-  Info,
   Key,
   Plus,
   RefreshCw,
@@ -29,7 +24,6 @@ import {
   Shield,
   TrendingUp,
   Unlock,
-  Zap,
 } from 'lucide-react';
 
 type DashboardStatsSummary = {
@@ -276,7 +270,7 @@ function TrafficOverviewPanel({
   compact?: boolean;
   fillHeight?: boolean;
 }) {
-  const chartHeight = compact ? (fillHeight ? 220 : 152) : 238;
+  const chartHeight = compact ? (fillHeight ? 168 : 156) : 238;
 
   return (
     <Card className={cn(
@@ -645,77 +639,145 @@ function ActivityItem({
   );
 }
 
-function ForecastTooltip({
-  keyId,
-  keyType,
+function ServerStatusCard({
+  t,
+  serverStatus,
+  serversLoading,
+  compact = false,
 }: {
-  keyId: string;
-  keyType: 'ACCESS_KEY' | 'DYNAMIC_KEY';
+  t: (key: string) => string;
+  serverStatus: Array<{
+    id: string;
+    name: string;
+    countryCode: string | null;
+    status: string;
+    latencyMs: number | null | undefined;
+    keyCount: number;
+  }> | undefined;
+  serversLoading: boolean;
+  compact?: boolean;
 }) {
-  const { data: forecast, isLoading } = trpc.analytics.forecast.useQuery(
-    { keyId, keyType },
-    { staleTime: 60000 }
-  );
-
-  if (isLoading) {
-    return (
-      <TooltipContent className="max-w-xs">
-        <p className="text-xs">Loading forecast...</p>
-      </TooltipContent>
-    );
-  }
-
-  if (!forecast || !forecast.hasQuota) {
-    return (
-      <TooltipContent className="max-w-xs">
-        <p className="text-xs text-muted-foreground">No quota limit set</p>
-      </TooltipContent>
-    );
-  }
+  const visibleServers = compact ? serverStatus?.slice(0, 4) : serverStatus?.slice(0, 5);
 
   return (
-    <TooltipContent className="max-w-xs p-3">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Gauge className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Usage Forecast</span>
+    <Card className="self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
+      <CardHeader className={cn(compact ? 'pb-2' : 'pb-3')}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+              <Server className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className={cn(compact ? 'text-lg' : 'text-xl')}>{t('dashboard.server_status')}</CardTitle>
+              <CardDescription>{t('dashboard.server_status_desc')}</CardDescription>
+            </div>
+          </div>
+          <Button asChild variant="ghost" className="rounded-full px-3">
+            <Link href="/dashboard/servers">
+              {t('dashboard.view_all')}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
-        <div className="space-y-1 text-xs">
-          <p>
-            <span className="text-muted-foreground">Current:</span>{' '}
-            {formatBytes(BigInt(forecast.currentUsageBytes || '0'))} /{' '}
-            {formatBytes(BigInt(forecast.dataLimitBytes || '0'))} ({forecast.usagePercent}%)
-          </p>
-          {forecast.dailyRateBytes ? (
-            <p>
-              <span className="text-muted-foreground">Daily rate:</span>{' '}
-              ~{formatBytes(BigInt(forecast.dailyRateBytes))}/day
-            </p>
-          ) : null}
-          {forecast.daysToQuota !== null && forecast.daysToQuota !== undefined ? (
-            <p
-              className={cn(
-                'font-medium',
-                forecast.daysToQuota <= 3
-                  ? 'text-red-500'
-                  : forecast.daysToQuota <= 7
-                    ? 'text-yellow-500'
-                    : 'text-green-500'
-              )}
-            >
-              <Clock className="mr-1 inline h-3 w-3" />
-              {forecast.message}
-            </p>
-          ) : null}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {serversLoading ? (
+          Array.from({ length: compact ? 3 : 4 }).map((_, index) => (
+            <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
+          ))
+        ) : visibleServers && visibleServers.length > 0 ? (
+          visibleServers.map((server) => <ServerRow key={server.id} server={server} />)
+        ) : (
+          <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
+            <Server className="mb-3 h-10 w-10 text-muted-foreground/50" />
+            <p className="text-sm font-semibold">{t('dashboard.no_servers_title')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_servers_desc')}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AlertsActivityCard({
+  t,
+  tf,
+  stats,
+  activity,
+  compact = false,
+}: {
+  t: (key: string) => string;
+  tf: (key: string, values: Record<string, string | number>) => string;
+  stats: {
+    downServers?: number;
+    expiringIn24h?: number;
+  } | undefined;
+  activity: {
+    recentKeys?: Array<{ id: string; name: string; createdAt: string | Date }>;
+  } | undefined;
+  compact?: boolean;
+}) {
+  const recentKeys = compact ? activity?.recentKeys?.slice(0, 3) : activity?.recentKeys?.slice(0, 4);
+  const hasSignals =
+    (stats?.downServers || 0) > 0 ||
+    (stats?.expiringIn24h || 0) > 0 ||
+    Boolean(recentKeys && recentKeys.length > 0);
+
+  return (
+    <Card className="self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
+      <CardHeader className={cn(compact ? 'pb-2' : 'pb-3')}>
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+            <RefreshCw className="h-5 w-5" />
+          </div>
+          <div>
+            <CardTitle className={cn(compact ? 'text-lg' : 'text-xl')}>{t('dashboard.alerts')}</CardTitle>
+            <CardDescription>{t('dashboard.recent_activity_desc')}</CardDescription>
+          </div>
         </div>
-      </div>
-    </TooltipContent>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {(stats?.downServers || 0) > 0 ? (
+          <ActivityItem
+            type="error"
+            title={t('dashboard.servers_offline_title')}
+            description={tf('dashboard.servers_offline_desc', { count: String(stats?.downServers || 0) })}
+            time={t('dashboard.now')}
+          />
+        ) : null}
+        {(stats?.expiringIn24h || 0) > 0 ? (
+          <ActivityItem
+            type="warning"
+            title={t('dashboard.keys_expiring_title')}
+            description={tf('dashboard.keys_expiring_desc', { count: String(stats?.expiringIn24h || 0) })}
+            time={t('dashboard.soon')}
+          />
+        ) : null}
+        {recentKeys
+          ? recentKeys.map((key) => (
+              <ActivityItem
+                key={key.id}
+                type="info"
+                title={t('dashboard.key_created_title')}
+                description={key.name}
+                time={formatRelativeTime(key.createdAt)}
+              />
+            ))
+          : null}
+        {!hasSignals ? (
+          <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
+            <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
+            <p className="text-sm font-semibold">{t('dashboard.system_clear')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_activity_desc')}</p>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
 export default function DashboardPage() {
   const [trafficDays, setTrafficDays] = useState(30);
-  const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
   const { t, mounted } = useLocale();
   const tf = (key: string, values: Record<string, string | number>) => {
     let text = t(key);
@@ -729,20 +791,12 @@ export default function DashboardPage() {
   const { data: serverStatus, isLoading: serversLoading } = trpc.dashboard.serverStatus.useQuery();
   const { data: activity } = trpc.dashboard.recentActivity.useQuery();
   const { data: trafficHistory, isLoading: trafficLoading } = trpc.dashboard.trafficHistory.useQuery({ days: trafficDays });
-  const { data: topConsumers, isLoading: loadingTopConsumers } = trpc.analytics.topConsumers.useQuery({
-    range: topConsumersRange,
-    limit: 5,
-  });
-  const { data: anomalies, isLoading: loadingAnomalies } = trpc.analytics.anomalies.useQuery({
-    range: '24h',
-  });
 
   const totalTraffic = trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) || BigInt(0);
   const totalServerKeys = serverStatus?.reduce((sum, item) => sum + item.keyCount, 0) || 0;
   const attentionCount =
     (stats?.downServers || 0) +
-    (stats?.expiringIn24h || 0) +
-    (anomalies?.length || 0);
+    (stats?.expiringIn24h || 0);
   const healthyShare = stats?.totalServers
     ? Math.round(((stats.activeServers || 0) / stats.totalServers) * 100)
     : 0;
@@ -784,7 +838,6 @@ export default function DashboardPage() {
   }
 
   return (
-    <TooltipProvider>
       <div className="space-y-6 lg:space-y-8">
         <section className="space-y-6 xl:hidden">
           <div className="ops-showcase space-y-5">
@@ -952,11 +1005,25 @@ export default function DashboardPage() {
               trafficHistory={trafficHistory}
               compact
             />
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <ServerStatusCard
+                t={t}
+                serverStatus={serverStatus}
+                serversLoading={serversLoading}
+              />
+              <AlertsActivityCard
+                t={t}
+                tf={tf}
+                stats={stats}
+                activity={activity}
+              />
+            </div>
           </div>
         </section>
 
         <section className="hidden xl:grid xl:gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-          <div className="ops-showcase flex h-full flex-col gap-6">
+          <div className="ops-showcase flex self-start flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-4">
                 <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
@@ -1035,7 +1102,6 @@ export default function DashboardPage() {
               trafficLoading={trafficLoading}
               trafficHistory={trafficHistory}
               compact
-              fillHeight
             />
           </div>
 
@@ -1131,232 +1197,35 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2 xl:auto-rows-fr">
-          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-500">
-                    <Zap className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">{t('dashboard.top_consumers')}</CardTitle>
-                    <CardDescription>{t('dashboard.top_consumers_desc')}</CardDescription>
-                  </div>
-                </div>
-                <Select value={topConsumersRange} onValueChange={(value) => setTopConsumersRange(value as '24h' | '7d' | '30d')}>
-                  <SelectTrigger className="h-11 w-full rounded-full border-border/70 bg-background/65 sm:w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="24h">{t('dashboard.range_24h')}</SelectItem>
-                    <SelectItem value="7d">{t('dashboard.range_7d')}</SelectItem>
-                    <SelectItem value="30d">{t('dashboard.range_30d')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loadingTopConsumers ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                ))
-              ) : topConsumers && topConsumers.length > 0 ? (
-                topConsumers.slice(0, 5).map((consumer) => (
-                  <Tooltip key={consumer.id}>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={
-                          consumer.type === 'ACCESS_KEY'
-                            ? `/dashboard/keys/${consumer.id}`
-                            : `/dashboard/dynamic-keys/${consumer.id}`
-                        }
-                        className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-                      >
-                        <div className="min-w-0 flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-500">
-                            <Key className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{consumer.name}</p>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">
-                              {consumer.serverName
-                                ? `${consumer.countryCode ? getCountryFlag(consumer.countryCode) : ''} ${consumer.serverName}`.trim()
-                                : t('dashboard.dynamic_target')}
-                            </p>
-                          </div>
-                          {consumer.dataLimitBytes ? (
-                            <Info className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          ) : null}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold">{formatBytes(BigInt(consumer.deltaBytes))}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.period_usage')}</p>
-                        </div>
-                      </Link>
-                    </TooltipTrigger>
-                    <ForecastTooltip keyId={consumer.id} keyType={consumer.type} />
-                    </Tooltip>
-                ))
-              ) : (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
-                  <Activity className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                  <p className="text-sm font-semibold">{t('dashboard.no_usage_title')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_usage_desc')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <section className="hidden xl:grid xl:grid-cols-2 xl:gap-6">
+          <ServerStatusCard
+            t={t}
+            serverStatus={serverStatus}
+            serversLoading={serversLoading}
+            compact
+          />
+          <AlertsActivityCard
+            t={t}
+            tf={tf}
+            stats={stats}
+            activity={activity}
+            compact
+          />
+        </section>
 
-          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">{t('dashboard.usage_anomalies')}</CardTitle>
-                  <CardDescription>{t('dashboard.usage_anomalies_desc')}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loadingAnomalies ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                ))
-              ) : anomalies && anomalies.length > 0 ? (
-                anomalies.slice(0, 5).map((anomaly) => (
-                  <Link
-                    key={anomaly.id}
-                    href={
-                      anomaly.type === 'ACCESS_KEY'
-                        ? `/dashboard/keys/${anomaly.id}`
-                        : `/dashboard/dynamic-keys/${anomaly.id}`
-                    }
-                    className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 transition-colors hover:bg-amber-500/15"
-                  >
-                    <div className="min-w-0 flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-500">
-                        <AlertTriangle className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{anomaly.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {anomaly.serverName || t('dashboard.dynamic_target')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge className="bg-amber-500 text-white hover:bg-amber-500">{anomaly.ratio}x</Badge>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatBytes(BigInt(anomaly.recentDeltaBytes))}
-                      </p>
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
-                  <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
-                  <p className="text-sm font-semibold">{t('dashboard.no_anomalies_title')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_anomalies_desc')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
-                    <Server className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">{t('dashboard.server_status')}</CardTitle>
-                    <CardDescription>{t('dashboard.server_status_desc')}</CardDescription>
-                  </div>
-                </div>
-                <Button asChild variant="ghost" className="rounded-full px-3">
-                  <Link href="/dashboard/servers">
-                    {t('dashboard.view_all')}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {serversLoading ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-16 rounded-[1.25rem] bg-muted animate-pulse" />
-                ))
-              ) : serverStatus && serverStatus.length > 0 ? (
-                serverStatus.slice(0, 5).map((server) => (
-                  <ServerRow key={server.id} server={server} />
-                ))
-              ) : (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
-                  <Server className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                  <p className="text-sm font-semibold">{t('dashboard.no_servers_title')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_servers_desc')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="self-start xl:h-full dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
-                  <RefreshCw className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">{t('dashboard.alerts')}</CardTitle>
-                  <CardDescription>{t('dashboard.recent_activity_desc')}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {(stats?.downServers || 0) > 0 ? (
-                <ActivityItem
-                  type="error"
-                  title={t('dashboard.servers_offline_title')}
-                  description={tf('dashboard.servers_offline_desc', { count: String(stats?.downServers || 0) })}
-                  time={t('dashboard.now')}
-                />
-              ) : null}
-              {(stats?.expiringIn24h || 0) > 0 ? (
-                <ActivityItem
-                  type="warning"
-                  title={t('dashboard.keys_expiring_title')}
-                  description={tf('dashboard.keys_expiring_desc', { count: String(stats?.expiringIn24h || 0) })}
-                  time={t('dashboard.soon')}
-                />
-              ) : null}
-              {activity?.recentKeys && activity.recentKeys.length > 0
-                ? activity.recentKeys.slice(0, 4).map((key) => (
-                    <ActivityItem
-                      key={key.id}
-                      type="info"
-                      title={t('dashboard.key_created_title')}
-                      description={key.name}
-                      time={formatRelativeTime(key.createdAt)}
-                    />
-                  ))
-                : null}
-              {!((stats?.downServers || 0) > 0) &&
-              !((stats?.expiringIn24h || 0) > 0) &&
-              (!activity?.recentKeys || activity.recentKeys.length === 0) ? (
-                <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border/70 bg-background/45 text-center dark:border-cyan-400/10 dark:bg-[linear-gradient(180deg,rgba(4,11,23,0.7),rgba(4,10,21,0.62))]">
-                  <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/70" />
-                  <p className="text-sm font-semibold">{t('dashboard.system_clear')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.no_activity_desc')}</p>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+        <section className="grid gap-6 md:grid-cols-2 xl:hidden">
+          <ServerStatusCard
+            t={t}
+            serverStatus={serverStatus}
+            serversLoading={serversLoading}
+          />
+          <AlertsActivityCard
+            t={t}
+            tf={tf}
+            stats={stats}
+            activity={activity}
+          />
         </section>
       </div>
-    </TooltipProvider>
   );
 }
