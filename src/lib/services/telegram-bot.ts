@@ -182,8 +182,10 @@ function getCommandKeyboard(isAdmin: boolean) {
 }
 
 const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
+const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
+type TelegramOrderReviewAction = 'approve' | 'reject';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -232,6 +234,41 @@ function parseTelegramLocaleCallbackData(data?: string | null) {
     locale,
     context,
     startArgs: parts.slice(3).join(':').trim(),
+  } as const;
+}
+
+function buildTelegramOrderReviewCallbackData(
+  action: TelegramOrderReviewAction,
+  orderId: string,
+) {
+  return `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}`;
+}
+
+function parseTelegramOrderReviewCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action =
+    parts[1] === 'approve'
+      ? 'approve'
+      : parts[1] === 'reject'
+        ? 'reject'
+        : null;
+  const orderId = parts[2]?.trim();
+
+  if (!action || !orderId) {
+    return null;
+  }
+
+  return {
+    action,
+    orderId,
   } as const;
 }
 
@@ -553,6 +590,15 @@ function getTelegramUi(locale: SupportedLocale) {
       : 'Before approval, you can cancel the current order at any time with /cancel.',
     orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order ကို စစ်ဆေးရန် လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
     orderReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးရန်' : 'Review in panel',
+    orderApproveActionLabel: isMyanmar ? 'Telegram မှ အတည်ပြုရန်' : 'Approve in Telegram',
+    orderRejectActionLabel: isMyanmar ? 'Telegram မှ ပယ်ရန်' : 'Reject in Telegram',
+    orderReviewActionUnauthorized: isMyanmar ? 'ဤ action ကို admin များသာ လုပ်နိုင်ပါသည်။' : 'Only admins can perform this action.',
+    orderReviewActionApproved: (code: string) =>
+      isMyanmar ? `Order ${code} ကို Telegram မှ အတည်ပြုပြီးပါပြီ။` : `Approved order ${code} from Telegram.`,
+    orderReviewActionRejected: (code: string) =>
+      isMyanmar ? `Order ${code} ကို Telegram မှ ပယ်လိုက်ပါပြီ။` : `Rejected order ${code} from Telegram.`,
+    orderReviewActionFailed: (message: string) =>
+      isMyanmar ? `Telegram action မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
@@ -822,7 +868,19 @@ async function sendTelegramOrderReviewAlert(orderId: string) {
   for (const adminChatId of config.adminChatIds) {
     await sendTelegramMessage(config.botToken, adminChatId, lines, {
       replyMarkup: {
-        inline_keyboard: [[{ text: ui.orderReviewPanelLabel, url: panelUrl }]],
+        inline_keyboard: [
+          [
+            {
+              text: ui.orderApproveActionLabel,
+              callback_data: buildTelegramOrderReviewCallbackData('approve', order.id),
+            },
+            {
+              text: ui.orderRejectActionLabel,
+              callback_data: buildTelegramOrderReviewCallbackData('reject', order.id),
+            },
+          ],
+          [{ text: ui.orderReviewPanelLabel, url: panelUrl }],
+        ],
       },
     });
 
@@ -1994,7 +2052,7 @@ async function fulfillTelegramRenewAccessOrder(input: {
 
 export async function approveTelegramOrder(input: {
   orderId: string;
-  reviewedByUserId: string;
+  reviewedByUserId?: string | null;
   reviewerName?: string | null;
   adminNote?: string | null;
 }) {
@@ -2005,7 +2063,7 @@ export async function approveTelegramOrder(input: {
     },
     data: {
       status: 'APPROVED',
-      reviewedByUserId: input.reviewedByUserId,
+      reviewedByUserId: input.reviewedByUserId ?? null,
       reviewedAt: new Date(),
       adminNote: input.adminNote?.trim() || null,
     },
@@ -2056,7 +2114,7 @@ export async function approveTelegramOrder(input: {
         status: 'FULFILLED',
         approvedAccessKeyId: key.id,
         fulfilledAt: new Date(),
-        reviewedByUserId: input.reviewedByUserId,
+        reviewedByUserId: input.reviewedByUserId ?? null,
         reviewedAt: new Date(),
         adminNote: appendTelegramOrderAdminNote(order.adminNote, input.adminNote),
       },
@@ -2089,7 +2147,7 @@ export async function approveTelegramOrder(input: {
     }
 
     await writeAuditLog({
-      userId: input.reviewedByUserId,
+      userId: input.reviewedByUserId ?? null,
       action: 'TELEGRAM_ORDER_APPROVED',
       entity: 'TELEGRAM_ORDER',
       entityId: finalOrder.id,
@@ -2131,7 +2189,7 @@ export async function approveTelegramOrder(input: {
 
 export async function rejectTelegramOrder(input: {
   orderId: string;
-  reviewedByUserId: string;
+  reviewedByUserId?: string | null;
   reviewerName?: string | null;
   adminNote?: string | null;
 }) {
@@ -2151,7 +2209,7 @@ export async function rejectTelegramOrder(input: {
     where: { id: order.id },
     data: {
       status: 'REJECTED',
-      reviewedByUserId: input.reviewedByUserId,
+      reviewedByUserId: input.reviewedByUserId ?? null,
       reviewedAt: new Date(),
       rejectedAt: new Date(),
       adminNote: appendTelegramOrderAdminNote(order.adminNote, input.adminNote),
@@ -2178,7 +2236,7 @@ export async function rejectTelegramOrder(input: {
   }
 
   await writeAuditLog({
-    userId: input.reviewedByUserId,
+    userId: input.reviewedByUserId ?? null,
     action: 'TELEGRAM_ORDER_REJECTED',
     entity: 'TELEGRAM_ORDER',
     entityId: finalOrder.id,
@@ -4036,10 +4094,6 @@ async function handleTelegramCallbackQuery(
   config: TelegramConfig,
 ) {
   const parsed = parseTelegramLocaleCallbackData(callbackQuery.data);
-  if (!parsed) {
-    return null;
-  }
-
   const chatId = callbackQuery.message?.chat.id;
   if (!chatId) {
     await answerTelegramCallbackQuery(
@@ -4053,6 +4107,70 @@ async function handleTelegramCallbackQuery(
   const isAdmin =
     config.adminChatIds.includes(String(callbackQuery.from.id)) ||
     config.adminChatIds.includes(String(chatId));
+
+  if (!parsed) {
+    const orderAction = parseTelegramOrderReviewCallbackData(callbackQuery.data);
+    if (!orderAction) {
+      return null;
+    }
+
+    const adminLocale = await getTelegramConversationLocale({
+      telegramUserId: callbackQuery.from.id,
+      telegramChatId: chatId,
+    });
+    const adminUi = getTelegramUi(adminLocale);
+
+    if (!isAdmin) {
+      await answerTelegramCallbackQuery(
+        config.botToken,
+        callbackQuery.id,
+        adminUi.orderReviewActionUnauthorized,
+      );
+      return null;
+    }
+
+    try {
+      if (orderAction.action === 'approve') {
+        const result = await approveTelegramOrder({
+          orderId: orderAction.orderId,
+          reviewedByUserId: null,
+          reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+          adminNote: callbackQuery.from.username
+            ? `Approved from Telegram by @${callbackQuery.from.username}`
+            : `Approved from Telegram by ${callbackQuery.from.first_name}`,
+        });
+
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          adminUi.orderReviewActionApproved(result.orderCode),
+        );
+      } else {
+        const result = await rejectTelegramOrder({
+          orderId: orderAction.orderId,
+          reviewedByUserId: null,
+          reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+          adminNote: callbackQuery.from.username
+            ? `Rejected from Telegram by @${callbackQuery.from.username}`
+            : `Rejected from Telegram by ${callbackQuery.from.first_name}`,
+        });
+
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          adminUi.orderReviewActionRejected(result.orderCode),
+        );
+      }
+    } catch (error) {
+      await answerTelegramCallbackQuery(
+        config.botToken,
+        callbackQuery.id,
+        adminUi.orderReviewActionFailed((error as Error).message),
+      );
+    }
+
+    return null;
+  }
 
   await setTelegramUserLocale({
     telegramUserId: String(callbackQuery.from.id),

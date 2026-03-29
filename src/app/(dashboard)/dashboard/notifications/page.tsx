@@ -259,6 +259,44 @@ type TelegramOrderRow = {
     id: string;
     email?: string | null;
   } | null;
+  customerProfile?: {
+    telegramUserId: string;
+    telegramChatId: string | null;
+    username?: string | null;
+    displayName?: string | null;
+    locale?: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+  customerLinkedKeys: Array<{
+    id: string;
+    name: string;
+    status: string;
+    email?: string | null;
+    publicSlug?: string | null;
+    usedBytes: string;
+    dataLimitBytes?: string | null;
+    expiresAt?: Date | null;
+  }>;
+  customerRecentOrders: Array<{
+    id: string;
+    orderCode: string;
+    status: string;
+    kind: string;
+    planName?: string | null;
+    approvedAccessKeyName?: string | null;
+    createdAt: Date;
+    fulfilledAt?: Date | null;
+    rejectedAt?: Date | null;
+  }>;
+  customerSummary: {
+    totalOrders: number;
+    pendingOrders: number;
+    fulfilledOrders: number;
+    rejectedOrders: number;
+    lastOrderAt?: Date | null;
+    lastFulfilledAt?: Date | null;
+  };
 };
 
 const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
@@ -1678,11 +1716,25 @@ function TelegramSalesWorkflowCard() {
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
-  const ordersQuery = trpc.telegramBot.listOrders.useQuery({ limit: 30 });
   const templatesQuery = trpc.templates.list.useQuery();
   const [form, setForm] = useState<TelegramSalesSettingsForm>(DEFAULT_TELEGRAM_SALES_SETTINGS);
   const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED'>('ALL');
+  const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
+  const deferredOrderSearch = useDeferredValue(orderSearch.trim());
+  const ordersQuery = trpc.telegramBot.listOrders.useQuery(
+    {
+      limit: 50,
+      statuses: statusFilter === 'ALL' ? undefined : [statusFilter],
+      kinds: kindFilter === 'ALL' ? undefined : [kindFilter],
+      query: deferredOrderSearch || undefined,
+    },
+    {
+      placeholderData: keepPreviousData,
+    },
+  );
 
   const salesUi = {
     title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
@@ -1715,6 +1767,33 @@ function TelegramSalesWorkflowCard() {
     pendingTitle: isMyanmar ? 'Pending review orders' : 'Pending review orders',
     reviewQueue: isMyanmar ? 'Review queue' : 'Review queue',
     noOrders: isMyanmar ? 'အော်ဒါ မရှိသေးပါ။' : 'No Telegram orders yet.',
+    searchPlaceholder: isMyanmar
+      ? 'Order code၊ Telegram username၊ email သို့မဟုတ် key name ဖြင့် ရှာရန်'
+      : 'Search by order code, Telegram username, email, or key name',
+    allStatuses: isMyanmar ? 'Status အားလုံး' : 'All statuses',
+    allTypes: isMyanmar ? 'Type အားလုံး' : 'All types',
+    newOrders: isMyanmar ? 'အသစ်' : 'New orders',
+    renewals: isMyanmar ? 'Renewals' : 'Renewals',
+    customer: isMyanmar ? 'Customer' : 'Customer',
+    linkedKeys: isMyanmar ? 'Linked keys' : 'Linked keys',
+    recentOrders: isMyanmar ? 'Recent orders' : 'Recent orders',
+    customerProfile: isMyanmar ? 'Telegram profile' : 'Telegram profile',
+    orderContext: isMyanmar ? 'Order context' : 'Order context',
+    noLinkedKeys: isMyanmar ? 'ဆက်စပ် key မတွေ့ပါ။' : 'No linked keys found.',
+    noRecentOrders: isMyanmar ? 'ယခင် order မတွေ့ပါ။' : 'No previous orders.',
+    noCaption: isMyanmar ? 'Caption မရှိပါ' : 'No caption',
+    proofForwardedHint: isMyanmar
+      ? 'Proof screenshot ကို admin Telegram chat သို့ copy လုပ်ထားပါသည်။'
+      : 'The proof screenshot has been copied into the admin Telegram chat.',
+    ordersMatched: (count: number) =>
+      isMyanmar ? `ကိုက်ညီသော order ${count} ခု` : `${count} matching orders`,
+    localeLabel: isMyanmar ? 'Locale' : 'Locale',
+    lastFulfilled: isMyanmar ? 'နောက်ဆုံး fulfilled' : 'Last fulfilled',
+    totalOrders: isMyanmar ? 'စုစုပေါင်း orders' : 'Total orders',
+    proofCaption: isMyanmar ? 'Proof caption' : 'Proof caption',
+    reviewContextHint: isMyanmar
+      ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
+      : 'Review customer context and linked keys before approving.',
     user: isMyanmar ? 'User' : 'User',
     order: isMyanmar ? 'Order' : 'Order',
     proof: isMyanmar ? 'Payment proof' : 'Payment proof',
@@ -1873,6 +1952,30 @@ function TelegramSalesWorkflowCard() {
   const pendingOrders = ((ordersQuery.data || []).filter(
     (order) => order.status === 'PENDING_REVIEW',
   ) as TelegramOrderRow[]);
+  const matchedOrders = (ordersQuery.data || []) as TelegramOrderRow[];
+  const selectedOrder = reviewTarget
+    ? matchedOrders.find((order) => order.id === reviewTarget.orderId) || null
+    : null;
+  const summaryCounts = matchedOrders.reduce(
+    (acc, order) => {
+      if (order.status === 'PENDING_REVIEW') acc.pending += 1;
+      if (order.status === 'FULFILLED') acc.fulfilled += 1;
+      if (order.status === 'REJECTED') acc.rejected += 1;
+      if (order.kind === 'NEW') acc.newOrders += 1;
+      if (order.kind === 'RENEW') acc.renewals += 1;
+      return acc;
+    },
+    { pending: 0, fulfilled: 0, rejected: 0, newOrders: 0, renewals: 0 },
+  );
+  const describeQuota = (order: TelegramOrderRow) => {
+    if (order.unlimitedQuota) {
+      return isMyanmar ? 'Unlimited quota' : 'Unlimited quota';
+    }
+    if (!order.dataLimitBytes) {
+      return '—';
+    }
+    return formatBytes(BigInt(order.dataLimitBytes));
+  };
 
   return (
     <>
@@ -2096,13 +2199,84 @@ function TelegramSalesWorkflowCard() {
           <CardDescription>{salesUi.markForReview}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[1.4fr,0.8fr,0.8fr]">
+            <div className="space-y-2">
+              <Label>{salesUi.reviewQueue}</Label>
+              <Input
+                value={orderSearch}
+                onChange={(event) => setOrderSearch(event.target.value)}
+                placeholder={salesUi.searchPlaceholder}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{salesUi.status}</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as 'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED')
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={salesUi.allStatuses} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">{salesUi.allStatuses}</SelectItem>
+                  <SelectItem value="PENDING_REVIEW">{salesUi.pending}</SelectItem>
+                  <SelectItem value="FULFILLED">{salesUi.fulfilled}</SelectItem>
+                  <SelectItem value="REJECTED">{salesUi.rejected}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{salesUi.order}</Label>
+              <Select
+                value={kindFilter}
+                onValueChange={(value) => setKindFilter(value as 'ALL' | 'NEW' | 'RENEW')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={salesUi.allTypes} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">{salesUi.allTypes}</SelectItem>
+                  <SelectItem value="NEW">{salesUi.newOrders}</SelectItem>
+                  <SelectItem value="RENEW">{salesUi.renewals}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.pendingTitle}</p>
+              <p className="mt-2 text-2xl font-semibold">{summaryCounts.pending}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.newOrders}</p>
+              <p className="mt-2 text-2xl font-semibold">{summaryCounts.newOrders}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewals}</p>
+              <p className="mt-2 text-2xl font-semibold">{summaryCounts.renewals}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.ordersMatched(matchedOrders.length)}</p>
+              <p className="mt-2 text-2xl font-semibold">{matchedOrders.length}</p>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Badge variant={pendingOrders.length > 0 ? 'default' : 'secondary'}>
               {salesUi.pendingTitle}: {pendingOrders.length}
             </Badge>
             <Badge variant="outline">
-              {isMyanmar ? `စုစုပေါင်း ${ordersQuery.data?.length || 0} ခု` : `Total ${ordersQuery.data?.length || 0} orders`}
+              {isMyanmar ? `စုစုပေါင်း ${matchedOrders.length} ခု` : `Total ${matchedOrders.length} orders`}
             </Badge>
+            {ordersQuery.isFetching && !ordersQuery.isLoading ? (
+              <Badge variant="outline">
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                {isMyanmar ? 'အပ်ဒိတ်လုပ်နေသည်' : 'Updating'}
+              </Badge>
+            ) : null}
           </div>
 
           {ordersQuery.isLoading ? (
@@ -2110,13 +2284,13 @@ function TelegramSalesWorkflowCard() {
               <Loader2 className="h-4 w-4 animate-spin" />
               {isMyanmar ? 'Telegram orders များကို ရယူနေသည်…' : 'Loading Telegram orders…'}
             </div>
-          ) : !ordersQuery.data?.length ? (
+          ) : !matchedOrders.length ? (
             <div className="rounded-2xl border border-dashed border-border/60 p-6 text-sm text-muted-foreground">
               {salesUi.noOrders}
             </div>
           ) : (
             <div className="space-y-3">
-              {ordersQuery.data.map((order) => (
+              {matchedOrders.map((order) => (
                 <div key={order.id} className="rounded-2xl border border-border/60 bg-background/55 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -2140,6 +2314,7 @@ function TelegramSalesWorkflowCard() {
                                 : order.status}
                         </Badge>
                         <Badge variant="outline">{order.kind}</Badge>
+                        <Badge variant="outline">{order.locale === 'my' ? 'မြန်မာ' : 'English'}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {salesUi.user}: @{order.telegramUsername || 'unknown'} · {order.telegramUserId}
@@ -2172,14 +2347,16 @@ function TelegramSalesWorkflowCard() {
                     ) : null}
                   </div>
 
-                  <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                    <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <div className="rounded-xl border border-border/50 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         {salesUi.order}
                       </p>
                       <p className="mt-2 text-sm font-medium">{order.planName || order.planCode || '—'}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {order.requestedName || order.targetAccessKeyName || '—'}
+                        {[order.requestedName || order.targetAccessKeyName || '—', describeQuota(order)]
+                          .filter(Boolean)
+                          .join(' • ')}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/50 p-3">
@@ -2213,6 +2390,85 @@ function TelegramSalesWorkflowCard() {
                     </div>
                   </div>
 
+                  <div className="mt-4 grid gap-3 xl:grid-cols-3">
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.customerProfile}
+                      </p>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p className="font-medium">
+                          {order.customerProfile?.displayName ||
+                            order.telegramUsername ||
+                            order.requestedName ||
+                            '—'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          @{order.customerProfile?.username || order.telegramUsername || 'unknown'} · {order.telegramChatId}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {salesUi.localeLabel}: {order.customerProfile?.locale === 'my' ? 'မြန်မာ' : 'English'}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-muted-foreground">
+                          <div>
+                            <p className="font-medium text-foreground">{order.customerSummary.totalOrders}</p>
+                            <p>{salesUi.totalOrders}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{order.customerSummary.fulfilledOrders}</p>
+                            <p>{salesUi.fulfilled}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.linkedKeys}
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {order.customerLinkedKeys.length > 0 ? (
+                          order.customerLinkedKeys.slice(0, 3).map((key) => (
+                            <div key={key.id} className="rounded-lg border border-border/40 p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="truncate text-sm font-medium">{key.name}</p>
+                                <Badge variant="outline">{key.status}</Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {key.email || '—'} • {formatBytes(BigInt(key.usedBytes))}
+                                {key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ` / ${salesUi.unlimited}`}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{salesUi.noLinkedKeys}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 bg-background/50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.recentOrders}
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {order.customerRecentOrders.length > 0 ? (
+                          order.customerRecentOrders.map((recentOrder) => (
+                            <div key={recentOrder.id} className="rounded-lg border border-border/40 p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{recentOrder.orderCode}</p>
+                                <Badge variant="outline">{recentOrder.status}</Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {recentOrder.planName || recentOrder.kind} • {formatRelativeTime(recentOrder.createdAt)}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{salesUi.noRecentOrders}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {order.adminNote ? (
                     <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -2242,8 +2498,117 @@ function TelegramSalesWorkflowCard() {
             <DialogTitle>
               {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
             </DialogTitle>
-            <DialogDescription>{salesUi.markForReview}</DialogDescription>
+            <DialogDescription>{salesUi.reviewContextHint}</DialogDescription>
           </DialogHeader>
+
+          {selectedOrder ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.orderContext}
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-medium">{selectedOrder.orderCode}</p>
+                  <p className="text-muted-foreground">{selectedOrder.planName || selectedOrder.planCode || '—'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedOrder.requestedName || selectedOrder.targetAccessKeyName || '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.customer}
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-medium">
+                    {selectedOrder.customerProfile?.displayName ||
+                      selectedOrder.telegramUsername ||
+                      selectedOrder.requestedName ||
+                      '—'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    @{selectedOrder.customerProfile?.username || selectedOrder.telegramUsername || 'unknown'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedOrder.requestedEmail || selectedOrder.telegramUserId}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {salesUi.lastFulfilled}:{' '}
+                    {selectedOrder.customerSummary.lastFulfilledAt
+                      ? formatDateTime(selectedOrder.customerSummary.lastFulfilledAt)
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.proof}
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-medium">{selectedOrder.paymentProofType || salesUi.awaitingProof}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedOrder.paymentSubmittedAt
+                      ? formatDateTime(selectedOrder.paymentSubmittedAt)
+                      : '—'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {salesUi.proofCaption}: {selectedOrder.paymentCaption || salesUi.noCaption}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{salesUi.proofForwardedHint}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedOrder ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.linkedKeys}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {selectedOrder.customerLinkedKeys.length > 0 ? (
+                    selectedOrder.customerLinkedKeys.slice(0, 4).map((key) => (
+                      <div key={key.id} className="rounded-lg border border-border/40 p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-medium">{key.name}</p>
+                          <Badge variant="outline">{key.status}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {key.email || '—'} • {formatBytes(BigInt(key.usedBytes))}
+                          {key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ` / ${salesUi.unlimited}`}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{salesUi.noLinkedKeys}</p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.recentOrders}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {selectedOrder.customerRecentOrders.length > 0 ? (
+                    selectedOrder.customerRecentOrders.map((order) => (
+                      <div key={order.id} className="rounded-lg border border-border/40 p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">{order.orderCode}</p>
+                          <Badge variant="outline">{order.status}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {order.planName || order.kind} • {formatDateTime(order.createdAt)}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{salesUi.noRecentOrders}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="telegram-order-review-note">{salesUi.adminNote}</Label>

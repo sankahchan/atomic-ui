@@ -185,21 +185,50 @@ export const telegramBotRouter = router({
         .object({
           limit: z.number().int().min(1).max(100).default(25),
           statuses: z.array(z.string()).optional(),
+          kinds: z.array(z.enum(['NEW', 'RENEW'])).optional(),
+          query: z.string().max(120).optional(),
         })
         .optional(),
     )
     .query(async ({ input }) => {
       const limit = input?.limit ?? 25;
       const statuses = input?.statuses?.filter(Boolean);
+      const kinds = input?.kinds?.filter(Boolean);
+      const query = input?.query?.trim();
+
+      const filters: Array<Record<string, unknown>> = [];
+
+      if (statuses?.length) {
+        filters.push({
+          status: {
+            in: statuses,
+          },
+        });
+      }
+
+      if (kinds?.length) {
+        filters.push({
+          kind: {
+            in: kinds,
+          },
+        });
+      }
+
+      if (query) {
+        filters.push({
+          OR: [
+            { orderCode: { contains: query } },
+            { telegramUsername: { contains: query } },
+            { telegramUserId: { contains: query } },
+            { requestedName: { contains: query } },
+            { requestedEmail: { contains: query } },
+            { planName: { contains: query } },
+          ],
+        });
+      }
 
       const orders = await db.telegramOrder.findMany({
-        where: statuses?.length
-          ? {
-              status: {
-                in: statuses,
-              },
-            }
-          : undefined,
+        where: filters.length ? { AND: filters } : undefined,
         orderBy: [{ createdAt: 'desc' }],
         take: limit,
         include: {
@@ -221,23 +250,184 @@ export const telegramBotRouter = router({
           ),
         ),
       );
+      const telegramUserIds = Array.from(new Set(orders.map((order) => order.telegramUserId).filter(Boolean)));
+      const telegramChatIds = Array.from(new Set(orders.map((order) => order.telegramChatId).filter(Boolean)));
+      const requestedEmails = Array.from(
+        new Set(
+          orders
+            .map((order) => order.requestedEmail?.trim().toLowerCase())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
 
-      const keys = relatedKeyIds.length
+      const keys =
+        relatedKeyIds.length || telegramUserIds.length || telegramChatIds.length || requestedEmails.length
         ? await db.accessKey.findMany({
             where: {
-              id: {
-                in: relatedKeyIds,
-              },
+              OR: [
+                ...(relatedKeyIds.length
+                  ? [
+                      {
+                        id: {
+                          in: relatedKeyIds,
+                        },
+                      },
+                    ]
+                  : []),
+                ...(telegramUserIds.length
+                  ? [
+                      {
+                        telegramId: {
+                          in: telegramUserIds,
+                        },
+                      },
+                    ]
+                  : []),
+                ...(telegramChatIds.length
+                  ? [
+                      {
+                        user: {
+                          telegramChatId: {
+                            in: telegramChatIds,
+                          },
+                        },
+                      },
+                    ]
+                  : []),
+                ...(requestedEmails.length
+                  ? [
+                      {
+                        email: {
+                          in: requestedEmails,
+                        },
+                      },
+                    ]
+                  : []),
+              ],
             },
             select: {
               id: true,
               name: true,
+              status: true,
+              email: true,
+              telegramId: true,
+              usedBytes: true,
+              dataLimitBytes: true,
+              expiresAt: true,
               publicSlug: true,
               subscriptionToken: true,
+              user: {
+                select: {
+                  telegramChatId: true,
+                },
+              },
             },
           })
         : [];
       const keysById = new Map(keys.map((key) => [key.id, key]));
+
+      const profiles =
+        telegramUserIds.length || telegramChatIds.length
+          ? await db.telegramUserProfile.findMany({
+              where: {
+                OR: [
+                  ...(telegramUserIds.length
+                    ? [
+                        {
+                          telegramUserId: {
+                            in: telegramUserIds,
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(telegramChatIds.length
+                    ? [
+                        {
+                          telegramChatId: {
+                            in: telegramChatIds,
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              select: {
+                telegramUserId: true,
+                telegramChatId: true,
+                username: true,
+                displayName: true,
+                locale: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            })
+          : [];
+
+      const relatedOrders =
+        telegramUserIds.length || telegramChatIds.length
+          ? await db.telegramOrder.findMany({
+              where: {
+                OR: [
+                  ...(telegramUserIds.length
+                    ? [
+                        {
+                          telegramUserId: {
+                            in: telegramUserIds,
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(telegramChatIds.length
+                    ? [
+                        {
+                          telegramChatId: {
+                            in: telegramChatIds,
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              orderBy: [{ createdAt: 'desc' }],
+              take: Math.max(limit * 6, 120),
+              select: {
+                id: true,
+                orderCode: true,
+                status: true,
+                kind: true,
+                telegramUserId: true,
+                telegramChatId: true,
+                requestedEmail: true,
+                planName: true,
+                approvedAccessKeyId: true,
+                createdAt: true,
+                fulfilledAt: true,
+                rejectedAt: true,
+              },
+            })
+          : [];
+
+      const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() || null;
+      const matchesOrderIdentity = (
+        order: (typeof orders)[number],
+        candidate: {
+          telegramUserId?: string | null;
+          telegramChatId?: string | null;
+          requestedEmail?: string | null;
+        },
+      ) => {
+        if (candidate.telegramUserId && candidate.telegramUserId === order.telegramUserId) {
+          return true;
+        }
+
+        if (candidate.telegramChatId && candidate.telegramChatId === order.telegramChatId) {
+          return true;
+        }
+
+        const orderEmail = normalizeEmail(order.requestedEmail);
+        const candidateEmail = normalizeEmail(candidate.requestedEmail);
+        return Boolean(orderEmail && candidateEmail && orderEmail === candidateEmail);
+      };
 
       return orders.map((order) => ({
         ...order,
@@ -251,6 +441,70 @@ export const telegramBotRouter = router({
         approvedAccessKeySlug: order.approvedAccessKeyId
           ? keysById.get(order.approvedAccessKeyId)?.publicSlug ?? null
           : null,
+        customerProfile:
+          profiles.find(
+            (profile) =>
+              profile.telegramUserId === order.telegramUserId ||
+              profile.telegramChatId === order.telegramChatId,
+          ) ?? null,
+        customerLinkedKeys: Array.from(
+          new Map(
+            keys
+              .filter((key) => {
+                const emailMatch =
+                  normalizeEmail(order.requestedEmail) &&
+                  normalizeEmail(key.email) === normalizeEmail(order.requestedEmail);
+                return (
+                  key.id === order.targetAccessKeyId ||
+                  key.id === order.approvedAccessKeyId ||
+                  key.telegramId === order.telegramUserId ||
+                  key.user?.telegramChatId === order.telegramChatId ||
+                  emailMatch
+                );
+              })
+              .map((key) => [
+                key.id,
+                {
+                  id: key.id,
+                  name: key.name,
+                  status: key.status,
+                  email: key.email,
+                  publicSlug: key.publicSlug,
+                  usedBytes: key.usedBytes.toString(),
+                  dataLimitBytes: key.dataLimitBytes?.toString() ?? null,
+                  expiresAt: key.expiresAt,
+                },
+              ]),
+          ).values(),
+        ).slice(0, 5),
+        customerRecentOrders: relatedOrders
+          .filter((candidate) => candidate.id !== order.id && matchesOrderIdentity(order, candidate))
+          .slice(0, 4)
+          .map((candidate) => ({
+            id: candidate.id,
+            orderCode: candidate.orderCode,
+            status: candidate.status,
+            kind: candidate.kind,
+            planName: candidate.planName,
+            approvedAccessKeyName: candidate.approvedAccessKeyId
+              ? keysById.get(candidate.approvedAccessKeyId)?.name ?? null
+              : null,
+            createdAt: candidate.createdAt,
+            fulfilledAt: candidate.fulfilledAt,
+            rejectedAt: candidate.rejectedAt,
+          })),
+        customerSummary: (() => {
+          const identityOrders = relatedOrders.filter((candidate) => matchesOrderIdentity(order, candidate));
+          const lastFulfilled = identityOrders.find((candidate) => candidate.status === 'FULFILLED');
+          return {
+            totalOrders: identityOrders.length,
+            pendingOrders: identityOrders.filter((candidate) => candidate.status === 'PENDING_REVIEW').length,
+            fulfilledOrders: identityOrders.filter((candidate) => candidate.status === 'FULFILLED').length,
+            rejectedOrders: identityOrders.filter((candidate) => candidate.status === 'REJECTED').length,
+            lastOrderAt: identityOrders[0]?.createdAt ?? null,
+            lastFulfilledAt: lastFulfilled?.fulfilledAt ?? lastFulfilled?.createdAt ?? null,
+          };
+        })(),
       }));
     }),
 
