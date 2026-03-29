@@ -52,12 +52,16 @@ import {
   formatTelegramSalesPlanSummary,
   generateTelegramOrderCode,
   getTelegramSalesSettings,
+  listEnabledTelegramSalesPaymentMethods,
   resolveTelegramSalesPaymentInstructions,
+  resolveTelegramSalesPaymentMethodLabel,
+  resolveTelegramSalesPaymentMethodNote,
   resolveTelegramSalesPlan,
   resolveTelegramSalesPlanLabel,
   resolveTelegramSalesPriceLabel,
   type TelegramOrderActiveStatus,
   type TelegramOrderTerminalStatus,
+  type TelegramSalesPaymentMethod,
   type TelegramSalesPlan,
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
@@ -188,7 +192,7 @@ const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
-type TelegramOrderUserAction = 'pl' | 'ky' | 'pay' | 'up' | 'st' | 'ca';
+type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pay' | 'up' | 'st' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -296,7 +300,7 @@ function parseTelegramOrderActionCallbackData(data?: string | null) {
   }
 
   const action = parts[1];
-  if (!['pl', 'ky', 'pay', 'up', 'st', 'ca'].includes(action)) {
+  if (!['pl', 'ky', 'sv', 'pay', 'up', 'st', 'ca'].includes(action)) {
     return null;
   }
 
@@ -592,11 +596,15 @@ function getTelegramUi(locale: SupportedLocale) {
       : '🧾 After payment, send the payment screenshot here as a photo or document. Make sure the amount, transfer ID, and time are clearly visible.',
     orderPlanPrompt: (code: string) =>
       isMyanmar
-        ? `🛒 <b>Order ${code}</b>\n\nအောက်ပါ plan စာရင်းမှ လိုချင်သော plan ကို ရွေးရန် 1, 2, သို့မဟုတ် 3 ဟု reply လုပ်ပါ။`
-        : `🛒 <b>Order ${code}</b>\n\nReply with 1, 2, or 3 to choose one of the plans below.`,
+        ? `🛒 <b>Order ${code}</b>\n\nအောက်ပါစာရင်းထဲမှ လိုချင်သော plan ကို ရွေးချယ်ပါ။ Button ကိုနှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။`
+        : `🛒 <b>Order ${code}</b>\n\nChoose one of the plans below. You can tap a button or reply with the plan number.`,
     orderMonthsPrompt: isMyanmar
       ? '📆 Unlimited plan အတွက် လအရေအတွက်ကို ပို့ပါ။ အနည်းဆုံး 3 လ ဖြစ်ရပါမည်။'
       : '📆 Send the number of months for the unlimited plan. The minimum is 3 months.',
+    orderServerPrompt: (code: string) =>
+      isMyanmar
+        ? `🖥 <b>Order ${code}</b>\n\nအသုံးပြုလိုသော server ကို ရွေးပါ။ Button ကိုနှိပ်နိုင်သလို စာရင်းနံပါတ်ကို reply လုပ်နိုင်ပါသည်။`
+        : `🖥 <b>Order ${code}</b>\n\nChoose the server you prefer. You can tap a button or reply with the server number.`,
     orderNamePrompt: isMyanmar
       ? '✍️ Key တွင် ပြမည့် အမည်ကို ပို့ပါ။ ဥပမာ - John iPhone 15'
       : '✍️ Send the name that should appear on the key. Example: John iPhone 15',
@@ -604,10 +612,14 @@ function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `🔄 <b>Renewal ${code}</b>\n\nသက်တမ်းတိုးလိုသော key ကို အောက်ပါစာရင်းမှ နံပါတ်ဖြင့် reply လုပ်ပါ။`
         : `🔄 <b>Renewal ${code}</b>\n\nReply with the number of the key you want to renew from the list below.`,
-    invalidPlanChoice: isMyanmar ? '❌ Plan အတွက် 1, 2, သို့မဟုတ် 3 ကိုသာ ပို့ပေးပါ။' : '❌ Reply with 1, 2, or 3 for the plan.',
+    invalidPlanChoice: isMyanmar ? '❌ စာရင်းထဲက plan နံပါတ်တစ်ခုကို ရွေးပေးပါ။' : '❌ Reply with one of the listed plan numbers.',
     invalidMonths: isMyanmar ? '❌ လအရေအတွက်ကို 3 နှင့်အထက် ဂဏန်းဖြင့် ပို့ပေးပါ။' : '❌ Send a number of months that is 3 or greater.',
     invalidRenewChoice: isMyanmar ? '❌ စာရင်းထဲက key နံပါတ်ကို ပို့ပေးပါ။' : '❌ Reply with one of the key numbers from the list.',
+    invalidServerChoice: isMyanmar ? '❌ စာရင်းထဲက server တစ်ခုကို ရွေးပေးပါ။' : '❌ Reply with one of the listed servers.',
     invalidOrderName: isMyanmar ? '❌ Key အမည်ကို စာလုံး 2 လုံးမှ 100 လုံးအတွင်း ပို့ပေးပါ။' : '❌ Send a key name between 2 and 100 characters.',
+    freeTrialUnavailable: isMyanmar
+      ? 'ℹ️ Free trial ကို new user တစ်ဦးအတွက် တစ်ကြိမ်သာ ရရှိနိုင်ပါသည်။'
+      : 'ℹ️ The free trial is only available once for each new user.',
     orderProofPending: (code: string) =>
       isMyanmar
         ? `📨 Order <b>${code}</b> အတွက် payment proof ကို လက်ခံပြီးပါပြီ။ Admin review စောင့်နေပါသည်။ အတည်ပြုပြီးနောက် key ကို ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
@@ -630,10 +642,13 @@ function getTelegramUi(locale: SupportedLocale) {
     orderActionRenewKey: isMyanmar ? 'ဤ key ကို သက်တမ်းတိုးရန်' : 'Renew this key',
     orderActionChoosePlan: isMyanmar ? 'Plan ရွေးရန်' : 'Choose plan',
     orderActionSelectKey: isMyanmar ? 'Key ရွေးရန်' : 'Select key',
+    orderActionSelectServer: isMyanmar ? 'Server ရွေးရန်' : 'Choose server',
     orderActionSelectedPlan: (label: string) =>
       isMyanmar ? `ရွေးထားသော plan: ${label}` : `Selected plan: ${label}`,
     orderActionSelectedKey: (label: string) =>
       isMyanmar ? `ရွေးထားသော key: ${label}` : `Selected key: ${label}`,
+    orderActionSelectedServer: (label: string) =>
+      isMyanmar ? `ရွေးထားသော server: ${label}` : `Selected server: ${label}`,
     orderActionCancelledInline: (code: string) =>
       isMyanmar ? `Order ${code} ကို ပယ်ဖျက်ပြီးပါပြီ။` : `Cancelled order ${code}.`,
     orderActionAlreadyClosed: isMyanmar ? 'ဤ order ကို ပိတ်ပြီး ဖြစ်ပါသည်။' : 'This order is already closed.',
@@ -657,6 +672,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderReviewActionFailed: (message: string) =>
       isMyanmar ? `Telegram action မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
+    paymentMethodsLabel: isMyanmar ? 'ငွေပေးချေမှု အကောင့်များ' : 'Payment methods',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
     priceLabel: isMyanmar ? 'စျေးနှုန်း' : 'Price',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
@@ -679,6 +695,7 @@ function getTelegramUi(locale: SupportedLocale) {
     fulfilledAtLabel: isMyanmar ? 'ပြီးစီးချိန်' : 'Fulfilled',
     rejectedAtLabel: isMyanmar ? 'ပယ်ချိန်' : 'Rejected',
     durationLabel: isMyanmar ? 'သက်တမ်းကာလ' : 'Duration',
+    preferredServerLabel: isMyanmar ? 'ရွေးထားသော server' : 'Preferred server',
     deliveredKeyLabel: isMyanmar ? 'ထုတ်ပေးထားသော key' : 'Delivered key',
     latestOrderHint: isMyanmar ? 'နောက်ဆုံး order ကို ပြထားပါသည်။' : 'Showing the latest order.',
     orderKindNew: isMyanmar ? 'အသစ်' : 'New',
@@ -686,6 +703,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderStatusAwaitingKeySelection: isMyanmar ? 'Key ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
     orderStatusAwaitingPlan: isMyanmar ? 'Plan ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting plan selection',
     orderStatusAwaitingMonths: isMyanmar ? 'လအရေအတွက် စောင့်နေသည်' : 'Awaiting month count',
+    orderStatusAwaitingServerSelection: isMyanmar ? 'Server ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting server selection',
     orderStatusAwaitingKeyName: isMyanmar ? 'Key အမည် စောင့်နေသည်' : 'Awaiting key name',
     orderStatusAwaitingPaymentProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
     orderStatusPendingReview: isMyanmar ? 'Admin စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
@@ -696,6 +714,9 @@ function getTelegramUi(locale: SupportedLocale) {
     paymentProofLabel: isMyanmar ? 'Proof' : 'Proof',
     requestedNameLabel: isMyanmar ? 'တောင်းဆိုထားသော အမည်' : 'Requested name',
     renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
+    accountNameLabel: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
+    accountNumberLabel: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
+    serverAutoSelect: isMyanmar ? 'အကောင်းဆုံး server ကို အလိုအလျောက် ရွေးမည်' : 'Auto-select the best server',
     adminNote: isMyanmar ? 'Admin note' : 'Admin note',
     statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
     statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
@@ -835,6 +856,7 @@ function formatTelegramOrderStateLine(order: {
   planName?: string | null;
   planCode?: string | null;
   durationMonths?: number | null;
+  durationDays?: number | null;
   requestedName?: string | null;
 }) {
   const parts = [`#${order.orderCode}`];
@@ -843,6 +865,9 @@ function formatTelegramOrderStateLine(order: {
   }
   if (order.durationMonths) {
     parts.push(`${order.durationMonths}m`);
+  }
+  if (order.durationDays) {
+    parts.push(`${order.durationDays}d`);
   }
   if (order.requestedName) {
     parts.push(order.requestedName);
@@ -872,6 +897,8 @@ function formatTelegramOrderStatusLabel(status: string, ui: ReturnType<typeof ge
       return ui.orderStatusAwaitingPlan;
     case 'AWAITING_MONTHS':
       return ui.orderStatusAwaitingMonths;
+    case 'AWAITING_SERVER_SELECTION':
+      return ui.orderStatusAwaitingServerSelection;
     case 'AWAITING_KEY_NAME':
       return ui.orderStatusAwaitingKeyName;
     case 'AWAITING_PAYMENT_PROOF':
@@ -992,6 +1019,16 @@ async function buildTelegramOrderStatusMessage(input: {
     );
   }
 
+  if (order.durationDays) {
+    lines.push(
+      `${ui.durationLabel}: ${escapeHtml(
+        locale === 'my'
+          ? `${order.durationDays} ရက်`
+          : `${order.durationDays} day${order.durationDays === 1 ? '' : 's'}`,
+      )}`,
+    );
+  }
+
   if (order.requestedName) {
     lines.push(`${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>`);
   }
@@ -1002,6 +1039,11 @@ async function buildTelegramOrderStatusMessage(input: {
 
   if (order.kind === 'RENEW' && order.targetAccessKeyId) {
     lines.push(`${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>`);
+  }
+
+  if (order.selectedServerName) {
+    const flag = order.selectedServerCountryCode ? ` ${getFlagEmoji(order.selectedServerCountryCode)}` : '';
+    lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}${flag}</b>`);
   }
 
   lines.push(`${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`);
@@ -1108,6 +1150,7 @@ async function handleOrdersCommand(
           planName: order.planName,
           planCode: order.planCode,
           durationMonths: order.durationMonths,
+          durationDays: order.durationDays,
           requestedName: order.requestedName,
         }),
       )}`,
@@ -1184,8 +1227,11 @@ function buildTelegramSalesPaymentPrompt(input: {
   orderCode: string;
   planSummary: string;
   paymentInstructions: string;
+  paymentMethods?: TelegramSalesPaymentMethod[];
+  selectedServerName?: string | null;
   requestedName?: string | null;
   renewalTargetName?: string | null;
+  supportLink?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
   const lines = [
@@ -1201,13 +1247,40 @@ function buildTelegramSalesPaymentPrompt(input: {
     lines.push(`${ui.renewalTargetLabel}: <b>${escapeHtml(input.renewalTargetName)}</b>`);
   }
 
+  if (input.selectedServerName) {
+    lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(input.selectedServerName)}</b>`);
+  }
+
   lines.push(
     '',
     `${ui.paymentInstructionsLabel}:`,
     escapeHtml(input.paymentInstructions),
-    '',
-    ui.paymentProofRequired,
   );
+
+  const paymentMethods = (input.paymentMethods || []).filter((method) => method.enabled);
+  if (paymentMethods.length > 0) {
+    lines.push('', `${ui.paymentMethodsLabel}:`);
+    for (const method of paymentMethods) {
+      const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
+      const note = resolveTelegramSalesPaymentMethodNote(method, input.locale);
+      lines.push(`• <b>${escapeHtml(label)}</b>`);
+      if (method.accountName?.trim()) {
+        lines.push(`  ${ui.accountNameLabel}: ${escapeHtml(method.accountName.trim())}`);
+      }
+      if (method.accountNumber?.trim()) {
+        lines.push(`  ${ui.accountNumberLabel}: <code>${escapeHtml(method.accountNumber.trim())}</code>`);
+      }
+      if (note) {
+        lines.push(`  ${escapeHtml(note)}`);
+      }
+    }
+  }
+
+  if (input.supportLink) {
+    lines.push('', `${ui.supportLabel}: ${escapeHtml(input.supportLink)}`);
+  }
+
+  lines.push('', ui.paymentProofRequired);
 
   return lines.join('\n');
 }
@@ -1264,6 +1337,84 @@ function buildTelegramRenewKeySelectionKeyboard(input: {
   };
 }
 
+async function listAssignableTelegramOrderServers() {
+  const servers = await db.server.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      countryCode: true,
+      isDefault: true,
+      sortOrder: true,
+      lifecycleMode: true,
+      isActive: true,
+    },
+    orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+  });
+
+  return servers.filter((server) => canAssignKeysToServer(server).allowed);
+}
+
+function formatTelegramServerChoiceLabel(
+  server: Awaited<ReturnType<typeof listAssignableTelegramOrderServers>>[number],
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  return server.id === 'auto'
+    ? ui.serverAutoSelect
+    : `${server.name}${server.countryCode ? ` ${getFlagEmoji(server.countryCode)}` : ''}`;
+}
+
+function buildTelegramServerSelectionKeyboard(input: {
+  orderId: string;
+  locale: SupportedLocale;
+  servers: Awaited<ReturnType<typeof listAssignableTelegramOrderServers>>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [
+    [
+      {
+        text: truncateTelegramButtonLabel(`⚡ ${ui.serverAutoSelect}`, 38),
+        callback_data: buildTelegramOrderActionCallbackData('sv', input.orderId, 'auto'),
+      },
+    ],
+  ];
+
+  for (const server of input.servers.slice(0, 8)) {
+    rows.push([
+      {
+        text: truncateTelegramButtonLabel(`🖥 ${formatTelegramServerChoiceLabel(server, ui)}`, 38),
+        callback_data: buildTelegramOrderActionCallbackData('sv', input.orderId, server.id),
+      },
+    ]);
+  }
+
+  rows.push([
+    {
+      text: ui.orderActionCancel,
+      callback_data: buildTelegramOrderActionCallbackData('ca', input.orderId),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramServerSelectionPromptText(input: {
+  orderCode: string;
+  locale: SupportedLocale;
+  servers: Awaited<ReturnType<typeof listAssignableTelegramOrderServers>>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const lines = [
+    ui.orderServerPrompt(input.orderCode),
+    `1. ${ui.serverAutoSelect}`,
+    ...input.servers.map((server, index) => `${index + 2}. ${formatTelegramServerChoiceLabel(server, ui)}`),
+  ];
+
+  return buildTelegramSalesPlanPromptText(input.locale, lines);
+}
+
 function buildTelegramOrderActionKeyboard(input: {
   order: {
     id: string;
@@ -1308,6 +1459,34 @@ function buildTelegramOrderActionKeyboard(input: {
         inline_keyboard: rows,
       }
     : undefined;
+}
+
+async function listAvailableTelegramPlansForOrder(input: {
+  kind: 'NEW' | 'RENEW';
+  chatId: number;
+  telegramUserId: number;
+  settings: Awaited<ReturnType<typeof getTelegramSalesSettings>>;
+}) {
+  const freeTrialEligible =
+    input.kind === 'NEW'
+      ? await isEligibleForTelegramFreeTrial(input.chatId, input.telegramUserId)
+      : false;
+
+  return input.settings.plans.filter((plan) => {
+    if (!plan.enabled) {
+      return false;
+    }
+
+    if (input.kind === 'RENEW' && plan.code === 'trial_1d_3gb') {
+      return false;
+    }
+
+    if (plan.code === 'trial_1d_3gb' && !freeTrialEligible) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 async function findTelegramOrderByIdForUser(input: {
@@ -1366,9 +1545,13 @@ async function createTelegramOrderRecord(input: {
   targetAccessKeyId?: string | null;
   planCode?: TelegramSalesPlanCode | null;
   durationMonths?: number | null;
+  durationDays?: number | null;
   dataLimitBytes?: bigint | null;
   unlimitedQuota?: boolean;
   requestedName?: string | null;
+  selectedServerId?: string | null;
+  selectedServerName?: string | null;
+  selectedServerCountryCode?: string | null;
 }) {
   const orderCode = await generateTelegramOrderCode();
   return db.telegramOrder.create({
@@ -1383,9 +1566,13 @@ async function createTelegramOrderRecord(input: {
       targetAccessKeyId: input.targetAccessKeyId || null,
       planCode: input.planCode || null,
       durationMonths: input.durationMonths ?? null,
+      durationDays: input.durationDays ?? null,
       dataLimitBytes: input.dataLimitBytes ?? null,
       unlimitedQuota: input.unlimitedQuota ?? false,
       requestedName: input.requestedName || null,
+      selectedServerId: input.selectedServerId ?? null,
+      selectedServerName: input.selectedServerName ?? null,
+      selectedServerCountryCode: input.selectedServerCountryCode ?? null,
     },
   });
 }
@@ -1528,7 +1715,12 @@ async function handleBuyCommand(
     initialStatus: 'AWAITING_PLAN',
   });
 
-  const enabledPlans = settings.plans.filter((plan) => plan.enabled);
+  const enabledPlans = await listAvailableTelegramPlansForOrder({
+    kind: 'NEW',
+    chatId,
+    telegramUserId,
+    settings,
+  });
   const lines = [
     ui.orderPlanPrompt(order.orderCode),
     ...enabledPlans.map((plan, index) => {
@@ -1613,6 +1805,7 @@ async function handleTelegramOrderTextMessage(input: {
   const locale = coerceSupportedLocale(activeOrder.locale) || (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
   const salesSettings = await getTelegramSalesSettings();
+  const defaults = await getSubscriptionDefaults();
   const trimmed = input.text.trim();
 
   switch (activeOrder.status) {
@@ -1641,7 +1834,12 @@ async function handleTelegramOrderTextMessage(input: {
         },
       });
 
-      const enabledPlans = salesSettings.plans.filter((plan) => plan.enabled);
+      const enabledPlans = await listAvailableTelegramPlansForOrder({
+        kind: 'RENEW',
+        chatId: input.chatId,
+        telegramUserId: input.telegramUserId,
+        settings: salesSettings,
+      });
       const lines = [
         ui.orderPlanPrompt(activeOrder.orderCode),
         `${ui.renewalTargetLabel}: <b>${escapeHtml(matchedKey.name)}</b>`,
@@ -1656,13 +1854,21 @@ async function handleTelegramOrderTextMessage(input: {
       return buildTelegramSalesPlanPromptText(locale, lines);
     }
     case 'AWAITING_PLAN': {
-      const enabledPlans = salesSettings.plans.filter((plan) => plan.enabled);
+      const enabledPlans = await listAvailableTelegramPlansForOrder({
+        kind: activeOrder.kind as 'NEW' | 'RENEW',
+        chatId: input.chatId,
+        telegramUserId: input.telegramUserId,
+        settings: salesSettings,
+      });
       const numericIndex = Number.parseInt(trimmed, 10);
       if (!Number.isFinite(numericIndex) || numericIndex < 1 || numericIndex > enabledPlans.length) {
         return ui.invalidPlanChoice;
       }
 
       const plan = enabledPlans[numericIndex - 1];
+      if (plan.code === 'trial_1d_3gb' && !(await isEligibleForTelegramFreeTrial(input.chatId, input.telegramUserId))) {
+        return ui.freeTrialUnavailable;
+      }
       const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
       const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
 
@@ -1684,11 +1890,12 @@ async function handleTelegramOrderTextMessage(input: {
         return ui.orderMonthsPrompt;
       }
 
-      const durationMonths = plan.fixedDurationMonths ?? plan.minDurationMonths ?? 1;
+      const durationMonths = plan.fixedDurationMonths ?? plan.minDurationMonths ?? null;
+      const durationDays = plan.fixedDurationDays ?? null;
       const dataLimitBytes = plan.dataLimitGB
         ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
         : null;
-      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_KEY_NAME' : 'AWAITING_PAYMENT_PROOF';
+      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
 
       const nextOrder = await db.telegramOrder.update({
         where: { id: activeOrder.id },
@@ -1700,14 +1907,20 @@ async function handleTelegramOrderTextMessage(input: {
           priceLabel: priceLabel || null,
           templateId: plan.templateId || null,
           durationMonths,
+          durationDays,
           dataLimitBytes,
           unlimitedQuota: plan.unlimitedQuota,
           status: nextStatus,
         },
       });
 
-      if (nextStatus === 'AWAITING_KEY_NAME') {
-        return ui.orderNamePrompt;
+      if (nextStatus === 'AWAITING_SERVER_SELECTION') {
+        const servers = await listAssignableTelegramOrderServers();
+        return buildTelegramServerSelectionPromptText({
+          orderCode: nextOrder.orderCode,
+          locale,
+          servers,
+        });
       }
 
       const renewalTarget = nextOrder.targetAccessKeyId
@@ -1723,7 +1936,9 @@ async function handleTelegramOrderTextMessage(input: {
         orderCode: nextOrder.orderCode,
         planSummary,
         paymentInstructions,
+        paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
         renewalTargetName: renewalTarget?.name || null,
+        supportLink: defaults.supportLink,
       });
     }
     case 'AWAITING_MONTHS': {
@@ -1740,11 +1955,12 @@ async function handleTelegramOrderTextMessage(input: {
       }
 
       const planSummary = formatTelegramSalesPlanSummary(plan, months, locale);
-      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_KEY_NAME' : 'AWAITING_PAYMENT_PROOF';
+      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
       const nextOrder = await db.telegramOrder.update({
         where: { id: activeOrder.id },
         data: {
           durationMonths: months,
+          durationDays: null,
           planName: planSummary,
           priceAmount: plan.priceAmount ?? null,
           priceCurrency: plan.priceCurrency || null,
@@ -1754,8 +1970,13 @@ async function handleTelegramOrderTextMessage(input: {
         },
       });
 
-      if (nextStatus === 'AWAITING_KEY_NAME') {
-        return ui.orderNamePrompt;
+      if (nextStatus === 'AWAITING_SERVER_SELECTION') {
+        const servers = await listAssignableTelegramOrderServers();
+        return buildTelegramServerSelectionPromptText({
+          orderCode: nextOrder.orderCode,
+          locale,
+          servers,
+        });
       }
 
       const renewalTarget = nextOrder.targetAccessKeyId
@@ -1769,8 +1990,60 @@ async function handleTelegramOrderTextMessage(input: {
         orderCode: nextOrder.orderCode,
         planSummary,
         paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+        paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
         renewalTargetName: renewalTarget?.name || null,
+        supportLink: defaults.supportLink,
       });
+    }
+    case 'AWAITING_SERVER_SELECTION': {
+      const servers = await listAssignableTelegramOrderServers();
+      const numericIndex = Number.parseInt(trimmed, 10);
+      const normalizedText = trimmed.toLowerCase();
+
+      let selectedServer:
+        | (Awaited<ReturnType<typeof listAssignableTelegramOrderServers>>[number] & { id: string })
+        | null = null;
+
+      if (normalizedText === 'auto' || normalizedText === 'a' || trimmed === '1') {
+        selectedServer = {
+          id: 'auto',
+          name: ui.serverAutoSelect,
+          countryCode: null,
+          isDefault: false,
+          sortOrder: 0,
+          lifecycleMode: 'ACTIVE',
+          isActive: true,
+        };
+      } else if (Number.isFinite(numericIndex) && numericIndex >= 2 && numericIndex <= servers.length + 1) {
+        selectedServer = servers[numericIndex - 2] || null;
+      } else {
+        selectedServer =
+          servers.find((server) => server.id === trimmed) ||
+          servers.find((server) => server.name.toLowerCase() === normalizedText) ||
+          servers.find((server) => server.name.toLowerCase().includes(normalizedText)) ||
+          null;
+      }
+
+      if (!selectedServer) {
+        return ui.invalidServerChoice;
+      }
+
+      await db.telegramOrder.update({
+        where: { id: activeOrder.id },
+        data: {
+          selectedServerId: selectedServer.id === 'auto' ? null : selectedServer.id,
+          selectedServerName: selectedServer.id === 'auto' ? null : selectedServer.name,
+          selectedServerCountryCode:
+            selectedServer.id === 'auto' ? null : (selectedServer.countryCode ?? null),
+          status: 'AWAITING_KEY_NAME',
+        },
+      });
+
+      const selectedLabel =
+        selectedServer.id === 'auto'
+          ? ui.serverAutoSelect
+          : formatTelegramServerChoiceLabel(selectedServer, ui);
+      return `${ui.orderActionSelectedServer(selectedLabel)}\n\n${ui.orderNamePrompt}`;
     }
     case 'AWAITING_KEY_NAME': {
       if (trimmed.length < 2 || trimmed.length > 100) {
@@ -1784,20 +2057,107 @@ async function handleTelegramOrderTextMessage(input: {
         ? formatTelegramSalesPlanSummary(plan, activeOrder.durationMonths, locale)
         : activeOrder.planName || '';
 
-      await db.telegramOrder.update({
+      const updatedOrder = await db.telegramOrder.update({
         where: { id: activeOrder.id },
         data: {
           requestedName: trimmed,
-          status: 'AWAITING_PAYMENT_PROOF',
+          status: plan?.code === 'trial_1d_3gb' ? 'APPROVED' : 'AWAITING_PAYMENT_PROOF',
+          reviewedAt: plan?.code === 'trial_1d_3gb' ? new Date() : null,
+          adminNote:
+            plan?.code === 'trial_1d_3gb'
+              ? appendTelegramOrderAdminNote(activeOrder.adminNote, 'Auto-approved free trial')
+              : activeOrder.adminNote,
         },
       });
+
+      if (plan?.code === 'trial_1d_3gb') {
+        try {
+          const { plan: resolvedPlan, template, durationMonths, durationDays } =
+            await resolveTelegramOrderPlanContext(updatedOrder);
+          const key = await fulfillTelegramNewAccessOrder({
+            orderId: updatedOrder.id,
+            orderCode: updatedOrder.orderCode,
+            telegramChatId: updatedOrder.telegramChatId,
+            telegramUserId: updatedOrder.telegramUserId,
+            requestedName: trimmed,
+            requestedEmail: updatedOrder.requestedEmail,
+            durationMonths,
+            durationDays,
+            selectedServerId: updatedOrder.selectedServerId,
+            plan: resolvedPlan,
+            template,
+          });
+
+          await db.telegramOrder.update({
+            where: { id: updatedOrder.id },
+            data: {
+              status: 'FULFILLED',
+              approvedAccessKeyId: key.id,
+              fulfilledAt: new Date(),
+            },
+          });
+
+          let deliveryError: string | null = null;
+          try {
+            const config = await getTelegramConfig();
+            if (config) {
+              await sendTelegramMessage(
+                config.botToken,
+                updatedOrder.telegramChatId,
+                ui.orderApproved(updatedOrder.orderCode),
+                {
+                  replyMarkup: getCommandKeyboard(false),
+                },
+              );
+            }
+
+            await sendAccessKeySharePageToTelegram({
+              accessKeyId: key.id,
+              chatId: updatedOrder.telegramChatId,
+              reason: 'CREATED',
+              source: 'telegram_trial',
+            });
+          } catch (error) {
+            deliveryError = (error as Error).message;
+          }
+
+          await writeAuditLog({
+            action: 'TELEGRAM_ORDER_TRIAL_FULFILLED',
+            entity: 'TELEGRAM_ORDER',
+            entityId: updatedOrder.id,
+            details: {
+              orderCode: updatedOrder.orderCode,
+              approvedAccessKeyId: key.id,
+              deliveryError,
+            },
+          });
+
+          return deliveryError ? `${ui.orderApproved(updatedOrder.orderCode)}\n\n${deliveryError}` : null;
+        } catch (error) {
+          await db.telegramOrder.update({
+            where: { id: updatedOrder.id },
+            data: {
+              status: 'AWAITING_KEY_NAME',
+              reviewedAt: null,
+              adminNote: appendTelegramOrderAdminNote(
+                activeOrder.adminNote,
+                `Free trial fulfillment failed at ${new Date().toISOString()}: ${(error as Error).message}`,
+              ),
+            },
+          });
+          return (error as Error).message;
+        }
+      }
 
       return buildTelegramSalesPaymentPrompt({
         locale,
         orderCode: activeOrder.orderCode,
         planSummary,
         paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+        paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
+        selectedServerName: updatedOrder.selectedServerName,
         requestedName: trimmed,
+        supportLink: defaults.supportLink,
       });
     }
     case 'AWAITING_PAYMENT_PROOF':
@@ -2204,6 +2564,54 @@ function addMonths(baseDate: Date, months: number) {
   return next;
 }
 
+function addDays(baseDate: Date, days: number) {
+  const next = new Date(baseDate);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function applyTelegramOrderDuration(input: {
+  baseDate: Date;
+  durationMonths?: number | null;
+  durationDays?: number | null;
+}) {
+  if (input.durationDays && input.durationDays > 0) {
+    return addDays(input.baseDate, input.durationDays);
+  }
+
+  return addMonths(input.baseDate, input.durationMonths ?? 1);
+}
+
+async function isEligibleForTelegramFreeTrial(chatId: number, telegramUserId: number) {
+  const [linkedKeyCount, fulfilledOrders, fulfilledTrialOrder] = await Promise.all([
+    db.accessKey.count({
+      where: {
+        OR: [{ telegramId: String(telegramUserId) }, { user: { telegramChatId: String(chatId) } }],
+        status: {
+          not: 'ARCHIVED',
+        },
+      },
+    }),
+    db.telegramOrder.count({
+      where: {
+        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
+        kind: 'NEW',
+        status: 'FULFILLED',
+      },
+    }),
+    db.telegramOrder.count({
+      where: {
+        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
+        kind: 'NEW',
+        planCode: 'trial_1d_3gb',
+        status: 'FULFILLED',
+      },
+    }),
+  ]);
+
+  return linkedKeyCount === 0 && fulfilledOrders === 0 && fulfilledTrialOrder === 0;
+}
+
 async function isGeneratedAccessSlugAvailable(slug: string) {
   if (!slug || !isValidPublicSlug(slug) || isReservedPublicSlug(slug)) {
     return false;
@@ -2276,6 +2684,7 @@ async function cancelStaleTelegramConversationOrders(chatId: number, telegramUse
           'AWAITING_KEY_SELECTION',
           'AWAITING_PLAN',
           'AWAITING_MONTHS',
+          'AWAITING_SERVER_SELECTION',
           'AWAITING_KEY_NAME',
           'AWAITING_PAYMENT_PROOF',
         ],
@@ -2319,6 +2728,7 @@ async function resolveTelegramOrderPlanContext(order: {
   locale: string;
   planCode?: string | null;
   durationMonths?: number | null;
+  durationDays?: number | null;
   templateId?: string | null;
 }) {
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
@@ -2335,6 +2745,7 @@ async function resolveTelegramOrderPlanContext(order: {
 
   const durationMonths =
     order.durationMonths ?? plan.fixedDurationMonths ?? plan.minDurationMonths ?? 1;
+  const durationDays = order.durationDays ?? plan.fixedDurationDays ?? null;
   const templateId = order.templateId || plan.templateId || null;
   const template = templateId
     ? await db.keyTemplate.findUnique({
@@ -2352,6 +2763,7 @@ async function resolveTelegramOrderPlanContext(order: {
     plan,
     template,
     durationMonths,
+    durationDays,
   };
 }
 
@@ -2374,12 +2786,32 @@ async function resolveTelegramOrderLinkedUser(order: {
   });
 }
 
-async function resolveTelegramProvisioningServer(template?: {
-  serverId?: string | null;
-} | null) {
-  if (template?.serverId) {
+async function resolveTelegramProvisioningServer(input?: {
+  selectedServerId?: string | null;
+  template?: {
+    serverId?: string | null;
+  } | null;
+}) {
+  if (input?.selectedServerId) {
+    const selectedServer = await db.server.findUnique({
+      where: { id: input.selectedServerId },
+    });
+
+    if (!selectedServer) {
+      throw new Error('The selected server could not be loaded.');
+    }
+
+    const assignmentCheck = canAssignKeysToServer(selectedServer);
+    if (!assignmentCheck.allowed) {
+      throw new Error(assignmentCheck.reason);
+    }
+
+    return selectedServer;
+  }
+
+  if (input?.template?.serverId) {
     const configuredServer = await db.server.findUnique({
-      where: { id: template.serverId },
+      where: { id: input.template.serverId },
     });
 
     if (!configuredServer) {
@@ -2445,7 +2877,9 @@ async function fulfillTelegramNewAccessOrder(input: {
   telegramUserId: string;
   requestedName?: string | null;
   requestedEmail?: string | null;
-  durationMonths: number;
+  durationMonths?: number | null;
+  durationDays?: number | null;
+  selectedServerId?: string | null;
   plan: TelegramSalesPlan;
   template?: {
     id: string;
@@ -2466,7 +2900,10 @@ async function fulfillTelegramNewAccessOrder(input: {
     autoRenewDurationDays?: number | null;
   } | null;
 }) {
-  const server = await resolveTelegramProvisioningServer(input.template);
+  const server = await resolveTelegramProvisioningServer({
+    selectedServerId: input.selectedServerId,
+    template: input.template,
+  });
   const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
   const linkedUser = await resolveTelegramOrderLinkedUser({
     telegramChatId: input.telegramChatId,
@@ -2479,7 +2916,11 @@ async function fulfillTelegramNewAccessOrder(input: {
   });
   const publicSlug = await resolveGeneratedAccessSlug(keyName, input.template?.slugPrefix || null);
   const now = new Date();
-  const expiresAt = addMonths(now, input.durationMonths);
+  const expiresAt = applyTelegramOrderDuration({
+    baseDate: now,
+    durationMonths: input.durationMonths,
+    durationDays: input.durationDays,
+  });
   const dataLimitBytes = input.plan.unlimitedQuota
     ? null
     : input.plan.dataLimitGB
@@ -2549,7 +2990,8 @@ async function fulfillTelegramRenewAccessOrder(input: {
   telegramChatId: string;
   targetAccessKeyId: string;
   requestedEmail?: string | null;
-  durationMonths: number;
+  durationMonths?: number | null;
+  durationDays?: number | null;
   plan: TelegramSalesPlan;
   template?: {
     id: string;
@@ -2590,7 +3032,11 @@ async function fulfillTelegramRenewAccessOrder(input: {
       : null;
   const expiryBase =
     key.expiresAt && key.expiresAt.getTime() > Date.now() ? key.expiresAt : new Date();
-  const expiresAt = addMonths(expiryBase, input.durationMonths);
+  const expiresAt = applyTelegramOrderDuration({
+    baseDate: expiryBase,
+    durationMonths: input.durationMonths,
+    durationDays: input.durationDays,
+  });
   const now = new Date();
 
   if (dataLimitBytes) {
@@ -2667,7 +3113,7 @@ export async function approveTelegramOrder(input: {
   }
 
   try {
-    const { locale, plan, template, durationMonths } = await resolveTelegramOrderPlanContext(order);
+    const { locale, plan, template, durationMonths, durationDays } = await resolveTelegramOrderPlanContext(order);
     const ui = getTelegramUi(locale);
     const key =
       order.kind === 'RENEW'
@@ -2678,6 +3124,7 @@ export async function approveTelegramOrder(input: {
             targetAccessKeyId: order.targetAccessKeyId || '',
             requestedEmail: order.requestedEmail,
             durationMonths,
+            durationDays,
             plan,
             template,
           })
@@ -2689,6 +3136,8 @@ export async function approveTelegramOrder(input: {
             requestedName: order.requestedName,
             requestedEmail: order.requestedEmail,
             durationMonths,
+            durationDays,
+            selectedServerId: order.selectedServerId,
             plan,
             template,
           });
@@ -4761,7 +5210,12 @@ async function handleTelegramCallbackQuery(
               targetAccessKeyId: matchedKey.id,
             });
 
-            const enabledPlans = settings.plans.filter((plan) => plan.enabled);
+            const enabledPlans = await listAvailableTelegramPlansForOrder({
+              kind: 'RENEW',
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              settings,
+            });
             const lines = [
               ui.orderPlanPrompt(order.orderCode),
               `${ui.renewalTargetLabel}: <b>${escapeHtml(matchedKey.name)}</b>`,
@@ -4821,6 +5275,19 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
+            if (
+              order.kind === 'NEW' &&
+              plan.code === 'trial_1d_3gb' &&
+              !(await isEligibleForTelegramFreeTrial(chatId, callbackQuery.from.id))
+            ) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.freeTrialUnavailable,
+              );
+              return null;
+            }
+
             const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
             const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
 
@@ -4834,6 +5301,7 @@ async function handleTelegramCallbackQuery(
                   priceCurrency: plan.priceCurrency || null,
                   priceLabel: priceLabel || null,
                   templateId: plan.templateId || null,
+                  durationDays: null,
                   dataLimitBytes: null,
                   unlimitedQuota: true,
                   status: 'AWAITING_MONTHS',
@@ -4857,11 +5325,12 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            const durationMonths = plan.fixedDurationMonths ?? plan.minDurationMonths ?? 1;
+            const durationMonths = plan.fixedDurationMonths ?? plan.minDurationMonths ?? null;
+            const durationDays = plan.fixedDurationDays ?? null;
             const dataLimitBytes = plan.dataLimitGB
               ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
               : null;
-            const nextStatus = order.kind === 'NEW' ? 'AWAITING_KEY_NAME' : 'AWAITING_PAYMENT_PROOF';
+            const nextStatus = order.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
             const nextOrder = await db.telegramOrder.update({
               where: { id: order.id },
               data: {
@@ -4872,19 +5341,31 @@ async function handleTelegramCallbackQuery(
                 priceLabel: priceLabel || null,
                 templateId: plan.templateId || null,
                 durationMonths,
+                durationDays,
                 dataLimitBytes,
                 unlimitedQuota: plan.unlimitedQuota,
                 status: nextStatus,
               },
             });
 
-            if (nextStatus === 'AWAITING_KEY_NAME') {
-              await sendTelegramMessage(config.botToken, chatId, ui.orderNamePrompt, {
-                replyMarkup: buildTelegramOrderActionKeyboard({
-                  order: nextOrder,
+            if (nextStatus === 'AWAITING_SERVER_SELECTION') {
+              const servers = await listAssignableTelegramOrderServers();
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                buildTelegramServerSelectionPromptText({
+                  orderCode: nextOrder.orderCode,
                   locale,
+                  servers,
                 }),
-              });
+                {
+                  replyMarkup: buildTelegramServerSelectionKeyboard({
+                    orderId: nextOrder.id,
+                    locale,
+                    servers,
+                  }),
+                },
+              );
             } else {
               const renewalTarget = nextOrder.targetAccessKeyId
                 ? await db.accessKey.findUnique({
@@ -4901,7 +5382,9 @@ async function handleTelegramCallbackQuery(
                   orderCode: nextOrder.orderCode,
                   planSummary,
                   paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
+                  paymentMethods: listEnabledTelegramSalesPaymentMethods(settings),
                   renewalTargetName: renewalTarget?.name || null,
+                  supportLink: (await getSubscriptionDefaults()).supportLink,
                 }),
                 {
                   replyMarkup: buildTelegramOrderActionKeyboard({
@@ -4916,6 +5399,70 @@ async function handleTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
               ui.orderActionSelectedPlan(planLabel),
+            );
+            return null;
+          }
+          case 'sv': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+            if (order.status !== 'AWAITING_SERVER_SELECTION') {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidServerChoice,
+              );
+              return null;
+            }
+
+            const servers = await listAssignableTelegramOrderServers();
+            const selectedServer =
+              userOrderAction.secondary === 'auto'
+                ? null
+                : servers.find((server) => server.id === userOrderAction.secondary);
+
+            if (userOrderAction.secondary !== 'auto' && !selectedServer) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidServerChoice,
+              );
+              return null;
+            }
+
+            const nextOrder = await db.telegramOrder.update({
+              where: { id: order.id },
+              data: {
+                selectedServerId: selectedServer?.id ?? null,
+                selectedServerName: selectedServer?.name ?? null,
+                selectedServerCountryCode: selectedServer?.countryCode ?? null,
+                status: 'AWAITING_KEY_NAME',
+              },
+            });
+
+            await sendTelegramMessage(config.botToken, chatId, ui.orderNamePrompt, {
+              replyMarkup: buildTelegramOrderActionKeyboard({
+                order: nextOrder,
+                locale,
+              }),
+            });
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedServer(
+                selectedServer ? formatTelegramServerChoiceLabel(selectedServer, ui) : ui.serverAutoSelect,
+              ),
             );
             return null;
           }
@@ -4960,17 +5507,20 @@ async function handleTelegramCallbackQuery(
             await sendTelegramMessage(
               config.botToken,
               chatId,
-              buildTelegramSalesPaymentPrompt({
-                locale,
-                orderCode: order.orderCode,
-                planSummary,
-                paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
-                requestedName: order.requestedName,
-                renewalTargetName: renewalTarget?.name || null,
-              }),
-              {
-                replyMarkup: buildTelegramOrderActionKeyboard({
-                  order,
+                buildTelegramSalesPaymentPrompt({
+                  locale,
+                  orderCode: order.orderCode,
+                  planSummary,
+                  paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+                  paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
+                  selectedServerName: order.selectedServerName,
+                  requestedName: order.requestedName,
+                  renewalTargetName: renewalTarget?.name || null,
+                  supportLink: (await getSubscriptionDefaults()).supportLink,
+                }),
+                {
+                  replyMarkup: buildTelegramOrderActionKeyboard({
+                    order,
                   locale,
                 }),
               },

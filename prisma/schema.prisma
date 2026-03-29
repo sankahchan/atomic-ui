@@ -254,9 +254,13 @@ model TelegramOrder {
   priceCurrency        String?
   priceLabel           String?
   durationMonths       Int?
+  durationDays         Int?
   dataLimitBytes       BigInt?
   unlimitedQuota       Boolean  @default(false)
   templateId           String?
+  selectedServerId     String?
+  selectedServerName   String?
+  selectedServerCountryCode String?
   targetAccessKeyId    String?
   approvedAccessKeyId  String?
   paymentProofFileId   String?

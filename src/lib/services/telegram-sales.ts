@@ -12,6 +12,7 @@ import { generateRandomString } from '@/lib/utils';
 export const TELEGRAM_SALES_SETTING_KEY = 'telegram_sales';
 
 export const telegramSalesPlanCodeSchema = z.enum([
+  'trial_1d_3gb',
   '1m_150gb',
   '2m_300gb',
   '3plus_unlimited',
@@ -27,10 +28,27 @@ export const telegramSalesPlanSchema = z.object({
   priceLabel: z.string().max(120).optional().default(''),
   localizedPriceLabels: z.record(z.string(), z.string()).optional().default({}),
   templateId: z.string().optional().nullable(),
+  fixedDurationDays: z.number().int().min(1).max(365).optional().nullable(),
   fixedDurationMonths: z.number().int().min(1).max(24).optional().nullable(),
   minDurationMonths: z.number().int().min(1).max(24).optional().nullable(),
   dataLimitGB: z.number().int().positive().optional().nullable(),
   unlimitedQuota: z.boolean().default(false),
+});
+
+export const telegramSalesPaymentMethodSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1)
+    .max(32)
+    .regex(/^[a-z0-9_]+$/i),
+  enabled: z.boolean().default(true),
+  label: z.string().min(1).max(80),
+  localizedLabels: z.record(z.string(), z.string()).optional().default({}),
+  accountName: z.string().max(120).optional().default(''),
+  accountNumber: z.string().max(160).optional().default(''),
+  note: z.string().max(240).optional().default(''),
+  localizedNotes: z.record(z.string(), z.string()).optional().default({}),
 });
 
 export const telegramSalesSettingsSchema = z.object({
@@ -38,17 +56,20 @@ export const telegramSalesSettingsSchema = z.object({
   allowRenewals: z.boolean().default(true),
   paymentInstructions: z.string().max(2000).optional().default(''),
   localizedPaymentInstructions: z.record(z.string(), z.string()).optional().default({}),
+  paymentMethods: z.array(telegramSalesPaymentMethodSchema).default([]),
   plans: z.array(telegramSalesPlanSchema).default([]),
 });
 
 export type TelegramSalesPlanCode = z.infer<typeof telegramSalesPlanCodeSchema>;
 export type TelegramSalesPlan = z.infer<typeof telegramSalesPlanSchema>;
+export type TelegramSalesPaymentMethod = z.infer<typeof telegramSalesPaymentMethodSchema>;
 export type TelegramSalesSettings = z.infer<typeof telegramSalesSettingsSchema>;
 
 export const TELEGRAM_ORDER_ACTIVE_STATUSES = [
   'AWAITING_KEY_SELECTION',
   'AWAITING_PLAN',
   'AWAITING_MONTHS',
+  'AWAITING_SERVER_SELECTION',
   'AWAITING_KEY_NAME',
   'AWAITING_PAYMENT_PROOF',
   'PENDING_REVIEW',
@@ -72,6 +93,25 @@ const DEFAULT_PAYMENT_INSTRUCTIONS_MY =
 function defaultPlans(): TelegramSalesPlan[] {
   return [
     {
+      code: 'trial_1d_3gb',
+      enabled: true,
+      label: 'Free Trial / 1 Day / 3 GB',
+      localizedLabels: { my: 'Free Trial / ၁ ရက် / 3 GB' },
+      priceAmount: 0,
+      priceCurrency: 'MMK',
+      priceLabel: 'Free Trial',
+      localizedPriceLabels: {
+        en: 'Free Trial',
+        my: 'အခမဲ့ အစမ်းသုံး',
+      },
+      templateId: null,
+      fixedDurationDays: 1,
+      fixedDurationMonths: null,
+      minDurationMonths: null,
+      dataLimitGB: 3,
+      unlimitedQuota: false,
+    },
+    {
       code: '1m_150gb',
       enabled: true,
       label: '1 Month / 150 GB',
@@ -81,6 +121,7 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: 1,
       minDurationMonths: null,
       dataLimitGB: 150,
@@ -96,6 +137,7 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: 2,
       minDurationMonths: null,
       dataLimitGB: 300,
@@ -111,10 +153,46 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: null,
       minDurationMonths: 3,
       dataLimitGB: null,
       unlimitedQuota: true,
+    },
+  ];
+}
+
+function defaultPaymentMethods(): TelegramSalesPaymentMethod[] {
+  return [
+    {
+      code: 'kpay',
+      enabled: true,
+      label: 'KPay',
+      localizedLabels: { my: 'KPay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: {},
+    },
+    {
+      code: 'wavepay',
+      enabled: true,
+      label: 'Wave Pay',
+      localizedLabels: { my: 'Wave Pay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: {},
+    },
+    {
+      code: 'aya_pay',
+      enabled: true,
+      label: 'AYA Pay',
+      localizedLabels: { my: 'AYA Pay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: {},
     },
   ];
 }
@@ -128,6 +206,7 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
       en: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
       my: DEFAULT_PAYMENT_INSTRUCTIONS_MY,
     },
+    paymentMethods: defaultPaymentMethods(),
     plans: defaultPlans(),
   };
 }
@@ -141,12 +220,26 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
 
   const next = parsed.data;
   const plansByCode = new Map(next.plans.map((plan) => [plan.code, plan]));
+  const paymentMethodsByCode = new Map(next.paymentMethods.map((method) => [method.code, method]));
 
   return {
     enabled: next.enabled,
     allowRenewals: next.allowRenewals,
     paymentInstructions: next.paymentInstructions || defaults.paymentInstructions,
     localizedPaymentInstructions: normalizeLocalizedTemplateMap(next.localizedPaymentInstructions),
+    paymentMethods: defaultPaymentMethods().map((fallbackMethod) => {
+      const override = paymentMethodsByCode.get(fallbackMethod.code);
+      if (!override) {
+        return fallbackMethod;
+      }
+
+      return {
+        ...fallbackMethod,
+        ...override,
+        localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
+        localizedNotes: normalizeLocalizedTemplateMap(override.localizedNotes),
+      };
+    }),
     plans: defaults.plans.map((fallbackPlan) => {
       const override = plansByCode.get(fallbackPlan.code);
       if (!override) {
@@ -158,6 +251,10 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
         ...override,
         localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
         localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
+        fixedDurationDays:
+          typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
+            ? override.fixedDurationDays
+            : fallbackPlan.fixedDurationDays ?? null,
         priceAmount:
           typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
             ? override.priceAmount
@@ -253,6 +350,36 @@ export function resolveTelegramSalesPaymentInstructions(
       settings.paymentInstructions,
     ) || settings.paymentInstructions
   ).trim();
+}
+
+export function resolveTelegramSalesPaymentMethodLabel(
+  method: TelegramSalesPaymentMethod,
+  locale: SupportedLocale,
+) {
+  return (
+    resolveLocalizedTemplate(
+      normalizeLocalizedTemplateMap(method.localizedLabels),
+      locale,
+      method.label,
+    ) || method.label
+  ).trim();
+}
+
+export function resolveTelegramSalesPaymentMethodNote(
+  method: TelegramSalesPaymentMethod,
+  locale: SupportedLocale,
+) {
+  return (
+    resolveLocalizedTemplate(
+      normalizeLocalizedTemplateMap(method.localizedNotes),
+      locale,
+      method.note,
+    ) || method.note
+  ).trim();
+}
+
+export function listEnabledTelegramSalesPaymentMethods(settings: TelegramSalesSettings) {
+  return settings.paymentMethods.filter((method) => method.enabled);
 }
 
 export function formatTelegramSalesPlanSummary(

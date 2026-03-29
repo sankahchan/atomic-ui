@@ -192,7 +192,7 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   showLanguageSelectorOnStart: true,
 };
 
-type TelegramSalesPlanCode = '1m_150gb' | '2m_300gb' | '3plus_unlimited';
+type TelegramSalesPlanCode = 'trial_1d_3gb' | '1m_150gb' | '2m_300gb' | '3plus_unlimited';
 
 type TelegramSalesPlanForm = {
   code: TelegramSalesPlanCode;
@@ -210,10 +210,28 @@ type TelegramSalesPlanForm = {
     my: string;
   };
   templateId?: string | null;
+  fixedDurationDays?: number | null;
   fixedDurationMonths?: number | null;
   minDurationMonths?: number | null;
   dataLimitGB?: number | null;
   unlimitedQuota: boolean;
+};
+
+type TelegramSalesPaymentMethodForm = {
+  code: string;
+  enabled: boolean;
+  label: string;
+  localizedLabels: {
+    en: string;
+    my: string;
+  };
+  accountName: string;
+  accountNumber: string;
+  note: string;
+  localizedNotes: {
+    en: string;
+    my: string;
+  };
 };
 
 type TelegramSalesSettingsForm = {
@@ -224,6 +242,7 @@ type TelegramSalesSettingsForm = {
     en: string;
     my: string;
   };
+  paymentMethods: TelegramSalesPaymentMethodForm[];
   plans: TelegramSalesPlanForm[];
 };
 
@@ -244,9 +263,13 @@ type TelegramOrderRow = {
   priceCurrency?: string | null;
   priceLabel?: string | null;
   durationMonths?: number | null;
+  durationDays?: number | null;
   dataLimitBytes?: string | null;
   unlimitedQuota: boolean;
   templateId?: string | null;
+  selectedServerId?: string | null;
+  selectedServerName?: string | null;
+  selectedServerCountryCode?: string | null;
   targetAccessKeyId?: string | null;
   targetAccessKeyName?: string | null;
   approvedAccessKeyId?: string | null;
@@ -312,7 +335,55 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
     en: 'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
     my: 'ငွေပေးချေပြီးပါက payment screenshot ကို ဤနေရာတွင် photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။',
   },
+  paymentMethods: [
+    {
+      code: 'kpay',
+      enabled: true,
+      label: 'KPay',
+      localizedLabels: { en: 'KPay', my: 'KPay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: { en: '', my: '' },
+    },
+    {
+      code: 'wavepay',
+      enabled: true,
+      label: 'Wave Pay',
+      localizedLabels: { en: 'Wave Pay', my: 'Wave Pay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: { en: '', my: '' },
+    },
+    {
+      code: 'aya_pay',
+      enabled: true,
+      label: 'AYA Pay',
+      localizedLabels: { en: 'AYA Pay', my: 'AYA Pay' },
+      accountName: '',
+      accountNumber: '',
+      note: '',
+      localizedNotes: { en: '', my: '' },
+    },
+  ],
   plans: [
+    {
+      code: 'trial_1d_3gb',
+      enabled: true,
+      label: 'Free Trial / 1 Day / 3 GB',
+      localizedLabels: { en: 'Free Trial / 1 Day / 3 GB', my: 'Free Trial / ၁ ရက် / 3 GB' },
+      priceAmount: '0',
+      priceCurrency: 'MMK',
+      priceLabel: 'Free Trial',
+      localizedPriceLabels: { en: 'Free Trial', my: 'အခမဲ့ အစမ်းသုံး' },
+      templateId: null,
+      fixedDurationDays: 1,
+      fixedDurationMonths: null,
+      minDurationMonths: null,
+      dataLimitGB: 3,
+      unlimitedQuota: false,
+    },
     {
       code: '1m_150gb',
       enabled: true,
@@ -323,6 +394,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: 1,
       minDurationMonths: null,
       dataLimitGB: 150,
@@ -338,6 +410,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: 2,
       minDurationMonths: null,
       dataLimitGB: 300,
@@ -353,6 +426,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
+      fixedDurationDays: null,
       fixedDurationMonths: null,
       minDurationMonths: 3,
       dataLimitGB: null,
@@ -1760,6 +1834,15 @@ function TelegramSalesWorkflowCard() {
     paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
     englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
     burmeseInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
+    paymentMethodsTitle: isMyanmar ? 'ငွေပေးချေမှု အကောင့်များ' : 'Payment methods',
+    paymentMethodsDesc: isMyanmar
+      ? 'KPay, Wave Pay, AYA Pay စသည့် ငွေပေးချေမှု account အချက်အလက်များကို bot မှ ပြသပါမည်။'
+      : 'Show KPay, Wave Pay, AYA Pay, and other payment account details in the bot before users upload screenshots.',
+    paymentMethodLabel: isMyanmar ? 'Payment method' : 'Payment method',
+    accountName: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
+    accountNumber: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
+    note: isMyanmar ? 'မှတ်ချက်' : 'Note',
+    burmeseNote: isMyanmar ? 'မြန်မာ မှတ်ချက်' : 'Burmese note',
     planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
     planLabel: isMyanmar ? 'Plan အမည်' : 'Plan label',
     burmeseLabel: isMyanmar ? 'မြန်မာ label' : 'Burmese label',
@@ -1785,6 +1868,8 @@ function TelegramSalesWorkflowCard() {
     disabledShort: isMyanmar ? 'ပိတ်ထား' : 'Disabled',
     none: isMyanmar ? 'မရှိ' : 'None',
     behavior: isMyanmar ? 'Plan behavior' : 'Plan behavior',
+    duration: isMyanmar ? 'သက်တမ်း' : 'Duration',
+    days: (count: number) => (isMyanmar ? `${count} ရက်` : `${count} day${count === 1 ? '' : 's'}`),
     enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
     disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
     unlimited: isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
@@ -1823,6 +1908,7 @@ function TelegramSalesWorkflowCard() {
     lastFulfilled: isMyanmar ? 'နောက်ဆုံး fulfilled' : 'Last fulfilled',
     totalOrders: isMyanmar ? 'စုစုပေါင်း orders' : 'Total orders',
     proofCaption: isMyanmar ? 'Proof caption' : 'Proof caption',
+    selectedServer: isMyanmar ? 'ရွေးထားသော server' : 'Selected server',
     reviewContextHint: isMyanmar
       ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
       : 'Review customer context and linked keys before approving.',
@@ -1937,6 +2023,23 @@ function TelegramSalesWorkflowCard() {
           settingsQuery.data.localizedPaymentInstructions?.my ||
           DEFAULT_TELEGRAM_SALES_SETTINGS.localizedPaymentInstructions.my,
       },
+      paymentMethods: DEFAULT_TELEGRAM_SALES_SETTINGS.paymentMethods.map((fallbackMethod) => {
+        const override = settingsQuery.data.paymentMethods?.find(
+          (method) => method.code === fallbackMethod.code,
+        );
+        return {
+          ...fallbackMethod,
+          ...override,
+          localizedLabels: {
+            en: override?.localizedLabels?.en || override?.label || fallbackMethod.localizedLabels.en,
+            my: override?.localizedLabels?.my || fallbackMethod.localizedLabels.my,
+          },
+          localizedNotes: {
+            en: override?.localizedNotes?.en || override?.note || fallbackMethod.localizedNotes.en,
+            my: override?.localizedNotes?.my || fallbackMethod.localizedNotes.my,
+          },
+        };
+      }),
       plans: DEFAULT_TELEGRAM_SALES_SETTINGS.plans.map((fallbackPlan) => {
         const override = settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code);
         return {
@@ -1959,6 +2062,7 @@ function TelegramSalesWorkflowCard() {
             my: override?.localizedPriceLabels?.my || fallbackPlan.localizedPriceLabels.my,
           },
           templateId: override?.templateId ?? fallbackPlan.templateId,
+          fixedDurationDays: override?.fixedDurationDays ?? fallbackPlan.fixedDurationDays ?? null,
         };
       }),
     });
@@ -2032,6 +2136,18 @@ function TelegramSalesWorkflowCard() {
     }));
   };
 
+  const updatePaymentMethod = (
+    methodCode: string,
+    updater: (method: TelegramSalesPaymentMethodForm) => TelegramSalesPaymentMethodForm,
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      paymentMethods: prev.paymentMethods.map((method) =>
+        method.code === methodCode ? updater(method) : method,
+      ),
+    }));
+  };
+
   const formatAutomaticPricePreview = (plan: TelegramSalesPlanForm) => {
     const trimmedAmount = plan.priceAmount.trim();
     if (!trimmedAmount) {
@@ -2060,6 +2176,22 @@ function TelegramSalesWorkflowCard() {
         en: form.localizedPaymentInstructions.en.trim(),
         my: form.localizedPaymentInstructions.my.trim(),
       },
+      paymentMethods: form.paymentMethods.map((method) => ({
+        code: method.code,
+        enabled: method.enabled,
+        label: method.label.trim(),
+        localizedLabels: {
+          en: method.localizedLabels.en.trim(),
+          my: method.localizedLabels.my.trim(),
+        },
+        accountName: method.accountName.trim(),
+        accountNumber: method.accountNumber.trim(),
+        note: method.note.trim(),
+        localizedNotes: {
+          en: method.localizedNotes.en.trim(),
+          my: method.localizedNotes.my.trim(),
+        },
+      })),
       plans: form.plans.map((plan) => ({
         code: plan.code,
         enabled: plan.enabled,
@@ -2083,6 +2215,7 @@ function TelegramSalesWorkflowCard() {
           my: plan.localizedPriceLabels.my.trim(),
         },
         templateId: plan.templateId || null,
+        fixedDurationDays: plan.fixedDurationDays ?? null,
         fixedDurationMonths: plan.fixedDurationMonths ?? null,
         minDurationMonths: plan.minDurationMonths ?? null,
         dataLimitGB: plan.dataLimitGB ?? null,
@@ -2193,6 +2326,130 @@ function TelegramSalesWorkflowCard() {
 
           <div className="space-y-3">
             <div className="space-y-1">
+              <p className="text-sm font-medium">{salesUi.paymentMethodsTitle}</p>
+              <p className="text-xs text-muted-foreground">{salesUi.paymentMethodsDesc}</p>
+            </div>
+            <div className="space-y-3">
+              {form.paymentMethods.map((method) => (
+                <div key={method.code} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{method.label}</p>
+                      <p className="text-xs text-muted-foreground">{method.code}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={method.enabled ? 'default' : 'secondary'}>
+                        {method.enabled ? salesUi.enabled : salesUi.disabled}
+                      </Badge>
+                      <Switch
+                        checked={method.enabled}
+                        onCheckedChange={(checked) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            enabled: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>{salesUi.paymentMethodLabel}</Label>
+                      <Input
+                        value={method.label}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            label: event.target.value,
+                            localizedLabels: {
+                              ...current.localizedLabels,
+                              en: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.burmeseLabel}</Label>
+                      <Input
+                        value={method.localizedLabels.my}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            localizedLabels: {
+                              ...current.localizedLabels,
+                              my: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.accountName}</Label>
+                      <Input
+                        value={method.accountName}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            accountName: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.accountNumber}</Label>
+                      <Input
+                        value={method.accountNumber}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            accountNumber: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.note}</Label>
+                      <Textarea
+                        value={method.note}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            note: event.target.value,
+                            localizedNotes: {
+                              ...current.localizedNotes,
+                              en: event.target.value,
+                            },
+                          }))
+                        }
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.burmeseNote}</Label>
+                      <Textarea
+                        value={method.localizedNotes.my}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            localizedNotes: {
+                              ...current.localizedNotes,
+                              my: event.target.value,
+                            },
+                          }))
+                        }
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
               <p className="text-sm font-medium">{salesUi.planConfig}</p>
               <p className="text-xs text-muted-foreground">
                 {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, ဈေးနှုန်း, custom label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, prices, custom labels, and templates used by the Telegram bot.'}
@@ -2205,7 +2462,9 @@ function TelegramSalesWorkflowCard() {
                     <div>
                       <p className="text-sm font-semibold">{plan.label}</p>
                       <p className="text-xs text-muted-foreground">
-                        {plan.fixedDurationMonths
+                        {plan.fixedDurationDays
+                          ? `${salesUi.days(plan.fixedDurationDays)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
+                          : plan.fixedDurationMonths
                           ? `${salesUi.months(plan.fixedDurationMonths)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
                           : `${salesUi.minMonths(plan.minDurationMonths ?? 3)} • ${salesUi.unlimited}`}
                       </p>
@@ -2537,6 +2796,12 @@ function TelegramSalesWorkflowCard() {
                           .filter(Boolean)
                           .join(' • ')}
                       </p>
+                      {order.selectedServerName ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {salesUi.selectedServer}: {order.selectedServerName}
+                          {order.selectedServerCountryCode ? ` (${order.selectedServerCountryCode})` : ''}
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-xs text-muted-foreground">
                         {salesUi.orderStatusCommand}: <code>/order {order.orderCode}</code>
                       </p>
@@ -2697,6 +2962,12 @@ function TelegramSalesWorkflowCard() {
                   <p className="text-xs text-muted-foreground">
                     {selectedOrder.requestedName || selectedOrder.targetAccessKeyName || '—'}
                   </p>
+                  {selectedOrder.selectedServerName ? (
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.selectedServer}: {selectedOrder.selectedServerName}
+                      {selectedOrder.selectedServerCountryCode ? ` (${selectedOrder.selectedServerCountryCode})` : ''}
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <div className="rounded-xl border border-border/50 p-3">
