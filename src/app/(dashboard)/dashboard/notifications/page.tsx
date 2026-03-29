@@ -237,6 +237,7 @@ type TelegramSalesPaymentMethodForm = {
 type TelegramSalesSettingsForm = {
   enabled: boolean;
   allowRenewals: boolean;
+  supportLink: string;
   paymentInstructions: string;
   localizedPaymentInstructions: {
     en: string;
@@ -329,6 +330,7 @@ type TelegramOrderRow = {
 const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
   allowRenewals: true,
+  supportLink: '',
   paymentInstructions:
     'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
   localizedPaymentInstructions: {
@@ -1831,6 +1833,10 @@ function TelegramSalesWorkflowCard() {
       : 'Let users pick a plan, upload payment proof, and wait for admin approval before a key is delivered.',
     enableOrders: isMyanmar ? 'Telegram order flow ကို ဖွင့်မည်' : 'Enable Telegram order flow',
     allowRenewals: isMyanmar ? 'Renewal order များကို ခွင့်ပြုမည်' : 'Allow renewal orders',
+    supportLink: isMyanmar ? 'Telegram support link' : 'Telegram support link',
+    supportLinkDesc: isMyanmar
+      ? 'Bot အတွင်း /support command နှင့် payment prompt များတွင် ဤ link ကို အသုံးပြုမည်။ မထည့်ပါက Subscription Page support link ကို fallback အဖြစ် သုံးမည်။'
+      : 'Use this link for the bot /support command and payment prompts. If left empty, the Subscription Page support link is used as a fallback.',
     paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
     englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
     burmeseInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
@@ -2013,6 +2019,7 @@ function TelegramSalesWorkflowCard() {
     setForm({
       enabled: settingsQuery.data.enabled ?? false,
       allowRenewals: settingsQuery.data.allowRenewals ?? true,
+      supportLink: settingsQuery.data.supportLink || DEFAULT_TELEGRAM_SALES_SETTINGS.supportLink,
       paymentInstructions: settingsQuery.data.paymentInstructions || DEFAULT_TELEGRAM_SALES_SETTINGS.paymentInstructions,
       localizedPaymentInstructions: {
         en:
@@ -2171,6 +2178,7 @@ function TelegramSalesWorkflowCard() {
     saveConfigMutation.mutate({
       enabled: form.enabled,
       allowRenewals: form.allowRenewals,
+      supportLink: form.supportLink.trim(),
       paymentInstructions: form.paymentInstructions.trim(),
       localizedPaymentInstructions: {
         en: form.localizedPaymentInstructions.en.trim(),
@@ -2286,6 +2294,21 @@ function TelegramSalesWorkflowCard() {
                 onCheckedChange={(checked) => setForm((prev) => ({ ...prev, allowRenewals: checked }))}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{salesUi.supportLink}</Label>
+            <Input
+              value={form.supportLink}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  supportLink: event.target.value,
+                }))
+              }
+              placeholder="https://t.me/your_support"
+            />
+            <p className="text-xs text-muted-foreground">{salesUi.supportLinkDesc}</p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">

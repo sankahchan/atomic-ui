@@ -54,6 +54,7 @@ export const telegramSalesPaymentMethodSchema = z.object({
 export const telegramSalesSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   allowRenewals: z.boolean().default(true),
+  supportLink: z.string().trim().max(500).optional().default(''),
   paymentInstructions: z.string().max(2000).optional().default(''),
   localizedPaymentInstructions: z.record(z.string(), z.string()).optional().default({}),
   paymentMethods: z.array(telegramSalesPaymentMethodSchema).default([]),
@@ -201,6 +202,7 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
   return {
     enabled: false,
     allowRenewals: true,
+    supportLink: '',
     paymentInstructions: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
     localizedPaymentInstructions: {
       en: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
@@ -225,6 +227,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
   return {
     enabled: next.enabled,
     allowRenewals: next.allowRenewals,
+    supportLink: next.supportLink?.trim() || '',
     paymentInstructions: next.paymentInstructions || defaults.paymentInstructions,
     localizedPaymentInstructions: normalizeLocalizedTemplateMap(next.localizedPaymentInstructions),
     paymentMethods: defaultPaymentMethods().map((fallbackMethod) => {

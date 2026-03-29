@@ -827,6 +827,15 @@ async function getSubscriptionDefaults() {
   };
 }
 
+async function getTelegramSupportLink() {
+  const [salesSettings, defaults] = await Promise.all([
+    getTelegramSalesSettings(),
+    getSubscriptionDefaults(),
+  ]);
+
+  return salesSettings.supportLink?.trim() || defaults.supportLink || null;
+}
+
 async function getTelegramBotUsername(botToken: string, configuredUsername?: string | null) {
   if (configuredUsername && configuredUsername.trim()) {
     return configuredUsername.replace(/^@/, '').trim();
@@ -1938,7 +1947,7 @@ async function handleTelegramOrderTextMessage(input: {
         paymentInstructions,
         paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
         renewalTargetName: renewalTarget?.name || null,
-        supportLink: defaults.supportLink,
+        supportLink: await getTelegramSupportLink(),
       });
     }
     case 'AWAITING_MONTHS': {
@@ -1992,7 +2001,7 @@ async function handleTelegramOrderTextMessage(input: {
         paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
         paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
         renewalTargetName: renewalTarget?.name || null,
-        supportLink: defaults.supportLink,
+        supportLink: await getTelegramSupportLink(),
       });
     }
     case 'AWAITING_SERVER_SELECTION': {
@@ -2157,7 +2166,7 @@ async function handleTelegramOrderTextMessage(input: {
         paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
         selectedServerName: updatedOrder.selectedServerName,
         requestedName: trimmed,
-        supportLink: defaults.supportLink,
+        supportLink: await getTelegramSupportLink(),
       });
     }
     case 'AWAITING_PAYMENT_PROOF':
@@ -3480,7 +3489,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
       locale,
       defaults.welcomeMessage ?? undefined,
     );
-  const supportLink = defaults.supportLink;
+  const supportLink = await getTelegramSupportLink();
   const reasonTitle = ui.accessReasonTitle(input.reason);
 
   const lines = [
@@ -3609,7 +3618,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       locale,
       defaults.welcomeMessage ?? undefined,
     );
-  const supportLink = defaults.supportLink;
+  const supportLink = await getTelegramSupportLink();
   const attachedCount = key.accessKeys.length;
   const uniqueServers = Array.from(
     new Set(
@@ -3749,7 +3758,8 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     return null;
   }
 
-  const { supportLink, defaultLanguage } = await getSubscriptionDefaults();
+  const { defaultLanguage } = await getSubscriptionDefaults();
+  const supportLink = await getTelegramSupportLink();
   const locale = await resolveTelegramLocaleForRecipient({
     telegramUserId: key.telegramId || null,
     telegramChatId: destinationChatId,
@@ -3878,7 +3888,7 @@ export async function sendAccessKeyRenewalReminder(input: {
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'renewal_reminder', lang: locale })
     : buildSharePageUrl(token, { source: input.source || 'renewal_reminder', lang: locale });
   const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'renewal_reminder' });
-  const supportLink = defaults.supportLink;
+  const supportLink = await getTelegramSupportLink();
 
   const lines = locale === 'my'
     ? [
@@ -4716,7 +4726,7 @@ async function handleSubscriptionLinksCommand(
 
 async function handleSupportCommand(locale: SupportedLocale): Promise<string> {
   const ui = getTelegramUi(locale);
-  const { supportLink } = await getSubscriptionDefaults();
+  const supportLink = await getTelegramSupportLink();
 
   if (!supportLink) {
     return ui.noSupportLink;
@@ -5384,7 +5394,7 @@ async function handleTelegramCallbackQuery(
                   paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
                   paymentMethods: listEnabledTelegramSalesPaymentMethods(settings),
                   renewalTargetName: renewalTarget?.name || null,
-                  supportLink: (await getSubscriptionDefaults()).supportLink,
+                  supportLink: await getTelegramSupportLink(),
                 }),
                 {
                   replyMarkup: buildTelegramOrderActionKeyboard({
@@ -5516,7 +5526,7 @@ async function handleTelegramCallbackQuery(
                   selectedServerName: order.selectedServerName,
                   requestedName: order.requestedName,
                   renewalTargetName: renewalTarget?.name || null,
-                  supportLink: (await getSubscriptionDefaults()).supportLink,
+                  supportLink: await getTelegramSupportLink(),
                 }),
                 {
                   replyMarkup: buildTelegramOrderActionKeyboard({
