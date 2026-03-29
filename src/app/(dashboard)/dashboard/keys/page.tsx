@@ -35,6 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
+import { withBasePath } from '@/lib/base-path';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes, formatRelativeTime, formatDateTime, getCountryFlag } from '@/lib/utils';
@@ -3345,7 +3346,7 @@ export default function KeysPage() {
       if (statusFilter) params.set('status', statusFilter);
       params.set('format', format);
 
-      const response = await fetch(`/api/export-keys?${params.toString()}`);
+      const response = await fetch(withBasePath(`/api/export-keys?${params.toString()}`));
       if (!response.ok) throw new Error(t('keys.toast.export_failed'));
 
       const blob = await response.blob();

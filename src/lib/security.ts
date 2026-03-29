@@ -52,7 +52,9 @@ function getGeoIpDataDirCandidates() {
     return [
         process.env.GEODATADIR,
         path.join(process.cwd(), 'node_modules', 'geoip-lite', 'data'),
+        path.join(process.cwd(), '.next', 'server', 'data'),
         path.join(process.cwd(), '.next', 'standalone', 'node_modules', 'geoip-lite', 'data'),
+        path.join(process.cwd(), '.next', 'standalone', '.next', 'server', 'data'),
     ].filter((candidate): candidate is string => Boolean(candidate));
 }
 

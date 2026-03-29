@@ -22,6 +22,7 @@ if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   mkdir -p .next/standalone/.next
   rm -rf .next/standalone/.next/static .next/standalone/public
   rm -rf .next/standalone/node_modules/@prisma .next/standalone/node_modules/.prisma
+  rm -rf .next/standalone/node_modules/geoip-lite/data .next/standalone/.next/server/data
   cp -r .next/static .next/standalone/.next/
   if [[ -d node_modules/@prisma ]]; then
     mkdir -p .next/standalone/node_modules
@@ -30,6 +31,11 @@ if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   if [[ -d node_modules/.prisma ]]; then
     mkdir -p .next/standalone/node_modules
     cp -r node_modules/.prisma .next/standalone/node_modules/
+  fi
+  if [[ -d node_modules/geoip-lite/data ]]; then
+    mkdir -p .next/standalone/node_modules/geoip-lite .next/standalone/.next/server
+    cp -r node_modules/geoip-lite/data .next/standalone/node_modules/geoip-lite/
+    cp -r node_modules/geoip-lite/data .next/standalone/.next/server/
   fi
   if [[ -d public ]]; then
     cp -r public .next/standalone/

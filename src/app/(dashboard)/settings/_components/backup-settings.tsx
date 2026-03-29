@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, Upload, AlertTriangle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,7 +28,7 @@ export function BackupSettings() {
     const [isRestoring, setIsRestoring] = useState(false);
 
     const handleDownload = () => {
-        window.location.href = '/api/backup';
+        window.location.href = withBasePath('/api/backup');
         toast({
             title: "Backup Started",
             description: "Your system backup download should begin shortly.",
@@ -42,7 +43,7 @@ export function BackupSettings() {
         formData.append('backup', file);
 
         try {
-            const res = await fetch('/api/restore', {
+            const res = await fetch(withBasePath('/api/restore'), {
                 method: 'POST',
                 body: formData,
             });

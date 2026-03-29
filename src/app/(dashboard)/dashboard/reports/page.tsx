@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { withBasePath } from '@/lib/base-path';
 import { formatBytes, formatDateTime } from '@/lib/utils';
 import {
   Table,
@@ -258,21 +259,21 @@ function ReportDetailDialog({
             <div className="flex gap-2 pt-2">
               <Button
                 variant="outline"
-                onClick={() => window.open(`/api/reports/download?id=${reportId}&format=csv`, '_blank')}
+                onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=csv`), '_blank')}
               >
                 <Download className="w-4 h-4 mr-2" />
                 Download CSV
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open(`/api/reports/download?id=${reportId}&format=json`, '_blank')}
+                onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=json`), '_blank')}
               >
                 <FileJson className="w-4 h-4 mr-2" />
                 Download JSON
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open(`/api/reports/download?id=${reportId}&format=pdf`, '_blank')}
+                onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=pdf`), '_blank')}
               >
                 <FileDown className="w-4 h-4 mr-2" />
                 Download PDF
@@ -809,14 +810,14 @@ export default function ReportsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/api/reports/download?id=${run.report?.id}&format=csv`, '_blank')}
+                            onClick={() => window.open(withBasePath(`/api/reports/download?id=${run.report?.id}&format=csv`), '_blank')}
                           >
                             CSV
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/api/reports/download?id=${run.report?.id}&format=pdf`, '_blank')}
+                            onClick={() => window.open(withBasePath(`/api/reports/download?id=${run.report?.id}&format=pdf`), '_blank')}
                           >
                             PDF
                           </Button>
@@ -940,7 +941,7 @@ export default function ReportsPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => window.open(`/api/reports/download?id=${report.id}&format=csv`, '_blank')}
+                        onClick={() => window.open(withBasePath(`/api/reports/download?id=${report.id}&format=csv`), '_blank')}
                         disabled={report.status !== 'READY'}
                       >
                         <Download className="mr-2 h-4 w-4" />
@@ -948,7 +949,7 @@ export default function ReportsPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => window.open(`/api/reports/download?id=${report.id}&format=pdf`, '_blank')}
+                        onClick={() => window.open(withBasePath(`/api/reports/download?id=${report.id}&format=pdf`), '_blank')}
                         disabled={report.status !== 'READY'}
                       >
                         <FileDown className="mr-2 h-4 w-4" />
@@ -1037,7 +1038,7 @@ export default function ReportsPage() {
                               size="sm"
                               onClick={() =>
                                 window.open(
-                                  `/api/reports/download?id=${report.id}&format=csv`,
+                                  withBasePath(`/api/reports/download?id=${report.id}&format=csv`),
                                   '_blank'
                                 )
                               }
@@ -1050,7 +1051,7 @@ export default function ReportsPage() {
                               size="sm"
                               onClick={() =>
                                 window.open(
-                                  `/api/reports/download?id=${report.id}&format=pdf`,
+                                  withBasePath(`/api/reports/download?id=${report.id}&format=pdf`),
                                   '_blank'
                                 )
                               }

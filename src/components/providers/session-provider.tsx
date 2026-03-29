@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { getBasePath, withBasePath } from '@/lib/base-path';
 
 interface SessionContextType {
     lastActivity: number;
@@ -22,7 +23,7 @@ const EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
 
 function normalizePathname(pathname: string | null) {
     const currentPath = pathname || '/';
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const basePath = getBasePath();
 
     if (!basePath) {
         return currentPath;
@@ -67,10 +68,8 @@ export function SessionProvider({
         if (isLoggingOutRef.current) return;
         isLoggingOutRef.current = true;
 
-        // Clear any local storage auth tokens if you use them
-        // Call logout endpoint
-        fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
-            router.push('/login?reason=timeout');
+        fetch(withBasePath('/api/auth/logout'), { method: 'POST' }).finally(() => {
+            router.push(withBasePath('/login?reason=timeout'));
             toast({
                 title: "Session Expired",
                 description: "You have been logged out due to inactivity.",
@@ -89,10 +88,11 @@ export function SessionProvider({
             const now = Date.now();
             const timeSinceLastActivity = now - lastActivityRef.current;
             const timeoutMs = timeoutMinutes * 60 * 1000;
+            const normalizedPathname = normalizePathname(pathname);
 
             if (timeSinceLastActivity > timeoutMs) {
                 // Only logout if we are not already on the login page
-                if (pathname !== '/login') {
+                if (normalizedPathname !== '/login') {
                     logout();
                 }
             }

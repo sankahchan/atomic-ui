@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { withBasePath } from '@/lib/base-path';
 import { cn } from '@/lib/utils';
 import {
     Activity,
@@ -58,7 +59,7 @@ export function ServerHealthMonitor() {
     const handleManualCheck = async (serverId: string) => {
         setCheckingServerId(serverId);
         try {
-            const response = await fetch(`/api/health-check?serverId=${encodeURIComponent(serverId)}`, {
+            const response = await fetch(withBasePath(`/api/health-check?serverId=${encodeURIComponent(serverId)}`), {
                 method: 'POST',
             });
 

@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { withBasePath } from '@/lib/base-path';
 import { BackButton } from '@/components/ui/back-button';
 import { settingsShortcutItems } from '@/components/layout/dashboard-nav';
 import { cn } from '@/lib/utils';
@@ -586,7 +587,7 @@ export default function SettingsPage() {
   };
 
   const handleDownloadBackup = (filename: string) => {
-    window.open(`/api/backup/download?filename=${filename}`, '_blank');
+    window.open(withBasePath(`/api/backup/download?filename=${filename}`), '_blank');
   };
 
   const handleVerifyBackup = (filename: string) => {

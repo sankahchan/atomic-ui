@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { withBasePath } from '@/lib/base-path';
 
 // ─────────────────────────────────────────────
 // Types
@@ -156,7 +157,7 @@ export default function StatusPage() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/health-check');
+      const res = await fetch(withBasePath('/api/health-check'));
       if (!res.ok) throw new Error('Failed to fetch status');
       const json = await res.json();
       setData(json);

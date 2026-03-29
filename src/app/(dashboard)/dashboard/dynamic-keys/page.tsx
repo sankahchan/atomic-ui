@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
+import { withBasePath } from '@/lib/base-path';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { cn, formatBytes, formatRelativeTime } from '@/lib/utils';
 import { SegmentedUsageBarCompact } from '@/components/ui/segmented-usage-bar';
@@ -2424,7 +2425,7 @@ export default function DynamicKeysPage() {
       if (typeFilter) params.set('type', typeFilter);
       params.set('format', format);
 
-      const response = await fetch(`/api/export-dynamic-keys?${params.toString()}`);
+      const response = await fetch(withBasePath(`/api/export-dynamic-keys?${params.toString()}`));
       if (!response.ok) throw new Error(t('dynamic_keys.msg.export_failed'));
 
       const blob = await response.blob();
