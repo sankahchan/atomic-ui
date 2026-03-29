@@ -270,12 +270,12 @@ function TrafficOverviewPanel({
   compact?: boolean;
   fillHeight?: boolean;
 }) {
-  const chartHeight = compact ? (fillHeight ? 168 : 156) : 238;
+  const chartHeight = compact ? (fillHeight ? 340 : 156) : 238;
 
   return (
     <Card className={cn(
       'overflow-hidden border-white/45 bg-white/65 dark:border-cyan-400/18 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.1),transparent_24%),linear-gradient(145deg,rgba(4,10,24,0.96),rgba(4,11,24,0.88))] dark:shadow-[0_28px_72px_rgba(1,6,20,0.56),0_0_0_1px_rgba(34,211,238,0.05),inset_0_1px_0_rgba(125,211,252,0.06)]',
-      compact && fillHeight && 'flex flex-1 flex-col'
+      compact && fillHeight && 'flex min-h-[36rem] flex-1 flex-col'
     )}>
       <CardHeader className={cn(compact ? 'pb-2' : 'pb-4')}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -352,7 +352,7 @@ function TrafficOverviewPanel({
           <div className={cn(
             'rounded-[1.6rem] border border-border/60 bg-background/45 dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.1),transparent_26%),linear-gradient(180deg,rgba(4,11,23,0.88),rgba(4,10,21,0.78))]',
             compact ? 'p-2.5' : 'p-3',
-            compact && fillHeight && 'flex flex-1 flex-col'
+            compact && fillHeight && 'flex flex-1 flex-col justify-center'
           )}>
             <div style={{ height: chartHeight }}>
               <TrafficChart data={trafficHistory} type="area" height={chartHeight} color="rgba(34,211,238,0.95)" />
@@ -660,7 +660,10 @@ function ServerStatusCard({
   const visibleServers = compact ? serverStatus?.slice(0, 4) : serverStatus?.slice(0, 5);
 
   return (
-    <Card className="self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
+    <Card className={cn(
+      'self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]',
+      compact && 'h-full min-h-[19rem]'
+    )}>
       <CardHeader className={cn(compact ? 'pb-2' : 'pb-3')}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -724,7 +727,10 @@ function AlertsActivityCard({
     Boolean(recentKeys && recentKeys.length > 0);
 
   return (
-    <Card className="self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]">
+    <Card className={cn(
+      'self-start dark:border-cyan-400/14 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(4,11,24,0.95),rgba(5,12,25,0.84))] dark:shadow-[0_24px_60px_rgba(1,6,20,0.42)]',
+      compact && 'h-full min-h-[19rem]'
+    )}>
       <CardHeader className={cn(compact ? 'pb-2' : 'pb-3')}>
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
@@ -805,7 +811,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 lg:space-y-8">
         <div className="ops-hero animate-pulse">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_380px]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_360px]">
             <div className="space-y-4">
               <div className="h-6 w-40 rounded-full bg-muted" />
               <div className="h-12 w-72 rounded-2xl bg-muted" />
@@ -820,7 +826,12 @@ export default function DashboardPage() {
                     <div key={index} className="h-24 rounded-[1.35rem] bg-background/70" />
                   ))}
                 </div>
-                <div className="mt-4 h-[220px] rounded-[1.6rem] bg-background/70" />
+                <div className="mt-4 h-[400px] rounded-[1.6rem] bg-background/70" />
+              </div>
+              <div className="grid gap-6 xl:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="h-72 rounded-[1.75rem] bg-muted" />
+                ))}
               </div>
             </div>
             <div className="space-y-4">
@@ -828,7 +839,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        <div className="grid gap-6 xl:grid-cols-2 xl:auto-rows-fr">
+        <div className="grid gap-6 md:grid-cols-2 xl:hidden">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="h-72 rounded-[1.75rem] bg-muted animate-pulse" />
           ))}
@@ -1022,7 +1033,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="hidden xl:grid xl:gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
+        <section className="hidden xl:grid xl:grid-cols-[minmax(0,1.6fr)_360px] xl:gap-6">
           <div className="ops-showcase flex self-start flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-4">
@@ -1102,7 +1113,24 @@ export default function DashboardPage() {
               trafficLoading={trafficLoading}
               trafficHistory={trafficHistory}
               compact
+              fillHeight
             />
+
+            <div className="grid items-stretch gap-6 xl:grid-cols-2">
+              <ServerStatusCard
+                t={t}
+                serverStatus={serverStatus}
+                serversLoading={serversLoading}
+                compact
+              />
+              <AlertsActivityCard
+                t={t}
+                tf={tf}
+                stats={stats}
+                activity={activity}
+                compact
+              />
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -1195,22 +1223,6 @@ export default function DashboardPage() {
               <KeyOperationsSummary stats={stats} t={t} embedded />
             </div>
           </div>
-        </section>
-
-        <section className="hidden xl:grid xl:grid-cols-2 xl:gap-6">
-          <ServerStatusCard
-            t={t}
-            serverStatus={serverStatus}
-            serversLoading={serversLoading}
-            compact
-          />
-          <AlertsActivityCard
-            t={t}
-            tf={tf}
-            stats={stats}
-            activity={activity}
-            compact
-          />
         </section>
 
         <section className="grid gap-6 md:grid-cols-2 xl:hidden">
