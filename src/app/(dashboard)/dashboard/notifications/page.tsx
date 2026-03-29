@@ -8,7 +8,7 @@
  */
 
 import { keepPreviousData } from '@tanstack/react-query';
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1087,9 +1087,9 @@ function TelegramBotSetupCard() {
             <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
               <p className="text-sm font-medium">{telegramUi.commandSurface}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {telegramUi.userCommands}: <code>/start</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
-                <code>/usage</code>, <code>/server</code>, <code>/renew</code>, <code>/support</code>,{' '}
-                <code>/language</code>
+                {telegramUi.userCommands}: <code>/start</code>, <code>/buy</code>, <code>/renew</code>,{' '}
+                <code>/orders</code>, <code>/order</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
+                <code>/usage</code>, <code>/server</code>, <code>/support</code>, <code>/language</code>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
@@ -1735,6 +1735,10 @@ function TelegramSalesWorkflowCard() {
       placeholderData: keepPreviousData,
     },
   );
+  const templatesById = useMemo(
+    () => new Map((templatesQuery.data || []).map((template) => [template.id, template])),
+    [templatesQuery.data],
+  );
 
   const salesUi = {
     title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
@@ -1753,6 +1757,20 @@ function TelegramSalesWorkflowCard() {
     burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
     template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
     noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
+    noTemplateSelected: isMyanmar ? 'ဤ plan အတွက် template မရွေးထားသေးပါ။' : 'No template is selected for this plan yet.',
+    templateMissing: isMyanmar ? 'ရွေးထားသော template ကို မတွေ့ပါ။' : 'The selected template could not be found.',
+    templateSummary: isMyanmar ? 'Template summary' : 'Template summary',
+    server: isMyanmar ? 'Server' : 'Server',
+    autoSelectServer: isMyanmar ? 'Auto-select' : 'Auto-select',
+    method: isMyanmar ? 'Method' : 'Method',
+    slugRule: isMyanmar ? 'Slug rule' : 'Slug rule',
+    theme: isMyanmar ? 'Theme' : 'Theme',
+    shareDelivery: isMyanmar ? 'Share page' : 'Share page',
+    clientDelivery: isMyanmar ? 'Client link' : 'Client link',
+    telegramDelivery: isMyanmar ? 'Telegram delivery' : 'Telegram delivery',
+    enabledShort: isMyanmar ? 'ဖွင့်ထား' : 'Enabled',
+    disabledShort: isMyanmar ? 'ပိတ်ထား' : 'Disabled',
+    none: isMyanmar ? 'မရှိ' : 'None',
     behavior: isMyanmar ? 'Plan behavior' : 'Plan behavior',
     enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
     disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
@@ -1777,6 +1795,7 @@ function TelegramSalesWorkflowCard() {
     customer: isMyanmar ? 'Customer' : 'Customer',
     linkedKeys: isMyanmar ? 'Linked keys' : 'Linked keys',
     recentOrders: isMyanmar ? 'Recent orders' : 'Recent orders',
+    orderStatusCommand: isMyanmar ? 'Order status command' : 'Order status command',
     customerProfile: isMyanmar ? 'Telegram profile' : 'Telegram profile',
     orderContext: isMyanmar ? 'Order context' : 'Order context',
     noLinkedKeys: isMyanmar ? 'ဆက်စပ် key မတွေ့ပါ။' : 'No linked keys found.',
@@ -1811,6 +1830,80 @@ function TelegramSalesWorkflowCard() {
     fulfilled: isMyanmar ? 'Fulfilled' : 'Fulfilled',
     rejected: isMyanmar ? 'Rejected' : 'Rejected',
     pending: isMyanmar ? 'Pending review' : 'Pending review',
+  };
+
+  const renderTemplateSummary = (templateId?: string | null, compact = false) => {
+    if (!templateId) {
+      return (
+        <div className="mt-3 rounded-xl border border-dashed border-border/50 bg-background/40 p-3 text-xs text-muted-foreground">
+          {salesUi.noTemplateSelected}
+        </div>
+      );
+    }
+
+    const template = templatesById.get(templateId);
+    if (!template) {
+      return (
+        <div className="mt-3 rounded-xl border border-dashed border-destructive/40 bg-destructive/[0.04] p-3 text-xs text-destructive">
+          {salesUi.templateMissing}
+        </div>
+      );
+    }
+
+    const serverLabel = template.server?.name
+      ? `${template.server.name}${template.server.countryCode ? ` (${template.server.countryCode})` : ''}`
+      : salesUi.autoSelectServer;
+
+    return (
+      <div className="mt-3 rounded-xl border border-border/50 bg-background/40 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={cn('font-medium', compact ? 'text-xs' : 'text-sm')}>{template.name}</p>
+          {template.subscriptionTheme ? (
+            <Badge variant="outline">{template.subscriptionTheme}</Badge>
+          ) : null}
+        </div>
+        {template.description ? (
+          <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
+        ) : null}
+        <div className={cn('mt-3 grid gap-2', compact ? 'sm:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4')}>
+          <div className="rounded-lg border border-border/40 p-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {salesUi.server}
+            </p>
+            <p className="mt-1 text-xs">{serverLabel}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 p-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {salesUi.method}
+            </p>
+            <p className="mt-1 text-xs">{template.method}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 p-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {salesUi.slugRule}
+            </p>
+            <p className="mt-1 text-xs">{template.slugPrefix || salesUi.none}</p>
+          </div>
+          <div className="rounded-lg border border-border/40 p-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {salesUi.theme}
+            </p>
+            <p className="mt-1 text-xs">{template.subscriptionTheme || salesUi.none}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant={template.sharePageEnabled ? 'default' : 'secondary'}>
+            {salesUi.shareDelivery}: {template.sharePageEnabled ? salesUi.enabledShort : salesUi.disabledShort}
+          </Badge>
+          <Badge variant={template.clientLinkEnabled ? 'default' : 'secondary'}>
+            {salesUi.clientDelivery}: {template.clientLinkEnabled ? salesUi.enabledShort : salesUi.disabledShort}
+          </Badge>
+          <Badge variant={template.telegramDeliveryEnabled ? 'default' : 'secondary'}>
+            {salesUi.telegramDelivery}: {template.telegramDeliveryEnabled ? salesUi.enabledShort : salesUi.disabledShort}
+          </Badge>
+        </div>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -2170,6 +2263,7 @@ function TelegramSalesWorkflowCard() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {renderTemplateSummary(plan.templateId, true)}
                     </div>
                   </div>
                 </div>
@@ -2347,7 +2441,7 @@ function TelegramSalesWorkflowCard() {
                     ) : null}
                   </div>
 
-                    <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                  <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <div className="rounded-xl border border-border/50 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         {salesUi.order}
@@ -2357,6 +2451,9 @@ function TelegramSalesWorkflowCard() {
                         {[order.requestedName || order.targetAccessKeyName || '—', describeQuota(order)]
                           .filter(Boolean)
                           .join(' • ')}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {salesUi.orderStatusCommand}: <code>/order {order.orderCode}</code>
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/50 p-3">
@@ -2389,6 +2486,8 @@ function TelegramSalesWorkflowCard() {
                       </p>
                     </div>
                   </div>
+
+                  {renderTemplateSummary(order.templateId, true)}
 
                   <div className="mt-4 grid gap-3 xl:grid-cols-3">
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3">
@@ -2559,6 +2658,8 @@ function TelegramSalesWorkflowCard() {
               </div>
             </div>
           ) : null}
+
+          {selectedOrder ? renderTemplateSummary(selectedOrder.templateId) : null}
 
           {selectedOrder ? (
             <div className="grid gap-3 md:grid-cols-2">

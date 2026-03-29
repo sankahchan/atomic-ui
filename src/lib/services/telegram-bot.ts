@@ -27,6 +27,7 @@ import {
   buildSharePageUrl,
   buildShortShareUrl,
   buildSubscriptionApiUrl,
+  buildSubscriptionClientUrl,
 } from '@/lib/subscription-links';
 import {
   recordSubscriptionPageEvent,
@@ -163,10 +164,10 @@ function escapeHtml(value: string) {
 function getCommandKeyboard(isAdmin: boolean) {
   const keyboard = [
     [{ text: '/buy' }, { text: '/renew' }],
-    [{ text: '/usage' }, { text: '/mykeys' }],
-    [{ text: '/sub' }, { text: '/support' }],
-    [{ text: '/cancel' }, { text: '/language' }],
-    [{ text: '/help' }],
+    [{ text: '/orders' }, { text: '/mykeys' }],
+    [{ text: '/usage' }, { text: '/sub' }],
+    [{ text: '/support' }, { text: '/language' }],
+    [{ text: '/cancel' }, { text: '/help' }],
   ];
 
   if (isAdmin) {
@@ -509,8 +510,8 @@ function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /renew - renew an existing key\n• /mykeys - view your linked keys\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
@@ -601,10 +602,45 @@ function getTelegramUi(locale: SupportedLocale) {
       isMyanmar ? `Telegram action မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
+    priceLabel: isMyanmar ? 'စျေးနှုန်း' : 'Price',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
+    orderTypeLabel: isMyanmar ? 'Order အမျိုးအစား' : 'Order type',
+    orderStatusTitle: isMyanmar ? '🧾 <b>Order အခြေအနေ</b>' : '🧾 <b>Order status</b>',
+    ordersTitle: isMyanmar ? '🧾 <b>သင့် recent orders များ</b>' : '🧾 <b>Your recent orders</b>',
+    ordersEmpty: isMyanmar ? 'ℹ️ ဤ Telegram account အတွက် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။' : 'ℹ️ There are no orders for this Telegram account yet. Start with /buy or /renew.',
+    ordersHint: isMyanmar ? 'ပိုအသေးစိတ်ကြည့်ရန် /order <order-code> သို့မဟုတ် /order ကို အသုံးပြုပါ။' : 'Use /order <order-code> or /order to view one order in detail.',
+    orderStatusUsage: isMyanmar ? 'အသုံးပြုပုံ: /order သို့မဟုတ် /order <ORDER-CODE>' : 'Usage: /order or /order <ORDER-CODE>',
+    orderStatusNotFound: (code: string) =>
+      isMyanmar
+        ? `❌ <b>${code}</b> နှင့် ကိုက်ညီသော order မတွေ့ပါ။`
+        : `❌ No order matched <b>${code}</b>.`,
+    orderStatusLatestNotFound: isMyanmar
+      ? 'ℹ️ ကြည့်ရန် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။'
+      : 'ℹ️ There is no order to show yet. Start with /buy or /renew.',
+    createdAtLabel: isMyanmar ? 'စတင်ချိန်' : 'Created',
+    paymentSubmittedLabel: isMyanmar ? 'Proof ပို့ချိန်' : 'Proof submitted',
+    reviewedAtLabel: isMyanmar ? 'Admin စစ်ဆေးချိန်' : 'Reviewed',
+    fulfilledAtLabel: isMyanmar ? 'ပြီးစီးချိန်' : 'Fulfilled',
+    rejectedAtLabel: isMyanmar ? 'ပယ်ချိန်' : 'Rejected',
+    durationLabel: isMyanmar ? 'သက်တမ်းကာလ' : 'Duration',
+    deliveredKeyLabel: isMyanmar ? 'ထုတ်ပေးထားသော key' : 'Delivered key',
+    latestOrderHint: isMyanmar ? 'နောက်ဆုံး order ကို ပြထားပါသည်။' : 'Showing the latest order.',
+    orderKindNew: isMyanmar ? 'အသစ်' : 'New',
+    orderKindRenew: isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal',
+    orderStatusAwaitingKeySelection: isMyanmar ? 'Key ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
+    orderStatusAwaitingPlan: isMyanmar ? 'Plan ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting plan selection',
+    orderStatusAwaitingMonths: isMyanmar ? 'လအရေအတွက် စောင့်နေသည်' : 'Awaiting month count',
+    orderStatusAwaitingKeyName: isMyanmar ? 'Key အမည် စောင့်နေသည်' : 'Awaiting key name',
+    orderStatusAwaitingPaymentProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
+    orderStatusPendingReview: isMyanmar ? 'Admin စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
+    orderStatusApproved: isMyanmar ? 'အတည်ပြုထားပြီး ဖြစ်သည်' : 'Approved',
+    orderStatusFulfilled: isMyanmar ? 'ပြီးစီးထားသည်' : 'Fulfilled',
+    orderStatusRejected: isMyanmar ? 'ပယ်ထားသည်' : 'Rejected',
+    orderStatusCancelled: isMyanmar ? 'ပယ်ဖျက်ထားသည်' : 'Cancelled',
     paymentProofLabel: isMyanmar ? 'Proof' : 'Proof',
     requestedNameLabel: isMyanmar ? 'တောင်းဆိုထားသော အမည်' : 'Requested name',
     renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
+    adminNote: isMyanmar ? 'Admin note' : 'Admin note',
     statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
     statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
     statusLabel: isMyanmar ? 'အခြေအနေ' : 'Status',
@@ -741,12 +777,13 @@ async function getTelegramBotUsername(botToken: string, configuredUsername?: str
 function formatTelegramOrderStateLine(order: {
   orderCode: string;
   planName?: string | null;
+  planCode?: string | null;
   durationMonths?: number | null;
   requestedName?: string | null;
 }) {
   const parts = [`#${order.orderCode}`];
-  if (order.planName) {
-    parts.push(order.planName);
+  if (order.planName || order.planCode) {
+    parts.push(order.planName || order.planCode || '');
   }
   if (order.durationMonths) {
     parts.push(`${order.durationMonths}m`);
@@ -755,6 +792,302 @@ function formatTelegramOrderStateLine(order: {
     parts.push(order.requestedName);
   }
   return parts.join(' • ');
+}
+
+function formatTelegramDateTime(value: Date | null | undefined, locale: SupportedLocale) {
+  if (!value) {
+    return '—';
+  }
+
+  return value.toLocaleString(locale === 'my' ? 'my-MM' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatTelegramOrderStatusLabel(status: string, ui: ReturnType<typeof getTelegramUi>) {
+  switch (status) {
+    case 'AWAITING_KEY_SELECTION':
+      return ui.orderStatusAwaitingKeySelection;
+    case 'AWAITING_PLAN':
+      return ui.orderStatusAwaitingPlan;
+    case 'AWAITING_MONTHS':
+      return ui.orderStatusAwaitingMonths;
+    case 'AWAITING_KEY_NAME':
+      return ui.orderStatusAwaitingKeyName;
+    case 'AWAITING_PAYMENT_PROOF':
+      return ui.orderStatusAwaitingPaymentProof;
+    case 'PENDING_REVIEW':
+      return ui.orderStatusPendingReview;
+    case 'APPROVED':
+      return ui.orderStatusApproved;
+    case 'FULFILLED':
+      return ui.orderStatusFulfilled;
+    case 'REJECTED':
+      return ui.orderStatusRejected;
+    case 'CANCELLED':
+      return ui.orderStatusCancelled;
+    default:
+      return status;
+  }
+}
+
+function formatTelegramOrderKindLabel(kind: string, ui: ReturnType<typeof getTelegramUi>) {
+  return kind === 'RENEW' ? ui.orderKindRenew : ui.orderKindNew;
+}
+
+function normalizeTelegramOrderLookupCodes(input: string) {
+  const trimmed = input.trim().toUpperCase();
+  if (!trimmed) {
+    return [];
+  }
+
+  return trimmed.startsWith('ORD-') ? [trimmed] : [trimmed, `ORD-${trimmed}`];
+}
+
+async function listTelegramOrdersForUser(chatId: number, telegramUserId: number, limit = 5) {
+  return db.telegramOrder.findMany({
+    where: {
+      OR: [
+        { telegramChatId: String(chatId) },
+        { telegramUserId: String(telegramUserId) },
+      ],
+    },
+    orderBy: [{ createdAt: 'desc' }],
+    take: limit,
+  });
+}
+
+async function findTelegramOrderForUser(input: {
+  chatId: number;
+  telegramUserId: number;
+  lookupCode?: string;
+}) {
+  const ownerFilter = {
+    OR: [
+      { telegramChatId: String(input.chatId) },
+      { telegramUserId: String(input.telegramUserId) },
+    ],
+  };
+
+  if (!input.lookupCode) {
+    return db.telegramOrder.findFirst({
+      where: ownerFilter,
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  const candidates = normalizeTelegramOrderLookupCodes(input.lookupCode);
+  if (!candidates.length) {
+    return null;
+  }
+
+  return db.telegramOrder.findFirst({
+    where: {
+      AND: [
+        ownerFilter,
+        {
+          orderCode: {
+            in: candidates,
+          },
+        },
+      ],
+    },
+  });
+}
+
+async function buildTelegramOrderStatusMessage(input: {
+  order: Awaited<ReturnType<typeof findTelegramOrderForUser>>;
+  locale: SupportedLocale;
+}) {
+  const order = input.order;
+  if (!order) {
+    return null;
+  }
+
+  const locale = input.locale;
+  const ui = getTelegramUi(locale);
+  const lines = [
+    ui.orderStatusTitle,
+    '',
+    `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
+    `${ui.orderTypeLabel}: ${escapeHtml(formatTelegramOrderKindLabel(order.kind, ui))}`,
+  ];
+
+  if (order.planName || order.planCode) {
+    lines.push(`${ui.planLabel}: <b>${escapeHtml(order.planName || order.planCode || '')}</b>`);
+  }
+
+  if (order.priceLabel) {
+    lines.push(`${ui.priceLabel}: ${escapeHtml(order.priceLabel)}`);
+  }
+
+  if (order.durationMonths) {
+    lines.push(
+      `${ui.durationLabel}: ${escapeHtml(
+        locale === 'my'
+          ? `${order.durationMonths} လ`
+          : `${order.durationMonths} month${order.durationMonths === 1 ? '' : 's'}`,
+      )}`,
+    );
+  }
+
+  if (order.requestedName) {
+    lines.push(`${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>`);
+  }
+
+  if (order.requestedEmail) {
+    lines.push(`${ui.emailLabel}: <code>${escapeHtml(order.requestedEmail)}</code>`);
+  }
+
+  if (order.kind === 'RENEW' && order.targetAccessKeyId) {
+    lines.push(`${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>`);
+  }
+
+  lines.push(`${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`);
+
+  if (order.paymentSubmittedAt) {
+    lines.push(
+      `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`,
+    );
+  }
+
+  if (order.reviewedAt) {
+    lines.push(`${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.reviewedAt, locale))}`);
+  }
+
+  if (order.fulfilledAt) {
+    lines.push(
+      `${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(order.fulfilledAt, locale))}`,
+    );
+  }
+
+  if (order.rejectedAt) {
+    lines.push(
+      `${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.rejectedAt, locale))}`,
+    );
+  }
+
+  if (order.adminNote?.trim()) {
+    lines.push('', `${ui.adminNote}:`, escapeHtml(order.adminNote.trim()));
+  }
+
+  const relatedKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
+  if (relatedKeyId) {
+    const key = await db.accessKey.findUnique({
+      where: { id: relatedKeyId },
+      select: {
+        id: true,
+        name: true,
+        publicSlug: true,
+        subscriptionToken: true,
+        sharePageEnabled: true,
+        clientLinkEnabled: true,
+      },
+    });
+
+    if (key) {
+      const token = key.subscriptionToken
+        ? key.subscriptionToken
+        : await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+
+      const sharePageUrl = key.sharePageEnabled
+        ? key.publicSlug
+          ? buildShortShareUrl(key.publicSlug, { source: 'telegram_order_status', lang: locale })
+          : buildSharePageUrl(token, { source: 'telegram_order_status', lang: locale })
+        : null;
+
+      const outlineClientUrl = key.clientLinkEnabled
+        ? key.publicSlug
+          ? buildSubscriptionClientUrl(key.publicSlug, key.name, {
+              source: 'telegram_order_status',
+              shortPath: true,
+            })
+          : buildSubscriptionClientUrl(token, key.name, {
+              source: 'telegram_order_status',
+            })
+        : null;
+
+      lines.push('', `${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`);
+
+      if (sharePageUrl) {
+        lines.push(`🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
+      }
+
+      if (outlineClientUrl) {
+        lines.push(`⚡ ${ui.outlineClientUrlLabel}: <code>${escapeHtml(outlineClientUrl)}</code>`);
+      }
+    }
+  }
+
+  if (order.status === 'AWAITING_PAYMENT_PROOF' || order.status === 'PENDING_REVIEW') {
+    lines.push('', ui.orderSupportHint);
+  }
+
+  return lines.join('\n');
+}
+
+async function handleOrdersCommand(chatId: number, telegramUserId: number, locale: SupportedLocale) {
+  const ui = getTelegramUi(locale);
+  const orders = await listTelegramOrdersForUser(chatId, telegramUserId, 6);
+  if (!orders.length) {
+    return ui.ordersEmpty;
+  }
+
+  const lines = [ui.ordersTitle, ''];
+  for (const order of orders) {
+    lines.push(
+      `• ${escapeHtml(
+        formatTelegramOrderStateLine({
+          orderCode: order.orderCode,
+          planName: order.planName,
+          planCode: order.planCode,
+          durationMonths: order.durationMonths,
+          requestedName: order.requestedName,
+        }),
+      )}`,
+    );
+    lines.push(
+      `  ${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))} • ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
+    );
+  }
+
+  lines.push('', ui.ordersHint);
+  return lines.join('\n');
+}
+
+async function handleOrderStatusCommand(
+  chatId: number,
+  telegramUserId: number,
+  argsText: string,
+  locale: SupportedLocale,
+) {
+  const ui = getTelegramUi(locale);
+  const lookupCode = argsText.trim();
+  const order = await findTelegramOrderForUser({
+    chatId,
+    telegramUserId,
+    lookupCode: lookupCode || undefined,
+  });
+
+  if (!order) {
+    return lookupCode ? ui.orderStatusNotFound(escapeHtml(lookupCode)) : ui.orderStatusLatestNotFound;
+  }
+
+  const message = await buildTelegramOrderStatusMessage({
+    order,
+    locale,
+  });
+
+  if (!message) {
+    return lookupCode ? ui.orderStatusNotFound(escapeHtml(lookupCode)) : ui.orderStatusLatestNotFound;
+  }
+
+  return lookupCode ? message : `${message}\n\n${ui.latestOrderHint}`;
 }
 
 function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines: string[]) {
@@ -4018,6 +4351,8 @@ async function handleHelpCommand(
 /start - Telegram account ကို ချိတ်ဆက်မည်
 /language - ဘာသာစကား ပြောင်းမည်
 /buy - Plan ရွေးပြီး key အသစ် မှာယူမည်
+/orders - မိမိ order များကို ကြည့်မည်
+/order [code] - order အခြေအနေ အသေးစိတ်ကြည့်မည်
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
 /sub - Share page များကို လက်ခံမည်
@@ -4031,6 +4366,8 @@ async function handleHelpCommand(
 /start - Link your Telegram account
 /language - Change the bot language
 /buy - Start a new key order
+/orders - Show your recent orders
+/order [code] - Show one order status
 /usage - Fetch your usage and QR/setup info
 /mykeys - List linked keys and IDs
 /sub - Receive your share pages
@@ -4310,6 +4647,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleBuyCommand(chatId, telegramUserId, username, locale);
+    case 'orders':
+      return handleOrdersCommand(chatId, telegramUserId, locale);
+    case 'order':
+      return handleOrderStatusCommand(chatId, telegramUserId, argsText, locale);
     case 'usage':
     case 'mykey':
     case 'key':
