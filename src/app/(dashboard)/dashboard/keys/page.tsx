@@ -273,7 +273,7 @@ function CreateKeyDialog({
     autoDisableOnLimit: true,
     autoDisableOnExpire: true,
     autoArchiveAfterDays: '0',
-    quotaAlertThresholds: '70,85,95',
+    quotaAlertThresholds: '80,90',
     autoRenewPolicy: 'NONE',
     autoRenewDurationDays: '',
   });
@@ -461,7 +461,7 @@ function CreateKeyDialog({
       autoDisableOnLimit: true,
       autoDisableOnExpire: true,
       autoArchiveAfterDays: '0',
-      quotaAlertThresholds: '70,85,95',
+      quotaAlertThresholds: '80,90',
       autoRenewPolicy: 'NONE',
       autoRenewDurationDays: '',
     });
@@ -548,7 +548,7 @@ function CreateKeyDialog({
       autoDisableOnLimit: template.autoDisableOnLimit ?? true,
       autoDisableOnExpire: template.autoDisableOnExpire ?? true,
       autoArchiveAfterDays: String(template.autoArchiveAfterDays ?? 0),
-      quotaAlertThresholds: template.quotaAlertThresholds || '70,85,95',
+      quotaAlertThresholds: template.quotaAlertThresholds || '80,90',
       autoRenewPolicy: template.autoRenewPolicy || 'NONE',
       autoRenewDurationDays: template.autoRenewDurationDays?.toString() || '',
     }));
@@ -953,7 +953,7 @@ function CreateKeyDialog({
                 <Label htmlFor="quotaThresholds">Quota alert thresholds (%)</Label>
                 <Input
                   id="quotaThresholds"
-                  placeholder="70,85,95"
+                  placeholder="80,90"
                   value={formData.quotaAlertThresholds}
                   onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
                 />

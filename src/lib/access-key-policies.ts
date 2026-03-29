@@ -1,4 +1,4 @@
-const DEFAULT_QUOTA_THRESHOLDS = [70, 85, 95];
+const DEFAULT_QUOTA_THRESHOLDS = [80, 90];
 
 export function parseQuotaAlertThresholds(value?: string | null) {
   if (!value?.trim()) {

@@ -231,7 +231,7 @@ export function SubscriptionSettings() {
         showUsageAlerts: isMyanmar ? "အသုံးပြုမှု သတိပေးချက်ကို ပြမည်" : "Show Usage Alerts",
         showUsageAlertsDesc: isMyanmar ? "ဒေတာအသုံးပြုမှုသည် threshold များသို့ ရောက်သောအခါ သတိပေးချက်ပြမည်။" : "Display warnings when data usage reaches thresholds.",
         alertThresholds: isMyanmar ? "သတိပေး Threshold များ (%)" : "Alert Thresholds (%)",
-        alertThresholdsHelp: isMyanmar ? "ဤအသုံးပြုမှု ရာခိုင်နှုန်းများတွင် သတိပေးချက်ပြမည် (ဥပမာ 80%, 90%, 95%)။" : "Show alerts at these usage percentages (e.g., 80%, 90%, 95%).",
+        alertThresholdsHelp: isMyanmar ? "ဤအသုံးပြုမှု ရာခိုင်နှုန်းများတွင် သတိပေးချက်ပြမည် (ဥပမာ 80%, 90%)။" : "Show alerts at these usage percentages (e.g., 80%, 90%).",
         appsTitle: isMyanmar ? "App Button များ" : "App Buttons",
         appsDesc: isMyanmar ? "Subscription page များပေါ်တွင် ပြသမည့် VPN client app များကို ရွေးပါ။" : "Choose which VPN client apps to show on subscription pages.",
         appsIntro: isMyanmar ? "Public page ပေါ်ရှိ ပထမဆုံး install button သည် သင်ရွေးထားသော primary app မှ လာမည်။ ကျန် app များကို အောက်တွင် ယခင်အစဉ်အတိုင်း ပြသမည်။" : "The first install button on the public page comes from your selected primary app. The remaining enabled apps appear below it in the order shown here.",

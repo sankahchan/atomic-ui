@@ -29,6 +29,7 @@ import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
+import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -219,6 +220,20 @@ export function initScheduler() {
         }
     });
 
+    // 14. Telegram unpaid order reminders / expiry (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runTelegramSalesOrderCycle();
+            if (!result.skipped && (result.reminded > 0 || result.expired > 0 || result.errors.length > 0)) {
+                logger.info(
+                    `Telegram sales orders: ${result.reminded} reminded, ${result.expired} expired, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Telegram sales order cycle failed', error);
+        }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
@@ -244,6 +259,17 @@ export function initScheduler() {
             await collectTrafficActivity();
         } catch (error) {
             logger.error('Initial traffic activity collection failed', error);
+        }
+
+        try {
+            const result = await runTelegramSalesOrderCycle();
+            if (!result.skipped && (result.reminded > 0 || result.expired > 0 || result.errors.length > 0)) {
+                logger.info(
+                    `Initial Telegram sales order cycle: ${result.reminded} reminded, ${result.expired} expired, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Initial Telegram sales order cycle failed', error);
         }
 
         // Ensure health check records exist for all servers

@@ -55,6 +55,8 @@ export const telegramSalesSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   allowRenewals: z.boolean().default(true),
   supportLink: z.string().trim().max(500).optional().default(''),
+  paymentReminderHours: z.number().int().min(1).max(168).default(3),
+  unpaidOrderExpiryHours: z.number().int().min(1).max(720).default(24),
   paymentInstructions: z.string().max(2000).optional().default(''),
   localizedPaymentInstructions: z.record(z.string(), z.string()).optional().default({}),
   paymentMethods: z.array(telegramSalesPaymentMethodSchema).default([]),
@@ -204,6 +206,8 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     enabled: false,
     allowRenewals: true,
     supportLink: '',
+    paymentReminderHours: 3,
+    unpaidOrderExpiryHours: 24,
     paymentInstructions: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
     localizedPaymentInstructions: {
       en: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
@@ -222,6 +226,14 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
   }
 
   const next = parsed.data;
+  const paymentReminderHours =
+    typeof next.paymentReminderHours === 'number' && Number.isFinite(next.paymentReminderHours)
+      ? next.paymentReminderHours
+      : defaults.paymentReminderHours;
+  const unpaidOrderExpiryHours =
+    typeof next.unpaidOrderExpiryHours === 'number' && Number.isFinite(next.unpaidOrderExpiryHours)
+      ? Math.max(next.unpaidOrderExpiryHours, paymentReminderHours)
+      : defaults.unpaidOrderExpiryHours;
   const plansByCode = new Map(next.plans.map((plan) => [plan.code, plan]));
   const paymentMethodsByCode = new Map(next.paymentMethods.map((method) => [method.code, method]));
 
@@ -229,6 +241,8 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     enabled: next.enabled,
     allowRenewals: next.allowRenewals,
     supportLink: next.supportLink?.trim() || '',
+    paymentReminderHours,
+    unpaidOrderExpiryHours,
     paymentInstructions: next.paymentInstructions || defaults.paymentInstructions,
     localizedPaymentInstructions: normalizeLocalizedTemplateMap(next.localizedPaymentInstructions),
     paymentMethods: defaultPaymentMethods().map((fallbackMethod) => {

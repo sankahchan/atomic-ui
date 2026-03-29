@@ -166,7 +166,7 @@ model AccessKey {
   bandwidthAlertAt80 Boolean @default(false) // true if 80% alert already sent
   bandwidthAlertAt90 Boolean @default(false) // true if 90% alert already sent
   autoDisableOnLimit Boolean @default(true) // auto-disable when 100% reached
-  quotaAlertThresholds String @default("70,85,95") // CSV thresholds for quota notifications
+  quotaAlertThresholds String @default("80,90") // CSV thresholds for quota notifications
   quotaAlertsSent      String @default("[]") // JSON array of thresholds already sent
 
   // Disable tracking - when DISABLED, key is deleted from Outline server
@@ -271,7 +271,10 @@ model TelegramOrder {
   paymentProofType     String?
   paymentMessageId     Int?
   paymentCaption       String?
+  paymentStageEnteredAt DateTime?
+  paymentReminderSentAt DateTime?
   paymentSubmittedAt   DateTime?
+  expiredAt            DateTime?
   adminNote            String?
   reviewedByUserId     String?
   reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
@@ -889,7 +892,7 @@ model KeyTemplate {
   autoDisableOnLimit     Boolean @default(true)
   autoDisableOnExpire    Boolean @default(true)
   autoArchiveAfterDays   Int     @default(0)
-  quotaAlertThresholds   String  @default("70,85,95")
+  quotaAlertThresholds   String  @default("80,90")
   autoRenewPolicy        String  @default("NONE")
   autoRenewDurationDays  Int?
 

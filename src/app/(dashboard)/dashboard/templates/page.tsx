@@ -54,7 +54,7 @@ function TemplateDialog({
     autoDisableOnLimit: template?.autoDisableOnLimit ?? true,
     autoDisableOnExpire: template?.autoDisableOnExpire ?? true,
     autoArchiveAfterDays: String(template?.autoArchiveAfterDays ?? 0),
-    quotaAlertThresholds: template?.quotaAlertThresholds || '70,85,95',
+    quotaAlertThresholds: template?.quotaAlertThresholds || '80,90',
     autoRenewPolicy: template?.autoRenewPolicy || 'NONE',
     autoRenewDurationDays: template?.autoRenewDurationDays?.toString() || '',
   });
@@ -325,7 +325,7 @@ function TemplateDialog({
               <Label htmlFor="templateThresholds">Quota Alert Thresholds (%)</Label>
               <Input
                 id="templateThresholds"
-                placeholder="70,85,95"
+                placeholder="80,90"
                 value={formData.quotaAlertThresholds}
                 onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
               />

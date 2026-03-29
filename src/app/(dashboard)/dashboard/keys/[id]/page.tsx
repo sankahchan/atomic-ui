@@ -183,7 +183,7 @@ function EditKeyDialog({
     autoDisableOnLimit: keyData.autoDisableOnLimit ?? true,
     autoDisableOnExpire: keyData.autoDisableOnExpire ?? true,
     autoArchiveAfterDays: String(keyData.autoArchiveAfterDays ?? 0),
-    quotaAlertThresholds: keyData.quotaAlertThresholds || '70,85,95',
+    quotaAlertThresholds: keyData.quotaAlertThresholds || '80,90',
     autoRenewPolicy: (keyData.autoRenewPolicy as 'NONE' | 'EXTEND_DURATION') || 'NONE',
     autoRenewDurationDays: keyData.autoRenewDurationDays?.toString() || '',
   });
@@ -334,7 +334,7 @@ function EditKeyDialog({
                 <Label htmlFor="editQuotaThresholds">Quota alert thresholds (%)</Label>
                 <Input
                   id="editQuotaThresholds"
-                  placeholder="70,85,95"
+                  placeholder="80,90"
                   value={formData.quotaAlertThresholds}
                   onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
                 />
@@ -3271,7 +3271,7 @@ export default function KeyDetailPage() {
             autoDisableOnLimit: (key as any).autoDisableOnLimit ?? true,
             autoDisableOnExpire: (key as any).autoDisableOnExpire ?? true,
             autoArchiveAfterDays: (key as any).autoArchiveAfterDays ?? 0,
-            quotaAlertThresholds: (key as any).quotaAlertThresholds ?? '70,85,95',
+            quotaAlertThresholds: (key as any).quotaAlertThresholds ?? '80,90',
             autoRenewPolicy: (key as any).autoRenewPolicy ?? 'NONE',
             autoRenewDurationDays: (key as any).autoRenewDurationDays ?? null,
           }}

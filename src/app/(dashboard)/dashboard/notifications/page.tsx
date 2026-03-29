@@ -238,6 +238,8 @@ type TelegramSalesSettingsForm = {
   enabled: boolean;
   allowRenewals: boolean;
   supportLink: string;
+  paymentReminderHours: string;
+  unpaidOrderExpiryHours: string;
   paymentInstructions: string;
   localizedPaymentInstructions: {
     en: string;
@@ -335,6 +337,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
   allowRenewals: true,
   supportLink: '',
+  paymentReminderHours: '3',
+  unpaidOrderExpiryHours: '24',
   paymentInstructions:
     'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
   localizedPaymentInstructions: {
@@ -1811,7 +1815,7 @@ function TelegramSalesWorkflowCard() {
   const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
   const deferredOrderSearch = useDeferredValue(orderSearch.trim());
   const ordersQuery = trpc.telegramBot.listOrders.useQuery(
@@ -1841,6 +1845,12 @@ function TelegramSalesWorkflowCard() {
     supportLinkDesc: isMyanmar
       ? 'Bot အတွင်း /support command နှင့် payment prompt များတွင် ဤ link ကို အသုံးပြုမည်။ မထည့်ပါက Subscription Page support link ကို fallback အဖြစ် သုံးမည်။'
       : 'Use this link for the bot /support command and payment prompts. If left empty, the Subscription Page support link is used as a fallback.',
+    paymentAutomation: isMyanmar ? 'Unpaid order automation' : 'Unpaid order automation',
+    paymentAutomationDesc: isMyanmar
+      ? 'Payment method မရွေးသေးသော သို့မဟုတ် screenshot မပို့ရသေးသော order များကို reminder ပို့ပြီး အချိန်ကျော်လျှင် အလိုအလျောက် cancel လုပ်ပါမည်။'
+      : 'Send one reminder for unpaid orders, then automatically cancel them if the user never selects a method or submits proof.',
+    paymentReminderHours: isMyanmar ? 'Reminder after (hours)' : 'Reminder after (hours)',
+    unpaidOrderExpiryHours: isMyanmar ? 'Auto-expire after (hours)' : 'Auto-expire after (hours)',
     paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
     englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
     burmeseInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
@@ -1851,8 +1861,8 @@ function TelegramSalesWorkflowCard() {
     paymentMethodLabel: isMyanmar ? 'Payment method' : 'Payment method',
     accountName: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumber: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
-    note: isMyanmar ? 'မှတ်ချက်' : 'Note',
-    burmeseNote: isMyanmar ? 'မြန်မာ မှတ်ချက်' : 'Burmese note',
+    englishMethodInstructions: isMyanmar ? 'English instructions' : 'English instructions',
+    burmeseMethodInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
     planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
     planLabel: isMyanmar ? 'Plan အမည်' : 'Plan label',
     burmeseLabel: isMyanmar ? 'မြန်မာ label' : 'Burmese label',
@@ -1936,8 +1946,9 @@ function TelegramSalesWorkflowCard() {
     deliveryWarning: isMyanmar ? 'Key ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
     markForReview: isMyanmar ? 'Payment proof ကို admin များ Telegram chat တွင် စစ်ဆေးပါ။' : 'Review the payment proof from your Telegram admin chat before approving.',
     awaitingProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
-    fulfilled: isMyanmar ? 'Fulfilled' : 'Fulfilled',
-    rejected: isMyanmar ? 'Rejected' : 'Rejected',
+    fulfilled: isMyanmar ? 'ပြီးစီးပြီး' : 'Fulfilled',
+    rejected: isMyanmar ? 'ပယ်ထားပြီး' : 'Rejected',
+    cancelled: isMyanmar ? 'ပယ်ဖျက်ပြီး' : 'Cancelled',
     pending: isMyanmar ? 'Pending review' : 'Pending review',
   };
 
@@ -2024,6 +2035,12 @@ function TelegramSalesWorkflowCard() {
       enabled: settingsQuery.data.enabled ?? false,
       allowRenewals: settingsQuery.data.allowRenewals ?? true,
       supportLink: settingsQuery.data.supportLink || DEFAULT_TELEGRAM_SALES_SETTINGS.supportLink,
+      paymentReminderHours: String(
+        settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
+      ),
+      unpaidOrderExpiryHours: String(
+        settingsQuery.data.unpaidOrderExpiryHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.unpaidOrderExpiryHours,
+      ),
       paymentInstructions: settingsQuery.data.paymentInstructions || DEFAULT_TELEGRAM_SALES_SETTINGS.paymentInstructions,
       localizedPaymentInstructions: {
         en:
@@ -2183,6 +2200,16 @@ function TelegramSalesWorkflowCard() {
       enabled: form.enabled,
       allowRenewals: form.allowRenewals,
       supportLink: form.supportLink.trim(),
+      paymentReminderHours: (() => {
+        const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+      })(),
+      unpaidOrderExpiryHours: (() => {
+        const parsed = Number.parseInt(form.unpaidOrderExpiryHours.trim(), 10);
+        const reminderHours = Number.parseInt(form.paymentReminderHours.trim(), 10);
+        const safeReminder = Number.isFinite(reminderHours) && reminderHours > 0 ? reminderHours : 3;
+        return Number.isFinite(parsed) && parsed > 0 ? Math.max(parsed, safeReminder) : 24;
+      })(),
       paymentInstructions: form.paymentInstructions.trim(),
       localizedPaymentInstructions: {
         en: form.localizedPaymentInstructions.en.trim(),
@@ -2315,6 +2342,43 @@ function TelegramSalesWorkflowCard() {
             <p className="text-xs text-muted-foreground">{salesUi.supportLinkDesc}</p>
           </div>
 
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{salesUi.paymentAutomation}</p>
+              <p className="text-xs text-muted-foreground">{salesUi.paymentAutomationDesc}</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{salesUi.paymentReminderHours}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.paymentReminderHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      paymentReminderHours: event.target.value,
+                    }))
+                  }
+                  placeholder="3"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.unpaidOrderExpiryHours}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.unpaidOrderExpiryHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      unpaidOrderExpiryHours: event.target.value,
+                    }))
+                  }
+                  placeholder="24"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
               <Label>{salesUi.englishInstructions}</Label>
@@ -2437,7 +2501,7 @@ function TelegramSalesWorkflowCard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>{salesUi.note}</Label>
+                      <Label>{salesUi.englishMethodInstructions}</Label>
                       <Textarea
                         value={method.note}
                         onChange={(event) =>
@@ -2454,7 +2518,7 @@ function TelegramSalesWorkflowCard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>{salesUi.burmeseNote}</Label>
+                      <Label>{salesUi.burmeseMethodInstructions}</Label>
                       <Textarea
                         value={method.localizedNotes.my}
                         onChange={(event) =>
@@ -2678,7 +2742,7 @@ function TelegramSalesWorkflowCard() {
               <Select
                 value={statusFilter}
                 onValueChange={(value) =>
-                  setStatusFilter(value as 'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED')
+                  setStatusFilter(value as 'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED')
                 }
               >
                 <SelectTrigger>
@@ -2689,6 +2753,7 @@ function TelegramSalesWorkflowCard() {
                   <SelectItem value="PENDING_REVIEW">{salesUi.pending}</SelectItem>
                   <SelectItem value="FULFILLED">{salesUi.fulfilled}</SelectItem>
                   <SelectItem value="REJECTED">{salesUi.rejected}</SelectItem>
+                  <SelectItem value="CANCELLED">{salesUi.cancelled}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2776,6 +2841,8 @@ function TelegramSalesWorkflowCard() {
                               ? salesUi.fulfilled
                               : order.status === 'REJECTED'
                                 ? salesUi.rejected
+                                : order.status === 'CANCELLED'
+                                  ? salesUi.cancelled
                                 : order.status}
                         </Badge>
                         <Badge variant="outline">{order.kind}</Badge>
