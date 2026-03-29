@@ -224,9 +224,12 @@ export function initScheduler() {
     cron.schedule('*/15 * * * *', async () => {
         try {
             const result = await runTelegramSalesOrderCycle();
-            if (!result.skipped && (result.reminded > 0 || result.expired > 0 || result.errors.length > 0)) {
+            if (
+                !result.skipped &&
+                (result.reminded > 0 || result.trialReminded > 0 || result.expired > 0 || result.errors.length > 0)
+            ) {
                 logger.info(
-                    `Telegram sales orders: ${result.reminded} reminded, ${result.expired} expired, ${result.errors.length} errors`,
+                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.trialReminded} trial reminded, ${result.expired} expired, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {

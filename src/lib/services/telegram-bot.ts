@@ -74,7 +74,7 @@ import {
   normalizePublicSlug,
   slugifyPublicName,
 } from '@/lib/public-slug';
-import { mergeTagsForStorage } from '@/lib/tags';
+import { mergeTagsForStorage, tagMatchesFilter } from '@/lib/tags';
 import { formatBytes, generateRandomString } from '@/lib/utils';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -195,7 +195,7 @@ const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
-type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca';
+type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca' | 'by';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -303,7 +303,7 @@ function parseTelegramOrderActionCallbackData(data?: string | null) {
   }
 
   const action = parts[1];
-  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'ca'].includes(action)) {
+  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'ca', 'by'].includes(action)) {
     return null;
   }
 
@@ -649,6 +649,16 @@ function getTelegramUi(locale: SupportedLocale) {
     orderExpiredUnpaidNote: isMyanmar
       ? 'Payment မပြီးစီးသေးသဖြင့် order ကို အလိုအလျောက် ပိတ်လိုက်ပါသည်။'
       : 'This order was automatically cancelled because payment was not completed in time.',
+    trialExpiringTitle: isMyanmar
+      ? '🎁 <b>သင့် free trial မကြာမီ ကုန်ဆုံးမည်</b>'
+      : '🎁 <b>Your free trial will expire soon</b>',
+    trialExpiringBody: (hoursLeft: number) =>
+      isMyanmar
+        ? `လက်ရှိ free trial ကို အသုံးပြုနိုင်ရန် ${hoursLeft} နာရီခန့်သာ ကျန်ပါသည်။`
+        : `Your current free trial has about ${hoursLeft} hour(s) left.`,
+    trialExpiringUpsell: isMyanmar
+      ? 'ဆက်လက် အသုံးပြုလိုပါက အောက်ပါ button ကိုနှိပ်ပြီး paid plan တစ်ခုကို ရွေးချယ်နိုင်ပါသည်။'
+      : 'If you want to keep using the service, choose a paid plan with the button below before the trial expires.',
     orderRejected: (code: string, note?: string | null) =>
       isMyanmar
         ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${note ? `\n\nမှတ်ချက်: ${note}` : ''}\n\nလိုအပ်ပါက screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကို ပြန်စနိုင်ပါသည်။`
@@ -664,6 +674,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderActionUploadProof: isMyanmar ? 'Screenshot ပို့ရန်' : 'Upload screenshot',
     orderActionCheckStatus: isMyanmar ? 'အခြေအနေ စစ်ရန်' : 'Check status',
     orderActionCancel: isMyanmar ? 'Order ပယ်ရန်' : 'Cancel order',
+    orderActionBuyNewKey: isMyanmar ? 'အသစ်ဝယ်ရန်' : 'Buy new key',
     orderActionRenewKey: isMyanmar ? 'ဤ key ကို သက်တမ်းတိုးရန်' : 'Renew this key',
     orderActionChoosePlan: isMyanmar ? 'Plan ရွေးရန်' : 'Choose plan',
     orderActionSelectKey: isMyanmar ? 'Key ရွေးရန်' : 'Select key',
@@ -3154,6 +3165,7 @@ export async function runTelegramSalesOrderCycle() {
     return {
       skipped: true,
       reminded: 0,
+      trialReminded: 0,
       expired: 0,
       errors: [] as string[],
     };
@@ -3162,6 +3174,7 @@ export async function runTelegramSalesOrderCycle() {
   const now = new Date();
   const reminderMs = Math.max(1, settings.paymentReminderHours) * 60 * 60 * 1000;
   const expiryMs = Math.max(settings.unpaidOrderExpiryHours, settings.paymentReminderHours) * 60 * 60 * 1000;
+  const trialReminderLeadMs = 6 * 60 * 60 * 1000;
   const config = await getTelegramConfig();
   const supportLink = config ? await getTelegramSupportLink() : null;
   const orders = await db.telegramOrder.findMany({
@@ -3195,6 +3208,7 @@ export async function runTelegramSalesOrderCycle() {
   });
 
   let reminded = 0;
+  let trialReminded = 0;
   let expired = 0;
   const errors: string[] = [];
 
@@ -3345,9 +3359,76 @@ export async function runTelegramSalesOrderCycle() {
     }
   }
 
+  const trialCandidates = await db.accessKey.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'PENDING'] },
+      telegramDeliveryEnabled: true,
+      expiresAt: {
+        not: null,
+        gt: now,
+        lte: new Date(now.getTime() + trialReminderLeadMs),
+      },
+      tags: {
+        contains: ',trial,',
+      },
+    },
+    select: {
+      id: true,
+      expiresAt: true,
+      tags: true,
+    },
+  });
+
+  const eligibleTrialCandidates = trialCandidates.filter((candidate) =>
+    tagMatchesFilter(candidate.tags || '', 'trial'),
+  );
+
+  if (eligibleTrialCandidates.length > 0) {
+    const existingReminderLogs = await db.notificationLog.findMany({
+      where: {
+        accessKeyId: { in: eligibleTrialCandidates.map((candidate) => candidate.id) },
+        event: 'TELEGRAM_TRIAL_EXPIRING',
+        status: 'SUCCESS',
+      },
+      select: {
+        accessKeyId: true,
+      },
+    });
+
+    const remindedAccessKeyIds = new Set(
+      existingReminderLogs
+        .map((entry) => entry.accessKeyId)
+        .filter((entry): entry is string => Boolean(entry)),
+    );
+
+    for (const key of eligibleTrialCandidates) {
+      if (!key.expiresAt || remindedAccessKeyIds.has(key.id)) {
+        continue;
+      }
+
+      const remainingMs = key.expiresAt.getTime() - now.getTime();
+      const hoursLeft = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)));
+
+      try {
+        const sent = await sendAccessKeyTrialExpiryReminder({
+          accessKeyId: key.id,
+          hoursLeft,
+          source: 'telegram_trial_expiry',
+        });
+
+        if (sent) {
+          trialReminded += 1;
+        }
+      } catch (error) {
+        errors.push(`trial:${key.id}:${(error as Error).message}`);
+      }
+    }
+  }
+
   return {
     skipped: false,
     reminded,
+    trialReminded,
     expired,
     errors,
   };
@@ -4620,6 +4701,129 @@ export async function sendAccessKeyRenewalReminder(input: {
     destinationChatId,
     sharePageUrl,
     subscriptionUrl,
+  };
+}
+
+export async function sendAccessKeyTrialExpiryReminder(input: {
+  accessKeyId: string;
+  hoursLeft: number;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key) {
+    return null;
+  }
+
+  if (!key.telegramDeliveryEnabled) {
+    return null;
+  }
+
+  const destinationChatId = resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    return null;
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+  const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'trial_expiry', lang: locale })
+    : buildSharePageUrl(token, { source: input.source || 'trial_expiry', lang: locale });
+
+  const lines = [
+    ui.trialExpiringTitle,
+    '',
+    `🔑 ${escapeHtml(key.name)}`,
+    ui.trialExpiringBody(Math.max(1, input.hoursLeft)),
+    ui.trialExpiringUpsell,
+    '',
+    `${ui.sharePageLabel}: ${sharePageUrl}`,
+  ];
+
+  if (supportLink) {
+    lines.push(`${ui.supportLabel}: ${supportLink}`);
+  }
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: ui.orderActionBuyNewKey,
+        callback_data: buildTelegramOrderActionCallbackData('by', key.id),
+      },
+    ],
+    [
+      {
+        text: ui.openSharePage,
+        url: sharePageUrl,
+      },
+    ],
+  ];
+
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+
+  if (!sent) {
+    await db.notificationLog.create({
+      data: {
+        event: 'TELEGRAM_TRIAL_EXPIRING',
+        message: `Failed to send free-trial expiry reminder (${input.hoursLeft}h left)`,
+        status: 'FAILED',
+        accessKeyId: key.id,
+      },
+    });
+    return null;
+  }
+
+  await recordSubscriptionPageEvent({
+    accessKeyId: key.id,
+    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+    source: input.source || 'trial_expiry',
+    metadata: {
+      destinationChatId,
+      notificationType: 'TRIAL_EXPIRING',
+      hoursLeft: input.hoursLeft,
+    },
+  });
+
+  await db.notificationLog.create({
+    data: {
+      event: 'TELEGRAM_TRIAL_EXPIRING',
+      message: `Sent free-trial expiry reminder (${input.hoursLeft}h left)`,
+      status: 'SUCCESS',
+      accessKeyId: key.id,
+    },
+  });
+
+  await writeAuditLog({
+    action: 'ACCESS_KEY_TRIAL_EXPIRY_REMINDER_SENT',
+    entity: 'ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      sharePageUrl,
+      hoursLeft: input.hoursLeft,
+    },
+  });
+
+  return {
+    destinationChatId,
+    sharePageUrl,
   };
 }
 
@@ -6432,6 +6636,20 @@ async function handleTelegramCallbackQuery(
               ui.orderActionSent,
             );
             return null;
+          }
+          case 'by': {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSent,
+            );
+            return handleBuyCommand(
+              chatId,
+              callbackQuery.from.id,
+              callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+              config.botToken,
+            );
           }
           case 'st': {
             const order = await findTelegramOrderByIdForUser({
