@@ -991,6 +991,8 @@ export const analyticsRouter = router({
             planName: true,
             priceAmount: true,
             priceCurrency: true,
+            paymentMethodCode: true,
+            paymentMethodLabel: true,
             paymentSubmittedAt: true,
             reviewedAt: true,
             fulfilledAt: true,
@@ -1015,6 +1017,8 @@ export const analyticsRouter = router({
             planName: true,
             priceAmount: true,
             priceCurrency: true,
+            paymentMethodCode: true,
+            paymentMethodLabel: true,
             createdAt: true,
             fulfilledAt: true,
           },
@@ -1037,6 +1041,16 @@ export const analyticsRouter = router({
         string,
         { planCode: string | null; planName: string; orders: number; fulfilled: number; revenueByCurrency: Map<string, number> }
       >();
+      const paymentMethods = new Map<
+        string,
+        {
+          paymentMethodCode: string | null;
+          paymentMethodLabel: string;
+          orders: number;
+          fulfilled: number;
+          revenueByCurrency: Map<string, number>;
+        }
+      >();
 
       let reviewCount = 0;
       let reviewMinutesTotal = 0;
@@ -1058,7 +1072,10 @@ export const analyticsRouter = router({
           summary.rejected += 1;
         } else if (order.status === 'CANCELLED') {
           summary.cancelled += 1;
-        } else if (order.status === 'AWAITING_PAYMENT_PROOF') {
+        } else if (
+          order.status === 'AWAITING_PAYMENT_METHOD' ||
+          order.status === 'AWAITING_PAYMENT_PROOF'
+        ) {
           summary.awaitingPayment += 1;
         }
 
@@ -1088,6 +1105,28 @@ export const analyticsRouter = router({
           }
         }
         topPlans.set(planKey, currentPlan);
+
+        if (order.paymentMethodCode || order.paymentMethodLabel) {
+          const paymentMethodKey = order.paymentMethodCode || order.paymentMethodLabel || 'unknown';
+          const paymentMethodLabel =
+            order.paymentMethodLabel || order.paymentMethodCode || 'Unknown method';
+          const currentMethod = paymentMethods.get(paymentMethodKey) || {
+            paymentMethodCode: order.paymentMethodCode,
+            paymentMethodLabel,
+            orders: 0,
+            fulfilled: 0,
+            revenueByCurrency: new Map<string, number>(),
+          };
+          currentMethod.orders += 1;
+          if (order.status === 'FULFILLED' && typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+            const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+            currentMethod.revenueByCurrency.set(
+              currency,
+              (currentMethod.revenueByCurrency.get(currency) || 0) + order.priceAmount,
+            );
+          }
+          paymentMethods.set(paymentMethodKey, currentMethod);
+        }
 
         if (order.paymentSubmittedAt && order.reviewedAt) {
           reviewMinutesTotal +=
@@ -1130,6 +1169,22 @@ export const analyticsRouter = router({
             return right.fulfilled - left.fulfilled;
           })
           .slice(0, input.limit),
+        paymentMethods: Array.from(paymentMethods.values())
+          .map((method) => ({
+            paymentMethodCode: method.paymentMethodCode,
+            paymentMethodLabel: method.paymentMethodLabel,
+            orders: method.orders,
+            fulfilled: method.fulfilled,
+            revenueByCurrency: Array.from(method.revenueByCurrency.entries())
+              .map(([currency, amount]) => ({ currency, amount }))
+              .sort((left, right) => right.amount - left.amount),
+          }))
+          .sort((left, right) => {
+            if (right.orders !== left.orders) {
+              return right.orders - left.orders;
+            }
+            return right.fulfilled - left.fulfilled;
+          }),
         recentOrders: recentOrders.map((order) => ({
           ...order,
           priceCurrency: order.priceCurrency?.trim().toUpperCase() || null,

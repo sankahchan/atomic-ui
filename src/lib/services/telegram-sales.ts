@@ -72,6 +72,7 @@ export const TELEGRAM_ORDER_ACTIVE_STATUSES = [
   'AWAITING_MONTHS',
   'AWAITING_SERVER_SELECTION',
   'AWAITING_KEY_NAME',
+  'AWAITING_PAYMENT_METHOD',
   'AWAITING_PAYMENT_PROOF',
   'PENDING_REVIEW',
   'APPROVED',
@@ -383,6 +384,17 @@ export function resolveTelegramSalesPaymentMethodNote(
 
 export function listEnabledTelegramSalesPaymentMethods(settings: TelegramSalesSettings) {
   return settings.paymentMethods.filter((method) => method.enabled);
+}
+
+export function resolveTelegramSalesPaymentMethod(
+  settings: TelegramSalesSettings,
+  code: string | null | undefined,
+) {
+  if (!code) {
+    return null;
+  }
+
+  return settings.paymentMethods.find((method) => method.code === code) || null;
 }
 
 export function formatTelegramSalesPlanSummary(

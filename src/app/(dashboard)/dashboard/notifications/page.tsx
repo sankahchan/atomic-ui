@@ -263,6 +263,10 @@ type TelegramOrderRow = {
   priceAmount?: number | null;
   priceCurrency?: string | null;
   priceLabel?: string | null;
+  paymentMethodCode?: string | null;
+  paymentMethodLabel?: string | null;
+  paymentMethodAccountName?: string | null;
+  paymentMethodAccountNumber?: string | null;
   durationMonths?: number | null;
   durationDays?: number | null;
   dataLimitBytes?: string | null;
@@ -2819,6 +2823,11 @@ function TelegramSalesWorkflowCard() {
                           .filter(Boolean)
                           .join(' • ')}
                       </p>
+                      {order.paymentMethodLabel ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {salesUi.paymentMethodLabel}: {order.paymentMethodLabel}
+                        </p>
+                      ) : null}
                       {order.selectedServerName ? (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {salesUi.selectedServer}: {order.selectedServerName}
@@ -3032,6 +3041,21 @@ function TelegramSalesWorkflowCard() {
                   <p className="text-xs text-muted-foreground">
                     {salesUi.proofCaption}: {selectedOrder.paymentCaption || salesUi.noCaption}
                   </p>
+                  {selectedOrder.paymentMethodLabel ? (
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.paymentMethodLabel}: {selectedOrder.paymentMethodLabel}
+                    </p>
+                  ) : null}
+                  {selectedOrder.paymentMethodAccountName ? (
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.accountName}: {selectedOrder.paymentMethodAccountName}
+                    </p>
+                  ) : null}
+                  {selectedOrder.paymentMethodAccountNumber ? (
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.accountNumber}: {selectedOrder.paymentMethodAccountNumber}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">{salesUi.proofForwardedHint}</p>
                 </div>
               </div>

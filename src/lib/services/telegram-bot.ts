@@ -53,6 +53,7 @@ import {
   generateTelegramOrderCode,
   getTelegramSalesSettings,
   listEnabledTelegramSalesPaymentMethods,
+  resolveTelegramSalesPaymentMethod,
   resolveTelegramSalesPaymentInstructions,
   resolveTelegramSalesPaymentMethodLabel,
   resolveTelegramSalesPaymentMethodNote,
@@ -192,7 +193,7 @@ const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
-type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pay' | 'up' | 'st' | 'ca';
+type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -300,7 +301,7 @@ function parseTelegramOrderActionCallbackData(data?: string | null) {
   }
 
   const action = parts[1];
-  if (!['pl', 'ky', 'sv', 'pay', 'up', 'st', 'ca'].includes(action)) {
+  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'ca'].includes(action)) {
     return null;
   }
 
@@ -608,6 +609,10 @@ function getTelegramUi(locale: SupportedLocale) {
     orderNamePrompt: isMyanmar
       ? '✍️ Key တွင် ပြမည့် အမည်ကို ပို့ပါ။ ဥပမာ - John iPhone 15'
       : '✍️ Send the name that should appear on the key. Example: John iPhone 15',
+    orderPaymentMethodPrompt: (code: string) =>
+      isMyanmar
+        ? `💳 <b>Order ${code}</b>\n\nငွေပေးချေမည့် payment method ကို ရွေးပါ။ Button ကိုနှိပ်နိုင်သလို စာရင်းနံပါတ်ကို reply လည်း လုပ်နိုင်ပါသည်။`
+        : `💳 <b>Order ${code}</b>\n\nChoose the payment method you will use. You can tap a button or reply with the number.`,
     renewTargetPrompt: (code: string) =>
       isMyanmar
         ? `🔄 <b>Renewal ${code}</b>\n\nသက်တမ်းတိုးလိုသော key ကို အောက်ပါစာရင်းမှ နံပါတ်ဖြင့် reply လုပ်ပါ။`
@@ -616,6 +621,9 @@ function getTelegramUi(locale: SupportedLocale) {
     invalidMonths: isMyanmar ? '❌ လအရေအတွက်ကို 3 နှင့်အထက် ဂဏန်းဖြင့် ပို့ပေးပါ။' : '❌ Send a number of months that is 3 or greater.',
     invalidRenewChoice: isMyanmar ? '❌ စာရင်းထဲက key နံပါတ်ကို ပို့ပေးပါ။' : '❌ Reply with one of the key numbers from the list.',
     invalidServerChoice: isMyanmar ? '❌ စာရင်းထဲက server တစ်ခုကို ရွေးပေးပါ။' : '❌ Reply with one of the listed servers.',
+    invalidPaymentMethodChoice: isMyanmar
+      ? '❌ စာရင်းထဲက payment method တစ်ခုကို ရွေးပေးပါ။'
+      : '❌ Reply with one of the listed payment methods.',
     invalidOrderName: isMyanmar ? '❌ Key အမည်ကို စာလုံး 2 လုံးမှ 100 လုံးအတွင်း ပို့ပေးပါ။' : '❌ Send a key name between 2 and 100 characters.',
     freeTrialUnavailable: isMyanmar
       ? 'ℹ️ Free trial ကို new user တစ်ဦးအတွက် တစ်ကြိမ်သာ ရရှိနိုင်ပါသည်။'
@@ -643,12 +651,15 @@ function getTelegramUi(locale: SupportedLocale) {
     orderActionChoosePlan: isMyanmar ? 'Plan ရွေးရန်' : 'Choose plan',
     orderActionSelectKey: isMyanmar ? 'Key ရွေးရန်' : 'Select key',
     orderActionSelectServer: isMyanmar ? 'Server ရွေးရန်' : 'Choose server',
+    orderActionChoosePaymentMethod: isMyanmar ? 'Payment method ရွေးရန်' : 'Choose payment method',
     orderActionSelectedPlan: (label: string) =>
       isMyanmar ? `ရွေးထားသော plan: ${label}` : `Selected plan: ${label}`,
     orderActionSelectedKey: (label: string) =>
       isMyanmar ? `ရွေးထားသော key: ${label}` : `Selected key: ${label}`,
     orderActionSelectedServer: (label: string) =>
       isMyanmar ? `ရွေးထားသော server: ${label}` : `Selected server: ${label}`,
+    orderActionSelectedPaymentMethod: (label: string) =>
+      isMyanmar ? `ရွေးထားသော payment method: ${label}` : `Selected payment method: ${label}`,
     orderActionCancelledInline: (code: string) =>
       isMyanmar ? `Order ${code} ကို ပယ်ဖျက်ပြီးပါပြီ။` : `Cancelled order ${code}.`,
     orderActionAlreadyClosed: isMyanmar ? 'ဤ order ကို ပိတ်ပြီး ဖြစ်ပါသည်။' : 'This order is already closed.',
@@ -673,6 +684,7 @@ function getTelegramUi(locale: SupportedLocale) {
       isMyanmar ? `Telegram action မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
     paymentMethodsLabel: isMyanmar ? 'ငွေပေးချေမှု အကောင့်များ' : 'Payment methods',
+    paymentMethodLabel: isMyanmar ? 'ရွေးထားသော ငွေပေးချေမှုနည်းလမ်း' : 'Payment method',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
     priceLabel: isMyanmar ? 'စျေးနှုန်း' : 'Price',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
@@ -705,6 +717,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderStatusAwaitingMonths: isMyanmar ? 'လအရေအတွက် စောင့်နေသည်' : 'Awaiting month count',
     orderStatusAwaitingServerSelection: isMyanmar ? 'Server ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting server selection',
     orderStatusAwaitingKeyName: isMyanmar ? 'Key အမည် စောင့်နေသည်' : 'Awaiting key name',
+    orderStatusAwaitingPaymentMethod: isMyanmar ? 'Payment method ရွေးရန် စောင့်နေသည်' : 'Awaiting payment method',
     orderStatusAwaitingPaymentProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
     orderStatusPendingReview: isMyanmar ? 'Admin စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
     orderStatusApproved: isMyanmar ? 'အတည်ပြုထားပြီး ဖြစ်သည်' : 'Approved',
@@ -910,6 +923,8 @@ function formatTelegramOrderStatusLabel(status: string, ui: ReturnType<typeof ge
       return ui.orderStatusAwaitingServerSelection;
     case 'AWAITING_KEY_NAME':
       return ui.orderStatusAwaitingKeyName;
+    case 'AWAITING_PAYMENT_METHOD':
+      return ui.orderStatusAwaitingPaymentMethod;
     case 'AWAITING_PAYMENT_PROOF':
       return ui.orderStatusAwaitingPaymentProof;
     case 'PENDING_REVIEW':
@@ -1053,6 +1068,10 @@ async function buildTelegramOrderStatusMessage(input: {
   if (order.selectedServerName) {
     const flag = order.selectedServerCountryCode ? ` ${getFlagEmoji(order.selectedServerCountryCode)}` : '';
     lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}${flag}</b>`);
+  }
+
+  if (order.paymentMethodLabel) {
+    lines.push(`${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`);
   }
 
   lines.push(`${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`);
@@ -1236,7 +1255,9 @@ function buildTelegramSalesPaymentPrompt(input: {
   orderCode: string;
   planSummary: string;
   paymentInstructions: string;
+  paymentMethod?: TelegramSalesPaymentMethod | null;
   paymentMethods?: TelegramSalesPaymentMethod[];
+  paymentMethodLabel?: string | null;
   selectedServerName?: string | null;
   requestedName?: string | null;
   renewalTargetName?: string | null;
@@ -1266,7 +1287,9 @@ function buildTelegramSalesPaymentPrompt(input: {
     escapeHtml(input.paymentInstructions),
   );
 
-  const paymentMethods = (input.paymentMethods || []).filter((method) => method.enabled);
+  const paymentMethods = input.paymentMethod
+    ? [input.paymentMethod]
+    : (input.paymentMethods || []).filter((method) => method.enabled);
   if (paymentMethods.length > 0) {
     lines.push('', `${ui.paymentMethodsLabel}:`);
     for (const method of paymentMethods) {
@@ -1283,6 +1306,8 @@ function buildTelegramSalesPaymentPrompt(input: {
         lines.push(`  ${escapeHtml(note)}`);
       }
     }
+  } else if (input.paymentMethodLabel?.trim()) {
+    lines.push('', `${ui.paymentMethodLabel}: <b>${escapeHtml(input.paymentMethodLabel.trim())}</b>`);
   }
 
   if (input.supportLink) {
@@ -1424,21 +1449,99 @@ function buildTelegramServerSelectionPromptText(input: {
   return buildTelegramSalesPlanPromptText(input.locale, lines);
 }
 
+function buildTelegramPaymentMethodSelectionKeyboard(input: {
+  orderId: string;
+  locale: SupportedLocale;
+  methods: TelegramSalesPaymentMethod[];
+}) {
+  const rows = input.methods.slice(0, 8).map((method) => [
+    {
+      text: truncateTelegramButtonLabel(
+        `💳 ${resolveTelegramSalesPaymentMethodLabel(method, input.locale)}`,
+        38,
+      ),
+      callback_data: buildTelegramOrderActionCallbackData('pm', input.orderId, method.code),
+    },
+  ]);
+
+  rows.push([
+    {
+      text: getTelegramUi(input.locale).orderActionCancel,
+      callback_data: buildTelegramOrderActionCallbackData('ca', input.orderId),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramPaymentMethodSelectionPromptText(input: {
+  orderCode: string;
+  locale: SupportedLocale;
+  methods: TelegramSalesPaymentMethod[];
+  planSummary: string;
+  requestedName?: string | null;
+  renewalTargetName?: string | null;
+  selectedServerName?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const lines = [
+    ui.orderPaymentMethodPrompt(input.orderCode),
+    `${ui.planLabel}: <b>${escapeHtml(input.planSummary)}</b>`,
+  ];
+
+  if (input.requestedName) {
+    lines.push(`${ui.requestedNameLabel}: <b>${escapeHtml(input.requestedName)}</b>`);
+  }
+
+  if (input.renewalTargetName) {
+    lines.push(`${ui.renewalTargetLabel}: <b>${escapeHtml(input.renewalTargetName)}</b>`);
+  }
+
+  if (input.selectedServerName) {
+    lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(input.selectedServerName)}</b>`);
+  }
+
+  lines.push(
+    '',
+    ...input.methods.map((method, index) => {
+      const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
+      return `${index + 1}. ${label}`;
+    }),
+  );
+
+  return buildTelegramSalesPlanPromptText(input.locale, lines);
+}
+
 function buildTelegramOrderActionKeyboard(input: {
   order: {
     id: string;
     status: string;
+    paymentMethodCode?: string | null;
   };
   locale: SupportedLocale;
 }) {
   const ui = getTelegramUi(input.locale);
   const rows: Array<Array<{ text: string; callback_data: string }>> = [];
 
+  if (input.order.status === 'AWAITING_PAYMENT_METHOD') {
+    rows.push([
+      {
+        text: ui.orderActionChoosePaymentMethod,
+        callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+      },
+    ]);
+  }
+
   if (input.order.status === 'AWAITING_PAYMENT_PROOF') {
     rows.push([
       {
-        text: ui.orderActionPayNow,
-        callback_data: buildTelegramOrderActionCallbackData('pay', input.order.id),
+        text: input.order.paymentMethodCode ? ui.orderActionPayNow : ui.orderActionChoosePaymentMethod,
+        callback_data: buildTelegramOrderActionCallbackData(
+          input.order.paymentMethodCode ? 'pay' : 'pm',
+          input.order.id,
+        ),
       },
       {
         text: ui.orderActionUploadProof,
@@ -1613,6 +1716,7 @@ async function sendTelegramOrderReviewAlert(orderId: string) {
     `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
     `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
     `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
     order.planName ? `${ui.planLabel}: <b>${escapeHtml(order.planName)}</b>` : '',
     order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
     order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
@@ -1904,7 +2008,13 @@ async function handleTelegramOrderTextMessage(input: {
       const dataLimitBytes = plan.dataLimitGB
         ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
         : null;
-      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
+      const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+      const nextStatus =
+        activeOrder.kind === 'NEW'
+          ? 'AWAITING_SERVER_SELECTION'
+          : enabledPaymentMethods.length > 0
+            ? 'AWAITING_PAYMENT_METHOD'
+            : 'AWAITING_PAYMENT_PROOF';
 
       const nextOrder = await db.telegramOrder.update({
         where: { id: activeOrder.id },
@@ -1929,6 +2039,23 @@ async function handleTelegramOrderTextMessage(input: {
           orderCode: nextOrder.orderCode,
           locale,
           servers,
+        });
+      }
+
+      if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
+        const renewalTarget = nextOrder.targetAccessKeyId
+          ? await db.accessKey.findUnique({
+              where: { id: nextOrder.targetAccessKeyId },
+              select: { name: true },
+            })
+          : null;
+        const planSummary = formatTelegramSalesPlanSummary(plan, durationMonths, locale);
+        return buildTelegramPaymentMethodSelectionPromptText({
+          orderCode: nextOrder.orderCode,
+          locale,
+          methods: enabledPaymentMethods,
+          planSummary,
+          renewalTargetName: renewalTarget?.name || null,
         });
       }
 
@@ -1964,7 +2091,13 @@ async function handleTelegramOrderTextMessage(input: {
       }
 
       const planSummary = formatTelegramSalesPlanSummary(plan, months, locale);
-      const nextStatus = activeOrder.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
+      const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+      const nextStatus =
+        activeOrder.kind === 'NEW'
+          ? 'AWAITING_SERVER_SELECTION'
+          : enabledPaymentMethods.length > 0
+            ? 'AWAITING_PAYMENT_METHOD'
+            : 'AWAITING_PAYMENT_PROOF';
       const nextOrder = await db.telegramOrder.update({
         where: { id: activeOrder.id },
         data: {
@@ -1985,6 +2118,22 @@ async function handleTelegramOrderTextMessage(input: {
           orderCode: nextOrder.orderCode,
           locale,
           servers,
+        });
+      }
+
+      if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
+        const renewalTarget = nextOrder.targetAccessKeyId
+          ? await db.accessKey.findUnique({
+              where: { id: nextOrder.targetAccessKeyId },
+              select: { name: true },
+            })
+          : null;
+        return buildTelegramPaymentMethodSelectionPromptText({
+          orderCode: nextOrder.orderCode,
+          locale,
+          methods: enabledPaymentMethods,
+          planSummary,
+          renewalTargetName: renewalTarget?.name || null,
         });
       }
 
@@ -2070,12 +2219,21 @@ async function handleTelegramOrderTextMessage(input: {
         where: { id: activeOrder.id },
         data: {
           requestedName: trimmed,
-          status: plan?.code === 'trial_1d_3gb' ? 'APPROVED' : 'AWAITING_PAYMENT_PROOF',
+          status:
+            plan?.code === 'trial_1d_3gb'
+              ? 'APPROVED'
+              : listEnabledTelegramSalesPaymentMethods(salesSettings).length > 0
+                ? 'AWAITING_PAYMENT_METHOD'
+                : 'AWAITING_PAYMENT_PROOF',
           reviewedAt: plan?.code === 'trial_1d_3gb' ? new Date() : null,
           adminNote:
             plan?.code === 'trial_1d_3gb'
               ? appendTelegramOrderAdminNote(activeOrder.adminNote, 'Auto-approved free trial')
               : activeOrder.adminNote,
+          paymentMethodCode: null,
+          paymentMethodLabel: null,
+          paymentMethodAccountName: null,
+          paymentMethodAccountNumber: null,
         },
       });
 
@@ -2158,6 +2316,18 @@ async function handleTelegramOrderTextMessage(input: {
         }
       }
 
+      const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+      if (enabledPaymentMethods.length > 0) {
+        return buildTelegramPaymentMethodSelectionPromptText({
+          orderCode: updatedOrder.orderCode,
+          locale,
+          methods: enabledPaymentMethods,
+          planSummary,
+          selectedServerName: updatedOrder.selectedServerName,
+          requestedName: trimmed,
+        });
+      }
+
       return buildTelegramSalesPaymentPrompt({
         locale,
         orderCode: activeOrder.orderCode,
@@ -2168,6 +2338,79 @@ async function handleTelegramOrderTextMessage(input: {
         requestedName: trimmed,
         supportLink: await getTelegramSupportLink(),
       });
+    }
+    case 'AWAITING_PAYMENT_METHOD': {
+      const paymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+      if (paymentMethods.length === 0) {
+        await db.telegramOrder.update({
+          where: { id: activeOrder.id },
+          data: {
+            status: 'AWAITING_PAYMENT_PROOF',
+          },
+        });
+        return ui.paymentProofRequired;
+      }
+
+      const numericIndex = Number.parseInt(trimmed, 10);
+      const normalizedText = trimmed.toLowerCase();
+      const selectedMethod =
+        Number.isFinite(numericIndex) && numericIndex >= 1 && numericIndex <= paymentMethods.length
+          ? paymentMethods[numericIndex - 1]
+          : paymentMethods.find((method) => method.code.toLowerCase() === normalizedText) ||
+            paymentMethods.find(
+              (method) =>
+                resolveTelegramSalesPaymentMethodLabel(method, locale).toLowerCase() === normalizedText,
+            ) ||
+            paymentMethods.find((method) =>
+              resolveTelegramSalesPaymentMethodLabel(method, locale)
+                .toLowerCase()
+                .includes(normalizedText),
+            ) ||
+            null;
+
+      if (!selectedMethod) {
+        return ui.invalidPaymentMethodChoice;
+      }
+
+      const updatedOrder = await db.telegramOrder.update({
+        where: { id: activeOrder.id },
+        data: {
+          paymentMethodCode: selectedMethod.code,
+          paymentMethodLabel: resolveTelegramSalesPaymentMethodLabel(selectedMethod, locale),
+          paymentMethodAccountName: selectedMethod.accountName?.trim() || null,
+          paymentMethodAccountNumber: selectedMethod.accountNumber?.trim() || null,
+          status: 'AWAITING_PAYMENT_PROOF',
+        },
+      });
+
+      const plan = updatedOrder.planCode
+        ? resolveTelegramSalesPlan(salesSettings, updatedOrder.planCode as TelegramSalesPlanCode)
+        : null;
+      const renewalTarget = updatedOrder.targetAccessKeyId
+        ? await db.accessKey.findUnique({
+            where: { id: updatedOrder.targetAccessKeyId },
+            select: { name: true },
+          })
+        : null;
+      const planSummary = plan
+        ? formatTelegramSalesPlanSummary(plan, updatedOrder.durationMonths, locale)
+        : updatedOrder.planName || '';
+
+      return [
+        ui.orderActionSelectedPaymentMethod(resolveTelegramSalesPaymentMethodLabel(selectedMethod, locale)),
+        '',
+        buildTelegramSalesPaymentPrompt({
+          locale,
+          orderCode: updatedOrder.orderCode,
+          planSummary,
+          paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+          paymentMethod: selectedMethod,
+          selectedServerName: updatedOrder.selectedServerName,
+          requestedName: updatedOrder.requestedName,
+          renewalTargetName: renewalTarget?.name || null,
+          supportLink: await getTelegramSupportLink(),
+        }),
+      ].join('\n');
     }
     case 'AWAITING_PAYMENT_PROOF':
       return ui.paymentProofRequired;
@@ -2695,6 +2938,7 @@ async function cancelStaleTelegramConversationOrders(chatId: number, telegramUse
           'AWAITING_MONTHS',
           'AWAITING_SERVER_SELECTION',
           'AWAITING_KEY_NAME',
+          'AWAITING_PAYMENT_METHOD',
           'AWAITING_PAYMENT_PROOF',
         ],
       },
@@ -5340,7 +5584,13 @@ async function handleTelegramCallbackQuery(
             const dataLimitBytes = plan.dataLimitGB
               ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
               : null;
-            const nextStatus = order.kind === 'NEW' ? 'AWAITING_SERVER_SELECTION' : 'AWAITING_PAYMENT_PROOF';
+            const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(settings);
+            const nextStatus =
+              order.kind === 'NEW'
+                ? 'AWAITING_SERVER_SELECTION'
+                : enabledPaymentMethods.length > 0
+                  ? 'AWAITING_PAYMENT_METHOD'
+                  : 'AWAITING_PAYMENT_PROOF';
             const nextOrder = await db.telegramOrder.update({
               where: { id: order.id },
               data: {
@@ -5373,6 +5623,31 @@ async function handleTelegramCallbackQuery(
                     orderId: nextOrder.id,
                     locale,
                     servers,
+                  }),
+                },
+              );
+            } else if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
+              const renewalTarget = nextOrder.targetAccessKeyId
+                ? await db.accessKey.findUnique({
+                    where: { id: nextOrder.targetAccessKeyId },
+                    select: { name: true },
+                  })
+                : null;
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                buildTelegramPaymentMethodSelectionPromptText({
+                  orderCode: nextOrder.orderCode,
+                  locale,
+                  methods: enabledPaymentMethods,
+                  planSummary: formatTelegramSalesPlanSummary(plan, durationMonths, locale),
+                  renewalTargetName: renewalTarget?.name || null,
+                }),
+                {
+                  replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+                    orderId: nextOrder.id,
+                    locale,
+                    methods: enabledPaymentMethods,
                   }),
                 },
               );
@@ -5476,6 +5751,153 @@ async function handleTelegramCallbackQuery(
             );
             return null;
           }
+          case 'pm': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+
+            const salesSettings = await getTelegramSalesSettings();
+            const paymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+            if (paymentMethods.length === 0) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionNotReadyForPayment,
+              );
+              return null;
+            }
+
+            if (!userOrderAction.secondary) {
+              const plan = order.planCode
+                ? resolveTelegramSalesPlan(salesSettings, order.planCode as TelegramSalesPlanCode)
+                : null;
+              const renewalTarget = order.targetAccessKeyId
+                ? await db.accessKey.findUnique({
+                    where: { id: order.targetAccessKeyId },
+                    select: { name: true },
+                  })
+                : null;
+              const planSummary = plan
+                ? formatTelegramSalesPlanSummary(plan, order.durationMonths, locale)
+                : order.planName || '';
+
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                buildTelegramPaymentMethodSelectionPromptText({
+                  orderCode: order.orderCode,
+                  locale,
+                  methods: paymentMethods,
+                  planSummary,
+                  requestedName: order.requestedName,
+                  renewalTargetName: renewalTarget?.name || null,
+                  selectedServerName: order.selectedServerName,
+                }),
+                {
+                  replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+                    orderId: order.id,
+                    locale,
+                    methods: paymentMethods,
+                  }),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
+
+            if (
+              order.status !== 'AWAITING_PAYMENT_METHOD' &&
+              order.status !== 'AWAITING_PAYMENT_PROOF'
+            ) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidPaymentMethodChoice,
+              );
+              return null;
+            }
+
+            const selectedMethod = paymentMethods.find(
+              (method) => method.code === userOrderAction.secondary,
+            );
+            if (!selectedMethod) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidPaymentMethodChoice,
+              );
+              return null;
+            }
+
+            const nextOrder = await db.telegramOrder.update({
+              where: { id: order.id },
+              data: {
+                paymentMethodCode: selectedMethod.code,
+                paymentMethodLabel: resolveTelegramSalesPaymentMethodLabel(selectedMethod, locale),
+                paymentMethodAccountName: selectedMethod.accountName?.trim() || null,
+                paymentMethodAccountNumber: selectedMethod.accountNumber?.trim() || null,
+                status: 'AWAITING_PAYMENT_PROOF',
+              },
+            });
+
+            const plan = nextOrder.planCode
+              ? resolveTelegramSalesPlan(salesSettings, nextOrder.planCode as TelegramSalesPlanCode)
+              : null;
+            const renewalTarget = nextOrder.targetAccessKeyId
+              ? await db.accessKey.findUnique({
+                  where: { id: nextOrder.targetAccessKeyId },
+                  select: { name: true },
+                })
+              : null;
+            const planSummary = plan
+              ? formatTelegramSalesPlanSummary(plan, nextOrder.durationMonths, locale)
+              : nextOrder.planName || '';
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              buildTelegramSalesPaymentPrompt({
+                locale,
+                orderCode: nextOrder.orderCode,
+                planSummary,
+                paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+                paymentMethod: selectedMethod,
+                selectedServerName: nextOrder.selectedServerName,
+                requestedName: nextOrder.requestedName,
+                renewalTargetName: renewalTarget?.name || null,
+                supportLink: await getTelegramSupportLink(),
+              }),
+              {
+                replyMarkup: buildTelegramOrderActionKeyboard({
+                  order: nextOrder,
+                  locale,
+                }),
+              },
+            );
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedPaymentMethod(
+                resolveTelegramSalesPaymentMethodLabel(selectedMethod, locale),
+              ),
+            );
+            return null;
+          }
           case 'pay':
           case 'up': {
             const order = await findTelegramOrderByIdForUser({
@@ -5491,7 +5913,10 @@ async function handleTelegramCallbackQuery(
               );
               return null;
             }
-            if (order.status !== 'AWAITING_PAYMENT_PROOF') {
+            if (
+              order.status !== 'AWAITING_PAYMENT_METHOD' &&
+              order.status !== 'AWAITING_PAYMENT_PROOF'
+            ) {
               await answerTelegramCallbackQuery(
                 config.botToken,
                 callbackQuery.id,
@@ -5513,6 +5938,40 @@ async function handleTelegramCallbackQuery(
             const planSummary = plan
               ? formatTelegramSalesPlanSummary(plan, order.durationMonths, locale)
               : order.planName || '';
+            const selectedPaymentMethod = resolveTelegramSalesPaymentMethod(
+              salesSettings,
+              order.paymentMethodCode,
+            );
+
+            if (order.status === 'AWAITING_PAYMENT_METHOD' || !selectedPaymentMethod) {
+              const paymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                buildTelegramPaymentMethodSelectionPromptText({
+                  orderCode: order.orderCode,
+                  locale,
+                  methods: paymentMethods,
+                  planSummary,
+                  selectedServerName: order.selectedServerName,
+                  requestedName: order.requestedName,
+                  renewalTargetName: renewalTarget?.name || null,
+                }),
+                {
+                  replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+                    orderId: order.id,
+                    locale,
+                    methods: paymentMethods,
+                  }),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
 
             await sendTelegramMessage(
               config.botToken,
@@ -5522,7 +5981,8 @@ async function handleTelegramCallbackQuery(
                   orderCode: order.orderCode,
                   planSummary,
                   paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
-                  paymentMethods: listEnabledTelegramSalesPaymentMethods(salesSettings),
+                  paymentMethod: selectedPaymentMethod,
+                  paymentMethodLabel: order.paymentMethodLabel,
                   selectedServerName: order.selectedServerName,
                   requestedName: order.requestedName,
                   renewalTargetName: renewalTarget?.name || null,

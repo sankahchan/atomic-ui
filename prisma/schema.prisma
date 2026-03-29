@@ -261,6 +261,10 @@ model TelegramOrder {
   selectedServerId     String?
   selectedServerName   String?
   selectedServerCountryCode String?
+  paymentMethodCode    String?
+  paymentMethodLabel   String?
+  paymentMethodAccountName String?
+  paymentMethodAccountNumber String?
   targetAccessKeyId    String?
   approvedAccessKeyId  String?
   paymentProofFileId   String?
