@@ -161,6 +161,7 @@ export default function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
   const [shareRange, setShareRange] = useState<'24h' | '7d' | '30d'>('7d');
+  const [telegramSalesRange, setTelegramSalesRange] = useState<'24h' | '7d' | '30d'>('30d');
 
   const { data: trafficHistory, isLoading: loadingTraffic } = trpc.dashboard.trafficHistory.useQuery({ days });
   const { data: topUsers, isLoading: loadingTopUsers } = trpc.dashboard.topUsers.useQuery({ limit: 5 });
@@ -179,6 +180,11 @@ export default function AnalyticsPage() {
     range: shareRange,
     limit: 6,
   });
+  const { data: telegramSalesDashboard, isLoading: loadingTelegramSalesDashboard } =
+    trpc.analytics.telegramSalesDashboard.useQuery({
+      range: telegramSalesRange,
+      limit: 6,
+    });
 
   const totalTraffic =
     trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) ?? BigInt(0);
@@ -194,6 +200,15 @@ export default function AnalyticsPage() {
   };
 
   const maxPeakBytes = peakHours?.reduce((max, curr) => Math.max(max, curr.bytes), 0) || 0;
+
+  const formatRevenueLabel = (currency: string, amount: number) => {
+    const normalizedCurrency = currency.trim().toUpperCase();
+    const formattedAmount = new Intl.NumberFormat('en-US').format(amount);
+    if (normalizedCurrency === 'MMK') {
+      return `${formattedAmount} Kyat`;
+    }
+    return `${formattedAmount} ${normalizedCurrency}`;
+  };
 
   const daysOfWeek = [
     t('days.sunday') || 'Sun',
@@ -748,6 +763,246 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-panel">
+            <CardHeader className="px-0 pt-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Send className="h-5 w-5 text-primary" />
+                    Telegram sales
+                  </CardTitle>
+                  <CardDescription>
+                    Track Telegram order volume, review speed, plan performance, and collected pricing signals.
+                  </CardDescription>
+                </div>
+                <Select
+                  value={telegramSalesRange}
+                  onValueChange={(value) => setTelegramSalesRange(value as '24h' | '7d' | '30d')}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24h">24h</SelectItem>
+                    <SelectItem value="7d">7 days</SelectItem>
+                    <SelectItem value="30d">30 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-0 pb-0">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Orders</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.totalOrders || 0}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">Total Telegram sales orders in the selected range.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pending review</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.pendingReview || 0}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">Orders waiting for payment-proof review.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.fulfilled || 0}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">Orders that created or renewed keys successfully.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Awaiting proof</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.awaitingPayment || 0}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">Users who have not uploaded payment proof yet.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg review time</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard
+                      ? '…'
+                      : telegramSalesDashboard?.averages.reviewMinutes !== null &&
+                          telegramSalesDashboard?.averages.reviewMinutes !== undefined
+                        ? `${Math.round(telegramSalesDashboard.averages.reviewMinutes)}m`
+                        : '—'}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">From proof upload to admin review.</p>
+                </div>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg fulfillment</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {loadingTelegramSalesDashboard
+                      ? '…'
+                      : telegramSalesDashboard?.averages.fulfillmentMinutes !== null &&
+                          telegramSalesDashboard?.averages.fulfillmentMinutes !== undefined
+                        ? `${Math.round(telegramSalesDashboard.averages.fulfillmentMinutes)}m`
+                        : '—'}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">From proof upload to delivered access.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Top plans</p>
+                      <h3 className="mt-2 text-lg font-semibold">Plan performance</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Best-performing Telegram plans by order volume and fulfilled revenue.
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {loadingTelegramSalesDashboard ? '…' : `${telegramSalesDashboard?.summary.newOrders || 0} new / ${telegramSalesDashboard?.summary.renewalOrders || 0} renew`}
+                    </Badge>
+                  </div>
+
+                  {loadingTelegramSalesDashboard ? (
+                    <div className="mt-4 space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                      ))}
+                    </div>
+                  ) : telegramSalesDashboard && telegramSalesDashboard.topPlans.length > 0 ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {telegramSalesDashboard.topPlans.map((plan) => (
+                        <div key={plan.planCode || plan.planName} className="rounded-[1.2rem] border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{plan.planName}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {plan.planCode || 'Custom plan'}
+                              </p>
+                            </div>
+                            <Badge variant="outline">{plan.orders} orders</Badge>
+                          </div>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fulfilled</p>
+                              <p className="mt-2 text-lg font-semibold">{plan.fulfilled}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {plan.orders > 0 ? `${Math.round((plan.fulfilled / plan.orders) * 100)}% success` : 'No approvals yet'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
+                              <div className="mt-2 space-y-1">
+                                {plan.revenueByCurrency.length > 0 ? (
+                                  plan.revenueByCurrency.map((revenue) => (
+                                    <p key={`${plan.planCode || plan.planName}-${revenue.currency}`} className="text-sm font-medium">
+                                      {formatRevenueLabel(revenue.currency, revenue.amount)}
+                                    </p>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No priced fulfillments yet</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ops-chart-empty mt-4">
+                      <div className="space-y-2 text-center">
+                        <Send className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                        <p className="font-medium text-foreground">No Telegram sales data yet</p>
+                        <p className="text-sm text-muted-foreground">
+                          Orders created from the bot will show plan performance and revenue here.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Revenue by currency</p>
+                    <h3 className="mt-2 text-lg font-semibold">Collected pricing</h3>
+                    <div className="mt-4 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-16 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.revenueByCurrency.length > 0 ? (
+                        telegramSalesDashboard.revenueByCurrency.map((revenue) => (
+                          <div key={revenue.currency} className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {revenue.currency}
+                            </p>
+                            <p className="mt-2 text-xl font-semibold">{formatRevenueLabel(revenue.currency, revenue.amount)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">From fulfilled Telegram orders in this range.</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="ops-chart-empty">
+                          <div className="space-y-2 text-center">
+                            <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                            <p className="font-medium text-foreground">No revenue signals yet</p>
+                            <p className="text-sm text-muted-foreground">
+                              Set plan pricing in Telegram sales settings to track collected amounts here.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recent orders</p>
+                    <h3 className="mt-2 text-lg font-semibold">Latest Telegram orders</h3>
+                    <div className="mt-4 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(4)].map((_, i) => (
+                          <div key={i} className="h-18 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.recentOrders.length > 0 ? (
+                        telegramSalesDashboard.recentOrders.map((order) => (
+                          <div key={order.id} className="rounded-[1.1rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-medium">{order.orderCode}</p>
+                                <p className="mt-1 truncate text-sm text-muted-foreground">
+                                  {order.planName || order.planCode || order.kind}
+                                </p>
+                              </div>
+                              <Badge variant="outline">{order.status}</Badge>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span>{order.requestedName || `@${order.telegramUsername || order.telegramUserId}`}</span>
+                              <span>•</span>
+                              <span>{formatRelativeTime(order.createdAt)}</span>
+                              {typeof order.priceAmount === 'number' && order.priceAmount > 0 ? (
+                                <>
+                                  <span>•</span>
+                                  <span>{formatRevenueLabel(order.priceCurrency || 'MMK', order.priceAmount)}</span>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="ops-chart-empty">
+                          <div className="space-y-2 text-center">
+                            <Users className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                            <p className="font-medium text-foreground">No recent Telegram orders</p>
+                            <p className="text-sm text-muted-foreground">
+                              The latest customer buy and renew requests will appear here.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

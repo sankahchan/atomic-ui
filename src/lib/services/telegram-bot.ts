@@ -184,9 +184,11 @@ function getCommandKeyboard(isAdmin: boolean) {
 
 const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
 const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
+const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
+type TelegramOrderUserAction = 'pl' | 'ky' | 'pay' | 'up' | 'st' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -271,6 +273,38 @@ function parseTelegramOrderReviewCallbackData(data?: string | null) {
     action,
     orderId,
   } as const;
+}
+
+function buildTelegramOrderActionCallbackData(
+  action: TelegramOrderUserAction,
+  primary: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
+    : `${TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
+}
+
+function parseTelegramOrderActionCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action = parts[1];
+  if (!['pl', 'ky', 'pay', 'up', 'st', 'ca'].includes(action)) {
+    return null;
+  }
+
+  return {
+    action: action as TelegramOrderUserAction,
+    primary: parts[2]?.trim() || '',
+    secondary: parts[3]?.trim() || null,
+  };
 }
 
 function getFlagEmoji(countryCode: string) {
@@ -589,6 +623,28 @@ function getTelegramUi(locale: SupportedLocale) {
     orderSupportHint: isMyanmar
       ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
       : 'Before approval, you can cancel the current order at any time with /cancel.',
+    orderActionPayNow: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Pay now',
+    orderActionUploadProof: isMyanmar ? 'Screenshot ပို့ရန်' : 'Upload screenshot',
+    orderActionCheckStatus: isMyanmar ? 'အခြေအနေ စစ်ရန်' : 'Check status',
+    orderActionCancel: isMyanmar ? 'Order ပယ်ရန်' : 'Cancel order',
+    orderActionRenewKey: isMyanmar ? 'ဤ key ကို သက်တမ်းတိုးရန်' : 'Renew this key',
+    orderActionChoosePlan: isMyanmar ? 'Plan ရွေးရန်' : 'Choose plan',
+    orderActionSelectKey: isMyanmar ? 'Key ရွေးရန်' : 'Select key',
+    orderActionSelectedPlan: (label: string) =>
+      isMyanmar ? `ရွေးထားသော plan: ${label}` : `Selected plan: ${label}`,
+    orderActionSelectedKey: (label: string) =>
+      isMyanmar ? `ရွေးထားသော key: ${label}` : `Selected key: ${label}`,
+    orderActionCancelledInline: (code: string) =>
+      isMyanmar ? `Order ${code} ကို ပယ်ဖျက်ပြီးပါပြီ။` : `Cancelled order ${code}.`,
+    orderActionAlreadyClosed: isMyanmar ? 'ဤ order ကို ပိတ်ပြီး ဖြစ်ပါသည်။' : 'This order is already closed.',
+    orderActionNotReadyForPayment: isMyanmar
+      ? 'ဤ order သည် payment screenshot ပို့ရန် အဆင့်သို့ မရောက်သေးပါ။'
+      : 'This order is not ready for payment proof yet.',
+    orderActionStatusMissing: isMyanmar ? 'Order ကို မတွေ့ပါ။' : 'Order not found.',
+    orderActionSent: isMyanmar ? 'အသေးစိတ်ကို Telegram တွင် ပို့ပြီးပါပြီ။' : 'Details sent in Telegram.',
+    myKeysRenewHint: isMyanmar
+      ? 'အောက်ပါ button များဖြင့် key ကို တိုက်ရိုက် သက်တမ်းတိုးနိုင်ပါသည်။'
+      : 'Use the buttons below to renew a specific key directly.',
     orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order ကို စစ်ဆေးရန် လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
     orderReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးရန်' : 'Review in panel',
     orderApproveActionLabel: isMyanmar ? 'Telegram မှ အတည်ပြုရန်' : 'Approve in Telegram',
@@ -1031,7 +1087,12 @@ async function buildTelegramOrderStatusMessage(input: {
   return lines.join('\n');
 }
 
-async function handleOrdersCommand(chatId: number, telegramUserId: number, locale: SupportedLocale) {
+async function handleOrdersCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+) {
   const ui = getTelegramUi(locale);
   const orders = await listTelegramOrdersForUser(chatId, telegramUserId, 6);
   if (!orders.length) {
@@ -1057,7 +1118,21 @@ async function handleOrdersCommand(chatId: number, telegramUserId: number, local
   }
 
   lines.push('', ui.ordersHint);
-  return lines.join('\n');
+  const summaryMessage = lines.join('\n');
+  const sentSummary = await sendTelegramMessage(botToken, chatId, summaryMessage);
+
+  const latestOrder = orders[0];
+  if (latestOrder) {
+    await sendTelegramOrderStatusCard({
+      botToken,
+      chatId,
+      order: latestOrder,
+      locale,
+      appendLatestHint: true,
+    });
+  }
+
+  return sentSummary ? null : summaryMessage;
 }
 
 async function handleOrderStatusCommand(
@@ -1065,6 +1140,7 @@ async function handleOrderStatusCommand(
   telegramUserId: number,
   argsText: string,
   locale: SupportedLocale,
+  botToken: string,
 ) {
   const ui = getTelegramUi(locale);
   const lookupCode = argsText.trim();
@@ -1087,7 +1163,15 @@ async function handleOrderStatusCommand(
     return lookupCode ? ui.orderStatusNotFound(escapeHtml(lookupCode)) : ui.orderStatusLatestNotFound;
   }
 
-  return lookupCode ? message : `${message}\n\n${ui.latestOrderHint}`;
+  const text = lookupCode ? message : `${message}\n\n${ui.latestOrderHint}`;
+  const sent = await sendTelegramMessage(botToken, chatId, text, {
+    replyMarkup: buildTelegramOrderActionKeyboard({
+      order,
+      locale,
+    }),
+  });
+
+  return sent ? null : text;
 }
 
 function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines: string[]) {
@@ -1126,6 +1210,150 @@ function buildTelegramSalesPaymentPrompt(input: {
   );
 
   return lines.join('\n');
+}
+
+function truncateTelegramButtonLabel(value: string, maxLength = 28) {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+function buildTelegramPlanSelectionKeyboard(input: {
+  orderId: string;
+  plans: TelegramSalesPlan[];
+  locale: SupportedLocale;
+}) {
+  return {
+    inline_keyboard: input.plans.map((plan) => {
+      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+      return [
+        {
+          text: truncateTelegramButtonLabel(price ? `${label} • ${price}` : label, 42),
+          callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, plan.code),
+        },
+      ];
+    }),
+  };
+}
+
+function buildTelegramRenewKeySelectionKeyboard(input: {
+  orderId: string;
+  keys: Awaited<ReturnType<typeof findLinkedAccessKeys>>;
+  locale: SupportedLocale;
+}) {
+  const rows = input.keys.slice(0, 8).map((key) => [
+    {
+      text: truncateTelegramButtonLabel(`🔄 ${key.name}`, 36),
+      callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
+    },
+  ]);
+
+  rows.push([
+    {
+      text: getTelegramUi(input.locale).orderActionCancel,
+      callback_data: buildTelegramOrderActionCallbackData('ca', input.orderId),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramOrderActionKeyboard(input: {
+  order: {
+    id: string;
+    status: string;
+  };
+  locale: SupportedLocale;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+
+  if (input.order.status === 'AWAITING_PAYMENT_PROOF') {
+    rows.push([
+      {
+        text: ui.orderActionPayNow,
+        callback_data: buildTelegramOrderActionCallbackData('pay', input.order.id),
+      },
+      {
+        text: ui.orderActionUploadProof,
+        callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
+      },
+    ]);
+  }
+
+  rows.push([
+    {
+      text: ui.orderActionCheckStatus,
+      callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
+    },
+  ]);
+
+  if (!isTelegramOrderTerminal(input.order.status) && input.order.status !== 'PENDING_REVIEW') {
+    rows.push([
+      {
+        text: ui.orderActionCancel,
+        callback_data: buildTelegramOrderActionCallbackData('ca', input.order.id),
+      },
+    ]);
+  }
+
+  return rows.length
+    ? {
+        inline_keyboard: rows,
+      }
+    : undefined;
+}
+
+async function findTelegramOrderByIdForUser(input: {
+  orderId: string;
+  chatId: number;
+  telegramUserId: number;
+}) {
+  return db.telegramOrder.findFirst({
+    where: {
+      id: input.orderId,
+      OR: [
+        { telegramChatId: String(input.chatId) },
+        { telegramUserId: String(input.telegramUserId) },
+      ],
+    },
+  });
+}
+
+async function sendTelegramOrderStatusCard(input: {
+  botToken: string;
+  chatId: number;
+  order: Awaited<ReturnType<typeof findTelegramOrderForUser>>;
+  locale: SupportedLocale;
+  appendLatestHint?: boolean;
+}) {
+  if (!input.order) {
+    return false;
+  }
+
+  const message = await buildTelegramOrderStatusMessage({
+    order: input.order,
+    locale: input.locale,
+  });
+
+  if (!message) {
+    return false;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const text = input.appendLatestHint ? `${message}\n\n${ui.latestOrderHint}` : message;
+  return sendTelegramMessage(input.botToken, input.chatId, text, {
+    replyMarkup: buildTelegramOrderActionKeyboard({
+      order: input.order,
+      locale: input.locale,
+    }),
+  });
 }
 
 async function createTelegramOrderRecord(input: {
@@ -1275,7 +1503,8 @@ async function handleBuyCommand(
   telegramUserId: number,
   username: string,
   locale: SupportedLocale,
-): Promise<string> {
+  botToken: string,
+): Promise<string | null> {
   const ui = getTelegramUi(locale);
   const settings = await getTelegramSalesSettings();
 
@@ -1308,8 +1537,16 @@ async function handleBuyCommand(
       return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
     }),
   ];
+  const message = buildTelegramSalesPlanPromptText(locale, lines);
+  const sent = await sendTelegramMessage(botToken, chatId, message, {
+    replyMarkup: buildTelegramPlanSelectionKeyboard({
+      orderId: order.id,
+      plans: enabledPlans,
+      locale,
+    }),
+  });
 
-  return buildTelegramSalesPlanPromptText(locale, lines);
+  return sent ? null : message;
 }
 
 async function handleRenewOrderCommand(
@@ -1317,7 +1554,8 @@ async function handleRenewOrderCommand(
   telegramUserId: number,
   username: string,
   locale: SupportedLocale,
-): Promise<string> {
+  botToken: string,
+): Promise<string | null> {
   const ui = getTelegramUi(locale);
   const settings = await getTelegramSalesSettings();
 
@@ -1350,8 +1588,16 @@ async function handleRenewOrderCommand(
     ui.renewTargetPrompt(order.orderCode),
     ...keys.map((key, index) => `${index + 1}. ${key.name} (${key.status})`),
   ];
+  const message = buildTelegramSalesPlanPromptText(locale, lines);
+  const sent = await sendTelegramMessage(botToken, chatId, message, {
+    replyMarkup: buildTelegramRenewKeySelectionKeyboard({
+      orderId: order.id,
+      keys,
+      locale,
+    }),
+  });
 
-  return buildTelegramSalesPlanPromptText(locale, lines);
+  return sent ? null : message;
 }
 
 async function handleTelegramOrderTextMessage(input: {
@@ -1426,6 +1672,8 @@ async function handleTelegramOrderTextMessage(input: {
           data: {
             planCode: plan.code,
             planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+            priceAmount: plan.priceAmount ?? null,
+            priceCurrency: plan.priceCurrency || null,
             priceLabel: priceLabel || null,
             templateId: plan.templateId || null,
             dataLimitBytes: null,
@@ -1447,6 +1695,8 @@ async function handleTelegramOrderTextMessage(input: {
         data: {
           planCode: plan.code,
           planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+          priceAmount: plan.priceAmount ?? null,
+          priceCurrency: plan.priceCurrency || null,
           priceLabel: priceLabel || null,
           templateId: plan.templateId || null,
           durationMonths,
@@ -1496,6 +1746,8 @@ async function handleTelegramOrderTextMessage(input: {
         data: {
           durationMonths: months,
           planName: planSummary,
+          priceAmount: plan.priceAmount ?? null,
+          priceCurrency: plan.priceCurrency || null,
           priceLabel: resolveTelegramSalesPriceLabel(plan, locale) || null,
           templateId: plan.templateId || null,
           status: nextStatus,
@@ -3942,7 +4194,8 @@ async function handleMyKeysCommand(
   chatId: number,
   telegramUserId: number,
   locale: SupportedLocale,
-): Promise<string> {
+  botToken: string,
+): Promise<string | null> {
   const ui = getTelegramUi(locale);
   const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
 
@@ -3967,7 +4220,20 @@ async function handleMyKeysCommand(
     );
   }
 
-  return lines.join('\n');
+  lines.push(ui.myKeysRenewHint);
+  const message = lines.join('\n');
+  const sent = await sendTelegramMessage(botToken, chatId, message, {
+    replyMarkup: {
+      inline_keyboard: keys.slice(0, 8).map((key) => [
+        {
+          text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
+          callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
+        },
+      ]),
+    },
+  });
+
+  return sent ? null : message;
 }
 
 async function handleSubscriptionLinksCommand(
@@ -4446,6 +4712,362 @@ async function handleTelegramCallbackQuery(
     config.adminChatIds.includes(String(chatId));
 
   if (!parsed) {
+    const userOrderAction = parseTelegramOrderActionCallbackData(callbackQuery.data);
+    if (userOrderAction) {
+      const locale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+      const ui = getTelegramUi(locale);
+
+      try {
+        switch (userOrderAction.action) {
+          case 'ky': {
+            const settings = await getTelegramSalesSettings();
+            if (!settings.enabled || !settings.allowRenewals) {
+              await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.renewDisabled);
+              return null;
+            }
+
+            const existing = await getActiveTelegramOrder(chatId, callbackQuery.from.id);
+            if (existing?.status === 'PENDING_REVIEW') {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.activeOrderPendingReview(existing.orderCode),
+              );
+              return null;
+            }
+
+            const keys = await findLinkedAccessKeys(chatId, callbackQuery.from.id, true);
+            const matchedKey = keys.find((key) => key.id === userOrderAction.primary);
+            if (!matchedKey) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidRenewChoice,
+              );
+              return null;
+            }
+
+            await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
+            const order = await createTelegramOrderRecord({
+              kind: 'RENEW',
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+              initialStatus: 'AWAITING_PLAN',
+              targetAccessKeyId: matchedKey.id,
+            });
+
+            const enabledPlans = settings.plans.filter((plan) => plan.enabled);
+            const lines = [
+              ui.orderPlanPrompt(order.orderCode),
+              `${ui.renewalTargetLabel}: <b>${escapeHtml(matchedKey.name)}</b>`,
+              '',
+              ...enabledPlans.map((plan, index) => {
+                const label = resolveTelegramSalesPlanLabel(plan, locale);
+                const price = resolveTelegramSalesPriceLabel(plan, locale);
+                return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
+              }),
+            ];
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              buildTelegramSalesPlanPromptText(locale, lines),
+              {
+                replyMarkup: buildTelegramPlanSelectionKeyboard({
+                  orderId: order.id,
+                  plans: enabledPlans,
+                  locale,
+                }),
+              },
+            );
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedKey(matchedKey.name),
+            );
+            return null;
+          }
+          case 'pl': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+
+            const settings = await getTelegramSalesSettings();
+            const plan = userOrderAction.secondary
+              ? resolveTelegramSalesPlan(settings, userOrderAction.secondary as TelegramSalesPlanCode)
+              : null;
+            if (!plan || !plan.enabled) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidPlanChoice,
+              );
+              return null;
+            }
+
+            const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
+            const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
+
+            if (plan.unlimitedQuota && !plan.fixedDurationMonths) {
+              await db.telegramOrder.update({
+                where: { id: order.id },
+                data: {
+                  planCode: plan.code,
+                  planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+                  priceAmount: plan.priceAmount ?? null,
+                  priceCurrency: plan.priceCurrency || null,
+                  priceLabel: priceLabel || null,
+                  templateId: plan.templateId || null,
+                  dataLimitBytes: null,
+                  unlimitedQuota: true,
+                  status: 'AWAITING_MONTHS',
+                },
+              });
+
+              await sendTelegramMessage(config.botToken, chatId, ui.orderMonthsPrompt, {
+                replyMarkup: buildTelegramOrderActionKeyboard({
+                  order: {
+                    id: order.id,
+                    status: 'AWAITING_MONTHS',
+                  },
+                  locale,
+                }),
+              });
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSelectedPlan(planLabel),
+              );
+              return null;
+            }
+
+            const durationMonths = plan.fixedDurationMonths ?? plan.minDurationMonths ?? 1;
+            const dataLimitBytes = plan.dataLimitGB
+              ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
+              : null;
+            const nextStatus = order.kind === 'NEW' ? 'AWAITING_KEY_NAME' : 'AWAITING_PAYMENT_PROOF';
+            const nextOrder = await db.telegramOrder.update({
+              where: { id: order.id },
+              data: {
+                planCode: plan.code,
+                planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+                priceAmount: plan.priceAmount ?? null,
+                priceCurrency: plan.priceCurrency || null,
+                priceLabel: priceLabel || null,
+                templateId: plan.templateId || null,
+                durationMonths,
+                dataLimitBytes,
+                unlimitedQuota: plan.unlimitedQuota,
+                status: nextStatus,
+              },
+            });
+
+            if (nextStatus === 'AWAITING_KEY_NAME') {
+              await sendTelegramMessage(config.botToken, chatId, ui.orderNamePrompt, {
+                replyMarkup: buildTelegramOrderActionKeyboard({
+                  order: nextOrder,
+                  locale,
+                }),
+              });
+            } else {
+              const renewalTarget = nextOrder.targetAccessKeyId
+                ? await db.accessKey.findUnique({
+                    where: { id: nextOrder.targetAccessKeyId },
+                    select: { name: true },
+                  })
+                : null;
+              const planSummary = formatTelegramSalesPlanSummary(plan, durationMonths, locale);
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                buildTelegramSalesPaymentPrompt({
+                  locale,
+                  orderCode: nextOrder.orderCode,
+                  planSummary,
+                  paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
+                  renewalTargetName: renewalTarget?.name || null,
+                }),
+                {
+                  replyMarkup: buildTelegramOrderActionKeyboard({
+                    order: nextOrder,
+                    locale,
+                  }),
+                },
+              );
+            }
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedPlan(planLabel),
+            );
+            return null;
+          }
+          case 'pay':
+          case 'up': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+            if (order.status !== 'AWAITING_PAYMENT_PROOF') {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionNotReadyForPayment,
+              );
+              return null;
+            }
+
+            const salesSettings = await getTelegramSalesSettings();
+            const plan = order.planCode
+              ? resolveTelegramSalesPlan(salesSettings, order.planCode as TelegramSalesPlanCode)
+              : null;
+            const renewalTarget = order.targetAccessKeyId
+              ? await db.accessKey.findUnique({
+                  where: { id: order.targetAccessKeyId },
+                  select: { name: true },
+                })
+              : null;
+            const planSummary = plan
+              ? formatTelegramSalesPlanSummary(plan, order.durationMonths, locale)
+              : order.planName || '';
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              buildTelegramSalesPaymentPrompt({
+                locale,
+                orderCode: order.orderCode,
+                planSummary,
+                paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+                requestedName: order.requestedName,
+                renewalTargetName: renewalTarget?.name || null,
+              }),
+              {
+                replyMarkup: buildTelegramOrderActionKeyboard({
+                  order,
+                  locale,
+                }),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSent,
+            );
+            return null;
+          }
+          case 'st': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+
+            await sendTelegramOrderStatusCard({
+              botToken: config.botToken,
+              chatId,
+              order,
+              locale,
+            });
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSent,
+            );
+            return null;
+          }
+          case 'ca': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+            if (isTelegramOrderTerminal(order.status)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionAlreadyClosed,
+              );
+              return null;
+            }
+            if (order.status === 'PENDING_REVIEW') {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.activeOrderPendingReview(order.orderCode),
+              );
+              return null;
+            }
+
+            await db.telegramOrder.update({
+              where: { id: order.id },
+              data: {
+                status: 'CANCELLED',
+              },
+            });
+            await sendTelegramMessage(config.botToken, chatId, ui.orderCancelled(order.orderCode), {
+              replyMarkup: getCommandKeyboard(isAdmin),
+            });
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionCancelledInline(order.orderCode),
+            );
+            return null;
+          }
+        }
+      } catch (error) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          (error as Error).message,
+        );
+        return null;
+      }
+    }
+
     const orderAction = parseTelegramOrderReviewCallbackData(callbackQuery.data);
     if (!orderAction) {
       return null;
@@ -4646,17 +5268,17 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'language':
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
-      return handleBuyCommand(chatId, telegramUserId, username, locale);
+      return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'orders':
-      return handleOrdersCommand(chatId, telegramUserId, locale);
+      return handleOrdersCommand(chatId, telegramUserId, locale, config.botToken);
     case 'order':
-      return handleOrderStatusCommand(chatId, telegramUserId, argsText, locale);
+      return handleOrderStatusCommand(chatId, telegramUserId, argsText, locale, config.botToken);
     case 'usage':
     case 'mykey':
     case 'key':
       return handleUsageCommand(chatId, telegramUserId, config.botToken, locale);
     case 'mykeys':
-      return handleMyKeysCommand(chatId, telegramUserId, locale);
+      return handleMyKeysCommand(chatId, telegramUserId, locale, config.botToken);
     case 'sub':
       return handleSubscriptionLinksCommand(chatId, telegramUserId, locale);
     case 'support':
@@ -4666,7 +5288,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         ? handleStatusCommand(locale)
         : handleUserServerCommand(chatId, telegramUserId, locale);
     case 'renew':
-      return handleRenewOrderCommand(chatId, telegramUserId, username, locale);
+      return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
       if (!currentOrder) {

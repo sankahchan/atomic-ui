@@ -22,6 +22,8 @@ export const telegramSalesPlanSchema = z.object({
   enabled: z.boolean().default(true),
   label: z.string().min(1).max(80),
   localizedLabels: z.record(z.string(), z.string()).optional().default({}),
+  priceAmount: z.number().int().nonnegative().optional().nullable(),
+  priceCurrency: z.string().trim().min(1).max(16).optional().default('MMK'),
   priceLabel: z.string().max(120).optional().default(''),
   localizedPriceLabels: z.record(z.string(), z.string()).optional().default({}),
   templateId: z.string().optional().nullable(),
@@ -74,6 +76,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       enabled: true,
       label: '1 Month / 150 GB',
       localizedLabels: { my: '၁ လ / 150 GB' },
+      priceAmount: 5000,
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
@@ -87,6 +91,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       enabled: true,
       label: '2 Months / 300 GB',
       localizedLabels: { my: '၂ လ / 300 GB' },
+      priceAmount: null,
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
@@ -100,6 +106,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       enabled: true,
       label: '3+ Months / Unlimited',
       localizedLabels: { my: '၃ လနှင့်အထက် / Unlimited' },
+      priceAmount: null,
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
       templateId: null,
@@ -150,6 +158,14 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
         ...override,
         localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
         localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
+        priceAmount:
+          typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
+            ? override.priceAmount
+            : fallbackPlan.priceAmount ?? null,
+        priceCurrency: (override.priceCurrency || fallbackPlan.priceCurrency || 'MMK')
+          .toString()
+          .trim()
+          .toUpperCase(),
       };
     }),
   };
@@ -193,13 +209,37 @@ export function resolveTelegramSalesPriceLabel(
   plan: TelegramSalesPlan,
   locale: SupportedLocale,
 ): string {
-  return (
+  const customLabel =
     resolveLocalizedTemplate(
       plan.localizedPriceLabels as LocalizedTemplateMap,
       locale,
       plan.priceLabel,
     ) || plan.priceLabel
-  ).trim();
+  ;
+
+  if (customLabel.trim()) {
+    return customLabel.trim();
+  }
+
+  if (typeof plan.priceAmount === 'number' && Number.isFinite(plan.priceAmount)) {
+    const amount = new Intl.NumberFormat(locale === 'my' ? 'my-MM' : 'en-US').format(
+      plan.priceAmount,
+    );
+    const currency = (plan.priceCurrency || 'MMK').trim().toUpperCase();
+
+    switch (currency) {
+      case 'MMK':
+        return locale === 'my' ? `${amount} ကျပ်` : `${amount} Kyat`;
+      case 'USD':
+        return locale === 'my' ? `${amount} ဒေါ်လာ` : `$${amount}`;
+      case 'THB':
+        return locale === 'my' ? `${amount} ဘတ်` : `${amount} Baht`;
+      default:
+        return `${amount} ${currency}`;
+    }
+  }
+
+  return '';
 }
 
 export function resolveTelegramSalesPaymentInstructions(

@@ -250,6 +250,8 @@ model TelegramOrder {
   requestedEmail       String?
   planCode             String?
   planName             String?
+  priceAmount          Int?
+  priceCurrency        String?
   priceLabel           String?
   durationMonths       Int?
   dataLimitBytes       BigInt?

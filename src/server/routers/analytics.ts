@@ -966,6 +966,177 @@ export const analyticsRouter = router({
       };
     }),
 
+  telegramSalesDashboard: adminProcedure
+    .input(z.object({
+      range: timeRangeSchema.default('30d'),
+      limit: z.number().int().min(1).max(20).default(8),
+    }))
+    .query(async ({ input }) => {
+      const cutoff = getDateCutoff(input.range);
+
+      const [orders, recentOrders] = await Promise.all([
+        db.telegramOrder.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+          select: {
+            id: true,
+            orderCode: true,
+            kind: true,
+            status: true,
+            telegramUsername: true,
+            telegramUserId: true,
+            requestedName: true,
+            planCode: true,
+            planName: true,
+            priceAmount: true,
+            priceCurrency: true,
+            paymentSubmittedAt: true,
+            reviewedAt: true,
+            fulfilledAt: true,
+            createdAt: true,
+          },
+        }),
+        db.telegramOrder.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+          orderBy: [{ createdAt: 'desc' }],
+          take: input.limit,
+          select: {
+            id: true,
+            orderCode: true,
+            kind: true,
+            status: true,
+            telegramUsername: true,
+            telegramUserId: true,
+            requestedName: true,
+            planCode: true,
+            planName: true,
+            priceAmount: true,
+            priceCurrency: true,
+            createdAt: true,
+            fulfilledAt: true,
+          },
+        }),
+      ]);
+
+      const summary = {
+        totalOrders: orders.length,
+        pendingReview: 0,
+        fulfilled: 0,
+        rejected: 0,
+        cancelled: 0,
+        newOrders: 0,
+        renewalOrders: 0,
+        awaitingPayment: 0,
+      };
+
+      const revenueByCurrency = new Map<string, number>();
+      const topPlans = new Map<
+        string,
+        { planCode: string | null; planName: string; orders: number; fulfilled: number; revenueByCurrency: Map<string, number> }
+      >();
+
+      let reviewCount = 0;
+      let reviewMinutesTotal = 0;
+      let fulfillmentCount = 0;
+      let fulfillmentMinutesTotal = 0;
+
+      for (const order of orders) {
+        if (order.kind === 'NEW') {
+          summary.newOrders += 1;
+        } else if (order.kind === 'RENEW') {
+          summary.renewalOrders += 1;
+        }
+
+        if (order.status === 'PENDING_REVIEW') {
+          summary.pendingReview += 1;
+        } else if (order.status === 'FULFILLED') {
+          summary.fulfilled += 1;
+        } else if (order.status === 'REJECTED') {
+          summary.rejected += 1;
+        } else if (order.status === 'CANCELLED') {
+          summary.cancelled += 1;
+        } else if (order.status === 'AWAITING_PAYMENT_PROOF') {
+          summary.awaitingPayment += 1;
+        }
+
+        if (order.status === 'FULFILLED' && typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+          const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+          revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        }
+
+        const planKey = order.planCode || order.planName || 'custom';
+        const planName = order.planName || order.planCode || 'Custom order';
+        const currentPlan = topPlans.get(planKey) || {
+          planCode: order.planCode,
+          planName,
+          orders: 0,
+          fulfilled: 0,
+          revenueByCurrency: new Map<string, number>(),
+        };
+        currentPlan.orders += 1;
+        if (order.status === 'FULFILLED') {
+          currentPlan.fulfilled += 1;
+          if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+            const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+            currentPlan.revenueByCurrency.set(
+              currency,
+              (currentPlan.revenueByCurrency.get(currency) || 0) + order.priceAmount,
+            );
+          }
+        }
+        topPlans.set(planKey, currentPlan);
+
+        if (order.paymentSubmittedAt && order.reviewedAt) {
+          reviewMinutesTotal +=
+            (order.reviewedAt.getTime() - order.paymentSubmittedAt.getTime()) / (1000 * 60);
+          reviewCount += 1;
+        }
+
+        if (order.fulfilledAt) {
+          const baseline = order.paymentSubmittedAt || order.createdAt;
+          fulfillmentMinutesTotal +=
+            (order.fulfilledAt.getTime() - baseline.getTime()) / (1000 * 60);
+          fulfillmentCount += 1;
+        }
+      }
+
+      return {
+        range: input.range,
+        summary,
+        revenueByCurrency: Array.from(revenueByCurrency.entries())
+          .map(([currency, amount]) => ({ currency, amount }))
+          .sort((left, right) => right.amount - left.amount),
+        averages: {
+          reviewMinutes: reviewCount ? reviewMinutesTotal / reviewCount : null,
+          fulfillmentMinutes: fulfillmentCount ? fulfillmentMinutesTotal / fulfillmentCount : null,
+        },
+        topPlans: Array.from(topPlans.values())
+          .map((plan) => ({
+            planCode: plan.planCode,
+            planName: plan.planName,
+            orders: plan.orders,
+            fulfilled: plan.fulfilled,
+            revenueByCurrency: Array.from(plan.revenueByCurrency.entries())
+              .map(([currency, amount]) => ({ currency, amount }))
+              .sort((left, right) => right.amount - left.amount),
+          }))
+          .sort((left, right) => {
+            if (right.orders !== left.orders) {
+              return right.orders - left.orders;
+            }
+            return right.fulfilled - left.fulfilled;
+          })
+          .slice(0, input.limit),
+        recentOrders: recentOrders.map((order) => ({
+          ...order,
+          priceCurrency: order.priceCurrency?.trim().toUpperCase() || null,
+        })),
+      };
+    }),
+
   /**
    * Get overall analytics summary
    */

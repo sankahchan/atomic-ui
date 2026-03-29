@@ -202,6 +202,8 @@ type TelegramSalesPlanForm = {
     en: string;
     my: string;
   };
+  priceAmount: string;
+  priceCurrency: string;
   priceLabel: string;
   localizedPriceLabels: {
     en: string;
@@ -238,6 +240,8 @@ type TelegramOrderRow = {
   requestedEmail?: string | null;
   planCode?: string | null;
   planName?: string | null;
+  priceAmount?: number | null;
+  priceCurrency?: string | null;
   priceLabel?: string | null;
   durationMonths?: number | null;
   dataLimitBytes?: string | null;
@@ -314,6 +318,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       enabled: true,
       label: '1 Month / 150 GB',
       localizedLabels: { en: '1 Month / 150 GB', my: '၁ လ / 150 GB' },
+      priceAmount: '5000',
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
@@ -327,6 +333,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       enabled: true,
       label: '2 Months / 300 GB',
       localizedLabels: { en: '2 Months / 300 GB', my: '၂ လ / 300 GB' },
+      priceAmount: '',
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
@@ -340,6 +348,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       enabled: true,
       label: '3+ Months / Unlimited',
       localizedLabels: { en: '3+ Months / Unlimited', my: '၃ လနှင့်အထက် / Unlimited' },
+      priceAmount: '',
+      priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
       templateId: null,
@@ -1753,8 +1763,11 @@ function TelegramSalesWorkflowCard() {
     planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
     planLabel: isMyanmar ? 'Plan အမည်' : 'Plan label',
     burmeseLabel: isMyanmar ? 'မြန်မာ label' : 'Burmese label',
+    priceAmount: isMyanmar ? 'ငွေပမာဏ' : 'Price amount',
+    priceCurrency: isMyanmar ? 'ငွေကြေး' : 'Currency',
     priceLabel: isMyanmar ? 'စျေးနှုန်း label' : 'Price label',
     burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
+    autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း preview' : 'Automatic price preview',
     template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
     noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
     noTemplateSelected: isMyanmar ? 'ဤ plan အတွက် template မရွေးထားသေးပါ။' : 'No template is selected for this plan yet.',
@@ -1781,7 +1794,7 @@ function TelegramSalesWorkflowCard() {
       gb ? (isMyanmar ? `${gb} GB limit` : `${gb} GB limit`) : isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
     saveConfig: isMyanmar ? 'Order settings သိမ်းမည်' : 'Save order settings',
     saved: isMyanmar ? 'Telegram order settings သိမ်းပြီးပါပြီ' : 'Telegram order settings saved',
-    savedDesc: isMyanmar ? 'Plan configuration နှင့် payment instructions ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Plan configuration and payment instructions were updated.',
+    savedDesc: isMyanmar ? 'Plan configuration, pricing နှင့် payment instructions ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Plan configuration, pricing, and payment instructions were updated.',
     pendingTitle: isMyanmar ? 'Pending review orders' : 'Pending review orders',
     reviewQueue: isMyanmar ? 'Review queue' : 'Review queue',
     noOrders: isMyanmar ? 'အော်ဒါ မရှိသေးပါ။' : 'No Telegram orders yet.',
@@ -1933,6 +1946,14 @@ function TelegramSalesWorkflowCard() {
             en: override?.localizedLabels?.en || override?.label || fallbackPlan.localizedLabels.en,
             my: override?.localizedLabels?.my || fallbackPlan.localizedLabels.my,
           },
+          priceAmount:
+            typeof override?.priceAmount === 'number' && Number.isFinite(override.priceAmount)
+              ? String(override.priceAmount)
+              : fallbackPlan.priceAmount,
+          priceCurrency:
+            typeof override?.priceCurrency === 'string' && override.priceCurrency.trim().length > 0
+              ? override.priceCurrency.trim().toUpperCase()
+              : fallbackPlan.priceCurrency,
           localizedPriceLabels: {
             en: override?.localizedPriceLabels?.en || override?.priceLabel || fallbackPlan.localizedPriceLabels.en,
             my: override?.localizedPriceLabels?.my || fallbackPlan.localizedPriceLabels.my,
@@ -2011,6 +2032,25 @@ function TelegramSalesWorkflowCard() {
     }));
   };
 
+  const formatAutomaticPricePreview = (plan: TelegramSalesPlanForm) => {
+    const trimmedAmount = plan.priceAmount.trim();
+    if (!trimmedAmount) {
+      return '—';
+    }
+
+    const parsedAmount = Number.parseInt(trimmedAmount, 10);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      return '—';
+    }
+
+    const currency = (plan.priceCurrency || 'MMK').trim().toUpperCase();
+    if (currency === 'MMK') {
+      return `${new Intl.NumberFormat('en-US').format(parsedAmount)} ${isMyanmar ? 'ကျပ်' : 'Kyat'}`;
+    }
+
+    return `${new Intl.NumberFormat('en-US').format(parsedAmount)} ${currency}`;
+  };
+
   const handleSaveConfig = () => {
     saveConfigMutation.mutate({
       enabled: form.enabled,
@@ -2028,6 +2068,15 @@ function TelegramSalesWorkflowCard() {
           en: plan.localizedLabels.en.trim(),
           my: plan.localizedLabels.my.trim(),
         },
+        priceAmount: (() => {
+          const trimmed = plan.priceAmount.trim();
+          if (!trimmed) {
+            return null;
+          }
+          const parsed = Number.parseInt(trimmed, 10);
+          return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+        })(),
+        priceCurrency: plan.priceCurrency.trim() || 'MMK',
         priceLabel: plan.priceLabel.trim(),
         localizedPriceLabels: {
           en: plan.localizedPriceLabels.en.trim(),
@@ -2146,7 +2195,7 @@ function TelegramSalesWorkflowCard() {
             <div className="space-y-1">
               <p className="text-sm font-medium">{salesUi.planConfig}</p>
               <p className="text-xs text-muted-foreground">
-                {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, price label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, price labels, and templates used by the Telegram bot.'}
+                {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, ဈေးနှုန်း, custom label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, prices, custom labels, and templates used by the Telegram bot.'}
               </p>
             </div>
             <div className="space-y-3">
@@ -2210,6 +2259,35 @@ function TelegramSalesWorkflowCard() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>{salesUi.priceAmount}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        value={plan.priceAmount}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            priceAmount: event.target.value,
+                          }))
+                        }
+                        placeholder="5000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.priceCurrency}</Label>
+                      <Input
+                        value={plan.priceCurrency}
+                        onChange={(event) =>
+                          updatePlan(plan.code, (current) => ({
+                            ...current,
+                            priceCurrency: event.target.value.toUpperCase(),
+                          }))
+                        }
+                        placeholder="MMK"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>{salesUi.priceLabel}</Label>
                       <Input
                         value={plan.priceLabel}
@@ -2238,6 +2316,13 @@ function TelegramSalesWorkflowCard() {
                             },
                           }))
                         }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{salesUi.autoPricePreview}</Label>
+                      <Input
+                        readOnly
+                        value={formatAutomaticPricePreview(plan)}
                       />
                     </div>
                     <div className="space-y-2 lg:col-span-2">

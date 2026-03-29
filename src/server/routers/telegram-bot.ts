@@ -630,7 +630,17 @@ export const telegramBotRouter = router({
       }
 
       const response = await fetch(
-        `https://api.telegram.org/bot${parsed.botToken}/setWebhook?url=${encodeURIComponent(input.webhookUrl)}`
+        `https://api.telegram.org/bot${parsed.botToken}/setWebhook`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: input.webhookUrl,
+            allowed_updates: ['message', 'callback_query'],
+          }),
+        },
       );
       const data = await response.json();
 
