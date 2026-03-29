@@ -39,6 +39,23 @@ export function formatTagsForStorage(input: string): string {
 }
 
 /**
+ * Merge multiple tag inputs and return storage format with leading/trailing commas.
+ */
+export function mergeTagsForStorage(...inputs: Array<string | null | undefined>): string {
+  const merged = normalizeTags(
+    inputs
+      .filter(Boolean)
+      .join(',')
+  );
+
+  if (merged.length === 0) {
+    return '';
+  }
+
+  return `,${merged.join(',')},`;
+}
+
+/**
  * Check if a tag exists in stored tags string
  */
 export function tagMatchesFilter(storedTags: string, filterTag: string): boolean {

@@ -95,6 +95,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 import { getTheme, subscriptionThemeIds, themeList } from '@/lib/subscription-themes';
+import { stringToTags, tagsToString } from '@/lib/tags';
 import {
   buildSharePageUrl,
   buildShortShareUrl,
@@ -229,6 +230,7 @@ function CreateKeyDialog({
     email: string;
     telegramId: string;
     notes: string;
+    tags: string;
     dataLimitGB: string;
     dataLimitResetStrategy: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER';
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
@@ -256,6 +258,7 @@ function CreateKeyDialog({
     email: '',
     telegramId: '',
     notes: '',
+    tags: '',
     dataLimitGB: '',
     dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
@@ -444,6 +447,7 @@ function CreateKeyDialog({
       email: '',
       telegramId: '',
       notes: '',
+      tags: '',
       dataLimitGB: '',
       dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
@@ -627,6 +631,7 @@ function CreateKeyDialog({
       email: formData.email || undefined,
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
+      tags: tagsToString(['web', formData.tags].filter(Boolean)),
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
@@ -907,6 +912,19 @@ function CreateKeyDialog({
                 onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tags">Extra Tags</Label>
+            <Input
+              id="tags"
+              placeholder="premium, trial, reseller"
+              value={formData.tags}
+              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Web-created keys are tagged with <span className="font-medium">web</span> automatically. Add any extra comma-separated tags here.
+            </p>
           </div>
 
           {/* Data limit */}
@@ -2313,6 +2331,7 @@ function KeyRow({
   onCopyAccessUrl,
   onCopySubscriptionUrl,
   onEdit,
+  onTagClick,
   sparklineData,
 }: {
   accessKey: {
@@ -2349,6 +2368,7 @@ function KeyRow({
   onCopyAccessUrl: () => void;
   onCopySubscriptionUrl: () => void;
   onEdit: () => void;
+  onTagClick?: (tag: string) => void;
   sparklineData?: { date: string; bytes: number }[];
 }) {
   const { t } = useLocale();
@@ -2400,13 +2420,15 @@ function KeyRow({
             </p>
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
-                {accessKey.tags.split(',').filter(Boolean).map((tag) => (
-                  <span
+                {stringToTags(accessKey.tags).map((tag) => (
+                  <button
+                    type="button"
                     key={tag}
-                    className="rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground dark:bg-white/[0.03]"
+                    className="rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary dark:bg-white/[0.03]"
+                    onClick={() => onTagClick?.(tag)}
                   >
-                    {tag.trim()}
-                  </span>
+                    {tag}
+                  </button>
                 ))}
               </div>
             )}
@@ -2647,6 +2669,10 @@ export default function KeysPage() {
   );
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('access-keys');
+  const applyTagFilter = useCallback((tag: string) => {
+    setTagFilter(tag);
+    setPage(1);
+  }, [setTagFilter]);
 
   const pageSize = 20;
 
@@ -2660,9 +2686,7 @@ export default function KeysPage() {
     const recentTrafficDeltaBytes = trafficMeta?.recentTrafficDeltaBytes ?? BigInt(0);
     const usedBytes = formatBytes(BigInt(key.usedBytes ?? 0));
     const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
-    const tags = typeof key.tags === 'string'
-      ? key.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean)
-      : [];
+    const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
 
     return (
       <div className="space-y-4">
@@ -2714,9 +2738,14 @@ export default function KeysPage() {
         {tags.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {tags.slice(0, 3).map((tag: string) => (
-              <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+              <button
+                type="button"
+                key={tag}
+                className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                onClick={() => applyTagFilter(tag)}
+              >
                 {tag}
-              </span>
+              </button>
             ))}
             {tags.length > 3 ? (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -4150,6 +4179,7 @@ export default function KeysPage() {
               const isOnline = checkIsOnline(key.id, key.status);
               const trafficMeta = liveMetricsById.get(key.id);
               const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
+              const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -4220,6 +4250,26 @@ export default function KeysPage() {
                         {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}
                       </span>
                     </div>
+
+                    {tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.slice(0, 3).map((tag) => (
+                          <button
+                            type="button"
+                            key={tag}
+                            className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                            onClick={() => applyTagFilter(tag)}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                        {tags.length > 3 ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            +{tags.length - 3}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <div className="flex items-center justify-between pt-2 border-t border-border/50">
                       <div className="flex gap-1">
@@ -4354,6 +4404,7 @@ export default function KeysPage() {
                       }
                     }}
                     onEdit={() => setEditingKey(key)}
+                    onTagClick={applyTagFilter}
                   />
                 ))
               ) : (

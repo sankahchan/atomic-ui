@@ -18,7 +18,7 @@ import { generateRandomString } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
-import { formatTagsForStorage } from '@/lib/tags';
+import { formatTagsForStorage, mergeTagsForStorage } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
@@ -116,6 +116,7 @@ const createKeySchema = z.object({
   telegramDeliveryEnabled: z.boolean().optional(),
   sharePagePassword: z.string().max(128).optional().nullable(),
   sharePageAccessExpiresAt: z.date().optional().nullable(),
+  tags: z.string().max(500).optional().nullable(),
   autoDisableOnLimit: z.boolean().optional(),
   autoDisableOnExpire: z.boolean().optional(),
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
@@ -942,6 +943,7 @@ export const keysRouter = router({
             autoRenewDurationDays: input.autoRenewDurationDays ?? null,
             subscriptionToken: generateRandomString(32),
             publicSlug,
+            tags: mergeTagsForStorage(input.tags, 'web'),
           },
           include: {
             server: {

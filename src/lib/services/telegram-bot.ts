@@ -74,6 +74,7 @@ import {
   normalizePublicSlug,
   slugifyPublicName,
 } from '@/lib/public-slug';
+import { mergeTagsForStorage } from '@/lib/tags';
 import { formatBytes, generateRandomString } from '@/lib/utils';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -3626,6 +3627,7 @@ async function fulfillTelegramNewAccessOrder(input: {
         autoRenewDurationDays: input.template?.autoRenewDurationDays ?? null,
         subscriptionToken: generateRandomString(32),
         publicSlug,
+        tags: mergeTagsForStorage('tele'),
       },
     });
   } catch (error) {
