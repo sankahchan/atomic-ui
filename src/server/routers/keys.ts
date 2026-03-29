@@ -18,7 +18,7 @@ import { generateRandomString } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
-import { formatTagsForStorage, mergeTagsForStorage } from '@/lib/tags';
+import { formatTagsForStorage, mergeTagsForStorage, summarizeStoredTags } from '@/lib/tags';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
@@ -2813,12 +2813,17 @@ export const keysRouter = router({
    * Get statistics about access keys.
    */
   stats: protectedProcedure.query(async () => {
-    const [total, active, expired, depleted, pending] = await Promise.all([
+    const [total, active, expired, depleted, pending, tagRows] = await Promise.all([
       db.accessKey.count(),
       db.accessKey.count({ where: { status: 'ACTIVE' } }),
       db.accessKey.count({ where: { status: 'EXPIRED' } }),
       db.accessKey.count({ where: { status: 'DEPLETED' } }),
       db.accessKey.count({ where: { status: 'PENDING' } }),
+      db.accessKey.findMany({
+        select: {
+          tags: true,
+        },
+      }),
     ]);
 
     // Get keys expiring in 24 hours
@@ -2855,6 +2860,7 @@ export const keysRouter = router({
       },
     });
     const totalDataLimitBytes = limitResult._sum.dataLimitBytes?.toString() || '0';
+    const tagSummary = summarizeStoredTags(tagRows.map((row) => row.tags));
 
     return {
       total,
@@ -2865,6 +2871,8 @@ export const keysRouter = router({
       expiringIn24h,
       totalUsedBytes,
       totalDataLimitBytes,
+      sourceCounts: tagSummary.sourceCounts,
+      topTags: tagSummary.topTags,
     };
   }),
 

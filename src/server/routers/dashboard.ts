@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { router, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
+import { summarizeStoredTags } from '@/lib/tags';
 
 export const dashboardRouter = router({
     /**
@@ -81,6 +82,7 @@ export const dashboardRouter = router({
             healthCounts,
             expiringIn24h,
             trafficResult,
+            tagRows,
         ] = await Promise.all([
             db.server.count(),
             db.server.count({ where: { isActive: true } }),
@@ -103,6 +105,11 @@ export const dashboardRouter = router({
             }),
             db.accessKey.aggregate({
                 _sum: { usedBytes: true },
+            }),
+            db.accessKey.findMany({
+                select: {
+                    tags: true,
+                },
             }),
         ]);
 
@@ -142,6 +149,7 @@ export const dashboardRouter = router({
                 downServers = item._count.lastStatus;
             }
         }
+        const tagSummary = summarizeStoredTags(tagRows.map((row) => row.tags));
 
         return {
             totalServers,
@@ -154,6 +162,7 @@ export const dashboardRouter = router({
             pendingKeys: keyStats.pending,
             expiringIn24h,
             totalTrafficBytes: trafficResult._sum.usedBytes ?? BigInt(0),
+            sourceCounts: tagSummary.sourceCounts,
         };
     }),
 

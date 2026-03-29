@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrafficChart } from '@/components/ui/traffic-chart';
 import { trpc } from '@/lib/trpc';
+import { getTagDisplayLabel, getTagToneClassName, KEY_SOURCE_TAGS } from '@/lib/tags';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
 import { useToast } from '@/hooks/use-toast';
@@ -239,6 +240,69 @@ function KeyOperationsSummary({
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
       </div>
+    </div>
+  );
+}
+
+function KeySourceBreakdownCard({
+  t,
+  sourceCounts,
+}: {
+  t: (key: string) => string;
+  sourceCounts:
+    | {
+        web: number;
+        tele: number;
+        trial: number;
+        reseller: number;
+        untagged: number;
+      }
+    | null
+    | undefined;
+}) {
+  const sourceItems = KEY_SOURCE_TAGS.map((tag) => ({
+    tag,
+    count: sourceCounts?.[tag] ?? 0,
+  }));
+
+  return (
+    <div className="ops-panel space-y-4">
+      <div className="space-y-2">
+        <p className="ops-section-heading">{t('dashboard.key_sources_title')}</p>
+        <div>
+          <h2 className="text-xl font-semibold">{t('dashboard.key_sources_title')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('dashboard.key_sources_desc')}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {sourceItems.map(({ tag, count }) => (
+          <div
+            key={tag}
+            className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]"
+          >
+            <span className={cn('inline-flex rounded-full border px-2.5 py-1 text-xs font-medium', getTagToneClassName(tag))}>
+              {getTagDisplayLabel(tag)}
+            </span>
+            <p className="mt-3 text-2xl font-semibold">{count}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('dashboard.key_sources_keys')}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <Link href="/dashboard/keys" className="ops-action-tile">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{t('dashboard.key_sources_action')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t('dashboard.key_sources_action_desc')}
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
     </div>
   );
 }
@@ -1001,6 +1065,8 @@ export default function DashboardPage() {
                 </div>
                 <KeyOperationsSummary stats={stats} t={t} embedded />
               </div>
+
+              <KeySourceBreakdownCard t={t} sourceCounts={stats?.sourceCounts} />
             </div>
 
             <TrafficOverviewPanel
@@ -1222,6 +1288,8 @@ export default function DashboardPage() {
 
               <KeyOperationsSummary stats={stats} t={t} embedded />
             </div>
+
+            <KeySourceBreakdownCard t={t} sourceCounts={stats?.sourceCounts} />
           </div>
         </section>
 

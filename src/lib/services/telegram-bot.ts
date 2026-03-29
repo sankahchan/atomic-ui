@@ -3627,7 +3627,10 @@ async function fulfillTelegramNewAccessOrder(input: {
         autoRenewDurationDays: input.template?.autoRenewDurationDays ?? null,
         subscriptionToken: generateRandomString(32),
         publicSlug,
-        tags: mergeTagsForStorage('tele'),
+        tags: mergeTagsForStorage(
+          'tele',
+          input.plan.code === 'trial_1d_3gb' ? 'trial' : undefined,
+        ),
       },
     });
   } catch (error) {

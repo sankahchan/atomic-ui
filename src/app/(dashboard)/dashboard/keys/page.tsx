@@ -95,7 +95,15 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
 import { getTheme, subscriptionThemeIds, themeList } from '@/lib/subscription-themes';
-import { stringToTags, tagsToString } from '@/lib/tags';
+import {
+  getTagDisplayLabel,
+  getTagToneClassName,
+  KEY_SOURCE_TAGS,
+  KEY_TAG_PRESETS,
+  stringToTags,
+  tagsToString,
+  toggleEditableTagList,
+} from '@/lib/tags';
 import {
   buildSharePageUrl,
   buildShortShareUrl,
@@ -203,6 +211,48 @@ function getKeySubscriptionPageUrl(
   }
 
   return buildSharePageUrl(subscriptionToken, { origin: window.location.origin, lang: locale });
+}
+
+function KeyTagChip({
+  tag,
+  count,
+  active = false,
+  onClick,
+  compact = false,
+}: {
+  tag: string;
+  count?: number;
+  active?: boolean;
+  onClick?: (tag: string) => void;
+  compact?: boolean;
+}) {
+  const content = (
+    <>
+      <span>{getTagDisplayLabel(tag)}</span>
+      {typeof count === 'number' ? (
+        <span className="rounded-full bg-black/8 px-1.5 py-0.5 text-[10px] font-semibold dark:bg-white/10">
+          {count}
+        </span>
+      ) : null}
+    </>
+  );
+
+  const className = cn(
+    'inline-flex items-center gap-1.5 rounded-full border font-medium transition-colors',
+    compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs',
+    getTagToneClassName(tag),
+    active && 'border-primary/45 ring-2 ring-primary/10 dark:border-cyan-400/30'
+  );
+
+  if (!onClick) {
+    return <span className={className}>{content}</span>;
+  }
+
+  return (
+    <button type="button" className={className} onClick={() => onClick(tag)}>
+      {content}
+    </button>
+  );
 }
 
 /**
@@ -322,6 +372,7 @@ function CreateKeyDialog({
       staleTime: 5_000,
     },
   );
+  const selectedCreateTags = useMemo(() => stringToTags(formData.tags), [formData.tags]);
 
   useEffect(() => {
     if (slugTouched) {
@@ -915,16 +966,46 @@ function CreateKeyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tags">Extra Tags</Label>
+            <Label htmlFor="tags">{t('keys.tags.extra_label')}</Label>
             <Input
               id="tags"
-              placeholder="premium, trial, reseller"
+              placeholder={t('keys.tags.extra_placeholder')}
               value={formData.tags}
               onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Web-created keys are tagged with <span className="font-medium">web</span> automatically. Add any extra comma-separated tags here.
+              {t('keys.tags.extra_help_prefix')}{' '}
+              <span className="font-medium">web</span>{' '}
+              {t('keys.tags.extra_help_suffix')}
             </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:bg-white/[0.03]">
+                {t('keys.tags.source_prefix')}: <span className="ml-1 font-semibold text-foreground">web</span>
+              </span>
+              {KEY_TAG_PRESETS.map((tag) => {
+                const isSelected = selectedCreateTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                      getTagToneClassName(tag),
+                      isSelected && 'border-primary/45 ring-2 ring-primary/10 dark:border-cyan-400/30'
+                    )}
+                    onClick={() =>
+                      setFormData((current) => ({
+                        ...current,
+                        tags: toggleEditableTagList(current.tags, tag),
+                      }))
+                    }
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {getTagDisplayLabel(tag)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Data limit */}
@@ -2421,14 +2502,12 @@ function KeyRow({
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {stringToTags(accessKey.tags).map((tag) => (
-                  <button
-                    type="button"
+                  <KeyTagChip
                     key={tag}
-                    className="rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary dark:bg-white/[0.03]"
-                    onClick={() => onTagClick?.(tag)}
-                  >
-                    {tag}
-                  </button>
+                    tag={tag}
+                    compact
+                    onClick={onTagClick}
+                  />
                 ))}
               </div>
             )}
@@ -2670,9 +2749,10 @@ export default function KeysPage() {
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('access-keys');
   const applyTagFilter = useCallback((tag: string) => {
-    setTagFilter(tag);
+    const normalizedTag = tag.trim().toLowerCase();
+    setTagFilter(filters.tagFilter === normalizedTag ? undefined : normalizedTag);
     setPage(1);
-  }, [setTagFilter]);
+  }, [filters.tagFilter, setTagFilter]);
 
   const pageSize = 20;
 
@@ -2738,14 +2818,7 @@ export default function KeysPage() {
         {tags.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {tags.slice(0, 3).map((tag: string) => (
-              <button
-                type="button"
-                key={tag}
-                className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                onClick={() => applyTagFilter(tag)}
-              >
-                {tag}
-              </button>
+              <KeyTagChip key={tag} tag={tag} compact onClick={applyTagFilter} />
             ))}
             {tags.length > 3 ? (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -2859,6 +2932,21 @@ export default function KeysPage() {
 
   // Fetch key stats; interval refresh is handled by the shared read-only page refresher.
   const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery();
+  const sourceTagChips = useMemo(
+    () =>
+      KEY_SOURCE_TAGS.map((tag) => ({
+        tag,
+        count: stats?.sourceCounts?.[tag] ?? 0,
+      })),
+    [stats],
+  );
+  const customTopTagChips = useMemo(
+    () =>
+      (stats?.topTags ?? [])
+        .filter(({ tag }) => !KEY_SOURCE_TAGS.includes(tag as (typeof KEY_SOURCE_TAGS)[number]))
+        .slice(0, 6),
+    [stats],
+  );
 
   // Fetch live usage plus recent server-side session state every 3 seconds.
   const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
@@ -3477,6 +3565,83 @@ export default function KeysPage() {
             </div>
           </div>
         )}
+
+        {stats ? (
+          <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-3.5 dark:bg-white/[0.02]">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('keys.tags.source_breakdown')}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('keys.tags.source_breakdown_desc')}
+                </p>
+              </div>
+              {filters.tagFilter ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-[11px]"
+                  onClick={() => {
+                    setTagFilter(undefined);
+                    setPage(1);
+                  }}
+                >
+                  <X className="mr-1 h-3 w-3" />
+                  {t('keys.tags.clear_tag_filter')}
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                  !filters.tagFilter
+                    ? 'border-primary/45 bg-primary/10 text-primary ring-2 ring-primary/10 dark:border-cyan-400/30'
+                    : 'border-border/60 bg-background/60 text-muted-foreground hover:border-primary/40 hover:text-primary dark:bg-white/[0.03]'
+                )}
+                onClick={() => {
+                  setTagFilter(undefined);
+                  setPage(1);
+                }}
+              >
+                <span>{t('keys.tags.all')}</span>
+                <span className="rounded-full bg-black/8 px-1.5 py-0.5 text-[10px] font-semibold dark:bg-white/10">
+                  {stats.total}
+                </span>
+              </button>
+
+              {sourceTagChips.map(({ tag, count }) => (
+                <KeyTagChip
+                  key={tag}
+                  tag={tag}
+                  count={count}
+                  active={filters.tagFilter === tag}
+                  onClick={applyTagFilter}
+                />
+              ))}
+            </div>
+
+            {customTopTagChips.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('keys.tags.popular')}
+                </span>
+                {customTopTagChips.map(({ tag, count }) => (
+                  <KeyTagChip
+                    key={tag}
+                    tag={tag}
+                    count={count}
+                    active={filters.tagFilter === tag}
+                    onClick={applyTagFilter}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <div className="space-y-3 md:hidden">
@@ -4254,14 +4419,7 @@ export default function KeysPage() {
                     {tags.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
                         {tags.slice(0, 3).map((tag) => (
-                          <button
-                            type="button"
-                            key={tag}
-                            className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                            onClick={() => applyTagFilter(tag)}
-                          >
-                            {tag}
-                          </button>
+                          <KeyTagChip key={tag} tag={tag} compact onClick={applyTagFilter} />
                         ))}
                         {tags.length > 3 ? (
                           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
