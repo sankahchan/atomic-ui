@@ -277,6 +277,7 @@ model TelegramOrder {
   paymentSubmittedAt   DateTime?
   expiredAt            DateTime?
   adminNote            String?
+  customerMessage      String?
   reviewedByUserId     String?
   reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   reviewedAt           DateTime?

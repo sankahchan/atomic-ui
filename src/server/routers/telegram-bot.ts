@@ -529,6 +529,7 @@ export const telegramBotRouter = router({
       z.object({
         orderId: z.string(),
         adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().max(1000).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -537,6 +538,7 @@ export const telegramBotRouter = router({
         reviewedByUserId: ctx.user.id,
         reviewerName: ctx.user.email || null,
         adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
       });
     }),
 

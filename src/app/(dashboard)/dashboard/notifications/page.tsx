@@ -287,6 +287,7 @@ type TelegramOrderRow = {
   paymentSubmittedAt?: Date | null;
   paymentCaption?: string | null;
   adminNote?: string | null;
+  customerMessage?: string | null;
   reviewedAt?: Date | null;
   fulfilledAt?: Date | null;
   rejectedAt?: Date | null;
@@ -1820,6 +1821,7 @@ function TelegramSalesWorkflowCard() {
   const [form, setForm] = useState<TelegramSalesSettingsForm>(DEFAULT_TELEGRAM_SALES_SETTINGS);
   const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [reviewCustomerMessage, setReviewCustomerMessage] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
@@ -1951,6 +1953,10 @@ function TelegramSalesWorkflowCard() {
     approve: isMyanmar ? 'အတည်ပြုမည်' : 'Approve',
     reject: isMyanmar ? 'ပယ်မည်' : 'Reject',
     adminNote: isMyanmar ? 'Admin note' : 'Admin note',
+    customerMessage: isMyanmar ? 'Customer message' : 'Customer message',
+    customerMessageDesc: isMyanmar
+      ? 'User ကို Telegram မှာ ပြသမည့် စာသားဖြစ်ပါသည်။ မထည့်ပါက support နှင့် ပြန်စနိုင်ကြောင်း default message ကို ပို့မည်။'
+      : 'This message is shown to the user in Telegram. Leave it empty to send the default support/retry message.',
     approveSuccess: isMyanmar ? 'အော်ဒါကို အတည်ပြုပြီး key ပေးပြီးပါပြီ' : 'Order approved and key delivered',
     rejectSuccess: isMyanmar ? 'အော်ဒါကို ပယ်ပြီး Telegram သို့ အသိပေးပြီးပါပြီ' : 'Order rejected and user notified',
     deliveryWarning: isMyanmar ? 'Key ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
@@ -2136,6 +2142,7 @@ function TelegramSalesWorkflowCard() {
       await utils.telegramBot.listOrders.invalidate();
       setReviewTarget(null);
       setReviewNote('');
+      setReviewCustomerMessage('');
       toast({
         title: salesUi.approveSuccess,
         description: result.deliveryError || result.sharePageUrl || result.accessKeyName,
@@ -2156,6 +2163,7 @@ function TelegramSalesWorkflowCard() {
       await utils.telegramBot.listOrders.invalidate();
       setReviewTarget(null);
       setReviewNote('');
+      setReviewCustomerMessage('');
       toast({
         title: salesUi.rejectSuccess,
       });
@@ -2906,6 +2914,7 @@ function TelegramSalesWorkflowCard() {
                           onClick={() => {
                             setReviewTarget({ orderId: order.id, mode: 'approve' });
                             setReviewNote(order.adminNote || '');
+                            setReviewCustomerMessage(order.customerMessage || '');
                           }}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -2917,6 +2926,7 @@ function TelegramSalesWorkflowCard() {
                           onClick={() => {
                             setReviewTarget({ orderId: order.id, mode: 'reject' });
                             setReviewNote(order.adminNote || '');
+                            setReviewCustomerMessage(order.customerMessage || '');
                           }}
                         >
                           <AlertTriangle className="mr-2 h-4 w-4" />
@@ -3072,6 +3082,15 @@ function TelegramSalesWorkflowCard() {
                       <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{order.adminNote}</p>
                     </div>
                   ) : null}
+
+                  {order.customerMessage ? (
+                    <div className="mt-3 rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {salesUi.customerMessage}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{order.customerMessage}</p>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -3085,6 +3104,7 @@ function TelegramSalesWorkflowCard() {
           if (!open) {
             setReviewTarget(null);
             setReviewNote('');
+            setReviewCustomerMessage('');
           }
         }}
       >
@@ -3238,12 +3258,27 @@ function TelegramSalesWorkflowCard() {
             />
           </div>
 
+          {reviewTarget?.mode === 'reject' ? (
+            <div className="space-y-2">
+              <Label htmlFor="telegram-order-customer-message">{salesUi.customerMessage}</Label>
+              <Textarea
+                id="telegram-order-customer-message"
+                value={reviewCustomerMessage}
+                onChange={(event) => setReviewCustomerMessage(event.target.value)}
+                rows={4}
+                placeholder={salesUi.customerMessageDesc}
+              />
+              <p className="text-xs text-muted-foreground">{salesUi.customerMessageDesc}</p>
+            </div>
+          ) : null}
+
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setReviewTarget(null);
                 setReviewNote('');
+                setReviewCustomerMessage('');
               }}
             >
               Cancel
@@ -3265,6 +3300,7 @@ function TelegramSalesWorkflowCard() {
                 rejectOrderMutation.mutate({
                   orderId: reviewTarget.orderId,
                   adminNote: reviewNote.trim() || undefined,
+                  customerMessage: reviewCustomerMessage.trim() || undefined,
                 });
               }}
               disabled={approveOrderMutation.isPending || rejectOrderMutation.isPending}

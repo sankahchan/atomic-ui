@@ -659,10 +659,10 @@ function getTelegramUi(locale: SupportedLocale) {
     trialExpiringUpsell: isMyanmar
       ? 'ဆက်လက် အသုံးပြုလိုပါက အောက်ပါ button ကိုနှိပ်ပြီး paid plan တစ်ခုကို ရွေးချယ်နိုင်ပါသည်။'
       : 'If you want to keep using the service, choose a paid plan with the button below before the trial expires.',
-    orderRejected: (code: string, supportLink?: string | null) =>
+    orderRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
       isMyanmar
-        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
-        : `❌ Order <b>${code}</b> was rejected.\n\nIf needed, please contact the admin for follow-up on this order. You can also start again with /buy or /renew and send a new screenshot.${supportLink ? `\n\n🛟 Support: ${supportLink}` : '\n\nIf you need help, use /support.'}`,
+        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
+        : `❌ Order <b>${code}</b> was rejected.${customerMessage ? `\n\n${customerMessage}` : ''}\n\nIf needed, please contact the admin for follow-up on this order. You can also start again with /buy or /renew and send a new screenshot.${supportLink ? `\n\n🛟 Support: ${supportLink}` : '\n\nIf you need help, use /support.'}`,
     orderApproved: (code: string) =>
       isMyanmar
         ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Access details ကို ယခု ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
@@ -761,6 +761,7 @@ function getTelegramUi(locale: SupportedLocale) {
     renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
     accountNameLabel: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumberLabel: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
+    customerMessage: isMyanmar ? 'Customer message' : 'Customer message',
     paymentMethodImageCaption: (label: string) =>
       isMyanmar
         ? `📷 ${label} QR / ငွေပေးချေမှု အကောင့်ပုံ`
@@ -1134,8 +1135,8 @@ async function buildTelegramOrderStatusMessage(input: {
     );
   }
 
-  if (order.adminNote?.trim()) {
-    lines.push('', `${ui.adminNote}:`, escapeHtml(order.adminNote.trim()));
+  if (order.customerMessage?.trim()) {
+    lines.push('', `${ui.customerMessage}:`, escapeHtml(order.customerMessage.trim()));
   }
 
   const relatedKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
@@ -4258,6 +4259,7 @@ export async function rejectTelegramOrder(input: {
   reviewedByUserId?: string | null;
   reviewerName?: string | null;
   adminNote?: string | null;
+  customerMessage?: string | null;
 }) {
   const order = await db.telegramOrder.findUnique({
     where: { id: input.orderId },
@@ -4279,6 +4281,7 @@ export async function rejectTelegramOrder(input: {
       reviewedAt: new Date(),
       rejectedAt: new Date(),
       adminNote: appendTelegramOrderAdminNote(order.adminNote, input.adminNote),
+      customerMessage: input.customerMessage?.trim() || null,
     },
   });
 
@@ -4292,7 +4295,7 @@ export async function rejectTelegramOrder(input: {
       await sendTelegramMessage(
         config.botToken,
         order.telegramChatId,
-        ui.orderRejected(order.orderCode, supportLink),
+        ui.orderRejected(order.orderCode, finalOrder.customerMessage, supportLink),
         {
           replyMarkup: getCommandKeyboard(false),
         },
