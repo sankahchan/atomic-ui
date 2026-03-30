@@ -13,7 +13,7 @@ import { getGeoIpCountry } from '@/lib/security';
 
 export const ADMIN_LOGIN_PROTECTION_SETTINGS_KEY = 'admin_login_protection';
 export const ADMIN_LOGIN_FAIL2BAN_LOG =
-  process.env.ADMIN_LOGIN_FAIL2BAN_LOG || '/tmp/atomic-ui-admin-login.log';
+  process.env.ADMIN_LOGIN_FAIL2BAN_LOG || '/var/log/atomic-ui/admin-login.log';
 export const ADMIN_LOGIN_FAIL2BAN_JAIL =
   process.env.ADMIN_LOGIN_FAIL2BAN_JAIL || 'atomic-ui-auth-login';
 export const GENERIC_ADMIN_LOGIN_BLOCK_MESSAGE = 'Too many failed attempts. Try again later.';

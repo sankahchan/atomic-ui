@@ -659,10 +659,10 @@ function getTelegramUi(locale: SupportedLocale) {
     trialExpiringUpsell: isMyanmar
       ? 'ဆက်လက် အသုံးပြုလိုပါက အောက်ပါ button ကိုနှိပ်ပြီး paid plan တစ်ခုကို ရွေးချယ်နိုင်ပါသည်။'
       : 'If you want to keep using the service, choose a paid plan with the button below before the trial expires.',
-    orderRejected: (code: string, note?: string | null) =>
+    orderRejected: (code: string, supportLink?: string | null) =>
       isMyanmar
-        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${note ? `\n\nမှတ်ချက်: ${note}` : ''}\n\nလိုအပ်ပါက screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကို ပြန်စနိုင်ပါသည်။`
-        : `❌ Order <b>${code}</b> was rejected.${note ? `\n\nNote: ${note}` : ''}\n\nIf needed, you can start again with /buy or /renew and send a new screenshot.`,
+        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
+        : `❌ Order <b>${code}</b> was rejected.\n\nIf needed, please contact the admin for follow-up on this order. You can also start again with /buy or /renew and send a new screenshot.${supportLink ? `\n\n🛟 Support: ${supportLink}` : '\n\nIf you need help, use /support.'}`,
     orderApproved: (code: string) =>
       isMyanmar
         ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Access details ကို ယခု ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
@@ -4284,6 +4284,7 @@ export async function rejectTelegramOrder(input: {
 
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
 
   try {
     const config = await getTelegramConfig();
@@ -4291,7 +4292,7 @@ export async function rejectTelegramOrder(input: {
       await sendTelegramMessage(
         config.botToken,
         order.telegramChatId,
-        ui.orderRejected(order.orderCode, input.adminNote || null),
+        ui.orderRejected(order.orderCode, supportLink),
         {
           replyMarkup: getCommandKeyboard(false),
         },
@@ -7052,9 +7053,7 @@ async function handleTelegramCallbackQuery(
           orderId: orderAction.orderId,
           reviewedByUserId: null,
           reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
-          adminNote: callbackQuery.from.username
-            ? `Rejected from Telegram by @${callbackQuery.from.username}`
-            : `Rejected from Telegram by ${callbackQuery.from.first_name}`,
+          adminNote: null,
         });
 
         await answerTelegramCallbackQuery(

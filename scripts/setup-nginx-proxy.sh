@@ -21,7 +21,7 @@ HARDEN_CONF="/etc/nginx/conf.d/${SITE_NAME}-hardening.conf"
 FAIL2BAN_FILTER="/etc/fail2ban/filter.d/${SITE_NAME}-login-abuse.conf"
 FAIL2BAN_AUTH_FILTER="/etc/fail2ban/filter.d/${SITE_NAME}-auth-login.conf"
 FAIL2BAN_JAIL="/etc/fail2ban/jail.d/${SITE_NAME}.local"
-ADMIN_LOGIN_FAIL2BAN_LOG="${ADMIN_LOGIN_FAIL2BAN_LOG:-/tmp/atomic-ui-admin-login.log}"
+ADMIN_LOGIN_FAIL2BAN_LOG="${ADMIN_LOGIN_FAIL2BAN_LOG:-/var/log/atomic-ui/admin-login.log}"
 ADMIN_LOGIN_FAIL2BAN_JAIL="${ADMIN_LOGIN_FAIL2BAN_JAIL:-${SITE_NAME}-auth-login}"
 SHARE_STATIC_DIR="/var/www/atomic-ui/share"
 SHARE_BLOCKED_FILE="${SHARE_STATIC_DIR}/blocked.html"
@@ -437,6 +437,7 @@ EOF
 failregex = ^\S+\s+ip=<HOST>\s+event=AUTH_LOGIN_FAILED\s+email=.*$
 ignoreregex =
 EOF
+  mkdir -p "$(dirname "${ADMIN_LOGIN_FAIL2BAN_LOG}")"
   touch "${ADMIN_LOGIN_FAIL2BAN_LOG}"
   chmod 0644 "${ADMIN_LOGIN_FAIL2BAN_LOG}"
   {
