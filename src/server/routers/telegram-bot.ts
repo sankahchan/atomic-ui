@@ -252,6 +252,15 @@ export const telegramBotRouter = router({
           ),
         ),
       );
+      const relatedDynamicKeyIds = Array.from(
+        new Set(
+          orders.flatMap((order) =>
+            [order.targetDynamicKeyId, order.approvedDynamicKeyId].filter(
+              (value): value is string => Boolean(value),
+            ),
+          ),
+        ),
+      );
       const telegramUserIds = Array.from(new Set(orders.map((order) => order.telegramUserId).filter(Boolean)));
       const telegramChatIds = Array.from(new Set(orders.map((order) => order.telegramChatId).filter(Boolean)));
       const requestedEmails = Array.from(
@@ -327,6 +336,71 @@ export const telegramBotRouter = router({
           })
         : [];
       const keysById = new Map(keys.map((key) => [key.id, key]));
+      const dynamicKeys =
+        relatedDynamicKeyIds.length || telegramUserIds.length || telegramChatIds.length || requestedEmails.length
+          ? await db.dynamicAccessKey.findMany({
+              where: {
+                OR: [
+                  ...(relatedDynamicKeyIds.length
+                    ? [
+                        {
+                          id: {
+                            in: relatedDynamicKeyIds,
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(telegramUserIds.length
+                    ? [
+                        {
+                          telegramId: {
+                            in: telegramUserIds,
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(telegramChatIds.length
+                    ? [
+                        {
+                          user: {
+                            telegramChatId: {
+                              in: telegramChatIds,
+                            },
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(requestedEmails.length
+                    ? [
+                        {
+                          email: {
+                            in: requestedEmails,
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                email: true,
+                telegramId: true,
+                usedBytes: true,
+                dataLimitBytes: true,
+                expiresAt: true,
+                publicSlug: true,
+                dynamicUrl: true,
+                user: {
+                  select: {
+                    telegramChatId: true,
+                  },
+                },
+              },
+            })
+          : [];
+      const dynamicKeysById = new Map(dynamicKeys.map((key) => [key.id, key]));
 
       const profiles =
         telegramUserIds.length || telegramChatIds.length
@@ -402,6 +476,7 @@ export const telegramBotRouter = router({
                 requestedEmail: true,
                 planName: true,
                 approvedAccessKeyId: true,
+                approvedDynamicKeyId: true,
                 createdAt: true,
                 fulfilledAt: true,
                 rejectedAt: true,
@@ -431,71 +506,130 @@ export const telegramBotRouter = router({
         return Boolean(orderEmail && candidateEmail && orderEmail === candidateEmail);
       };
 
-      return orders.map((order) => ({
-        ...order,
-        dataLimitBytes: order.dataLimitBytes?.toString() ?? null,
-        targetAccessKeyName: order.targetAccessKeyId
-          ? keysById.get(order.targetAccessKeyId)?.name ?? null
-          : null,
-        approvedAccessKeyName: order.approvedAccessKeyId
-          ? keysById.get(order.approvedAccessKeyId)?.name ?? null
-          : null,
-        approvedAccessKeySlug: order.approvedAccessKeyId
-          ? keysById.get(order.approvedAccessKeyId)?.publicSlug ?? null
-          : null,
-        customerProfile:
-          profiles.find(
-            (profile) =>
-              profile.telegramUserId === order.telegramUserId ||
-              profile.telegramChatId === order.telegramChatId,
-          ) ?? null,
-        customerLinkedKeys: Array.from(
-          new Map(
-            keys
-              .filter((key) => {
-                const emailMatch =
-                  normalizeEmail(order.requestedEmail) &&
-                  normalizeEmail(key.email) === normalizeEmail(order.requestedEmail);
-                return (
-                  key.id === order.targetAccessKeyId ||
-                  key.id === order.approvedAccessKeyId ||
-                  key.telegramId === order.telegramUserId ||
-                  key.user?.telegramChatId === order.telegramChatId ||
-                  emailMatch
-                );
-              })
-              .map((key) => [
-                key.id,
-                {
-                  id: key.id,
-                  name: key.name,
-                  status: key.status,
-                  email: key.email,
-                  publicSlug: key.publicSlug,
-                  usedBytes: key.usedBytes.toString(),
-                  dataLimitBytes: key.dataLimitBytes?.toString() ?? null,
-                  expiresAt: key.expiresAt,
-                },
-              ]),
-          ).values(),
-        ).slice(0, 5),
-        customerRecentOrders: relatedOrders
-          .filter((candidate) => candidate.id !== order.id && matchesOrderIdentity(order, candidate))
-          .slice(0, 4)
-          .map((candidate) => ({
-            id: candidate.id,
-            orderCode: candidate.orderCode,
-            status: candidate.status,
-            kind: candidate.kind,
-            planName: candidate.planName,
-            approvedAccessKeyName: candidate.approvedAccessKeyId
-              ? keysById.get(candidate.approvedAccessKeyId)?.name ?? null
-              : null,
-            createdAt: candidate.createdAt,
-            fulfilledAt: candidate.fulfilledAt,
-            rejectedAt: candidate.rejectedAt,
-          })),
-        customerSummary: (() => {
+      type CustomerLinkedKey = {
+        id: string;
+        type: 'ACCESS_KEY' | 'DYNAMIC_KEY';
+        name: string;
+        status: string;
+        email: string | null;
+        publicSlug: string | null;
+        usedBytes: string;
+        dataLimitBytes: string | null;
+        expiresAt: Date | null;
+      };
+
+      return orders.map((order) => {
+        const accessLinkedEntries: Array<[string, CustomerLinkedKey]> = keys
+          .filter((key) => {
+            const emailMatch =
+              normalizeEmail(order.requestedEmail) &&
+              normalizeEmail(key.email) === normalizeEmail(order.requestedEmail);
+            return (
+              key.id === order.targetAccessKeyId ||
+              key.id === order.approvedAccessKeyId ||
+              key.telegramId === order.telegramUserId ||
+              key.user?.telegramChatId === order.telegramChatId ||
+              emailMatch
+            );
+          })
+          .map((key) => [
+            `access:${key.id}`,
+            {
+              id: key.id,
+              type: 'ACCESS_KEY',
+              name: key.name,
+              status: key.status,
+              email: key.email,
+              publicSlug: key.publicSlug,
+              usedBytes: key.usedBytes.toString(),
+              dataLimitBytes: key.dataLimitBytes?.toString() ?? null,
+              expiresAt: key.expiresAt,
+            },
+          ]);
+
+        const dynamicLinkedEntries: Array<[string, CustomerLinkedKey]> = dynamicKeys
+          .filter((key) => {
+            const emailMatch =
+              normalizeEmail(order.requestedEmail) &&
+              normalizeEmail(key.email) === normalizeEmail(order.requestedEmail);
+            return (
+              key.id === order.targetDynamicKeyId ||
+              key.id === order.approvedDynamicKeyId ||
+              key.telegramId === order.telegramUserId ||
+              key.user?.telegramChatId === order.telegramChatId ||
+              emailMatch
+            );
+          })
+          .map((key) => [
+            `dynamic:${key.id}`,
+            {
+              id: key.id,
+              type: 'DYNAMIC_KEY',
+              name: key.name,
+              status: key.status,
+              email: key.email,
+              publicSlug: key.publicSlug,
+              usedBytes: key.usedBytes.toString(),
+              dataLimitBytes: key.dataLimitBytes?.toString() ?? null,
+              expiresAt: key.expiresAt,
+            },
+          ]);
+
+        return {
+          ...order,
+          dataLimitBytes: order.dataLimitBytes?.toString() ?? null,
+          deliveryType: order.deliveryType ?? 'ACCESS_KEY',
+          dynamicTemplateId: order.dynamicTemplateId ?? null,
+          targetAccessKeyName: order.targetAccessKeyId
+            ? keysById.get(order.targetAccessKeyId)?.name ?? null
+            : null,
+          targetDynamicKeyName: order.targetDynamicKeyId
+            ? dynamicKeysById.get(order.targetDynamicKeyId)?.name ?? null
+            : null,
+          approvedAccessKeyName: order.approvedAccessKeyId
+            ? keysById.get(order.approvedAccessKeyId)?.name ?? null
+            : null,
+          approvedAccessKeySlug: order.approvedAccessKeyId
+            ? keysById.get(order.approvedAccessKeyId)?.publicSlug ?? null
+            : null,
+          approvedDynamicKeyName: order.approvedDynamicKeyId
+            ? dynamicKeysById.get(order.approvedDynamicKeyId)?.name ?? null
+            : null,
+          approvedDynamicKeySlug: order.approvedDynamicKeyId
+            ? dynamicKeysById.get(order.approvedDynamicKeyId)?.publicSlug ?? null
+            : null,
+          customerProfile:
+            profiles.find(
+              (profile) =>
+                profile.telegramUserId === order.telegramUserId ||
+                profile.telegramChatId === order.telegramChatId,
+            ) ?? null,
+          customerLinkedKeys: Array.from(
+            new Map<string, CustomerLinkedKey>([
+              ...accessLinkedEntries,
+              ...dynamicLinkedEntries,
+            ]).values(),
+          ).slice(0, 5),
+          customerRecentOrders: relatedOrders
+            .filter((candidate) => candidate.id !== order.id && matchesOrderIdentity(order, candidate))
+            .slice(0, 4)
+            .map((candidate) => ({
+              id: candidate.id,
+              orderCode: candidate.orderCode,
+              status: candidate.status,
+              kind: candidate.kind,
+              planName: candidate.planName,
+              approvedAccessKeyName: candidate.approvedAccessKeyId
+                ? keysById.get(candidate.approvedAccessKeyId)?.name ?? null
+                : null,
+              approvedDynamicKeyName: candidate.approvedDynamicKeyId
+                ? dynamicKeysById.get(candidate.approvedDynamicKeyId)?.name ?? null
+                : null,
+              createdAt: candidate.createdAt,
+              fulfilledAt: candidate.fulfilledAt,
+              rejectedAt: candidate.rejectedAt,
+            })),
+          customerSummary: (() => {
           const identityOrders = relatedOrders.filter((candidate) => matchesOrderIdentity(order, candidate));
           const lastFulfilled = identityOrders.find((candidate) => candidate.status === 'FULFILLED');
           return {
@@ -506,8 +640,9 @@ export const telegramBotRouter = router({
             lastOrderAt: identityOrders[0]?.createdAt ?? null,
             lastFulfilledAt: lastFulfilled?.fulfilledAt ?? lastFulfilled?.createdAt ?? null,
           };
-        })(),
-      }));
+          })(),
+        };
+      });
     }),
 
   approveOrder: adminProcedure

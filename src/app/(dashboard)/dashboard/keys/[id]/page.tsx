@@ -2366,6 +2366,8 @@ export default function KeyDetailPage() {
   const keyId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [replacementServerId, setReplacementServerId] = useState('none');
+  const [notifyOnReplacement, setNotifyOnReplacement] = useState(true);
   const { data: currentUser } = trpc.auth.me.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
@@ -2392,6 +2394,14 @@ export default function KeyDetailPage() {
       refetchIntervalInBackground: false,
     },
   );
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const { data: assignableServers } = trpc.servers.list.useQuery(
+    { includeInactive: false },
+    {
+      enabled: Boolean(keyId && isAdmin),
+      staleTime: 30_000,
+    },
+  );
 
   // Fetch QR code
   const { data: qrData, isLoading: qrLoading } = trpc.keys.generateQRCode.useQuery(
@@ -2416,8 +2426,30 @@ export default function KeyDetailPage() {
       });
     },
   });
+  const replaceServerMutation = trpc.keys.replaceServer.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Server replaced',
+        description: `${result.keyName} moved to ${result.targetServerName}. ${result.remainingChanges} change${result.remainingChanges === 1 ? '' : 's'} remaining.`,
+      });
+      setReplacementServerId('none');
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Server replacement failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  useEffect(() => {
+    setReplacementServerId('none');
+    setNotifyOnReplacement(Boolean(key?.telegramDeliveryEnabled));
+  }, [key?.id, key?.telegramDeliveryEnabled]);
 
   const handleDelete = () => {
     setDeleteDialogOpen(true);
@@ -2513,9 +2545,12 @@ export default function KeyDetailPage() {
     lastTrafficAt &&
       Date.now() - lastTrafficAt.getTime() <= TRAFFIC_ACTIVE_WINDOW_MS,
   );
-  const isAdmin = currentUser?.role === 'ADMIN';
   const qrDownloadFilename = buildDownloadFilename(key.name, 'qr', 'png');
   const configDownloadFilename = buildDownloadFilename(key.name, 'client-config', 'txt');
+  const availableReplacementServers = (assignableServers || []).filter((server) => server.id !== key.serverId);
+  const serverChangeCount = keyRecord.serverChangeCount ?? 0;
+  const serverChangeLimit = keyRecord.serverChangeLimit ?? 3;
+  const remainingServerChanges = Math.max(0, serverChangeLimit - serverChangeCount);
 
   const handleDownloadQr = () => {
     if (!qrData?.qrCode) {
@@ -3081,6 +3116,114 @@ export default function KeyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {isAdmin ? (
+            <Card className="ops-detail-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <RotateCw className="w-5 h-5 text-primary" />
+                  Server Replacement
+                </CardTitle>
+                <CardDescription>
+                  Move this key to another server while keeping its usage and expiry unchanged.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="ops-inline-stat">
+                    <p className="text-sm text-muted-foreground">Current server</p>
+                    <p className="font-medium">
+                      {keyRecord.server?.name || 'Unassigned'}
+                      {keyRecord.server?.countryCode ? ` (${keyRecord.server.countryCode})` : ''}
+                    </p>
+                  </div>
+                  <div className="ops-inline-stat">
+                    <p className="text-sm text-muted-foreground">Changes used</p>
+                    <p className="font-medium">
+                      {serverChangeCount} / {serverChangeLimit}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {remainingServerChanges} change{remainingServerChanges === 1 ? '' : 's'} remaining
+                    </p>
+                  </div>
+                </div>
+
+                {keyRecord.lastServerChangeAt ? (
+                  <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                    Last moved {formatRelativeTime(keyRecord.lastServerChangeAt)}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label>Replace to server</Label>
+                  <Select
+                    value={replacementServerId}
+                    onValueChange={setReplacementServerId}
+                    disabled={remainingServerChanges <= 0 || replaceServerMutation.isPending}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a target server" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Choose a target server</SelectItem>
+                      {availableReplacementServers.map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          {server.name}
+                          {server.countryCode ? ` (${server.countryCode})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The key stays on the same expiry date and keeps its existing usage.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 dark:bg-white/[0.03]">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Notify user in Telegram</p>
+                    <p className="text-xs text-muted-foreground">
+                      Resend the updated share page after the replacement is complete.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notifyOnReplacement}
+                    onCheckedChange={setNotifyOnReplacement}
+                    disabled={replaceServerMutation.isPending || !key.telegramDeliveryEnabled}
+                  />
+                </div>
+
+                <Button
+                  className="w-full"
+                  disabled={
+                    replacementServerId === 'none' ||
+                    remainingServerChanges <= 0 ||
+                    replaceServerMutation.isPending
+                  }
+                  onClick={() =>
+                    replaceServerMutation.mutate({
+                      id: key.id,
+                      targetServerId: replacementServerId,
+                      notifyUser: notifyOnReplacement,
+                    })
+                  }
+                >
+                  {replaceServerMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCw className="mr-2 h-4 w-4" />
+                  )}
+                  Replace on selected server
+                </Button>
+
+                {remainingServerChanges <= 0 ? (
+                  <div className="rounded-[1.05rem] border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                    This key has reached the 3-change limit. The user must buy a new key or contact admin.
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <ClientEndpointTestCard
             endpointUrl={subscriptionApiUrl}

@@ -209,6 +209,9 @@ model AccessKey {
   telegramDeliveryEnabled    Boolean @default(true)
   sharePagePasswordHash      String?
   sharePageAccessExpiresAt   DateTime?
+  serverChangeCount          Int      @default(0)
+  serverChangeLimit          Int      @default(3)
+  lastServerChangeAt         DateTime?
 
   // Connection/device tracking
   estimatedDevices Int @default(0)
@@ -258,6 +261,8 @@ model TelegramOrder {
   dataLimitBytes       BigInt?
   unlimitedQuota       Boolean  @default(false)
   templateId           String?
+  dynamicTemplateId    String?
+  deliveryType         String   @default("ACCESS_KEY")
   selectedServerId     String?
   selectedServerName   String?
   selectedServerCountryCode String?
@@ -266,7 +271,9 @@ model TelegramOrder {
   paymentMethodAccountName String?
   paymentMethodAccountNumber String?
   targetAccessKeyId    String?
+  targetDynamicKeyId   String?
   approvedAccessKeyId  String?
+  approvedDynamicKeyId String?
   paymentProofFileId   String?
   paymentProofType     String?
   paymentProofRevision Int      @default(0)

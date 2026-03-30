@@ -2634,6 +2634,213 @@ export const keysRouter = router({
       };
     }),
 
+  replaceServer: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        targetServerId: z.string(),
+        notifyUser: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        include: {
+          server: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              telegramChatId: true,
+            },
+          },
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (key.serverId === input.targetServerId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This key is already on the selected server.',
+        });
+      }
+
+      if (key.serverChangeCount >= key.serverChangeLimit) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This key has reached its server-change limit. Please create a new key or contact admin.',
+        });
+      }
+
+      if (!['ACTIVE', 'PENDING'].includes(key.status)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only active or pending keys can be moved to another server.',
+        });
+      }
+
+      const targetServer = await db.server.findUnique({
+        where: { id: input.targetServerId },
+      });
+
+      if (!targetServer) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target server not found',
+        });
+      }
+
+      const assignmentCheck = canAssignKeysToServer(targetServer);
+      if (!assignmentCheck.allowed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: assignmentCheck.reason,
+        });
+      }
+
+      const sourceClient = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+      const targetClient = createOutlineClient(targetServer.apiUrl, targetServer.apiCertSha256);
+
+      let newOutlineKey:
+        | {
+            id: string;
+            accessUrl: string;
+            password?: string | null;
+            port?: number | null;
+            method?: string | null;
+          }
+        | null = null;
+
+      try {
+        newOutlineKey = await targetClient.createAccessKey({
+          name: key.name,
+          method: key.method || 'chacha20-ietf-poly1305',
+        });
+
+        if (key.dataLimitBytes) {
+          try {
+            await targetClient.setAccessKeyDataLimit(newOutlineKey.id, Number(key.dataLimitBytes));
+          } catch (error) {
+            logger.warn(
+              `Failed to copy data limit for access key ${key.id} to server ${targetServer.id}: ${
+                (error as Error).message
+              }`,
+            );
+          }
+        } else {
+          try {
+            await targetClient.removeAccessKeyDataLimit(newOutlineKey.id);
+          } catch {
+            // Ignore: unlimited quota is already the default state on Outline.
+          }
+        }
+
+        await db.connectionSession.updateMany({
+          where: {
+            accessKeyId: key.id,
+            isActive: true,
+          },
+          data: {
+            isActive: false,
+            endedAt: new Date(),
+            endedReason: 'SERVER_REPLACED',
+          },
+        });
+
+        const updatedKey = await db.accessKey.update({
+          where: { id: key.id },
+          data: {
+            serverId: targetServer.id,
+            outlineKeyId: newOutlineKey.id,
+            accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
+            password: newOutlineKey.password ?? null,
+            port: newOutlineKey.port ?? null,
+            method: newOutlineKey.method ?? key.method,
+            usageOffset: -key.usedBytes,
+            serverChangeCount: { increment: 1 },
+            lastServerChangeAt: new Date(),
+            status: key.status === 'DISABLED' ? 'ACTIVE' : key.status,
+            disabledAt: null,
+            disabledOutlineKeyId: null,
+          },
+        });
+
+        try {
+          await sourceClient.deleteAccessKey(key.outlineKeyId);
+        } catch (error) {
+          logger.warn(
+            `Failed to delete old Outline key ${key.outlineKeyId} after server replacement: ${
+              (error as Error).message
+            }`,
+          );
+        }
+
+        if (input.notifyUser && key.telegramDeliveryEnabled) {
+          try {
+            await sendAccessKeySharePageToTelegram({
+              accessKeyId: updatedKey.id,
+              chatId: key.telegramId || key.user?.telegramChatId || undefined,
+              reason: 'RESENT',
+              source: 'dashboard_server_replace',
+            });
+          } catch (error) {
+            logger.warn(
+              `Failed to notify Telegram user for replaced access key ${key.id}: ${
+                (error as Error).message
+              }`,
+            );
+          }
+        }
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_SERVER_REPLACED',
+          entity: 'ACCESS_KEY',
+          entityId: key.id,
+          details: {
+            sourceServerId: key.serverId,
+            sourceServerName: key.server.name,
+            targetServerId: targetServer.id,
+            targetServerName: targetServer.name,
+            serverChangeCount: key.serverChangeCount + 1,
+            serverChangeLimit: key.serverChangeLimit,
+            notifyUser: input.notifyUser,
+          },
+        });
+
+        return {
+          success: true,
+          keyId: updatedKey.id,
+          keyName: updatedKey.name,
+          targetServerId: targetServer.id,
+          targetServerName: targetServer.name,
+          serverChangeCount: updatedKey.serverChangeCount,
+          serverChangeLimit: updatedKey.serverChangeLimit,
+          remainingChanges: Math.max(0, updatedKey.serverChangeLimit - updatedKey.serverChangeCount),
+        };
+      } catch (error) {
+        if (newOutlineKey?.id) {
+          try {
+            await targetClient.deleteAccessKey(newOutlineKey.id);
+          } catch {
+            // Ignore cleanup failure here; the new key is not referenced in DB.
+          }
+        }
+
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message || 'Failed to replace server for this key.',
+        });
+      }
+    }),
+
   getSharePageAnalytics: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -3239,7 +3446,7 @@ export const keysRouter = router({
               password: newKey.password,
               port: newKey.port,
               method: newKey.method,
-              usageOffset: key.usedBytes,
+              usageOffset: -key.usedBytes,
             },
           });
 

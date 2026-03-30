@@ -27,7 +27,9 @@ export const telegramSalesPlanSchema = z.object({
   priceCurrency: z.string().trim().min(1).max(16).optional().default('MMK'),
   priceLabel: z.string().max(120).optional().default(''),
   localizedPriceLabels: z.record(z.string(), z.string()).optional().default({}),
+  deliveryType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY']).default('ACCESS_KEY'),
   templateId: z.string().optional().nullable(),
+  dynamicTemplateId: z.string().optional().nullable(),
   fixedDurationDays: z.number().int().min(1).max(365).optional().nullable(),
   fixedDurationMonths: z.number().int().min(1).max(24).optional().nullable(),
   minDurationMonths: z.number().int().min(1).max(24).optional().nullable(),
@@ -212,7 +214,9 @@ function defaultPlans(): TelegramSalesPlan[] {
         en: 'Free Trial',
         my: 'အခမဲ့ အစမ်းသုံး',
       },
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: 1,
       fixedDurationMonths: null,
       minDurationMonths: null,
@@ -228,7 +232,9 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: 1,
       minDurationMonths: null,
@@ -244,7 +250,9 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: 2,
       minDurationMonths: null,
@@ -260,7 +268,9 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
+      deliveryType: 'DYNAMIC_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: null,
       minDurationMonths: 3,
@@ -384,6 +394,12 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
         ...override,
         localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
         localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
+        deliveryType: override.deliveryType === 'DYNAMIC_KEY' ? 'DYNAMIC_KEY' : fallbackPlan.deliveryType,
+        templateId:
+          (override.templateId ?? '').trim() || (override.deliveryType === 'ACCESS_KEY' ? fallbackPlan.templateId ?? null : null),
+        dynamicTemplateId:
+          (override.dynamicTemplateId ?? '').trim() ||
+          (override.deliveryType === 'DYNAMIC_KEY' ? fallbackPlan.dynamicTemplateId ?? null : null),
         fixedDurationDays:
           typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
             ? override.fixedDurationDays

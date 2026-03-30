@@ -212,7 +212,9 @@ type TelegramSalesPlanForm = {
     en: string;
     my: string;
   };
+  deliveryType: 'ACCESS_KEY' | 'DYNAMIC_KEY';
   templateId?: string | null;
+  dynamicTemplateId?: string | null;
   fixedDurationDays?: number | null;
   fixedDurationMonths?: number | null;
   minDurationMonths?: number | null;
@@ -278,14 +280,20 @@ type TelegramOrderRow = {
   durationDays?: number | null;
   dataLimitBytes?: string | null;
   unlimitedQuota: boolean;
+  deliveryType?: 'ACCESS_KEY' | 'DYNAMIC_KEY' | null;
   templateId?: string | null;
+  dynamicTemplateId?: string | null;
   selectedServerId?: string | null;
   selectedServerName?: string | null;
   selectedServerCountryCode?: string | null;
   targetAccessKeyId?: string | null;
   targetAccessKeyName?: string | null;
+  targetDynamicKeyId?: string | null;
+  targetDynamicKeyName?: string | null;
   approvedAccessKeyId?: string | null;
   approvedAccessKeyName?: string | null;
+  approvedDynamicKeyId?: string | null;
+  approvedDynamicKeyName?: string | null;
   paymentProofType?: string | null;
   paymentProofRevision?: number | null;
   paymentSubmittedAt?: Date | null;
@@ -312,6 +320,7 @@ type TelegramOrderRow = {
   } | null;
   customerLinkedKeys: Array<{
     id: string;
+    type?: 'ACCESS_KEY' | 'DYNAMIC_KEY';
     name: string;
     status: string;
     email?: string | null;
@@ -327,6 +336,7 @@ type TelegramOrderRow = {
     kind: string;
     planName?: string | null;
     approvedAccessKeyName?: string | null;
+    approvedDynamicKeyName?: string | null;
     createdAt: Date;
     fulfilledAt?: Date | null;
     rejectedAt?: Date | null;
@@ -442,7 +452,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceCurrency: 'MMK',
       priceLabel: 'Free Trial',
       localizedPriceLabels: { en: 'Free Trial', my: 'အခမဲ့ အစမ်းသုံး' },
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: 1,
       fixedDurationMonths: null,
       minDurationMonths: null,
@@ -458,7 +470,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: 1,
       minDurationMonths: null,
@@ -474,7 +488,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'ACCESS_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: 2,
       minDurationMonths: null,
@@ -490,7 +506,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
       templateId: null,
+      dynamicTemplateId: null,
       fixedDurationDays: null,
       fixedDurationMonths: null,
       minDurationMonths: 3,
@@ -1866,6 +1884,7 @@ function TelegramSalesWorkflowCard() {
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
   const templatesQuery = trpc.templates.list.useQuery();
+  const dynamicTemplatesQuery = trpc.dynamicKeys.listTemplates.useQuery();
   const serversQuery = trpc.servers.list.useQuery();
   const [form, setForm] = useState<TelegramSalesSettingsForm>(DEFAULT_TELEGRAM_SALES_SETTINGS);
   const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
@@ -1893,6 +1912,10 @@ function TelegramSalesWorkflowCard() {
   const templatesById = useMemo(
     () => new Map((templatesQuery.data || []).map((template) => [template.id, template])),
     [templatesQuery.data],
+  );
+  const dynamicTemplatesById = useMemo(
+    () => new Map((dynamicTemplatesQuery.data || []).map((template) => [template.id, template])),
+    [dynamicTemplatesQuery.data],
   );
 
   const salesUi = {
@@ -1936,7 +1959,11 @@ function TelegramSalesWorkflowCard() {
     priceLabel: isMyanmar ? 'စျေးနှုန်း label' : 'Price label',
     burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
     autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း preview' : 'Automatic price preview',
+    deliveryType: isMyanmar ? 'Delivery type' : 'Delivery type',
+    accessKeyDelivery: isMyanmar ? 'Normal access key' : 'Normal access key',
+    dynamicKeyDelivery: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
     template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
+    dynamicTemplate: isMyanmar ? 'အသုံးပြုမည့် dynamic template' : 'Dynamic template to apply',
     noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
     noTemplateSelected: isMyanmar ? 'ဤ plan အတွက် template မရွေးထားသေးပါ။' : 'No template is selected for this plan yet.',
     templateMissing: isMyanmar ? 'ရွေးထားသော template ကို မတွေ့ပါ။' : 'The selected template could not be found.',
@@ -2039,7 +2066,95 @@ function TelegramSalesWorkflowCard() {
     pending: isMyanmar ? 'Pending review' : 'Pending review',
   };
 
-  const renderTemplateSummary = (templateId?: string | null, compact = false) => {
+  const renderTemplateSummary = (
+    deliveryType?: 'ACCESS_KEY' | 'DYNAMIC_KEY' | null,
+    templateId?: string | null,
+    dynamicTemplateId?: string | null,
+    compact = false,
+  ) => {
+    if (deliveryType === 'DYNAMIC_KEY') {
+      if (!dynamicTemplateId) {
+        return (
+          <div className="mt-3 rounded-xl border border-dashed border-border/50 bg-background/40 p-3 text-xs text-muted-foreground">
+            {salesUi.noTemplateSelected}
+          </div>
+        );
+      }
+
+      const template = dynamicTemplatesById.get(dynamicTemplateId);
+      if (!template) {
+        return (
+          <div className="mt-3 rounded-xl border border-dashed border-destructive/40 bg-destructive/[0.04] p-3 text-xs text-destructive">
+            {salesUi.templateMissing}
+          </div>
+        );
+      }
+
+      const serverSummary = template.preferredServerIds.length > 0
+        ? `${template.preferredServerIds.length} preferred server${template.preferredServerIds.length === 1 ? '' : 's'}`
+        : template.preferredCountryCodes.length > 0
+          ? template.preferredCountryCodes.join(', ')
+          : salesUi.autoSelectServer;
+
+      return (
+        <div className="mt-3 rounded-xl border border-border/50 bg-background/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={cn('font-medium', compact ? 'text-xs' : 'text-sm')}>{template.name}</p>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{template.type === 'SELF_MANAGED' ? 'Self-managed' : 'Manual'}</Badge>
+              {template.subscriptionTheme ? (
+                <Badge variant="outline">{template.subscriptionTheme}</Badge>
+              ) : null}
+            </div>
+          </div>
+          {template.description ? (
+            <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
+          ) : null}
+          <div className={cn('mt-3 grid gap-2', compact ? 'sm:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4')}>
+            <div className="rounded-lg border border-border/40 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {salesUi.server}
+              </p>
+              <p className="mt-1 text-sm font-medium">{serverSummary}</p>
+            </div>
+            <div className="rounded-lg border border-border/40 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {salesUi.method}
+              </p>
+              <p className="mt-1 text-sm font-medium">{template.method}</p>
+            </div>
+            <div className="rounded-lg border border-border/40 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {salesUi.behavior}
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {template.rotationEnabled ? `Rotation · ${template.rotationTriggerMode.toLowerCase()}` : 'Stable routing'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/40 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {salesUi.duration}
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {template.durationDays ? salesUi.days(template.durationDays) : salesUi.none}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant={template.sharePageEnabled ? 'default' : 'secondary'}>
+              {salesUi.shareDelivery}: {template.sharePageEnabled ? salesUi.enabledShort : salesUi.disabledShort}
+            </Badge>
+            <Badge variant="outline">
+              {salesUi.clientDelivery}: {salesUi.enabledShort}
+            </Badge>
+            <Badge variant="outline">
+              {salesUi.telegramDelivery}: {salesUi.enabledShort}
+            </Badge>
+          </div>
+        </div>
+      );
+    }
+
     if (!templateId) {
       return (
         <div className="mt-3 rounded-xl border border-dashed border-border/50 bg-background/40 p-3 text-xs text-muted-foreground">
@@ -2181,8 +2296,14 @@ function TelegramSalesWorkflowCard() {
             en: override?.localizedPriceLabels?.en || override?.priceLabel || fallbackPlan.localizedPriceLabels.en,
             my: override?.localizedPriceLabels?.my || fallbackPlan.localizedPriceLabels.my,
           },
+          deliveryType: override?.deliveryType ?? fallbackPlan.deliveryType,
           templateId: override?.templateId ?? fallbackPlan.templateId,
+          dynamicTemplateId: override?.dynamicTemplateId ?? fallbackPlan.dynamicTemplateId,
           fixedDurationDays: override?.fixedDurationDays ?? fallbackPlan.fixedDurationDays ?? null,
+          fixedDurationMonths: override?.fixedDurationMonths ?? fallbackPlan.fixedDurationMonths ?? null,
+          minDurationMonths: override?.minDurationMonths ?? fallbackPlan.minDurationMonths ?? null,
+          dataLimitGB: override?.dataLimitGB ?? fallbackPlan.dataLimitGB ?? null,
+          unlimitedQuota: override?.unlimitedQuota ?? fallbackPlan.unlimitedQuota,
         };
       }),
     });
@@ -2374,7 +2495,9 @@ function TelegramSalesWorkflowCard() {
           en: plan.localizedPriceLabels.en.trim(),
           my: plan.localizedPriceLabels.my.trim(),
         },
-        templateId: plan.templateId || null,
+        deliveryType: plan.deliveryType,
+        templateId: plan.deliveryType === 'ACCESS_KEY' ? plan.templateId || null : null,
+        dynamicTemplateId: plan.deliveryType === 'DYNAMIC_KEY' ? plan.dynamicTemplateId || null : null,
         fixedDurationDays: plan.fixedDurationDays ?? null,
         fixedDurationMonths: plan.fixedDurationMonths ?? null,
         minDurationMonths: plan.minDurationMonths ?? null,
@@ -2861,29 +2984,75 @@ function TelegramSalesWorkflowCard() {
                       />
                     </div>
                     <div className="space-y-2 lg:col-span-2">
-                      <Label>{salesUi.template}</Label>
+                      <Label>{salesUi.deliveryType}</Label>
                       <Select
-                        value={plan.templateId || 'none'}
-                        onValueChange={(value) =>
+                        value={plan.deliveryType}
+                        onValueChange={(value: 'ACCESS_KEY' | 'DYNAMIC_KEY') =>
                           updatePlan(plan.code, (current) => ({
                             ...current,
-                            templateId: value === 'none' ? null : value,
+                            deliveryType: value,
+                            templateId: value === 'ACCESS_KEY' ? current.templateId : null,
+                            dynamicTemplateId: value === 'DYNAMIC_KEY' ? current.dynamicTemplateId : null,
                           }))
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={salesUi.noTemplate} />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
-                          {(templatesQuery.data || []).map((template) => (
-                            <SelectItem key={template.id} value={template.id}>
-                              {template.name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="ACCESS_KEY">{salesUi.accessKeyDelivery}</SelectItem>
+                          <SelectItem value="DYNAMIC_KEY">{salesUi.dynamicKeyDelivery}</SelectItem>
                         </SelectContent>
                       </Select>
-                      {renderTemplateSummary(plan.templateId, true)}
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <Label>{plan.deliveryType === 'DYNAMIC_KEY' ? salesUi.dynamicTemplate : salesUi.template}</Label>
+                      {plan.deliveryType === 'DYNAMIC_KEY' ? (
+                        <Select
+                          value={plan.dynamicTemplateId || 'none'}
+                          onValueChange={(value) =>
+                            updatePlan(plan.code, (current) => ({
+                              ...current,
+                              dynamicTemplateId: value === 'none' ? null : value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={salesUi.noTemplate} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
+                            {(dynamicTemplatesQuery.data || []).map((template) => (
+                              <SelectItem key={template.id} value={template.id}>
+                                {template.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select
+                          value={plan.templateId || 'none'}
+                          onValueChange={(value) =>
+                            updatePlan(plan.code, (current) => ({
+                              ...current,
+                              templateId: value === 'none' ? null : value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={salesUi.noTemplate} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
+                            {(templatesQuery.data || []).map((template) => (
+                              <SelectItem key={template.id} value={template.id}>
+                                {template.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {renderTemplateSummary(plan.deliveryType, plan.templateId, plan.dynamicTemplateId, true)}
                     </div>
                   </div>
                 </div>
@@ -3114,9 +3283,11 @@ function TelegramSalesWorkflowCard() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         {salesUi.target}
                       </p>
-                      <p className="mt-2 text-sm font-medium">{order.targetAccessKeyName || 'New key'}</p>
+                      <p className="mt-2 text-sm font-medium">
+                        {order.targetAccessKeyName || order.targetDynamicKeyName || 'New key'}
+                      </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {order.approvedAccessKeyName || order.reviewedBy?.email || '—'}
+                        {order.approvedAccessKeyName || order.approvedDynamicKeyName || order.reviewedBy?.email || '—'}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/50 p-3">
@@ -3130,7 +3301,7 @@ function TelegramSalesWorkflowCard() {
                     </div>
                   </div>
 
-                  {renderTemplateSummary(order.templateId, true)}
+                  {renderTemplateSummary(order.deliveryType, order.templateId, order.dynamicTemplateId, true)}
 
                   <div className="mt-4 grid gap-3 xl:grid-cols-3">
                     <div className="rounded-xl border border-border/50 bg-background/50 p-3">
@@ -3172,9 +3343,16 @@ function TelegramSalesWorkflowCard() {
                           order.customerLinkedKeys.slice(0, 3).map((key) => (
                             <div key={key.id} className="rounded-lg border border-border/40 p-2">
                               <div className="flex items-center justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
                                 <p className="truncate text-sm font-medium">{key.name}</p>
-                                <Badge variant="outline">{key.status}</Badge>
+                                {key.type ? (
+                                  <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                    {key.type === 'DYNAMIC_KEY' ? salesUi.dynamicKeyDelivery : salesUi.accessKeyDelivery}
+                                  </Badge>
+                                ) : null}
                               </div>
+                              <Badge variant="outline">{key.status}</Badge>
+                            </div>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {key.email || '—'} • {formatBytes(BigInt(key.usedBytes))}
                                 {key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ` / ${salesUi.unlimited}`}
@@ -3264,7 +3442,7 @@ function TelegramSalesWorkflowCard() {
                   <p className="font-medium">{selectedOrder.orderCode}</p>
                   <p className="text-muted-foreground">{selectedOrder.planName || selectedOrder.planCode || '—'}</p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedOrder.requestedName || selectedOrder.targetAccessKeyName || '—'}
+                          {selectedOrder.requestedName || selectedOrder.targetAccessKeyName || selectedOrder.targetDynamicKeyName || '—'}
                   </p>
                   {selectedOrder.selectedServerName ? (
                     <p className="text-xs text-muted-foreground">
@@ -3418,7 +3596,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           ) : null}
 
-          {selectedOrder ? renderTemplateSummary(selectedOrder.templateId) : null}
+          {selectedOrder ? renderTemplateSummary(selectedOrder.deliveryType, selectedOrder.templateId, selectedOrder.dynamicTemplateId) : null}
 
           {selectedOrder ? (
             <div className="grid gap-3 md:grid-cols-2">
@@ -3431,7 +3609,14 @@ function TelegramSalesWorkflowCard() {
                     selectedOrder.customerLinkedKeys.slice(0, 4).map((key) => (
                       <div key={key.id} className="rounded-lg border border-border/40 p-2">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-medium">{key.name}</p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="truncate text-sm font-medium">{key.name}</p>
+                            {key.type ? (
+                              <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                {key.type === 'DYNAMIC_KEY' ? salesUi.dynamicKeyDelivery : salesUi.accessKeyDelivery}
+                              </Badge>
+                            ) : null}
+                          </div>
                           <Badge variant="outline">{key.status}</Badge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">

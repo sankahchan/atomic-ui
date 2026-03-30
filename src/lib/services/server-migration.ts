@@ -188,7 +188,7 @@ async function migrateSingleKey(
         port: newOutlineKey.port,
         method: newOutlineKey.method,
         // Reset usage tracking for the new server context
-        usageOffset: key.usedBytes, // Preserve cumulative count by setting offset
+        usageOffset: -key.usedBytes, // Preserve cumulative count across server replacement
       },
     });
 
