@@ -91,6 +91,108 @@ export const TELEGRAM_ORDER_TERMINAL_STATUSES = [
 export type TelegramOrderActiveStatus = (typeof TELEGRAM_ORDER_ACTIVE_STATUSES)[number];
 export type TelegramOrderTerminalStatus = (typeof TELEGRAM_ORDER_TERMINAL_STATUSES)[number];
 
+export const TELEGRAM_REJECTION_REASON_PRESETS = [
+  {
+    code: 'proof_unclear',
+    labels: {
+      en: 'Screenshot unclear',
+      my: 'Screenshot မရှင်းလင်း',
+    },
+    customerMessages: {
+      en: 'The payment screenshot is not clear enough to verify. Please send a clearer screenshot that shows the amount, account, and transfer time.',
+      my: 'Payment screenshot ကို အတည်ပြုရန် မရှင်းလင်းသေးပါ။ Amount, account နှင့် transfer time ကို ရှင်းလင်းစွာ မြင်ရသော screenshot အသစ်တစ်ခု ပြန်ပို့ပေးပါ။',
+    },
+  },
+  {
+    code: 'amount_mismatch',
+    labels: {
+      en: 'Amount mismatch',
+      my: 'ငွေပမာဏ မကိုက်ညီ',
+    },
+    customerMessages: {
+      en: 'The payment amount does not match the selected plan. Please contact support or send a corrected payment screenshot.',
+      my: 'ငွေပေးချေထားသော amount သည် ရွေးထားသော plan နှင့် မကိုက်ညီပါ။ Support ကို ဆက်သွယ်ပါ သို့မဟုတ် မှန်ကန်သော payment screenshot ကို ပြန်ပို့ပေးပါ။',
+    },
+  },
+  {
+    code: 'wrong_payment_method',
+    labels: {
+      en: 'Wrong payment method',
+      my: 'ငွေပေးချေမှုနည်းလမ်း မမှန်',
+    },
+    customerMessages: {
+      en: 'The screenshot does not match the selected payment method. Please switch the payment method or upload the correct screenshot.',
+      my: 'Screenshot သည် ရွေးထားသော payment method နှင့် မကိုက်ညီပါ။ Payment method ကို ပြောင်းပါ သို့မဟုတ် မှန်ကန်သော screenshot ကို တင်ပေးပါ။',
+    },
+  },
+  {
+    code: 'duplicate_payment',
+    labels: {
+      en: 'Duplicate payment proof',
+      my: 'Duplicate payment proof',
+    },
+    customerMessages: {
+      en: 'This payment proof appears to have been used before. Please contact support for manual review.',
+      my: 'ဤ payment proof ကို ယခင်က အသုံးပြုထားသည့်ပုံစံ တွေ့ရပါသည်။ Manual review အတွက် support ကို ဆက်သွယ်ပါ။',
+    },
+  },
+  {
+    code: 'manual_review_required',
+    labels: {
+      en: 'Needs manual review',
+      my: 'Manual review လိုအပ်',
+    },
+    customerMessages: {
+      en: 'We need a little more time to review this payment. Please contact support for follow-up on this order.',
+      my: 'ဤ payment ကို စစ်ဆေးရန် အချိန်ပိုလိုအပ်ပါသည်။ ဤ order အတွက် နောက်ဆက်တွဲအခြေအနေကို support နှင့် ဆက်သွယ်ပေးပါ။',
+    },
+  },
+] as const;
+
+export type TelegramRejectionReasonCode =
+  (typeof TELEGRAM_REJECTION_REASON_PRESETS)[number]['code'];
+
+export function getTelegramRejectionReasonPreset(code?: string | null) {
+  if (!code) {
+    return null;
+  }
+
+  return TELEGRAM_REJECTION_REASON_PRESETS.find((preset) => preset.code === code) || null;
+}
+
+export function resolveTelegramRejectionReasonLabel(
+  code: string | null | undefined,
+  locale: SupportedLocale,
+) {
+  const preset = getTelegramRejectionReasonPreset(code);
+  if (preset) {
+    return locale === 'my' ? preset.labels.my : preset.labels.en;
+  }
+
+  if (!code) {
+    return locale === 'my' ? 'Custom reason' : 'Custom reason';
+  }
+
+  const normalized = code.replaceAll('_', ' ').trim();
+  if (!normalized) {
+    return locale === 'my' ? 'Custom reason' : 'Custom reason';
+  }
+
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function resolveTelegramRejectionReasonMessage(
+  code: string | null | undefined,
+  locale: SupportedLocale,
+) {
+  const preset = getTelegramRejectionReasonPreset(code);
+  if (!preset) {
+    return '';
+  }
+
+  return locale === 'my' ? preset.customerMessages.my : preset.customerMessages.en;
+}
+
 const DEFAULT_PAYMENT_INSTRUCTIONS_EN =
   'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.';
 const DEFAULT_PAYMENT_INSTRUCTIONS_MY =

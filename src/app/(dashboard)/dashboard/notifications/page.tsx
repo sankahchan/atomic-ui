@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { withBasePath } from '@/lib/base-path';
 import type { LocalizedTemplateMap } from '@/lib/localized-templates';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -50,6 +51,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Save,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 
@@ -284,10 +287,12 @@ type TelegramOrderRow = {
   approvedAccessKeyId?: string | null;
   approvedAccessKeyName?: string | null;
   paymentProofType?: string | null;
+  paymentProofRevision?: number | null;
   paymentSubmittedAt?: Date | null;
   paymentCaption?: string | null;
   adminNote?: string | null;
   customerMessage?: string | null;
+  rejectionReasonCode?: string | null;
   reviewedAt?: Date | null;
   fulfilledAt?: Date | null;
   rejectedAt?: Date | null;
@@ -335,6 +340,49 @@ type TelegramOrderRow = {
     lastFulfilledAt?: Date | null;
   };
 };
+
+const TELEGRAM_REJECTION_REASON_PRESETS = [
+  {
+    code: 'proof_unclear',
+    label: { en: 'Screenshot unclear', my: 'Screenshot မရှင်းလင်း' },
+    message: {
+      en: 'The payment screenshot is not clear enough to verify. Please send a clearer screenshot that shows the amount, account, and transfer time.',
+      my: 'Payment screenshot ကို အတည်ပြုရန် မရှင်းလင်းသေးပါ။ Amount, account နှင့် transfer time ကို ရှင်းလင်းစွာ မြင်ရသော screenshot အသစ်တစ်ခု ပြန်ပို့ပေးပါ။',
+    },
+  },
+  {
+    code: 'amount_mismatch',
+    label: { en: 'Amount mismatch', my: 'ငွေပမာဏ မကိုက်ညီ' },
+    message: {
+      en: 'The payment amount does not match the selected plan. Please contact support or send a corrected payment screenshot.',
+      my: 'ငွေပေးချေထားသော amount သည် ရွေးထားသော plan နှင့် မကိုက်ညီပါ။ Support ကို ဆက်သွယ်ပါ သို့မဟုတ် မှန်ကန်သော payment screenshot ကို ပြန်ပို့ပေးပါ။',
+    },
+  },
+  {
+    code: 'wrong_payment_method',
+    label: { en: 'Wrong payment method', my: 'ငွေပေးချေမှုနည်းလမ်း မမှန်' },
+    message: {
+      en: 'The screenshot does not match the selected payment method. Please switch the payment method or upload the correct screenshot.',
+      my: 'Screenshot သည် ရွေးထားသော payment method နှင့် မကိုက်ညီပါ။ Payment method ကို ပြောင်းပါ သို့မဟုတ် မှန်ကန်သော screenshot ကို တင်ပေးပါ။',
+    },
+  },
+  {
+    code: 'duplicate_payment',
+    label: { en: 'Duplicate proof', my: 'Duplicate proof' },
+    message: {
+      en: 'This payment proof appears to have been used before. Please contact support for manual review.',
+      my: 'ဤ payment proof ကို ယခင်က အသုံးပြုထားသည့်ပုံစံ တွေ့ရပါသည်။ Manual review အတွက် support ကို ဆက်သွယ်ပါ။',
+    },
+  },
+  {
+    code: 'manual_review_required',
+    label: { en: 'Needs manual review', my: 'Manual review လိုအပ်' },
+    message: {
+      en: 'We need a little more time to review this payment. Please contact support for follow-up on this order.',
+      my: 'ဤ payment ကို စစ်ဆေးရန် အချိန်ပိုလိုအပ်ပါသည်။ ဤ order အတွက် နောက်ဆက်တွဲအခြေအနေကို support နှင့် ဆက်သွယ်ပေးပါ။',
+    },
+  },
+] as const;
 
 const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
@@ -1818,10 +1866,15 @@ function TelegramSalesWorkflowCard() {
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
   const templatesQuery = trpc.templates.list.useQuery();
+  const serversQuery = trpc.servers.list.useQuery();
   const [form, setForm] = useState<TelegramSalesSettingsForm>(DEFAULT_TELEGRAM_SALES_SETTINGS);
   const [reviewTarget, setReviewTarget] = useState<{ orderId: string; mode: 'approve' | 'reject' } | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [reviewCustomerMessage, setReviewCustomerMessage] = useState('');
+  const [reviewReasonCode, setReviewReasonCode] = useState<string>('custom');
+  const [reviewPlanCode, setReviewPlanCode] = useState<TelegramSalesPlanCode | ''>('');
+  const [reviewDurationMonths, setReviewDurationMonths] = useState('');
+  const [reviewSelectedServerId, setReviewSelectedServerId] = useState('auto');
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
@@ -1957,6 +2010,24 @@ function TelegramSalesWorkflowCard() {
     customerMessageDesc: isMyanmar
       ? 'User ကို Telegram မှာ ပြသမည့် စာသားဖြစ်ပါသည်။ မထည့်ပါက support နှင့် ပြန်စနိုင်ကြောင်း default message ကို ပို့မည်။'
       : 'This message is shown to the user in Telegram. Leave it empty to send the default support/retry message.',
+    rejectPresets: isMyanmar ? 'Reject reason presets' : 'Reject reason presets',
+    rejectPresetCustom: isMyanmar ? 'Custom message' : 'Custom message',
+    proofRevision: isMyanmar ? 'Proof revisions' : 'Proof revisions',
+    proofPreview: isMyanmar ? 'Proof preview' : 'Proof preview',
+    openProof: isMyanmar ? 'Proof ဖွင့်မည်' : 'Open proof',
+    downloadProof: isMyanmar ? 'Proof ဒေါင်းလုဒ်လုပ်မည်' : 'Download proof',
+    editBeforeApproval: isMyanmar ? 'Approve မပြုမီ order ကို ပြင်ဆင်မည်' : 'Edit order before approval',
+    editBeforeApprovalDesc: isMyanmar
+      ? 'Plan၊ သက်တမ်းနှင့် server ကို ပြောင်းပြီး key ဖန်တီးမည့် setting ကို အတည်ပြုပြီးမှ approve လုပ်ပါ။'
+      : 'Adjust the plan, duration, or preferred server before you approve and create the key.',
+    saveOrderChanges: isMyanmar ? 'Order changes သိမ်းမည်' : 'Save order changes',
+    orderUpdated: isMyanmar ? 'Order ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Order updated',
+    orderUpdatedDesc: isMyanmar
+      ? 'Approve မပြုမီ order အသေးစိတ်ကို ပြင်ဆင်ပြီးပါပြီ။'
+      : 'The order details were updated before approval.',
+    updateFailed: isMyanmar ? 'Order အပ်ဒိတ် မအောင်မြင်ပါ' : 'Order update failed',
+    paymentProofImage: isMyanmar ? 'Payment proof image' : 'Payment proof image',
+    noImagePreview: isMyanmar ? 'ဤ proof ကို panel ထဲတွင် preview မပြနိုင်ပါ။' : 'This proof cannot be previewed inline.',
     approveSuccess: isMyanmar ? 'အော်ဒါကို အတည်ပြုပြီး key ပေးပြီးပါပြီ' : 'Order approved and key delivered',
     rejectSuccess: isMyanmar ? 'အော်ဒါကို ပယ်ပြီး Telegram သို့ အသိပေးပြီးပါပြီ' : 'Order rejected and user notified',
     deliveryWarning: isMyanmar ? 'Key ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
@@ -2143,6 +2214,7 @@ function TelegramSalesWorkflowCard() {
       setReviewTarget(null);
       setReviewNote('');
       setReviewCustomerMessage('');
+      setReviewReasonCode('custom');
       toast({
         title: salesUi.approveSuccess,
         description: result.deliveryError || result.sharePageUrl || result.accessKeyName,
@@ -2164,6 +2236,7 @@ function TelegramSalesWorkflowCard() {
       setReviewTarget(null);
       setReviewNote('');
       setReviewCustomerMessage('');
+      setReviewReasonCode('custom');
       toast({
         title: salesUi.rejectSuccess,
       });
@@ -2171,6 +2244,26 @@ function TelegramSalesWorkflowCard() {
     onError: (error) => {
       toast({
         title: 'Rejection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateOrderDraftMutation = trpc.telegramBot.updateOrderDraft.useMutation({
+    onSuccess: async (result) => {
+      await utils.telegramBot.listOrders.invalidate();
+      setReviewPlanCode((result.planCode as TelegramSalesPlanCode | null) || '');
+      setReviewDurationMonths(result.durationMonths ? String(result.durationMonths) : '');
+      setReviewSelectedServerId(result.selectedServerId || 'auto');
+      toast({
+        title: salesUi.orderUpdated,
+        description: salesUi.orderUpdatedDesc,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: salesUi.updateFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -2298,6 +2391,21 @@ function TelegramSalesWorkflowCard() {
   const selectedOrder = reviewTarget
     ? matchedOrders.find((order) => order.id === reviewTarget.orderId) || null
     : null;
+  const selectedOrderId = selectedOrder?.id ?? null;
+  const selectedOrderRejectionReasonCode = selectedOrder?.rejectionReasonCode ?? null;
+  const selectedOrderPlanCode = (selectedOrder?.planCode as TelegramSalesPlanCode | null) ?? null;
+  const selectedOrderDurationMonths = selectedOrder?.durationMonths ?? null;
+  const selectedOrderSelectedServerId = selectedOrder?.selectedServerId ?? null;
+  const selectedOrderProofUrl = selectedOrder
+    ? withBasePath(`/api/telegram/orders/${selectedOrder.id}/proof`)
+    : '';
+  const selectedOrderProofDownloadUrl = selectedOrder
+    ? withBasePath(`/api/telegram/orders/${selectedOrder.id}/proof?download=1`)
+    : '';
+  const selectedOrderProofIsImage = selectedOrder?.paymentProofType === 'photo';
+  const selectedPlan = reviewPlanCode
+    ? form.plans.find((plan) => plan.code === reviewPlanCode) || null
+    : null;
   const summaryCounts = matchedOrders.reduce(
     (acc, order) => {
       if (order.status === 'PENDING_REVIEW') acc.pending += 1;
@@ -2318,6 +2426,28 @@ function TelegramSalesWorkflowCard() {
     }
     return formatBytes(BigInt(order.dataLimitBytes));
   };
+
+  useEffect(() => {
+    if (!selectedOrderId) {
+      setReviewReasonCode('custom');
+      setReviewPlanCode('');
+      setReviewDurationMonths('');
+      setReviewSelectedServerId('auto');
+      return;
+    }
+
+    setReviewReasonCode(selectedOrderRejectionReasonCode || 'custom');
+    setReviewPlanCode(selectedOrderPlanCode || '');
+    setReviewDurationMonths(selectedOrderDurationMonths ? String(selectedOrderDurationMonths) : '');
+    setReviewSelectedServerId(selectedOrderSelectedServerId || 'auto');
+  }, [
+    selectedOrderId,
+    selectedOrderRejectionReasonCode,
+    selectedOrderPlanCode,
+    selectedOrderDurationMonths,
+    selectedOrderSelectedServerId,
+    reviewTarget?.mode,
+  ]);
 
   return (
     <>
@@ -2915,6 +3045,7 @@ function TelegramSalesWorkflowCard() {
                             setReviewTarget({ orderId: order.id, mode: 'approve' });
                             setReviewNote(order.adminNote || '');
                             setReviewCustomerMessage(order.customerMessage || '');
+                            setReviewReasonCode(order.rejectionReasonCode || 'custom');
                           }}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -2927,6 +3058,7 @@ function TelegramSalesWorkflowCard() {
                             setReviewTarget({ orderId: order.id, mode: 'reject' });
                             setReviewNote(order.adminNote || '');
                             setReviewCustomerMessage(order.customerMessage || '');
+                            setReviewReasonCode(order.rejectionReasonCode || 'custom');
                           }}
                         >
                           <AlertTriangle className="mr-2 h-4 w-4" />
@@ -2972,6 +3104,11 @@ function TelegramSalesWorkflowCard() {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {order.paymentSubmittedAt ? formatDateTime(order.paymentSubmittedAt) : '—'}
                       </p>
+                      {typeof order.paymentProofRevision === 'number' && order.paymentProofRevision > 0 ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {salesUi.proofRevision}: {order.paymentProofRevision}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="rounded-xl border border-border/50 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -3105,10 +3242,11 @@ function TelegramSalesWorkflowCard() {
             setReviewTarget(null);
             setReviewNote('');
             setReviewCustomerMessage('');
+            setReviewReasonCode('custom');
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>
               {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
@@ -3172,6 +3310,11 @@ function TelegramSalesWorkflowCard() {
                       ? formatDateTime(selectedOrder.paymentSubmittedAt)
                       : '—'}
                   </p>
+                  {typeof selectedOrder.paymentProofRevision === 'number' && selectedOrder.paymentProofRevision > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.proofRevision}: {selectedOrder.paymentProofRevision}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     {salesUi.proofCaption}: {selectedOrder.paymentCaption || salesUi.noCaption}
                   </p>
@@ -3191,8 +3334,87 @@ function TelegramSalesWorkflowCard() {
                     </p>
                   ) : null}
                   <p className="text-xs text-muted-foreground">{salesUi.proofForwardedHint}</p>
+                  {selectedOrder.paymentProofType ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(selectedOrderProofUrl, '_blank', 'noopener,noreferrer')}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        {salesUi.openProof}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          window.open(selectedOrderProofDownloadUrl, '_blank', 'noopener,noreferrer')
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        {salesUi.downloadProof}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {selectedOrder ? (
+            <div className="rounded-xl border border-border/50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {salesUi.proofPreview}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedOrderProofIsImage ? salesUi.paymentProofImage : salesUi.noImagePreview}
+                  </p>
+                </div>
+                {selectedOrder.paymentProofType ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(selectedOrderProofUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      {salesUi.openProof}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(selectedOrderProofDownloadUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {salesUi.downloadProof}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              {selectedOrder.paymentProofType ? (
+                selectedOrderProofIsImage ? (
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-border/50 bg-background/50">
+                    {/* Preview stays same-origin through an admin-authenticated proxy route. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={selectedOrderProofUrl}
+                      alt={salesUi.paymentProofImage}
+                      className="max-h-[26rem] w-full object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+                    {salesUi.noImagePreview}
+                  </div>
+                )
+              ) : null}
             </div>
           ) : null}
 
@@ -3248,6 +3470,111 @@ function TelegramSalesWorkflowCard() {
             </div>
           ) : null}
 
+          {selectedOrder ? (
+            <div className="rounded-xl border border-border/50 p-4">
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.editBeforeApproval}
+                </p>
+                <p className="text-sm text-muted-foreground">{salesUi.editBeforeApprovalDesc}</p>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>{salesUi.planConfig}</Label>
+                  <Select
+                    value={reviewPlanCode || selectedOrder.planCode || ''}
+                    onValueChange={(value) => setReviewPlanCode(value as TelegramSalesPlanCode)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={salesUi.planLabel} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {form.plans.map((plan) => (
+                        <SelectItem key={plan.code} value={plan.code}>
+                          {plan.localizedLabels[isMyanmar ? 'my' : 'en'] || plan.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{salesUi.duration}</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={reviewDurationMonths}
+                    onChange={(event) => setReviewDurationMonths(event.target.value)}
+                    placeholder={
+                      selectedPlan?.fixedDurationMonths
+                        ? String(selectedPlan.fixedDurationMonths)
+                        : selectedPlan?.minDurationMonths
+                          ? String(selectedPlan.minDurationMonths)
+                          : selectedOrder.durationMonths
+                            ? String(selectedOrder.durationMonths)
+                            : '1'
+                    }
+                    disabled={Boolean(selectedPlan?.fixedDurationDays || selectedPlan?.fixedDurationMonths)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{salesUi.server}</Label>
+                  <Select
+                    value={reviewSelectedServerId}
+                    onValueChange={(value) => setReviewSelectedServerId(value)}
+                    disabled={selectedOrder.kind !== 'NEW'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={salesUi.autoSelectServer} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">{salesUi.autoSelectServer}</SelectItem>
+                      {(serversQuery.data || []).map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          {server.name}
+                          {server.countryCode ? ` (${server.countryCode})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    updateOrderDraftMutation.mutate({
+                      orderId: selectedOrder.id,
+                      planCode: (reviewPlanCode || selectedOrder.planCode || undefined) as
+                        | TelegramSalesPlanCode
+                        | undefined,
+                      durationMonths: (() => {
+                        if (!reviewDurationMonths.trim()) {
+                          return selectedOrder.durationMonths || undefined;
+                        }
+                        const parsed = Number.parseInt(reviewDurationMonths.trim(), 10);
+                        return Number.isFinite(parsed) ? parsed : selectedOrder.durationMonths || undefined;
+                      })(),
+                      selectedServerId:
+                        selectedOrder.kind === 'NEW'
+                          ? reviewSelectedServerId === 'auto'
+                            ? null
+                            : reviewSelectedServerId
+                          : null,
+                    })
+                  }
+                  disabled={updateOrderDraftMutation.isPending}
+                >
+                  {updateOrderDraftMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {salesUi.saveOrderChanges}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="telegram-order-review-note">{salesUi.adminNote}</Label>
             <Textarea
@@ -3259,7 +3586,34 @@ function TelegramSalesWorkflowCard() {
           </div>
 
           {reviewTarget?.mode === 'reject' ? (
-            <div className="space-y-2">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{salesUi.rejectPresets}</Label>
+                <div className="flex flex-wrap gap-2">
+                  {TELEGRAM_REJECTION_REASON_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.code}
+                      type="button"
+                      variant={reviewReasonCode === preset.code ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setReviewReasonCode(preset.code);
+                        setReviewCustomerMessage(preset.message[isMyanmar ? 'my' : 'en']);
+                      }}
+                    >
+                      {preset.label[isMyanmar ? 'my' : 'en']}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant={reviewReasonCode === 'custom' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setReviewReasonCode('custom')}
+                  >
+                    {salesUi.rejectPresetCustom}
+                  </Button>
+                </div>
+              </div>
               <Label htmlFor="telegram-order-customer-message">{salesUi.customerMessage}</Label>
               <Textarea
                 id="telegram-order-customer-message"
@@ -3279,6 +3633,7 @@ function TelegramSalesWorkflowCard() {
                 setReviewTarget(null);
                 setReviewNote('');
                 setReviewCustomerMessage('');
+                setReviewReasonCode('custom');
               }}
             >
               Cancel
@@ -3301,11 +3656,18 @@ function TelegramSalesWorkflowCard() {
                   orderId: reviewTarget.orderId,
                   adminNote: reviewNote.trim() || undefined,
                   customerMessage: reviewCustomerMessage.trim() || undefined,
+                  reasonCode: reviewReasonCode === 'custom' ? undefined : reviewReasonCode,
                 });
               }}
-              disabled={approveOrderMutation.isPending || rejectOrderMutation.isPending}
+              disabled={
+                approveOrderMutation.isPending ||
+                rejectOrderMutation.isPending ||
+                updateOrderDraftMutation.isPending
+              }
             >
-              {approveOrderMutation.isPending || rejectOrderMutation.isPending ? (
+              {approveOrderMutation.isPending ||
+              rejectOrderMutation.isPending ||
+              updateOrderDraftMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : reviewTarget?.mode === 'approve' ? (
                 <CheckCircle2 className="mr-2 h-4 w-4" />

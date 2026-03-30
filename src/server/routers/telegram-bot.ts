@@ -20,11 +20,13 @@ import {
 import {
   TELEGRAM_SALES_SETTING_KEY,
   normalizeTelegramSalesSettings,
+  telegramSalesPlanCodeSchema,
   telegramSalesSettingsSchema,
 } from '@/lib/services/telegram-sales';
 import {
   approveTelegramOrder,
   rejectTelegramOrder,
+  updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
 
 /**
@@ -524,12 +526,33 @@ export const telegramBotRouter = router({
       });
     }),
 
+  updateOrderDraft: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        planCode: telegramSalesPlanCodeSchema.optional().nullable(),
+        durationMonths: z.number().int().min(1).max(24).optional().nullable(),
+        selectedServerId: z.string().optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return updateTelegramOrderDraft({
+        orderId: input.orderId,
+        updatedByUserId: ctx.user.id,
+        updaterName: ctx.user.email || null,
+        planCode: input.planCode,
+        durationMonths: input.durationMonths,
+        selectedServerId: input.selectedServerId,
+      });
+    }),
+
   rejectOrder: adminProcedure
     .input(
       z.object({
         orderId: z.string(),
         adminNote: z.string().max(1000).optional().nullable(),
         customerMessage: z.string().max(1000).optional().nullable(),
+        reasonCode: z.string().max(64).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -539,6 +562,7 @@ export const telegramBotRouter = router({
         reviewerName: ctx.user.email || null,
         adminNote: input.adminNote,
         customerMessage: input.customerMessage,
+        reasonCode: input.reasonCode,
       });
     }),
 

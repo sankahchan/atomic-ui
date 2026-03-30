@@ -52,7 +52,9 @@ import {
   formatTelegramSalesPlanSummary,
   generateTelegramOrderCode,
   getTelegramSalesSettings,
+  getTelegramRejectionReasonPreset,
   listEnabledTelegramSalesPaymentMethods,
+  resolveTelegramRejectionReasonMessage,
   resolveTelegramSalesPaymentMethod,
   resolveTelegramSalesPaymentInstructions,
   resolveTelegramSalesPaymentMethodLabel,
@@ -1938,10 +1940,15 @@ async function handleTelegramOrderProofMessage(input: {
       }),
       paymentProofFileId: proofFileId,
       paymentProofType: input.document ? 'document' : 'photo',
+      paymentProofRevision: {
+        increment: 1,
+      },
       paymentMessageId: input.messageId,
       paymentCaption: input.caption || null,
       reviewReminderSentAt: null,
       paymentSubmittedAt: new Date(),
+      customerMessage: null,
+      rejectionReasonCode: null,
     },
   });
 
@@ -4184,6 +4191,8 @@ export async function approveTelegramOrder(input: {
         reviewedByUserId: input.reviewedByUserId ?? null,
         reviewedAt: new Date(),
         adminNote: appendTelegramOrderAdminNote(order.adminNote, input.adminNote),
+        customerMessage: null,
+        rejectionReasonCode: null,
       },
     });
 
@@ -4260,6 +4269,7 @@ export async function rejectTelegramOrder(input: {
   reviewerName?: string | null;
   adminNote?: string | null;
   customerMessage?: string | null;
+  reasonCode?: string | null;
 }) {
   const order = await db.telegramOrder.findUnique({
     where: { id: input.orderId },
@@ -4273,6 +4283,8 @@ export async function rejectTelegramOrder(input: {
     throw new Error('This Telegram order has already been completed.');
   }
 
+  const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
+
   const finalOrder = await db.telegramOrder.update({
     where: { id: order.id },
     data: {
@@ -4281,11 +4293,14 @@ export async function rejectTelegramOrder(input: {
       reviewedAt: new Date(),
       rejectedAt: new Date(),
       adminNote: appendTelegramOrderAdminNote(order.adminNote, input.adminNote),
-      customerMessage: input.customerMessage?.trim() || null,
+      customerMessage:
+        input.customerMessage?.trim() ||
+        resolveTelegramRejectionReasonMessage(input.reasonCode, locale) ||
+        null,
+      rejectionReasonCode: getTelegramRejectionReasonPreset(input.reasonCode)?.code || null,
     },
   });
 
-  const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
 
@@ -4321,6 +4336,120 @@ export async function rejectTelegramOrder(input: {
     orderId: finalOrder.id,
     orderCode: order.orderCode,
   };
+}
+
+export async function updateTelegramOrderDraft(input: {
+  orderId: string;
+  updatedByUserId?: string | null;
+  updaterName?: string | null;
+  planCode?: TelegramSalesPlanCode | null;
+  durationMonths?: number | null;
+  selectedServerId?: string | null;
+}) {
+  const order = await db.telegramOrder.findUnique({
+    where: { id: input.orderId },
+  });
+
+  if (!order) {
+    throw new Error('Telegram order not found.');
+  }
+
+  if (isTelegramOrderTerminal(order.status) || order.status === 'FULFILLED' || order.status === 'APPROVED') {
+    throw new Error('Only active Telegram orders can be edited.');
+  }
+
+  const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
+  const salesSettings = await getTelegramSalesSettings();
+  const planCode = (input.planCode || order.planCode || null) as TelegramSalesPlanCode | null;
+
+  if (!planCode) {
+    throw new Error('Select a plan before updating the order.');
+  }
+
+  const plan = resolveTelegramSalesPlan(salesSettings, planCode);
+  if (!plan || !plan.enabled) {
+    throw new Error('The selected plan is no longer available.');
+  }
+
+  let durationMonths: number | null = null;
+  let durationDays: number | null = null;
+  if (typeof plan.fixedDurationDays === 'number' && Number.isFinite(plan.fixedDurationDays)) {
+    durationDays = plan.fixedDurationDays;
+  } else if (typeof plan.fixedDurationMonths === 'number' && Number.isFinite(plan.fixedDurationMonths)) {
+    durationMonths = plan.fixedDurationMonths;
+  } else {
+    const requestedDuration =
+      input.durationMonths ?? order.durationMonths ?? plan.minDurationMonths ?? 1;
+    const minDuration = plan.minDurationMonths ?? 1;
+    if (requestedDuration < minDuration) {
+      throw new Error(`The selected plan requires at least ${minDuration} month(s).`);
+    }
+    durationMonths = requestedDuration;
+  }
+
+  let selectedServerId = order.selectedServerId;
+  let selectedServerName = order.selectedServerName;
+  let selectedServerCountryCode = order.selectedServerCountryCode;
+
+  if (order.kind === 'NEW' && input.selectedServerId !== undefined) {
+    if (!input.selectedServerId) {
+      selectedServerId = null;
+      selectedServerName = null;
+      selectedServerCountryCode = null;
+    } else {
+      const resolvedServer = await resolveTelegramProvisioningServer({
+        selectedServerId: input.selectedServerId,
+      });
+      selectedServerId = resolvedServer.id;
+      selectedServerName = resolvedServer.name;
+      selectedServerCountryCode = resolvedServer.countryCode ?? null;
+    }
+  }
+
+  const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
+  const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
+
+  const updatedOrder = await db.telegramOrder.update({
+    where: { id: order.id },
+    data: {
+      planCode: plan.code,
+      planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
+      priceAmount: plan.priceAmount ?? null,
+      priceCurrency: plan.priceCurrency || null,
+      priceLabel: priceLabel || null,
+      templateId: plan.templateId || null,
+      durationMonths,
+      durationDays,
+      dataLimitBytes: plan.unlimitedQuota
+        ? null
+        : plan.dataLimitGB
+          ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
+          : null,
+      unlimitedQuota: plan.unlimitedQuota,
+      selectedServerId,
+      selectedServerName,
+      selectedServerCountryCode,
+      updatedAt: new Date(),
+    },
+  });
+
+  await writeAuditLog({
+    userId: input.updatedByUserId ?? null,
+    action: 'TELEGRAM_ORDER_UPDATED',
+    entity: 'TELEGRAM_ORDER',
+    entityId: updatedOrder.id,
+    details: {
+      orderCode: updatedOrder.orderCode,
+      updaterName: input.updaterName ?? null,
+      planCode: updatedOrder.planCode,
+      durationMonths: updatedOrder.durationMonths,
+      durationDays: updatedOrder.durationDays,
+      selectedServerId: updatedOrder.selectedServerId,
+      selectedServerName: updatedOrder.selectedServerName,
+    },
+  });
+
+  return updatedOrder;
 }
 
 function getDynamicKeyMessagingUrls(

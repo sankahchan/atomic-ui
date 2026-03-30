@@ -10,6 +10,7 @@ import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
+import { resolveTelegramRejectionReasonLabel } from '@/lib/services/telegram-sales';
 
 // Time range options
 const timeRangeSchema = z.enum(['24h', '7d', '30d']);
@@ -974,7 +975,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders] = await Promise.all([
+      const [orders, recentOrders, fulfilledTrials] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -996,8 +997,11 @@ export const analyticsRouter = router({
             paymentReminderSentAt: true,
             reviewReminderSentAt: true,
             paymentSubmittedAt: true,
+            paymentProofRevision: true,
             reviewedAt: true,
             fulfilledAt: true,
+            rejectedAt: true,
+            rejectionReasonCode: true,
             createdAt: true,
           },
         }),
@@ -1021,8 +1025,22 @@ export const analyticsRouter = router({
             priceCurrency: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
+            paymentProofRevision: true,
+            rejectionReasonCode: true,
             createdAt: true,
             fulfilledAt: true,
+          },
+        }),
+        db.telegramOrder.findMany({
+          where: {
+            planCode: 'trial_1d_3gb',
+            status: 'FULFILLED',
+          },
+          select: {
+            telegramUserId: true,
+            telegramChatId: true,
+            fulfilledAt: true,
+            createdAt: true,
           },
         }),
       ]);
@@ -1050,6 +1068,7 @@ export const analyticsRouter = router({
         pendingReviewReminderSent: 0,
         pendingReviewReminderConverted: 0,
       };
+      const rejectionReasons = new Map<string, number>();
 
       const revenueByCurrency = new Map<string, number>();
       const topPlans = new Map<
@@ -1071,12 +1090,30 @@ export const analyticsRouter = router({
       let reviewMinutesTotal = 0;
       let fulfillmentCount = 0;
       let fulfillmentMinutesTotal = 0;
+      let trialFulfilledInRange = 0;
+      let trialConvertedPaidOrders = 0;
+      const trialConvertedUsers = new Set<string>();
+      const earliestTrialByIdentity = new Map<string, Date>();
+
+      for (const trialOrder of fulfilledTrials) {
+        const baseline = trialOrder.fulfilledAt || trialOrder.createdAt;
+        for (const identity of [trialOrder.telegramUserId, trialOrder.telegramChatId].filter(Boolean)) {
+          const existing = earliestTrialByIdentity.get(identity as string);
+          if (!existing || baseline.getTime() < existing.getTime()) {
+            earliestTrialByIdentity.set(identity as string, baseline);
+          }
+        }
+      }
 
       for (const order of orders) {
         if (order.kind === 'NEW') {
           summary.newOrders += 1;
         } else if (order.kind === 'RENEW') {
           summary.renewalOrders += 1;
+        }
+
+        if (order.planCode === 'trial_1d_3gb' && order.status === 'FULFILLED') {
+          trialFulfilledInRange += 1;
         }
 
         if (order.paymentMethodCode || order.paymentMethodLabel) {
@@ -1110,6 +1147,8 @@ export const analyticsRouter = router({
           summary.fulfilled += 1;
         } else if (order.status === 'REJECTED') {
           summary.rejected += 1;
+          const rejectionKey = order.rejectionReasonCode?.trim() || 'custom';
+          rejectionReasons.set(rejectionKey, (rejectionReasons.get(rejectionKey) || 0) + 1);
         } else if (order.status === 'CANCELLED') {
           summary.cancelled += 1;
         } else if (
@@ -1180,6 +1219,21 @@ export const analyticsRouter = router({
             (order.fulfilledAt.getTime() - baseline.getTime()) / (1000 * 60);
           fulfillmentCount += 1;
         }
+
+        if (
+          order.status === 'FULFILLED' &&
+          order.kind === 'NEW' &&
+          order.planCode !== 'trial_1d_3gb'
+        ) {
+          const earliestTrial = [order.telegramUserId]
+            .map((identity) => earliestTrialByIdentity.get(identity))
+            .find(Boolean);
+
+          if (earliestTrial && earliestTrial.getTime() <= order.createdAt.getTime()) {
+            trialConvertedPaidOrders += 1;
+            trialConvertedUsers.add(order.telegramUserId);
+          }
+        }
       }
 
       return {
@@ -1194,6 +1248,20 @@ export const analyticsRouter = router({
         },
         funnel,
         reminders,
+        rejectionReasons: Array.from(rejectionReasons.entries())
+          .map(([code, count]) => ({
+            code,
+            label: resolveTelegramRejectionReasonLabel(code, 'en'),
+            count,
+          }))
+          .sort((left, right) => right.count - left.count),
+        trialConversion: {
+          fulfilledTrials: trialFulfilledInRange,
+          convertedPaidOrders: trialConvertedPaidOrders,
+          convertedUsers: trialConvertedUsers.size,
+          conversionRate:
+            trialFulfilledInRange > 0 ? (trialConvertedUsers.size / trialFulfilledInRange) * 100 : null,
+        },
         topPlans: Array.from(topPlans.values())
           .map((plan) => ({
             planCode: plan.planCode,

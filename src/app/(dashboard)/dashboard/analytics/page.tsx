@@ -991,6 +991,80 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial conversion</p>
+                    <h3 className="mt-2 text-lg font-semibold">Free trial to paid</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled trials</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.fulfilledTrials || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Trial orders that were actually delivered.</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Converted users</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.convertedUsers || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : telegramSalesDashboard?.trialConversion.conversionRate !== null &&
+                                telegramSalesDashboard?.trialConversion.conversionRate !== undefined
+                              ? `${Math.round(telegramSalesDashboard.trialConversion.conversionRate)}% trial-to-paid conversion`
+                              : 'No paid conversions yet'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Converted paid orders</p>
+                      <p className="mt-2 text-xl font-semibold">
+                        {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.convertedPaidOrders || 0}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Paid Telegram orders linked to users who had a fulfilled free trial first.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejection reasons</p>
+                    <h3 className="mt-2 text-lg font-semibold">Why proofs are rejected</h3>
+                    <div className="mt-4 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-16 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.rejectionReasons.length > 0 ? (
+                        telegramSalesDashboard.rejectionReasons.map((reason) => (
+                          <div
+                            key={reason.code}
+                            className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{reason.label}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">{reason.code}</p>
+                              </div>
+                              <Badge variant="outline">{reason.count}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="ops-chart-empty">
+                          <div className="space-y-2 text-center">
+                            <AlertTriangle className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                            <p className="font-medium text-foreground">No rejection reasons yet</p>
+                            <p className="text-sm text-muted-foreground">
+                              Once orders are rejected with a preset reason, the breakdown will appear here.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Revenue by currency</p>
                     <h3 className="mt-2 text-lg font-semibold">Collected pricing</h3>
                     <div className="mt-4 space-y-3">

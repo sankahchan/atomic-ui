@@ -269,6 +269,7 @@ model TelegramOrder {
   approvedAccessKeyId  String?
   paymentProofFileId   String?
   paymentProofType     String?
+  paymentProofRevision Int      @default(0)
   paymentMessageId     Int?
   paymentCaption       String?
   paymentStageEnteredAt DateTime?
@@ -278,6 +279,7 @@ model TelegramOrder {
   expiredAt            DateTime?
   adminNote            String?
   customerMessage      String?
+  rejectionReasonCode  String?
   reviewedByUserId     String?
   reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   reviewedAt           DateTime?
