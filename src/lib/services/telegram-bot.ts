@@ -680,6 +680,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderActionSelectKey: isMyanmar ? 'Key ရွေးရန်' : 'Select key',
     orderActionSelectServer: isMyanmar ? 'Server ရွေးရန်' : 'Choose server',
     orderActionChoosePaymentMethod: isMyanmar ? 'Payment method ရွေးရန်' : 'Choose payment method',
+    orderActionSwitchPaymentMethod: isMyanmar ? 'Payment method ပြောင်းရန်' : 'Switch payment method',
     orderActionSelectedPlan: (label: string) =>
       isMyanmar ? `ရွေးထားသော plan: ${label}` : `Selected plan: ${label}`,
     orderActionSelectedKey: (label: string) =>
@@ -700,6 +701,9 @@ function getTelegramUi(locale: SupportedLocale) {
       ? 'အောက်ပါ button များဖြင့် key ကို တိုက်ရိုက် သက်တမ်းတိုးနိုင်ပါသည်။'
       : 'Use the buttons below to renew a specific key directly.',
     orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order ကို စစ်ဆေးရန် လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
+    orderReviewReminderTitle: isMyanmar
+      ? '⏰ <b>Telegram order review reminder</b>'
+      : '⏰ <b>Telegram order review reminder</b>',
     orderReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးရန်' : 'Review in panel',
     orderApproveActionLabel: isMyanmar ? 'Telegram မှ အတည်ပြုရန်' : 'Approve in Telegram',
     orderRejectActionLabel: isMyanmar ? 'Telegram မှ ပယ်ရန်' : 'Reject in Telegram',
@@ -757,6 +761,10 @@ function getTelegramUi(locale: SupportedLocale) {
     renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
     accountNameLabel: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumberLabel: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
+    paymentMethodImageCaption: (label: string) =>
+      isMyanmar
+        ? `📷 ${label} QR / ငွေပေးချေမှု အကောင့်ပုံ`
+        : `📷 ${label} QR / payment account image`,
     serverAutoSelect: isMyanmar ? 'အကောင်းဆုံး server ကို အလိုအလျောက် ရွေးမည်' : 'Auto-select the best server',
     adminNote: isMyanmar ? 'Admin note' : 'Admin note',
     statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
@@ -1347,6 +1355,80 @@ function buildTelegramSalesPaymentPrompt(input: {
   return lines.join('\n');
 }
 
+async function sendTelegramPaymentMethodMedia(input: {
+  botToken: string;
+  chatId: number | string;
+  paymentMethod?: TelegramSalesPaymentMethod | null;
+  locale: SupportedLocale;
+}) {
+  const paymentMethod = input.paymentMethod;
+  const imageUrl = paymentMethod?.imageUrl?.trim();
+  if (!paymentMethod || !imageUrl) {
+    return;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const label = resolveTelegramSalesPaymentMethodLabel(paymentMethod, input.locale);
+  await sendTelegramPhotoUrl(
+    input.botToken,
+    input.chatId,
+    imageUrl,
+    ui.paymentMethodImageCaption(escapeHtml(label)),
+  );
+}
+
+async function sendTelegramOrderPaymentPromptCard(input: {
+  botToken: string;
+  chatId: number | string;
+  locale: SupportedLocale;
+  order: {
+    id: string;
+    status: string;
+    paymentMethodCode?: string | null;
+  };
+  orderCode: string;
+  planSummary: string;
+  paymentInstructions: string;
+  paymentMethod?: TelegramSalesPaymentMethod | null;
+  paymentMethods?: TelegramSalesPaymentMethod[];
+  paymentMethodLabel?: string | null;
+  selectedServerName?: string | null;
+  requestedName?: string | null;
+  renewalTargetName?: string | null;
+  supportLink?: string | null;
+}) {
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramSalesPaymentPrompt({
+      locale: input.locale,
+      orderCode: input.orderCode,
+      planSummary: input.planSummary,
+      paymentInstructions: input.paymentInstructions,
+      paymentMethod: input.paymentMethod,
+      paymentMethods: input.paymentMethods,
+      paymentMethodLabel: input.paymentMethodLabel,
+      selectedServerName: input.selectedServerName,
+      requestedName: input.requestedName,
+      renewalTargetName: input.renewalTargetName,
+      supportLink: input.supportLink,
+    }),
+    {
+      replyMarkup: buildTelegramOrderActionKeyboard({
+        order: input.order,
+        locale: input.locale,
+      }),
+    },
+  );
+
+  await sendTelegramPaymentMethodMedia({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    paymentMethod: input.paymentMethod,
+    locale: input.locale,
+  });
+}
+
 function truncateTelegramButtonLabel(value: string, maxLength = 28) {
   const trimmed = value.trim();
   if (trimmed.length <= maxLength) {
@@ -1577,7 +1659,10 @@ function buildTelegramOrderActionKeyboard(input: {
     ]);
   }
 
-  if (input.order.status === 'AWAITING_PAYMENT_PROOF') {
+  if (
+    input.order.status === 'AWAITING_PAYMENT_PROOF' ||
+    input.order.status === 'PENDING_REVIEW'
+  ) {
     rows.push([
       {
         text: input.order.paymentMethodCode ? ui.orderActionPayNow : ui.orderActionChoosePaymentMethod,
@@ -1591,6 +1676,15 @@ function buildTelegramOrderActionKeyboard(input: {
         callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
     ]);
+
+    if (input.order.paymentMethodCode) {
+      rows.push([
+        {
+          text: ui.orderActionSwitchPaymentMethod,
+          callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+        },
+      ]);
+    }
   }
 
   rows.push([
@@ -1600,7 +1694,7 @@ function buildTelegramOrderActionKeyboard(input: {
     },
   ]);
 
-  if (!isTelegramOrderTerminal(input.order.status) && input.order.status !== 'PENDING_REVIEW') {
+  if (!isTelegramOrderTerminal(input.order.status)) {
     rows.push([
       {
         text: ui.orderActionCancel,
@@ -1735,7 +1829,10 @@ async function createTelegramOrderRecord(input: {
   });
 }
 
-async function sendTelegramOrderReviewAlert(orderId: string) {
+async function sendTelegramOrderReviewAlert(
+  orderId: string,
+  mode: 'initial' | 'reminder' | 'updated' = 'initial',
+) {
   const config = await getTelegramConfig();
   if (!config || config.adminChatIds.length === 0) {
     return;
@@ -1756,7 +1853,7 @@ async function sendTelegramOrderReviewAlert(orderId: string) {
   const ui = getTelegramUi(locale);
   const panelUrl = await buildTelegramOrderPanelUrl(order.id);
   const lines = [
-    ui.orderReviewAlertTitle,
+    mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
     '',
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
     `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
@@ -1812,7 +1909,10 @@ async function handleTelegramOrderProofMessage(input: {
   caption?: string;
 }) {
   const activeOrder = await getActiveTelegramOrder(input.chatId, input.telegramUserId);
-  if (!activeOrder || activeOrder.status !== 'AWAITING_PAYMENT_PROOF') {
+  if (
+    !activeOrder ||
+    (activeOrder.status !== 'AWAITING_PAYMENT_PROOF' && activeOrder.status !== 'PENDING_REVIEW')
+  ) {
     return null;
   }
 
@@ -1839,11 +1939,12 @@ async function handleTelegramOrderProofMessage(input: {
       paymentProofType: input.document ? 'document' : 'photo',
       paymentMessageId: input.messageId,
       paymentCaption: input.caption || null,
+      reviewReminderSentAt: null,
       paymentSubmittedAt: new Date(),
     },
   });
 
-  await sendTelegramOrderReviewAlert(next.id);
+  await sendTelegramOrderReviewAlert(next.id, activeOrder.status === 'PENDING_REVIEW' ? 'updated' : 'initial');
 
   const locale = coerceSupportedLocale(next.locale) || (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
@@ -2040,6 +2141,7 @@ async function handleTelegramOrderTextMessage(input: {
   chatId: number;
   telegramUserId: number;
   text: string;
+  botToken: string;
 }) {
   const activeOrder = await getActiveTelegramOrder(input.chatId, input.telegramUserId);
   if (!activeOrder) {
@@ -2095,7 +2197,19 @@ async function handleTelegramOrderTextMessage(input: {
         }),
       ];
 
-      return buildTelegramSalesPlanPromptText(locale, lines);
+      await sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        buildTelegramSalesPlanPromptText(locale, lines),
+        {
+          replyMarkup: buildTelegramPlanSelectionKeyboard({
+            orderId: activeOrder.id,
+            plans: enabledPlans,
+            locale,
+          }),
+        },
+      );
+      return null;
     }
     case 'AWAITING_PLAN': {
       const enabledPlans = await listAvailableTelegramPlansForOrder({
@@ -2172,11 +2286,23 @@ async function handleTelegramOrderTextMessage(input: {
 
       if (nextStatus === 'AWAITING_SERVER_SELECTION') {
         const servers = await listAssignableTelegramOrderServers();
-        return buildTelegramServerSelectionPromptText({
-          orderCode: nextOrder.orderCode,
-          locale,
-          servers,
-        });
+        await sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          buildTelegramServerSelectionPromptText({
+            orderCode: nextOrder.orderCode,
+            locale,
+            servers,
+          }),
+          {
+            replyMarkup: buildTelegramServerSelectionKeyboard({
+              orderId: nextOrder.id,
+              locale,
+              servers,
+            }),
+          },
+        );
+        return null;
       }
 
       if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
@@ -2187,13 +2313,25 @@ async function handleTelegramOrderTextMessage(input: {
             })
           : null;
         const planSummary = formatTelegramSalesPlanSummary(plan, durationMonths, locale);
-        return buildTelegramPaymentMethodSelectionPromptText({
-          orderCode: nextOrder.orderCode,
-          locale,
-          methods: enabledPaymentMethods,
-          planSummary,
-          renewalTargetName: renewalTarget?.name || null,
-        });
+        await sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          buildTelegramPaymentMethodSelectionPromptText({
+            orderCode: nextOrder.orderCode,
+            locale,
+            methods: enabledPaymentMethods,
+            planSummary,
+            renewalTargetName: renewalTarget?.name || null,
+          }),
+          {
+            replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+              orderId: nextOrder.id,
+              locale,
+              methods: enabledPaymentMethods,
+            }),
+          },
+        );
+        return null;
       }
 
       const renewalTarget = nextOrder.targetAccessKeyId
@@ -2204,8 +2342,11 @@ async function handleTelegramOrderTextMessage(input: {
         : null;
       const paymentInstructions = resolveTelegramSalesPaymentInstructions(salesSettings, locale);
       const planSummary = formatTelegramSalesPlanSummary(plan, durationMonths, locale);
-      return buildTelegramSalesPaymentPrompt({
+      await sendTelegramOrderPaymentPromptCard({
+        botToken: input.botToken,
+        chatId: input.chatId,
         locale,
+        order: nextOrder,
         orderCode: nextOrder.orderCode,
         planSummary,
         paymentInstructions,
@@ -2213,6 +2354,7 @@ async function handleTelegramOrderTextMessage(input: {
         renewalTargetName: renewalTarget?.name || null,
         supportLink: await getTelegramSupportLink(),
       });
+      return null;
     }
     case 'AWAITING_MONTHS': {
       const months = Number.parseInt(trimmed, 10);
@@ -2257,11 +2399,23 @@ async function handleTelegramOrderTextMessage(input: {
 
       if (nextStatus === 'AWAITING_SERVER_SELECTION') {
         const servers = await listAssignableTelegramOrderServers();
-        return buildTelegramServerSelectionPromptText({
-          orderCode: nextOrder.orderCode,
-          locale,
-          servers,
-        });
+        await sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          buildTelegramServerSelectionPromptText({
+            orderCode: nextOrder.orderCode,
+            locale,
+            servers,
+          }),
+          {
+            replyMarkup: buildTelegramServerSelectionKeyboard({
+              orderId: nextOrder.id,
+              locale,
+              servers,
+            }),
+          },
+        );
+        return null;
       }
 
       if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
@@ -2271,13 +2425,25 @@ async function handleTelegramOrderTextMessage(input: {
               select: { name: true },
             })
           : null;
-        return buildTelegramPaymentMethodSelectionPromptText({
-          orderCode: nextOrder.orderCode,
-          locale,
-          methods: enabledPaymentMethods,
-          planSummary,
-          renewalTargetName: renewalTarget?.name || null,
-        });
+        await sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          buildTelegramPaymentMethodSelectionPromptText({
+            orderCode: nextOrder.orderCode,
+            locale,
+            methods: enabledPaymentMethods,
+            planSummary,
+            renewalTargetName: renewalTarget?.name || null,
+          }),
+          {
+            replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+              orderId: nextOrder.id,
+              locale,
+              methods: enabledPaymentMethods,
+            }),
+          },
+        );
+        return null;
       }
 
       const renewalTarget = nextOrder.targetAccessKeyId
@@ -2286,8 +2452,11 @@ async function handleTelegramOrderTextMessage(input: {
             select: { name: true },
           })
         : null;
-      return buildTelegramSalesPaymentPrompt({
+      await sendTelegramOrderPaymentPromptCard({
+        botToken: input.botToken,
+        chatId: input.chatId,
         locale,
+        order: nextOrder,
         orderCode: nextOrder.orderCode,
         planSummary,
         paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
@@ -2295,6 +2464,7 @@ async function handleTelegramOrderTextMessage(input: {
         renewalTargetName: renewalTarget?.name || null,
         supportLink: await getTelegramSupportLink(),
       });
+      return null;
     }
     case 'AWAITING_SERVER_SELECTION': {
       const servers = await listAssignableTelegramOrderServers();
@@ -2472,18 +2642,33 @@ async function handleTelegramOrderTextMessage(input: {
 
       const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
       if (enabledPaymentMethods.length > 0) {
-        return buildTelegramPaymentMethodSelectionPromptText({
-          orderCode: updatedOrder.orderCode,
-          locale,
-          methods: enabledPaymentMethods,
-          planSummary,
-          selectedServerName: updatedOrder.selectedServerName,
-          requestedName: trimmed,
-        });
+        await sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          buildTelegramPaymentMethodSelectionPromptText({
+            orderCode: updatedOrder.orderCode,
+            locale,
+            methods: enabledPaymentMethods,
+            planSummary,
+            selectedServerName: updatedOrder.selectedServerName,
+            requestedName: trimmed,
+          }),
+          {
+            replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+              orderId: updatedOrder.id,
+              locale,
+              methods: enabledPaymentMethods,
+            }),
+          },
+        );
+        return null;
       }
 
-      return buildTelegramSalesPaymentPrompt({
+      await sendTelegramOrderPaymentPromptCard({
+        botToken: input.botToken,
+        chatId: input.chatId,
         locale,
+        order: updatedOrder,
         orderCode: activeOrder.orderCode,
         planSummary,
         paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
@@ -2492,6 +2677,7 @@ async function handleTelegramOrderTextMessage(input: {
         requestedName: trimmed,
         supportLink: await getTelegramSupportLink(),
       });
+      return null;
     }
     case 'AWAITING_PAYMENT_METHOD': {
       const paymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
@@ -2506,6 +2692,7 @@ async function handleTelegramOrderTextMessage(input: {
               paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
               paymentReminderSentAt: activeOrder.paymentReminderSentAt,
             }),
+            reviewReminderSentAt: null,
           },
         });
         return ui.paymentProofRequired;
@@ -2546,6 +2733,9 @@ async function handleTelegramOrderTextMessage(input: {
             paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
             paymentReminderSentAt: activeOrder.paymentReminderSentAt,
           }),
+          reviewReminderSentAt: null,
+          reviewedAt: null,
+          rejectedAt: null,
         },
       });
 
@@ -2562,21 +2752,26 @@ async function handleTelegramOrderTextMessage(input: {
         ? formatTelegramSalesPlanSummary(plan, updatedOrder.durationMonths, locale)
         : updatedOrder.planName || '';
 
-      return [
+      await sendTelegramMessage(
+        input.botToken,
+        input.chatId,
         ui.orderActionSelectedPaymentMethod(resolveTelegramSalesPaymentMethodLabel(selectedMethod, locale)),
-        '',
-        buildTelegramSalesPaymentPrompt({
-          locale,
-          orderCode: updatedOrder.orderCode,
-          planSummary,
-          paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
-          paymentMethod: selectedMethod,
-          selectedServerName: updatedOrder.selectedServerName,
-          requestedName: updatedOrder.requestedName,
-          renewalTargetName: renewalTarget?.name || null,
-          supportLink: await getTelegramSupportLink(),
-        }),
-      ].join('\n');
+      );
+      await sendTelegramOrderPaymentPromptCard({
+        botToken: input.botToken,
+        chatId: input.chatId,
+        locale,
+        order: updatedOrder,
+        orderCode: updatedOrder.orderCode,
+        planSummary,
+        paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+        paymentMethod: selectedMethod,
+        selectedServerName: updatedOrder.selectedServerName,
+        requestedName: updatedOrder.requestedName,
+        renewalTargetName: renewalTarget?.name || null,
+        supportLink: await getTelegramSupportLink(),
+      });
+      return null;
     }
     case 'AWAITING_PAYMENT_PROOF':
       return ui.paymentProofRequired;
@@ -2862,6 +3057,40 @@ export async function sendTelegramPhoto(
     }
   } catch (error) {
     console.error(`Error sending Telegram photo to ${chatId}:`, error);
+  }
+}
+
+export async function sendTelegramPhotoUrl(
+  botToken: string,
+  chatId: number | string,
+  photoUrl: string,
+  caption?: string,
+) {
+  const trimmedPhotoUrl = photoUrl.trim();
+  if (!trimmedPhotoUrl) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId.toString(),
+        photo: trimmedPhotoUrl,
+        caption,
+        parse_mode: caption ? 'HTML' : undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(`Failed to send Telegram photo URL to ${chatId}:`, data.description);
+    }
+  } catch (error) {
+    console.error(`Error sending Telegram photo URL to ${chatId}:`, error);
   }
 }
 
@@ -3153,6 +3382,7 @@ async function cancelStaleTelegramConversationOrders(chatId: number, telegramUse
       status: 'CANCELLED',
       paymentStageEnteredAt: null,
       paymentReminderSentAt: null,
+      reviewReminderSentAt: null,
       expiredAt: null,
       updatedAt: new Date(),
     },
@@ -3165,6 +3395,7 @@ export async function runTelegramSalesOrderCycle() {
     return {
       skipped: true,
       reminded: 0,
+      pendingReviewReminded: 0,
       trialReminded: 0,
       expired: 0,
       errors: [] as string[],
@@ -3201,13 +3432,42 @@ export async function runTelegramSalesOrderCycle() {
       targetAccessKeyId: true,
       paymentStageEnteredAt: true,
       paymentReminderSentAt: true,
+      reviewReminderSentAt: true,
       createdAt: true,
       updatedAt: true,
       adminNote: true,
     },
   });
+  const pendingReviewOrders = await db.telegramOrder.findMany({
+    where: {
+      status: 'PENDING_REVIEW',
+      reviewedAt: null,
+    },
+    orderBy: [{ paymentSubmittedAt: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      orderCode: true,
+      status: true,
+      telegramChatId: true,
+      telegramUserId: true,
+      locale: true,
+      planCode: true,
+      planName: true,
+      durationMonths: true,
+      paymentMethodCode: true,
+      paymentMethodLabel: true,
+      requestedName: true,
+      selectedServerName: true,
+      targetAccessKeyId: true,
+      paymentSubmittedAt: true,
+      reviewReminderSentAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   let reminded = 0;
+  let pendingReviewReminded = 0;
   let trialReminded = 0;
   let expired = 0;
   const errors: string[] = [];
@@ -3227,6 +3487,7 @@ export async function runTelegramSalesOrderCycle() {
             expiredAt: now,
             paymentStageEnteredAt: null,
             paymentReminderSentAt: null,
+            reviewReminderSentAt: null,
             adminNote: appendTelegramOrderAdminNote(
               order.adminNote,
               ui.orderExpiredUnpaidNote,
@@ -3310,29 +3571,23 @@ export async function runTelegramSalesOrderCycle() {
         await sendTelegramMessage(
           config.botToken,
           order.telegramChatId,
-          [
-            ui.orderPaymentProofReminder(order.orderCode),
-            '',
-            buildTelegramSalesPaymentPrompt({
-              locale,
-              orderCode: order.orderCode,
-              planSummary,
-              paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
-              paymentMethod: selectedMethod,
-              paymentMethodLabel: order.paymentMethodLabel,
-              selectedServerName: order.selectedServerName,
-              requestedName: order.requestedName,
-              renewalTargetName: renewalTarget?.name || null,
-              supportLink,
-            }),
-          ].join('\n'),
-          {
-            replyMarkup: buildTelegramOrderActionKeyboard({
-              order,
-              locale,
-            }),
-          },
+          ui.orderPaymentProofReminder(order.orderCode),
         );
+        await sendTelegramOrderPaymentPromptCard({
+          botToken: config.botToken,
+          chatId: order.telegramChatId,
+          locale,
+          order,
+          orderCode: order.orderCode,
+          planSummary,
+          paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
+          paymentMethod: selectedMethod,
+          paymentMethodLabel: order.paymentMethodLabel,
+          selectedServerName: order.selectedServerName,
+          requestedName: order.requestedName,
+          renewalTargetName: renewalTarget?.name || null,
+          supportLink,
+        });
       }
 
       await db.telegramOrder.update({
@@ -3356,6 +3611,41 @@ export async function runTelegramSalesOrderCycle() {
       reminded += 1;
     } catch (error) {
       errors.push(`reminder:${order.orderCode}:${(error as Error).message}`);
+    }
+  }
+
+  if (config) {
+    const pendingReviewReminderMs = Math.max(1, settings.pendingReviewReminderHours) * 60 * 60 * 1000;
+    for (const order of pendingReviewOrders) {
+      const baseline = order.paymentSubmittedAt ?? order.updatedAt ?? order.createdAt;
+      const elapsedMs = now.getTime() - baseline.getTime();
+      if (order.reviewReminderSentAt || elapsedMs < pendingReviewReminderMs) {
+        continue;
+      }
+
+      try {
+        await sendTelegramOrderReviewAlert(order.id, 'reminder');
+        await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            reviewReminderSentAt: now,
+          },
+        });
+
+        await writeAuditLog({
+          action: 'TELEGRAM_ORDER_PENDING_REVIEW_REMINDER_SENT',
+          entity: 'TELEGRAM_ORDER',
+          entityId: order.id,
+          details: {
+            orderCode: order.orderCode,
+            elapsedHours: Math.round(elapsedMs / (60 * 60 * 1000)),
+          },
+        });
+
+        pendingReviewReminded += 1;
+      } catch (error) {
+        errors.push(`review-reminder:${order.orderCode}:${(error as Error).message}`);
+      }
     }
   }
 
@@ -3428,6 +3718,7 @@ export async function runTelegramSalesOrderCycle() {
   return {
     skipped: false,
     reminded,
+    pendingReviewReminded,
     trialReminded,
     expired,
     errors,
@@ -5528,6 +5819,7 @@ async function handleMyKeysCommand(
   }
 
   const lines = [ui.myKeysTitle, ''];
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   for (const key of keys) {
     const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
@@ -5542,19 +5834,22 @@ async function handleMyKeysCommand(
       `  ${ui.sharePageLabel}: ${sharePageUrl}`,
       '',
     );
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.openSharePage}: ${key.name}`, 38),
+        url: sharePageUrl,
+      },
+      {
+        text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
+        callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
+      },
+    ]);
   }
 
   lines.push(ui.myKeysRenewHint);
   const message = lines.join('\n');
   const sent = await sendTelegramMessage(botToken, chatId, message, {
-    replyMarkup: {
-      inline_keyboard: keys.slice(0, 8).map((key) => [
-        {
-          text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
-          callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
-        },
-      ]),
-    },
+    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard.slice(0, 8) } : undefined,
   });
 
   return sent ? null : message;
@@ -6288,25 +6583,18 @@ async function handleTelegramCallbackQuery(
                   })
                 : null;
               const planSummary = formatTelegramSalesPlanSummary(plan, durationMonths, locale);
-              await sendTelegramMessage(
-                config.botToken,
+              await sendTelegramOrderPaymentPromptCard({
+                botToken: config.botToken,
                 chatId,
-                buildTelegramSalesPaymentPrompt({
-                  locale,
-                  orderCode: nextOrder.orderCode,
-                  planSummary,
-                  paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
-                  paymentMethods: listEnabledTelegramSalesPaymentMethods(settings),
-                  renewalTargetName: renewalTarget?.name || null,
-                  supportLink: await getTelegramSupportLink(),
-                }),
-                {
-                  replyMarkup: buildTelegramOrderActionKeyboard({
-                    order: nextOrder,
-                    locale,
-                  }),
-                },
-              );
+                locale,
+                order: nextOrder,
+                orderCode: nextOrder.orderCode,
+                planSummary,
+                paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
+                paymentMethods: listEnabledTelegramSalesPaymentMethods(settings),
+                renewalTargetName: renewalTarget?.name || null,
+                supportLink: await getTelegramSupportLink(),
+              });
             }
 
             await answerTelegramCallbackQuery(
@@ -6450,7 +6738,8 @@ async function handleTelegramCallbackQuery(
 
             if (
               order.status !== 'AWAITING_PAYMENT_METHOD' &&
-              order.status !== 'AWAITING_PAYMENT_PROOF'
+              order.status !== 'AWAITING_PAYMENT_PROOF' &&
+              order.status !== 'PENDING_REVIEW'
             ) {
               await answerTelegramCallbackQuery(
                 config.botToken,
@@ -6486,6 +6775,9 @@ async function handleTelegramCallbackQuery(
                   paymentStageEnteredAt: order.paymentStageEnteredAt,
                   paymentReminderSentAt: order.paymentReminderSentAt,
                 }),
+                reviewReminderSentAt: null,
+                reviewedAt: null,
+                rejectedAt: null,
               },
             });
 
@@ -6502,27 +6794,20 @@ async function handleTelegramCallbackQuery(
               ? formatTelegramSalesPlanSummary(plan, nextOrder.durationMonths, locale)
               : nextOrder.planName || '';
 
-            await sendTelegramMessage(
-              config.botToken,
+            await sendTelegramOrderPaymentPromptCard({
+              botToken: config.botToken,
               chatId,
-              buildTelegramSalesPaymentPrompt({
-                locale,
-                orderCode: nextOrder.orderCode,
-                planSummary,
-                paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
-                paymentMethod: selectedMethod,
-                selectedServerName: nextOrder.selectedServerName,
-                requestedName: nextOrder.requestedName,
-                renewalTargetName: renewalTarget?.name || null,
-                supportLink: await getTelegramSupportLink(),
-              }),
-              {
-                replyMarkup: buildTelegramOrderActionKeyboard({
-                  order: nextOrder,
-                  locale,
-                }),
-              },
-            );
+              locale,
+              order: nextOrder,
+              orderCode: nextOrder.orderCode,
+              planSummary,
+              paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+              paymentMethod: selectedMethod,
+              selectedServerName: nextOrder.selectedServerName,
+              requestedName: nextOrder.requestedName,
+              renewalTargetName: renewalTarget?.name || null,
+              supportLink: await getTelegramSupportLink(),
+            });
 
             await answerTelegramCallbackQuery(
               config.botToken,
@@ -6550,7 +6835,8 @@ async function handleTelegramCallbackQuery(
             }
             if (
               order.status !== 'AWAITING_PAYMENT_METHOD' &&
-              order.status !== 'AWAITING_PAYMENT_PROOF'
+              order.status !== 'AWAITING_PAYMENT_PROOF' &&
+              order.status !== 'PENDING_REVIEW'
             ) {
               await answerTelegramCallbackQuery(
                 config.botToken,
@@ -6608,28 +6894,21 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            await sendTelegramMessage(
-              config.botToken,
+            await sendTelegramOrderPaymentPromptCard({
+              botToken: config.botToken,
               chatId,
-                buildTelegramSalesPaymentPrompt({
-                  locale,
-                  orderCode: order.orderCode,
-                  planSummary,
-                  paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
-                  paymentMethod: selectedPaymentMethod,
-                  paymentMethodLabel: order.paymentMethodLabel,
-                  selectedServerName: order.selectedServerName,
-                  requestedName: order.requestedName,
-                  renewalTargetName: renewalTarget?.name || null,
-                  supportLink: await getTelegramSupportLink(),
-                }),
-                {
-                  replyMarkup: buildTelegramOrderActionKeyboard({
-                    order,
-                  locale,
-                }),
-              },
-            );
+              locale,
+              order,
+              orderCode: order.orderCode,
+              planSummary,
+              paymentInstructions: resolveTelegramSalesPaymentInstructions(salesSettings, locale),
+              paymentMethod: selectedPaymentMethod,
+              paymentMethodLabel: order.paymentMethodLabel,
+              selectedServerName: order.selectedServerName,
+              requestedName: order.requestedName,
+              renewalTargetName: renewalTarget?.name || null,
+              supportLink: await getTelegramSupportLink(),
+            });
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
@@ -6701,21 +6980,13 @@ async function handleTelegramCallbackQuery(
               );
               return null;
             }
-            if (order.status === 'PENDING_REVIEW') {
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.activeOrderPendingReview(order.orderCode),
-              );
-              return null;
-            }
-
             await db.telegramOrder.update({
               where: { id: order.id },
               data: {
                 status: 'CANCELLED',
                 paymentStageEnteredAt: null,
                 paymentReminderSentAt: null,
+                reviewReminderSentAt: null,
                 expiredAt: null,
               },
             });
@@ -6915,6 +7186,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         chatId,
         telegramUserId,
         text,
+        botToken: config.botToken,
       });
     }
 
@@ -6969,16 +7241,13 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         return ui.noOrderToCancel;
       }
 
-      if (currentOrder.status === 'PENDING_REVIEW') {
-        return ui.activeOrderPendingReview(currentOrder.orderCode);
-      }
-
       await db.telegramOrder.update({
         where: { id: currentOrder.id },
         data: {
           status: 'CANCELLED',
           paymentStageEnteredAt: null,
           paymentReminderSentAt: null,
+          reviewReminderSentAt: null,
           expiredAt: null,
         },
       });

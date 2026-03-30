@@ -273,6 +273,7 @@ model TelegramOrder {
   paymentCaption       String?
   paymentStageEnteredAt DateTime?
   paymentReminderSentAt DateTime?
+  reviewReminderSentAt  DateTime?
   paymentSubmittedAt   DateTime?
   expiredAt            DateTime?
   adminNote            String?

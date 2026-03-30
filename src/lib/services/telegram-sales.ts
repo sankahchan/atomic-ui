@@ -47,6 +47,7 @@ export const telegramSalesPaymentMethodSchema = z.object({
   localizedLabels: z.record(z.string(), z.string()).optional().default({}),
   accountName: z.string().max(120).optional().default(''),
   accountNumber: z.string().max(160).optional().default(''),
+  imageUrl: z.string().trim().max(1000).optional().default(''),
   note: z.string().max(240).optional().default(''),
   localizedNotes: z.record(z.string(), z.string()).optional().default({}),
 });
@@ -56,6 +57,7 @@ export const telegramSalesSettingsSchema = z.object({
   allowRenewals: z.boolean().default(true),
   supportLink: z.string().trim().max(500).optional().default(''),
   paymentReminderHours: z.number().int().min(1).max(168).default(3),
+  pendingReviewReminderHours: z.number().int().min(1).max(168).default(6),
   unpaidOrderExpiryHours: z.number().int().min(1).max(720).default(24),
   paymentInstructions: z.string().max(2000).optional().default(''),
   localizedPaymentInstructions: z.record(z.string(), z.string()).optional().default({}),
@@ -175,6 +177,7 @@ function defaultPaymentMethods(): TelegramSalesPaymentMethod[] {
       localizedLabels: { my: 'KPay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: {},
     },
@@ -185,6 +188,7 @@ function defaultPaymentMethods(): TelegramSalesPaymentMethod[] {
       localizedLabels: { my: 'Wave Pay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: {},
     },
@@ -195,6 +199,7 @@ function defaultPaymentMethods(): TelegramSalesPaymentMethod[] {
       localizedLabels: { my: 'AYA Pay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: {},
     },
@@ -207,6 +212,7 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     allowRenewals: true,
     supportLink: '',
     paymentReminderHours: 3,
+    pendingReviewReminderHours: 6,
     unpaidOrderExpiryHours: 24,
     paymentInstructions: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
     localizedPaymentInstructions: {
@@ -230,6 +236,11 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     typeof next.paymentReminderHours === 'number' && Number.isFinite(next.paymentReminderHours)
       ? next.paymentReminderHours
       : defaults.paymentReminderHours;
+  const pendingReviewReminderHours =
+    typeof next.pendingReviewReminderHours === 'number' &&
+    Number.isFinite(next.pendingReviewReminderHours)
+      ? next.pendingReviewReminderHours
+      : defaults.pendingReviewReminderHours;
   const unpaidOrderExpiryHours =
     typeof next.unpaidOrderExpiryHours === 'number' && Number.isFinite(next.unpaidOrderExpiryHours)
       ? Math.max(next.unpaidOrderExpiryHours, paymentReminderHours)
@@ -242,6 +253,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     allowRenewals: next.allowRenewals,
     supportLink: next.supportLink?.trim() || '',
     paymentReminderHours,
+    pendingReviewReminderHours,
     unpaidOrderExpiryHours,
     paymentInstructions: next.paymentInstructions || defaults.paymentInstructions,
     localizedPaymentInstructions: normalizeLocalizedTemplateMap(next.localizedPaymentInstructions),
@@ -254,6 +266,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
       return {
         ...fallbackMethod,
         ...override,
+        imageUrl: override.imageUrl?.trim() || '',
         localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
         localizedNotes: normalizeLocalizedTemplateMap(override.localizedNotes),
       };

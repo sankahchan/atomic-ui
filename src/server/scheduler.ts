@@ -226,10 +226,16 @@ export function initScheduler() {
             const result = await runTelegramSalesOrderCycle();
             if (
                 !result.skipped &&
-                (result.reminded > 0 || result.trialReminded > 0 || result.expired > 0 || result.errors.length > 0)
+                (
+                    result.reminded > 0 ||
+                    result.pendingReviewReminded > 0 ||
+                    result.trialReminded > 0 ||
+                    result.expired > 0 ||
+                    result.errors.length > 0
+                )
             ) {
                 logger.info(
-                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.trialReminded} trial reminded, ${result.expired} expired, ${result.errors.length} errors`,
+                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.trialReminded} trial reminded, ${result.expired} expired, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {
@@ -266,9 +272,17 @@ export function initScheduler() {
 
         try {
             const result = await runTelegramSalesOrderCycle();
-            if (!result.skipped && (result.reminded > 0 || result.expired > 0 || result.errors.length > 0)) {
+            if (
+                !result.skipped &&
+                (
+                    result.reminded > 0 ||
+                    result.pendingReviewReminded > 0 ||
+                    result.expired > 0 ||
+                    result.errors.length > 0
+                )
+            ) {
                 logger.info(
-                    `Initial Telegram sales order cycle: ${result.reminded} reminded, ${result.expired} expired, ${result.errors.length} errors`,
+                    `Initial Telegram sales order cycle: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.expired} expired, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {

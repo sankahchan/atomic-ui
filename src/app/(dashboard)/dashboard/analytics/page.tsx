@@ -924,6 +924,73 @@ export default function AnalyticsPage() {
 
                 <div className="space-y-4">
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Conversion funnel</p>
+                    <h3 className="mt-2 text-lg font-semibold">Telegram storefront flow</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {[
+                        {
+                          label: 'Orders created',
+                          value: telegramSalesDashboard?.funnel.created || 0,
+                        },
+                        {
+                          label: 'Method selected',
+                          value: telegramSalesDashboard?.funnel.paymentMethodSelected || 0,
+                        },
+                        {
+                          label: 'Proof uploaded',
+                          value: telegramSalesDashboard?.funnel.proofUploaded || 0,
+                        },
+                        {
+                          label: 'Reviewed',
+                          value: telegramSalesDashboard?.funnel.reviewed || 0,
+                        },
+                        {
+                          label: 'Fulfilled',
+                          value: telegramSalesDashboard?.funnel.fulfilled || 0,
+                        },
+                      ].map((step) => (
+                        <div key={step.label} className="ops-mini-tile">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {step.label}
+                          </p>
+                          <p className="mt-2 text-2xl font-semibold">
+                            {loadingTelegramSalesDashboard ? '…' : step.value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Reminder conversion</p>
+                    <h3 className="mt-2 text-lg font-semibold">Reminder effectiveness</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Payment reminders</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.paymentReminderSent || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.reminders.paymentReminderConverted || 0} progressed after reminder`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Review reminders</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.pendingReviewReminderSent || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.reminders.pendingReviewReminderConverted || 0} fulfilled after reminder`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Revenue by currency</p>
                     <h3 className="mt-2 text-lg font-semibold">Collected pricing</h3>
                     <div className="mt-4 space-y-3">

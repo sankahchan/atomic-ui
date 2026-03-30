@@ -993,6 +993,8 @@ export const analyticsRouter = router({
             priceCurrency: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
+            paymentReminderSentAt: true,
+            reviewReminderSentAt: true,
             paymentSubmittedAt: true,
             reviewedAt: true,
             fulfilledAt: true,
@@ -1035,6 +1037,19 @@ export const analyticsRouter = router({
         renewalOrders: 0,
         awaitingPayment: 0,
       };
+      const funnel = {
+        created: orders.length,
+        paymentMethodSelected: 0,
+        proofUploaded: 0,
+        reviewed: 0,
+        fulfilled: 0,
+      };
+      const reminders = {
+        paymentReminderSent: 0,
+        paymentReminderConverted: 0,
+        pendingReviewReminderSent: 0,
+        pendingReviewReminderConverted: 0,
+      };
 
       const revenueByCurrency = new Map<string, number>();
       const topPlans = new Map<
@@ -1062,6 +1077,31 @@ export const analyticsRouter = router({
           summary.newOrders += 1;
         } else if (order.kind === 'RENEW') {
           summary.renewalOrders += 1;
+        }
+
+        if (order.paymentMethodCode || order.paymentMethodLabel) {
+          funnel.paymentMethodSelected += 1;
+        }
+        if (order.paymentSubmittedAt || order.status === 'PENDING_REVIEW' || order.reviewedAt || order.fulfilledAt) {
+          funnel.proofUploaded += 1;
+        }
+        if (order.reviewedAt || order.status === 'FULFILLED' || order.status === 'REJECTED') {
+          funnel.reviewed += 1;
+        }
+        if (order.status === 'FULFILLED' || order.fulfilledAt) {
+          funnel.fulfilled += 1;
+        }
+        if (order.paymentReminderSentAt) {
+          reminders.paymentReminderSent += 1;
+          if (order.status === 'FULFILLED' || order.paymentSubmittedAt || order.reviewedAt) {
+            reminders.paymentReminderConverted += 1;
+          }
+        }
+        if (order.reviewReminderSentAt) {
+          reminders.pendingReviewReminderSent += 1;
+          if (order.status === 'FULFILLED' || order.reviewedAt) {
+            reminders.pendingReviewReminderConverted += 1;
+          }
         }
 
         if (order.status === 'PENDING_REVIEW') {
@@ -1152,6 +1192,8 @@ export const analyticsRouter = router({
           reviewMinutes: reviewCount ? reviewMinutesTotal / reviewCount : null,
           fulfillmentMinutes: fulfillmentCount ? fulfillmentMinutesTotal / fulfillmentCount : null,
         },
+        funnel,
+        reminders,
         topPlans: Array.from(topPlans.values())
           .map((plan) => ({
             planCode: plan.planCode,

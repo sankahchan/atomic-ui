@@ -227,6 +227,7 @@ type TelegramSalesPaymentMethodForm = {
   };
   accountName: string;
   accountNumber: string;
+  imageUrl: string;
   note: string;
   localizedNotes: {
     en: string;
@@ -239,6 +240,7 @@ type TelegramSalesSettingsForm = {
   allowRenewals: boolean;
   supportLink: string;
   paymentReminderHours: string;
+  pendingReviewReminderHours: string;
   unpaidOrderExpiryHours: string;
   paymentInstructions: string;
   localizedPaymentInstructions: {
@@ -338,6 +340,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   allowRenewals: true,
   supportLink: '',
   paymentReminderHours: '3',
+  pendingReviewReminderHours: '6',
   unpaidOrderExpiryHours: '24',
   paymentInstructions:
     'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
@@ -353,6 +356,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       localizedLabels: { en: 'KPay', my: 'KPay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: { en: '', my: '' },
     },
@@ -363,6 +367,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       localizedLabels: { en: 'Wave Pay', my: 'Wave Pay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: { en: '', my: '' },
     },
@@ -373,6 +378,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       localizedLabels: { en: 'AYA Pay', my: 'AYA Pay' },
       accountName: '',
       accountNumber: '',
+      imageUrl: '',
       note: '',
       localizedNotes: { en: '', my: '' },
     },
@@ -1850,6 +1856,9 @@ function TelegramSalesWorkflowCard() {
       ? 'Payment method မရွေးသေးသော သို့မဟုတ် screenshot မပို့ရသေးသော order များကို reminder ပို့ပြီး အချိန်ကျော်လျှင် အလိုအလျောက် cancel လုပ်ပါမည်။'
       : 'Send one reminder for unpaid orders, then automatically cancel them if the user never selects a method or submits proof.',
     paymentReminderHours: isMyanmar ? 'Reminder after (hours)' : 'Reminder after (hours)',
+    pendingReviewReminderHours: isMyanmar
+      ? 'Admin review reminder (hours)'
+      : 'Admin review reminder (hours)',
     unpaidOrderExpiryHours: isMyanmar ? 'Auto-expire after (hours)' : 'Auto-expire after (hours)',
     paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
     englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
@@ -1861,6 +1870,7 @@ function TelegramSalesWorkflowCard() {
     paymentMethodLabel: isMyanmar ? 'Payment method' : 'Payment method',
     accountName: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumber: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
+    paymentImageUrl: isMyanmar ? 'QR / account image URL' : 'QR / account image URL',
     englishMethodInstructions: isMyanmar ? 'English instructions' : 'English instructions',
     burmeseMethodInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
     planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
@@ -2038,6 +2048,10 @@ function TelegramSalesWorkflowCard() {
       paymentReminderHours: String(
         settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
       ),
+      pendingReviewReminderHours: String(
+        settingsQuery.data.pendingReviewReminderHours ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.pendingReviewReminderHours,
+      ),
       unpaidOrderExpiryHours: String(
         settingsQuery.data.unpaidOrderExpiryHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.unpaidOrderExpiryHours,
       ),
@@ -2058,6 +2072,7 @@ function TelegramSalesWorkflowCard() {
         return {
           ...fallbackMethod,
           ...override,
+          imageUrl: override?.imageUrl || fallbackMethod.imageUrl,
           localizedLabels: {
             en: override?.localizedLabels?.en || override?.label || fallbackMethod.localizedLabels.en,
             my: override?.localizedLabels?.my || fallbackMethod.localizedLabels.my,
@@ -2204,6 +2219,10 @@ function TelegramSalesWorkflowCard() {
         const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
       })(),
+      pendingReviewReminderHours: (() => {
+        const parsed = Number.parseInt(form.pendingReviewReminderHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
+      })(),
       unpaidOrderExpiryHours: (() => {
         const parsed = Number.parseInt(form.unpaidOrderExpiryHours.trim(), 10);
         const reminderHours = Number.parseInt(form.paymentReminderHours.trim(), 10);
@@ -2225,6 +2244,7 @@ function TelegramSalesWorkflowCard() {
         },
         accountName: method.accountName.trim(),
         accountNumber: method.accountNumber.trim(),
+        imageUrl: method.imageUrl.trim(),
         note: method.note.trim(),
         localizedNotes: {
           en: method.localizedNotes.en.trim(),
@@ -2347,7 +2367,7 @@ function TelegramSalesWorkflowCard() {
               <p className="text-sm font-medium">{salesUi.paymentAutomation}</p>
               <p className="text-xs text-muted-foreground">{salesUi.paymentAutomationDesc}</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>{salesUi.paymentReminderHours}</Label>
                 <Input
@@ -2360,6 +2380,20 @@ function TelegramSalesWorkflowCard() {
                     }))
                   }
                   placeholder="3"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.pendingReviewReminderHours}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.pendingReviewReminderHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      pendingReviewReminderHours: event.target.value,
+                    }))
+                  }
+                  placeholder="6"
                 />
               </div>
               <div className="space-y-2">
@@ -2498,6 +2532,19 @@ function TelegramSalesWorkflowCard() {
                             accountNumber: event.target.value,
                           }))
                         }
+                      />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <Label>{salesUi.paymentImageUrl}</Label>
+                      <Input
+                        value={method.imageUrl}
+                        onChange={(event) =>
+                          updatePaymentMethod(method.code, (current) => ({
+                            ...current,
+                            imageUrl: event.target.value,
+                          }))
+                        }
+                        placeholder="https://example.com/kpay-qr.png"
                       />
                     </div>
                     <div className="space-y-2">
