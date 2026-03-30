@@ -25,7 +25,9 @@ import {
 } from '@/lib/services/telegram-sales';
 import {
   approveTelegramOrder,
+  approveTelegramServerChangeRequest,
   rejectTelegramOrder,
+  rejectTelegramServerChangeRequest,
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
 
@@ -645,6 +647,90 @@ export const telegramBotRouter = router({
       });
     }),
 
+  listServerChangeRequests: adminProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(100).default(25),
+          statuses: z.array(z.string()).optional(),
+          query: z.string().max(120).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 25;
+      const statuses = input?.statuses?.filter(Boolean);
+      const query = input?.query?.trim();
+
+      const filters: Array<Record<string, unknown>> = [];
+      if (statuses?.length) {
+        filters.push({
+          status: {
+            in: statuses,
+          },
+        });
+      }
+
+      if (query) {
+        filters.push({
+          OR: [
+            { requestCode: { contains: query } },
+            { telegramUsername: { contains: query } },
+            { telegramUserId: { contains: query } },
+            { currentServerName: { contains: query } },
+            { requestedServerName: { contains: query } },
+            {
+              accessKey: {
+                name: {
+                  contains: query,
+                },
+              },
+            },
+          ],
+        });
+      }
+
+      const requests = await db.telegramServerChangeRequest.findMany({
+        where: filters.length ? { AND: filters } : undefined,
+        orderBy: [{ createdAt: 'desc' }],
+        take: limit,
+        include: {
+          accessKey: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              telegramId: true,
+              email: true,
+              usedBytes: true,
+              dataLimitBytes: true,
+              expiresAt: true,
+              publicSlug: true,
+              serverChangeCount: true,
+              serverChangeLimit: true,
+            },
+          },
+        },
+      });
+
+      return requests.map((request) => ({
+        ...request,
+        accessKey: {
+          ...request.accessKey,
+          usedBytes: request.accessKey.usedBytes.toString(),
+          dataLimitBytes: request.accessKey.dataLimitBytes?.toString() ?? null,
+        },
+        remainingChangesBeforeApproval: Math.max(
+          0,
+          request.accessKey.serverChangeLimit - request.accessKey.serverChangeCount,
+        ),
+        remainingChangesAfterApproval: Math.max(
+          0,
+          request.accessKey.serverChangeLimit - request.accessKey.serverChangeCount - 1,
+        ),
+      }));
+    }),
+
   approveOrder: adminProcedure
     .input(
       z.object({
@@ -698,6 +784,40 @@ export const telegramBotRouter = router({
         adminNote: input.adminNote,
         customerMessage: input.customerMessage,
         reasonCode: input.reasonCode,
+      });
+    }),
+
+  approveServerChangeRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return approveTelegramServerChangeRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+      });
+    }),
+
+  rejectServerChangeRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().max(1000).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return rejectTelegramServerChangeRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
       });
     }),
 

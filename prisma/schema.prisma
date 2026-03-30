@@ -231,6 +231,7 @@ model AccessKey {
   subscriptionEvents     SubscriptionPageEvent[]
   slugHistory            AccessKeySlugHistory[]
   distributionLinks      AccessDistributionLink[]
+  telegramServerChangeRequests TelegramServerChangeRequest[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -299,6 +300,38 @@ model TelegramOrder {
   @@index([telegramUserId, status, createdAt])
   @@index([status, createdAt])
   @@index([reviewedByUserId, status])
+}
+
+model TelegramServerChangeRequest {
+  id                         String   @id @default(cuid())
+  requestCode                String   @unique
+  status                     String
+  locale                     String   @default("en")
+  telegramChatId             String
+  telegramUserId             String
+  telegramUsername           String?
+  accessKeyId                String
+  accessKey                  AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  currentServerId            String
+  currentServerName          String
+  currentServerCountryCode   String?
+  requestedServerId          String
+  requestedServerName        String
+  requestedServerCountryCode String?
+  adminNote                  String?
+  customerMessage            String?
+  reviewedByUserId           String?
+  reviewerName               String?
+  reviewedAt                 DateTime?
+  fulfilledAt                DateTime?
+  rejectedAt                 DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([telegramChatId, status, createdAt])
+  @@index([telegramUserId, status, createdAt])
+  @@index([accessKeyId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model TelegramUserProfile {

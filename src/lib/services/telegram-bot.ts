@@ -81,7 +81,8 @@ import {
   slugifyPublicName,
 } from '@/lib/public-slug';
 import { mergeTagsForStorage, tagMatchesFilter } from '@/lib/tags';
-import { formatBytes, generateRandomString } from '@/lib/utils';
+import { formatBytes, formatDateTime, generateRandomString } from '@/lib/utils';
+import { replaceAccessKeyServer } from '@/lib/services/server-migration';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -178,8 +179,9 @@ function getCommandKeyboard(isAdmin: boolean) {
     [{ text: '/buy' }, { text: '/trial' }],
     [{ text: '/renew' }, { text: '/orders' }],
     [{ text: '/mykeys' }, { text: '/usage' }],
-    [{ text: '/sub' }, { text: '/support' }],
-    [{ text: '/language' }, { text: '/cancel' }],
+    [{ text: '/sub' }, { text: '/server' }],
+    [{ text: '/support' }, { text: '/language' }],
+    [{ text: '/cancel' }],
     [{ text: '/help' }],
   ];
 
@@ -198,10 +200,14 @@ function getCommandKeyboard(isAdmin: boolean) {
 const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
 const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
 const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
+const TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX = 'server-review';
+const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
 type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca' | 'by';
+type TelegramServerChangeReviewAction = 'approve' | 'reject';
+type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -315,6 +321,73 @@ function parseTelegramOrderActionCallbackData(data?: string | null) {
 
   return {
     action: action as TelegramOrderUserAction,
+    primary: parts[2]?.trim() || '',
+    secondary: parts[3]?.trim() || null,
+  };
+}
+
+function buildTelegramServerChangeReviewCallbackData(
+  action: TelegramServerChangeReviewAction,
+  requestId: string,
+) {
+  return `${TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX}:${action}:${requestId}`;
+}
+
+function parseTelegramServerChangeReviewCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action =
+    parts[1] === 'approve'
+      ? 'approve'
+      : parts[1] === 'reject'
+        ? 'reject'
+        : null;
+  const requestId = parts[2]?.trim();
+
+  if (!action || !requestId) {
+    return null;
+  }
+
+  return {
+    action,
+    requestId,
+  } as const;
+}
+
+function buildTelegramServerChangeActionCallbackData(
+  action: TelegramServerChangeUserAction,
+  primary: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
+    : `${TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
+}
+
+function parseTelegramServerChangeActionCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action = parts[1];
+  if (!['ky', 'sv', 'st', 'ca'].includes(action)) {
+    return null;
+  }
+
+  return {
+    action: action as TelegramServerChangeUserAction,
     primary: parts[2]?.trim() || '',
     secondary: parts[3]?.trim() || null,
   };
@@ -557,8 +630,8 @@ function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
@@ -587,6 +660,66 @@ function getTelegramUi(locale: SupportedLocale) {
     telegramIdLabel: isMyanmar ? 'Telegram ID' : 'Telegram ID',
     requesterLabel: isMyanmar ? 'Requester' : 'Requester',
     serversTitle: isMyanmar ? '🖥 <b>သင့် server များ</b>' : '🖥 <b>Your servers</b>',
+    serverChangeTitle: isMyanmar ? '🛠 <b>Server ပြောင်းရန် key ရွေးပါ</b>' : '🛠 <b>Choose a key for server replacement</b>',
+    serverChangeDesc: isMyanmar
+      ? 'Normal key များကို server မလုပ်ဆောင်ပါက admin review ဖြင့် အများဆုံး 3 ကြိမ်အထိ server ပြောင်းနိုင်ပါသည်။ သက်တမ်းနှင့် အသုံးပြုထားသော quota မပြောင်းပါ။'
+      : 'If a normal key server is not working, the admin can move it to another server up to 3 times. Expiry and used quota stay the same.',
+    serverChangeKeyLine: (name: string, currentServer: string, remainingChanges: number, limit: number) =>
+      isMyanmar
+        ? `• <b>${name}</b>\n  လက်ရှိ server: ${currentServer}\n  ကျန်ရှိသောပြောင်းလဲခွင့်: ${remainingChanges}/${limit}`
+        : `• <b>${name}</b>\n  Current server: ${currentServer}\n  Remaining changes: ${remainingChanges}/${limit}`,
+    serverChangeNoEligible: isMyanmar
+      ? 'ℹ️ Server ပြောင်းရန် eligible ဖြစ်သော normal key မတွေ့ပါ။'
+      : 'ℹ️ No eligible normal keys are available for server replacement.',
+    serverChangeLimitReached: (keyName: string) =>
+      isMyanmar
+        ? `⚠️ <b>${keyName}</b> သည် server ပြောင်းလဲခွင့် အများဆုံးအရေအတွက် ရောက်ရှိပြီးပါပြီ။ Key အသစ်ဝယ်ရန် သို့မဟုတ် admin ကို ဆက်သွယ်ပါ။`
+        : `⚠️ <b>${keyName}</b> has reached the server-change limit. Please buy a new key or contact the admin.`,
+    serverChangeChooseServer: (keyName: string, currentServer: string, remainingChanges: number, limit: number) =>
+      isMyanmar
+        ? `🖥 <b>${keyName}</b> အတွက် target server ကို ရွေးပါ။\n\nလက်ရှိ server: <b>${currentServer}</b>\nကျန်ရှိသောပြောင်းလဲခွင့်: <b>${remainingChanges}/${limit}</b>`
+        : `🖥 Choose the target server for <b>${keyName}</b>.\n\nCurrent server: <b>${currentServer}</b>\nRemaining changes: <b>${remainingChanges}/${limit}</b>`,
+    serverChangeRequestSubmitted: (code: string, keyName: string, targetServer: string) =>
+      isMyanmar
+        ? `📨 Server change request <b>${code}</b> ကို ပို့ပြီးပါပြီ။ <b>${keyName}</b> ကို <b>${targetServer}</b> သို့ ပြောင်းရန် admin review စောင့်နေပါသည်။`
+        : `📨 Server change request <b>${code}</b> has been submitted. <b>${keyName}</b> is waiting for admin review to move to <b>${targetServer}</b>.`,
+    serverChangeStatusTitle: isMyanmar ? '🧾 <b>Server change request</b>' : '🧾 <b>Server change request</b>',
+    serverChangeRequestNotFound: isMyanmar ? '❌ Server change request ကို မတွေ့ပါ။' : '❌ Server change request not found.',
+    serverChangeRequestPending: (code: string) =>
+      isMyanmar
+        ? `⏳ Server change request <b>${code}</b> သည် review စောင့်နေဆဲ ဖြစ်ပါသည်။`
+        : `⏳ Server change request <b>${code}</b> is still pending review.`,
+    serverChangeRequestApproved: (code: string, keyName: string, targetServer: string) =>
+      isMyanmar
+        ? `✅ Server change request <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ <b>${keyName}</b> ကို <b>${targetServer}</b> သို့ ပြောင်းပြီး access ကို ယခု ပို့ပေးပါမည်။`
+        : `✅ Server change request <b>${code}</b> was approved. <b>${keyName}</b> has been moved to <b>${targetServer}</b> and the updated access will be sent next.`,
+    serverChangeRequestRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
+      isMyanmar
+        ? `❌ Server change request <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\n${supportLink ? `🛟 အကူအညီ: ${supportLink}` : 'အကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
+        : `❌ Server change request <b>${code}</b> was rejected.${customerMessage ? `\n\n${customerMessage}` : ''}\n\n${supportLink ? `🛟 Support: ${supportLink}` : 'If you need help, use /support.'}`,
+    serverChangeReviewAlertTitle: isMyanmar ? '🛠 <b>Server change request</b>' : '🛠 <b>Server change request</b>',
+    serverChangeReviewReminderTitle: isMyanmar ? '⏰ <b>Pending server change request</b>' : '⏰ <b>Pending server change request</b>',
+    serverChangeReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးမည်' : 'Review in panel',
+    serverChangeApproveActionLabel: isMyanmar ? 'အတည်ပြုမည်' : 'Approve',
+    serverChangeRejectActionLabel: isMyanmar ? 'ပယ်မည်' : 'Reject',
+    serverChangeReviewActionApproved: (code: string) =>
+      isMyanmar ? `${code} ကို အတည်ပြုပြီးပါပြီ` : `${code} approved`,
+    serverChangeReviewActionRejected: (code: string) =>
+      isMyanmar ? `${code} ကို ပယ်လိုက်ပါပြီ` : `${code} rejected`,
+    serverChangeReviewActionUnauthorized: isMyanmar ? 'ဤ action ကို admin များသာ အသုံးပြုနိုင်ပါသည်။' : 'Only admins can use this action.',
+    serverChangeReviewActionFailed: (message: string) =>
+      isMyanmar ? `Action မအောင်မြင်ပါ: ${message}` : `Action failed: ${message}`,
+    serverChangeCancelled: isMyanmar ? 'Server change request ကို ပယ်ဖျက်လိုက်ပါပြီ။' : 'Server change request cancelled.',
+    serverChangeNoAlternateServers: isMyanmar
+      ? 'ℹ️ ဤ key အတွက် ရွေးချယ်ရန် အခြား assignable server မရှိပါ။'
+      : 'ℹ️ There are no other assignable servers available for this key.',
+    serverChangeRequestCodeLabel: isMyanmar ? 'Request' : 'Request',
+    currentServerLabel: isMyanmar ? 'လက်ရှိ server' : 'Current server',
+    requestedServerLabel: isMyanmar ? 'ရွေးထားသော server' : 'Requested server',
+    remainingChangesLabel: isMyanmar ? 'ကျန်ရှိသောပြောင်းလဲခွင့်' : 'Remaining changes',
+    serverChangeSupportDefault: isMyanmar
+      ? 'ဤ key ကို ပြန်လည်စစ်ဆေးရန် admin/support ကို ဆက်သွယ်ပေးပါ။'
+      : 'Please contact admin/support for follow-up on this key.',
     renewNoMatch: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော linked key မရှိပါ။` : `❌ No linked key matched "${query}".`,
     renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
     buyDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ key အသစ် မမှာယူနိုင်သေးပါ။' : 'ℹ️ New key orders are not available through Telegram right now.',
@@ -1613,6 +1746,128 @@ function buildTelegramServerSelectionPromptText(input: {
   return buildTelegramSalesPlanPromptText(input.locale, lines);
 }
 
+function buildTelegramServerChangeKeySelectionKeyboard(input: {
+  locale: SupportedLocale;
+  keys: Array<{
+    id: string;
+    name: string;
+    currentServerName: string;
+    remainingChanges: number;
+    limit: number;
+  }>;
+}) {
+  const rows = input.keys.slice(0, 8).map((key) => [
+    {
+      text: truncateTelegramButtonLabel(`🛠 ${key.name} • ${key.remainingChanges}/${key.limit}`, 38),
+      callback_data: buildTelegramServerChangeActionCallbackData('ky', key.id),
+    },
+  ]);
+
+  rows.push([
+    {
+      text: getTelegramUi(input.locale).orderActionCancel,
+      callback_data: buildTelegramServerChangeActionCallbackData('ca', 'list'),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramServerChangeSelectionKeyboard(input: {
+  accessKeyId: string;
+  locale: SupportedLocale;
+  servers: Awaited<ReturnType<typeof listAssignableTelegramOrderServers>>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const rows = input.servers.slice(0, 8).map((server) => [
+    {
+      text: truncateTelegramButtonLabel(`🖥 ${formatTelegramServerChoiceLabel(server, ui)}`, 38),
+      callback_data: buildTelegramServerChangeActionCallbackData('sv', input.accessKeyId, server.id),
+    },
+  ]);
+
+  rows.push([
+    {
+      text: ui.orderActionCancel,
+      callback_data: buildTelegramServerChangeActionCallbackData('ca', input.accessKeyId),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramServerChangeSupportKeyboard(
+  locale: SupportedLocale,
+  supportLink?: string | null,
+) {
+  const ui = getTelegramUi(locale);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [[
+    {
+      text: ui.orderActionBuyNewKey,
+      callback_data: buildTelegramOrderActionCallbackData('by', 'server-change'),
+    },
+  ]];
+
+  if (supportLink) {
+    rows.push([
+      {
+        text: ui.getSupport,
+        url: supportLink,
+      },
+    ]);
+  }
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramServerChangePendingKeyboard(
+  requestId: string,
+  locale: SupportedLocale,
+  supportLink?: string | null,
+) {
+  const ui = getTelegramUi(locale);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [[
+    {
+      text: ui.orderActionCheckStatus,
+      callback_data: buildTelegramServerChangeActionCallbackData('st', requestId),
+    },
+  ]];
+
+  if (supportLink) {
+    rows.push([
+      {
+        text: ui.getSupport,
+        url: supportLink,
+      },
+    ]);
+  }
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+async function generateTelegramServerChangeRequestCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = `SRV-${generateRandomString(8).toUpperCase()}`;
+    const existing = await db.telegramServerChangeRequest.findUnique({
+      where: { requestCode: candidate },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `SRV-${Date.now().toString(36).toUpperCase()}`;
+}
+
 function buildTelegramPaymentMethodSelectionKeyboard(input: {
   orderId: string;
   locale: SupportedLocale;
@@ -1896,6 +2151,67 @@ async function createTelegramOrderRecord(input: {
   });
 }
 
+async function createTelegramServerChangeRequestRecord(input: {
+  chatId: number;
+  telegramUserId: number;
+  telegramUsername?: string;
+  locale: SupportedLocale;
+  accessKey: {
+    id: string;
+    serverId: string;
+    server: {
+      name: string;
+      countryCode?: string | null;
+    };
+  };
+  requestedServer: {
+    id: string;
+    name: string;
+    countryCode?: string | null;
+  };
+}) {
+  const requestCode = await generateTelegramServerChangeRequestCode();
+  return db.telegramServerChangeRequest.create({
+    data: {
+      requestCode,
+      status: 'PENDING_REVIEW',
+      telegramChatId: String(input.chatId),
+      telegramUserId: String(input.telegramUserId),
+      telegramUsername: input.telegramUsername || null,
+      locale: input.locale,
+      accessKeyId: input.accessKey.id,
+      currentServerId: input.accessKey.serverId,
+      currentServerName: input.accessKey.server.name,
+      currentServerCountryCode: input.accessKey.server.countryCode || null,
+      requestedServerId: input.requestedServer.id,
+      requestedServerName: input.requestedServer.name,
+      requestedServerCountryCode: input.requestedServer.countryCode || null,
+    },
+  });
+}
+
+async function findTelegramServerChangeRequestByIdForUser(input: {
+  requestId: string;
+  chatId: number;
+  telegramUserId: number;
+}) {
+  return db.telegramServerChangeRequest.findFirst({
+    where: {
+      id: input.requestId,
+      telegramChatId: String(input.chatId),
+      telegramUserId: String(input.telegramUserId),
+    },
+    include: {
+      accessKey: {
+        include: {
+          server: true,
+          user: true,
+        },
+      },
+    },
+  });
+}
+
 async function sendTelegramOrderReviewAlert(
   orderId: string,
   mode: 'initial' | 'reminder' | 'updated' = 'initial',
@@ -1964,6 +2280,121 @@ async function sendTelegramOrderReviewAlert(
       );
     }
   }
+}
+
+async function sendTelegramServerChangeReviewAlert(
+  requestId: string,
+  mode: 'initial' | 'reminder' = 'initial',
+) {
+  const config = await getTelegramConfig();
+  if (!config || config.adminChatIds.length === 0) {
+    return;
+  }
+
+  const request = await db.telegramServerChangeRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      accessKey: {
+        select: {
+          id: true,
+          name: true,
+          serverChangeCount: true,
+          serverChangeLimit: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    return;
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+  const panelUrl = await buildTelegramServerChangePanelUrl(request.id);
+  const remainingAfterApproval = Math.max(
+    0,
+    request.accessKey.serverChangeLimit - (request.accessKey.serverChangeCount + 1),
+  );
+  const lines = [
+    mode === 'reminder' ? ui.serverChangeReviewReminderTitle : ui.serverChangeReviewAlertTitle,
+    '',
+    `${ui.serverChangeRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
+    `${ui.requesterLabel}: <b>${escapeHtml(request.telegramUsername || request.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(request.telegramUserId)}</code>`,
+    `${ui.keyLabel}: <b>${escapeHtml(request.accessKey.name)}</b>`,
+    `${ui.currentServerLabel}: <b>${escapeHtml(request.currentServerName)}${request.currentServerCountryCode ? ` ${getFlagEmoji(request.currentServerCountryCode)}` : ''}</b>`,
+    `${ui.requestedServerLabel}: <b>${escapeHtml(request.requestedServerName)}${request.requestedServerCountryCode ? ` ${getFlagEmoji(request.requestedServerCountryCode)}` : ''}</b>`,
+    `${ui.remainingChangesLabel}: <b>${remainingAfterApproval}</b>`,
+    '',
+    `${ui.serverChangeReviewPanelLabel}: ${panelUrl}`,
+  ].join('\n');
+
+  for (const adminChatId of config.adminChatIds) {
+    await sendTelegramMessage(config.botToken, adminChatId, lines, {
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: ui.serverChangeApproveActionLabel,
+              callback_data: buildTelegramServerChangeReviewCallbackData('approve', request.id),
+            },
+            {
+              text: ui.serverChangeRejectActionLabel,
+              callback_data: buildTelegramServerChangeReviewCallbackData('reject', request.id),
+            },
+          ],
+          [{ text: ui.serverChangeReviewPanelLabel, url: panelUrl }],
+        ],
+      },
+    });
+  }
+}
+
+function buildTelegramServerChangeStatusMessage(input: {
+  locale: SupportedLocale;
+  request: {
+    requestCode: string;
+    status: string;
+    currentServerName: string;
+    currentServerCountryCode?: string | null;
+    requestedServerName: string;
+    requestedServerCountryCode?: string | null;
+    createdAt: Date;
+    customerMessage?: string | null;
+    accessKey: {
+      name: string;
+      serverChangeCount: number;
+      serverChangeLimit: number;
+    };
+  };
+}) {
+  const ui = getTelegramUi(input.locale);
+  const { request } = input;
+  const currentServer = `${request.currentServerName}${request.currentServerCountryCode ? ` ${getFlagEmoji(request.currentServerCountryCode)}` : ''}`;
+  const requestedServer = `${request.requestedServerName}${request.requestedServerCountryCode ? ` ${getFlagEmoji(request.requestedServerCountryCode)}` : ''}`;
+  const remainingChanges = Math.max(
+    0,
+    request.accessKey.serverChangeLimit - request.accessKey.serverChangeCount,
+  );
+
+  const lines = [
+    ui.serverChangeStatusTitle,
+    '',
+    `${ui.serverChangeRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
+    `${ui.keyLabel}: <b>${escapeHtml(request.accessKey.name)}</b>`,
+    `${ui.currentServerLabel}: <b>${escapeHtml(currentServer)}</b>`,
+    `${ui.requestedServerLabel}: <b>${escapeHtml(requestedServer)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(request.status)}</b>`,
+    `${ui.remainingChangesLabel}: <b>${remainingChanges}</b>`,
+    `${ui.createdAtLabel}: ${escapeHtml(formatDateTime(request.createdAt))}`,
+  ];
+
+  if (request.customerMessage) {
+    lines.push('', escapeHtml(request.customerMessage));
+  }
+
+  return lines.join('\n');
 }
 
 async function handleTelegramOrderProofMessage(input: {
@@ -3827,7 +4258,32 @@ async function buildTelegramOrderPanelUrl(orderId: string) {
   return `${origin}${basePath}/dashboard/notifications?telegramOrder=${encodeURIComponent(orderId)}`;
 }
 
+async function buildTelegramServerChangePanelUrl(requestId: string) {
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3000';
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `${origin}${basePath}/dashboard/notifications?serverChangeRequest=${encodeURIComponent(requestId)}`;
+}
+
 function appendTelegramOrderAdminNote(existingNote?: string | null, nextNote?: string | null) {
+  const trimmedExisting = existingNote?.trim();
+  const trimmedNext = nextNote?.trim();
+
+  if (!trimmedNext) {
+    return trimmedExisting || null;
+  }
+
+  if (!trimmedExisting) {
+    return trimmedNext;
+  }
+
+  return `${trimmedExisting}\n\n${trimmedNext}`;
+}
+
+function appendTelegramServerChangeAdminNote(existingNote?: string | null, nextNote?: string | null) {
   const trimmedExisting = existingNote?.trim();
   const trimmedNext = nextNote?.trim();
 
@@ -4780,6 +5236,219 @@ export async function rejectTelegramOrder(input: {
   return {
     orderId: finalOrder.id,
     orderCode: order.orderCode,
+  };
+}
+
+export async function approveTelegramServerChangeRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+}) {
+  const claim = await db.telegramServerChangeRequest.updateMany({
+    where: {
+      id: input.requestId,
+      status: 'PENDING_REVIEW',
+    },
+    data: {
+      status: 'APPROVED',
+      reviewedByUserId: input.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? null,
+      reviewedAt: new Date(),
+      adminNote: input.adminNote?.trim() || null,
+    },
+  });
+
+  if (claim.count === 0) {
+    throw new Error('This server-change request is no longer pending review.');
+  }
+
+  const request = await db.telegramServerChangeRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      accessKey: {
+        include: {
+          server: true,
+          user: {
+            select: {
+              telegramChatId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new Error('Server-change request not found.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+
+  try {
+    const replacement = await replaceAccessKeyServer(request.accessKeyId, request.requestedServerId);
+    if (!replacement.updatedKey) {
+      throw new Error('The key was replaced but could not be reloaded afterwards.');
+    }
+
+    const finalRequest = await db.telegramServerChangeRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'FULFILLED',
+        reviewedByUserId: input.reviewedByUserId ?? null,
+        reviewerName: input.reviewerName ?? null,
+        reviewedAt: new Date(),
+        fulfilledAt: new Date(),
+        adminNote: appendTelegramServerChangeAdminNote(request.adminNote, input.adminNote),
+        customerMessage: null,
+      },
+    });
+
+    let deliveryError: string | null = null;
+    try {
+      const config = await getTelegramConfig();
+      if (config) {
+        await sendTelegramMessage(
+          config.botToken,
+          request.telegramChatId,
+          ui.serverChangeRequestApproved(
+            request.requestCode,
+            replacement.updatedKey.name,
+            replacement.targetServer.name,
+          ),
+          {
+            replyMarkup: getCommandKeyboard(false),
+          },
+        );
+      }
+
+      await sendAccessKeySharePageToTelegram({
+        accessKeyId: replacement.updatedKey.id,
+        chatId:
+          request.telegramChatId ||
+          replacement.updatedKey.telegramId ||
+          replacement.updatedKey.user?.telegramChatId ||
+          undefined,
+        reason: 'RESENT',
+        source: 'telegram_server_change',
+      });
+    } catch (error) {
+      deliveryError = (error as Error).message;
+    }
+
+    await writeAuditLog({
+      userId: input.reviewedByUserId ?? null,
+      action: 'TELEGRAM_SERVER_CHANGE_APPROVED',
+      entity: 'TELEGRAM_SERVER_CHANGE_REQUEST',
+      entityId: finalRequest.id,
+      details: {
+        requestCode: request.requestCode,
+        accessKeyId: request.accessKeyId,
+        targetServerId: request.requestedServerId,
+        reviewerName: input.reviewerName ?? null,
+        deliveryError,
+      },
+    });
+
+    return {
+      requestId: finalRequest.id,
+      requestCode: request.requestCode,
+      accessKeyId: replacement.updatedKey.id,
+      accessKeyName: replacement.updatedKey.name,
+      targetServerName: replacement.targetServer.name,
+      deliveryError,
+    };
+  } catch (error) {
+    await db.telegramServerChangeRequest.update({
+      where: { id: input.requestId },
+      data: {
+        status: 'PENDING_REVIEW',
+        reviewedByUserId: null,
+        reviewerName: null,
+        reviewedAt: null,
+        adminNote: appendTelegramServerChangeAdminNote(
+          request.adminNote,
+          `Approval failed at ${new Date().toISOString()}: ${(error as Error).message}`,
+        ),
+      },
+    });
+
+    throw error;
+  }
+}
+
+export async function rejectTelegramServerChangeRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+}) {
+  const request = await db.telegramServerChangeRequest.findUnique({
+    where: { id: input.requestId },
+  });
+
+  if (!request) {
+    throw new Error('Server-change request not found.');
+  }
+
+  if (['FULFILLED', 'REJECTED', 'CANCELLED'].includes(request.status)) {
+    throw new Error('This server-change request has already been completed.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  const finalRequest = await db.telegramServerChangeRequest.update({
+    where: { id: request.id },
+    data: {
+      status: 'REJECTED',
+      reviewedByUserId: input.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? null,
+      reviewedAt: new Date(),
+      rejectedAt: new Date(),
+      adminNote: appendTelegramServerChangeAdminNote(request.adminNote, input.adminNote),
+      customerMessage: input.customerMessage?.trim() || ui.serverChangeSupportDefault,
+    },
+  });
+
+  try {
+    const config = await getTelegramConfig();
+    if (config) {
+      await sendTelegramMessage(
+        config.botToken,
+        request.telegramChatId,
+        ui.serverChangeRequestRejected(
+          request.requestCode,
+          finalRequest.customerMessage,
+          supportLink,
+        ),
+        {
+          replyMarkup: getCommandKeyboard(false),
+        },
+      );
+    }
+  } catch (error) {
+    console.error('Failed to send Telegram server-change rejection message:', error);
+  }
+
+  await writeAuditLog({
+    userId: input.reviewedByUserId ?? null,
+    action: 'TELEGRAM_SERVER_CHANGE_REJECTED',
+    entity: 'TELEGRAM_SERVER_CHANGE_REQUEST',
+    entityId: finalRequest.id,
+    details: {
+      requestCode: request.requestCode,
+      accessKeyId: request.accessKeyId,
+      reviewerName: input.reviewerName ?? null,
+    },
+  });
+
+  return {
+    requestId: finalRequest.id,
+    requestCode: request.requestCode,
   };
 }
 
@@ -6621,44 +7290,63 @@ async function handleUserServerCommand(
   chatId: number,
   telegramUserId: number,
   locale: SupportedLocale,
-): Promise<string> {
+  botToken: string,
+): Promise<string | null> {
   const ui = getTelegramUi(locale);
-  const keys = await findLinkedAccessKeys(chatId, telegramUserId, true);
+  const supportLink = await getTelegramSupportLink();
+  const keys = (await findLinkedAccessKeys(chatId, telegramUserId, true))
+    .filter((key) => ['ACTIVE', 'PENDING'].includes(key.status));
 
   if (keys.length === 0) {
     return ui.myKeysEmpty;
   }
 
-  const grouped = new Map<
-    string,
-    { name: string; countryCode: string | null; keyCount: number; activeCount: number }
-  >();
+  const eligibleKeys = keys
+    .map((key) => {
+      const remainingChanges = Math.max(0, key.serverChangeLimit - key.serverChangeCount);
+      return {
+        key,
+        remainingChanges,
+      };
+    })
+    .filter(({ remainingChanges }) => remainingChanges > 0);
 
-  for (const key of keys) {
-    const current = grouped.get(key.serverId) || {
-      name: key.server.name,
-      countryCode: key.server.countryCode,
-      keyCount: 0,
-      activeCount: 0,
-    };
-
-    current.keyCount += 1;
-    if (key.status === 'ACTIVE' || key.status === 'PENDING') {
-      current.activeCount += 1;
-    }
-    grouped.set(key.serverId, current);
+  if (eligibleKeys.length === 0) {
+    const message = `${ui.serverChangeNoEligible}\n\n${ui.serverChangeLimitReached(keys[0]?.name || ui.keyLabel)}`;
+    const sent = await sendTelegramMessage(botToken, chatId, message, {
+      replyMarkup: buildTelegramServerChangeSupportKeyboard(locale, supportLink),
+    });
+    return sent ? null : message;
   }
 
-  const lines = [ui.serversTitle, ''];
-  for (const server of Array.from(grouped.values())) {
+  const lines = [ui.serverChangeTitle, '', ui.serverChangeDesc, ''];
+
+  for (const { key, remainingChanges } of eligibleKeys.slice(0, 8)) {
     lines.push(
-      `• ${escapeHtml(server.name)}${server.countryCode ? ` ${getFlagEmoji(server.countryCode)}` : ''}`,
-      `  ${ui.keysLabel}: ${server.keyCount} total, ${server.activeCount} active`,
+      ui.serverChangeKeyLine(
+        escapeHtml(key.name),
+        `${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
+        remainingChanges,
+        key.serverChangeLimit,
+      ),
       '',
     );
   }
 
-  return lines.join('\n');
+  const sent = await sendTelegramMessage(botToken, chatId, lines.join('\n'), {
+    replyMarkup: buildTelegramServerChangeKeySelectionKeyboard({
+      locale,
+      keys: eligibleKeys.slice(0, 8).map(({ key, remainingChanges }) => ({
+        id: key.id,
+        name: key.name,
+        currentServerName: key.server.name,
+        remainingChanges,
+        limit: key.serverChangeLimit,
+      })),
+    }),
+  });
+
+  return sent ? null : lines.join('\n');
 }
 
 async function handleStatusCommand(locale: SupportedLocale): Promise<string> {
@@ -6965,7 +7653,7 @@ async function handleHelpCommand(
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
 /sub - Share page များကို လက်ခံမည်
 /support - သတ်မှတ်ထားသော support link ကို ကြည့်မည်
-/server - သင့် key များအတွက် server များကို ကြည့်မည်
+ /server - normal key အတွက် server ပြောင်းရန် တောင်းဆိုမည်
 /renew - ရှိပြီးသော key ကို plan အလိုက် သက်တမ်းတိုးမည်
 /cancel - လက်ရှိ order ကို ပယ်ဖျက်မည်
 /help - ဤ help စာမျက်နှာကို ပြမည်`
@@ -6981,7 +7669,7 @@ async function handleHelpCommand(
 /mykeys - List linked keys and IDs
 /sub - Receive your share pages
 /support - Show the configured support link
-/server - Show the servers behind your keys
+/server - Request a server change for a normal key
 /renew - Renew one of your existing keys
 /cancel - Cancel the current order
 /help - Show this help message`;
@@ -7055,6 +7743,287 @@ async function handleTelegramCallbackQuery(
     config.adminChatIds.includes(String(chatId));
 
   if (!parsed) {
+    const userServerChangeAction = parseTelegramServerChangeActionCallbackData(callbackQuery.data);
+    if (userServerChangeAction) {
+      const locale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+      const ui = getTelegramUi(locale);
+      const supportLink = await getTelegramSupportLink();
+
+      try {
+        switch (userServerChangeAction.action) {
+          case 'ky': {
+            const accessKey = (await findLinkedAccessKeys(chatId, callbackQuery.from.id, true)).find(
+              (key) => key.id === userServerChangeAction.primary,
+            );
+
+            if (!accessKey || !['ACTIVE', 'PENDING'].includes(accessKey.status)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeRequestNotFound,
+              );
+              return null;
+            }
+
+            const remainingChanges = Math.max(
+              0,
+              accessKey.serverChangeLimit - accessKey.serverChangeCount,
+            );
+            if (remainingChanges <= 0) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                `${ui.serverChangeNoEligible}\n\n${ui.serverChangeLimitReached(accessKey.name)}`,
+                {
+                  replyMarkup: buildTelegramServerChangeSupportKeyboard(locale, supportLink),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeLimitReached(accessKey.name),
+              );
+              return null;
+            }
+
+            const existingPending = await db.telegramServerChangeRequest.findFirst({
+              where: {
+                accessKeyId: accessKey.id,
+                status: 'PENDING_REVIEW',
+              },
+              select: {
+                id: true,
+                requestCode: true,
+              },
+            });
+            if (existingPending) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.serverChangeRequestPending(existingPending.requestCode),
+                {
+                  replyMarkup: buildTelegramServerChangePendingKeyboard(
+                    existingPending.id,
+                    locale,
+                    supportLink,
+                  ),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeRequestPending(existingPending.requestCode),
+              );
+              return null;
+            }
+
+            const candidateServers = (await listAssignableTelegramOrderServers()).filter(
+              (server) => server.id !== accessKey.serverId,
+            );
+            if (candidateServers.length === 0) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.serverChangeNoAlternateServers,
+                {
+                  replyMarkup: buildTelegramServerChangeSupportKeyboard(locale, supportLink),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeNoAlternateServers,
+              );
+              return null;
+            }
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.serverChangeChooseServer(
+                escapeHtml(accessKey.name),
+                `${escapeHtml(accessKey.server.name)}${accessKey.server.countryCode ? ` ${getFlagEmoji(accessKey.server.countryCode)}` : ''}`,
+                remainingChanges,
+                accessKey.serverChangeLimit,
+              ),
+              {
+                replyMarkup: buildTelegramServerChangeSelectionKeyboard({
+                  accessKeyId: accessKey.id,
+                  locale,
+                  servers: candidateServers,
+                }),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedKey(accessKey.name),
+            );
+            return null;
+          }
+          case 'sv': {
+            const accessKey = (await findLinkedAccessKeys(chatId, callbackQuery.from.id, true)).find(
+              (key) => key.id === userServerChangeAction.primary,
+            );
+
+            if (!accessKey || !['ACTIVE', 'PENDING'].includes(accessKey.status)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeRequestNotFound,
+              );
+              return null;
+            }
+
+            const remainingChanges = Math.max(
+              0,
+              accessKey.serverChangeLimit - accessKey.serverChangeCount,
+            );
+            if (remainingChanges <= 0) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeLimitReached(accessKey.name),
+              );
+              return null;
+            }
+
+            const requestedServer = (await listAssignableTelegramOrderServers()).find(
+              (server) =>
+                server.id === userServerChangeAction.secondary && server.id !== accessKey.serverId,
+            );
+            if (!requestedServer) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidServerChoice,
+              );
+              return null;
+            }
+
+            const existingPending = await db.telegramServerChangeRequest.findFirst({
+              where: {
+                accessKeyId: accessKey.id,
+                status: 'PENDING_REVIEW',
+              },
+              select: {
+                id: true,
+                requestCode: true,
+              },
+            });
+            if (existingPending) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.serverChangeRequestPending(existingPending.requestCode),
+                {
+                  replyMarkup: buildTelegramServerChangePendingKeyboard(
+                    existingPending.id,
+                    locale,
+                    supportLink,
+                  ),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeRequestPending(existingPending.requestCode),
+              );
+              return null;
+            }
+
+            const request = await createTelegramServerChangeRequestRecord({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+              accessKey,
+              requestedServer,
+            });
+
+            await sendTelegramServerChangeReviewAlert(request.id);
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.serverChangeRequestSubmitted(
+                request.requestCode,
+                accessKey.name,
+                `${requestedServer.name}${requestedServer.countryCode ? ` ${getFlagEmoji(requestedServer.countryCode)}` : ''}`,
+              ),
+              {
+                replyMarkup: buildTelegramServerChangePendingKeyboard(
+                  request.id,
+                  locale,
+                  supportLink,
+                ),
+              },
+            );
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSelectedServer(requestedServer.name),
+            );
+            return null;
+          }
+          case 'st': {
+            const request = await findTelegramServerChangeRequestByIdForUser({
+              requestId: userServerChangeAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!request) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.serverChangeRequestNotFound,
+              );
+              return null;
+            }
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              buildTelegramServerChangeStatusMessage({
+                locale,
+                request,
+              }),
+              {
+                replyMarkup:
+                  request.status === 'PENDING_REVIEW'
+                    ? buildTelegramServerChangePendingKeyboard(request.id, locale, supportLink)
+                    : buildTelegramServerChangeSupportKeyboard(locale, supportLink),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSent,
+            );
+            return null;
+          }
+          case 'ca': {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.serverChangeCancelled,
+            );
+            return null;
+          }
+        }
+      } catch (error) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          (error as Error).message,
+        );
+        return null;
+      }
+    }
+
     const userOrderAction = parseTelegramOrderActionCallbackData(callbackQuery.data);
     if (userOrderAction) {
       const locale = await getTelegramConversationLocale({
@@ -7745,6 +8714,64 @@ async function handleTelegramCallbackQuery(
       }
     }
 
+    const serverChangeReviewAction = parseTelegramServerChangeReviewCallbackData(callbackQuery.data);
+    if (serverChangeReviewAction) {
+      const adminLocale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+      const adminUi = getTelegramUi(adminLocale);
+
+      if (!isAdmin) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          adminUi.serverChangeReviewActionUnauthorized,
+        );
+        return null;
+      }
+
+      try {
+        if (serverChangeReviewAction.action === 'approve') {
+          const result = await approveTelegramServerChangeRequest({
+            requestId: serverChangeReviewAction.requestId,
+            reviewedByUserId: null,
+            reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+            adminNote: callbackQuery.from.username
+              ? `Approved from Telegram by @${callbackQuery.from.username}`
+              : `Approved from Telegram by ${callbackQuery.from.first_name}`,
+          });
+
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            adminUi.serverChangeReviewActionApproved(result.requestCode),
+          );
+        } else {
+          const result = await rejectTelegramServerChangeRequest({
+            requestId: serverChangeReviewAction.requestId,
+            reviewedByUserId: null,
+            reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+            adminNote: null,
+          });
+
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            adminUi.serverChangeReviewActionRejected(result.requestCode),
+          );
+        }
+      } catch (error) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          adminUi.serverChangeReviewActionFailed((error as Error).message),
+        );
+      }
+
+      return null;
+    }
+
     const orderAction = parseTelegramOrderReviewCallbackData(callbackQuery.data);
     if (!orderAction) {
       return null;
@@ -7964,7 +8991,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'server':
       return isAdmin && !argsText.trim()
         ? handleStatusCommand(locale)
-        : handleUserServerCommand(chatId, telegramUserId, locale);
+        : handleUserServerCommand(chatId, telegramUserId, locale, config.botToken);
     case 'renew':
       return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'cancel': {

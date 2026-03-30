@@ -14,7 +14,9 @@
 
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { logger } from '@/lib/logger';
+import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
 
 // ────────────────────────────────────────────────
 // Types
@@ -58,6 +60,27 @@ export interface MigrationPreview {
     dynamicKeyName: string | null;
   }[];
   totalKeys: number;
+}
+
+export interface ReplaceAccessKeyServerResult {
+  updatedKey: {
+    id: string;
+    name: string;
+    telegramId: string | null;
+    serverChangeCount: number;
+    serverChangeLimit: number;
+    user: {
+      telegramChatId: string | null;
+    } | null;
+  } | null;
+  sourceServer: {
+    id: string;
+    name: string;
+  };
+  targetServer: {
+    id: string;
+    name: string;
+  };
 }
 
 // ────────────────────────────────────────────────
@@ -218,6 +241,168 @@ async function migrateSingleKey(
     const msg = (error as Error).message;
     logger.error(`Migration failed for key "${key.name}": ${msg}`);
     return { keyId, keyName: key.name, success: false, error: msg };
+  }
+}
+
+export async function replaceAccessKeyServer(
+  keyId: string,
+  targetServerId: string,
+): Promise<ReplaceAccessKeyServerResult> {
+  const key = await db.accessKey.findUnique({
+    where: { id: keyId },
+    include: {
+      server: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          telegramChatId: true,
+        },
+      },
+    },
+  });
+
+  if (!key) {
+    throw new Error('Access key not found');
+  }
+
+  if (key.serverId === targetServerId) {
+    throw new Error('This key is already on the selected server.');
+  }
+
+  if (key.serverChangeCount >= key.serverChangeLimit) {
+    throw new Error('This key has reached its server-change limit. Please create a new key or contact admin.');
+  }
+
+  if (!['ACTIVE', 'PENDING'].includes(key.status)) {
+    throw new Error('Only active or pending keys can be moved to another server.');
+  }
+
+  const targetServer = await db.server.findUnique({
+    where: { id: targetServerId },
+  });
+
+  if (!targetServer) {
+    throw new Error('Target server not found');
+  }
+
+  const assignmentCheck = canAssignKeysToServer(targetServer);
+  if (!assignmentCheck.allowed) {
+    throw new Error(assignmentCheck.reason);
+  }
+
+  const sourceClient = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+  const targetClient = createOutlineClient(targetServer.apiUrl, targetServer.apiCertSha256);
+
+  let newOutlineKey:
+    | {
+        id: string;
+        accessUrl: string;
+        password?: string | null;
+        port?: number | null;
+        method?: string | null;
+      }
+    | null = null;
+
+  try {
+    newOutlineKey = await targetClient.createAccessKey({
+      name: key.name,
+      method: key.method || 'chacha20-ietf-poly1305',
+    });
+
+    if (key.dataLimitBytes) {
+      try {
+        await targetClient.setAccessKeyDataLimit(newOutlineKey.id, Number(key.dataLimitBytes));
+      } catch (error) {
+        logger.warn(
+          `Failed to copy data limit for access key ${key.id} to server ${targetServer.id}: ${
+            (error as Error).message
+          }`,
+        );
+      }
+    } else {
+      try {
+        await targetClient.removeAccessKeyDataLimit(newOutlineKey.id);
+      } catch {
+        // Unlimited is already the default Outline state.
+      }
+    }
+
+    await db.connectionSession.updateMany({
+      where: {
+        accessKeyId: key.id,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        endedAt: new Date(),
+        endedReason: 'SERVER_REPLACED',
+      },
+    });
+
+    await db.accessKey.update({
+      where: { id: key.id },
+      data: {
+        serverId: targetServer.id,
+        outlineKeyId: newOutlineKey.id,
+        accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
+        password: newOutlineKey.password ?? null,
+        port: newOutlineKey.port ?? null,
+        method: newOutlineKey.method ?? key.method,
+        usageOffset: -key.usedBytes,
+        serverChangeCount: { increment: 1 },
+        lastServerChangeAt: new Date(),
+        status: key.status === 'DISABLED' ? 'ACTIVE' : key.status,
+        disabledAt: null,
+        disabledOutlineKeyId: null,
+      },
+    });
+
+    try {
+      await sourceClient.deleteAccessKey(key.outlineKeyId);
+    } catch (error) {
+      logger.warn(
+        `Failed to delete old Outline key ${key.outlineKeyId} after server replacement: ${
+          (error as Error).message
+        }`,
+      );
+    }
+
+    const updatedKey = await db.accessKey.findUnique({
+      where: { id: key.id },
+      include: {
+        server: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            telegramChatId: true,
+          },
+        },
+      },
+    });
+
+    return {
+      updatedKey,
+      sourceServer: {
+        id: key.serverId,
+        name: key.server.name,
+      },
+      targetServer: {
+        id: targetServer.id,
+        name: targetServer.name,
+      },
+    };
+  } catch (error) {
+    if (newOutlineKey?.id) {
+      try {
+        await targetClient.deleteAccessKey(newOutlineKey.id);
+      } catch {
+        // Ignore cleanup failure here; the new key is not referenced in DB.
+      }
+    }
+
+    throw error;
   }
 }
 

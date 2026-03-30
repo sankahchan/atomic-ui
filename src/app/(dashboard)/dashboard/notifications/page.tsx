@@ -351,6 +351,45 @@ type TelegramOrderRow = {
   };
 };
 
+type TelegramServerChangeRequestRow = {
+  id: string;
+  requestCode: string;
+  status: string;
+  locale: string;
+  telegramChatId: string;
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  currentServerId: string;
+  currentServerName: string;
+  currentServerCountryCode?: string | null;
+  requestedServerId: string;
+  requestedServerName: string;
+  requestedServerCountryCode?: string | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  reviewedAt?: Date | null;
+  fulfilledAt?: Date | null;
+  rejectedAt?: Date | null;
+  createdAt: Date;
+  remainingChangesBeforeApproval: number;
+  remainingChangesAfterApproval: number;
+  accessKey: {
+    id: string;
+    name: string;
+    status: string;
+    telegramId?: string | null;
+    email?: string | null;
+    usedBytes: string;
+    dataLimitBytes?: string | null;
+    expiresAt?: Date | null;
+    publicSlug?: string | null;
+    serverChangeCount: number;
+    serverChangeLimit: number;
+  };
+};
+
 const TELEGRAM_REJECTION_REASON_PRESETS = [
   {
     code: 'proof_unclear',
@@ -1909,6 +1948,15 @@ function TelegramSalesWorkflowCard() {
       placeholderData: keepPreviousData,
     },
   );
+  const serverChangeRequestsQuery = trpc.telegramBot.listServerChangeRequests.useQuery(
+    {
+      limit: 20,
+      statuses: ['PENDING_REVIEW'],
+    },
+    {
+      placeholderData: keepPreviousData,
+    },
+  );
   const templatesById = useMemo(
     () => new Map((templatesQuery.data || []).map((template) => [template.id, template])),
     [templatesQuery.data],
@@ -2064,6 +2112,21 @@ function TelegramSalesWorkflowCard() {
     rejected: isMyanmar ? 'ပယ်ထားပြီး' : 'Rejected',
     cancelled: isMyanmar ? 'ပယ်ဖျက်ပြီး' : 'Cancelled',
     pending: isMyanmar ? 'Pending review' : 'Pending review',
+    serverChangeRequestsTitle: isMyanmar ? 'Server change requests' : 'Server change requests',
+    serverChangeRequestsDesc: isMyanmar
+      ? 'User များက normal key အတွက် server ပြောင်းရန် တောင်းဆိုထားသော request များကို စစ်ဆေးပြီး approve/reject လုပ်ပါ။'
+      : 'Review requests from users who need a normal access key moved to another server.',
+    noServerChangeRequests: isMyanmar
+      ? 'Pending server change request မရှိသေးပါ။'
+      : 'No pending server change requests.',
+    requestedMove: isMyanmar ? 'Requested move' : 'Requested move',
+    remainingAfterApproval: isMyanmar ? 'Approve ပြီးနောက် ကျန်မည့် ပြောင်းခွင့်' : 'Remaining after approval',
+    reviewInKeyPage: isMyanmar ? 'Key page ဖွင့်မည်' : 'Open key page',
+    currentServer: isMyanmar ? 'လက်ရှိ server' : 'Current server',
+    requestedServer: isMyanmar ? 'တောင်းဆိုထားသော server' : 'Requested server',
+    requestSubmittedAt: isMyanmar ? 'Requested' : 'Requested',
+    approveMoveSuccess: isMyanmar ? 'Server change request ကို approve လုပ်ပြီး key ကို ပြောင်းပြီးပါပြီ' : 'Server change request approved and key moved',
+    rejectMoveSuccess: isMyanmar ? 'Server change request ကို reject လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Server change request rejected and user notified',
   };
 
   const renderTemplateSummary = (
@@ -2367,6 +2430,40 @@ function TelegramSalesWorkflowCard() {
         title: 'Rejection failed',
         description: error.message,
         variant: 'destructive',
+      });
+    },
+  });
+  const approveServerChangeRequestMutation = trpc.telegramBot.approveServerChangeRequest.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.listServerChangeRequests.invalidate(),
+        utils.keys.list.invalidate(),
+        utils.keys.getById.invalidate(),
+      ]);
+      toast({
+        title: salesUi.approveMoveSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: salesUi.updateFailed,
+        description: error.message,
+      });
+    },
+  });
+  const rejectServerChangeRequestMutation = trpc.telegramBot.rejectServerChangeRequest.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listServerChangeRequests.invalidate();
+      toast({
+        title: salesUi.rejectMoveSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: salesUi.updateFailed,
+        description: error.message,
       });
     },
   });
@@ -3406,6 +3503,148 @@ function TelegramSalesWorkflowCard() {
                       <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{order.customerMessage}</p>
                     </div>
                   ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border border-border/60 bg-background/80 shadow-[0_22px_50px_-24px_rgba(15,23,42,0.35)] dark:bg-[#050816]/90">
+        <CardHeader>
+          <CardTitle>{salesUi.serverChangeRequestsTitle}</CardTitle>
+          <CardDescription>{salesUi.serverChangeRequestsDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {serverChangeRequestsQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading…
+            </div>
+          ) : !serverChangeRequestsQuery.data || serverChangeRequestsQuery.data.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 p-6 text-sm text-muted-foreground">
+              {salesUi.noServerChangeRequests}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {serverChangeRequestsQuery.data.map((request: TelegramServerChangeRequestRow) => (
+                <div
+                  key={request.id}
+                  className="rounded-2xl border border-border/60 bg-background/45 p-4"
+                >
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{request.requestCode}</p>
+                        <Badge variant="outline">{request.status}</Badge>
+                        <Badge variant="secondary">{request.accessKey.name}</Badge>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.user}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            @{request.telegramUsername || 'unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{request.telegramUserId}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.currentServer}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.currentServerName}
+                            {request.currentServerCountryCode ? ` (${request.currentServerCountryCode})` : ''}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.requestedServer}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.requestedServerName}
+                            {request.requestedServerCountryCode ? ` (${request.requestedServerCountryCode})` : ''}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.remainingAfterApproval}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.remainingChangesAfterApproval}/{request.accessKey.serverChangeLimit}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {salesUi.requestSubmittedAt}: {formatRelativeTime(request.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {salesUi.order}: {request.accessKey.status} • {formatBytes(BigInt(request.accessKey.usedBytes))}
+                        {request.accessKey.dataLimitBytes
+                          ? ` / ${formatBytes(BigInt(request.accessKey.dataLimitBytes))}`
+                          : ` / ${salesUi.unlimited}`}
+                        {request.accessKey.expiresAt ? ` • ${formatDateTime(request.accessKey.expiresAt)}` : ''}
+                      </div>
+                      {request.adminNote ? (
+                        <div className="rounded-xl border border-border/40 bg-background/40 p-3 text-sm text-muted-foreground">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.adminNote}
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap">{request.adminNote}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2 xl:w-[13rem] xl:flex-col">
+                      <Button
+                        type="button"
+                        className="rounded-full"
+                        onClick={() =>
+                          approveServerChangeRequestMutation.mutate({
+                            requestId: request.id,
+                          })
+                        }
+                        disabled={
+                          approveServerChangeRequestMutation.isPending ||
+                          rejectServerChangeRequestMutation.isPending
+                        }
+                      >
+                        {approveServerChangeRequestMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                        )}
+                        {salesUi.approve}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() =>
+                          rejectServerChangeRequestMutation.mutate({
+                            requestId: request.id,
+                          })
+                        }
+                        disabled={
+                          approveServerChangeRequestMutation.isPending ||
+                          rejectServerChangeRequestMutation.isPending
+                        }
+                      >
+                        {rejectServerChangeRequestMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                        )}
+                        {salesUi.reject}
+                      </Button>
+                      <Button asChild type="button" variant="ghost" className="rounded-full">
+                        <Link href={withBasePath(`/dashboard/keys/${request.accessKey.id}`)}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          {salesUi.reviewInKeyPage}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
