@@ -1273,6 +1273,10 @@ function getTelegramUi(locale: SupportedLocale) {
     orderStatusRejected: isMyanmar ? 'ပယ်ထားသည်' : 'Rejected',
     orderStatusCancelled: isMyanmar ? 'ပယ်ဖျက်ထားသည်' : 'Cancelled',
     paymentProofLabel: isMyanmar ? 'Proof' : 'Proof',
+    duplicateProofWarning: (orderCode: string) =>
+      isMyanmar
+        ? `⚠️ ဤ screenshot သည် ယခင် order <b>${orderCode}</b> တွင် အသုံးပြုထားသည့်ပုံစံနှင့် ကိုက်ညီနေပါသည်။`
+        : `⚠️ This screenshot matches payment proof previously used on order <b>${orderCode}</b>.`,
     requestedNameLabel: isMyanmar ? 'တောင်းဆိုထားသော အမည်' : 'Requested name',
     renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
     accountNameLabel: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
@@ -3470,6 +3474,9 @@ async function sendTelegramOrderReviewAlert(
     `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
     `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
     `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.duplicateProofOrderCode
+      ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
+      : '',
     order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
     order.planName ? `${ui.planLabel}: <b>${escapeHtml(order.planName)}</b>` : '',
     order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
@@ -3879,10 +3886,33 @@ async function handleTelegramOrderProofMessage(input: {
     input.photo?.[input.photo.length - 1]?.file_id ||
     input.document?.file_id ||
     null;
+  const proofUniqueId =
+    input.photo?.[input.photo.length - 1]?.file_unique_id ||
+    input.document?.file_unique_id ||
+    null;
 
   if (!proofFileId) {
     return null;
   }
+
+  const duplicateProofSource = proofUniqueId
+    ? await db.telegramOrder.findFirst({
+        where: {
+          id: {
+            not: activeOrder.id,
+          },
+          paymentProofUniqueId: proofUniqueId,
+        },
+        orderBy: [
+          { paymentSubmittedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          orderCode: true,
+        },
+      })
+    : null;
 
   const next = await db.telegramOrder.update({
     where: { id: activeOrder.id },
@@ -3896,10 +3926,14 @@ async function handleTelegramOrderProofMessage(input: {
         retryReminderSentAt: activeOrder.retryReminderSentAt,
       }),
       paymentProofFileId: proofFileId,
+      paymentProofUniqueId: proofUniqueId,
       paymentProofType: input.document ? 'document' : 'photo',
       paymentProofRevision: {
         increment: 1,
       },
+      duplicateProofOrderId: duplicateProofSource?.id || null,
+      duplicateProofOrderCode: duplicateProofSource?.orderCode || null,
+      duplicateProofDetectedAt: duplicateProofSource ? new Date() : null,
       paymentMessageId: input.messageId,
       paymentCaption: input.caption || null,
       reviewReminderSentAt: null,
@@ -3908,6 +3942,21 @@ async function handleTelegramOrderProofMessage(input: {
       rejectionReasonCode: null,
     },
   });
+
+  if (duplicateProofSource) {
+    await writeAuditLog({
+      action: 'TELEGRAM_ORDER_DUPLICATE_PROOF_DETECTED',
+      entity: 'TELEGRAM_ORDER',
+      entityId: next.id,
+      details: {
+        orderCode: next.orderCode,
+        duplicateProofOrderId: duplicateProofSource.id,
+        duplicateProofOrderCode: duplicateProofSource.orderCode,
+        telegramUserId: next.telegramUserId,
+        paymentProofUniqueId: proofUniqueId,
+      },
+    });
+  }
 
   await sendTelegramOrderReviewAlert(next.id, activeOrder.status === 'PENDING_REVIEW' ? 'updated' : 'initial');
 

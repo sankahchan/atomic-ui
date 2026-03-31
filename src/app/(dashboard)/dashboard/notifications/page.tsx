@@ -297,7 +297,11 @@ type TelegramOrderRow = {
   approvedDynamicKeyId?: string | null;
   approvedDynamicKeyName?: string | null;
   paymentProofType?: string | null;
+  paymentProofUniqueId?: string | null;
   paymentProofRevision?: number | null;
+  duplicateProofOrderId?: string | null;
+  duplicateProofOrderCode?: string | null;
+  duplicateProofDetectedAt?: Date | null;
   paymentSubmittedAt?: Date | null;
   paymentCaption?: string | null;
   adminNote?: string | null;
@@ -2357,6 +2361,12 @@ function TelegramSalesWorkflowCard() {
     rejectPresets: isMyanmar ? 'Reject reason presets' : 'Reject reason presets',
     rejectPresetCustom: isMyanmar ? 'Custom message' : 'Custom message',
     proofRevision: isMyanmar ? 'Proof revisions' : 'Proof revisions',
+    duplicateProofFlag: isMyanmar ? 'Duplicate proof detected' : 'Duplicate proof detected',
+    duplicateProofHint: isMyanmar
+      ? 'ဤ payment screenshot သည် ယခင် order တစ်ခုတွင် အသုံးပြုထားသော proof နှင့် ကိုက်ညီနေပါသည်။'
+      : 'This payment screenshot matches proof already used on another order.',
+    duplicateProofOrderLabel: isMyanmar ? 'Matched order' : 'Matched order',
+    duplicateProofDetectedAt: isMyanmar ? 'Detected at' : 'Detected at',
     proofPreview: isMyanmar ? 'Proof preview' : 'Proof preview',
     zoomProof: isMyanmar ? 'Proof ကို ချဲ့ကြည့်မည်' : 'Zoom proof',
     openProof: isMyanmar ? 'Proof ဖွင့်မည်' : 'Open proof',
@@ -3113,7 +3123,9 @@ function TelegramSalesWorkflowCard() {
       return;
     }
 
-    setReviewReasonCode(selectedOrderRejectionReasonCode || 'custom');
+    setReviewReasonCode(
+      selectedOrderRejectionReasonCode || (selectedOrder?.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
+    );
     setReviewPlanCode(selectedOrderPlanCode || '');
     setReviewDurationMonths(selectedOrderDurationMonths ? String(selectedOrderDurationMonths) : '');
     setReviewSelectedServerId(selectedOrderSelectedServerId || 'auto');
@@ -3123,6 +3135,7 @@ function TelegramSalesWorkflowCard() {
     selectedOrderPlanCode,
     selectedOrderDurationMonths,
     selectedOrderSelectedServerId,
+    selectedOrder?.duplicateProofOrderCode,
     reviewTarget?.mode,
   ]);
 
@@ -3804,7 +3817,9 @@ function TelegramSalesWorkflowCard() {
                             setReviewTarget({ orderId: order.id, mode: 'approve' });
                             setReviewNote(order.adminNote || '');
                             setReviewCustomerMessage(order.customerMessage || '');
-                            setReviewReasonCode(order.rejectionReasonCode || 'custom');
+                            setReviewReasonCode(
+                              order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
+                            );
                           }}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -3817,7 +3832,9 @@ function TelegramSalesWorkflowCard() {
                             setReviewTarget({ orderId: order.id, mode: 'reject' });
                             setReviewNote(order.adminNote || '');
                             setReviewCustomerMessage(order.customerMessage || '');
-                            setReviewReasonCode(order.rejectionReasonCode || 'custom');
+                            setReviewReasonCode(
+                              order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
+                            );
                           }}
                         >
                           <AlertTriangle className="mr-2 h-4 w-4" />
@@ -3826,6 +3843,21 @@ function TelegramSalesWorkflowCard() {
                       </div>
                     ) : null}
                   </div>
+
+                  {order.duplicateProofOrderCode ? (
+                    <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">{salesUi.duplicateProofFlag}</p>
+                          <p className="text-xs text-muted-foreground">{salesUi.duplicateProofHint}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {salesUi.duplicateProofOrderLabel}: <span className="font-medium text-foreground">{order.duplicateProofOrderCode}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <div className="rounded-xl border border-border/50 p-3">
@@ -4549,6 +4581,25 @@ function TelegramSalesWorkflowCard() {
                     <p className="text-xs text-muted-foreground">
                       {salesUi.accountNumber}: {selectedOrder.paymentMethodAccountNumber}
                     </p>
+                  ) : null}
+                  {selectedOrder.duplicateProofOrderCode ? (
+                    <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">{salesUi.duplicateProofFlag}</p>
+                          <p className="text-xs text-muted-foreground">{salesUi.duplicateProofHint}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {salesUi.duplicateProofOrderLabel}: <span className="font-medium text-foreground">{selectedOrder.duplicateProofOrderCode}</span>
+                          </p>
+                          {selectedOrder.duplicateProofDetectedAt ? (
+                            <p className="text-xs text-muted-foreground">
+                              {salesUi.duplicateProofDetectedAt}: {formatDateTime(selectedOrder.duplicateProofDetectedAt)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   ) : null}
                   <p className="text-xs text-muted-foreground">{salesUi.proofForwardedHint}</p>
                   {selectedOrder.paymentProofType ? (

@@ -279,8 +279,12 @@ model TelegramOrder {
   approvedAccessKeyId  String?
   approvedDynamicKeyId String?
   paymentProofFileId   String?
+  paymentProofUniqueId String?
   paymentProofType     String?
   paymentProofRevision Int      @default(0)
+  duplicateProofOrderId String?
+  duplicateProofOrderCode String?
+  duplicateProofDetectedAt DateTime?
   paymentMessageId     Int?
   paymentCaption       String?
   paymentStageEnteredAt DateTime?
@@ -309,6 +313,7 @@ model TelegramOrder {
   @@index([reviewedByUserId, status])
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])
+  @@index([paymentProofUniqueId, createdAt])
 }
 
 model TelegramServerChangeRequest {
