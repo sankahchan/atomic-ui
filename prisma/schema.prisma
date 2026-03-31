@@ -288,6 +288,8 @@ model TelegramOrder {
   reviewReminderSentAt  DateTime?
   paymentSubmittedAt   DateTime?
   expiredAt            DateTime?
+  retryOfOrderId       String?
+  retentionSource      String?
   adminNote            String?
   customerMessage      String?
   rejectionReasonCode  String?
@@ -303,6 +305,8 @@ model TelegramOrder {
   @@index([telegramUserId, status, createdAt])
   @@index([status, createdAt])
   @@index([reviewedByUserId, status])
+  @@index([retryOfOrderId, createdAt])
+  @@index([retentionSource, createdAt])
 }
 
 model TelegramServerChangeRequest {

@@ -1174,6 +1174,87 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal conversion</p>
+                    <h3 className="mt-2 text-lg font-semibold">Renewal retention</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal orders</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.renewalConversion.totalOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Renew requests created from Telegram.</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal rate</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : telegramSalesDashboard?.renewalConversion.conversionRate !== null &&
+                                telegramSalesDashboard?.renewalConversion.conversionRate !== undefined
+                              ? `${Math.round(telegramSalesDashboard.renewalConversion.conversionRate)}%`
+                              : '0%'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.renewalConversion.fulfilledOrders || 0} fulfilled renewals`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery flows</p>
+                    <h3 className="mt-2 text-lg font-semibold">Recovered sales</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Retried orders</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.retriedOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.retention.retriedFulfilled || 0} fulfilled after retry`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial upsells</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.trialUpsellOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.retention.trialUpsellFulfilled || 0} fulfilled from trial-ending prompts`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expired recovery</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.expiredRecoveryOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.retention.expiredRecoveryFulfilled || 0} fulfilled after expiry recovery`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium renewal prompts</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.premiumRenewalOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.retention.premiumRenewalFulfilled || 0} fulfilled from premium renewal prompts`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial conversion</p>
                     <h3 className="mt-2 text-lg font-semibold">Free trial to paid</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -997,6 +997,8 @@ export const analyticsRouter = router({
             selectedServerCountryCode: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
+            retryOfOrderId: true,
+            retentionSource: true,
             paymentReminderSentAt: true,
             reviewReminderSentAt: true,
             paymentSubmittedAt: true,
@@ -1029,6 +1031,8 @@ export const analyticsRouter = router({
             deliveryType: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
+            retryOfOrderId: true,
+            retentionSource: true,
             paymentProofRevision: true,
             rejectionReasonCode: true,
             createdAt: true,
@@ -1094,6 +1098,18 @@ export const analyticsRouter = router({
         pendingReviewReminderSent: 0,
         pendingReviewReminderConverted: 0,
       };
+      const retention = {
+        retriedOrders: 0,
+        retriedFulfilled: 0,
+        trialUpsellOrders: 0,
+        trialUpsellFulfilled: 0,
+        expiredRecoveryOrders: 0,
+        expiredRecoveryFulfilled: 0,
+        renewalReminderOrders: 0,
+        renewalReminderFulfilled: 0,
+        premiumRenewalOrders: 0,
+        premiumRenewalFulfilled: 0,
+      };
       const rejectionReasons = new Map<string, number>();
 
       const revenueByCurrency = new Map<string, number>();
@@ -1116,6 +1132,7 @@ export const analyticsRouter = router({
       let reviewMinutesTotal = 0;
       let fulfillmentCount = 0;
       let fulfillmentMinutesTotal = 0;
+      let fulfilledRenewalOrders = 0;
       let trialFulfilledInRange = 0;
       let trialConvertedPaidOrders = 0;
       const trialConvertedUsers = new Set<string>();
@@ -1148,6 +1165,49 @@ export const analyticsRouter = router({
           summary.newOrders += 1;
         } else if (order.kind === 'RENEW') {
           summary.renewalOrders += 1;
+          if (order.status === 'FULFILLED') {
+            fulfilledRenewalOrders += 1;
+          }
+        }
+
+        if (order.retryOfOrderId) {
+          retention.retriedOrders += 1;
+          if (order.status === 'FULFILLED') {
+            retention.retriedFulfilled += 1;
+          }
+        }
+
+        switch (order.retentionSource) {
+          case 'trial_expiry':
+          case 'trial_expired':
+            retention.trialUpsellOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.trialUpsellFulfilled += 1;
+            }
+            break;
+          case 'expired_recovery':
+            retention.expiredRecoveryOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.expiredRecoveryFulfilled += 1;
+            }
+            break;
+          case 'renewal_7d':
+          case 'renewal_3d':
+          case 'renewal_manual':
+            retention.renewalReminderOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.renewalReminderFulfilled += 1;
+            }
+            break;
+          case 'premium_renewal_7d':
+          case 'premium_renewal_3d':
+            retention.premiumRenewalOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.premiumRenewalFulfilled += 1;
+            }
+            break;
+          default:
+            break;
         }
 
         if (order.planCode === 'trial_1d_3gb' && order.status === 'FULFILLED') {
@@ -1406,6 +1466,15 @@ export const analyticsRouter = router({
           ...order,
           priceCurrency: order.priceCurrency?.trim().toUpperCase() || null,
         })),
+        renewalConversion: {
+          totalOrders: summary.renewalOrders,
+          fulfilledOrders: fulfilledRenewalOrders,
+          conversionRate:
+            summary.renewalOrders > 0
+              ? (fulfilledRenewalOrders / summary.renewalOrders) * 100
+              : null,
+        },
+        retention,
         premium: {
           summary: {
             premiumOrders: orders.filter((order) => order.deliveryType === 'DYNAMIC_KEY').length,
