@@ -854,6 +854,13 @@ function getTelegramUi(locale: SupportedLocale) {
     premiumStatusHint: isMyanmar
       ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new premium support request.',
+    premiumOpenRequestLabel: isMyanmar ? 'Open request' : 'Open request',
+    premiumLatestReplyLabel: isMyanmar ? 'Latest reply' : 'Latest reply',
+    premiumAwaitingAdminReply: isMyanmar ? 'Admin reply စောင့်နေသည်' : 'Waiting for admin reply',
+    premiumAwaitingYourReply: isMyanmar ? 'သင့် follow-up ကို စောင့်နေသည်' : 'Waiting for your follow-up',
+    premiumStatusReplyHint: isMyanmar
+      ? 'လိုအပ်ပါက Reply to request ကိုနှိပ်ပြီး နောက်ဆက်တွဲ message ပို့နိုင်ပါသည်။'
+      : 'Use Reply to request if you want to continue the same support thread.',
     premiumStatusUpdatedLabel: isMyanmar ? 'Updated' : 'Updated',
     premiumResponseTimeLabel: isMyanmar ? 'First response' : 'First response',
     premiumResolutionTimeLabel: isMyanmar ? 'Resolved' : 'Resolved',
@@ -946,6 +953,16 @@ function getTelegramUi(locale: SupportedLocale) {
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
     myKeysEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိပါ။' : '❌ No linked keys found for this Telegram account.',
     myKeysTitle: isMyanmar ? '🗂 <b>သင့်နှင့် ချိတ်ထားသော key များ</b>' : '🗂 <b>Your linked keys</b>',
+    myKeysSectionStandard: isMyanmar ? '🔑 <b>Normal keys</b>' : '🔑 <b>Normal keys</b>',
+    myKeysSectionTrial: isMyanmar ? '🎁 <b>Trial keys</b>' : '🎁 <b>Trial keys</b>',
+    myKeysSectionPremium: isMyanmar ? '💎 <b>Premium dynamic keys</b>' : '💎 <b>Premium dynamic keys</b>',
+    myKeysTypeStandard: isMyanmar ? 'Normal access key' : 'Normal access key',
+    myKeysTypeTrial: isMyanmar ? 'Free trial key' : 'Free trial key',
+    myKeysTypePremium: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
+    myKeysCurrentPoolLabel: isMyanmar ? 'Current pool' : 'Current pool',
+    myKeysServerIssue: isMyanmar ? 'Server issue' : 'Server issue',
+    myKeysPremiumStatus: isMyanmar ? 'Support status' : 'Support status',
+    myKeysOpenSupport: isMyanmar ? 'Support' : 'Support',
     subEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော active key မရှိပါ။' : '❌ No active keys are linked to this Telegram account.',
     subSent: (count: number) => isMyanmar ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။` : `📎 Sent ${count} share page(s) to this chat.`,
     noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ support link မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
@@ -1149,6 +1166,19 @@ function getTelegramUi(locale: SupportedLocale) {
     myKeysRenewHint: isMyanmar
       ? 'အောက်ပါ button များဖြင့် key ကို တိုက်ရိုက် သက်တမ်းတိုးနိုင်ပါသည်။'
       : 'Use the buttons below to renew a specific key directly.',
+    renewShortcutUsed: (keyName: string) =>
+      isMyanmar
+        ? `🔄 <b>${keyName}</b> အတွက် renewal ကို တိုက်ရိုက် စတင်လိုက်ပါပြီ။`
+        : `🔄 Started a direct renewal for <b>${keyName}</b>.`,
+    renewDirectHint: isMyanmar
+      ? 'key တစ်ခုသာ ရှိသောကြောင့် renewal target ကို အလိုအလျောက် ရွေးပြီး plan ရွေးရန် တိုက်ရိုက် ဖွင့်လိုက်ပါသည်။'
+      : 'Only one linked key was found, so the renewal target was preselected automatically.',
+    renewalBenefitsStandard: isMyanmar
+      ? 'Renew လုပ်ပါက လက်ရှိ share page, Telegram linkage နှင့် support history ကို ဆက်ထားနိုင်ပါသည်။'
+      : 'Renew to keep the same share page, Telegram linkage, and support history.',
+    renewalBenefitsPremium: isMyanmar
+      ? 'Renew လုပ်ပါက stable premium link, auto failover နှင့် preferred region support ကို ဆက်အသုံးပြုနိုင်ပါသည်။'
+      : 'Renew to keep your stable premium link, auto failover, and preferred region support.',
     orderReviewAlertTitle: isMyanmar ? '🧾 <b>Telegram order ကို စစ်ဆေးရန် လိုအပ်ပါသည်</b>' : '🧾 <b>Telegram order needs review</b>',
     orderReviewReminderTitle: isMyanmar
       ? '⏰ <b>Telegram order review reminder</b>'
@@ -1172,8 +1202,14 @@ function getTelegramUi(locale: SupportedLocale) {
     orderTypeLabel: isMyanmar ? 'Order အမျိုးအစား' : 'Order type',
     orderStatusTitle: isMyanmar ? '🧾 <b>Order အခြေအနေ</b>' : '🧾 <b>Order status</b>',
     ordersTitle: isMyanmar ? '🧾 <b>သင့် recent orders များ</b>' : '🧾 <b>Your recent orders</b>',
+    ordersAttentionTitle: isMyanmar ? '⚡ <b>Needs your action</b>' : '⚡ <b>Needs your action</b>',
+    ordersReviewTitle: isMyanmar ? '🕐 <b>Being reviewed</b>' : '🕐 <b>Being reviewed</b>',
+    ordersCompletedTitle: isMyanmar ? '✅ <b>Completed</b>' : '✅ <b>Completed</b>',
     ordersEmpty: isMyanmar ? 'ℹ️ ဤ Telegram account အတွက် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။' : 'ℹ️ There are no orders for this Telegram account yet. Start with /buy or /renew.',
     ordersHint: isMyanmar ? 'ပိုအသေးစိတ်ကြည့်ရန် /order <order-code> သို့မဟုတ် /order ကို အသုံးပြုပါ။' : 'Use /order <order-code> or /order to view one order in detail.',
+    ordersLatestActiveHint: isMyanmar
+      ? 'သင်၏ နောက်ဆုံး active order ကို အောက်တွင် အသေးစိတ်ပြထားပါသည်။'
+      : 'Your most recent active order is shown in detail below.',
     orderStatusUsage: isMyanmar ? 'အသုံးပြုပုံ: /order သို့မဟုတ် /order <ORDER-CODE>' : 'Usage: /order or /order <ORDER-CODE>',
     orderStatusNotFound: (code: string) =>
       isMyanmar
@@ -1191,6 +1227,23 @@ function getTelegramUi(locale: SupportedLocale) {
     preferredServerLabel: isMyanmar ? 'ရွေးထားသော server' : 'Preferred server',
     deliveredKeyLabel: isMyanmar ? 'ထုတ်ပေးထားသော key' : 'Delivered key',
     latestOrderHint: isMyanmar ? 'နောက်ဆုံး order ကို ပြထားပါသည်။' : 'Showing the latest order.',
+    orderTimelineTitle: isMyanmar ? 'Timeline' : 'Timeline',
+    orderNextStepLabel: isMyanmar ? 'Next step' : 'Next step',
+    orderTimelineCreated: isMyanmar ? 'Order created' : 'Order created',
+    orderTimelinePaymentStage: isMyanmar ? 'Payment step opened' : 'Payment step opened',
+    orderTimelineProofSubmitted: isMyanmar ? 'Proof submitted' : 'Proof submitted',
+    orderTimelineReviewed: isMyanmar ? 'Admin reviewed' : 'Admin reviewed',
+    orderTimelineFulfilled: isMyanmar ? 'Access delivered' : 'Access delivered',
+    orderTimelineRejected: isMyanmar ? 'Order rejected' : 'Order rejected',
+    orderTimelineCancelled: isMyanmar ? 'Order cancelled' : 'Order cancelled',
+    orderNextChooseKey: isMyanmar ? 'Renew လုပ်မည့် key ကို ရွေးပါ။' : 'Choose which key you want to renew.',
+    orderNextChoosePlan: isMyanmar ? 'Plan ကို ရွေးပါ။' : 'Choose your plan.',
+    orderNextChooseServer: isMyanmar ? 'အသုံးပြုလိုသော server ကို ရွေးပါ။' : 'Choose the server you prefer.',
+    orderNextChoosePaymentMethod: isMyanmar ? 'ငွေပေးချေမည့် method ကို ရွေးပါ။' : 'Choose the payment method you will use.',
+    orderNextUploadProof: isMyanmar ? 'ငွေပေးချေပြီး screenshot ကို ပို့ပါ။' : 'Complete payment and send the screenshot.',
+    orderNextWaitReview: isMyanmar ? 'Admin review စောင့်ပါ။ အတည်ပြုပြီးနောက် access ကို ဤ chat သို့ ပို့မည်။' : 'Wait for admin review. Your access will be delivered here after approval.',
+    orderNextRetry: isMyanmar ? 'အော်ဒါကို retry လုပ်ပါ သို့မဟုတ် /buy /renew ဖြင့် ပြန်စပါ။' : 'Retry this order or start again with /buy or /renew.',
+    orderNextDelivered: isMyanmar ? 'Key ကို ပြန်ဖွင့်ရန် share page သို့မဟုတ် renew button ကို အသုံးပြုနိုင်ပါသည်။' : 'Use the share page or renew button to continue with this key.',
     orderKindNew: isMyanmar ? 'အသစ်' : 'New',
     orderKindRenew: isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal',
     orderStatusAwaitingKeySelection: isMyanmar ? 'Key ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
@@ -1432,6 +1485,29 @@ function formatTelegramOrderKindLabel(kind: string, ui: ReturnType<typeof getTel
   return kind === 'RENEW' ? ui.orderKindRenew : ui.orderKindNew;
 }
 
+function formatTelegramOrderStatusIcon(status: string) {
+  switch (status) {
+    case 'AWAITING_KEY_SELECTION':
+    case 'AWAITING_PLAN':
+    case 'AWAITING_MONTHS':
+    case 'AWAITING_SERVER_SELECTION':
+    case 'AWAITING_PAYMENT_METHOD':
+    case 'AWAITING_PAYMENT_PROOF':
+      return '🟡';
+    case 'PENDING_REVIEW':
+    case 'APPROVED':
+      return '🟣';
+    case 'FULFILLED':
+      return '🟢';
+    case 'REJECTED':
+      return '🔴';
+    case 'CANCELLED':
+      return '⚪';
+    default:
+      return '•';
+  }
+}
+
 function formatTelegramPremiumSupportStatusLabel(
   status: string,
   ui: ReturnType<typeof getTelegramUi>,
@@ -1475,6 +1551,152 @@ function normalizeTelegramPremiumSupportLookupCodes(input: string) {
   }
 
   return trimmed.startsWith('PRM-') ? [trimmed] : [trimmed, `PRM-${trimmed}`];
+}
+
+function getTelegramAccessKeyCategory(tags?: string | null) {
+  return tagMatchesFilter(tags || '', 'trial') ? 'trial' : 'standard';
+}
+
+function formatTelegramQuotaSummary(input: {
+  usedBytes?: bigint | null;
+  dataLimitBytes?: bigint | null;
+  ui: ReturnType<typeof getTelegramUi>;
+}) {
+  if (input.dataLimitBytes) {
+    return `${formatBytes(input.usedBytes || BigInt(0))} / ${formatBytes(input.dataLimitBytes)}`;
+  }
+
+  return input.ui.unlimited;
+}
+
+function formatTelegramPremiumFollowUpState(
+  request: {
+    status: string;
+    followUpPending?: boolean | null;
+    replies?: Array<{
+      senderType: string;
+      createdAt: Date;
+      message: string;
+    }>;
+  },
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  if (request.status === 'DISMISSED') {
+    return ui.premiumStatusDismissed;
+  }
+
+  if (request.followUpPending) {
+    return ui.premiumAwaitingAdminReply;
+  }
+
+  const lastReply = request.replies?.[request.replies.length - 1];
+  if (lastReply?.senderType === 'ADMIN') {
+    return ui.premiumAwaitingYourReply;
+  }
+
+  if (request.status === 'PENDING_REVIEW') {
+    return ui.premiumStatusPendingReview;
+  }
+
+  return formatTelegramPremiumSupportStatusLabel(request.status, ui);
+}
+
+function buildTelegramOrderTimelineLines(input: {
+  order: {
+    status: string;
+    createdAt: Date;
+    paymentStageEnteredAt?: Date | null;
+    paymentSubmittedAt?: Date | null;
+    reviewedAt?: Date | null;
+    fulfilledAt?: Date | null;
+    rejectedAt?: Date | null;
+    expiredAt?: Date | null;
+  };
+  locale: SupportedLocale;
+  ui: ReturnType<typeof getTelegramUi>;
+}) {
+  const { order, locale, ui } = input;
+  const lines = [
+    `${ui.orderTimelineTitle}:`,
+    `• ${ui.orderTimelineCreated} · ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
+  ];
+
+  if (order.paymentStageEnteredAt) {
+    lines.push(
+      `• ${ui.orderTimelinePaymentStage} · ${escapeHtml(
+        formatTelegramDateTime(order.paymentStageEnteredAt, locale),
+      )}`,
+    );
+  }
+
+  if (order.paymentSubmittedAt) {
+    lines.push(
+      `• ${ui.orderTimelineProofSubmitted} · ${escapeHtml(
+        formatTelegramDateTime(order.paymentSubmittedAt, locale),
+      )}`,
+    );
+  }
+
+  if (order.reviewedAt) {
+    lines.push(
+      `• ${ui.orderTimelineReviewed} · ${escapeHtml(
+        formatTelegramDateTime(order.reviewedAt, locale),
+      )}`,
+    );
+  }
+
+  if (order.fulfilledAt) {
+    lines.push(
+      `• ${ui.orderTimelineFulfilled} · ${escapeHtml(
+        formatTelegramDateTime(order.fulfilledAt, locale),
+      )}`,
+    );
+  } else if (order.rejectedAt) {
+    lines.push(
+      `• ${ui.orderTimelineRejected} · ${escapeHtml(
+        formatTelegramDateTime(order.rejectedAt, locale),
+      )}`,
+    );
+  } else if (order.status === 'CANCELLED') {
+    lines.push(
+      `• ${ui.orderTimelineCancelled} · ${escapeHtml(
+        formatTelegramDateTime(order.expiredAt || order.reviewedAt || order.paymentStageEnteredAt || order.createdAt, locale),
+      )}`,
+    );
+  }
+
+  return lines;
+}
+
+function buildTelegramOrderNextStepText(
+  order: {
+    status: string;
+  },
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  switch (order.status) {
+    case 'AWAITING_KEY_SELECTION':
+      return ui.orderNextChooseKey;
+    case 'AWAITING_PLAN':
+    case 'AWAITING_MONTHS':
+      return ui.orderNextChoosePlan;
+    case 'AWAITING_SERVER_SELECTION':
+      return ui.orderNextChooseServer;
+    case 'AWAITING_PAYMENT_METHOD':
+      return ui.orderNextChoosePaymentMethod;
+    case 'AWAITING_PAYMENT_PROOF':
+      return ui.orderNextUploadProof;
+    case 'PENDING_REVIEW':
+    case 'APPROVED':
+      return ui.orderNextWaitReview;
+    case 'REJECTED':
+    case 'CANCELLED':
+      return ui.orderNextRetry;
+    case 'FULFILLED':
+      return ui.orderNextDelivered;
+    default:
+      return null;
+  }
 }
 
 async function listTelegramOrdersForUser(chatId: number, telegramUserId: number, limit = 5) {
@@ -1543,7 +1765,7 @@ async function buildTelegramOrderStatusMessage(input: {
     ui.orderStatusTitle,
     '',
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
-    `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
+    `${ui.statusLineLabel}: <b>${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
     `${ui.orderTypeLabel}: ${escapeHtml(formatTelegramOrderKindLabel(order.kind, ui))}`,
   ];
 
@@ -1625,6 +1847,13 @@ async function buildTelegramOrderStatusMessage(input: {
 
   if (order.customerMessage?.trim()) {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(order.customerMessage.trim()));
+  }
+
+  lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
+
+  const nextStep = buildTelegramOrderNextStepText(order, ui);
+  if (nextStep) {
+    lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
   }
 
   const relatedAccessKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
@@ -1750,30 +1979,61 @@ async function handleOrdersCommand(
     return ui.ordersEmpty;
   }
 
+  const attentionOrders = orders.filter((order) =>
+    [
+      'AWAITING_KEY_SELECTION',
+      'AWAITING_PLAN',
+      'AWAITING_MONTHS',
+      'AWAITING_SERVER_SELECTION',
+      'AWAITING_PAYMENT_METHOD',
+      'AWAITING_PAYMENT_PROOF',
+      'REJECTED',
+      'CANCELLED',
+    ].includes(order.status),
+  );
+  const reviewOrders = orders.filter((order) => ['PENDING_REVIEW', 'APPROVED'].includes(order.status));
+  const completedOrders = orders.filter((order) => order.status === 'FULFILLED');
   const lines = [ui.ordersTitle, ''];
-  for (const order of orders) {
-    lines.push(
-      `• ${escapeHtml(
-        formatTelegramOrderStateLine({
-          orderCode: order.orderCode,
-          planName: order.planName,
-          planCode: order.planCode,
-          durationMonths: order.durationMonths,
-          durationDays: order.durationDays,
-          requestedName: order.requestedName,
-        }),
-      )}`,
-    );
-    lines.push(
-      `  ${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))} • ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
-    );
+  const sections = [
+    [ui.ordersAttentionTitle, attentionOrders],
+    [ui.ordersReviewTitle, reviewOrders],
+    [ui.ordersCompletedTitle, completedOrders],
+  ] as const;
+
+  for (const [title, sectionOrders] of sections) {
+    if (sectionOrders.length === 0) {
+      continue;
+    }
+
+    lines.push(title);
+    for (const order of sectionOrders) {
+      lines.push(
+        `${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(
+          formatTelegramOrderStateLine({
+            orderCode: order.orderCode,
+            planName: order.planName,
+            planCode: order.planCode,
+            durationMonths: order.durationMonths,
+            durationDays: order.durationDays,
+            requestedName: order.requestedName,
+          }),
+        )}`,
+      );
+      lines.push(
+        `  ${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))} • ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
+      );
+    }
+    lines.push('');
   }
 
-  lines.push('', ui.ordersHint);
+  lines.push(ui.ordersHint);
   const summaryMessage = lines.join('\n');
   const sentSummary = await sendTelegramMessage(botToken, chatId, summaryMessage);
 
-  const latestOrder = orders[0];
+  const latestOrder =
+    attentionOrders[0] ||
+    reviewOrders[0] ||
+    orders[0];
   if (latestOrder) {
     await sendTelegramOrderStatusCard({
       botToken,
@@ -1816,11 +2076,12 @@ async function handleOrderStatusCommand(
   }
 
   const text = lookupCode ? message : `${message}\n\n${ui.latestOrderHint}`;
+  const replyMarkup = await buildTelegramOrderStatusReplyMarkup({
+    order,
+    locale,
+  });
   const sent = await sendTelegramMessage(botToken, chatId, text, {
-    replyMarkup: buildTelegramOrderActionKeyboard({
-      order,
-      locale,
-    }),
+    replyMarkup,
   });
 
   return sent ? null : text;
@@ -2701,6 +2962,103 @@ function buildTelegramOrderActionKeyboard(input: {
     : undefined;
 }
 
+async function buildTelegramOrderStatusReplyMarkup(input: {
+  order: Awaited<ReturnType<typeof findTelegramOrderForUser>>;
+  locale: SupportedLocale;
+}) {
+  if (!input.order) {
+    return undefined;
+  }
+
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    ...(
+      buildTelegramOrderActionKeyboard({
+        order: input.order,
+        locale: input.locale,
+      })?.inline_keyboard || []
+    ),
+  ];
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await getTelegramSupportLink();
+
+  if (input.order.status === 'FULFILLED') {
+    const relatedAccessKeyId = input.order.approvedAccessKeyId || input.order.targetAccessKeyId;
+    if (relatedAccessKeyId) {
+      const key = await db.accessKey.findUnique({
+        where: { id: relatedAccessKeyId },
+        select: {
+          id: true,
+          name: true,
+          publicSlug: true,
+          subscriptionToken: true,
+          sharePageEnabled: true,
+        },
+      });
+
+      if (key) {
+        const token = key.subscriptionToken
+          ? key.subscriptionToken
+          : await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+        const sharePageUrl = key.sharePageEnabled
+          ? key.publicSlug
+            ? buildShortShareUrl(key.publicSlug, { source: 'telegram_order_status', lang: input.locale })
+            : buildSharePageUrl(token, { source: 'telegram_order_status', lang: input.locale })
+          : null;
+
+        if (sharePageUrl) {
+          rows.unshift([{ text: ui.openSharePage, url: sharePageUrl }]);
+        }
+
+        rows.unshift([
+          {
+            text: ui.orderActionRenewKey,
+            callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'renewal_manual'),
+          },
+        ]);
+      }
+    }
+
+    const relatedDynamicKeyId = input.order.approvedDynamicKeyId || input.order.targetDynamicKeyId;
+    if (relatedDynamicKeyId) {
+      const key = await db.dynamicAccessKey.findUnique({
+        where: { id: relatedDynamicKeyId },
+        select: {
+          id: true,
+          publicSlug: true,
+          dynamicUrl: true,
+          sharePageEnabled: true,
+        },
+      });
+
+      if (key) {
+        const sharePageUrl = key.sharePageEnabled
+          ? key.publicSlug
+            ? buildDynamicShortShareUrl(key.publicSlug, { source: 'telegram_order_status', lang: input.locale })
+            : key.dynamicUrl
+              ? buildDynamicSharePageUrl(key.dynamicUrl, { source: 'telegram_order_status', lang: input.locale })
+              : null
+          : null;
+        if (sharePageUrl) {
+          rows.unshift([{ text: ui.openSharePage, url: sharePageUrl }]);
+        }
+
+        rows.unshift([
+          {
+            text: ui.premiumRenewNow,
+            callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic_renewal_7d'),
+          },
+        ]);
+      }
+    }
+  }
+
+  if (supportLink && input.order.status !== 'PENDING_REVIEW') {
+    rows.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  return rows.length ? { inline_keyboard: rows } : undefined;
+}
+
 async function listAvailableTelegramPlansForOrder(input: {
   kind: 'NEW' | 'RENEW';
   chatId: number;
@@ -2771,12 +3129,13 @@ async function sendTelegramOrderStatusCard(input: {
   }
 
   const ui = getTelegramUi(input.locale);
-  const text = input.appendLatestHint ? `${message}\n\n${ui.latestOrderHint}` : message;
+  const text = input.appendLatestHint ? `${message}\n\n${ui.ordersLatestActiveHint}` : message;
+  const replyMarkup = await buildTelegramOrderStatusReplyMarkup({
+    order: input.order,
+    locale: input.locale,
+  });
   return sendTelegramMessage(input.botToken, input.chatId, text, {
-    replyMarkup: buildTelegramOrderActionKeyboard({
-      order: input.order,
-      locale: input.locale,
-    }),
+    replyMarkup,
   });
 }
 
@@ -2972,12 +3331,12 @@ async function listTelegramPremiumSupportRequestsForUser(
     },
     include: {
       dynamicAccessKey: {
-        select: {
-          id: true,
-          name: true,
-          publicSlug: true,
-          dynamicUrl: true,
-          status: true,
+        include: {
+          accessKeys: {
+            include: {
+              server: true,
+            },
+          },
         },
       },
       replies: {
@@ -3003,12 +3362,12 @@ async function findTelegramPremiumSupportRequestByIdForUser(input: {
     },
     include: {
       dynamicAccessKey: {
-        select: {
-          id: true,
-          name: true,
-          publicSlug: true,
-          dynamicUrl: true,
-          status: true,
+        include: {
+          accessKeys: {
+            include: {
+              server: true,
+            },
+          },
         },
       },
       replies: {
@@ -3297,6 +3656,9 @@ function buildTelegramPremiumSupportStatusMessage(input: {
 }) {
   const ui = getTelegramUi(input.locale);
   const { request } = input;
+  const poolSummary = formatTelegramDynamicPoolSummary(request.dynamicAccessKey, ui);
+  const latestReply = request.replies?.[request.replies.length - 1] || null;
+  const currentState = formatTelegramPremiumFollowUpState(request, ui);
   const lines = [
     ui.premiumStatusTitle,
     '',
@@ -3308,7 +3670,9 @@ function buildTelegramPremiumSupportStatusMessage(input: {
     `${ui.statusLineLabel}: <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
+    `${ui.premiumOpenRequestLabel}: <b>${escapeHtml(currentState)}</b>`,
     `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
+    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
   ];
 
   if (request.requestedRegionCode) {
@@ -3353,6 +3717,36 @@ function buildTelegramPremiumSupportStatusMessage(input: {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(request.customerMessage.trim()));
   }
 
+  if (latestReply) {
+    const senderLabel =
+      latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
+    lines.push(
+      '',
+      `${ui.premiumLatestReplyLabel}: <b>${escapeHtml(senderLabel)}</b> · ${escapeHtml(
+        formatTelegramDateTime(latestReply.createdAt, input.locale),
+      )}`,
+      escapeHtml(latestReply.message),
+    );
+  }
+
+  lines.push('', `${ui.orderTimelineTitle}:`);
+  lines.push(`• ${ui.premiumHistorySubmitted} · ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`);
+  if (request.reviewedAt) {
+    lines.push(`• ${ui.premiumHistoryReviewed} · ${escapeHtml(formatTelegramDateTime(request.reviewedAt, input.locale))}`);
+  }
+  if (request.status === 'APPROVED' && request.reviewedAt) {
+    lines.push(`• ${ui.premiumHistoryApproved} · ${escapeHtml(formatTelegramDateTime(request.reviewedAt, input.locale))}`);
+  }
+  if (request.handledAt) {
+    lines.push(`• ${ui.premiumHistoryHandled} · ${escapeHtml(formatTelegramDateTime(request.handledAt, input.locale))}`);
+  }
+  if (request.dismissedAt) {
+    lines.push(`• ${ui.premiumHistoryDismissed} · ${escapeHtml(formatTelegramDateTime(request.dismissedAt, input.locale))}`);
+  }
+  if (request.appliedPinServerName) {
+    lines.push(`• ${ui.premiumHistoryPinApplied} · ${escapeHtml(request.appliedPinServerName)}`);
+  }
+
   if (request.replies?.length) {
     lines.push('', `${ui.premiumFollowUpHistoryTitle}:`);
     for (const reply of request.replies.slice(-3)) {
@@ -3367,7 +3761,87 @@ function buildTelegramPremiumSupportStatusMessage(input: {
     }
   }
 
+  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(ui.premiumStatusReplyHint)}`);
+
   return lines.join('\n');
+}
+
+type TelegramRenewableKeyOption = {
+  id: string;
+  name: string;
+  kind: 'access' | 'dynamic';
+  status: string;
+};
+
+function matchTelegramRenewableKeyOption(
+  query: string,
+  options: TelegramRenewableKeyOption[],
+) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return (
+    options.find((key) => key.id === trimmed || key.name.toLowerCase() === trimmed.toLowerCase()) ||
+    options.find((key) => key.name.toLowerCase().includes(trimmed.toLowerCase())) ||
+    null
+  );
+}
+
+async function sendTelegramRenewalPlanSelection(input: {
+  orderId: string;
+  orderCode: string;
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  salesSettings: Awaited<ReturnType<typeof getTelegramSalesSettings>>;
+  targetKey: TelegramRenewableKeyOption;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const enabledPlans = await listAvailableTelegramPlansForOrder({
+    kind: 'RENEW',
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    settings: input.salesSettings,
+    deliveryType: input.targetKey.kind === 'dynamic' ? 'DYNAMIC_KEY' : 'ACCESS_KEY',
+  });
+
+  await db.telegramOrder.update({
+    where: { id: input.orderId },
+    data: {
+      targetAccessKeyId: input.targetKey.kind === 'access' ? input.targetKey.id : null,
+      targetDynamicKeyId: input.targetKey.kind === 'dynamic' ? input.targetKey.id : null,
+      status: 'AWAITING_PLAN',
+    },
+  });
+
+  const lines = [
+    ui.orderPlanPrompt(input.orderCode),
+    `${ui.renewalTargetLabel}: <b>${escapeHtml(input.targetKey.name)}</b>`,
+    '',
+    input.targetKey.kind === 'dynamic' ? ui.renewalBenefitsPremium : ui.renewalBenefitsStandard,
+    '',
+    ...enabledPlans.map((plan, index) => {
+      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+      return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
+    }),
+  ];
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramSalesPlanPromptText(input.locale, lines),
+    {
+      replyMarkup: buildTelegramPlanSelectionKeyboard({
+        orderId: input.orderId,
+        plans: enabledPlans,
+        locale: input.locale,
+      }),
+    },
+  );
 }
 
 async function handleTelegramOrderProofMessage(input: {
@@ -3570,6 +4044,7 @@ async function handleRenewOrderCommand(
   username: string,
   locale: SupportedLocale,
   botToken: string,
+  argsText = '',
 ): Promise<string | null> {
   const ui = getTelegramUi(locale);
   const settings = await getTelegramSalesSettings();
@@ -3606,6 +4081,26 @@ async function handleRenewOrderCommand(
     locale,
     initialStatus: 'AWAITING_KEY_SELECTION',
   });
+
+  const preselectedKey =
+    matchTelegramRenewableKeyOption(argsText, renewableKeys) ||
+    (renewableKeys.length === 1 ? renewableKeys[0] : null);
+
+  if (preselectedKey) {
+    await sendTelegramRenewalPlanSelection({
+      orderId: order.id,
+      orderCode: order.orderCode,
+      chatId,
+      telegramUserId,
+      locale,
+      botToken,
+      salesSettings: settings,
+      targetKey: preselectedKey,
+    });
+
+    const hint = renewableKeys.length === 1 ? `\n\n${ui.renewDirectHint}` : '';
+    return `${ui.renewShortcutUsed(preselectedKey.name)}${hint}`;
+  }
 
   const lines = [
     ui.renewTargetPrompt(order.orderCode),
@@ -3665,45 +4160,21 @@ async function handleTelegramOrderTextMessage(input: {
         return ui.invalidRenewChoice;
       }
 
-      await db.telegramOrder.update({
-        where: { id: activeOrder.id },
-        data: {
-          targetAccessKeyId: matchedKey.kind === 'access' ? matchedKey.id : null,
-          targetDynamicKeyId: matchedKey.kind === 'dynamic' ? matchedKey.id : null,
-          status: 'AWAITING_PLAN',
-        },
-      });
-
-      const enabledPlans = await listAvailableTelegramPlansForOrder({
-        kind: 'RENEW',
+      await sendTelegramRenewalPlanSelection({
+        orderId: activeOrder.id,
+        orderCode: activeOrder.orderCode,
         chatId: input.chatId,
         telegramUserId: input.telegramUserId,
-        settings: salesSettings,
-        deliveryType: matchedKey.kind === 'dynamic' ? 'DYNAMIC_KEY' : 'ACCESS_KEY',
-      });
-      const lines = [
-        ui.orderPlanPrompt(activeOrder.orderCode),
-        `${ui.renewalTargetLabel}: <b>${escapeHtml(matchedKey.name)}</b>`,
-        '',
-        ...enabledPlans.map((plan, index) => {
-          const label = resolveTelegramSalesPlanLabel(plan, locale);
-          const price = resolveTelegramSalesPriceLabel(plan, locale);
-          return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
-        }),
-      ];
-
-      await sendTelegramMessage(
-        input.botToken,
-        input.chatId,
-        buildTelegramSalesPlanPromptText(locale, lines),
-        {
-          replyMarkup: buildTelegramPlanSelectionKeyboard({
-            orderId: activeOrder.id,
-            plans: enabledPlans,
-            locale,
-          }),
+        locale,
+        botToken: input.botToken,
+        salesSettings,
+        targetKey: {
+          id: matchedKey.id,
+          name: matchedKey.name,
+          kind: matchedKey.kind,
+          status: activeOrder.status,
         },
-      );
+      });
       return null;
     }
     case 'AWAITING_PLAN': {
@@ -7651,6 +8122,13 @@ export async function sendAccessKeySharePageToTelegram(input: {
     ]);
   }
 
+  inlineKeyboard.push([
+    {
+      text: ui.myKeysServerIssue,
+      callback_data: buildTelegramServerChangeActionCallbackData('ky', key.id),
+    },
+  ]);
+
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
@@ -7758,6 +8236,22 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       defaults.welcomeMessage ?? undefined,
     );
   const supportLink = await getTelegramSupportLink();
+  const latestRequest = await db.telegramPremiumSupportRequest.findFirst({
+    where: {
+      dynamicAccessKeyId: key.id,
+      OR: [
+        { telegramChatId: destinationChatId },
+        ...(key.telegramId ? [{ telegramUserId: key.telegramId }] : []),
+      ],
+    },
+    include: {
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 4,
+      },
+    },
+    orderBy: [{ updatedAt: 'desc' }],
+  });
   const attachedCount = key.accessKeys.length;
   const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
   const preferredRegions = getDynamicKeyRegionChoices(key);
@@ -7837,6 +8331,19 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
     },
   ]);
+
+  if (latestRequest) {
+    inlineKeyboard.push([
+      {
+        text: ui.myKeysPremiumStatus,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('st', latestRequest.id),
+      },
+      {
+        text: ui.premiumReplyToRequest,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rp', latestRequest.id),
+      },
+    ]);
+  }
 
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
@@ -8137,6 +8644,7 @@ export async function sendAccessKeyRenewalReminder(input: {
           ? `📦 အသုံးပြုမှု: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
           : `📦 အသုံးပြုမှု: ${ui.unlimited}`,
         '',
+        ui.renewalBenefitsStandard,
         'သင့် key ကို ဆက်လက်အသုံးပြုလိုပါက administrator ထံ ဆက်သွယ်ပြီး သက်တမ်းတိုးနိုင်ပါသည်။',
         '',
         `🌐 Share page: ${sharePageUrl}`,
@@ -8152,8 +8660,9 @@ export async function sendAccessKeyRenewalReminder(input: {
           ? `📦 Usage: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
           : `📦 Usage: ${ui.unlimited}`,
         '',
-        'If you want to keep using this key, please contact your administrator to renew it.',
+        ui.renewalBenefitsStandard,
         '',
+        'If you want to keep using this key, please contact your administrator to renew it.',
         `🌐 Share page: ${sharePageUrl}`,
         `🔄 Subscription URL: ${subscriptionUrl}`,
       ];
@@ -9248,9 +9757,11 @@ async function handleMyKeysCommand(
   botToken: string,
 ): Promise<string | null> {
   const ui = getTelegramUi(locale);
-  const [keys, dynamicKeys] = await Promise.all([
+  const supportLink = await getTelegramSupportLink();
+  const [keys, dynamicKeys, premiumRequests] = await Promise.all([
     findLinkedAccessKeys(chatId, telegramUserId, true),
     findLinkedDynamicAccessKeys(chatId, telegramUserId, true),
+    listTelegramPremiumSupportRequestsForUser(chatId, telegramUserId, 8),
   ]);
 
   if (keys.length === 0 && dynamicKeys.length === 0) {
@@ -9259,17 +9770,83 @@ async function handleMyKeysCommand(
 
   const lines = [ui.myKeysTitle, ''];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
+  const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
+  const latestPremiumRequestByKey = new Map<string, (typeof premiumRequests)[number]>();
+  for (const request of premiumRequests) {
+    if (!latestPremiumRequestByKey.has(request.dynamicAccessKeyId)) {
+      latestPremiumRequestByKey.set(request.dynamicAccessKeyId, request);
+    }
+  }
 
-  for (const key of keys) {
+  if (standardKeys.length > 0) {
+    lines.push(ui.myKeysSectionStandard, '');
+  }
+
+  for (const key of standardKeys) {
     const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
     const sharePageUrl = key.publicSlug
       ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: locale })
       : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: locale });
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
-      `  ${ui.idLabel}: <code>${key.id}</code>`,
+      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypeStandard)}`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-      `  ${ui.serverLabel}: ${escapeHtml(key.server.name)}`,
+      `  ${ui.serverLabel}: ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+        usedBytes: key.usedBytes,
+        dataLimitBytes: key.dataLimitBytes,
+        ui,
+      })}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+      `  ${ui.sharePageLabel}: ${sharePageUrl}`,
+      '',
+    );
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.openSharePage}: ${key.name}`, 38),
+        url: sharePageUrl,
+      },
+      {
+        text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
+        callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
+      },
+    ]);
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.myKeysServerIssue}: ${key.name}`, 38),
+        callback_data: buildTelegramServerChangeActionCallbackData('ky', key.id),
+      },
+      ...(supportLink
+        ? [
+            {
+              text: truncateTelegramButtonLabel(ui.myKeysOpenSupport, 24),
+              url: supportLink,
+            },
+          ]
+        : []),
+    ]);
+  }
+
+  if (trialKeys.length > 0) {
+    lines.push(ui.myKeysSectionTrial, '');
+  }
+
+  for (const key of trialKeys) {
+    const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+    const sharePageUrl = key.publicSlug
+      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: locale })
+      : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: locale });
+    lines.push(
+      `• <b>${escapeHtml(key.name)}</b>`,
+      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypeTrial)}`,
+      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+        usedBytes: key.usedBytes,
+        dataLimitBytes: key.dataLimitBytes,
+        ui,
+      })}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
       `  ${ui.sharePageLabel}: ${sharePageUrl}`,
       '',
     );
@@ -9285,16 +9862,35 @@ async function handleMyKeysCommand(
     ]);
   }
 
+  if (dynamicKeys.length > 0) {
+    lines.push(ui.myKeysSectionPremium, '');
+  }
+
   for (const key of dynamicKeys) {
     const { sharePageUrl } = getDynamicKeyMessagingUrls(key, 'telegram_mykeys', locale);
     const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
+    const latestRequest = latestPremiumRequestByKey.get(key.id);
+    const preferredRegions = getDynamicKeyRegionChoices(key);
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
-      `  ${ui.idLabel}: <code>${key.id}</code>`,
-      `  ${ui.planLabel}: ${escapeHtml(ui.premiumLabel)}`,
+      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypePremium)}`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
       `  ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
-      `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
+      `  ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+        usedBytes: key.usedBytes,
+        dataLimitBytes: key.dataLimitBytes,
+        ui,
+      })}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+      preferredRegions.length > 0
+        ? `  ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
+        : '',
+      latestRequest
+        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+            `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
+          )}`
+        : '',
       sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
       '',
     );
@@ -9318,16 +9914,37 @@ async function handleMyKeysCommand(
         callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
       },
       {
-        text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 38),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
+        text: truncateTelegramButtonLabel(
+          `${latestRequest ? ui.premiumReplyToRequest : ui.premiumReportRouteIssue}: ${key.name}`,
+          38,
+        ),
+        callback_data: latestRequest
+          ? buildTelegramDynamicSupportActionCallbackData('rp', latestRequest.id)
+          : buildTelegramDynamicSupportActionCallbackData('is', key.id),
       },
+    ]);
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.myKeysPremiumStatus}: ${key.name}`, 38),
+        callback_data: latestRequest
+          ? buildTelegramDynamicSupportActionCallbackData('st', latestRequest.id)
+          : buildTelegramDynamicSupportActionCallbackData('is', key.id),
+      },
+      ...(supportLink
+        ? [
+            {
+              text: truncateTelegramButtonLabel(ui.myKeysOpenSupport, 24),
+              url: supportLink,
+            },
+          ]
+        : []),
     ]);
   }
 
   lines.push(ui.myKeysRenewHint);
   const message = lines.join('\n');
   const sent = await sendTelegramMessage(botToken, chatId, message, {
-    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard.slice(0, 8) } : undefined,
+    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard.slice(0, 12) } : undefined,
   });
 
   return sent ? null : message;
@@ -9413,10 +10030,16 @@ async function handlePremiumCommand(
   for (const key of dynamicKeys.slice(0, 4)) {
     const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
     const { sharePageUrl } = getDynamicKeyMessagingUrls(key, 'telegram_premium', locale);
+    const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
       `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
+      latestRequest
+        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+            `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
+          )}`
+        : '',
       sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
       '',
     );
@@ -9431,6 +10054,19 @@ async function handlePremiumCommand(
         callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
       },
     ]);
+
+    if (latestRequest) {
+      inlineKeyboard.push([
+        {
+          text: truncateTelegramButtonLabel(`${ui.orderActionCheckStatus}: ${latestRequest.requestCode}`, 36),
+          callback_data: buildTelegramDynamicSupportActionCallbackData('st', latestRequest.id),
+        },
+        {
+          text: truncateTelegramButtonLabel(ui.premiumReplyToRequest, 30),
+          callback_data: buildTelegramDynamicSupportActionCallbackData('rp', latestRequest.id),
+        },
+      ]);
+    }
   }
 
   if (recentRequests.length > 0) {
@@ -9453,6 +10089,10 @@ async function handlePremiumCommand(
       {
         text: ui.orderActionCheckStatus,
         callback_data: buildTelegramDynamicSupportActionCallbackData('st', recentRequests[0].id),
+      },
+      {
+        text: ui.premiumReplyToRequest,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rp', recentRequests[0].id),
       },
     ]);
   }
@@ -9490,12 +10130,12 @@ async function handlePremiumSupportStatusCommand(
           },
           include: {
             dynamicAccessKey: {
-              select: {
-                id: true,
-                name: true,
-                publicSlug: true,
-                dynamicUrl: true,
-                status: true,
+              include: {
+                accessKeys: {
+                  include: {
+                    server: true,
+                  },
+                },
               },
             },
             replies: {
@@ -9544,6 +10184,7 @@ async function handlePremiumSupportStatusCommand(
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   for (const request of requests) {
+    const latestReply = request.replies?.[request.replies.length - 1] || null;
     lines.push(
       `• <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
         formatTelegramPremiumSupportStatusLabel(request.status, ui),
@@ -9551,7 +10192,13 @@ async function handlePremiumSupportStatusCommand(
       `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
         formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
       )}`,
+      `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
       `  ${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, locale))}`,
+      latestReply
+        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(
+            `${latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou} • ${formatTelegramDateTime(latestReply.createdAt, locale)}`,
+          )}`
+        : '',
       '',
     );
     inlineKeyboard.push([
@@ -10789,48 +11436,24 @@ async function handleTelegramCallbackQuery(
               telegramUserId: callbackQuery.from.id,
               telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
               locale,
-              initialStatus: 'AWAITING_PLAN',
-              targetAccessKeyId: isDynamicRenewalActionSecondary(userOrderAction.secondary)
-                ? null
-                : matchedKey.id,
-              targetDynamicKeyId: isDynamicRenewalActionSecondary(userOrderAction.secondary)
-                ? matchedKey.id
-                : null,
+              initialStatus: 'AWAITING_KEY_SELECTION',
               retentionSource,
             });
-
-            const enabledPlans = await listAvailableTelegramPlansForOrder({
-              kind: 'RENEW',
+            await sendTelegramRenewalPlanSelection({
+              orderId: order.id,
+              orderCode: order.orderCode,
               chatId,
               telegramUserId: callbackQuery.from.id,
-              settings,
-              deliveryType: isDynamicRenewalActionSecondary(userOrderAction.secondary)
-                ? 'DYNAMIC_KEY'
-                : 'ACCESS_KEY',
-            });
-            const lines = [
-              ui.orderPlanPrompt(order.orderCode),
-              `${ui.renewalTargetLabel}: <b>${escapeHtml(matchedKey.name)}</b>`,
-              '',
-              ...enabledPlans.map((plan, index) => {
-                const label = resolveTelegramSalesPlanLabel(plan, locale);
-                const price = resolveTelegramSalesPriceLabel(plan, locale);
-                return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
-              }),
-            ];
-
-            await sendTelegramMessage(
-              config.botToken,
-              chatId,
-              buildTelegramSalesPlanPromptText(locale, lines),
-              {
-                replyMarkup: buildTelegramPlanSelectionKeyboard({
-                  orderId: order.id,
-                  plans: enabledPlans,
-                  locale,
-                }),
+              locale,
+              botToken: config.botToken,
+              salesSettings: settings,
+              targetKey: {
+                id: matchedKey.id,
+                name: matchedKey.name,
+                kind: isDynamicRenewalActionSecondary(userOrderAction.secondary) ? 'dynamic' : 'access',
+                status: matchedKey.status,
               },
-            );
+            });
 
             await answerTelegramCallbackQuery(
               config.botToken,
@@ -11784,7 +12407,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         ? handleStatusCommand(locale)
         : handleUserServerCommand(chatId, telegramUserId, locale, config.botToken);
     case 'renew':
-      return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken);
+      return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken, argsText);
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
       if (!currentOrder && pendingPremiumReply) {
