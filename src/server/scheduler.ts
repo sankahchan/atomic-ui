@@ -33,6 +33,7 @@ import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
+import { runServerOutageCycle } from '@/lib/services/server-outage';
 
 let isSchedulerRunning = false;
 
@@ -240,6 +241,20 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Telegram sales order cycle failed', error);
+        }
+    });
+
+    // 15. Delayed server outage user alerts (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runServerOutageCycle();
+            if (result.alerted > 0 || result.resolved > 0) {
+                logger.info(
+                    `Server outage cycle: ${result.alerted} user alert(s), ${result.resolved} resolved, ${result.skipped} skipped`,
+                );
+            }
+        } catch (error) {
+            logger.error('Server outage cycle failed', error);
         }
     });
 

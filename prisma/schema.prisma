@@ -81,6 +81,7 @@ model Server {
   tags         ServerTag[]
   accessKeys   AccessKey[]
   healthCheck  HealthCheck?
+  outageState  ServerOutageState?
   metrics      ServerMetric[]
   keyTemplates KeyTemplate[]
 
@@ -756,6 +757,32 @@ model HealthCheck {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ServerOutageState {
+  id                     String   @id @default(cuid())
+  serverId               String   @unique
+  server                 Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  cause                  String   @default("HEALTH_DOWN") // HEALTH_DOWN, MANUAL_OUTAGE
+  startedAt              DateTime @default(now())
+  lastDetectedAt         DateTime @default(now())
+  recoveredAt            DateTime?
+  gracePeriodHours       Int      @default(3)
+  userAlertScheduledFor  DateTime
+  userAlertSentAt        DateTime?
+  migrationTargetServerId   String?
+  migrationTargetServerName String?
+  migrationTriggeredAt   DateTime?
+  migrationCompletedAt   DateTime?
+  recoveryNotifiedAt     DateTime?
+  affectedAccessKeyIdsJson String @default("[]")
+  affectedTelegramChatIdsJson String @default("[]")
+  lastError              String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([recoveredAt, userAlertScheduledFor])
+  @@index([migrationCompletedAt, recoveryNotifiedAt])
 }
 
 model ServerMetric {

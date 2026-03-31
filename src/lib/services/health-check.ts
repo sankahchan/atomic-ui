@@ -9,6 +9,10 @@ import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { createOutlineClient } from '@/lib/outline-api';
 import { sendAdminAlert } from '@/lib/services/telegram-bot';
+import {
+  markServerOutageDetected,
+  markServerOutageRecovered,
+} from '@/lib/services/server-outage';
 
 export interface HealthCheckResult {
     serverId: string;
@@ -121,6 +125,15 @@ export async function runHealthChecks(): Promise<{
 
                 logger.info(`Server alert state changed: ${server.name} is now ${statusText}`);
                 await sendAdminAlert(statusMsg);
+            }
+
+            if (isNowDown) {
+                await markServerOutageDetected({
+                    serverId: server.id,
+                    cause: 'HEALTH_DOWN',
+                });
+            } else if (wasDown) {
+                await markServerOutageRecovered(server.id);
             }
         }
     }

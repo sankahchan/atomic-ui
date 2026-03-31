@@ -237,11 +237,27 @@ export default function ServerDetailPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [lifecycleMode, setLifecycleMode] = useState('ACTIVE');
   const [lifecycleNote, setLifecycleNote] = useState('');
+  const [outageTargetServerId, setOutageTargetServerId] = useState('none');
+  const [outageGraceHours, setOutageGraceHours] = useState('3');
+  const [outageNotifyUsers, setOutageNotifyUsers] = useState(true);
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
     { id: serverId },
     { enabled: !!serverId }
+  );
+  const { data: allServers } = trpc.servers.list.useQuery(
+    { includeInactive: true },
+    { enabled: !!serverId },
+  );
+  const outagePreviewQuery = trpc.servers.migrationPreview.useQuery(
+    {
+      sourceServerId: serverId,
+      targetServerId: outageTargetServerId,
+    },
+    {
+      enabled: !!serverId && outageTargetServerId !== 'none',
+    },
   );
 
   // Sync mutation
@@ -295,6 +311,25 @@ export default function ServerDetailPage() {
       });
     },
   });
+  const outageReplaceMutation = trpc.servers.outageReplace.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Outage replacement completed',
+        description:
+          result.failed > 0
+            ? `${result.migrated} keys moved, ${result.failed} still need attention.`
+            : `${result.migrated} keys moved to ${result.targetServer.name}.`,
+      });
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Outage replacement failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   useEffect(() => {
     if (!server) {
@@ -304,6 +339,13 @@ export default function ServerDetailPage() {
     setLifecycleMode(server.lifecycleMode || 'ACTIVE');
     setLifecycleNote(server.lifecycleNote || '');
   }, [server]);
+
+  const availableOutageTargets = (allServers || []).filter(
+    (candidate) =>
+      candidate.id !== serverId &&
+      candidate.isActive &&
+      (candidate.lifecycleMode || 'ACTIVE') === 'ACTIVE',
+  );
 
   const handleDelete = () => {
     if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
@@ -773,6 +815,107 @@ export default function ServerDetailPage() {
               <Button onClick={handleSaveLifecycle} disabled={lifecycleMutation.isPending}>
                 {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save Mode
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Outage replacement
+              </CardTitle>
+              <CardDescription>
+                Quarantine this server and move all active or pending keys to a healthy replacement server.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Replacement server</Label>
+                <Select value={outageTargetServerId} onValueChange={setOutageTargetServerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a healthy target server" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select a server</SelectItem>
+                    {availableOutageTargets.map((candidate) => (
+                      <SelectItem key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                        {candidate.location ? ` · ${candidate.location}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>User wait notice</Label>
+                  <Select value={outageGraceHours} onValueChange={setOutageGraceHours}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 hours</SelectItem>
+                      <SelectItem value="3">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                  <p className="font-medium text-foreground">Policy</p>
+                  <p className="mt-1">
+                    Admin outage replacements preserve expiry and usage, and do not consume the user’s 3-change limit.
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-[1rem] border border-border/60 bg-background/35 p-3 text-sm dark:bg-white/[0.03]">
+                <input
+                  type="checkbox"
+                  checked={outageNotifyUsers}
+                  onChange={(event) => setOutageNotifyUsers(event.target.checked)}
+                  className="mt-1 rounded border-gray-300"
+                />
+                <span className="text-muted-foreground">
+                  Send Telegram recovery messages after the migration completes. Delayed outage warnings will still go out if the server stays down during the grace window.
+                </span>
+              </label>
+
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                <p className="font-medium text-foreground">Affected keys</p>
+                <p className="mt-1 text-muted-foreground">
+                  {outageTargetServerId === 'none'
+                    ? 'Choose a target server to preview how many keys will move.'
+                    : outagePreviewQuery.isLoading
+                      ? 'Loading outage preview...'
+                      : outagePreviewQuery.data
+                        ? `${outagePreviewQuery.data.totalKeys} active or pending key(s) will move from ${outagePreviewQuery.data.sourceServer.name} to ${outagePreviewQuery.data.targetServer.name}.`
+                        : 'No preview available yet.'}
+                </p>
+              </div>
+
+              <Button
+                variant="destructive"
+                disabled={
+                  outageTargetServerId === 'none' ||
+                  outageReplaceMutation.isPending ||
+                  outagePreviewQuery.isLoading
+                }
+                onClick={() =>
+                  outageReplaceMutation.mutate({
+                    sourceServerId: serverId,
+                    targetServerId: outageTargetServerId,
+                    gracePeriodHours: Number(outageGraceHours),
+                    notifyUsers: outageNotifyUsers,
+                  })
+                }
+              >
+                {outageReplaceMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                )}
+                Quarantine and replace all affected keys
               </Button>
             </CardContent>
           </Card>

@@ -206,7 +206,7 @@ async function migrateSingleKey(
       data: {
         serverId: targetServerId,
         outlineKeyId: newOutlineKey.id,
-        accessUrl: newOutlineKey.accessUrl,
+        accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
         password: newOutlineKey.password,
         port: newOutlineKey.port,
         method: newOutlineKey.method,

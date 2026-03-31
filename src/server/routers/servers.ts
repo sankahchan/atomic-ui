@@ -185,6 +185,7 @@ export const serversRouter = router({
             },
           },
           healthCheck: true,
+          outageState: true,
           accessKeys: {
             take: 100,
             orderBy: { createdAt: 'desc' },
@@ -458,6 +459,17 @@ export const serversRouter = router({
         },
       });
 
+      if (input.lifecycleMode === 'MAINTENANCE') {
+        const { markServerOutageDetected } = await import('@/lib/services/server-outage');
+        await markServerOutageDetected({
+          serverId: server.id,
+          cause: 'MANUAL_OUTAGE',
+        });
+      } else if ((existing.lifecycleMode as string | null) === 'MAINTENANCE') {
+        const { markServerOutageRecovered } = await import('@/lib/services/server-outage');
+        await markServerOutageRecovered(server.id);
+      }
+
       await writeAuditLog({
         userId: ctx.user.id,
         ip: ctx.clientIp,
@@ -475,6 +487,56 @@ export const serversRouter = router({
       });
 
       return server;
+    }),
+
+  outageReplace: adminProcedure
+    .input(
+      z.object({
+        sourceServerId: z.string(),
+        targetServerId: z.string(),
+        gracePeriodHours: z.number().int().min(2).max(3).default(3),
+        notifyUsers: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceServerId === input.targetServerId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Source and target servers must be different.',
+        });
+      }
+
+      try {
+        const { executeServerOutageReplacement } = await import('@/lib/services/server-outage');
+        const result = await executeServerOutageReplacement(input);
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'SERVER_OUTAGE_REPLACEMENT',
+          entity: 'SERVER',
+          entityId: input.sourceServerId,
+          details: {
+            sourceServerId: result.sourceServer.id,
+            sourceServerName: result.sourceServer.name,
+            targetServerId: result.targetServer.id,
+            targetServerName: result.targetServer.name,
+            migrated: result.migrated,
+            failed: result.failed,
+            total: result.total,
+            gracePeriodHours: input.gracePeriodHours,
+            notifyUsers: input.notifyUsers,
+            recoveryNotifications: result.recoveryNotifications,
+          },
+        });
+
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: (error as Error).message || 'Failed to replace outage keys.',
+        });
+      }
     }),
 
   /**
