@@ -82,6 +82,7 @@ model Server {
   accessKeys   AccessKey[]
   healthCheck  HealthCheck?
   outageState  ServerOutageState?
+  outageIncidents ServerOutageIncident[]
   metrics      ServerMetric[]
   keyTemplates KeyTemplate[]
 
@@ -352,6 +353,10 @@ model TelegramPremiumSupportRequest {
   currentResolvedServerId      String?
   currentResolvedServerName    String?
   currentResolvedServerCountryCode String?
+  linkedOutageIncidentId       String?
+  linkedOutageIncident         ServerOutageIncident? @relation(fields: [linkedOutageIncidentId], references: [id], onDelete: SetNull)
+  linkedOutageServerId         String?
+  linkedOutageServerName       String?
   appliedPinServerId           String?
   appliedPinServerName         String?
   appliedPinExpiresAt          DateTime?
@@ -370,6 +375,7 @@ model TelegramPremiumSupportRequest {
   @@index([telegramUserId, status, createdAt])
   @@index([dynamicAccessKeyId, status, createdAt])
   @@index([status, requestType, createdAt])
+  @@index([linkedOutageIncidentId, status, createdAt])
 }
 
 model TelegramUserProfile {
@@ -763,6 +769,7 @@ model ServerOutageState {
   id                     String   @id @default(cuid())
   serverId               String   @unique
   server                 Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  incidentId             String?
   cause                  String   @default("HEALTH_DOWN") // HEALTH_DOWN, MANUAL_OUTAGE
   startedAt              DateTime @default(now())
   lastDetectedAt         DateTime @default(now())
@@ -783,6 +790,56 @@ model ServerOutageState {
 
   @@index([recoveredAt, userAlertScheduledFor])
   @@index([migrationCompletedAt, recoveryNotifiedAt])
+}
+
+model ServerOutageIncident {
+  id                        String   @id @default(cuid())
+  incidentCode              String   @unique
+  serverId                  String
+  server                    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  status                    String   @default("OPEN") // OPEN, MIGRATING, RESOLVED
+  cause                     String   @default("HEALTH_DOWN")
+  startedAt                 DateTime @default(now())
+  lastDetectedAt            DateTime @default(now())
+  gracePeriodHours          Int      @default(3)
+  userAlertScheduledFor     DateTime?
+  userAlertSentAt           DateTime?
+  migrationTargetServerId   String?
+  migrationTargetServerName String?
+  migrationTriggeredAt      DateTime?
+  migrationCompletedAt      DateTime?
+  recoveryNotifiedAt        DateTime?
+  recoveredAt               DateTime?
+  affectedKeyCount          Int      @default(0)
+  affectedTelegramUsers     Int      @default(0)
+  affectedAccessKeyIdsJson  String   @default("[]")
+  affectedTelegramChatIdsJson String @default("[]")
+  lastError                 String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  updates                ServerOutageIncidentUpdate[]
+  premiumSupportRequests TelegramPremiumSupportRequest[]
+
+  @@index([serverId, startedAt])
+  @@index([status, startedAt])
+}
+
+model ServerOutageIncidentUpdate {
+  id                String   @id @default(cuid())
+  incidentId        String
+  incident          ServerOutageIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  updateType        String
+  title             String
+  message           String?
+  visibleToUsers    Boolean  @default(false)
+  createdByUserId   String?
+  createdByName     String?
+  sentToTelegramUsers Int    @default(0)
+  createdAt         DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+  @@index([updateType, createdAt])
 }
 
 model ServerMetric {

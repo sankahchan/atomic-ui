@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -240,6 +241,9 @@ export default function ServerDetailPage() {
   const [outageTargetServerId, setOutageTargetServerId] = useState('none');
   const [outageGraceHours, setOutageGraceHours] = useState('3');
   const [outageNotifyUsers, setOutageNotifyUsers] = useState(true);
+  const [outageFollowUpMessage, setOutageFollowUpMessage] = useState(
+    'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
+  );
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
@@ -258,6 +262,10 @@ export default function ServerDetailPage() {
     {
       enabled: !!serverId && outageTargetServerId !== 'none',
     },
+  );
+  const outageHistoryQuery = trpc.servers.outageHistory.useQuery(
+    { serverId, limit: 6 },
+    { enabled: !!serverId },
   );
 
   // Sync mutation
@@ -321,10 +329,28 @@ export default function ServerDetailPage() {
             : `${result.migrated} keys moved to ${result.targetServer.name}.`,
       });
       refetch();
+      outageHistoryQuery.refetch();
     },
     onError: (error) => {
       toast({
         title: 'Outage replacement failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const outageFollowUpMutation = trpc.servers.sendOutageFollowUp.useMutation({
+    onSuccess: (result, variables) => {
+      toast({
+        title: variables.markRecovered ? 'Recovery update sent' : 'Outage follow-up sent',
+        description: `Telegram update sent to ${result.sentToTelegramUsers} affected user(s).`,
+      });
+      refetch();
+      outageHistoryQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to send outage update',
         description: error.message,
         variant: 'destructive',
       });
@@ -346,6 +372,10 @@ export default function ServerDetailPage() {
       candidate.isActive &&
       (candidate.lifecycleMode || 'ACTIVE') === 'ACTIVE',
   );
+  const currentOutageState = (server?.outageState as any) || null;
+  const activeOutageIncident = currentOutageState?.incidentId
+    ? outageHistoryQuery.data?.find((incident: any) => incident.id === currentOutageState.incidentId) || null
+    : null;
 
   const handleDelete = () => {
     if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
@@ -892,6 +922,52 @@ export default function ServerDetailPage() {
                         ? `${outagePreviewQuery.data.totalKeys} active or pending key(s) will move from ${outagePreviewQuery.data.sourceServer.name} to ${outagePreviewQuery.data.targetServer.name}.`
                         : 'No preview available yet.'}
                 </p>
+                {outagePreviewQuery.data ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Telegram users
+                      </p>
+                      <p className="mt-1 text-xl font-semibold">{outagePreviewQuery.data.affectedTelegramUsers}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {outagePreviewQuery.data.telegramEligibleKeys} key(s) can receive outage updates.
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Sample keys
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {outagePreviewQuery.data.sampleKeyNames.length > 0
+                          ? outagePreviewQuery.data.sampleKeyNames.join(', ')
+                          : 'No active keys on this server.'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Linked premium requests
+                      </p>
+                      <p className="mt-1 text-xl font-semibold">{outagePreviewQuery.data.linkedPremiumRequestCount}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Premium route issues or region requests tied to this server.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+                {outagePreviewQuery.data?.linkedPremiumRequests?.length ? (
+                  <div className="mt-3 rounded-xl border border-border/40 bg-background/35 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Premium requests that will be linked to this outage
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {outagePreviewQuery.data.linkedPremiumRequests.map((request) => (
+                        <Badge key={request.id} variant="outline">
+                          {request.requestCode} · {request.dynamicAccessKeyName}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <Button
@@ -917,6 +993,222 @@ export default function ServerDetailPage() {
                 )}
                 Quarantine and replace all affected keys
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-cyan-500" />
+                Outage updates
+              </CardTitle>
+              <CardDescription>
+                Send a Telegram follow-up to affected users while the outage is active, or close the outage early if the server recovers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {server.outageState && !server.outageState.recoveredAt ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Started
+                      </p>
+                      <p className="mt-1 text-sm font-medium">
+                        {formatRelativeTime(server.outageState.startedAt)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(server.outageState.startedAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        User alert
+                      </p>
+                      <p className="mt-1 text-sm font-medium">
+                        {server.outageState.userAlertSentAt
+                          ? `Sent ${formatRelativeTime(server.outageState.userAlertSentAt)}`
+                          : `Scheduled ${formatRelativeTime(server.outageState.userAlertScheduledFor)}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Grace window: {server.outageState.gracePeriodHours} hour(s)
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Current incident
+                      </p>
+                      <p className="mt-1 text-sm font-medium">
+                        {activeOutageIncident?.incidentCode || 'Open outage'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activeOutageIncident?.premiumSupportRequests?.length || 0} linked premium request(s)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="outageFollowUpMessage">Telegram follow-up</Label>
+                    <Textarea
+                      id="outageFollowUpMessage"
+                      rows={4}
+                      value={outageFollowUpMessage}
+                      onChange={(event) => setOutageFollowUpMessage(event.target.value)}
+                      placeholder="We are still working on the replacement. Please wait a little longer."
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() =>
+                        setOutageFollowUpMessage(
+                          'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
+                        )
+                      }
+                    >
+                      Still working
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() =>
+                        setOutageFollowUpMessage(
+                          'The server recovered earlier than expected. Please try using your key again now.',
+                        )
+                      }
+                    >
+                      Resolved early
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
+                      onClick={() =>
+                        outageFollowUpMutation.mutate({
+                          serverId,
+                          message: outageFollowUpMessage,
+                          markRecovered: false,
+                        })
+                      }
+                    >
+                      {outageFollowUpMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Send follow-up
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-full"
+                      disabled={outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
+                      onClick={() =>
+                        outageFollowUpMutation.mutate({
+                          serverId,
+                          message: outageFollowUpMessage,
+                          markRecovered: true,
+                        })
+                      }
+                    >
+                      {outageFollowUpMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                      )}
+                      Send resolution update
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                  There is no active outage on this server right now.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle>Outage history</CardTitle>
+              <CardDescription>
+                Review past outages, replacement targets, follow-ups, and linked premium support requests for this server.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {outageHistoryQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading outage history…
+                </div>
+              ) : !outageHistoryQuery.data || outageHistoryQuery.data.length === 0 ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                  No outage history for this server yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {outageHistoryQuery.data.map((incident: any) => (
+                    <div key={incident.id} className="rounded-[1.1rem] border border-border/60 bg-background/35 p-4 dark:bg-white/[0.03]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{incident.incidentCode}</p>
+                        <Badge variant="outline">{incident.status}</Badge>
+                        <Badge variant="secondary">{incident.cause === 'MANUAL_OUTAGE' ? 'Manual outage' : 'Health outage'}</Badge>
+                        {incident.migrationTargetServerName ? (
+                          <Badge variant="outline">Target: {incident.migrationTargetServerName}</Badge>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-4">
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Started</p>
+                          <p className="mt-1 text-sm font-medium">{formatRelativeTime(incident.startedAt)}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Affected keys</p>
+                          <p className="mt-1 text-sm font-medium">{incident.affectedKeyCount}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram users</p>
+                          <p className="mt-1 text-sm font-medium">{incident.affectedTelegramUsers}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovered</p>
+                          <p className="mt-1 text-sm font-medium">
+                            {incident.recoveredAt ? formatRelativeTime(incident.recoveredAt) : 'Still open'}
+                          </p>
+                        </div>
+                      </div>
+                      {incident.premiumSupportRequests.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {incident.premiumSupportRequests.slice(0, 5).map((request: any) => (
+                            <Badge key={request.id} variant="outline">
+                              {request.requestCode} · {request.dynamicAccessKey.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                      {incident.updates.length ? (
+                        <div className="mt-3 space-y-2">
+                          {incident.updates.slice(-4).map((update: any) => (
+                            <div key={update.id} className="rounded-xl border border-border/40 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{update.title}</p>
+                                <span className="text-xs text-muted-foreground">{formatRelativeTime(update.createdAt)}</span>
+                              </div>
+                              {update.message ? (
+                                <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{update.message}</p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

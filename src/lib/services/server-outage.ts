@@ -1,16 +1,29 @@
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-bot';
-import { migrateKeys } from '@/lib/services/server-migration';
+import { getMigrationPreview, migrateKeys } from '@/lib/services/server-migration';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
+import { generateRandomString } from '@/lib/utils';
 
 const DEFAULT_OUTAGE_GRACE_HOURS = 3;
+const prisma = db as any;
 
 type AffectedKeySnapshot = {
   id: string;
   name: string;
   telegramChatId: string | null;
   telegramDeliveryEnabled: boolean;
+};
+
+type LinkedPremiumSupportSnapshot = {
+  id: string;
+  requestCode: string;
+  requestType: string;
+  status: string;
+  telegramChatId: string;
+  telegramUsername: string | null;
+  dynamicAccessKeyId: string;
+  dynamicAccessKeyName: string;
 };
 
 function parseJsonArray(value?: string | null): string[] {
@@ -81,13 +94,152 @@ async function getAffectedAccessKeysForServer(serverId: string) {
   });
 
   return keys
-    .filter((key) => key.telegramDeliveryEnabled)
     .map((key) => ({
       id: key.id,
       name: key.name,
       telegramChatId: key.telegramId || key.user?.telegramChatId || null,
       telegramDeliveryEnabled: key.telegramDeliveryEnabled,
     })) satisfies AffectedKeySnapshot[];
+}
+
+async function generateServerOutageIncidentCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = `OUT-${generateRandomString(8).toUpperCase()}`;
+    const existing = await prisma.serverOutageIncident.findUnique({
+      where: { incidentCode: candidate },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `OUT-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function summarizeAffectedTelegramUsers(affectedKeys: AffectedKeySnapshot[]) {
+  return uniqueStrings(
+    affectedKeys
+      .filter((key) => key.telegramDeliveryEnabled)
+      .map((key) => key.telegramChatId),
+  ).length;
+}
+
+async function appendOutageIncidentUpdate(input: {
+  incidentId: string;
+  updateType: string;
+  title: string;
+  message?: string | null;
+  visibleToUsers?: boolean;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  sentToTelegramUsers?: number;
+}) {
+  return prisma.serverOutageIncidentUpdate.create({
+    data: {
+      incidentId: input.incidentId,
+      updateType: input.updateType,
+      title: input.title,
+      message: input.message?.trim() || null,
+      visibleToUsers: input.visibleToUsers ?? false,
+      createdByUserId: input.createdByUserId ?? null,
+      createdByName: input.createdByName ?? null,
+      sentToTelegramUsers: input.sentToTelegramUsers ?? 0,
+    },
+  });
+}
+
+async function getLinkedPremiumSupportRequestsForServer(serverId: string) {
+  return db.telegramPremiumSupportRequest.findMany({
+    where: {
+      status: { in: ['PENDING_REVIEW', 'APPROVED', 'HANDLED'] },
+      OR: [
+        { currentResolvedServerId: serverId },
+        {
+          dynamicAccessKey: {
+            accessKeys: {
+              some: {
+                serverId,
+                status: { in: ['ACTIVE', 'PENDING'] },
+              },
+            },
+          },
+        },
+      ],
+    },
+    include: {
+      dynamicAccessKey: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+  }).then((requests) =>
+    requests.map((request) => ({
+      id: request.id,
+      requestCode: request.requestCode,
+      requestType: request.requestType,
+      status: request.status,
+      telegramChatId: request.telegramChatId,
+      telegramUsername: request.telegramUsername || null,
+      dynamicAccessKeyId: request.dynamicAccessKeyId,
+      dynamicAccessKeyName: request.dynamicAccessKey.name,
+    })) satisfies LinkedPremiumSupportSnapshot[],
+  );
+}
+
+async function linkPremiumSupportRequestsToIncident(input: {
+  incidentId: string;
+  serverId: string;
+  serverName: string;
+}) {
+  const requests = (await getLinkedPremiumSupportRequestsForServer(input.serverId)).filter(
+    (request) => Boolean(request.id),
+  );
+  if (requests.length === 0) {
+    return requests;
+  }
+
+  const requestsToUpdate = await prisma.telegramPremiumSupportRequest.findMany({
+    where: {
+      id: { in: requests.map((request) => request.id) },
+      OR: [
+        { linkedOutageIncidentId: null },
+        { linkedOutageIncidentId: { not: input.incidentId } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (requestsToUpdate.length > 0) {
+    await prisma.telegramPremiumSupportRequest.updateMany({
+      where: {
+        id: { in: requestsToUpdate.map((request: any) => request.id) },
+      },
+      data: {
+        linkedOutageIncidentId: input.incidentId,
+        linkedOutageServerId: input.serverId,
+        linkedOutageServerName: input.serverName,
+      },
+    });
+
+    const updatedRequestIds = new Set(requestsToUpdate.map((request: any) => request.id));
+    await appendOutageIncidentUpdate({
+      incidentId: input.incidentId,
+      updateType: 'LINKED_PREMIUM_REQUESTS',
+      title: `Linked ${updatedRequestIds.size} premium request(s)`,
+      message:
+        requests
+          .filter((request) => updatedRequestIds.has(request.id))
+          .slice(0, 3)
+          .map((request) => `${request.requestCode} · ${request.dynamicAccessKeyName}`)
+          .join('\n') || null,
+    });
+  }
+
+  return requests;
 }
 
 async function upsertOutageState(input: {
@@ -108,14 +260,39 @@ async function upsertOutageState(input: {
     ),
   );
 
-  const existing = await db.serverOutageState.findUnique({
+  const existing = await prisma.serverOutageState.findUnique({
     where: { serverId: input.serverId },
   });
 
   if (!existing || existing.recoveredAt) {
-    return db.serverOutageState.upsert({
+    const incident = await prisma.serverOutageIncident.create({
+      data: {
+        incidentCode: await generateServerOutageIncidentCode(),
+        serverId: input.serverId,
+        status: 'OPEN',
+        cause: input.cause,
+        startedAt: now,
+        lastDetectedAt: now,
+        gracePeriodHours,
+        userAlertScheduledFor: addHours(now, gracePeriodHours),
+        affectedKeyCount: affectedKeys.length,
+        affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        affectedAccessKeyIdsJson,
+        affectedTelegramChatIdsJson,
+      },
+    });
+
+    await appendOutageIncidentUpdate({
+      incidentId: incident.id,
+      updateType: 'DETECTED',
+      title: input.cause === 'MANUAL_OUTAGE' ? 'Manual outage started' : 'Outage detected',
+      message: `${affectedKeys.length} active or pending key(s) are affected.`,
+    });
+
+    const state = await prisma.serverOutageState.upsert({
       where: { serverId: input.serverId },
       update: {
+        incidentId: incident.id,
         cause: input.cause,
         startedAt: now,
         lastDetectedAt: now,
@@ -134,6 +311,7 @@ async function upsertOutageState(input: {
       },
       create: {
         serverId: input.serverId,
+        incidentId: incident.id,
         cause: input.cause,
         startedAt: now,
         lastDetectedAt: now,
@@ -143,11 +321,69 @@ async function upsertOutageState(input: {
         affectedTelegramChatIdsJson,
       },
     });
+
+    const server = await db.server.findUnique({
+      where: { id: input.serverId },
+      select: { id: true, name: true },
+    });
+    if (server) {
+      await linkPremiumSupportRequestsToIncident({
+        incidentId: incident.id,
+        serverId: server.id,
+        serverName: server.name,
+      });
+    }
+
+    return state;
   }
 
-  return db.serverOutageState.update({
+  let incidentId = existing.incidentId;
+  if (!incidentId) {
+    const incident = await prisma.serverOutageIncident.create({
+      data: {
+        incidentCode: await generateServerOutageIncidentCode(),
+        serverId: input.serverId,
+        status: 'OPEN',
+        cause: input.cause,
+        startedAt: existing.startedAt,
+        lastDetectedAt: now,
+        gracePeriodHours,
+        userAlertScheduledFor: existing.userAlertScheduledFor,
+        affectedKeyCount: affectedKeys.length,
+        affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        affectedAccessKeyIdsJson,
+        affectedTelegramChatIdsJson,
+      },
+    });
+    incidentId = incident.id;
+    await appendOutageIncidentUpdate({
+      incidentId,
+      updateType: 'DETECTED',
+      title: input.cause === 'MANUAL_OUTAGE' ? 'Manual outage started' : 'Outage detected',
+      message: `${affectedKeys.length} active or pending key(s) are affected.`,
+    });
+  } else {
+    await prisma.serverOutageIncident.update({
+      where: { id: incidentId },
+      data: {
+        status: 'OPEN',
+        cause: input.cause,
+        lastDetectedAt: now,
+        gracePeriodHours,
+        userAlertScheduledFor: existing.userAlertScheduledFor,
+        affectedKeyCount: affectedKeys.length,
+        affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        affectedAccessKeyIdsJson,
+        affectedTelegramChatIdsJson,
+        lastError: null,
+      },
+    });
+  }
+
+  const state = await prisma.serverOutageState.update({
     where: { serverId: input.serverId },
     data: {
+      incidentId,
       cause: input.cause,
       lastDetectedAt: now,
       gracePeriodHours,
@@ -156,6 +392,20 @@ async function upsertOutageState(input: {
       lastError: null,
     },
   });
+
+  const server = await db.server.findUnique({
+    where: { id: input.serverId },
+    select: { id: true, name: true },
+  });
+  if (server && incidentId) {
+    await linkPremiumSupportRequestsToIncident({
+      incidentId,
+      serverId: server.id,
+      serverName: server.name,
+    });
+  }
+
+  return state;
 }
 
 export async function markServerOutageDetected(input: {
@@ -171,7 +421,7 @@ export async function markServerOutageDetected(input: {
 }
 
 export async function markServerOutageRecovered(serverId: string) {
-  const existing = await db.serverOutageState.findUnique({
+  const existing = await prisma.serverOutageState.findUnique({
     where: { serverId },
   });
 
@@ -179,10 +429,28 @@ export async function markServerOutageRecovered(serverId: string) {
     return existing;
   }
 
-  return db.serverOutageState.update({
+  const recoveredAt = new Date();
+
+  if (existing.incidentId) {
+    await prisma.serverOutageIncident.update({
+      where: { id: existing.incidentId },
+      data: {
+        status: 'RESOLVED',
+        recoveredAt,
+      },
+    });
+    await appendOutageIncidentUpdate({
+      incidentId: existing.incidentId,
+      updateType: 'RECOVERED',
+      title: 'Outage recovered',
+      message: 'The impacted server is reachable again.',
+    });
+  }
+
+  return prisma.serverOutageState.update({
     where: { serverId },
     data: {
-      recoveredAt: new Date(),
+      recoveredAt,
     },
   });
 }
@@ -236,9 +504,37 @@ function buildOutageRecoveryMessage(input: {
   return lines.join('\n');
 }
 
+function buildOutageFollowUpMessage(input: {
+  serverName: string;
+  message: string;
+  supportLink?: string | null;
+  markRecovered?: boolean;
+}) {
+  const lines = input.markRecovered
+    ? [
+        '✅ <b>Server issue resolved</b>',
+        '',
+        `The issue affecting <b>${input.serverName}</b> has been resolved earlier than expected.`,
+        input.message,
+        'You can try using your key again now.',
+      ]
+    : [
+        '🛠️ <b>Maintenance update</b>',
+        '',
+        `We are still working on the issue affecting <b>${input.serverName}</b>.`,
+        input.message,
+      ];
+
+  if (input.supportLink) {
+    lines.push('', `Support: ${input.supportLink}`);
+  }
+
+  return lines.join('\n');
+}
+
 export async function runServerOutageCycle() {
   const now = new Date();
-  const states = await db.serverOutageState.findMany({
+  const states = await prisma.serverOutageState.findMany({
     where: {
       recoveredAt: null,
       migrationCompletedAt: null,
@@ -277,10 +573,25 @@ export async function runServerOutageCycle() {
       state.server.healthCheck?.lastStatus === 'DOWN';
 
     if (!stillImpacted) {
-      await db.serverOutageState.update({
+      await prisma.serverOutageState.update({
         where: { id: state.id },
         data: { recoveredAt: now },
       });
+      if (state.incidentId) {
+        await prisma.serverOutageIncident.update({
+          where: { id: state.incidentId },
+          data: {
+            status: 'RESOLVED',
+            recoveredAt: now,
+          },
+        });
+        await appendOutageIncidentUpdate({
+          incidentId: state.incidentId,
+          updateType: 'RECOVERED',
+          title: 'Recovered before user warning',
+          message: 'The server recovered during the grace period, so no user outage warning was sent.',
+        });
+      }
       resolved += 1;
       continue;
     }
@@ -335,12 +646,28 @@ export async function runServerOutageCycle() {
       );
     }
 
-    await db.serverOutageState.update({
+    await prisma.serverOutageState.update({
       where: { id: state.id },
       data: {
         userAlertSentAt: now,
       },
     });
+    if (state.incidentId) {
+      await prisma.serverOutageIncident.update({
+        where: { id: state.incidentId },
+        data: {
+          userAlertSentAt: now,
+        },
+      });
+      await appendOutageIncidentUpdate({
+        incidentId: state.incidentId,
+        updateType: 'ALERT_SENT',
+        title: 'Delayed outage warning sent',
+        message: `Affected users were told to wait ${state.gracePeriodHours} hour(s) while a replacement is prepared.`,
+        visibleToUsers: true,
+        sentToTelegramUsers: chatMap.size,
+      });
+    }
     alerted += chatMap.size;
   }
 
@@ -401,7 +728,7 @@ export async function executeServerOutageReplacement(input: {
     },
   });
 
-  const outageState = await db.serverOutageState.update({
+  const outageState = await prisma.serverOutageState.update({
     where: { serverId: sourceServer.id },
     data: {
       migrationTargetServerId: targetServer.id,
@@ -410,6 +737,25 @@ export async function executeServerOutageReplacement(input: {
       lastError: null,
     },
   });
+
+  if (outageState.incidentId) {
+    await prisma.serverOutageIncident.update({
+      where: { id: outageState.incidentId },
+      data: {
+        status: 'MIGRATING',
+        migrationTargetServerId: targetServer.id,
+        migrationTargetServerName: targetServer.name,
+        migrationTriggeredAt: new Date(),
+        lastError: null,
+      },
+    });
+    await appendOutageIncidentUpdate({
+      incidentId: outageState.incidentId,
+      updateType: 'MIGRATION_TRIGGERED',
+      title: 'Bulk replacement started',
+      message: `${allEligibleKeyIds.length} affected key(s) will move from ${sourceServer.name} to ${targetServer.name}.`,
+    });
+  }
 
   const result = await migrateKeys(sourceServer.id, targetServer.id, allEligibleKeyIds, true);
   const successfulKeyIds = result.results.filter((item) => item.success).map((item) => item.keyId);
@@ -467,7 +813,7 @@ export async function executeServerOutageReplacement(input: {
     }
   }
 
-  await db.serverOutageState.update({
+  await prisma.serverOutageState.update({
     where: { id: outageState.id },
     data: {
       affectedAccessKeyIdsJson: JSON.stringify(failedKeyIds),
@@ -491,6 +837,53 @@ export async function executeServerOutageReplacement(input: {
     },
   });
 
+  if (outageState.incidentId) {
+    await prisma.serverOutageIncident.update({
+      where: { id: outageState.incidentId },
+      data: {
+        status: failedKeyIds.length === 0 ? 'RESOLVED' : 'MIGRATING',
+        migrationCompletedAt: failedKeyIds.length === 0 ? new Date() : null,
+        recoveryNotifiedAt: recoveryNotifications > 0 ? new Date() : null,
+        recoveredAt: failedKeyIds.length === 0 ? new Date() : null,
+        affectedKeyCount: failedKeyIds.length,
+        affectedTelegramUsers: failedKeyIds.length
+          ? uniqueStrings(
+              affectedKeys
+                .filter((key) => failedKeyIds.includes(key.id) && key.telegramDeliveryEnabled)
+                .map((key) => key.telegramChatId),
+            ).length
+          : 0,
+        affectedAccessKeyIdsJson: JSON.stringify(failedKeyIds),
+        affectedTelegramChatIdsJson:
+          failedKeyIds.length > 0
+            ? JSON.stringify(
+                uniqueStrings(
+                  affectedKeys
+                    .filter((key) => failedKeyIds.includes(key.id) && key.telegramDeliveryEnabled)
+                    .map((key) => key.telegramChatId),
+                ),
+              )
+            : '[]',
+        lastError:
+          failedKeyIds.length > 0
+            ? `Migration incomplete: ${failedKeyIds.length} key(s) still need attention.`
+            : null,
+      },
+    });
+    await appendOutageIncidentUpdate({
+      incidentId: outageState.incidentId,
+      updateType: failedKeyIds.length === 0 ? 'MIGRATION_COMPLETED' : 'MIGRATION_PARTIAL',
+      title:
+        failedKeyIds.length === 0 ? 'Bulk replacement completed' : 'Bulk replacement incomplete',
+      message:
+        failedKeyIds.length === 0
+          ? `${result.migrated} key(s) were moved to ${targetServer.name}.`
+          : `${result.migrated} key(s) moved successfully, ${failedKeyIds.length} still need attention.`,
+      visibleToUsers: recoveryNotifications > 0,
+      sentToTelegramUsers: recoveryNotifications,
+    });
+  }
+
   logger.info(
     `Server outage replacement complete for ${sourceServer.name} -> ${targetServer.name}: ${result.migrated}/${result.total} migrated`,
   );
@@ -506,5 +899,153 @@ export async function executeServerOutageReplacement(input: {
       name: targetServer.name,
     },
     recoveryNotifications,
+  };
+}
+
+export async function getServerOutagePreview(input: {
+  sourceServerId: string;
+  targetServerId: string;
+}) {
+  const [preview, affectedKeys, linkedPremiumRequests] = await Promise.all([
+    getMigrationPreview(input.sourceServerId, input.targetServerId),
+    getAffectedAccessKeysForServer(input.sourceServerId),
+    getLinkedPremiumSupportRequestsForServer(input.sourceServerId),
+  ]);
+
+  const telegramEligibleKeys = affectedKeys.filter((key) => key.telegramDeliveryEnabled);
+  const affectedTelegramUsers = uniqueStrings(
+    telegramEligibleKeys.map((key) => key.telegramChatId),
+  );
+
+  return {
+    ...preview,
+    totalKeys: preview.totalKeys,
+    telegramEligibleKeys: telegramEligibleKeys.length,
+    affectedTelegramUsers: affectedTelegramUsers.length,
+    sampleKeyNames: affectedKeys.slice(0, 6).map((key) => key.name),
+    linkedPremiumRequests: linkedPremiumRequests.slice(0, 5),
+    linkedPremiumRequestCount: linkedPremiumRequests.length,
+  };
+}
+
+export async function listServerOutageHistory(serverId: string, limit = 8) {
+  return prisma.serverOutageIncident.findMany({
+    where: { serverId },
+    orderBy: [{ startedAt: 'desc' }],
+    take: limit,
+    include: {
+      updates: {
+        orderBy: [{ createdAt: 'asc' }],
+      },
+      premiumSupportRequests: {
+        select: {
+          id: true,
+          requestCode: true,
+          requestType: true,
+          status: true,
+          dynamicAccessKey: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function sendServerOutageFollowUp(input: {
+  serverId: string;
+  message: string;
+  markRecovered?: boolean;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+}) {
+  const state = await prisma.serverOutageState.findUnique({
+    where: { serverId: input.serverId },
+    include: {
+      server: true,
+    },
+  });
+
+  if (!state || state.recoveredAt) {
+    throw new Error('There is no active outage for this server.');
+  }
+
+  const config = await getTelegramConfig();
+  if (!config?.botToken) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const keyIds = parseJsonArray(state.affectedAccessKeyIdsJson);
+  const keys = await db.accessKey.findMany({
+    where: {
+      id: { in: keyIds },
+    },
+    select: {
+      telegramDeliveryEnabled: true,
+      telegramId: true,
+      user: {
+        select: {
+          telegramChatId: true,
+        },
+      },
+    },
+  });
+
+  const chatIds = uniqueStrings(
+    keys
+      .filter((key) => key.telegramDeliveryEnabled)
+      .map((key) => key.telegramId || key.user?.telegramChatId || null),
+  );
+  const supportLink = await getSupportLink();
+  const message = buildOutageFollowUpMessage({
+    serverName: state.server.name,
+    message: input.message.trim(),
+    supportLink,
+    markRecovered: input.markRecovered,
+  });
+
+  for (const chatId of chatIds) {
+    await sendTelegramMessage(config.botToken, chatId, message);
+  }
+
+  if (state.incidentId) {
+    await appendOutageIncidentUpdate({
+      incidentId: state.incidentId,
+      updateType: input.markRecovered ? 'MANUAL_RESOLUTION' : 'FOLLOW_UP',
+      title: input.markRecovered ? 'Resolved early message sent' : 'Follow-up update sent',
+      message: input.message.trim(),
+      visibleToUsers: true,
+      createdByUserId: input.createdByUserId ?? null,
+      createdByName: input.createdByName ?? null,
+      sentToTelegramUsers: chatIds.length,
+    });
+    await prisma.serverOutageIncident.update({
+      where: { id: state.incidentId },
+      data: input.markRecovered
+        ? {
+            status: 'RESOLVED',
+            recoveredAt: new Date(),
+            recoveryNotifiedAt: new Date(),
+          }
+        : {},
+    });
+  }
+
+  if (input.markRecovered) {
+    await prisma.serverOutageState.update({
+      where: { id: state.id },
+      data: {
+        recoveredAt: new Date(),
+        recoveryNotifiedAt: new Date(),
+      },
+    });
+  }
+
+  return {
+    sentToTelegramUsers: chatIds.length,
+    message,
   };
 }

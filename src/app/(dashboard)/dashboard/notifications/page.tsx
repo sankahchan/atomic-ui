@@ -416,6 +416,17 @@ type TelegramPremiumSupportRequestRow = {
   dismissedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  linkedOutage?: {
+    id: string;
+    incidentCode: string;
+    status: string;
+    startedAt: Date;
+    userAlertSentAt?: Date | null;
+    migrationTargetServerName?: string | null;
+    recoveredAt?: Date | null;
+    serverId?: string | null;
+    serverName?: string | null;
+  } | null;
   reviewedBy?: {
     id: string;
     email?: string | null;
@@ -592,6 +603,15 @@ function buildPremiumSupportHistory(
       label: salesUi.premiumHistoryDismissed,
       at: request.dismissedAt || request.reviewedAt!,
       detail: request.customerMessage || null,
+    });
+  }
+
+  if (request.linkedOutage) {
+    entries.push({
+      key: 'linked-outage',
+      label: `Linked outage ${request.linkedOutage.incidentCode}`,
+      at: request.linkedOutage.startedAt,
+      detail: request.linkedOutage.serverName || request.linkedOutage.serverId || null,
     });
   }
 
@@ -4155,6 +4175,31 @@ function TelegramSalesWorkflowCard() {
                               : salesUi.premiumNoPinServer}
                           </p>
                         </div>
+                        {request.linkedOutage ? (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-3 md:col-span-2 xl:col-span-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              Linked outage
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">
+                                {request.linkedOutage.incidentCode}
+                              </p>
+                              <Badge variant="outline">{request.linkedOutage.status}</Badge>
+                              {request.linkedOutage.serverName ? (
+                                <Badge variant="secondary">{request.linkedOutage.serverName}</Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Started {formatRelativeTime(request.linkedOutage.startedAt)}
+                              {request.linkedOutage.migrationTargetServerName
+                                ? ` · target ${request.linkedOutage.migrationTargetServerName}`
+                                : ''}
+                              {request.linkedOutage.userAlertSentAt
+                                ? ` · user alert ${formatRelativeTime(request.linkedOutage.userAlertSentAt)}`
+                                : ''}
+                            </p>
+                          </div>
+                        ) : null}
                         <div className="rounded-xl border border-border/40 p-3 md:col-span-2 xl:col-span-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                             {salesUi.premiumLastUpdate}

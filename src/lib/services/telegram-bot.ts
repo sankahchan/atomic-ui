@@ -2556,6 +2556,31 @@ async function createTelegramPremiumSupportRequestRecord(input: {
   const resolvedServer = input.dynamicAccessKey.accessKeys.find(
     (accessKey) => accessKey.server?.id === input.dynamicAccessKey.lastResolvedServerId,
   )?.server;
+  const candidateOutageServerIds = Array.from(
+    new Set(
+      [
+        input.dynamicAccessKey.lastResolvedServerId,
+        ...input.dynamicAccessKey.accessKeys.map((accessKey) => accessKey.server?.id || null),
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const linkedOutage = candidateOutageServerIds.length
+    ? await (db as any).serverOutageState.findFirst({
+        where: {
+          serverId: { in: candidateOutageServerIds },
+          recoveredAt: null,
+        },
+        include: {
+          server: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: [{ startedAt: 'desc' }],
+      })
+    : null;
 
   return db.telegramPremiumSupportRequest.create({
     data: {
@@ -2572,6 +2597,9 @@ async function createTelegramPremiumSupportRequestRecord(input: {
       currentResolvedServerId: resolvedServer?.id || input.dynamicAccessKey.lastResolvedServerId || null,
       currentResolvedServerName: resolvedServer?.name || null,
       currentResolvedServerCountryCode: resolvedServer?.countryCode || null,
+      linkedOutageIncidentId: linkedOutage?.incidentId || null,
+      linkedOutageServerId: linkedOutage?.server?.id || null,
+      linkedOutageServerName: linkedOutage?.server?.name || null,
     },
   });
 }

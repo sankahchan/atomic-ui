@@ -778,7 +778,7 @@ export const telegramBotRouter = router({
         });
       }
 
-      const requests = await db.telegramPremiumSupportRequest.findMany({
+      const requests = await (db as any).telegramPremiumSupportRequest.findMany({
         where: filters.length ? { AND: filters } : undefined,
         orderBy: [{ createdAt: 'desc' }],
         take: limit,
@@ -787,6 +787,17 @@ export const telegramBotRouter = router({
             select: {
               id: true,
               email: true,
+            },
+          },
+          linkedOutageIncident: {
+            select: {
+              id: true,
+              incidentCode: true,
+              status: true,
+              startedAt: true,
+              userAlertSentAt: true,
+              migrationTargetServerName: true,
+              recoveredAt: true,
             },
           },
           dynamicAccessKey: {
@@ -822,7 +833,7 @@ export const telegramBotRouter = router({
         },
       });
 
-      return requests.map((request) => {
+      return requests.map((request: any) => {
         const preferredCountries = parseDynamicRoutingPreferences({
           preferredCountryCodesJson: request.dynamicAccessKey.preferredCountryCodesJson,
           preferredRegionMode: request.dynamicAccessKey.preferredRegionMode,
@@ -830,8 +841,8 @@ export const telegramBotRouter = router({
         const attachedCountries = Array.from(
           new Set(
             request.dynamicAccessKey.accessKeys
-              .map((accessKey) => accessKey.server?.countryCode?.toUpperCase())
-              .filter((value): value is string => Boolean(value)),
+              .map((accessKey: any) => accessKey.server?.countryCode?.toUpperCase())
+              .filter((value: any): value is string => Boolean(value)),
           ),
         );
         const availableRegionCodes = Array.from(
@@ -844,8 +855,8 @@ export const telegramBotRouter = router({
         const availablePinServers = Array.from(
           new Map(
             request.dynamicAccessKey.accessKeys
-              .filter((accessKey) => accessKey.server)
-              .map((accessKey) => [
+              .filter((accessKey: any) => accessKey.server)
+              .map((accessKey: any) => [
                 accessKey.server!.id,
                 {
                   id: accessKey.server!.id,
@@ -858,6 +869,19 @@ export const telegramBotRouter = router({
 
         return {
           ...request,
+          linkedOutage: request.linkedOutageIncident
+            ? {
+                id: request.linkedOutageIncident.id,
+                incidentCode: request.linkedOutageIncident.incidentCode,
+                status: request.linkedOutageIncident.status,
+                startedAt: request.linkedOutageIncident.startedAt,
+                userAlertSentAt: request.linkedOutageIncident.userAlertSentAt,
+                migrationTargetServerName: request.linkedOutageIncident.migrationTargetServerName,
+                recoveredAt: request.linkedOutageIncident.recoveredAt,
+                serverId: request.linkedOutageServerId,
+                serverName: request.linkedOutageServerName,
+              }
+            : null,
           dynamicAccessKey: {
             ...request.dynamicAccessKey,
             availableRegionCodes,

@@ -1542,12 +1542,57 @@ export const serversRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const { getMigrationPreview } = await import('@/lib/services/server-migration');
-      return getMigrationPreview(
-        input.sourceServerId,
-        input.targetServerId,
-        input.keyIds,
-      );
+      const { getServerOutagePreview } = await import('@/lib/services/server-outage');
+      return getServerOutagePreview({
+        sourceServerId: input.sourceServerId,
+        targetServerId: input.targetServerId,
+      });
+    }),
+
+  outageHistory: adminProcedure
+    .input(
+      z.object({
+        serverId: z.string(),
+        limit: z.number().int().min(1).max(20).default(8),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { listServerOutageHistory } = await import('@/lib/services/server-outage');
+      return listServerOutageHistory(input.serverId, input.limit);
+    }),
+
+  sendOutageFollowUp: adminProcedure
+    .input(
+      z.object({
+        serverId: z.string(),
+        message: z.string().trim().min(10).max(1000),
+        markRecovered: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { sendServerOutageFollowUp } = await import('@/lib/services/server-outage');
+      const result = await sendServerOutageFollowUp({
+        serverId: input.serverId,
+        message: input.message,
+        markRecovered: input.markRecovered,
+        createdByUserId: ctx.user.id,
+        createdByName: ctx.user.email || null,
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: input.markRecovered ? 'SERVER_OUTAGE_RECOVERY_UPDATE' : 'SERVER_OUTAGE_FOLLOW_UP',
+        entity: 'SERVER',
+        entityId: input.serverId,
+        details: {
+          message: input.message,
+          markRecovered: input.markRecovered,
+          sentToTelegramUsers: result.sentToTelegramUsers,
+        },
+      });
+
+      return result;
     }),
 
   /**
