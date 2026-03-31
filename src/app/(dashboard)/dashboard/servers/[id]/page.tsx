@@ -14,7 +14,7 @@
  * - Actions: Sync, edit, and danger zone operations
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,8 @@ import {
   BarChart3,
   ExternalLink,
   Copy,
+  Gauge,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 /**
@@ -267,6 +269,13 @@ export default function ServerDetailPage() {
     { serverId, limit: 6 },
     { enabled: !!serverId },
   );
+  const loadStatsQuery = trpc.servers.getLoadStats.useQuery(undefined, {
+    enabled: !!serverId,
+  });
+  const recommendedAssignmentTargetQuery = trpc.servers.recommendAssignmentTarget.useQuery(
+    undefined,
+    { enabled: !!serverId },
+  );
 
   // Sync mutation
   const syncMutation = trpc.servers.sync.useMutation({
@@ -366,16 +375,56 @@ export default function ServerDetailPage() {
     setLifecycleNote(server.lifecycleNote || '');
   }, [server]);
 
-  const availableOutageTargets = (allServers || []).filter(
-    (candidate) =>
-      candidate.id !== serverId &&
-      candidate.isActive &&
-      (candidate.lifecycleMode || 'ACTIVE') === 'ACTIVE',
-  );
+  const loadStatsByServerId = useMemo(() => {
+    return new Map((loadStatsQuery.data || []).map((item) => [item.serverId, item]));
+  }, [loadStatsQuery.data]);
+
+  const availableOutageTargets = useMemo(() => {
+    return (allServers || [])
+      .filter(
+        (candidate) =>
+          candidate.id !== serverId &&
+          candidate.isActive &&
+          (candidate.lifecycleMode || 'ACTIVE') === 'ACTIVE',
+      )
+      .sort((left, right) => {
+        const leftLoad = loadStatsByServerId.get(left.id);
+        const rightLoad = loadStatsByServerId.get(right.id);
+        if ((leftLoad?.isAssignable ?? false) !== (rightLoad?.isAssignable ?? false)) {
+          return leftLoad?.isAssignable ? -1 : 1;
+        }
+        if ((leftLoad?.loadScore ?? Number.MAX_SAFE_INTEGER) !== (rightLoad?.loadScore ?? Number.MAX_SAFE_INTEGER)) {
+          return (leftLoad?.loadScore ?? Number.MAX_SAFE_INTEGER) - (rightLoad?.loadScore ?? Number.MAX_SAFE_INTEGER);
+        }
+        return left.name.localeCompare(right.name);
+      });
+  }, [allServers, loadStatsByServerId, serverId]);
+
+  useEffect(() => {
+    if (outageTargetServerId !== 'none') {
+      return;
+    }
+
+    const recommended = recommendedAssignmentTargetQuery.data;
+    if (!recommended?.serverId) {
+      return;
+    }
+
+    if (availableOutageTargets.some((candidate) => candidate.id === recommended.serverId)) {
+      setOutageTargetServerId(recommended.serverId);
+    }
+  }, [availableOutageTargets, outageTargetServerId, recommendedAssignmentTargetQuery.data]);
+
   const currentOutageState = (server?.outageState as any) || null;
   const activeOutageIncident = currentOutageState?.incidentId
     ? outageHistoryQuery.data?.find((incident: any) => incident.id === currentOutageState.incidentId) || null
     : null;
+  const activeOutageTotal = activeOutageIncident?.initialAffectedKeyCount ?? currentOutageState?.initialAffectedKeyCount ?? 0;
+  const activeOutageMigrated = activeOutageIncident?.migratedKeyCount ?? currentOutageState?.migratedKeyCount ?? 0;
+  const activeOutageFailed = activeOutageIncident?.failedKeyCount ?? currentOutageState?.failedKeyCount ?? 0;
+  const activeOutageProgress = activeOutageTotal > 0 ? Math.round((activeOutageMigrated / activeOutageTotal) * 100) : 0;
+  const currentServerLoad = loadStatsByServerId.get(serverId);
+  const recommendedAssignmentTarget = recommendedAssignmentTargetQuery.data || null;
 
   const handleDelete = () => {
     if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
@@ -836,6 +885,41 @@ export default function ServerDetailPage() {
                 <p>`Maintenance` blocks new assignments while the server is being worked on.</p>
               </div>
 
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[
+                  {
+                    mode: 'ACTIVE',
+                    title: 'Active',
+                    desc: 'Normal placement and migrations allowed.',
+                  },
+                  {
+                    mode: 'DRAINING',
+                    title: 'Drain mode',
+                    desc: 'Stops new assignments but keeps existing users connected.',
+                  },
+                  {
+                    mode: 'MAINTENANCE',
+                    title: 'Maintenance',
+                    desc: 'Stops assignments and enables planned-maintenance outage handling.',
+                  },
+                ].map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    onClick={() => setLifecycleMode(option.mode)}
+                    className={cn(
+                      'rounded-[1rem] border p-3 text-left transition-colors',
+                      lifecycleMode === option.mode
+                        ? 'border-cyan-500/40 bg-cyan-500/10'
+                        : 'border-border/50 bg-background/30 hover:bg-background/45',
+                    )}
+                  >
+                    <p className="text-sm font-medium">{option.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{option.desc}</p>
+                  </button>
+                ))}
+              </div>
+
               {server.lifecycleChangedAt ? (
                 <p className="text-xs text-muted-foreground">
                   Last changed {formatRelativeTime(server.lifecycleChangedAt)}
@@ -846,6 +930,73 @@ export default function ServerDetailPage() {
                 {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save Mode
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-emerald-500" />
+                Capacity-aware routing
+              </CardTitle>
+              <CardDescription>
+                Automatic key placement avoids draining, maintenance, and full servers. This shows the current preferred target.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Current server pressure
+                </p>
+                <p className="mt-1 text-lg font-semibold">
+                  {currentServerLoad?.loadScore ?? '—'}
+                  {typeof currentServerLoad?.loadScore === 'number' ? ' load score' : ''}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {currentServerLoad
+                    ? currentServerLoad.capacityPercent !== null
+                      ? `${currentServerLoad.capacityPercent}% capacity · ${currentServerLoad.activeKeyCount} active keys`
+                      : `${currentServerLoad.activeKeyCount} active keys · no max-key cap`
+                    : 'Load data unavailable'}
+                </p>
+              </div>
+
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Preferred new-key target
+                </p>
+                {recommendedAssignmentTarget ? (
+                  <>
+                    <p className="mt-1 text-lg font-semibold">{recommendedAssignmentTarget.serverName}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge variant="secondary">
+                        load {recommendedAssignmentTarget.loadScore}
+                      </Badge>
+                      {recommendedAssignmentTarget.capacityPercent !== null ? (
+                        <Badge variant="outline">
+                          {recommendedAssignmentTarget.capacityPercent}% capacity
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">No max-key cap</Badge>
+                      )}
+                      {recommendedAssignmentTarget.availableSlots !== null ? (
+                        <Badge variant="outline">
+                          {recommendedAssignmentTarget.availableSlots} slots free
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                      {recommendedAssignmentTarget.reasons.map((reason) => (
+                        <li key={reason}>• {reason}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    No assignable target is currently available.
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -866,16 +1017,33 @@ export default function ServerDetailPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a healthy target server" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Select a server</SelectItem>
-                    {availableOutageTargets.map((candidate) => (
-                      <SelectItem key={candidate.id} value={candidate.id}>
-                        {candidate.name}
-                        {candidate.location ? ` · ${candidate.location}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="none">Select a server</SelectItem>
+                      {availableOutageTargets.map((candidate) => {
+                        const candidateLoad = loadStatsByServerId.get(candidate.id);
+                        return (
+                          <SelectItem key={candidate.id} value={candidate.id}>
+                            {candidate.name}
+                            {candidate.location ? ` · ${candidate.location}` : ''}
+                            {candidateLoad?.capacityPercent != null
+                              ? ` · ${candidateLoad.capacityPercent}%`
+                              : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
                 </Select>
+                {outageTargetServerId !== 'none' && loadStatsByServerId.get(outageTargetServerId) ? (
+                  <p className="text-xs text-muted-foreground">
+                    Target load {loadStatsByServerId.get(outageTargetServerId)?.loadScore}
+                    {loadStatsByServerId.get(outageTargetServerId)?.capacityPercent != null
+                      ? ` · ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}% capacity`
+                      : ' · no max-key cap'}
+                    {loadStatsByServerId.get(outageTargetServerId)?.availableSlots != null
+                      ? ` · ${loadStatsByServerId.get(outageTargetServerId)?.availableSlots} free slots`
+                      : ''}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -993,6 +1161,74 @@ export default function ServerDetailPage() {
                 )}
                 Quarantine and replace all affected keys
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-cyan-500" />
+                Migration progress
+              </CardTitle>
+              <CardDescription>
+                Track how many keys were affected, moved, and still need attention for the current outage.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentOutageState && activeOutageIncident ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Affected</p>
+                      <p className="mt-1 text-xl font-semibold">{activeOutageTotal}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Migrated</p>
+                      <p className="mt-1 text-xl font-semibold">{activeOutageMigrated}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs attention</p>
+                      <p className="mt-1 text-xl font-semibold">{activeOutageFailed}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovery notifications</p>
+                      <p className="mt-1 text-xl font-semibold">
+                        {activeOutageIncident.recoveryNotificationCount ?? currentOutageState.recoveryNotificationCount ?? 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Migration completion</span>
+                      <span>{activeOutageProgress}%</span>
+                    </div>
+                    <Progress value={activeOutageProgress} className="h-2" />
+                  </div>
+                  <div className="rounded-[1.1rem] border border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                    <p>
+                      Target server:{' '}
+                      <span className="font-medium text-foreground">
+                        {activeOutageIncident.migrationTargetServerName || currentOutageState.migrationTargetServerName || 'Not selected yet'}
+                      </span>
+                    </p>
+                    <p className="mt-1">
+                      {currentOutageState.migrationTriggeredAt
+                        ? `Started ${formatRelativeTime(currentOutageState.migrationTriggeredAt)}`
+                        : 'Migration has not started yet.'}
+                      {currentOutageState.migrationCompletedAt
+                        ? ` · completed ${formatRelativeTime(currentOutageState.migrationCompletedAt)}`
+                        : ''}
+                    </p>
+                    {currentOutageState.lastError ? (
+                      <p className="mt-2 text-red-500">{currentOutageState.lastError}</p>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                  No active migration is running for this server right now.
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1168,7 +1404,7 @@ export default function ServerDetailPage() {
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Affected keys</p>
-                          <p className="mt-1 text-sm font-medium">{incident.affectedKeyCount}</p>
+                          <p className="mt-1 text-sm font-medium">{incident.initialAffectedKeyCount || incident.affectedKeyCount}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram users</p>
@@ -1181,6 +1417,34 @@ export default function ServerDetailPage() {
                           </p>
                         </div>
                       </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Migrated</p>
+                          <p className="mt-1 text-sm font-medium">{incident.migratedKeyCount || 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs attention</p>
+                          <p className="mt-1 text-sm font-medium">{incident.failedKeyCount || 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovery notifications</p>
+                          <p className="mt-1 text-sm font-medium">{incident.recoveryNotificationCount || 0}</p>
+                        </div>
+                      </div>
+                      {(incident.initialAffectedKeyCount || incident.affectedKeyCount) > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Migration progress</span>
+                            <span>
+                              {Math.round(((incident.migratedKeyCount || 0) / (incident.initialAffectedKeyCount || incident.affectedKeyCount || 1)) * 100)}%
+                            </span>
+                          </div>
+                          <Progress
+                            value={Math.round(((incident.migratedKeyCount || 0) / (incident.initialAffectedKeyCount || incident.affectedKeyCount || 1)) * 100)}
+                            className="h-2"
+                          />
+                        </div>
+                      ) : null}
                       {incident.premiumSupportRequests.length ? (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {incident.premiumSupportRequests.slice(0, 5).map((request: any) => (

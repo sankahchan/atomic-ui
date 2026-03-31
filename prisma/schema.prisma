@@ -803,6 +803,10 @@ model ServerOutageState {
   gracePeriodHours       Int      @default(3)
   userAlertScheduledFor  DateTime
   userAlertSentAt        DateTime?
+  initialAffectedKeyCount Int     @default(0)
+  migratedKeyCount       Int      @default(0)
+  failedKeyCount         Int      @default(0)
+  recoveryNotificationCount Int   @default(0)
   migrationTargetServerId   String?
   migrationTargetServerName String?
   migrationTriggeredAt   DateTime?
@@ -830,6 +834,10 @@ model ServerOutageIncident {
   gracePeriodHours          Int      @default(3)
   userAlertScheduledFor     DateTime?
   userAlertSentAt           DateTime?
+  initialAffectedKeyCount   Int      @default(0)
+  migratedKeyCount          Int      @default(0)
+  failedKeyCount            Int      @default(0)
+  recoveryNotificationCount Int      @default(0)
   migrationTargetServerId   String?
   migrationTargetServerName String?
   migrationTriggeredAt      DateTime?

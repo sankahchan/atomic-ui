@@ -277,6 +277,10 @@ async function upsertOutageState(input: {
         userAlertScheduledFor: addHours(now, gracePeriodHours),
         affectedKeyCount: affectedKeys.length,
         affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        initialAffectedKeyCount: affectedKeys.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
         affectedAccessKeyIdsJson,
         affectedTelegramChatIdsJson,
       },
@@ -317,6 +321,10 @@ async function upsertOutageState(input: {
         lastDetectedAt: now,
         gracePeriodHours,
         userAlertScheduledFor: addHours(now, gracePeriodHours),
+        initialAffectedKeyCount: affectedKeys.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
         affectedAccessKeyIdsJson,
         affectedTelegramChatIdsJson,
       },
@@ -351,6 +359,10 @@ async function upsertOutageState(input: {
         userAlertScheduledFor: existing.userAlertScheduledFor,
         affectedKeyCount: affectedKeys.length,
         affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        initialAffectedKeyCount: affectedKeys.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
         affectedAccessKeyIdsJson,
         affectedTelegramChatIdsJson,
       },
@@ -373,6 +385,10 @@ async function upsertOutageState(input: {
         userAlertScheduledFor: existing.userAlertScheduledFor,
         affectedKeyCount: affectedKeys.length,
         affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        initialAffectedKeyCount: affectedKeys.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
         affectedAccessKeyIdsJson,
         affectedTelegramChatIdsJson,
         lastError: null,
@@ -456,6 +472,7 @@ export async function markServerOutageRecovered(serverId: string) {
 }
 
 function buildOutageAlertMessage(input: {
+  cause: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
   serverName: string;
   keyNames: string[];
   gracePeriodHours: number;
@@ -463,16 +480,27 @@ function buildOutageAlertMessage(input: {
 }) {
   const listedKeys = input.keyNames.slice(0, 5);
   const moreCount = Math.max(0, input.keyNames.length - listedKeys.length);
-  const lines = [
-    '🚨 <b>Server issue notice</b>',
-    '',
-    `One of the servers currently serving your VPN access is unavailable: <b>${input.serverName}</b>.`,
-    `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a replacement.`,
-    '',
-    `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
-    'You do not need to buy a new key right now.',
-    'We will send you another message once the replacement is ready.',
-  ];
+  const lines = input.cause === 'MANUAL_OUTAGE'
+    ? [
+        '🛠️ <b>Planned maintenance notice</b>',
+        '',
+        `We are performing maintenance for the server currently serving your VPN access: <b>${input.serverName}</b>.`,
+        `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a replacement or complete the maintenance.`,
+        '',
+        `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
+        'You do not need to buy a new key right now.',
+        'We will send you another message once the replacement or recovery is ready.',
+      ]
+    : [
+        '🚨 <b>Server issue notice</b>',
+        '',
+        `One of the servers currently serving your VPN access is unavailable: <b>${input.serverName}</b>.`,
+        `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a replacement.`,
+        '',
+        `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
+        'You do not need to buy a new key right now.',
+        'We will send you another message once the replacement is ready.',
+      ];
 
   if (input.supportLink) {
     lines.push('', `Support: ${input.supportLink}`);
@@ -505,6 +533,7 @@ function buildOutageRecoveryMessage(input: {
 }
 
 function buildOutageFollowUpMessage(input: {
+  cause: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
   serverName: string;
   message: string;
   supportLink?: string | null;
@@ -518,12 +547,19 @@ function buildOutageFollowUpMessage(input: {
         input.message,
         'You can try using your key again now.',
       ]
-    : [
-        '🛠️ <b>Maintenance update</b>',
-        '',
-        `We are still working on the issue affecting <b>${input.serverName}</b>.`,
-        input.message,
-      ];
+    : input.cause === 'MANUAL_OUTAGE'
+      ? [
+          '🛠️ <b>Maintenance update</b>',
+          '',
+          `We are still working on the planned maintenance affecting <b>${input.serverName}</b>.`,
+          input.message,
+        ]
+      : [
+          '🛠️ <b>Maintenance update</b>',
+          '',
+          `We are still working on the issue affecting <b>${input.serverName}</b>.`,
+          input.message,
+        ];
 
   if (input.supportLink) {
     lines.push('', `Support: ${input.supportLink}`);
@@ -638,6 +674,7 @@ export async function runServerOutageCycle() {
         config.botToken,
         chatId,
         buildOutageAlertMessage({
+          cause: state.cause === 'MANUAL_OUTAGE' ? 'MANUAL_OUTAGE' : 'HEALTH_DOWN',
           serverName: state.server.name,
           keyNames,
           gracePeriodHours: state.gracePeriodHours,
@@ -730,12 +767,16 @@ export async function executeServerOutageReplacement(input: {
 
   const outageState = await prisma.serverOutageState.update({
     where: { serverId: sourceServer.id },
-    data: {
-      migrationTargetServerId: targetServer.id,
-      migrationTargetServerName: targetServer.name,
-      migrationTriggeredAt: new Date(),
-      lastError: null,
-    },
+      data: {
+        migrationTargetServerId: targetServer.id,
+        migrationTargetServerName: targetServer.name,
+        migrationTriggeredAt: new Date(),
+        initialAffectedKeyCount: allEligibleKeyIds.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
+        lastError: null,
+      },
   });
 
   if (outageState.incidentId) {
@@ -746,6 +787,10 @@ export async function executeServerOutageReplacement(input: {
         migrationTargetServerId: targetServer.id,
         migrationTargetServerName: targetServer.name,
         migrationTriggeredAt: new Date(),
+        initialAffectedKeyCount: allEligibleKeyIds.length,
+        migratedKeyCount: 0,
+        failedKeyCount: 0,
+        recoveryNotificationCount: 0,
         lastError: null,
       },
     });
@@ -827,6 +872,10 @@ export async function executeServerOutageReplacement(input: {
               ),
             )
           : '[]',
+      initialAffectedKeyCount: allEligibleKeyIds.length,
+      migratedKeyCount: result.migrated,
+      failedKeyCount: failedKeyIds.length,
+      recoveryNotificationCount: recoveryNotifications,
       migrationCompletedAt: failedKeyIds.length === 0 ? new Date() : null,
       recoveryNotifiedAt: recoveryNotifications > 0 ? new Date() : null,
       recoveredAt: failedKeyIds.length === 0 ? new Date() : null,
@@ -845,14 +894,12 @@ export async function executeServerOutageReplacement(input: {
         migrationCompletedAt: failedKeyIds.length === 0 ? new Date() : null,
         recoveryNotifiedAt: recoveryNotifications > 0 ? new Date() : null,
         recoveredAt: failedKeyIds.length === 0 ? new Date() : null,
-        affectedKeyCount: failedKeyIds.length,
-        affectedTelegramUsers: failedKeyIds.length
-          ? uniqueStrings(
-              affectedKeys
-                .filter((key) => failedKeyIds.includes(key.id) && key.telegramDeliveryEnabled)
-                .map((key) => key.telegramChatId),
-            ).length
-          : 0,
+        affectedKeyCount: allEligibleKeyIds.length,
+        affectedTelegramUsers: summarizeAffectedTelegramUsers(affectedKeys),
+        initialAffectedKeyCount: allEligibleKeyIds.length,
+        migratedKeyCount: result.migrated,
+        failedKeyCount: failedKeyIds.length,
+        recoveryNotificationCount: recoveryNotifications,
         affectedAccessKeyIdsJson: JSON.stringify(failedKeyIds),
         affectedTelegramChatIdsJson:
           failedKeyIds.length > 0
@@ -1001,6 +1048,7 @@ export async function sendServerOutageFollowUp(input: {
   );
   const supportLink = await getSupportLink();
   const message = buildOutageFollowUpMessage({
+    cause: state.cause === 'MANUAL_OUTAGE' ? 'MANUAL_OUTAGE' : 'HEALTH_DOWN',
     serverName: state.server.name,
     message: input.message.trim(),
     supportLink,
