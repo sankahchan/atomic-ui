@@ -31,6 +31,7 @@ import {
   handleTelegramPremiumSupportRequest,
   rejectTelegramOrder,
   rejectTelegramServerChangeRequest,
+  replyTelegramPremiumSupportRequest,
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
@@ -780,7 +781,7 @@ export const telegramBotRouter = router({
 
       const requests = await (db as any).telegramPremiumSupportRequest.findMany({
         where: filters.length ? { AND: filters } : undefined,
-        orderBy: [{ createdAt: 'desc' }],
+        orderBy: [{ updatedAt: 'desc' }],
         take: limit,
         include: {
           reviewedBy: {
@@ -829,6 +830,10 @@ export const telegramBotRouter = router({
                 },
               },
             },
+          },
+          replies: {
+            orderBy: [{ createdAt: 'asc' }],
+            take: 12,
           },
         },
       });
@@ -888,6 +893,24 @@ export const telegramBotRouter = router({
             availablePinServers,
           },
         };
+      });
+    }),
+
+  replyPremiumSupportRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().min(1).max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return replyTelegramPremiumSupportRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
       });
     }),
 

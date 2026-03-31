@@ -360,6 +360,9 @@ model TelegramPremiumSupportRequest {
   appliedPinServerId           String?
   appliedPinServerName         String?
   appliedPinExpiresAt          DateTime?
+  followUpPending              Boolean  @default(false)
+  lastFollowUpAt               DateTime?
+  lastAdminReplyAt             DateTime?
   adminNote                    String?
   customerMessage              String?
   reviewedByUserId             String?
@@ -371,11 +374,14 @@ model TelegramPremiumSupportRequest {
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 
+  replies                      TelegramPremiumSupportReply[]
+
   @@index([telegramChatId, status, createdAt])
   @@index([telegramUserId, status, createdAt])
   @@index([dynamicAccessKeyId, status, createdAt])
   @@index([status, requestType, createdAt])
   @@index([linkedOutageIncidentId, status, createdAt])
+  @@index([followUpPending, updatedAt])
 }
 
 model TelegramUserProfile {
@@ -384,10 +390,28 @@ model TelegramUserProfile {
   username       String?
   displayName    String?
   locale         String?
+  pendingPremiumSupportRequestId String?
+  pendingPremiumReplyStartedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([telegramChatId])
+}
+
+model TelegramPremiumSupportReply {
+  id                String   @id @default(cuid())
+  requestId         String
+  request           TelegramPremiumSupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  senderType        String
+  telegramUserId    String?
+  telegramUsername  String?
+  adminUserId       String?
+  senderName        String?
+  message           String
+  createdAt         DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([senderType, createdAt])
 }
 
 model DynamicAccessKey {
@@ -424,6 +448,8 @@ model DynamicAccessKey {
   status        String    @default("ACTIVE") // Same values as AccessKey
   firstUsedAt   DateTime?
   lastTrafficAt DateTime?
+  lastWarningSentAt DateTime?
+  expirationWarningStage String?
 
   // Dynamic URL
   dynamicUrl String? @unique

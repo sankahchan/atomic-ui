@@ -210,7 +210,7 @@ type TelegramOrderReviewAction = 'approve' | 'reject';
 type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca' | 'by';
 type TelegramServerChangeReviewAction = 'approve' | 'reject';
 type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
-type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'ca';
+type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -417,7 +417,7 @@ function parseTelegramDynamicSupportActionCallbackData(data?: string | null) {
   }
 
   const action = parts[1];
-  if (!['rg', 'rv', 'is', 'st', 'ca'].includes(action)) {
+  if (!['rg', 'rv', 'is', 'st', 'rp', 'ca'].includes(action)) {
     return null;
   }
 
@@ -512,6 +512,42 @@ async function upsertTelegramUserProfile(input: {
       ...(input.locale ? { locale: input.locale } : {}),
     },
   });
+}
+
+async function setTelegramPendingPremiumReply(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  requestId?: string | null;
+}) {
+  return db.telegramUserProfile.upsert({
+    where: { telegramUserId: input.telegramUserId },
+    create: {
+      telegramUserId: input.telegramUserId,
+      telegramChatId: input.telegramChatId || null,
+      pendingPremiumSupportRequestId: input.requestId || null,
+      pendingPremiumReplyStartedAt: input.requestId ? new Date() : null,
+    },
+    update: {
+      telegramChatId: input.telegramChatId || null,
+      pendingPremiumSupportRequestId: input.requestId || null,
+      pendingPremiumReplyStartedAt: input.requestId ? new Date() : null,
+    },
+  });
+}
+
+async function getTelegramPendingPremiumReply(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+}) {
+  const profile = await getTelegramUserProfile(input.telegramUserId, input.telegramChatId);
+  if (!profile?.pendingPremiumSupportRequestId) {
+    return null;
+  }
+
+  return {
+    requestId: profile.pendingPremiumSupportRequestId,
+    startedAt: profile.pendingPremiumReplyStartedAt || null,
+  };
 }
 
 async function setTelegramUserLocale(input: {
@@ -658,6 +694,39 @@ function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `ℹ️ Pending premium support request <b>${requestCode}</b> ရှိပြီးသားဖြစ်ပါသည်။ Admin က စစ်ဆေးပြီး ပြန်လည်အကြောင်းကြားပါမည်။`
         : `ℹ️ Premium support request <b>${requestCode}</b> is already pending. The admin will review it and follow up.`,
+    premiumReplyToRequest: isMyanmar ? 'Request ကို ပြန်စာပို့ရန်' : 'Reply to request',
+    premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
+      isMyanmar
+        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် နောက်ဆက်တွဲ message ကို ယခုပို့ပါ။\n\nလိုအပ်ပါက route issue အသေးစိတ်၊ လက်ရှိ region၊ error message စသည်တို့ကို ထည့်ပေးပါ။ မပို့တော့လိုပါက /cancel ကို အသုံးပြုပါ။`
+        : `✍️ Send your follow-up message now for <b>${requestCode}</b> (${keyName}).\n\nInclude any extra route details, current region, or error notes. Use /cancel if you want to stop.`,
+    premiumFollowUpSubmitted: (requestCode: string) =>
+      isMyanmar
+        ? `📨 <b>${requestCode}</b> အတွက် နောက်ဆက်တွဲ message ကို admin ထံ ပို့ပြီးပါပြီ။`
+        : `📨 Your follow-up for <b>${requestCode}</b> has been sent to the admin.`,
+    premiumFollowUpCancelled: isMyanmar
+      ? 'Premium request နောက်ဆက်တွဲ message ကို ပယ်ဖျက်ပြီးပါပြီ။'
+      : 'Cancelled the premium follow-up message.',
+    premiumFollowUpNotAllowed: isMyanmar
+      ? 'ဤ premium request ကို နောက်ဆက်တွဲ reply မပို့နိုင်တော့ပါ။'
+      : 'This premium request is no longer open for follow-up replies.',
+    premiumFollowUpHistoryTitle: isMyanmar ? 'Conversation' : 'Conversation',
+    premiumFollowUpFromYou: isMyanmar ? 'You' : 'You',
+    premiumFollowUpFromAdmin: isMyanmar ? 'Admin' : 'Admin',
+    premiumFollowUpNeedsReview: isMyanmar ? 'Follow-up waiting' : 'Follow-up waiting',
+    premiumRenewalTitle: isMyanmar ? '💎 <b>Premium renewal reminder</b>' : '💎 <b>Premium renewal reminder</b>',
+    premiumRenewalBody: (daysLeft: number) =>
+      isMyanmar
+        ? `သင့် premium dynamic key သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့် ကျန်ပါသည်။`
+        : `Your premium dynamic key has about ${daysLeft} day(s) left before it expires.`,
+    premiumRenewalBenefits: isMyanmar
+      ? 'သက်တမ်းတိုးပါက stable premium link, auto failover နှင့် preferred region support ကို ဆက်လက် အသုံးပြုနိုင်ပါသည်။'
+      : 'Renew to keep your stable premium link, auto failover, and preferred region support.',
+    premiumRenewNow: isMyanmar ? 'Premium ကို သက်တမ်းတိုးရန်' : 'Renew premium key',
+    premiumExpiredTitle: isMyanmar ? '⛔ <b>Premium key expired</b>' : '⛔ <b>Premium key expired</b>',
+    premiumExpiredBody: (keyName: string) =>
+      isMyanmar
+        ? `<b>${keyName}</b> premium dynamic key သက်တမ်းကုန်သွားပါပြီ။ ဆက်လက်အသုံးပြုလိုပါက renewal order တင်ပေးပါ။`
+        : `Your premium dynamic key <b>${keyName}</b> has expired. Place a renewal order to keep using the service.`,
     premiumRequestApproved: (keyName: string, regionLabel?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? [
@@ -2084,6 +2153,7 @@ function buildTelegramDynamicPremiumSupportKeyboard(
   dynamicAccessKeyId: string,
   locale: SupportedLocale,
   supportLink?: string | null,
+  requestId?: string | null,
 ) {
   const ui = getTelegramUi(locale);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
@@ -2100,6 +2170,15 @@ function buildTelegramDynamicPremiumSupportKeyboard(
       },
     ],
   ];
+
+  if (requestId) {
+    rows.push([
+      {
+        text: ui.premiumReplyToRequest,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rp', requestId),
+      },
+    ]);
+  }
 
   if (supportLink) {
     rows.push([{ text: ui.getSupport, url: supportLink }]);
@@ -2139,6 +2218,13 @@ function buildTelegramDynamicPremiumPendingKeyboard(input: {
     {
       text: ui.premiumReportRouteIssue,
       callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.dynamicAccessKeyId),
+    },
+  ]);
+
+  rows.push([
+    {
+      text: ui.premiumReplyToRequest,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('rp', input.requestId),
     },
   ]);
 
@@ -2646,8 +2732,12 @@ async function listTelegramPremiumSupportRequestsForUser(
           status: true,
         },
       },
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 8,
+      },
     },
-    orderBy: [{ createdAt: 'desc' }],
+    orderBy: [{ updatedAt: 'desc' }],
     take: limit,
   });
 }
@@ -2673,8 +2763,60 @@ async function findTelegramPremiumSupportRequestByIdForUser(input: {
           status: true,
         },
       },
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 12,
+      },
     },
   });
+}
+
+async function addTelegramPremiumSupportReply(input: {
+  requestId: string;
+  senderType: 'CUSTOMER' | 'ADMIN';
+  message: string;
+  telegramUserId?: string | null;
+  telegramUsername?: string | null;
+  adminUserId?: string | null;
+  senderName?: string | null;
+  markPending?: boolean;
+}) {
+  const message = input.message.trim();
+  if (!message) {
+    throw new Error('Reply message is required.');
+  }
+
+  const now = new Date();
+
+  const [reply] = await db.$transaction([
+    db.telegramPremiumSupportReply.create({
+      data: {
+        requestId: input.requestId,
+        senderType: input.senderType,
+        telegramUserId: input.telegramUserId || null,
+        telegramUsername: input.telegramUsername || null,
+        adminUserId: input.adminUserId || null,
+        senderName: input.senderName || null,
+        message,
+      },
+    }),
+    db.telegramPremiumSupportRequest.update({
+      where: { id: input.requestId },
+      data: input.senderType === 'CUSTOMER'
+        ? {
+            followUpPending: input.markPending ?? true,
+            lastFollowUpAt: now,
+            updatedAt: now,
+          }
+        : {
+            followUpPending: false,
+            lastAdminReplyAt: now,
+            updatedAt: now,
+          },
+    }),
+  ]);
+
+  return reply;
 }
 
 async function sendTelegramOrderReviewAlert(
@@ -2961,6 +3103,20 @@ function buildTelegramPremiumSupportStatusMessage(input: {
 
   if (request.customerMessage?.trim()) {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(request.customerMessage.trim()));
+  }
+
+  if (request.replies?.length) {
+    lines.push('', `${ui.premiumFollowUpHistoryTitle}:`);
+    for (const reply of request.replies.slice(-3)) {
+      const senderLabel =
+        reply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
+      lines.push(
+        `• <b>${escapeHtml(senderLabel)}</b> · ${escapeHtml(
+          formatTelegramDateTime(reply.createdAt, input.locale),
+        )}`,
+        `  ${escapeHtml(reply.message)}`,
+      );
+    }
   }
 
   return lines.join('\n');
@@ -4546,6 +4702,8 @@ export async function runTelegramSalesOrderCycle() {
       reminded: 0,
       pendingReviewReminded: 0,
       trialReminded: 0,
+      premiumRenewalReminded: 0,
+      premiumExpired: 0,
       expired: 0,
       errors: [] as string[],
     };
@@ -4618,6 +4776,8 @@ export async function runTelegramSalesOrderCycle() {
   let reminded = 0;
   let pendingReviewReminded = 0;
   let trialReminded = 0;
+  let premiumRenewalReminded = 0;
+  let premiumExpired = 0;
   let expired = 0;
   const errors: string[] = [];
 
@@ -4864,11 +5024,89 @@ export async function runTelegramSalesOrderCycle() {
     }
   }
 
+  const premiumRenewalCandidates = await db.dynamicAccessKey.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'PENDING'] },
+      expiresAt: {
+        not: null,
+        lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+      },
+      tags: {
+        contains: ',premium,',
+      },
+    },
+    select: {
+      id: true,
+      expiresAt: true,
+      tags: true,
+      expirationWarningStage: true,
+    },
+  });
+
+  for (const key of premiumRenewalCandidates) {
+    if (!key.expiresAt || !tagMatchesFilter(key.tags || '', 'premium')) {
+      continue;
+    }
+
+    if (key.expiresAt.getTime() <= now.getTime()) {
+      try {
+        await db.dynamicAccessKey.update({
+          where: { id: key.id },
+          data: {
+            status: 'EXPIRED',
+            expirationWarningStage: null,
+            lastWarningSentAt: now,
+          },
+        });
+
+        await sendDynamicKeyExpiryTelegramNotification({
+          dynamicAccessKeyId: key.id,
+          source: 'premium_expired',
+        });
+
+        premiumExpired += 1;
+      } catch (error) {
+        errors.push(`premium-expired:${key.id}:${(error as Error).message}`);
+      }
+
+      continue;
+    }
+
+    const remainingMs = key.expiresAt.getTime() - now.getTime();
+    const daysLeft = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+    const nextStage = daysLeft <= 3 ? '3D' : '7D';
+    if (key.expirationWarningStage === nextStage) {
+      continue;
+    }
+
+    try {
+      await sendDynamicKeyRenewalReminder({
+        dynamicAccessKeyId: key.id,
+        daysLeft,
+        source: nextStage === '3D' ? 'premium_renewal_3d' : 'premium_renewal_7d',
+      });
+
+      await db.dynamicAccessKey.update({
+        where: { id: key.id },
+        data: {
+          expirationWarningStage: nextStage,
+          lastWarningSentAt: now,
+        },
+      });
+
+      premiumRenewalReminded += 1;
+    } catch (error) {
+      errors.push(`premium-renewal:${key.id}:${(error as Error).message}`);
+    }
+  }
+
   return {
     skipped: false,
     reminded,
     pendingReviewReminded,
     trialReminded,
+    premiumRenewalReminded,
+    premiumExpired,
     expired,
     errors,
   };
@@ -4983,6 +5221,49 @@ async function sendTelegramPremiumSupportAlert(input: {
       panelUrl,
     },
   });
+}
+
+async function sendTelegramPremiumSupportFollowUpAlert(input: {
+  requestId: string;
+  requestCode: string;
+  dynamicAccessKeyId: string;
+  telegramChatId: string;
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  locale: SupportedLocale;
+  message: string;
+}) {
+  const config = await getTelegramConfig();
+  if (!config || config.adminChatIds.length === 0) {
+    return;
+  }
+
+  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
+  if (!key) {
+    return;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const panelUrl = await buildTelegramPremiumSupportPanelUrl(input.requestId);
+  const lines = [
+    ui.premiumReviewAlertTitle,
+    '',
+    `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(input.telegramUserId)}</code>`,
+    `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(input.requestCode)}</b>`,
+    `${ui.premiumFollowUpNeedsReview}: <b>${escapeHtml(input.message)}</b>`,
+    '',
+    `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
+  ].join('\n');
+
+  for (const adminChatId of config.adminChatIds) {
+    await sendTelegramMessage(config.botToken, adminChatId, lines, {
+      replyMarkup: {
+        inline_keyboard: [[{ text: ui.premiumReviewPanelLabel, url: panelUrl }]],
+      },
+    });
+  }
 }
 
 function appendTelegramOrderAdminNote(existingNote?: string | null, nextNote?: string | null) {
@@ -5707,6 +5988,8 @@ async function fulfillTelegramRenewDynamicOrder(input: {
       pinnedServerId: null,
       pinnedAt: null,
       pinExpiresAt: null,
+      expirationWarningStage: null,
+      lastWarningSentAt: null,
     },
   });
 }
@@ -6377,12 +6660,24 @@ export async function approveTelegramPremiumSupportRequest(input: {
         appliedPinServerId: applied.appliedPinServerId,
         appliedPinServerName: applied.appliedPinServerName,
         appliedPinExpiresAt: applied.appliedPinExpiresAt,
+        followUpPending: false,
+        lastAdminReplyAt: new Date(),
         adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
         customerMessage:
           input.customerMessage?.trim() ||
           ui.premiumRequestApproved(request.dynamicAccessKey.name, applied.appliedRegionCode, supportLink),
       },
     });
+
+    if (finalRequest.customerMessage?.trim()) {
+      await addTelegramPremiumSupportReply({
+        requestId: finalRequest.id,
+        senderType: 'ADMIN',
+        adminUserId: input.reviewedByUserId ?? null,
+        senderName: input.reviewerName ?? null,
+        message: finalRequest.customerMessage,
+      });
+    }
 
     const config = await getTelegramConfig();
     if (config) {
@@ -6500,12 +6795,24 @@ export async function handleTelegramPremiumSupportRequest(input: {
         appliedPinServerId: applied.appliedPinServerId,
         appliedPinServerName: applied.appliedPinServerName,
         appliedPinExpiresAt: applied.appliedPinExpiresAt,
+        followUpPending: false,
+        lastAdminReplyAt: new Date(),
         adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
         customerMessage:
           input.customerMessage?.trim() ||
           ui.premiumIssueHandled(request.dynamicAccessKey.name, supportLink),
       },
     });
+
+    if (finalRequest.customerMessage?.trim()) {
+      await addTelegramPremiumSupportReply({
+        requestId: finalRequest.id,
+        senderType: 'ADMIN',
+        adminUserId: input.reviewedByUserId ?? null,
+        senderName: input.reviewerName ?? null,
+        message: finalRequest.customerMessage,
+      });
+    }
 
     const config = await getTelegramConfig();
     if (config) {
@@ -6587,12 +6894,24 @@ export async function dismissTelegramPremiumSupportRequest(input: {
       reviewerName: input.reviewerName ?? null,
       reviewedAt: new Date(),
       dismissedAt: new Date(),
+      followUpPending: false,
+      lastAdminReplyAt: new Date(),
       adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
       customerMessage:
         input.customerMessage?.trim() ||
         ui.premiumSupportDismissed(request.dynamicAccessKey.name, null, supportLink),
     },
   });
+
+  if (finalRequest.customerMessage?.trim()) {
+    await addTelegramPremiumSupportReply({
+      requestId: finalRequest.id,
+      senderType: 'ADMIN',
+      adminUserId: input.reviewedByUserId ?? null,
+      senderName: input.reviewerName ?? null,
+      message: finalRequest.customerMessage,
+    });
+  }
 
   const config = await getTelegramConfig();
   if (config) {
@@ -6611,6 +6930,97 @@ export async function dismissTelegramPremiumSupportRequest(input: {
     action: 'TELEGRAM_PREMIUM_SUPPORT_DISMISSED',
     entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
     entityId: finalRequest.id,
+    details: {
+      requestCode: request.requestCode,
+      requestType: request.requestType,
+      dynamicAccessKeyId: request.dynamicAccessKeyId,
+      reviewerName: input.reviewerName ?? null,
+    },
+  });
+
+  return finalRequest;
+}
+
+export async function replyTelegramPremiumSupportRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+  customerMessage: string;
+}) {
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      dynamicAccessKey: true,
+    },
+  });
+
+  if (!request) {
+    throw new Error('Premium support request not found.');
+  }
+
+  if (request.status === 'DISMISSED') {
+    throw new Error('This premium support request is closed.');
+  }
+
+  const message = input.customerMessage.trim();
+  if (!message) {
+    throw new Error('Customer message is required.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const supportLink = await getTelegramSupportLink();
+
+  const finalRequest = await db.telegramPremiumSupportRequest.update({
+    where: { id: request.id },
+    data: {
+      adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
+      customerMessage: message,
+      followUpPending: false,
+      lastAdminReplyAt: new Date(),
+      reviewedByUserId: input.reviewedByUserId ?? request.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? request.reviewerName ?? null,
+    },
+  });
+
+  await addTelegramPremiumSupportReply({
+    requestId: request.id,
+    senderType: 'ADMIN',
+    adminUserId: input.reviewedByUserId ?? null,
+    senderName: input.reviewerName ?? null,
+    message,
+  });
+
+  const config = await getTelegramConfig();
+  if (config) {
+    await sendTelegramMessage(
+      config.botToken,
+      request.telegramChatId,
+      message,
+      {
+        replyMarkup:
+          request.status === 'PENDING_REVIEW'
+            ? buildTelegramDynamicPremiumPendingKeyboard({
+                dynamicAccessKeyId: request.dynamicAccessKeyId,
+                requestId: request.id,
+                locale,
+                supportLink,
+              })
+            : buildTelegramDynamicPremiumSupportKeyboard(
+                request.dynamicAccessKeyId,
+                locale,
+                supportLink,
+                request.id,
+              ),
+      },
+    );
+  }
+
+  await writeAuditLog({
+    userId: input.reviewedByUserId ?? null,
+    action: 'TELEGRAM_PREMIUM_SUPPORT_REPLIED',
+    entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+    entityId: request.id,
     details: {
       requestCode: request.requestCode,
       requestType: request.requestType,
@@ -7464,6 +7874,164 @@ export async function sendAccessKeyRenewalReminder(input: {
     sharePageUrl,
     subscriptionUrl,
   };
+}
+
+export async function sendDynamicKeyRenewalReminder(input: {
+  dynamicAccessKeyId: string;
+  chatId?: string | number | null;
+  daysLeft: number;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    throw new Error('Telegram bot is not configured.');
+  }
+
+  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
+  if (!key) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const destinationChatId =
+    (input.chatId ? String(input.chatId) : null) || resolveTelegramChatIdForDynamicKey(key);
+  if (!destinationChatId) {
+    throw new Error('This premium dynamic key is not linked to a Telegram chat yet.');
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const { sharePageUrl, subscriptionUrl } = getDynamicKeyMessagingUrls(
+    key,
+    input.source || 'premium_renewal_reminder',
+    locale,
+  );
+  const supportLink = await getTelegramSupportLink();
+
+  const lines = [
+    ui.premiumRenewalTitle,
+    '',
+    `🔁 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
+    key.dataLimitBytes
+      ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
+      : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
+    '',
+    ui.premiumRenewalBody(input.daysLeft),
+    ui.premiumRenewalBenefits,
+  ];
+
+  if (sharePageUrl) {
+    lines.push('', `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
+  }
+  if (subscriptionUrl) {
+    lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
+  }
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: ui.premiumRenewNow,
+        callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic'),
+      },
+    ],
+  ];
+
+  if (sharePageUrl) {
+    inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
+  }
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+
+  await writeAuditLog({
+    action: 'DYNAMIC_KEY_RENEWAL_REMINDER_SENT',
+    entity: 'DYNAMIC_ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      daysLeft: input.daysLeft,
+      sharePageUrl,
+      subscriptionUrl,
+    },
+  });
+
+  return {
+    destinationChatId,
+    sharePageUrl,
+    subscriptionUrl,
+  };
+}
+
+async function sendDynamicKeyExpiryTelegramNotification(input: {
+  dynamicAccessKeyId: string;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
+  if (!key) {
+    return null;
+  }
+
+  const destinationChatId = resolveTelegramChatIdForDynamicKey(key);
+  if (!destinationChatId) {
+    return null;
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: ui.premiumRenewNow,
+        callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic'),
+      },
+    ],
+  ];
+
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  await sendTelegramMessage(
+    config.botToken,
+    destinationChatId,
+    [ui.premiumExpiredTitle, '', ui.premiumExpiredBody(key.name)].join('\n'),
+    {
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    },
+  );
+
+  await writeAuditLog({
+    action: 'DYNAMIC_KEY_EXPIRED_NOTICE_SENT',
+    entity: 'DYNAMIC_ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      source: input.source || 'premium_expired',
+    },
+  });
+
+  return { destinationChatId };
 }
 
 export async function sendAccessKeyTrialExpiryReminder(input: {
@@ -8598,6 +9166,10 @@ async function handlePremiumSupportStatusCommand(
                 status: true,
               },
             },
+            replies: {
+              orderBy: [{ createdAt: 'asc' }],
+              take: 12,
+            },
           },
         })
       : null;
@@ -8623,6 +9195,7 @@ async function handlePremiumSupportStatusCommand(
                 request.dynamicAccessKeyId,
                 locale,
                 supportLink,
+                request.id,
               ),
       },
     );
@@ -8669,6 +9242,103 @@ async function handlePremiumSupportStatusCommand(
   });
 
   return sent ? null : lines.join('\n');
+}
+
+async function handlePremiumSupportFollowUpText(input: {
+  chatId: number;
+  telegramUserId: number;
+  username: string;
+  locale: SupportedLocale;
+  botToken: string;
+  text: string;
+}) {
+  const pending = await getTelegramPendingPremiumReply({
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+  });
+  if (!pending) {
+    return null;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await getTelegramSupportLink();
+  const request = await findTelegramPremiumSupportRequestByIdForUser({
+    requestId: pending.requestId,
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+
+  if (!request || request.status === 'DISMISSED') {
+    await setTelegramPendingPremiumReply({
+      telegramUserId: String(input.telegramUserId),
+      telegramChatId: String(input.chatId),
+      requestId: null,
+    });
+    return ui.premiumFollowUpNotAllowed;
+  }
+
+  await addTelegramPremiumSupportReply({
+    requestId: request.id,
+    senderType: 'CUSTOMER',
+    telegramUserId: String(input.telegramUserId),
+    telegramUsername: input.username || null,
+    senderName: input.username || null,
+    message: input.text,
+    markPending: true,
+  });
+
+  await setTelegramPendingPremiumReply({
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+    requestId: null,
+  });
+
+  await sendTelegramPremiumSupportFollowUpAlert({
+    requestId: request.id,
+    requestCode: request.requestCode,
+    dynamicAccessKeyId: request.dynamicAccessKeyId,
+    telegramChatId: request.telegramChatId,
+    telegramUserId: request.telegramUserId,
+    telegramUsername: request.telegramUsername || input.username,
+    locale: input.locale,
+    message: input.text,
+  });
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    ui.premiumFollowUpSubmitted(request.requestCode),
+    {
+      replyMarkup:
+        request.status === 'PENDING_REVIEW'
+          ? buildTelegramDynamicPremiumPendingKeyboard({
+              dynamicAccessKeyId: request.dynamicAccessKeyId,
+              requestId: request.id,
+              locale: input.locale,
+              supportLink,
+            })
+          : buildTelegramDynamicPremiumSupportKeyboard(
+              request.dynamicAccessKeyId,
+              input.locale,
+              supportLink,
+              request.id,
+            ),
+    },
+  );
+
+  await writeAuditLog({
+    action: 'TELEGRAM_PREMIUM_SUPPORT_FOLLOW_UP',
+    entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+    entityId: request.id,
+    details: {
+      requestCode: request.requestCode,
+      dynamicAccessKeyId: request.dynamicAccessKeyId,
+      telegramChatId: request.telegramChatId,
+      telegramUserId: request.telegramUserId,
+    },
+  });
+
+  return null;
 }
 
 async function handleUserServerCommand(
@@ -9456,6 +10126,7 @@ async function handleTelegramCallbackQuery(
                       request.dynamicAccessKeyId,
                       locale,
                       supportLink,
+                      request.id,
                     ),
             },
           );
@@ -9463,6 +10134,57 @@ async function handleTelegramCallbackQuery(
             config.botToken,
             callbackQuery.id,
             ui.orderActionSent,
+          );
+          return null;
+        }
+
+        if (dynamicSupportAction.action === 'rp') {
+          const request = await findTelegramPremiumSupportRequestByIdForUser({
+            requestId: dynamicSupportAction.primary,
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+
+          if (!request || request.status === 'DISMISSED') {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.premiumFollowUpNotAllowed,
+            );
+            return null;
+          }
+
+          await setTelegramPendingPremiumReply({
+            telegramUserId: String(callbackQuery.from.id),
+            telegramChatId: String(chatId),
+            requestId: request.id,
+          });
+
+          await sendTelegramMessage(
+            config.botToken,
+            chatId,
+            ui.premiumFollowUpPrompt(request.requestCode, request.dynamicAccessKey.name),
+            {
+              replyMarkup:
+                request.status === 'PENDING_REVIEW'
+                  ? buildTelegramDynamicPremiumPendingKeyboard({
+                      dynamicAccessKeyId: request.dynamicAccessKeyId,
+                      requestId: request.id,
+                      locale,
+                      supportLink,
+                    })
+                  : buildTelegramDynamicPremiumSupportKeyboard(
+                      request.dynamicAccessKeyId,
+                      locale,
+                      supportLink,
+                      request.id,
+                    ),
+            },
+          );
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            ui.premiumReplyToRequest,
           );
           return null;
         }
@@ -10590,8 +11312,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
   }
 
   const activeOrder = await getActiveTelegramOrder(chatId, telegramUserId);
+  const pendingPremiumReply = activeOrder
+    ? null
+    : await getTelegramPendingPremiumReply({
+        telegramUserId: String(telegramUserId),
+        telegramChatId: String(chatId),
+      });
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!activeOrder && emailRegex.test(text)) {
+  if (!activeOrder && !pendingPremiumReply && emailRegex.test(text)) {
     return handleEmailLink(chatId, telegramUserId, text, locale);
   }
 
@@ -10603,6 +11331,17 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         telegramUserId,
         text,
         botToken: config.botToken,
+      });
+    }
+
+    if (pendingPremiumReply) {
+      return handlePremiumSupportFollowUpText({
+        chatId,
+        telegramUserId,
+        username,
+        locale,
+        botToken: config.botToken,
+        text,
       });
     }
 
@@ -10663,6 +11402,15 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
+      if (!currentOrder && pendingPremiumReply) {
+        await setTelegramPendingPremiumReply({
+          telegramUserId: String(telegramUserId),
+          telegramChatId: String(chatId),
+          requestId: null,
+        });
+        return ui.premiumFollowUpCancelled;
+      }
+
       if (!currentOrder) {
         return ui.noOrderToCancel;
       }

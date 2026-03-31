@@ -407,6 +407,9 @@ type TelegramPremiumSupportRequestRow = {
   appliedPinServerId?: string | null;
   appliedPinServerName?: string | null;
   appliedPinExpiresAt?: Date | null;
+  followUpPending: boolean;
+  lastFollowUpAt?: Date | null;
+  lastAdminReplyAt?: Date | null;
   adminNote?: string | null;
   customerMessage?: string | null;
   reviewedByUserId?: string | null;
@@ -431,6 +434,16 @@ type TelegramPremiumSupportRequestRow = {
     id: string;
     email?: string | null;
   } | null;
+  replies: Array<{
+    id: string;
+    senderType: string;
+    telegramUserId?: string | null;
+    telegramUsername?: string | null;
+    adminUserId?: string | null;
+    senderName?: string | null;
+    message: string;
+    createdAt: Date;
+  }>;
   dynamicAccessKey: {
     id: string;
     name: string;
@@ -547,6 +560,8 @@ function buildPremiumSupportHistory(
     premiumHistoryHandled: string;
     premiumHistoryDismissed: string;
     premiumHistoryPinApplied: string;
+    premiumHistoryCustomerReply: string;
+    premiumHistoryAdminReply: string;
     premiumPinExpires: string;
   },
 ): PremiumSupportHistoryEntry[] {
@@ -612,6 +627,18 @@ function buildPremiumSupportHistory(
       label: `Linked outage ${request.linkedOutage.incidentCode}`,
       at: request.linkedOutage.startedAt,
       detail: request.linkedOutage.serverName || request.linkedOutage.serverId || null,
+    });
+  }
+
+  for (const reply of request.replies || []) {
+    entries.push({
+      key: `reply-${reply.id}`,
+      label:
+        reply.senderType === 'ADMIN'
+          ? salesUi.premiumHistoryAdminReply
+          : salesUi.premiumHistoryCustomerReply,
+      at: reply.createdAt,
+      detail: reply.message,
     });
   }
 
@@ -2169,7 +2196,7 @@ function TelegramSalesWorkflowCard() {
   );
   const [premiumReviewTarget, setPremiumReviewTarget] = useState<{
     requestId: string;
-    mode: 'approve' | 'handle' | 'dismiss';
+    mode: 'approve' | 'handle' | 'dismiss' | 'reply';
   } | null>(null);
   const [premiumReviewNote, setPremiumReviewNote] = useState('');
   const [premiumReviewCustomerMessage, setPremiumReviewCustomerMessage] = useState('');
@@ -2374,6 +2401,8 @@ function TelegramSalesWorkflowCard() {
     premiumApproveRegion: isMyanmar ? 'Region approve' : 'Approve region',
     premiumHandleIssue: isMyanmar ? 'Handle issue' : 'Handle issue',
     premiumDismiss: isMyanmar ? 'Dismiss' : 'Dismiss',
+    premiumReply: isMyanmar ? 'Reply to user' : 'Reply to user',
+    premiumReplySuccess: isMyanmar ? 'Premium reply ကို user ထံ ပို့ပြီးပါပြီ' : 'Premium reply sent to the user',
     premiumPinServer: isMyanmar ? 'Temporary pin server' : 'Temporary pin server',
     premiumPinExpires: isMyanmar ? 'Pin duration' : 'Pin duration',
     premiumNoPinServer: isMyanmar ? 'No temporary pin' : 'No temporary pin',
@@ -2403,6 +2432,11 @@ function TelegramSalesWorkflowCard() {
     premiumHistoryHandled: isMyanmar ? 'Issue handled' : 'Issue handled',
     premiumHistoryDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
     premiumHistoryPinApplied: isMyanmar ? 'Temporary pin applied' : 'Temporary pin applied',
+    premiumHistoryCustomerReply: isMyanmar ? 'Customer follow-up' : 'Customer follow-up',
+    premiumHistoryAdminReply: isMyanmar ? 'Admin reply' : 'Admin reply',
+    premiumFollowUpPending: isMyanmar ? 'Follow-up waiting' : 'Follow-up waiting',
+    premiumReplyThreadTitle: isMyanmar ? 'Conversation' : 'Conversation',
+    premiumLatestReply: isMyanmar ? 'Latest reply' : 'Latest reply',
     premiumLastUpdate: isMyanmar ? 'Last update' : 'Last update',
   };
 
@@ -2836,6 +2870,24 @@ function TelegramSalesWorkflowCard() {
         variant: 'destructive',
         title: salesUi.updateFailed,
         description: error.message,
+      });
+    },
+  });
+  const replyPremiumSupportRequestMutation = trpc.telegramBot.replyPremiumSupportRequest.useMutation({
+    onSuccess: () => {
+      toast({
+        title: salesUi.premiumReplySuccess,
+      });
+      void premiumSupportRequestsQuery.refetch();
+      setPremiumReviewTarget(null);
+      setPremiumReviewNote('');
+      setPremiumReviewCustomerMessage('');
+    },
+    onError: (error) => {
+      toast({
+        title: salesUi.updateFailed,
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
@@ -4108,6 +4160,7 @@ function TelegramSalesWorkflowCard() {
                   {(() => {
                     const history = buildPremiumSupportHistory(request, salesUi);
                     const latestHistory = history[history.length - 1];
+                    const latestReply = request.replies[request.replies.length - 1];
                     return (
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1 space-y-3">
@@ -4120,6 +4173,9 @@ function TelegramSalesWorkflowCard() {
                         <Badge variant="outline">
                           {formatPremiumSupportRequestTypeLabel(request.requestType, salesUi)}
                         </Badge>
+                        {request.followUpPending ? (
+                          <Badge variant="secondary">{salesUi.premiumFollowUpPending}</Badge>
+                        ) : null}
                       </div>
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <div className="rounded-xl border border-border/40 p-3">
@@ -4210,6 +4266,24 @@ function TelegramSalesWorkflowCard() {
                             {latestHistory.detail ? ` · ${latestHistory.detail}` : ''}
                           </p>
                         </div>
+                        {latestReply ? (
+                          <div className="rounded-xl border border-border/40 p-3 md:col-span-2 xl:col-span-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              {salesUi.premiumLatestReply}
+                            </p>
+                            <p className="mt-1 text-sm font-medium">
+                              {latestReply.senderType === 'ADMIN'
+                                ? salesUi.premiumHistoryAdminReply
+                                : salesUi.premiumHistoryCustomerReply}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground break-words">
+                              {latestReply.message}
+                            </p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {formatRelativeTime(latestReply.createdAt)}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
                       {request.adminNote ? (
                         <div className="rounded-xl border border-border/40 bg-background/40 p-3 text-sm text-muted-foreground">
@@ -4260,6 +4334,29 @@ function TelegramSalesWorkflowCard() {
                           {salesUi.premiumHandleIssue}
                         </Button>
                       )}
+                      {request.status !== 'DISMISSED' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() => {
+                            setPremiumReviewTarget({ requestId: request.id, mode: 'reply' });
+                            setPremiumReviewNote('');
+                            setPremiumReviewCustomerMessage('');
+                            setPremiumReviewRegionCode(
+                              request.requestedRegionCode ||
+                                request.dynamicAccessKey.availableRegionCodes[0] ||
+                                '',
+                            );
+                            setPremiumReviewPinServerId('none');
+                            setPremiumReviewPinExpires('60');
+                            setPremiumAppendNoteToKey(false);
+                          }}
+                        >
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          {salesUi.premiumReply}
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="outline"
@@ -4764,14 +4861,16 @@ function TelegramSalesWorkflowCard() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {premiumReviewTarget?.mode === 'approve'
                 ? salesUi.premiumApproveRegion
                 : premiumReviewTarget?.mode === 'handle'
                   ? salesUi.premiumHandleIssue
-                  : salesUi.premiumDismiss}
+                  : premiumReviewTarget?.mode === 'reply'
+                    ? salesUi.premiumReply
+                    : salesUi.premiumDismiss}
             </DialogTitle>
             <DialogDescription>{salesUi.reviewContextHint}</DialogDescription>
           </DialogHeader>
@@ -4842,6 +4941,43 @@ function TelegramSalesWorkflowCard() {
                   ))}
                 </div>
               </div>
+
+              {selectedPremiumSupportRequest.replies?.length ? (
+                <div className="rounded-xl border border-border/50 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {salesUi.premiumReplyThreadTitle}
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {selectedPremiumSupportRequest.replies.map((reply) => (
+                      <div
+                        key={reply.id}
+                        className="rounded-lg border border-border/40 bg-background/40 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">
+                              {reply.senderType === 'ADMIN'
+                                ? salesUi.premiumHistoryAdminReply
+                                : salesUi.premiumHistoryCustomerReply}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground break-words">
+                              {reply.message}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-xs font-medium">
+                              {formatRelativeTime(reply.createdAt)}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatDateTime(reply.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -4864,7 +5000,9 @@ function TelegramSalesWorkflowCard() {
             </div>
           ) : null}
 
-          {premiumReviewTarget?.mode !== 'dismiss' && selectedPremiumSupportRequest ? (
+          {(premiumReviewTarget?.mode === 'approve' ||
+            premiumReviewTarget?.mode === 'handle') &&
+          selectedPremiumSupportRequest ? (
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>{salesUi.premiumPinServer}</Label>
@@ -4901,7 +5039,8 @@ function TelegramSalesWorkflowCard() {
             </div>
           ) : null}
 
-          {premiumReviewTarget?.mode !== 'dismiss' ? (
+          {premiumReviewTarget?.mode === 'approve' ||
+          premiumReviewTarget?.mode === 'handle' ? (
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">{salesUi.premiumAppendNoteToKey}</p>
@@ -4984,6 +5123,15 @@ function TelegramSalesWorkflowCard() {
                   return;
                 }
 
+                if (premiumReviewTarget.mode === 'reply') {
+                  replyPremiumSupportRequestMutation.mutate({
+                    requestId: premiumReviewTarget.requestId,
+                    adminNote: premiumReviewNote.trim() || undefined,
+                    customerMessage: premiumReviewCustomerMessage.trim(),
+                  });
+                  return;
+                }
+
                 dismissPremiumSupportRequestMutation.mutate({
                   requestId: premiumReviewTarget.requestId,
                   adminNote: premiumReviewNote.trim() || undefined,
@@ -4993,15 +5141,20 @@ function TelegramSalesWorkflowCard() {
               disabled={
                 approvePremiumSupportRequestMutation.isPending ||
                 handlePremiumSupportRequestMutation.isPending ||
-                dismissPremiumSupportRequestMutation.isPending
+                replyPremiumSupportRequestMutation.isPending ||
+                dismissPremiumSupportRequestMutation.isPending ||
+                (premiumReviewTarget?.mode === 'reply' && !premiumReviewCustomerMessage.trim())
               }
             >
               {approvePremiumSupportRequestMutation.isPending ||
               handlePremiumSupportRequestMutation.isPending ||
+              replyPremiumSupportRequestMutation.isPending ||
               dismissPremiumSupportRequestMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : premiumReviewTarget?.mode === 'dismiss' ? (
                 <AlertTriangle className="mr-2 h-4 w-4" />
+              ) : premiumReviewTarget?.mode === 'reply' ? (
+                <MessageSquare className="mr-2 h-4 w-4" />
               ) : (
                 <CheckCircle2 className="mr-2 h-4 w-4" />
               )}
@@ -5009,6 +5162,8 @@ function TelegramSalesWorkflowCard() {
                 ? salesUi.premiumApproveRegion
                 : premiumReviewTarget?.mode === 'handle'
                   ? salesUi.premiumHandleIssue
+                  : premiumReviewTarget?.mode === 'reply'
+                    ? salesUi.premiumReply
                   : salesUi.premiumDismiss}
             </Button>
           </DialogFooter>
