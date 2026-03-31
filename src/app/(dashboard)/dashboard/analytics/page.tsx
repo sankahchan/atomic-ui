@@ -849,6 +849,127 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
+              <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium dynamic sales</p>
+                    <h3 className="mt-2 text-lg font-semibold">Premium support and demand</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Split premium dynamic-key sales, region demand, and support workload from the normal Telegram storefront.
+                    </p>
+                  </div>
+                  <Badge variant="outline">
+                    {loadingTelegramSalesDashboard
+                      ? '…'
+                      : `${telegramSalesDashboard?.premium.summary.openSupportRequests || 0} open support`}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium orders</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.premiumOrders || 0}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Telegram premium orders delivered as dynamic keys.</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active premium users</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.activeUsers || 0}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Unique Telegram users with fulfilled premium dynamic orders in range.</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active premium keys</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.activeDynamicKeys || 0}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Premium dynamic keys fulfilled in the selected range.</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Handled support</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : (telegramSalesDashboard?.premium.summary.approvedRegionRequests || 0) +
+                          (telegramSalesDashboard?.premium.summary.handledSupportRequests || 0)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : `${telegramSalesDashboard?.premium.summary.dismissedSupportRequests || 0} dismissed`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium revenue</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(2)].map((_, i) => (
+                          <div key={i} className="h-16 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.revenueByCurrency.length > 0 ? (
+                        telegramSalesDashboard.premium.revenueByCurrency.map((revenue) => (
+                          <div key={revenue.currency} className="ops-mini-tile">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{revenue.currency}</p>
+                            <p className="mt-2 text-xl font-semibold">{formatRevenueLabel(revenue.currency, revenue.amount)}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No premium revenue yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Region demand</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.regionDemand.length > 0 ? (
+                        telegramSalesDashboard.premium.regionDemand.slice(0, 6).map((region) => (
+                          <div key={region.region} className="ops-mini-tile">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{region.region}</p>
+                              <Badge variant="outline">{region.count}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No premium region requests yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Route issues by server</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.routeIssuesByServer.length > 0 ? (
+                        telegramSalesDashboard.premium.routeIssuesByServer.slice(0, 6).map((server) => (
+                          <div key={server.label} className="ops-mini-tile">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{server.label}</p>
+                              <Badge variant="outline">{server.count}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No premium route issues yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-3">

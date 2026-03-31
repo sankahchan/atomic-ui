@@ -648,6 +648,57 @@ function getTelegramUi(locale: SupportedLocale) {
     premiumCurrentPoolLabel: isMyanmar ? 'Current premium pool' : 'Current premium pool',
     premiumRequestedRegionLabel: isMyanmar ? 'Requested region' : 'Requested region',
     premiumReviewPanelLabel: isMyanmar ? 'Dynamic key page ဖွင့်ရန်' : 'Open dynamic key page',
+    premiumRequestCodeLabel: isMyanmar ? 'Support request code' : 'Support request code',
+    premiumSupportRequestPending: (requestCode: string) =>
+      isMyanmar
+        ? `ℹ️ Pending premium support request <b>${requestCode}</b> ရှိပြီးသားဖြစ်ပါသည်။ Admin က စစ်ဆေးပြီး ပြန်လည်အကြောင်းကြားပါမည်။`
+        : `ℹ️ Premium support request <b>${requestCode}</b> is already pending. The admin will review it and follow up.`,
+    premiumRequestApproved: (keyName: string, regionLabel?: string | null, supportLink?: string | null) =>
+      isMyanmar
+        ? [
+            `✅ <b>${keyName}</b> အတွက် premium request ကို လုပ်ဆောင်ပြီးပါပြီ။`,
+            regionLabel ? `ဦးစားပေး region: <b>${regionLabel}</b>` : 'Routing setting ကို ပြန်လည်စစ်ဆေးပြီးပါပြီ။',
+            supportLink ? `အကူအညီလိုပါက ${supportLink}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : [
+            `✅ The premium request for <b>${keyName}</b> has been applied.`,
+            regionLabel ? `Preferred region: <b>${regionLabel}</b>` : 'The routing preference has been reviewed.',
+            supportLink ? `Need help? ${supportLink}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+    premiumIssueHandled: (keyName: string, supportLink?: string | null) =>
+      isMyanmar
+        ? [
+            `✅ <b>${keyName}</b> အတွက် premium route issue ကို စစ်ဆေးပြီး update လုပ်ပြီးပါပြီ။`,
+            supportLink ? `နောက်ထပ်အကူအညီလိုပါက ${supportLink}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : [
+            `✅ The premium route issue for <b>${keyName}</b> has been reviewed and updated.`,
+            supportLink ? `Need more help? ${supportLink}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+    premiumSupportDismissed: (keyName: string, message?: string | null, supportLink?: string | null) =>
+      isMyanmar
+        ? [
+            `ℹ️ <b>${keyName}</b> အတွက် premium support request ကို မလုပ်ဆောင်တော့ပါ။`,
+            message || 'အသေးစိတ်အတွက် admin/support ကို ဆက်သွယ်ပါ။',
+            supportLink || '',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : [
+            `ℹ️ The premium support request for <b>${keyName}</b> was dismissed.`,
+            message || 'Please contact admin/support for more details.',
+            supportLink || '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
     accessShareFallback: isMyanmar
       ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် နောက်ဆုံး connection အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
       : 'Open the share page below for install steps, manual setup, and the latest connection details.',
@@ -2051,6 +2102,21 @@ async function generateTelegramServerChangeRequestCode(): Promise<string> {
   return `SRV-${Date.now().toString(36).toUpperCase()}`;
 }
 
+async function generateTelegramPremiumSupportRequestCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = `PRM-${generateRandomString(8).toUpperCase()}`;
+    const existing = await db.telegramPremiumSupportRequest.findUnique({
+      where: { requestCode: candidate },
+      select: { id: true },
+    });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `PRM-${Date.now().toString(36).toUpperCase()}`;
+}
+
 function buildTelegramPaymentMethodSelectionKeyboard(input: {
   orderId: string;
   locale: SupportedLocale;
@@ -2373,6 +2439,40 @@ async function createTelegramServerChangeRequestRecord(input: {
   });
 }
 
+async function createTelegramPremiumSupportRequestRecord(input: {
+  chatId: number;
+  telegramUserId: number;
+  telegramUsername?: string;
+  locale: SupportedLocale;
+  dynamicAccessKey: NonNullable<Awaited<ReturnType<typeof loadDynamicAccessKeyForMessaging>>>;
+  requestType: 'REGION_CHANGE' | 'ROUTE_ISSUE';
+  requestedRegionCode?: string | null;
+}) {
+  const requestCode = await generateTelegramPremiumSupportRequestCode();
+  const ui = getTelegramUi(input.locale);
+  const resolvedServer = input.dynamicAccessKey.accessKeys.find(
+    (accessKey) => accessKey.server?.id === input.dynamicAccessKey.lastResolvedServerId,
+  )?.server;
+
+  return db.telegramPremiumSupportRequest.create({
+    data: {
+      requestCode,
+      status: 'PENDING_REVIEW',
+      requestType: input.requestType,
+      locale: input.locale,
+      telegramChatId: String(input.chatId),
+      telegramUserId: String(input.telegramUserId),
+      telegramUsername: input.telegramUsername || null,
+      dynamicAccessKeyId: input.dynamicAccessKey.id,
+      requestedRegionCode: input.requestedRegionCode?.toUpperCase() || null,
+      currentPoolSummary: formatTelegramDynamicPoolSummary(input.dynamicAccessKey, ui),
+      currentResolvedServerId: resolvedServer?.id || input.dynamicAccessKey.lastResolvedServerId || null,
+      currentResolvedServerName: resolvedServer?.name || null,
+      currentResolvedServerCountryCode: resolvedServer?.countryCode || null,
+    },
+  });
+}
+
 async function findTelegramServerChangeRequestByIdForUser(input: {
   requestId: string;
   chatId: number;
@@ -2529,6 +2629,43 @@ async function sendTelegramServerChangeReviewAlert(
           ],
           [{ text: ui.serverChangeReviewPanelLabel, url: panelUrl }],
         ],
+      },
+    });
+  }
+}
+
+async function sendTelegramPremiumSupportReviewAlert(
+  requestId: string,
+  mode: 'initial' | 'updated' = 'initial',
+) {
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: requestId },
+  });
+
+  if (!request) {
+    return;
+  }
+
+  await sendTelegramPremiumSupportAlert({
+    requestPanelId: request.id,
+    requestCode: request.requestCode,
+    dynamicAccessKeyId: request.dynamicAccessKeyId,
+    requestType: request.requestType as 'REGION_CHANGE' | 'ROUTE_ISSUE',
+    telegramChatId: request.telegramChatId,
+    telegramUserId: request.telegramUserId,
+    telegramUsername: request.telegramUsername,
+    locale: coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale()),
+    requestedRegionCode: request.requestedRegionCode,
+  });
+
+  if (mode === 'updated') {
+    await writeAuditLog({
+      action: 'TELEGRAM_PREMIUM_SUPPORT_REVIEW_ALERT_SENT',
+      entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+      entityId: request.id,
+      details: {
+        requestCode: request.requestCode,
+        requestType: request.requestType,
       },
     });
   }
@@ -4508,6 +4645,16 @@ async function buildTelegramServerChangePanelUrl(requestId: string) {
   return `${origin}${basePath}/dashboard/notifications?serverChangeRequest=${encodeURIComponent(requestId)}`;
 }
 
+async function buildTelegramPremiumSupportPanelUrl(requestId: string) {
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3000';
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `${origin}${basePath}/dashboard/notifications?premiumSupportRequest=${encodeURIComponent(requestId)}`;
+}
+
 async function buildTelegramDynamicKeyPanelUrl(dynamicAccessKeyId: string) {
   const origin =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -4519,6 +4666,8 @@ async function buildTelegramDynamicKeyPanelUrl(dynamicAccessKeyId: string) {
 }
 
 async function sendTelegramPremiumSupportAlert(input: {
+  requestPanelId?: string | null;
+  requestCode?: string | null;
   dynamicAccessKeyId: string;
   requestType: 'REGION_CHANGE' | 'ROUTE_ISSUE';
   telegramChatId: string;
@@ -4538,7 +4687,9 @@ async function sendTelegramPremiumSupportAlert(input: {
   }
 
   const ui = getTelegramUi(input.locale);
-  const panelUrl = await buildTelegramDynamicKeyPanelUrl(key.id);
+  const panelUrl = input.requestPanelId
+    ? await buildTelegramPremiumSupportPanelUrl(input.requestPanelId)
+    : await buildTelegramDynamicKeyPanelUrl(key.id);
   const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
   const lines = [
     ui.premiumReviewAlertTitle,
@@ -4552,6 +4703,9 @@ async function sendTelegramPremiumSupportAlert(input: {
     `${ui.customerMessage}: <b>${escapeHtml(input.requestType === 'REGION_CHANGE' ? ui.premiumIssueTypeRegion : ui.premiumIssueTypeRoute)}</b>`,
     input.requestedRegionCode
       ? `${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(input.requestedRegionCode)}</b>`
+      : '',
+    input.requestCode
+      ? `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(input.requestCode)}</b>`
       : '',
     '',
     `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
@@ -4598,6 +4752,21 @@ function appendTelegramOrderAdminNote(existingNote?: string | null, nextNote?: s
 }
 
 function appendTelegramServerChangeAdminNote(existingNote?: string | null, nextNote?: string | null) {
+  const trimmedExisting = existingNote?.trim();
+  const trimmedNext = nextNote?.trim();
+
+  if (!trimmedNext) {
+    return trimmedExisting || null;
+  }
+
+  if (!trimmedExisting) {
+    return trimmedNext;
+  }
+
+  return `${trimmedExisting}\n\n${trimmedNext}`;
+}
+
+function appendTelegramPremiumSupportAdminNote(existingNote?: string | null, nextNote?: string | null) {
   const trimmedExisting = existingNote?.trim();
   const trimmedNext = nextNote?.trim();
 
@@ -5764,6 +5933,444 @@ export async function rejectTelegramServerChangeRequest(input: {
     requestId: finalRequest.id,
     requestCode: request.requestCode,
   };
+}
+
+async function applyPremiumSupportRoutingUpdate(input: {
+  request: {
+    id: string;
+    requestCode: string;
+    requestType: string;
+    requestedRegionCode?: string | null;
+    dynamicAccessKeyId: string;
+  };
+  approvedRegionCode?: string | null;
+  pinServerId?: string | null;
+  pinExpiresInMinutes?: number | null;
+  adminNote?: string | null;
+  appendNoteToKey?: boolean;
+}) {
+  const dynamicKey = await db.dynamicAccessKey.findUnique({
+    where: { id: input.request.dynamicAccessKeyId },
+    include: {
+      accessKeys: {
+        where: { status: 'ACTIVE' },
+        include: {
+          server: true,
+        },
+      },
+    },
+  });
+
+  if (!dynamicKey) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const updateData: Record<string, unknown> = {};
+  let appliedRegionCode: string | null = null;
+  let appliedPinServerId: string | null = null;
+  let appliedPinServerName: string | null = null;
+  let appliedPinExpiresAt: Date | null = null;
+
+  if (input.request.requestType === 'REGION_CHANGE') {
+    const nextRegion = input.approvedRegionCode?.trim().toUpperCase() || input.request.requestedRegionCode?.trim().toUpperCase() || null;
+    if (!nextRegion) {
+      throw new Error('Select a preferred region before approving this request.');
+    }
+
+    const existingRouting = parseDynamicRoutingPreferences({
+      preferredServerIdsJson: dynamicKey.preferredServerIdsJson,
+      preferredCountryCodesJson: dynamicKey.preferredCountryCodesJson,
+      preferredServerWeightsJson: dynamicKey.preferredServerWeightsJson,
+      preferredCountryWeightsJson: dynamicKey.preferredCountryWeightsJson,
+      preferredRegionMode: dynamicKey.preferredRegionMode,
+      sessionStickinessMode: dynamicKey.sessionStickinessMode,
+      drainGraceMinutes: dynamicKey.drainGraceMinutes,
+    });
+
+    const normalized = normalizeDynamicRoutingPreferences({
+      preferredServerIds: existingRouting.preferredServerIds,
+      preferredCountryCodes: [nextRegion],
+      preferredServerWeights: existingRouting.preferredServerWeights,
+      preferredCountryWeights: existingRouting.preferredCountryWeights,
+      preferredRegionMode: existingRouting.preferredRegionMode,
+      sessionStickinessMode: existingRouting.sessionStickinessMode,
+      drainGraceMinutes: existingRouting.drainGraceMinutes,
+    });
+
+    updateData.preferredCountryCodesJson = JSON.stringify(normalized.preferredCountryCodes);
+    updateData.preferredCountryWeightsJson = JSON.stringify(normalized.preferredCountryWeights);
+    updateData.preferredRegionMode = normalized.preferredRegionMode;
+    appliedRegionCode = nextRegion;
+  }
+
+  if (input.pinServerId) {
+    const pinCandidate = dynamicKey.accessKeys.find((accessKey) => accessKey.server?.id === input.pinServerId)?.server;
+    if (!pinCandidate) {
+      throw new Error('Choose one of the currently attached premium servers for a temporary pin.');
+    }
+
+    appliedPinServerId = pinCandidate.id;
+    appliedPinServerName = pinCandidate.name;
+    appliedPinExpiresAt = input.pinExpiresInMinutes
+      ? new Date(Date.now() + input.pinExpiresInMinutes * 60_000)
+      : null;
+
+    updateData.pinnedAccessKeyId = null;
+    updateData.pinnedServerId = pinCandidate.id;
+    updateData.pinnedAt = new Date();
+    updateData.pinExpiresAt = appliedPinExpiresAt;
+  }
+
+  if (input.appendNoteToKey && input.adminNote?.trim()) {
+    const supportStamp = `[Premium support ${input.request.requestCode} · ${new Date().toISOString()}]`;
+    updateData.notes = appendTelegramPremiumSupportAdminNote(
+      dynamicKey.notes,
+      `${supportStamp}\n${input.adminNote.trim()}`,
+    );
+  }
+
+  const updatedKey =
+    Object.keys(updateData).length > 0
+      ? await db.dynamicAccessKey.update({
+          where: { id: dynamicKey.id },
+          data: updateData,
+          select: {
+            id: true,
+            name: true,
+            publicSlug: true,
+            dynamicUrl: true,
+          },
+        })
+      : {
+          id: dynamicKey.id,
+          name: dynamicKey.name,
+          publicSlug: dynamicKey.publicSlug,
+          dynamicUrl: dynamicKey.dynamicUrl,
+        };
+
+  return {
+    updatedKey,
+    appliedRegionCode,
+    appliedPinServerId,
+    appliedPinServerName,
+    appliedPinExpiresAt,
+  };
+}
+
+export async function approveTelegramPremiumSupportRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+  approvedRegionCode?: string | null;
+  pinServerId?: string | null;
+  pinExpiresInMinutes?: number | null;
+  appendNoteToKey?: boolean;
+}) {
+  const claim = await db.telegramPremiumSupportRequest.updateMany({
+    where: {
+      id: input.requestId,
+      status: 'PENDING_REVIEW',
+      requestType: 'REGION_CHANGE',
+    },
+    data: {
+      status: 'APPROVED',
+      reviewedByUserId: input.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? null,
+      reviewedAt: new Date(),
+      handledAt: new Date(),
+      adminNote: input.adminNote?.trim() || null,
+    },
+  });
+
+  if (claim.count === 0) {
+    throw new Error('This premium support request is no longer pending review.');
+  }
+
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      dynamicAccessKey: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new Error('Premium support request not found.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  try {
+    const applied = await applyPremiumSupportRoutingUpdate({
+      request,
+      approvedRegionCode: input.approvedRegionCode,
+      pinServerId: input.pinServerId,
+      pinExpiresInMinutes: input.pinExpiresInMinutes,
+      adminNote: input.adminNote,
+      appendNoteToKey: input.appendNoteToKey,
+    });
+
+    const finalRequest = await db.telegramPremiumSupportRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'APPROVED',
+        reviewedByUserId: input.reviewedByUserId ?? null,
+        reviewerName: input.reviewerName ?? null,
+        reviewedAt: new Date(),
+        handledAt: new Date(),
+        appliedPinServerId: applied.appliedPinServerId,
+        appliedPinServerName: applied.appliedPinServerName,
+        appliedPinExpiresAt: applied.appliedPinExpiresAt,
+        adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
+        customerMessage:
+          input.customerMessage?.trim() ||
+          ui.premiumRequestApproved(request.dynamicAccessKey.name, applied.appliedRegionCode, supportLink),
+      },
+    });
+
+    const config = await getTelegramConfig();
+    if (config) {
+      await sendTelegramMessage(
+        config.botToken,
+        request.telegramChatId,
+        finalRequest.customerMessage || ui.premiumRequestApproved(request.dynamicAccessKey.name, applied.appliedRegionCode, supportLink),
+        {
+          replyMarkup: getCommandKeyboard(false),
+        },
+      );
+    }
+
+    await writeAuditLog({
+      userId: input.reviewedByUserId ?? null,
+      action: 'TELEGRAM_PREMIUM_SUPPORT_APPROVED',
+      entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+      entityId: finalRequest.id,
+      details: {
+        requestCode: request.requestCode,
+        requestType: request.requestType,
+        dynamicAccessKeyId: request.dynamicAccessKeyId,
+        approvedRegionCode: applied.appliedRegionCode,
+        pinServerId: applied.appliedPinServerId,
+        reviewerName: input.reviewerName ?? null,
+      },
+    });
+
+    return finalRequest;
+  } catch (error) {
+    await db.telegramPremiumSupportRequest.update({
+      where: { id: input.requestId },
+      data: {
+        status: 'PENDING_REVIEW',
+        reviewedByUserId: null,
+        reviewerName: null,
+        reviewedAt: null,
+        handledAt: null,
+        adminNote: appendTelegramPremiumSupportAdminNote(
+          request.adminNote,
+          `Approval failed at ${new Date().toISOString()}: ${(error as Error).message}`,
+        ),
+      },
+    });
+    throw error;
+  }
+}
+
+export async function handleTelegramPremiumSupportRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+  pinServerId?: string | null;
+  pinExpiresInMinutes?: number | null;
+  appendNoteToKey?: boolean;
+}) {
+  const claim = await db.telegramPremiumSupportRequest.updateMany({
+    where: {
+      id: input.requestId,
+      status: 'PENDING_REVIEW',
+      requestType: 'ROUTE_ISSUE',
+    },
+    data: {
+      status: 'HANDLED',
+      reviewedByUserId: input.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? null,
+      reviewedAt: new Date(),
+      handledAt: new Date(),
+      adminNote: input.adminNote?.trim() || null,
+    },
+  });
+
+  if (claim.count === 0) {
+    throw new Error('This premium support request is no longer pending review.');
+  }
+
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      dynamicAccessKey: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new Error('Premium support request not found.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  try {
+    const applied = await applyPremiumSupportRoutingUpdate({
+      request,
+      pinServerId: input.pinServerId,
+      pinExpiresInMinutes: input.pinExpiresInMinutes,
+      adminNote: input.adminNote,
+      appendNoteToKey: input.appendNoteToKey,
+    });
+
+    const finalRequest = await db.telegramPremiumSupportRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'HANDLED',
+        reviewedByUserId: input.reviewedByUserId ?? null,
+        reviewerName: input.reviewerName ?? null,
+        reviewedAt: new Date(),
+        handledAt: new Date(),
+        appliedPinServerId: applied.appliedPinServerId,
+        appliedPinServerName: applied.appliedPinServerName,
+        appliedPinExpiresAt: applied.appliedPinExpiresAt,
+        adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
+        customerMessage:
+          input.customerMessage?.trim() ||
+          ui.premiumIssueHandled(request.dynamicAccessKey.name, supportLink),
+      },
+    });
+
+    const config = await getTelegramConfig();
+    if (config) {
+      await sendTelegramMessage(
+        config.botToken,
+        request.telegramChatId,
+        finalRequest.customerMessage || ui.premiumIssueHandled(request.dynamicAccessKey.name, supportLink),
+        {
+          replyMarkup: getCommandKeyboard(false),
+        },
+      );
+    }
+
+    await writeAuditLog({
+      userId: input.reviewedByUserId ?? null,
+      action: 'TELEGRAM_PREMIUM_SUPPORT_HANDLED',
+      entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+      entityId: finalRequest.id,
+      details: {
+        requestCode: request.requestCode,
+        requestType: request.requestType,
+        dynamicAccessKeyId: request.dynamicAccessKeyId,
+        pinServerId: applied.appliedPinServerId,
+        reviewerName: input.reviewerName ?? null,
+      },
+    });
+
+    return finalRequest;
+  } catch (error) {
+    await db.telegramPremiumSupportRequest.update({
+      where: { id: input.requestId },
+      data: {
+        status: 'PENDING_REVIEW',
+        reviewedByUserId: null,
+        reviewerName: null,
+        reviewedAt: null,
+        handledAt: null,
+        adminNote: appendTelegramPremiumSupportAdminNote(
+          request.adminNote,
+          `Handling failed at ${new Date().toISOString()}: ${(error as Error).message}`,
+        ),
+      },
+    });
+    throw error;
+  }
+}
+
+export async function dismissTelegramPremiumSupportRequest(input: {
+  requestId: string;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+}) {
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      dynamicAccessKey: true,
+    },
+  });
+
+  if (!request) {
+    throw new Error('Premium support request not found.');
+  }
+
+  if (request.status !== 'PENDING_REVIEW') {
+    throw new Error('This premium support request has already been reviewed.');
+  }
+
+  const locale = coerceSupportedLocale(request.locale) || (await getTelegramDefaultLocale());
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  const finalRequest = await db.telegramPremiumSupportRequest.update({
+    where: { id: request.id },
+    data: {
+      status: 'DISMISSED',
+      reviewedByUserId: input.reviewedByUserId ?? null,
+      reviewerName: input.reviewerName ?? null,
+      reviewedAt: new Date(),
+      dismissedAt: new Date(),
+      adminNote: appendTelegramPremiumSupportAdminNote(request.adminNote, input.adminNote),
+      customerMessage:
+        input.customerMessage?.trim() ||
+        ui.premiumSupportDismissed(request.dynamicAccessKey.name, null, supportLink),
+    },
+  });
+
+  const config = await getTelegramConfig();
+  if (config) {
+    await sendTelegramMessage(
+      config.botToken,
+      request.telegramChatId,
+      finalRequest.customerMessage || ui.premiumSupportDismissed(request.dynamicAccessKey.name, null, supportLink),
+      {
+        replyMarkup: getCommandKeyboard(false),
+      },
+    );
+  }
+
+  await writeAuditLog({
+    userId: input.reviewedByUserId ?? null,
+    action: 'TELEGRAM_PREMIUM_SUPPORT_DISMISSED',
+    entity: 'TELEGRAM_PREMIUM_SUPPORT_REQUEST',
+    entityId: finalRequest.id,
+    details: {
+      requestCode: request.requestCode,
+      requestType: request.requestType,
+      dynamicAccessKeyId: request.dynamicAccessKeyId,
+      reviewerName: input.reviewerName ?? null,
+    },
+  });
+
+  return finalRequest;
 }
 
 export async function updateTelegramOrderDraft(input: {
@@ -8451,15 +9058,48 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            await sendTelegramPremiumSupportAlert({
-              dynamicAccessKeyId: dynamicKey.id,
-              requestType: 'REGION_CHANGE',
-              telegramChatId: String(chatId),
-              telegramUserId: String(callbackQuery.from.id),
+            const existingPending = await db.telegramPremiumSupportRequest.findFirst({
+              where: {
+                dynamicAccessKeyId: dynamicKey.id,
+                requestType: 'REGION_CHANGE',
+                status: 'PENDING_REVIEW',
+              },
+              select: {
+                id: true,
+                requestCode: true,
+              },
+            });
+            if (existingPending) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.premiumSupportRequestPending(existingPending.requestCode),
+                {
+                  replyMarkup: buildTelegramDynamicPremiumSupportKeyboard(
+                    dynamicKey.id,
+                    locale,
+                    supportLink,
+                  ),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.premiumSupportRequestPending(existingPending.requestCode),
+              );
+              return null;
+            }
+
+            const request = await createTelegramPremiumSupportRequestRecord({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
               telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
               locale,
+              dynamicAccessKey: dynamicKey,
+              requestType: 'REGION_CHANGE',
               requestedRegionCode: regionCode,
             });
+            await sendTelegramPremiumSupportReviewAlert(request.id);
             await sendTelegramMessage(
               config.botToken,
               chatId,
@@ -8480,14 +9120,47 @@ async function handleTelegramCallbackQuery(
             return null;
           }
           case 'is': {
-            await sendTelegramPremiumSupportAlert({
-              dynamicAccessKeyId: dynamicKey.id,
-              requestType: 'ROUTE_ISSUE',
-              telegramChatId: String(chatId),
-              telegramUserId: String(callbackQuery.from.id),
+            const existingPending = await db.telegramPremiumSupportRequest.findFirst({
+              where: {
+                dynamicAccessKeyId: dynamicKey.id,
+                requestType: 'ROUTE_ISSUE',
+                status: 'PENDING_REVIEW',
+              },
+              select: {
+                id: true,
+                requestCode: true,
+              },
+            });
+            if (existingPending) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.premiumSupportRequestPending(existingPending.requestCode),
+                {
+                  replyMarkup: buildTelegramDynamicPremiumSupportKeyboard(
+                    dynamicKey.id,
+                    locale,
+                    supportLink,
+                  ),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.premiumSupportRequestPending(existingPending.requestCode),
+              );
+              return null;
+            }
+
+            const request = await createTelegramPremiumSupportRequestRecord({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
               telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
               locale,
+              dynamicAccessKey: dynamicKey,
+              requestType: 'ROUTE_ISSUE',
             });
+            await sendTelegramPremiumSupportReviewAlert(request.id);
             await sendTelegramMessage(
               config.botToken,
               chatId,

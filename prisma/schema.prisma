@@ -39,6 +39,7 @@ model User {
   dynamicAccessKeys  DynamicAccessKey[]
   telegramLinkTokens TelegramLinkToken[]
   reviewedTelegramOrders TelegramOrder[]
+  reviewedTelegramPremiumSupportRequests TelegramPremiumSupportRequest[] @relation("ReviewedTelegramPremiumSupportRequests")
   sessions           Session[]
 }
 
@@ -334,6 +335,42 @@ model TelegramServerChangeRequest {
   @@index([status, createdAt])
 }
 
+model TelegramPremiumSupportRequest {
+  id                           String   @id @default(cuid())
+  requestCode                  String   @unique
+  status                       String
+  requestType                  String
+  locale                       String   @default("en")
+  telegramChatId               String
+  telegramUserId               String
+  telegramUsername             String?
+  dynamicAccessKeyId           String
+  dynamicAccessKey             DynamicAccessKey @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  requestedRegionCode          String?
+  currentPoolSummary           String?
+  currentResolvedServerId      String?
+  currentResolvedServerName    String?
+  currentResolvedServerCountryCode String?
+  appliedPinServerId           String?
+  appliedPinServerName         String?
+  appliedPinExpiresAt          DateTime?
+  adminNote                    String?
+  customerMessage              String?
+  reviewedByUserId             String?
+  reviewedBy                   User?    @relation("ReviewedTelegramPremiumSupportRequests", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewerName                 String?
+  reviewedAt                   DateTime?
+  handledAt                    DateTime?
+  dismissedAt                  DateTime?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@index([telegramChatId, status, createdAt])
+  @@index([telegramUserId, status, createdAt])
+  @@index([dynamicAccessKeyId, status, createdAt])
+  @@index([status, requestType, createdAt])
+}
+
 model TelegramUserProfile {
   telegramUserId String   @id
   telegramChatId String?
@@ -462,6 +499,7 @@ model DynamicAccessKey {
   subscriptionEvents SubscriptionPageEvent[]
   routingEvents      DynamicRoutingEvent[]
   distributionLinks  AccessDistributionLink[]
+  premiumSupportRequests TelegramPremiumSupportRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

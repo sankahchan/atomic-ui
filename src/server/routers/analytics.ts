@@ -975,7 +975,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders, fulfilledTrials] = await Promise.all([
+      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -992,6 +992,9 @@ export const analyticsRouter = router({
             planName: true,
             priceAmount: true,
             priceCurrency: true,
+            deliveryType: true,
+            approvedDynamicKeyId: true,
+            selectedServerCountryCode: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
             paymentReminderSentAt: true,
@@ -1023,12 +1026,34 @@ export const analyticsRouter = router({
             planName: true,
             priceAmount: true,
             priceCurrency: true,
+            deliveryType: true,
             paymentMethodCode: true,
             paymentMethodLabel: true,
             paymentProofRevision: true,
             rejectionReasonCode: true,
             createdAt: true,
             fulfilledAt: true,
+          },
+        }),
+        db.telegramPremiumSupportRequest.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+          select: {
+            id: true,
+            requestType: true,
+            status: true,
+            requestedRegionCode: true,
+            currentResolvedServerName: true,
+            currentResolvedServerCountryCode: true,
+            createdAt: true,
+            handledAt: true,
+            dismissedAt: true,
+          },
+        }),
+        db.telegramPremiumSupportRequest.count({
+          where: {
+            status: 'PENDING_REVIEW',
           },
         }),
         db.telegramOrder.findMany({
@@ -1094,6 +1119,11 @@ export const analyticsRouter = router({
       let trialConvertedPaidOrders = 0;
       const trialConvertedUsers = new Set<string>();
       const earliestTrialByIdentity = new Map<string, Date>();
+      const premiumRevenueByCurrency = new Map<string, number>();
+      const premiumRegionDemand = new Map<string, number>();
+      const premiumRouteIssuesByServer = new Map<string, { label: string; count: number }>();
+      const premiumActiveUsers = new Set<string>();
+      const premiumActiveDynamicKeys = new Set<string>();
 
       for (const trialOrder of fulfilledTrials) {
         const baseline = trialOrder.fulfilledAt || trialOrder.createdAt;
@@ -1161,6 +1191,25 @@ export const analyticsRouter = router({
         if (order.status === 'FULFILLED' && typeof order.priceAmount === 'number' && order.priceAmount > 0) {
           const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
           revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        }
+
+        if (order.deliveryType === 'DYNAMIC_KEY') {
+          if (order.status === 'FULFILLED') {
+            premiumActiveUsers.add(order.telegramUserId);
+            if (order.approvedDynamicKeyId) {
+              premiumActiveDynamicKeys.add(order.approvedDynamicKeyId);
+            }
+            if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+              const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+              premiumRevenueByCurrency.set(
+                currency,
+                (premiumRevenueByCurrency.get(currency) || 0) + order.priceAmount,
+              );
+            }
+          }
+
+          const regionKey = order.selectedServerCountryCode?.trim().toUpperCase() || 'AUTO';
+          premiumRegionDemand.set(regionKey, (premiumRegionDemand.get(regionKey) || 0) + 1);
         }
 
         const planKey = order.planCode || order.planName || 'custom';
@@ -1236,6 +1285,28 @@ export const analyticsRouter = router({
         }
       }
 
+      for (const request of premiumSupportRequests) {
+        if (request.requestType !== 'ROUTE_ISSUE') {
+          if (request.requestedRegionCode) {
+            const key = request.requestedRegionCode.trim().toUpperCase();
+            premiumRegionDemand.set(key, (premiumRegionDemand.get(key) || 0) + 1);
+          }
+          continue;
+        }
+
+        const serverKey =
+          request.currentResolvedServerName?.trim() ||
+          request.currentResolvedServerCountryCode?.trim().toUpperCase() ||
+          'UNRESOLVED';
+        const label =
+          request.currentResolvedServerName?.trim() ||
+          request.currentResolvedServerCountryCode?.trim().toUpperCase() ||
+          'Unresolved';
+        const current = premiumRouteIssuesByServer.get(serverKey) || { label, count: 0 };
+        current.count += 1;
+        premiumRouteIssuesByServer.set(serverKey, current);
+      }
+
       return {
         range: input.range,
         summary,
@@ -1299,6 +1370,26 @@ export const analyticsRouter = router({
           ...order,
           priceCurrency: order.priceCurrency?.trim().toUpperCase() || null,
         })),
+        premium: {
+          summary: {
+            premiumOrders: orders.filter((order) => order.deliveryType === 'DYNAMIC_KEY').length,
+            activeUsers: premiumActiveUsers.size,
+            activeDynamicKeys: premiumActiveDynamicKeys.size,
+            openSupportRequests,
+            handledSupportRequests: premiumSupportRequests.filter((request) => request.status === 'HANDLED').length,
+            approvedRegionRequests: premiumSupportRequests.filter((request) => request.status === 'APPROVED').length,
+            dismissedSupportRequests: premiumSupportRequests.filter((request) => request.status === 'DISMISSED').length,
+          },
+          revenueByCurrency: Array.from(premiumRevenueByCurrency.entries())
+            .map(([currency, amount]) => ({ currency, amount }))
+            .sort((left, right) => right.amount - left.amount),
+          regionDemand: Array.from(premiumRegionDemand.entries())
+            .map(([region, count]) => ({ region, count }))
+            .sort((left, right) => right.count - left.count),
+          routeIssuesByServer: Array.from(premiumRouteIssuesByServer.values()).sort(
+            (left, right) => right.count - left.count,
+          ),
+        },
       };
     }),
 

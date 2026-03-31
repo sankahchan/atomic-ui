@@ -25,11 +25,15 @@ import {
 } from '@/lib/services/telegram-sales';
 import {
   approveTelegramOrder,
+  approveTelegramPremiumSupportRequest,
   approveTelegramServerChangeRequest,
+  dismissTelegramPremiumSupportRequest,
+  handleTelegramPremiumSupportRequest,
   rejectTelegramOrder,
   rejectTelegramServerChangeRequest,
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
+import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
 
 /**
  * Telegram Bot Settings Schema
@@ -731,6 +735,138 @@ export const telegramBotRouter = router({
       }));
     }),
 
+  listPremiumSupportRequests: adminProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(100).default(25),
+          statuses: z.array(z.string()).optional(),
+          requestTypes: z.array(z.enum(['REGION_CHANGE', 'ROUTE_ISSUE'])).optional(),
+          query: z.string().max(120).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 25;
+      const statuses = input?.statuses?.filter(Boolean);
+      const requestTypes = input?.requestTypes?.filter(Boolean);
+      const query = input?.query?.trim();
+
+      const filters: Array<Record<string, unknown>> = [];
+      if (statuses?.length) {
+        filters.push({ status: { in: statuses } });
+      }
+      if (requestTypes?.length) {
+        filters.push({ requestType: { in: requestTypes } });
+      }
+      if (query) {
+        filters.push({
+          OR: [
+            { requestCode: { contains: query } },
+            { telegramUsername: { contains: query } },
+            { telegramUserId: { contains: query } },
+            { requestedRegionCode: { contains: query } },
+            { currentResolvedServerName: { contains: query } },
+            {
+              dynamicAccessKey: {
+                name: {
+                  contains: query,
+                },
+              },
+            },
+          ],
+        });
+      }
+
+      const requests = await db.telegramPremiumSupportRequest.findMany({
+        where: filters.length ? { AND: filters } : undefined,
+        orderBy: [{ createdAt: 'desc' }],
+        take: limit,
+        include: {
+          reviewedBy: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+          dynamicAccessKey: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              dynamicUrl: true,
+              publicSlug: true,
+              lastResolvedServerId: true,
+              lastResolvedAt: true,
+              preferredCountryCodesJson: true,
+              preferredRegionMode: true,
+              pinnedServerId: true,
+              pinExpiresAt: true,
+              notes: true,
+              accessKeys: {
+                where: { status: 'ACTIVE' },
+                select: {
+                  id: true,
+                  name: true,
+                  server: {
+                    select: {
+                      id: true,
+                      name: true,
+                      countryCode: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return requests.map((request) => {
+        const preferredCountries = parseDynamicRoutingPreferences({
+          preferredCountryCodesJson: request.dynamicAccessKey.preferredCountryCodesJson,
+          preferredRegionMode: request.dynamicAccessKey.preferredRegionMode,
+        }).preferredCountryCodes;
+        const attachedCountries = Array.from(
+          new Set(
+            request.dynamicAccessKey.accessKeys
+              .map((accessKey) => accessKey.server?.countryCode?.toUpperCase())
+              .filter((value): value is string => Boolean(value)),
+          ),
+        );
+        const availableRegionCodes = Array.from(
+          new Set([
+            ...preferredCountries.map((code) => code.toUpperCase()),
+            ...attachedCountries,
+            request.requestedRegionCode?.toUpperCase() || '',
+          ].filter(Boolean)),
+        );
+        const availablePinServers = Array.from(
+          new Map(
+            request.dynamicAccessKey.accessKeys
+              .filter((accessKey) => accessKey.server)
+              .map((accessKey) => [
+                accessKey.server!.id,
+                {
+                  id: accessKey.server!.id,
+                  name: accessKey.server!.name,
+                  countryCode: accessKey.server!.countryCode || null,
+                },
+              ]),
+          ).values(),
+        );
+
+        return {
+          ...request,
+          dynamicAccessKey: {
+            ...request.dynamicAccessKey,
+            availableRegionCodes,
+            availablePinServers,
+          },
+        };
+      });
+    }),
+
   approveOrder: adminProcedure
     .input(
       z.object({
@@ -813,6 +949,74 @@ export const telegramBotRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       return rejectTelegramServerChangeRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
+      });
+    }),
+
+  approvePremiumSupportRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().max(1000).optional().nullable(),
+        approvedRegionCode: z.string().max(16).optional().nullable(),
+        pinServerId: z.string().optional().nullable(),
+        pinExpiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional().nullable(),
+        appendNoteToKey: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return approveTelegramPremiumSupportRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
+        approvedRegionCode: input.approvedRegionCode,
+        pinServerId: input.pinServerId,
+        pinExpiresInMinutes: input.pinExpiresInMinutes,
+        appendNoteToKey: input.appendNoteToKey,
+      });
+    }),
+
+  handlePremiumSupportRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().max(1000).optional().nullable(),
+        pinServerId: z.string().optional().nullable(),
+        pinExpiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional().nullable(),
+        appendNoteToKey: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return handleTelegramPremiumSupportRequest({
+        requestId: input.requestId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: input.adminNote,
+        customerMessage: input.customerMessage,
+        pinServerId: input.pinServerId,
+        pinExpiresInMinutes: input.pinExpiresInMinutes,
+        appendNoteToKey: input.appendNoteToKey,
+      });
+    }),
+
+  dismissPremiumSupportRequest: adminProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        adminNote: z.string().max(1000).optional().nullable(),
+        customerMessage: z.string().max(1000).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return dismissTelegramPremiumSupportRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
         reviewerName: ctx.user.email || null,

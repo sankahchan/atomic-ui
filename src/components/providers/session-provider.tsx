@@ -69,7 +69,7 @@ export function SessionProvider({
         isLoggingOutRef.current = true;
 
         fetch(withBasePath('/api/auth/logout'), { method: 'POST' }).finally(() => {
-            router.push(withBasePath('/login?reason=timeout'));
+            router.push('/login?reason=timeout');
             toast({
                 title: "Session Expired",
                 description: "You have been logged out due to inactivity.",

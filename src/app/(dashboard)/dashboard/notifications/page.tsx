@@ -390,6 +390,57 @@ type TelegramServerChangeRequestRow = {
   };
 };
 
+type TelegramPremiumSupportRequestRow = {
+  id: string;
+  requestCode: string;
+  status: string;
+  requestType: string;
+  locale: string;
+  telegramChatId: string;
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  requestedRegionCode?: string | null;
+  currentPoolSummary?: string | null;
+  currentResolvedServerId?: string | null;
+  currentResolvedServerName?: string | null;
+  currentResolvedServerCountryCode?: string | null;
+  appliedPinServerId?: string | null;
+  appliedPinServerName?: string | null;
+  appliedPinExpiresAt?: Date | null;
+  adminNote?: string | null;
+  customerMessage?: string | null;
+  reviewedByUserId?: string | null;
+  reviewerName?: string | null;
+  reviewedAt?: Date | null;
+  handledAt?: Date | null;
+  dismissedAt?: Date | null;
+  createdAt: Date;
+  reviewedBy?: {
+    id: string;
+    email?: string | null;
+  } | null;
+  dynamicAccessKey: {
+    id: string;
+    name: string;
+    status: string;
+    dynamicUrl?: string | null;
+    publicSlug?: string | null;
+    lastResolvedServerId?: string | null;
+    lastResolvedAt?: Date | null;
+    preferredCountryCodesJson?: string | null;
+    preferredRegionMode?: string | null;
+    pinnedServerId?: string | null;
+    pinExpiresAt?: Date | null;
+    notes?: string | null;
+    availableRegionCodes: string[];
+    availablePinServers: Array<{
+      id: string;
+      name: string;
+      countryCode?: string | null;
+    }>;
+  };
+};
+
 const TELEGRAM_REJECTION_REASON_PRESETS = [
   {
     code: 'proof_unclear',
@@ -1957,6 +2008,25 @@ function TelegramSalesWorkflowCard() {
       placeholderData: keepPreviousData,
     },
   );
+  const premiumSupportRequestsQuery = trpc.telegramBot.listPremiumSupportRequests.useQuery(
+    {
+      limit: 20,
+      statuses: ['PENDING_REVIEW'],
+    },
+    {
+      placeholderData: keepPreviousData,
+    },
+  );
+  const [premiumReviewTarget, setPremiumReviewTarget] = useState<{
+    requestId: string;
+    mode: 'approve' | 'handle' | 'dismiss';
+  } | null>(null);
+  const [premiumReviewNote, setPremiumReviewNote] = useState('');
+  const [premiumReviewCustomerMessage, setPremiumReviewCustomerMessage] = useState('');
+  const [premiumReviewRegionCode, setPremiumReviewRegionCode] = useState('');
+  const [premiumReviewPinServerId, setPremiumReviewPinServerId] = useState('none');
+  const [premiumReviewPinExpires, setPremiumReviewPinExpires] = useState('60');
+  const [premiumAppendNoteToKey, setPremiumAppendNoteToKey] = useState(true);
   const templatesById = useMemo(
     () => new Map((templatesQuery.data || []).map((template) => [template.id, template])),
     [templatesQuery.data],
@@ -2138,6 +2208,33 @@ function TelegramSalesWorkflowCard() {
     requestSubmittedAt: isMyanmar ? 'Requested' : 'Requested',
     approveMoveSuccess: isMyanmar ? 'Server change request ကို approve လုပ်ပြီး key ကို ပြောင်းပြီးပါပြီ' : 'Server change request approved and key moved',
     rejectMoveSuccess: isMyanmar ? 'Server change request ကို reject လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Server change request rejected and user notified',
+    premiumSupportRequestsTitle: isMyanmar ? 'Premium support requests' : 'Premium support requests',
+    premiumSupportRequestsDesc: isMyanmar
+      ? 'Premium dynamic key များအတွက် region preference နှင့် route issue request များကို စစ်ဆေးပြီး လိုအပ်သလို update လုပ်ပါ။'
+      : 'Review preferred-region changes and premium route-issue reports for dynamic keys.',
+    noPremiumSupportRequests: isMyanmar
+      ? 'Pending premium support request မရှိသေးပါ။'
+      : 'No pending premium support requests.',
+    premiumRequestType: isMyanmar ? 'Request type' : 'Request type',
+    premiumRequestTypeRegion: isMyanmar ? 'Preferred region change' : 'Preferred region change',
+    premiumRequestTypeRoute: isMyanmar ? 'Route issue report' : 'Route issue report',
+    premiumPoolSummary: isMyanmar ? 'Current premium pool' : 'Current premium pool',
+    premiumResolvedServer: isMyanmar ? 'Last resolved server' : 'Last resolved server',
+    premiumRequestedRegion: isMyanmar ? 'Requested region' : 'Requested region',
+    premiumApproveRegion: isMyanmar ? 'Region approve' : 'Approve region',
+    premiumHandleIssue: isMyanmar ? 'Handle issue' : 'Handle issue',
+    premiumDismiss: isMyanmar ? 'Dismiss' : 'Dismiss',
+    premiumPinServer: isMyanmar ? 'Temporary pin server' : 'Temporary pin server',
+    premiumPinExpires: isMyanmar ? 'Pin duration' : 'Pin duration',
+    premiumNoPinServer: isMyanmar ? 'No temporary pin' : 'No temporary pin',
+    premiumAppendNoteToKey: isMyanmar ? 'Dynamic key note ထဲသို့ admin note ကို ထည့်မည်' : 'Append admin note to the dynamic key',
+    premiumApproveSuccess: isMyanmar ? 'Premium region request ကို approve လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium region request approved and user notified',
+    premiumHandleSuccess: isMyanmar ? 'Premium route issue ကို handle လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium route issue handled and user notified',
+    premiumDismissSuccess: isMyanmar ? 'Premium support request ကို dismiss လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium support request dismissed and user notified',
+    premiumOpenDynamicKey: isMyanmar ? 'Dynamic key page ဖွင့်မည်' : 'Open dynamic key page',
+    premiumPinPresets: isMyanmar ? 'Pin time' : 'Pin time',
+    premiumCurrentPin: isMyanmar ? 'Current pin' : 'Current pin',
+    premiumNoRequestedRegion: isMyanmar ? 'Auto / admin review' : 'Auto / admin review',
   };
 
   const renderTemplateSummary = (
@@ -2494,6 +2591,85 @@ function TelegramSalesWorkflowCard() {
       });
     },
   });
+  const approvePremiumSupportRequestMutation = trpc.telegramBot.approvePremiumSupportRequest.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.listPremiumSupportRequests.invalidate(),
+        utils.analytics.telegramSalesDashboard.invalidate(),
+        utils.dynamicKeys.list.invalidate(),
+        utils.dynamicKeys.getById.invalidate(),
+      ]);
+      setPremiumReviewTarget(null);
+      setPremiumReviewNote('');
+      setPremiumReviewCustomerMessage('');
+      setPremiumReviewRegionCode('');
+      setPremiumReviewPinServerId('none');
+      setPremiumReviewPinExpires('60');
+      setPremiumAppendNoteToKey(true);
+      toast({
+        title: salesUi.premiumApproveSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: salesUi.updateFailed,
+        description: error.message,
+      });
+    },
+  });
+  const handlePremiumSupportRequestMutation = trpc.telegramBot.handlePremiumSupportRequest.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.listPremiumSupportRequests.invalidate(),
+        utils.analytics.telegramSalesDashboard.invalidate(),
+        utils.dynamicKeys.list.invalidate(),
+        utils.dynamicKeys.getById.invalidate(),
+      ]);
+      setPremiumReviewTarget(null);
+      setPremiumReviewNote('');
+      setPremiumReviewCustomerMessage('');
+      setPremiumReviewRegionCode('');
+      setPremiumReviewPinServerId('none');
+      setPremiumReviewPinExpires('60');
+      setPremiumAppendNoteToKey(true);
+      toast({
+        title: salesUi.premiumHandleSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: salesUi.updateFailed,
+        description: error.message,
+      });
+    },
+  });
+  const dismissPremiumSupportRequestMutation = trpc.telegramBot.dismissPremiumSupportRequest.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.telegramBot.listPremiumSupportRequests.invalidate(),
+        utils.analytics.telegramSalesDashboard.invalidate(),
+      ]);
+      setPremiumReviewTarget(null);
+      setPremiumReviewNote('');
+      setPremiumReviewCustomerMessage('');
+      setPremiumReviewRegionCode('');
+      setPremiumReviewPinServerId('none');
+      setPremiumReviewPinExpires('60');
+      setPremiumAppendNoteToKey(true);
+      toast({
+        title: salesUi.premiumDismissSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: salesUi.updateFailed,
+        description: error.message,
+      });
+    },
+  });
 
   const updateOrderDraftMutation = trpc.telegramBot.updateOrderDraft.useMutation({
     onSuccess: async (result) => {
@@ -2650,6 +2826,11 @@ function TelegramSalesWorkflowCard() {
     ? withBasePath(`/api/telegram/orders/${selectedOrder.id}/proof?download=1`)
     : '';
   const selectedOrderProofIsImage = selectedOrder?.paymentProofType === 'photo';
+  const selectedPremiumSupportRequest = premiumReviewTarget
+    ? ((premiumSupportRequestsQuery.data || []) as TelegramPremiumSupportRequestRow[]).find(
+        (request) => request.id === premiumReviewTarget.requestId,
+      ) || null
+    : null;
   const selectedPlan = reviewPlanCode
     ? form.plans.find((plan) => plan.code === reviewPlanCode) || null
     : null;
@@ -3687,6 +3868,180 @@ function TelegramSalesWorkflowCard() {
         </CardContent>
       </Card>
 
+      <Card className="border border-border/60 bg-background/80 shadow-[0_22px_50px_-24px_rgba(15,23,42,0.35)] dark:bg-[#050816]/90">
+        <CardHeader>
+          <CardTitle>{salesUi.premiumSupportRequestsTitle}</CardTitle>
+          <CardDescription>{salesUi.premiumSupportRequestsDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {premiumSupportRequestsQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading…
+            </div>
+          ) : !premiumSupportRequestsQuery.data || premiumSupportRequestsQuery.data.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 p-6 text-sm text-muted-foreground">
+              {salesUi.noPremiumSupportRequests}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {premiumSupportRequestsQuery.data.map((request: TelegramPremiumSupportRequestRow) => (
+                <div
+                  key={request.id}
+                  className="rounded-2xl border border-border/60 bg-background/45 p-4"
+                >
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{request.requestCode}</p>
+                        <Badge variant="outline">{request.status}</Badge>
+                        <Badge variant="secondary">{request.dynamicAccessKey.name}</Badge>
+                        <Badge variant="outline">
+                          {request.requestType === 'REGION_CHANGE'
+                            ? salesUi.premiumRequestTypeRegion
+                            : salesUi.premiumRequestTypeRoute}
+                        </Badge>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.user}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            @{request.telegramUsername || 'unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{request.telegramUserId}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.premiumPoolSummary}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">{request.currentPoolSummary || '—'}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.premiumResolvedServer}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.currentResolvedServerName || '—'}
+                            {request.currentResolvedServerCountryCode
+                              ? ` (${request.currentResolvedServerCountryCode})`
+                              : ''}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.requestSubmittedAt}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">{formatRelativeTime(request.createdAt)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateTime(request.createdAt)}</p>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.premiumRequestedRegion}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.requestedRegionCode || salesUi.premiumNoRequestedRegion}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.premiumCurrentPin}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {request.dynamicAccessKey.pinnedServerId
+                              ? `${request.dynamicAccessKey.pinnedServerId}${request.dynamicAccessKey.pinExpiresAt ? ` · ${formatRelativeTime(request.dynamicAccessKey.pinExpiresAt)}` : ''}`
+                              : salesUi.premiumNoPinServer}
+                          </p>
+                        </div>
+                      </div>
+                      {request.adminNote ? (
+                        <div className="rounded-xl border border-border/40 bg-background/40 p-3 text-sm text-muted-foreground">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.adminNote}
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap">{request.adminNote}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2 xl:w-[13rem] xl:flex-col">
+                      {request.requestType === 'REGION_CHANGE' ? (
+                        <Button
+                          type="button"
+                          className="rounded-full"
+                          onClick={() => {
+                            setPremiumReviewTarget({ requestId: request.id, mode: 'approve' });
+                            setPremiumReviewNote(request.adminNote || '');
+                            setPremiumReviewCustomerMessage(request.customerMessage || '');
+                            setPremiumReviewRegionCode(
+                              request.requestedRegionCode ||
+                                request.dynamicAccessKey.availableRegionCodes[0] ||
+                                '',
+                            );
+                            setPremiumReviewPinServerId('none');
+                            setPremiumReviewPinExpires('60');
+                            setPremiumAppendNoteToKey(true);
+                          }}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          {salesUi.premiumApproveRegion}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="rounded-full"
+                          onClick={() => {
+                            setPremiumReviewTarget({ requestId: request.id, mode: 'handle' });
+                            setPremiumReviewNote(request.adminNote || '');
+                            setPremiumReviewCustomerMessage(request.customerMessage || '');
+                            setPremiumReviewRegionCode('');
+                            setPremiumReviewPinServerId('none');
+                            setPremiumReviewPinExpires('60');
+                            setPremiumAppendNoteToKey(true);
+                          }}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          {salesUi.premiumHandleIssue}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => {
+                          setPremiumReviewTarget({ requestId: request.id, mode: 'dismiss' });
+                          setPremiumReviewNote(request.adminNote || '');
+                          setPremiumReviewCustomerMessage(request.customerMessage || '');
+                          setPremiumReviewRegionCode(
+                            request.requestedRegionCode ||
+                              request.dynamicAccessKey.availableRegionCodes[0] ||
+                              '',
+                          );
+                          setPremiumReviewPinServerId('none');
+                          setPremiumReviewPinExpires('60');
+                          setPremiumAppendNoteToKey(false);
+                        }}
+                      >
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        {salesUi.premiumDismiss}
+                      </Button>
+                      <Button asChild type="button" variant="ghost" className="rounded-full">
+                        <Link href={withBasePath(`/dashboard/dynamic-keys/${request.dynamicAccessKey.id}`)}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          {salesUi.premiumOpenDynamicKey}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog
         open={Boolean(reviewTarget)}
         onOpenChange={(open) => {
@@ -4134,6 +4489,244 @@ function TelegramSalesWorkflowCard() {
                 <AlertTriangle className="mr-2 h-4 w-4" />
               )}
               {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(premiumReviewTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPremiumReviewTarget(null);
+            setPremiumReviewNote('');
+            setPremiumReviewCustomerMessage('');
+            setPremiumReviewRegionCode('');
+            setPremiumReviewPinServerId('none');
+            setPremiumReviewPinExpires('60');
+            setPremiumAppendNoteToKey(true);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {premiumReviewTarget?.mode === 'approve'
+                ? salesUi.premiumApproveRegion
+                : premiumReviewTarget?.mode === 'handle'
+                  ? salesUi.premiumHandleIssue
+                  : salesUi.premiumDismiss}
+            </DialogTitle>
+            <DialogDescription>{salesUi.reviewContextHint}</DialogDescription>
+          </DialogHeader>
+
+          {selectedPremiumSupportRequest ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.orderContext}
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-medium">{selectedPremiumSupportRequest.requestCode}</p>
+                  <p className="text-muted-foreground">
+                    {selectedPremiumSupportRequest.requestType === 'REGION_CHANGE'
+                      ? salesUi.premiumRequestTypeRegion
+                      : salesUi.premiumRequestTypeRoute}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedPremiumSupportRequest.dynamicAccessKey.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {salesUi.premiumPoolSummary}: {selectedPremiumSupportRequest.currentPoolSummary || '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {salesUi.customer}
+                </p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-medium">@{selectedPremiumSupportRequest.telegramUsername || 'unknown'}</p>
+                  <p className="text-xs text-muted-foreground">{selectedPremiumSupportRequest.telegramUserId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {salesUi.requestSubmittedAt}: {formatDateTime(selectedPremiumSupportRequest.createdAt)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {salesUi.premiumResolvedServer}: {selectedPremiumSupportRequest.currentResolvedServerName || '—'}
+                    {selectedPremiumSupportRequest.currentResolvedServerCountryCode
+                      ? ` (${selectedPremiumSupportRequest.currentResolvedServerCountryCode})`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedPremiumSupportRequest?.requestType === 'REGION_CHANGE' &&
+          premiumReviewTarget?.mode === 'approve' ? (
+            <div className="space-y-2">
+              <Label>{salesUi.premiumRequestedRegion}</Label>
+              <Select value={premiumReviewRegionCode} onValueChange={setPremiumReviewRegionCode}>
+                <SelectTrigger>
+                  <SelectValue placeholder={salesUi.premiumNoRequestedRegion} />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedPremiumSupportRequest.dynamicAccessKey.availableRegionCodes.map((region) => (
+                    <SelectItem key={region} value={region}>
+                      {region}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {premiumReviewTarget?.mode !== 'dismiss' && selectedPremiumSupportRequest ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{salesUi.premiumPinServer}</Label>
+                <Select value={premiumReviewPinServerId} onValueChange={setPremiumReviewPinServerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={salesUi.premiumNoPinServer} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{salesUi.premiumNoPinServer}</SelectItem>
+                    {selectedPremiumSupportRequest.dynamicAccessKey.availablePinServers.map((server) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name}
+                        {server.countryCode ? ` (${server.countryCode})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.premiumPinExpires}</Label>
+                <Select value={premiumReviewPinExpires} onValueChange={setPremiumReviewPinExpires}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="180">3 hours</SelectItem>
+                    <SelectItem value="720">12 hours</SelectItem>
+                    <SelectItem value="1440">24 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : null}
+
+          {premiumReviewTarget?.mode !== 'dismiss' ? (
+            <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.premiumAppendNoteToKey}</p>
+                <p className="text-xs text-muted-foreground">{salesUi.adminNote}</p>
+              </div>
+              <Switch checked={premiumAppendNoteToKey} onCheckedChange={setPremiumAppendNoteToKey} />
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="telegram-premium-review-note">{salesUi.adminNote}</Label>
+            <Textarea
+              id="telegram-premium-review-note"
+              value={premiumReviewNote}
+              onChange={(event) => setPremiumReviewNote(event.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="telegram-premium-customer-message">{salesUi.customerMessage}</Label>
+            <Textarea
+              id="telegram-premium-customer-message"
+              value={premiumReviewCustomerMessage}
+              onChange={(event) => setPremiumReviewCustomerMessage(event.target.value)}
+              rows={4}
+              placeholder={salesUi.customerMessageDesc}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPremiumReviewTarget(null);
+                setPremiumReviewNote('');
+                setPremiumReviewCustomerMessage('');
+                setPremiumReviewRegionCode('');
+                setPremiumReviewPinServerId('none');
+                setPremiumReviewPinExpires('60');
+                setPremiumAppendNoteToKey(true);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!premiumReviewTarget || !selectedPremiumSupportRequest) {
+                  return;
+                }
+
+                if (premiumReviewTarget.mode === 'approve') {
+                  approvePremiumSupportRequestMutation.mutate({
+                    requestId: premiumReviewTarget.requestId,
+                    adminNote: premiumReviewNote.trim() || undefined,
+                    customerMessage: premiumReviewCustomerMessage.trim() || undefined,
+                    approvedRegionCode: premiumReviewRegionCode || undefined,
+                    pinServerId: premiumReviewPinServerId === 'none' ? null : premiumReviewPinServerId,
+                    pinExpiresInMinutes:
+                      premiumReviewPinServerId === 'none'
+                        ? null
+                        : Number.parseInt(premiumReviewPinExpires, 10) || 60,
+                    appendNoteToKey: premiumAppendNoteToKey,
+                  });
+                  return;
+                }
+
+                if (premiumReviewTarget.mode === 'handle') {
+                  handlePremiumSupportRequestMutation.mutate({
+                    requestId: premiumReviewTarget.requestId,
+                    adminNote: premiumReviewNote.trim() || undefined,
+                    customerMessage: premiumReviewCustomerMessage.trim() || undefined,
+                    pinServerId: premiumReviewPinServerId === 'none' ? null : premiumReviewPinServerId,
+                    pinExpiresInMinutes:
+                      premiumReviewPinServerId === 'none'
+                        ? null
+                        : Number.parseInt(premiumReviewPinExpires, 10) || 60,
+                    appendNoteToKey: premiumAppendNoteToKey,
+                  });
+                  return;
+                }
+
+                dismissPremiumSupportRequestMutation.mutate({
+                  requestId: premiumReviewTarget.requestId,
+                  adminNote: premiumReviewNote.trim() || undefined,
+                  customerMessage: premiumReviewCustomerMessage.trim() || undefined,
+                });
+              }}
+              disabled={
+                approvePremiumSupportRequestMutation.isPending ||
+                handlePremiumSupportRequestMutation.isPending ||
+                dismissPremiumSupportRequestMutation.isPending
+              }
+            >
+              {approvePremiumSupportRequestMutation.isPending ||
+              handlePremiumSupportRequestMutation.isPending ||
+              dismissPremiumSupportRequestMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : premiumReviewTarget?.mode === 'dismiss' ? (
+                <AlertTriangle className="mr-2 h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              {premiumReviewTarget?.mode === 'approve'
+                ? salesUi.premiumApproveRegion
+                : premiumReviewTarget?.mode === 'handle'
+                  ? salesUi.premiumHandleIssue
+                  : salesUi.premiumDismiss}
             </Button>
           </DialogFooter>
         </DialogContent>
