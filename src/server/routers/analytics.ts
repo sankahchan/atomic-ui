@@ -1047,6 +1047,7 @@ export const analyticsRouter = router({
             currentResolvedServerName: true,
             currentResolvedServerCountryCode: true,
             createdAt: true,
+            reviewedAt: true,
             handledAt: true,
             dismissedAt: true,
           },
@@ -1124,6 +1125,13 @@ export const analyticsRouter = router({
       const premiumRouteIssuesByServer = new Map<string, { label: string; count: number }>();
       const premiumActiveUsers = new Set<string>();
       const premiumActiveDynamicKeys = new Set<string>();
+      let premiumFirstResponseMinutesTotal = 0;
+      let premiumFirstResponseCount = 0;
+      let premiumResolutionMinutesTotal = 0;
+      let premiumResolutionCount = 0;
+      let premiumOpenOlderThan6Hours = 0;
+      let premiumOpenOlderThan24Hours = 0;
+      let premiumOldestOpenMinutes: number | null = null;
 
       for (const trialOrder of fulfilledTrials) {
         const baseline = trialOrder.fulfilledAt || trialOrder.createdAt;
@@ -1286,6 +1294,34 @@ export const analyticsRouter = router({
       }
 
       for (const request of premiumSupportRequests) {
+        const firstResponseAt = request.reviewedAt || request.handledAt || request.dismissedAt;
+        if (firstResponseAt) {
+          premiumFirstResponseMinutesTotal +=
+            (firstResponseAt.getTime() - request.createdAt.getTime()) / (1000 * 60);
+          premiumFirstResponseCount += 1;
+        }
+
+        const resolutionAt =
+          request.handledAt ||
+          request.dismissedAt ||
+          (request.status === 'APPROVED' ? request.reviewedAt : null);
+        if (resolutionAt) {
+          premiumResolutionMinutesTotal +=
+            (resolutionAt.getTime() - request.createdAt.getTime()) / (1000 * 60);
+          premiumResolutionCount += 1;
+        }
+
+        if (request.status === 'PENDING_REVIEW') {
+          const openMinutes = (Date.now() - request.createdAt.getTime()) / (1000 * 60);
+          if (openMinutes >= 6 * 60) {
+            premiumOpenOlderThan6Hours += 1;
+          }
+          if (openMinutes >= 24 * 60) {
+            premiumOpenOlderThan24Hours += 1;
+          }
+          premiumOldestOpenMinutes = Math.max(premiumOldestOpenMinutes || 0, openMinutes);
+        }
+
         if (request.requestType !== 'ROUTE_ISSUE') {
           if (request.requestedRegionCode) {
             const key = request.requestedRegionCode.trim().toUpperCase();
@@ -1379,6 +1415,19 @@ export const analyticsRouter = router({
             handledSupportRequests: premiumSupportRequests.filter((request) => request.status === 'HANDLED').length,
             approvedRegionRequests: premiumSupportRequests.filter((request) => request.status === 'APPROVED').length,
             dismissedSupportRequests: premiumSupportRequests.filter((request) => request.status === 'DISMISSED').length,
+          },
+          sla: {
+            avgFirstResponseMinutes:
+              premiumFirstResponseCount > 0
+                ? premiumFirstResponseMinutesTotal / premiumFirstResponseCount
+                : null,
+            avgResolutionMinutes:
+              premiumResolutionCount > 0
+                ? premiumResolutionMinutesTotal / premiumResolutionCount
+                : null,
+            openOlderThan6Hours: premiumOpenOlderThan6Hours,
+            openOlderThan24Hours: premiumOpenOlderThan24Hours,
+            oldestOpenMinutes: premiumOldestOpenMinutes,
           },
           revenueByCurrency: Array.from(premiumRevenueByCurrency.entries())
             .map(([currency, amount]) => ({ currency, amount }))

@@ -415,6 +415,7 @@ type TelegramPremiumSupportRequestRow = {
   handledAt?: Date | null;
   dismissedAt?: Date | null;
   createdAt: Date;
+  updatedAt: Date;
   reviewedBy?: {
     id: string;
     email?: string | null;
@@ -439,6 +440,13 @@ type TelegramPremiumSupportRequestRow = {
       countryCode?: string | null;
     }>;
   };
+};
+
+type PremiumSupportHistoryEntry = {
+  key: string;
+  label: string;
+  at: Date;
+  detail?: string | null;
 };
 
 const TELEGRAM_REJECTION_REASON_PRESETS = [
@@ -483,6 +491,112 @@ const TELEGRAM_REJECTION_REASON_PRESETS = [
     },
   },
 ] as const;
+
+function formatPremiumSupportRequestTypeLabel(
+  requestType: string,
+  salesUi: {
+    premiumRequestTypeRegion: string;
+    premiumRequestTypeRoute: string;
+  },
+) {
+  return requestType === 'REGION_CHANGE'
+    ? salesUi.premiumRequestTypeRegion
+    : salesUi.premiumRequestTypeRoute;
+}
+
+function formatPremiumSupportRequestStatusLabel(
+  status: string,
+  salesUi: {
+    premiumStatusPending: string;
+    premiumStatusApproved: string;
+    premiumStatusHandled: string;
+    premiumStatusDismissed: string;
+  },
+) {
+  switch (status) {
+    case 'PENDING_REVIEW':
+      return salesUi.premiumStatusPending;
+    case 'APPROVED':
+      return salesUi.premiumStatusApproved;
+    case 'HANDLED':
+      return salesUi.premiumStatusHandled;
+    case 'DISMISSED':
+      return salesUi.premiumStatusDismissed;
+    default:
+      return status;
+  }
+}
+
+function buildPremiumSupportHistory(
+  request: TelegramPremiumSupportRequestRow,
+  salesUi: {
+    premiumHistorySubmitted: string;
+    premiumHistoryReviewed: string;
+    premiumHistoryApproved: string;
+    premiumHistoryHandled: string;
+    premiumHistoryDismissed: string;
+    premiumHistoryPinApplied: string;
+    premiumPinExpires: string;
+  },
+): PremiumSupportHistoryEntry[] {
+  const entries: PremiumSupportHistoryEntry[] = [
+    {
+      key: 'submitted',
+      label: salesUi.premiumHistorySubmitted,
+      at: request.createdAt,
+      detail: request.requestedRegionCode || null,
+    },
+  ];
+
+  if (request.reviewedAt) {
+    entries.push({
+      key: 'reviewed',
+      label: salesUi.premiumHistoryReviewed,
+      at: request.reviewedAt,
+      detail: request.reviewerName || request.reviewedBy?.email || null,
+    });
+  }
+
+  if (request.status === 'APPROVED' && request.reviewedAt) {
+    entries.push({
+      key: 'approved',
+      label: salesUi.premiumHistoryApproved,
+      at: request.reviewedAt,
+      detail: request.requestedRegionCode || null,
+    });
+  }
+
+  if (request.status === 'HANDLED' && (request.handledAt || request.reviewedAt)) {
+    entries.push({
+      key: 'handled',
+      label: salesUi.premiumHistoryHandled,
+      at: request.handledAt || request.reviewedAt!,
+      detail: request.currentResolvedServerName || request.currentResolvedServerCountryCode || null,
+    });
+  }
+
+  if (request.appliedPinServerName || request.appliedPinServerId) {
+    entries.push({
+      key: 'pin',
+      label: salesUi.premiumHistoryPinApplied,
+      at: request.handledAt || request.reviewedAt || request.updatedAt,
+      detail: request.appliedPinExpiresAt
+        ? `${request.appliedPinServerName || request.appliedPinServerId} · ${salesUi.premiumPinExpires}: ${formatDateTime(request.appliedPinExpiresAt)}`
+        : request.appliedPinServerName || request.appliedPinServerId || null,
+    });
+  }
+
+  if (request.status === 'DISMISSED' && (request.dismissedAt || request.reviewedAt)) {
+    entries.push({
+      key: 'dismissed',
+      label: salesUi.premiumHistoryDismissed,
+      at: request.dismissedAt || request.reviewedAt!,
+      detail: request.customerMessage || null,
+    });
+  }
+
+  return entries.sort((left, right) => left.at.getTime() - right.at.getTime());
+}
 
 const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
@@ -2008,10 +2122,26 @@ function TelegramSalesWorkflowCard() {
       placeholderData: keepPreviousData,
     },
   );
+  const [premiumRequestSearch, setPremiumRequestSearch] = useState('');
+  const deferredPremiumRequestSearch = useDeferredValue(premiumRequestSearch.trim());
+  const [premiumRequestStatusFilter, setPremiumRequestStatusFilter] = useState<
+    'ALL' | 'PENDING_REVIEW' | 'APPROVED' | 'HANDLED' | 'DISMISSED'
+  >('ALL');
+  const [premiumRequestTypeFilter, setPremiumRequestTypeFilter] = useState<
+    'ALL' | 'REGION_CHANGE' | 'ROUTE_ISSUE'
+  >('ALL');
   const premiumSupportRequestsQuery = trpc.telegramBot.listPremiumSupportRequests.useQuery(
     {
-      limit: 20,
-      statuses: ['PENDING_REVIEW'],
+      limit: 50,
+      statuses:
+        premiumRequestStatusFilter === 'ALL'
+          ? undefined
+          : [premiumRequestStatusFilter],
+      requestTypes:
+        premiumRequestTypeFilter === 'ALL'
+          ? undefined
+          : [premiumRequestTypeFilter],
+      query: deferredPremiumRequestSearch || undefined,
     },
     {
       placeholderData: keepPreviousData,
@@ -2235,6 +2365,25 @@ function TelegramSalesWorkflowCard() {
     premiumPinPresets: isMyanmar ? 'Pin time' : 'Pin time',
     premiumCurrentPin: isMyanmar ? 'Current pin' : 'Current pin',
     premiumNoRequestedRegion: isMyanmar ? 'Auto / admin review' : 'Auto / admin review',
+    premiumSearchPlaceholder: isMyanmar
+      ? 'Request code၊ key၊ region သို့မဟုတ် Telegram user ဖြင့် ရှာရန်'
+      : 'Search by request code, key, region, or Telegram user',
+    premiumAllStatuses: isMyanmar ? 'Status အားလုံး' : 'All statuses',
+    premiumAllTypes: isMyanmar ? 'Request type အားလုံး' : 'All request types',
+    premiumQueueMatches: (count: number) =>
+      isMyanmar ? `ကိုက်ညီသော request ${count} ခု` : `${count} matching requests`,
+    premiumStatusPending: isMyanmar ? 'Pending review' : 'Pending review',
+    premiumStatusApproved: isMyanmar ? 'Approved' : 'Approved',
+    premiumStatusHandled: isMyanmar ? 'Handled' : 'Handled',
+    premiumStatusDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
+    premiumHistoryTitle: isMyanmar ? 'Status history' : 'Status history',
+    premiumHistorySubmitted: isMyanmar ? 'Submitted' : 'Submitted',
+    premiumHistoryReviewed: isMyanmar ? 'Reviewed' : 'Reviewed',
+    premiumHistoryApproved: isMyanmar ? 'Preferred region applied' : 'Preferred region applied',
+    premiumHistoryHandled: isMyanmar ? 'Issue handled' : 'Issue handled',
+    premiumHistoryDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
+    premiumHistoryPinApplied: isMyanmar ? 'Temporary pin applied' : 'Temporary pin applied',
+    premiumLastUpdate: isMyanmar ? 'Last update' : 'Last update',
   };
 
   const renderTemplateSummary = (
@@ -3874,6 +4023,48 @@ function TelegramSalesWorkflowCard() {
           <CardDescription>{salesUi.premiumSupportRequestsDesc}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_220px_220px]">
+            <Input
+              value={premiumRequestSearch}
+              onChange={(event) => setPremiumRequestSearch(event.target.value)}
+              placeholder={salesUi.premiumSearchPlaceholder}
+            />
+            <Select
+              value={premiumRequestStatusFilter}
+              onValueChange={(value) =>
+                setPremiumRequestStatusFilter(
+                  value as 'ALL' | 'PENDING_REVIEW' | 'APPROVED' | 'HANDLED' | 'DISMISSED',
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={salesUi.premiumAllStatuses} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{salesUi.premiumAllStatuses}</SelectItem>
+                <SelectItem value="PENDING_REVIEW">{salesUi.premiumStatusPending}</SelectItem>
+                <SelectItem value="APPROVED">{salesUi.premiumStatusApproved}</SelectItem>
+                <SelectItem value="HANDLED">{salesUi.premiumStatusHandled}</SelectItem>
+                <SelectItem value="DISMISSED">{salesUi.premiumStatusDismissed}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={premiumRequestTypeFilter}
+              onValueChange={(value) =>
+                setPremiumRequestTypeFilter(value as 'ALL' | 'REGION_CHANGE' | 'ROUTE_ISSUE')
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={salesUi.premiumAllTypes} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{salesUi.premiumAllTypes}</SelectItem>
+                <SelectItem value="REGION_CHANGE">{salesUi.premiumRequestTypeRegion}</SelectItem>
+                <SelectItem value="ROUTE_ISSUE">{salesUi.premiumRequestTypeRoute}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {premiumSupportRequestsQuery.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -3885,21 +4076,29 @@ function TelegramSalesWorkflowCard() {
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span>{salesUi.premiumQueueMatches(premiumSupportRequestsQuery.data.length)}</span>
+                <span>{salesUi.premiumLastUpdate}: {formatRelativeTime(premiumSupportRequestsQuery.data[0]?.updatedAt || premiumSupportRequestsQuery.data[0]?.createdAt)}</span>
+              </div>
               {premiumSupportRequestsQuery.data.map((request: TelegramPremiumSupportRequestRow) => (
                 <div
                   key={request.id}
                   className="rounded-2xl border border-border/60 bg-background/45 p-4"
                 >
+                  {(() => {
+                    const history = buildPremiumSupportHistory(request, salesUi);
+                    const latestHistory = history[history.length - 1];
+                    return (
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold">{request.requestCode}</p>
-                        <Badge variant="outline">{request.status}</Badge>
+                        <Badge variant="outline">
+                          {formatPremiumSupportRequestStatusLabel(request.status, salesUi)}
+                        </Badge>
                         <Badge variant="secondary">{request.dynamicAccessKey.name}</Badge>
                         <Badge variant="outline">
-                          {request.requestType === 'REGION_CHANGE'
-                            ? salesUi.premiumRequestTypeRegion
-                            : salesUi.premiumRequestTypeRoute}
+                          {formatPremiumSupportRequestTypeLabel(request.requestType, salesUi)}
                         </Badge>
                       </div>
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -3954,6 +4153,16 @@ function TelegramSalesWorkflowCard() {
                             {request.dynamicAccessKey.pinnedServerId
                               ? `${request.dynamicAccessKey.pinnedServerId}${request.dynamicAccessKey.pinExpiresAt ? ` · ${formatRelativeTime(request.dynamicAccessKey.pinExpiresAt)}` : ''}`
                               : salesUi.premiumNoPinServer}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/40 p-3 md:col-span-2 xl:col-span-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {salesUi.premiumLastUpdate}
+                          </p>
+                          <p className="mt-1 text-sm font-medium">{latestHistory.label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatRelativeTime(latestHistory.at)}
+                            {latestHistory.detail ? ` · ${latestHistory.detail}` : ''}
                           </p>
                         </div>
                       </div>
@@ -4035,6 +4244,8 @@ function TelegramSalesWorkflowCard() {
                       </Button>
                     </div>
                   </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -4521,45 +4732,72 @@ function TelegramSalesWorkflowCard() {
           </DialogHeader>
 
           {selectedPremiumSupportRequest ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-border/50 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {salesUi.orderContext}
-                </p>
-                <div className="mt-2 space-y-1 text-sm">
-                  <p className="font-medium">{selectedPremiumSupportRequest.requestCode}</p>
-                  <p className="text-muted-foreground">
-                    {selectedPremiumSupportRequest.requestType === 'REGION_CHANGE'
-                      ? salesUi.premiumRequestTypeRegion
-                      : salesUi.premiumRequestTypeRoute}
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-border/50 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {salesUi.orderContext}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedPremiumSupportRequest.dynamicAccessKey.name}
+                  <div className="mt-2 space-y-1 text-sm">
+                    <p className="font-medium">{selectedPremiumSupportRequest.requestCode}</p>
+                    <p className="text-muted-foreground">
+                      {formatPremiumSupportRequestTypeLabel(
+                        selectedPremiumSupportRequest.requestType,
+                        salesUi,
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedPremiumSupportRequest.dynamicAccessKey.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.premiumPoolSummary}: {selectedPremiumSupportRequest.currentPoolSummary || '—'}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/50 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {salesUi.customer}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {salesUi.premiumPoolSummary}: {selectedPremiumSupportRequest.currentPoolSummary || '—'}
-                  </p>
+                  <div className="mt-2 space-y-1 text-sm">
+                    <p className="font-medium">@{selectedPremiumSupportRequest.telegramUsername || 'unknown'}</p>
+                    <p className="text-xs text-muted-foreground">{selectedPremiumSupportRequest.telegramUserId}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.requestSubmittedAt}: {formatDateTime(selectedPremiumSupportRequest.createdAt)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {salesUi.premiumResolvedServer}: {selectedPremiumSupportRequest.currentResolvedServerName || '—'}
+                      {selectedPremiumSupportRequest.currentResolvedServerCountryCode
+                        ? ` (${selectedPremiumSupportRequest.currentResolvedServerCountryCode})`
+                        : ''}
+                    </p>
+                  </div>
                 </div>
               </div>
+
               <div className="rounded-xl border border-border/50 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {salesUi.customer}
+                  {salesUi.premiumHistoryTitle}
                 </p>
-                <div className="mt-2 space-y-1 text-sm">
-                  <p className="font-medium">@{selectedPremiumSupportRequest.telegramUsername || 'unknown'}</p>
-                  <p className="text-xs text-muted-foreground">{selectedPremiumSupportRequest.telegramUserId}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {salesUi.requestSubmittedAt}: {formatDateTime(selectedPremiumSupportRequest.createdAt)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {salesUi.premiumResolvedServer}: {selectedPremiumSupportRequest.currentResolvedServerName || '—'}
-                    {selectedPremiumSupportRequest.currentResolvedServerCountryCode
-                      ? ` (${selectedPremiumSupportRequest.currentResolvedServerCountryCode})`
-                      : ''}
-                  </p>
+                <div className="mt-3 space-y-3">
+                  {buildPremiumSupportHistory(selectedPremiumSupportRequest, salesUi).map((entry) => (
+                    <div key={entry.key} className="flex items-start justify-between gap-3 rounded-lg border border-border/40 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{entry.label}</p>
+                        {entry.detail ? (
+                          <p className="mt-1 text-xs text-muted-foreground break-words">
+                            {entry.detail}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-medium">{formatRelativeTime(entry.at)}</p>
+                        <p className="text-[11px] text-muted-foreground">{formatDateTime(entry.at)}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            </>
           ) : null}
 
           {selectedPremiumSupportRequest?.requestType === 'REGION_CHANGE' &&

@@ -210,6 +210,19 @@ export default function AnalyticsPage() {
     return `${formattedAmount} ${normalizedCurrency}`;
   };
 
+  const formatDurationMetric = (minutes?: number | null) => {
+    if (minutes === null || minutes === undefined) {
+      return '—';
+    }
+    if (minutes < 60) {
+      return `${Math.round(minutes)}m`;
+    }
+    if (minutes < 24 * 60) {
+      return `${(minutes / 60).toFixed(1)}h`;
+    }
+    return `${(minutes / (24 * 60)).toFixed(1)}d`;
+  };
+
   const daysOfWeek = [
     t('days.sunday') || 'Sun',
     t('days.monday') || 'Mon',
@@ -900,6 +913,55 @@ export default function AnalyticsPage() {
                         ? '…'
                         : `${telegramSalesDashboard?.premium.summary.dismissedSupportRequests || 0} dismissed`}
                     </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg first response</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : formatDurationMetric(
+                            telegramSalesDashboard?.premium.sla.avgFirstResponseMinutes,
+                          )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">From request submission to first admin review.</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg resolution</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : formatDurationMetric(
+                            telegramSalesDashboard?.premium.sla.avgResolutionMinutes,
+                          )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">From request submission to approved, handled, or dismissed.</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Backlog &gt; 6h</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : telegramSalesDashboard?.premium.sla.openOlderThan6Hours || 0}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : `${telegramSalesDashboard?.premium.sla.openOlderThan24Hours || 0} older than 24h`}
+                    </p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Oldest open</p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : formatDurationMetric(
+                            telegramSalesDashboard?.premium.sla.oldestOpenMinutes,
+                          )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Oldest pending premium support request in the queue.</p>
                   </div>
                 </div>
 
