@@ -36,6 +36,109 @@ import {
 } from '@/lib/services/telegram-bot';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
 
+const TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES = new Set([
+  'AWAITING_KEY_SELECTION',
+  'AWAITING_PLAN',
+  'AWAITING_MONTHS',
+  'AWAITING_SERVER_SELECTION',
+  'AWAITING_KEY_NAME',
+  'AWAITING_PAYMENT_METHOD',
+  'AWAITING_PAYMENT_PROOF',
+  'PENDING_REVIEW',
+  'APPROVED',
+]);
+
+type TelegramOrderRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type TelegramOrderRiskReason =
+  | 'duplicate_proof'
+  | 'repeated_rejections'
+  | 'payment_history_mismatch'
+  | 'retry_pattern'
+  | 'multiple_open_orders'
+  | 'resubmitted_proof';
+
+function computeTelegramOrderRisk(input: {
+  order: {
+    id: string;
+    duplicateProofOrderCode?: string | null;
+    paymentProofRevision?: number | null;
+    retryOfOrderId?: string | null;
+  };
+  identityOrders: Array<{
+    id: string;
+    status: string;
+    createdAt: Date;
+    rejectionReasonCode?: string | null;
+    retryOfOrderId?: string | null;
+  }>;
+}) {
+  let score = 0;
+  const reasons: TelegramOrderRiskReason[] = [];
+  const now = Date.now();
+  const previousOrders = input.identityOrders.filter((candidate) => candidate.id !== input.order.id);
+  const previousRejectedOrders = previousOrders.filter((candidate) => candidate.status === 'REJECTED');
+  const recentRejectedOrders = previousRejectedOrders.filter(
+    (candidate) => now - candidate.createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000,
+  );
+  const mismatchHistoryCount = previousRejectedOrders.filter((candidate) =>
+    candidate.rejectionReasonCode === 'wrong_payment_method' ||
+    candidate.rejectionReasonCode === 'amount_mismatch',
+  ).length;
+  const retryCount = input.identityOrders.filter((candidate) => Boolean(candidate.retryOfOrderId)).length;
+  const openOrders = input.identityOrders.filter((candidate) =>
+    TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES.has(candidate.status),
+  ).length;
+
+  if (input.order.duplicateProofOrderCode) {
+    score += 45;
+    reasons.push('duplicate_proof');
+  }
+
+  if ((input.order.paymentProofRevision ?? 0) > 1) {
+    score += 10;
+    reasons.push('resubmitted_proof');
+  }
+
+  if (recentRejectedOrders.length >= 2 || previousRejectedOrders.length >= 3) {
+    score += 20;
+    reasons.push('repeated_rejections');
+  } else if (previousRejectedOrders.length >= 1) {
+    score += 10;
+    reasons.push('repeated_rejections');
+  }
+
+  if (mismatchHistoryCount >= 1) {
+    score += 10;
+    reasons.push('payment_history_mismatch');
+  }
+
+  if (input.order.retryOfOrderId || retryCount >= 2) {
+    score += input.order.retryOfOrderId ? 15 : 10;
+    reasons.push('retry_pattern');
+  }
+
+  if (openOrders > 1) {
+    score += 10;
+    reasons.push('multiple_open_orders');
+  }
+
+  const riskScore = Math.min(100, score);
+  const riskLevel: TelegramOrderRiskLevel =
+    riskScore >= 70
+      ? 'CRITICAL'
+      : riskScore >= 45
+        ? 'HIGH'
+        : riskScore >= 20
+          ? 'MEDIUM'
+          : 'LOW';
+
+  return {
+    riskScore,
+    riskLevel,
+    riskReasons: Array.from(new Set(reasons)),
+  };
+}
+
 /**
  * Telegram Bot Settings Schema
  */
@@ -482,6 +585,8 @@ export const telegramBotRouter = router({
                 telegramChatId: true,
                 requestedEmail: true,
                 planName: true,
+                retryOfOrderId: true,
+                rejectionReasonCode: true,
                 approvedAccessKeyId: true,
                 approvedDynamicKeyId: true,
                 createdAt: true,
@@ -526,6 +631,11 @@ export const telegramBotRouter = router({
       };
 
       return orders.map((order) => {
+        const identityOrders = relatedOrders.filter((candidate) => matchesOrderIdentity(order, candidate));
+        const risk = computeTelegramOrderRisk({
+          order,
+          identityOrders,
+        });
         const accessLinkedEntries: Array<[string, CustomerLinkedKey]> = keys
           .filter((key) => {
             const emailMatch =
@@ -617,8 +727,8 @@ export const telegramBotRouter = router({
               ...dynamicLinkedEntries,
             ]).values(),
           ).slice(0, 5),
-          customerRecentOrders: relatedOrders
-            .filter((candidate) => candidate.id !== order.id && matchesOrderIdentity(order, candidate))
+          customerRecentOrders: identityOrders
+            .filter((candidate) => candidate.id !== order.id)
             .slice(0, 4)
             .map((candidate) => ({
               id: candidate.id,
@@ -636,17 +746,19 @@ export const telegramBotRouter = router({
               fulfilledAt: candidate.fulfilledAt,
               rejectedAt: candidate.rejectedAt,
             })),
+          riskScore: risk.riskScore,
+          riskLevel: risk.riskLevel,
+          riskReasons: risk.riskReasons,
           customerSummary: (() => {
-          const identityOrders = relatedOrders.filter((candidate) => matchesOrderIdentity(order, candidate));
-          const lastFulfilled = identityOrders.find((candidate) => candidate.status === 'FULFILLED');
-          return {
-            totalOrders: identityOrders.length,
-            pendingOrders: identityOrders.filter((candidate) => candidate.status === 'PENDING_REVIEW').length,
-            fulfilledOrders: identityOrders.filter((candidate) => candidate.status === 'FULFILLED').length,
-            rejectedOrders: identityOrders.filter((candidate) => candidate.status === 'REJECTED').length,
-            lastOrderAt: identityOrders[0]?.createdAt ?? null,
-            lastFulfilledAt: lastFulfilled?.fulfilledAt ?? lastFulfilled?.createdAt ?? null,
-          };
+            const lastFulfilled = identityOrders.find((candidate) => candidate.status === 'FULFILLED');
+            return {
+              totalOrders: identityOrders.length,
+              pendingOrders: identityOrders.filter((candidate) => candidate.status === 'PENDING_REVIEW').length,
+              fulfilledOrders: identityOrders.filter((candidate) => candidate.status === 'FULFILLED').length,
+              rejectedOrders: identityOrders.filter((candidate) => candidate.status === 'REJECTED').length,
+              lastOrderAt: identityOrders[0]?.createdAt ?? null,
+              lastFulfilledAt: lastFulfilled?.fulfilledAt ?? lastFulfilled?.createdAt ?? null,
+            };
           })(),
         };
       });

@@ -311,6 +311,16 @@ type TelegramOrderRow = {
   fulfilledAt?: Date | null;
   rejectedAt?: Date | null;
   createdAt: Date;
+  riskScore: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  riskReasons: Array<
+    | 'duplicate_proof'
+    | 'repeated_rejections'
+    | 'payment_history_mismatch'
+    | 'retry_pattern'
+    | 'multiple_open_orders'
+    | 'resubmitted_proof'
+  >;
   reviewedBy?: {
     id: string;
     email?: string | null;
@@ -2345,6 +2355,17 @@ function TelegramSalesWorkflowCard() {
     reviewContextHint: isMyanmar
       ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
       : 'Review customer context and linked keys before approving.',
+    riskLabel: isMyanmar ? 'Risk score' : 'Risk score',
+    riskLow: isMyanmar ? 'Low' : 'Low',
+    riskMedium: isMyanmar ? 'Medium' : 'Medium',
+    riskHigh: isMyanmar ? 'High' : 'High',
+    riskCritical: isMyanmar ? 'Critical' : 'Critical',
+    riskReasonDuplicateProof: isMyanmar ? 'Duplicate proof history' : 'Duplicate proof history',
+    riskReasonRepeatedRejections: isMyanmar ? 'Repeated rejected orders' : 'Repeated rejected orders',
+    riskReasonPaymentMismatch: isMyanmar ? 'Payment mismatch history' : 'Payment mismatch history',
+    riskReasonRetryPattern: isMyanmar ? 'Retry-heavy order pattern' : 'Retry-heavy order pattern',
+    riskReasonMultipleOpenOrders: isMyanmar ? 'Multiple open orders' : 'Multiple open orders',
+    riskReasonResubmittedProof: isMyanmar ? 'Proof resubmitted' : 'Proof resubmitted',
     user: isMyanmar ? 'User' : 'User',
     order: isMyanmar ? 'Order' : 'Order',
     proof: isMyanmar ? 'Payment proof' : 'Payment proof',
@@ -3069,7 +3090,24 @@ function TelegramSalesWorkflowCard() {
   const pendingOrders = ((ordersQuery.data || []).filter(
     (order) => order.status === 'PENDING_REVIEW',
   ) as TelegramOrderRow[]);
-  const matchedOrders = (ordersQuery.data || []) as TelegramOrderRow[];
+  const matchedOrders = useMemo(
+    () =>
+      [...(((ordersQuery.data || []) as TelegramOrderRow[]))].sort((left, right) => {
+        const pendingDelta =
+          Number(right.status === 'PENDING_REVIEW') - Number(left.status === 'PENDING_REVIEW');
+        if (pendingDelta !== 0) {
+          return pendingDelta;
+        }
+
+        const riskDelta = (right.riskScore || 0) - (left.riskScore || 0);
+        if (riskDelta !== 0) {
+          return riskDelta;
+        }
+
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      }),
+    [ordersQuery.data],
+  );
   const selectedOrder = reviewTarget
     ? matchedOrders.find((order) => order.id === reviewTarget.orderId) || null
     : null;
@@ -3112,6 +3150,51 @@ function TelegramSalesWorkflowCard() {
       return '—';
     }
     return formatBytes(BigInt(order.dataLimitBytes));
+  };
+
+  const formatOrderRiskLevelLabel = (level: TelegramOrderRow['riskLevel']) => {
+    switch (level) {
+      case 'CRITICAL':
+        return salesUi.riskCritical;
+      case 'HIGH':
+        return salesUi.riskHigh;
+      case 'MEDIUM':
+        return salesUi.riskMedium;
+      default:
+        return salesUi.riskLow;
+    }
+  };
+
+  const formatOrderRiskReasonLabel = (reason: TelegramOrderRow['riskReasons'][number]) => {
+    switch (reason) {
+      case 'duplicate_proof':
+        return salesUi.riskReasonDuplicateProof;
+      case 'repeated_rejections':
+        return salesUi.riskReasonRepeatedRejections;
+      case 'payment_history_mismatch':
+        return salesUi.riskReasonPaymentMismatch;
+      case 'retry_pattern':
+        return salesUi.riskReasonRetryPattern;
+      case 'multiple_open_orders':
+        return salesUi.riskReasonMultipleOpenOrders;
+      case 'resubmitted_proof':
+        return salesUi.riskReasonResubmittedProof;
+      default:
+        return reason;
+    }
+  };
+
+  const getOrderRiskBadgeClass = (level: TelegramOrderRow['riskLevel']) => {
+    switch (level) {
+      case 'CRITICAL':
+        return 'border-red-500/40 bg-red-500/10 text-red-200';
+      case 'HIGH':
+        return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+      case 'MEDIUM':
+        return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200';
+      default:
+        return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
+    }
   };
 
   useEffect(() => {
@@ -3800,10 +3883,15 @@ function TelegramSalesWorkflowCard() {
                                 ? salesUi.rejected
                                 : order.status === 'CANCELLED'
                                   ? salesUi.cancelled
-                                : order.status}
+                                  : order.status}
                         </Badge>
                         <Badge variant="outline">{order.kind}</Badge>
                         <Badge variant="outline">{order.locale === 'my' ? 'မြန်မာ' : 'English'}</Badge>
+                        {order.riskScore > 0 ? (
+                          <Badge variant="outline" className={cn('font-medium', getOrderRiskBadgeClass(order.riskLevel))}>
+                            {salesUi.riskLabel}: {formatOrderRiskLevelLabel(order.riskLevel)} · {order.riskScore}
+                          </Badge>
+                        ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {salesUi.user}: @{order.telegramUsername || 'unknown'} · {order.telegramUserId}
@@ -3855,6 +3943,24 @@ function TelegramSalesWorkflowCard() {
                             {salesUi.duplicateProofOrderLabel}: <span className="font-medium text-foreground">{order.duplicateProofOrderCode}</span>
                           </p>
                         </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {order.riskScore > 0 ? (
+                    <div className="mt-4 rounded-xl border border-border/50 bg-background/50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-foreground">{salesUi.riskLabel}</p>
+                        <Badge variant="outline" className={cn('font-medium', getOrderRiskBadgeClass(order.riskLevel))}>
+                          {formatOrderRiskLevelLabel(order.riskLevel)} · {order.riskScore}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {order.riskReasons.map((reason) => (
+                          <Badge key={reason} variant="secondary" className="text-[11px]">
+                            {formatOrderRiskReasonLabel(reason)}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   ) : null}
@@ -4639,6 +4745,25 @@ function TelegramSalesWorkflowCard() {
                   ) : null}
                 </div>
               </div>
+              {selectedOrder.riskScore > 0 ? (
+                <div className="rounded-xl border border-border/50 p-3 md:col-span-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {salesUi.riskLabel}
+                    </p>
+                    <Badge variant="outline" className={cn('font-medium', getOrderRiskBadgeClass(selectedOrder.riskLevel))}>
+                      {formatOrderRiskLevelLabel(selectedOrder.riskLevel)} · {selectedOrder.riskScore}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedOrder.riskReasons.map((reason) => (
+                      <Badge key={reason} variant="secondary" className="text-[11px]">
+                        {formatOrderRiskReasonLabel(reason)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
