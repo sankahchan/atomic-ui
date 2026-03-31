@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { router, adminProcedure, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
+import { writeAuditLog } from '@/lib/audit';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
@@ -137,6 +138,41 @@ function computeTelegramOrderRisk(input: {
     riskLevel,
     riskReasons: Array.from(new Set(reasons)),
   };
+}
+
+async function ensureTelegramOrderAssignmentAccess(input: {
+  orderId: string;
+  userId?: string | null;
+}) {
+  const order = await db.telegramOrder.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      orderCode: true,
+      status: true,
+      assignedReviewerUserId: true,
+      assignedReviewerEmail: true,
+    },
+  });
+
+  if (!order) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Telegram order not found.',
+    });
+  }
+
+  if (
+    order.assignedReviewerUserId &&
+    order.assignedReviewerUserId !== input.userId
+  ) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: `This order is claimed by ${order.assignedReviewerEmail || 'another admin'}.`,
+    });
+  }
+
+  return order;
 }
 
 /**
@@ -749,6 +785,9 @@ export const telegramBotRouter = router({
           riskScore: risk.riskScore,
           riskLevel: risk.riskLevel,
           riskReasons: risk.riskReasons,
+          assignedReviewerUserId: order.assignedReviewerUserId,
+          assignedReviewerEmail: order.assignedReviewerEmail,
+          assignedAt: order.assignedAt,
           customerSummary: (() => {
             const lastFulfilled = identityOrders.find((candidate) => candidate.status === 'FULFILLED');
             return {
@@ -762,6 +801,114 @@ export const telegramBotRouter = router({
           })(),
         };
       });
+    }),
+
+  claimOrder: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        claimed: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          status: true,
+          assignedReviewerUserId: true,
+          assignedReviewerEmail: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found.',
+        });
+      }
+
+      if (order.status !== 'PENDING_REVIEW') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only pending-review orders can be claimed.',
+        });
+      }
+
+      if (input.claimed) {
+        if (order.assignedReviewerUserId && order.assignedReviewerUserId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `This order is already claimed by ${order.assignedReviewerEmail || 'another admin'}.`,
+          });
+        }
+
+        const claimedOrder = await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            assignedReviewerUserId: ctx.user.id,
+            assignedReviewerEmail: ctx.user.email || null,
+            assignedAt: new Date(),
+          },
+          select: {
+            id: true,
+            orderCode: true,
+            assignedReviewerUserId: true,
+            assignedReviewerEmail: true,
+            assignedAt: true,
+          },
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          action: 'TELEGRAM_ORDER_CLAIMED',
+          entity: 'TELEGRAM_ORDER',
+          entityId: order.id,
+          details: {
+            orderCode: order.orderCode,
+            assignedReviewerEmail: ctx.user.email || null,
+          },
+        });
+
+        return claimedOrder;
+      }
+
+      if (order.assignedReviewerUserId && order.assignedReviewerUserId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `This order is claimed by ${order.assignedReviewerEmail || 'another admin'}.`,
+        });
+      }
+
+      const releasedOrder = await db.telegramOrder.update({
+        where: { id: order.id },
+        data: {
+          assignedReviewerUserId: null,
+          assignedReviewerEmail: null,
+          assignedAt: null,
+        },
+        select: {
+          id: true,
+          orderCode: true,
+          assignedReviewerUserId: true,
+          assignedReviewerEmail: true,
+          assignedAt: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'TELEGRAM_ORDER_RELEASED',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          previousAssignedReviewerEmail: order.assignedReviewerEmail || null,
+        },
+      });
+
+      return releasedOrder;
     }),
 
   listServerChangeRequests: adminProcedure
@@ -1034,6 +1181,10 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureTelegramOrderAssignmentAccess({
+        orderId: input.orderId,
+        userId: ctx.user.id,
+      });
       return approveTelegramOrder({
         orderId: input.orderId,
         reviewedByUserId: ctx.user.id,
@@ -1052,6 +1203,10 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureTelegramOrderAssignmentAccess({
+        orderId: input.orderId,
+        userId: ctx.user.id,
+      });
       return updateTelegramOrderDraft({
         orderId: input.orderId,
         updatedByUserId: ctx.user.id,
@@ -1072,6 +1227,10 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureTelegramOrderAssignmentAccess({
+        orderId: input.orderId,
+        userId: ctx.user.id,
+      });
       return rejectTelegramOrder({
         orderId: input.orderId,
         reviewedByUserId: ctx.user.id,

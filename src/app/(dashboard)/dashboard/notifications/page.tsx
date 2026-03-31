@@ -321,6 +321,9 @@ type TelegramOrderRow = {
     | 'multiple_open_orders'
     | 'resubmitted_proof'
   >;
+  assignedReviewerUserId?: string | null;
+  assignedReviewerEmail?: string | null;
+  assignedAt?: Date | null;
   reviewedBy?: {
     id: string;
     email?: string | null;
@@ -2151,6 +2154,7 @@ function TelegramSalesWorkflowCard() {
   const { locale } = useLocale();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
+  const currentUserQuery = trpc.auth.me.useQuery();
   const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
   const templatesQuery = trpc.templates.list.useQuery();
   const dynamicTemplatesQuery = trpc.dynamicKeys.listTemplates.useQuery();
@@ -2355,6 +2359,15 @@ function TelegramSalesWorkflowCard() {
     reviewContextHint: isMyanmar
       ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
       : 'Review customer context and linked keys before approving.',
+    reviewerAssignment: isMyanmar ? 'Reviewer assignment' : 'Reviewer assignment',
+    claimOrder: isMyanmar ? 'Claim' : 'Claim',
+    releaseOrder: isMyanmar ? 'Release' : 'Release',
+    claimedBy: isMyanmar ? 'Claimed by' : 'Claimed by',
+    claimedAt: isMyanmar ? 'Claimed at' : 'Claimed at',
+    claimedByMe: isMyanmar ? 'Claimed by me' : 'Claimed by me',
+    unassigned: isMyanmar ? 'Unassigned' : 'Unassigned',
+    claimSuccess: isMyanmar ? 'Order ကို claim လုပ်ပြီးပါပြီ' : 'Order claimed',
+    releaseSuccess: isMyanmar ? 'Order claim ကို လွှတ်ပြီးပါပြီ' : 'Order released',
     riskLabel: isMyanmar ? 'Risk score' : 'Risk score',
     riskLow: isMyanmar ? 'Low' : 'Low',
     riskMedium: isMyanmar ? 'Medium' : 'Medium',
@@ -2811,6 +2824,22 @@ function TelegramSalesWorkflowCard() {
       });
     },
   });
+
+  const claimOrderMutation = trpc.telegramBot.claimOrder.useMutation({
+    onSuccess: async (_result, variables) => {
+      await utils.telegramBot.listOrders.invalidate();
+      toast({
+        title: variables.claimed ? salesUi.claimSuccess : salesUi.releaseSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: isMyanmar ? 'Order assignment failed' : 'Order assignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
   const approveServerChangeRequestMutation = trpc.telegramBot.approveServerChangeRequest.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -3111,6 +3140,8 @@ function TelegramSalesWorkflowCard() {
   const selectedOrder = reviewTarget
     ? matchedOrders.find((order) => order.id === reviewTarget.orderId) || null
     : null;
+  const currentReviewerId = currentUserQuery.data?.id ?? null;
+  const currentReviewerEmail = currentUserQuery.data?.email ?? null;
   const selectedOrderId = selectedOrder?.id ?? null;
   const selectedOrderRejectionReasonCode = selectedOrder?.rejectionReasonCode ?? null;
   const selectedOrderPlanCode = (selectedOrder?.planCode as TelegramSalesPlanCode | null) ?? null;
@@ -3195,6 +3226,16 @@ function TelegramSalesWorkflowCard() {
       default:
         return 'border-slate-500/40 bg-slate-500/10 text-slate-200';
     }
+  };
+
+  const isOrderClaimedByCurrentUser = (order: TelegramOrderRow) =>
+    Boolean(order.assignedReviewerUserId && currentReviewerId && order.assignedReviewerUserId === currentReviewerId);
+
+  const isOrderClaimedByOtherUser = (order: TelegramOrderRow) =>
+    Boolean(order.assignedReviewerUserId && (!currentReviewerId || order.assignedReviewerUserId !== currentReviewerId));
+
+  const handleClaimOrder = (orderId: string, claimed: boolean) => {
+    claimOrderMutation.mutate({ orderId, claimed });
   };
 
   useEffect(() => {
@@ -3892,6 +3933,15 @@ function TelegramSalesWorkflowCard() {
                             {salesUi.riskLabel}: {formatOrderRiskLevelLabel(order.riskLevel)} · {order.riskScore}
                           </Badge>
                         ) : null}
+                        {order.assignedReviewerEmail ? (
+                          <Badge variant="outline">
+                            {isOrderClaimedByCurrentUser(order)
+                              ? salesUi.claimedByMe
+                              : `${salesUi.claimedBy} ${order.assignedReviewerEmail}`}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">{salesUi.unassigned}</Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {salesUi.user}: @{order.telegramUsername || 'unknown'} · {order.telegramUserId}
@@ -3899,6 +3949,27 @@ function TelegramSalesWorkflowCard() {
                     </div>
                     {order.status === 'PENDING_REVIEW' ? (
                       <div className="flex flex-wrap gap-2">
+                        {!order.assignedReviewerUserId ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleClaimOrder(order.id, true)}
+                            disabled={claimOrderMutation.isPending}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {salesUi.claimOrder}
+                          </Button>
+                        ) : isOrderClaimedByCurrentUser(order) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleClaimOrder(order.id, false)}
+                            disabled={claimOrderMutation.isPending}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            {salesUi.releaseOrder}
+                          </Button>
+                        ) : null}
                         <Button
                           size="sm"
                           onClick={() => {
@@ -3909,6 +3980,7 @@ function TelegramSalesWorkflowCard() {
                               order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
                             );
                           }}
+                          disabled={isOrderClaimedByOtherUser(order)}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           {salesUi.approve}
@@ -3924,6 +3996,7 @@ function TelegramSalesWorkflowCard() {
                               order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
                             );
                           }}
+                          disabled={isOrderClaimedByOtherUser(order)}
                         >
                           <AlertTriangle className="mr-2 h-4 w-4" />
                           {salesUi.reject}
@@ -3962,6 +4035,24 @@ function TelegramSalesWorkflowCard() {
                           </Badge>
                         ))}
                       </div>
+                    </div>
+                  ) : null}
+
+                  {order.assignedReviewerEmail ? (
+                    <div className="mt-4 rounded-xl border border-border/50 bg-background/50 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-foreground">{salesUi.reviewerAssignment}</p>
+                        <Badge variant="outline">
+                          {isOrderClaimedByCurrentUser(order)
+                            ? salesUi.claimedByMe
+                            : `${salesUi.claimedBy} ${order.assignedReviewerEmail}`}
+                        </Badge>
+                      </div>
+                      {order.assignedAt ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {salesUi.claimedAt}: {formatDateTime(order.assignedAt)}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -4764,6 +4855,50 @@ function TelegramSalesWorkflowCard() {
                   </div>
                 </div>
               ) : null}
+              <div className="rounded-xl border border-border/50 p-3 md:col-span-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {salesUi.reviewerAssignment}
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      {selectedOrder.assignedReviewerEmail
+                        ? isOrderClaimedByCurrentUser(selectedOrder)
+                          ? salesUi.claimedByMe
+                          : `${salesUi.claimedBy} ${selectedOrder.assignedReviewerEmail}`
+                        : salesUi.unassigned}
+                    </p>
+                    {selectedOrder.assignedAt ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {salesUi.claimedAt}: {formatDateTime(selectedOrder.assignedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                  {selectedOrder.status === 'PENDING_REVIEW' ? (
+                    !selectedOrder.assignedReviewerUserId ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => handleClaimOrder(selectedOrder.id, true)}
+                        disabled={claimOrderMutation.isPending}
+                      >
+                        <KeyRound className="mr-2 h-4 w-4" />
+                        {salesUi.claimOrder}
+                      </Button>
+                    ) : isOrderClaimedByCurrentUser(selectedOrder) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleClaimOrder(selectedOrder.id, false)}
+                        disabled={claimOrderMutation.isPending}
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        {salesUi.releaseOrder}
+                      </Button>
+                    ) : null
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -4985,7 +5120,7 @@ function TelegramSalesWorkflowCard() {
                           : null,
                     })
                   }
-                  disabled={updateOrderDraftMutation.isPending}
+                  disabled={updateOrderDraftMutation.isPending || isOrderClaimedByOtherUser(selectedOrder)}
                 >
                   {updateOrderDraftMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -5085,7 +5220,8 @@ function TelegramSalesWorkflowCard() {
               disabled={
                 approveOrderMutation.isPending ||
                 rejectOrderMutation.isPending ||
-                updateOrderDraftMutation.isPending
+                updateOrderDraftMutation.isPending ||
+                (selectedOrder ? isOrderClaimedByOtherUser(selectedOrder) : false)
               }
             >
               {approveOrderMutation.isPending ||

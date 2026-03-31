@@ -6957,10 +6957,35 @@ export async function approveTelegramOrder(input: {
   reviewerName?: string | null;
   adminNote?: string | null;
 }) {
+  const existingOrder = await db.telegramOrder.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      orderCode: true,
+      status: true,
+      assignedReviewerUserId: true,
+      assignedReviewerEmail: true,
+    },
+  });
+
+  if (!existingOrder) {
+    throw new Error('Telegram order not found.');
+  }
+
+  if (
+    existingOrder.assignedReviewerUserId &&
+    existingOrder.assignedReviewerUserId !== (input.reviewedByUserId ?? null)
+  ) {
+    throw new Error(`This Telegram order is claimed by ${existingOrder.assignedReviewerEmail || 'another admin'}.`);
+  }
+
   const claim = await db.telegramOrder.updateMany({
     where: {
       id: input.orderId,
       status: 'PENDING_REVIEW',
+      assignedReviewerUserId: existingOrder.assignedReviewerUserId
+        ? (input.reviewedByUserId ?? null)
+        : null,
     },
     data: {
       status: 'APPROVED',
@@ -7154,6 +7179,13 @@ export async function rejectTelegramOrder(input: {
 
   if (isTelegramOrderTerminal(order.status)) {
     throw new Error('This Telegram order has already been completed.');
+  }
+
+  if (
+    order.assignedReviewerUserId &&
+    order.assignedReviewerUserId !== (input.reviewedByUserId ?? null)
+  ) {
+    throw new Error(`This Telegram order is claimed by ${order.assignedReviewerEmail || 'another admin'}.`);
   }
 
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
@@ -8010,6 +8042,13 @@ export async function updateTelegramOrderDraft(input: {
 
   if (isTelegramOrderTerminal(order.status) || order.status === 'FULFILLED' || order.status === 'APPROVED') {
     throw new Error('Only active Telegram orders can be edited.');
+  }
+
+  if (
+    order.assignedReviewerUserId &&
+    order.assignedReviewerUserId !== (input.updatedByUserId ?? null)
+  ) {
+    throw new Error(`This Telegram order is claimed by ${order.assignedReviewerEmail || 'another admin'}.`);
   }
 
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());

@@ -299,6 +299,9 @@ model TelegramOrder {
   adminNote            String?
   customerMessage      String?
   rejectionReasonCode  String?
+  assignedReviewerUserId String?
+  assignedReviewerEmail String?
+  assignedAt           DateTime?
   reviewedByUserId     String?
   reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   reviewedAt           DateTime?
@@ -311,6 +314,7 @@ model TelegramOrder {
   @@index([telegramUserId, status, createdAt])
   @@index([status, createdAt])
   @@index([reviewedByUserId, status])
+  @@index([assignedReviewerUserId, status, createdAt])
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])
   @@index([paymentProofUniqueId, createdAt])
