@@ -246,6 +246,8 @@ type TelegramSalesSettingsForm = {
   supportLink: string;
   paymentReminderHours: string;
   pendingReviewReminderHours: string;
+  rejectedOrderReminderHours: string;
+  retryOrderReminderHours: string;
   unpaidOrderExpiryHours: string;
   paymentInstructions: string;
   localizedPaymentInstructions: {
@@ -651,6 +653,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   supportLink: '',
   paymentReminderHours: '3',
   pendingReviewReminderHours: '6',
+  rejectedOrderReminderHours: '12',
+  retryOrderReminderHours: '8',
   unpaidOrderExpiryHours: '24',
   paymentInstructions:
     'After payment, send the payment screenshot here as a photo or document. Please make sure the amount, transfer ID, and payment time are visible. Your order will stay pending until an admin approves it.',
@@ -2145,6 +2149,7 @@ function TelegramSalesWorkflowCard() {
   const [reviewPlanCode, setReviewPlanCode] = useState<TelegramSalesPlanCode | ''>('');
   const [reviewDurationMonths, setReviewDurationMonths] = useState('');
   const [reviewSelectedServerId, setReviewSelectedServerId] = useState('auto');
+  const [proofPreviewOpen, setProofPreviewOpen] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
@@ -2236,6 +2241,12 @@ function TelegramSalesWorkflowCard() {
     pendingReviewReminderHours: isMyanmar
       ? 'Admin review reminder (hours)'
       : 'Admin review reminder (hours)',
+    rejectedOrderReminderHours: isMyanmar
+      ? 'Rejected follow-up reminder (hours)'
+      : 'Rejected follow-up reminder (hours)',
+    retryOrderReminderHours: isMyanmar
+      ? 'Retry reminder (hours)'
+      : 'Retry reminder (hours)',
     unpaidOrderExpiryHours: isMyanmar ? 'Auto-expire after (hours)' : 'Auto-expire after (hours)',
     paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
     englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
@@ -2347,6 +2358,7 @@ function TelegramSalesWorkflowCard() {
     rejectPresetCustom: isMyanmar ? 'Custom message' : 'Custom message',
     proofRevision: isMyanmar ? 'Proof revisions' : 'Proof revisions',
     proofPreview: isMyanmar ? 'Proof preview' : 'Proof preview',
+    zoomProof: isMyanmar ? 'Proof ကို ချဲ့ကြည့်မည်' : 'Zoom proof',
     openProof: isMyanmar ? 'Proof ဖွင့်မည်' : 'Open proof',
     downloadProof: isMyanmar ? 'Proof ဒေါင်းလုဒ်လုပ်မည်' : 'Download proof',
     editBeforeApproval: isMyanmar ? 'Approve မပြုမီ order ကို ပြင်ဆင်မည်' : 'Edit order before approval',
@@ -2633,6 +2645,14 @@ function TelegramSalesWorkflowCard() {
       pendingReviewReminderHours: String(
         settingsQuery.data.pendingReviewReminderHours ??
           DEFAULT_TELEGRAM_SALES_SETTINGS.pendingReviewReminderHours,
+      ),
+      rejectedOrderReminderHours: String(
+        settingsQuery.data.rejectedOrderReminderHours ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.rejectedOrderReminderHours,
+      ),
+      retryOrderReminderHours: String(
+        settingsQuery.data.retryOrderReminderHours ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.retryOrderReminderHours,
       ),
       unpaidOrderExpiryHours: String(
         settingsQuery.data.unpaidOrderExpiryHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.unpaidOrderExpiryHours,
@@ -2966,6 +2986,14 @@ function TelegramSalesWorkflowCard() {
         const parsed = Number.parseInt(form.pendingReviewReminderHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
       })(),
+      rejectedOrderReminderHours: (() => {
+        const parsed = Number.parseInt(form.rejectedOrderReminderHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+      })(),
+      retryOrderReminderHours: (() => {
+        const parsed = Number.parseInt(form.retryOrderReminderHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 8;
+      })(),
       unpaidOrderExpiryHours: (() => {
         const parsed = Number.parseInt(form.unpaidOrderExpiryHours.trim(), 10);
         const reminderHours = Number.parseInt(form.paymentReminderHours.trim(), 10);
@@ -3154,7 +3182,7 @@ function TelegramSalesWorkflowCard() {
               <p className="text-sm font-medium">{salesUi.paymentAutomation}</p>
               <p className="text-xs text-muted-foreground">{salesUi.paymentAutomationDesc}</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <div className="space-y-2">
                 <Label>{salesUi.paymentReminderHours}</Label>
                 <Input
@@ -3181,6 +3209,34 @@ function TelegramSalesWorkflowCard() {
                     }))
                   }
                   placeholder="6"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.rejectedOrderReminderHours}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.rejectedOrderReminderHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      rejectedOrderReminderHours: event.target.value,
+                    }))
+                  }
+                  placeholder="12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.retryOrderReminderHours}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.retryOrderReminderHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      retryOrderReminderHours: event.target.value,
+                    }))
+                  }
+                  placeholder="8"
                 />
               </div>
               <div className="space-y-2">
@@ -4403,6 +4459,7 @@ function TelegramSalesWorkflowCard() {
             setReviewNote('');
             setReviewCustomerMessage('');
             setReviewReasonCode('custom');
+            setProofPreviewOpen(false);
           }
         }}
       >
@@ -4496,6 +4553,17 @@ function TelegramSalesWorkflowCard() {
                   <p className="text-xs text-muted-foreground">{salesUi.proofForwardedHint}</p>
                   {selectedOrder.paymentProofType ? (
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedOrderProofIsImage ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setProofPreviewOpen(true)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          {salesUi.zoomProof}
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="outline"
@@ -4536,6 +4604,17 @@ function TelegramSalesWorkflowCard() {
                 </div>
                 {selectedOrder.paymentProofType ? (
                   <div className="flex flex-wrap gap-2">
+                    {selectedOrderProofIsImage ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setProofPreviewOpen(true)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        {salesUi.zoomProof}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       variant="outline"
@@ -4565,8 +4644,9 @@ function TelegramSalesWorkflowCard() {
                     <img
                       src={selectedOrderProofUrl}
                       alt={salesUi.paymentProofImage}
-                      className="max-h-[26rem] w-full object-contain"
+                      className="max-h-[26rem] w-full cursor-zoom-in object-contain"
                       loading="lazy"
+                      onClick={() => setProofPreviewOpen(true)}
                     />
                   </div>
                 ) : (
@@ -4844,6 +4924,50 @@ function TelegramSalesWorkflowCard() {
               {reviewTarget?.mode === 'approve' ? salesUi.approve : salesUi.reject}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={proofPreviewOpen} onOpenChange={setProofPreviewOpen}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>{salesUi.proofPreview}</DialogTitle>
+            <DialogDescription>{selectedOrder?.orderCode || '—'}</DialogDescription>
+          </DialogHeader>
+          {selectedOrder && selectedOrderProofIsImage ? (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/70">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selectedOrderProofUrl}
+                  alt={salesUi.paymentProofImage}
+                  className="max-h-[72vh] w-full object-contain"
+                  loading="eager"
+                />
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.open(selectedOrderProofUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {salesUi.openProof}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.open(selectedOrderProofDownloadUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {salesUi.downloadProof}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+              {salesUi.noImagePreview}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -1105,6 +1105,20 @@ function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `⏰ Order <b>${code}</b> သည် payment screenshot မရသေးပါ။ ငွေပေးချေပြီးဖြစ်ပါက screenshot ကို ဤ chat ထဲသို့ ပို့ပေးပါ။`
         : `⏰ Order <b>${code}</b> is still waiting for your payment screenshot. If you have already paid, send the screenshot in this chat.`,
+    orderRejectedFollowUpReminder: (code: string) =>
+      isMyanmar
+        ? `ℹ️ Order <b>${code}</b> ကို ယခင်က ပယ်ထားပြီးဖြစ်ပါသည်။ ဆက်လုပ်လိုပါက retry ကို နှိပ်ပြီး screenshot အသစ်တင်ပါ သို့မဟုတ် support ကို ဆက်သွယ်ပါ။`
+        : `ℹ️ Order <b>${code}</b> was rejected earlier. If you still want this plan, tap retry and upload a new screenshot, or contact support.`,
+    orderRejectedFollowUpNote: isMyanmar
+      ? 'Rejected order အတွက် follow-up reminder ကို ပို့ခဲ့သည်။'
+      : 'Sent a follow-up reminder for this rejected order.',
+    orderRetryReminder: (code: string) =>
+      isMyanmar
+        ? `⏰ Retry order <b>${code}</b> သည် မပြီးသေးပါ။ ဆက်လုပ်လိုပါက payment method ကို ပြန်ရွေးပါ သို့မဟုတ် screenshot ကို တင်ပေးပါ။`
+        : `⏰ Retry order <b>${code}</b> is still incomplete. Choose your payment method or upload your screenshot to continue.`,
+    orderRetryReminderNote: isMyanmar
+      ? 'Retry order အတွက် follow-up reminder ကို ပို့ခဲ့သည်။'
+      : 'Sent a follow-up reminder for this retry order.',
     orderExpiredUnpaid: (code: string) =>
       isMyanmar
         ? `⌛ Order <b>${code}</b> ကို ငွေပေးချေမှု မပြီးစီးသေးသဖြင့် အလိုအလျောက် ပိတ်လိုက်ပါပြီ။ အဆင်သင့်ဖြစ်သည့်အချိန်တွင် /buy သို့မဟုတ် /renew ဖြင့် ပြန်စနိုင်ပါသည်။`
@@ -3879,6 +3893,7 @@ async function handleTelegramOrderProofMessage(input: {
         currentStatus: activeOrder.status,
         paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
         paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+        retryReminderSentAt: activeOrder.retryReminderSentAt,
       }),
       paymentProofFileId: proofFileId,
       paymentProofType: input.document ? 'document' : 'photo',
@@ -4230,6 +4245,7 @@ async function handleTelegramOrderTextMessage(input: {
             currentStatus: activeOrder.status,
             paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
             paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+            retryReminderSentAt: activeOrder.retryReminderSentAt,
           }),
         },
       });
@@ -4352,6 +4368,7 @@ async function handleTelegramOrderTextMessage(input: {
             currentStatus: activeOrder.status,
             paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
             paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+            retryReminderSentAt: activeOrder.retryReminderSentAt,
           }),
         },
       });
@@ -4526,6 +4543,7 @@ async function handleTelegramOrderTextMessage(input: {
             currentStatus: activeOrder.status,
             paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
             paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+            retryReminderSentAt: activeOrder.retryReminderSentAt,
           }),
         },
       });
@@ -4660,6 +4678,7 @@ async function handleTelegramOrderTextMessage(input: {
               currentStatus: activeOrder.status,
               paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
               paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+              retryReminderSentAt: activeOrder.retryReminderSentAt,
             }),
             reviewReminderSentAt: null,
           },
@@ -4701,6 +4720,7 @@ async function handleTelegramOrderTextMessage(input: {
             currentStatus: activeOrder.status,
             paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
             paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+            retryReminderSentAt: activeOrder.retryReminderSentAt,
           }),
           reviewReminderSentAt: null,
           reviewedAt: null,
@@ -5341,6 +5361,7 @@ function buildTelegramOrderPaymentStageFields(input: {
   currentStatus?: string | null;
   paymentStageEnteredAt?: Date | null;
   paymentReminderSentAt?: Date | null;
+  retryReminderSentAt?: Date | null;
   preserveReminderSentAt?: boolean;
 }) {
   const nextIsPayment = isTelegramOrderAwaitingPayment(input.nextStatus);
@@ -5358,6 +5379,7 @@ function buildTelegramOrderPaymentStageFields(input: {
           : currentIsPayment
             ? input.paymentReminderSentAt ?? null
             : null,
+      retryReminderSentAt: currentIsPayment ? input.retryReminderSentAt ?? null : null,
       expiredAt: null,
     };
   }
@@ -5366,6 +5388,7 @@ function buildTelegramOrderPaymentStageFields(input: {
     return {
       paymentStageEnteredAt: null,
       paymentReminderSentAt: null,
+      retryReminderSentAt: null,
     };
   }
 
@@ -5409,6 +5432,7 @@ async function cancelStaleTelegramConversationOrders(chatId: number, telegramUse
       paymentStageEnteredAt: null,
       paymentReminderSentAt: null,
       reviewReminderSentAt: null,
+      retryReminderSentAt: null,
       expiredAt: null,
       updatedAt: new Date(),
     },
@@ -5422,6 +5446,8 @@ export async function runTelegramSalesOrderCycle() {
       skipped: true,
       reminded: 0,
       pendingReviewReminded: 0,
+      rejectedFollowUpReminded: 0,
+      retryReminded: 0,
       trialReminded: 0,
       premiumRenewalReminded: 0,
       premiumExpired: 0,
@@ -5461,9 +5487,11 @@ export async function runTelegramSalesOrderCycle() {
       paymentStageEnteredAt: true,
       paymentReminderSentAt: true,
       reviewReminderSentAt: true,
+      retryReminderSentAt: true,
       createdAt: true,
       updatedAt: true,
       adminNote: true,
+      retryOfOrderId: true,
     },
   });
   const pendingReviewOrders = await db.telegramOrder.findMany({
@@ -5493,9 +5521,33 @@ export async function runTelegramSalesOrderCycle() {
       updatedAt: true,
     },
   });
+  const rejectedOrders = await db.telegramOrder.findMany({
+    where: {
+      status: 'REJECTED',
+      rejectedAt: {
+        not: null,
+      },
+    },
+    orderBy: [{ rejectedAt: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      orderCode: true,
+      status: true,
+      telegramChatId: true,
+      telegramUserId: true,
+      locale: true,
+      paymentMethodCode: true,
+      rejectedAt: true,
+      rejectedFollowUpSentAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   let reminded = 0;
   let pendingReviewReminded = 0;
+  let rejectedFollowUpReminded = 0;
+  let retryReminded = 0;
   let trialReminded = 0;
   let premiumRenewalReminded = 0;
   let premiumExpired = 0;
@@ -5652,6 +5704,60 @@ export async function runTelegramSalesOrderCycle() {
   }
 
   if (config) {
+    const retryReminderMs = Math.max(1, settings.retryOrderReminderHours) * 60 * 60 * 1000;
+    for (const order of orders) {
+      if (!order.retryOfOrderId) {
+        continue;
+      }
+
+      const baseline = order.paymentStageEnteredAt ?? order.updatedAt ?? order.createdAt;
+      const elapsedMs = now.getTime() - baseline.getTime();
+      if (order.retryReminderSentAt || elapsedMs < retryReminderMs) {
+        continue;
+      }
+
+      try {
+        const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
+        const ui = getTelegramUi(locale);
+        await sendTelegramMessage(
+          config.botToken,
+          order.telegramChatId,
+          [
+            ui.orderRetryReminder(order.orderCode),
+            '',
+            supportLink ? `${ui.supportLabel}: ${supportLink}` : ui.orderSupportHint,
+          ].join('\n'),
+          {
+            replyMarkup: buildTelegramOrderActionKeyboard({
+              order,
+              locale,
+            }),
+          },
+        );
+
+        await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            retryReminderSentAt: now,
+          },
+        });
+
+        await writeAuditLog({
+          action: 'TELEGRAM_ORDER_RETRY_REMINDER_SENT',
+          entity: 'TELEGRAM_ORDER',
+          entityId: order.id,
+          details: {
+            orderCode: order.orderCode,
+            elapsedHours: Math.round(elapsedMs / (60 * 60 * 1000)),
+          },
+        });
+
+        retryReminded += 1;
+      } catch (error) {
+        errors.push(`retry-reminder:${order.orderCode}:${(error as Error).message}`);
+      }
+    }
+
     const pendingReviewReminderMs = Math.max(1, settings.pendingReviewReminderHours) * 60 * 60 * 1000;
     for (const order of pendingReviewOrders) {
       const baseline = order.paymentSubmittedAt ?? order.updatedAt ?? order.createdAt;
@@ -5682,6 +5788,78 @@ export async function runTelegramSalesOrderCycle() {
         pendingReviewReminded += 1;
       } catch (error) {
         errors.push(`review-reminder:${order.orderCode}:${(error as Error).message}`);
+      }
+    }
+
+    const rejectedReminderMs = Math.max(1, settings.rejectedOrderReminderHours) * 60 * 60 * 1000;
+    const rejectedOrderIds = rejectedOrders.map((order) => order.id);
+    const retryCounts = rejectedOrderIds.length
+      ? await db.telegramOrder.groupBy({
+          by: ['retryOfOrderId'],
+          where: {
+            retryOfOrderId: { in: rejectedOrderIds },
+          },
+          _count: {
+            _all: true,
+          },
+        })
+      : [];
+    const retriedRejectedOrderIds = new Set(
+      retryCounts
+        .map((row) => row.retryOfOrderId)
+        .filter((value): value is string => Boolean(value)),
+    );
+
+    for (const order of rejectedOrders) {
+      const baseline = order.rejectedAt ?? order.updatedAt ?? order.createdAt;
+      const elapsedMs = now.getTime() - baseline.getTime();
+      if (
+        order.rejectedFollowUpSentAt ||
+        elapsedMs < rejectedReminderMs ||
+        retriedRejectedOrderIds.has(order.id)
+      ) {
+        continue;
+      }
+
+      try {
+        const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
+        const ui = getTelegramUi(locale);
+        await sendTelegramMessage(
+          config.botToken,
+          order.telegramChatId,
+          [
+            ui.orderRejectedFollowUpReminder(order.orderCode),
+            '',
+            supportLink ? `${ui.supportLabel}: ${supportLink}` : ui.orderSupportHint,
+          ].join('\n'),
+          {
+            replyMarkup: buildTelegramOrderActionKeyboard({
+              order,
+              locale,
+            }),
+          },
+        );
+
+        await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            rejectedFollowUpSentAt: now,
+          },
+        });
+
+        await writeAuditLog({
+          action: 'TELEGRAM_ORDER_REJECTED_FOLLOWUP_SENT',
+          entity: 'TELEGRAM_ORDER',
+          entityId: order.id,
+          details: {
+            orderCode: order.orderCode,
+            elapsedHours: Math.round(elapsedMs / (60 * 60 * 1000)),
+          },
+        });
+
+        rejectedFollowUpReminded += 1;
+      } catch (error) {
+        errors.push(`rejected-followup:${order.orderCode}:${(error as Error).message}`);
       }
     }
   }
@@ -5832,6 +6010,8 @@ export async function runTelegramSalesOrderCycle() {
     skipped: false,
     reminded,
     pendingReviewReminded,
+    rejectedFollowUpReminded,
+    retryReminded,
     trialReminded,
     premiumRenewalReminded,
     premiumExpired,
@@ -11565,6 +11745,7 @@ async function handleTelegramCallbackQuery(
                   currentStatus: order.status,
                   paymentStageEnteredAt: order.paymentStageEnteredAt,
                   paymentReminderSentAt: order.paymentReminderSentAt,
+                  retryReminderSentAt: order.retryReminderSentAt,
                 }),
               },
             });
@@ -11821,6 +12002,7 @@ async function handleTelegramCallbackQuery(
                   currentStatus: order.status,
                   paymentStageEnteredAt: order.paymentStageEnteredAt,
                   paymentReminderSentAt: order.paymentReminderSentAt,
+                  retryReminderSentAt: order.retryReminderSentAt,
                 }),
                 reviewReminderSentAt: null,
                 reviewedAt: null,

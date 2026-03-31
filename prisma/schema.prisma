@@ -286,6 +286,8 @@ model TelegramOrder {
   paymentStageEnteredAt DateTime?
   paymentReminderSentAt DateTime?
   reviewReminderSentAt  DateTime?
+  rejectedFollowUpSentAt DateTime?
+  retryReminderSentAt   DateTime?
   paymentSubmittedAt   DateTime?
   expiredAt            DateTime?
   retryOfOrderId       String?

@@ -1086,6 +1086,11 @@ export default function AnalyticsPage() {
                                 ) : (
                                   <p className="text-sm text-muted-foreground">No priced fulfillments yet</p>
                                 )}
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {plan.orders > 0
+                                    ? `${Math.round(plan.conversionRate)}% conversion`
+                                    : 'No conversions yet'}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -1147,7 +1152,7 @@ export default function AnalyticsPage() {
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Reminder conversion</p>
                     <h3 className="mt-2 text-lg font-semibold">Reminder effectiveness</h3>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Payment reminders</p>
                         <p className="mt-2 text-2xl font-semibold">
@@ -1168,6 +1173,28 @@ export default function AnalyticsPage() {
                           {loadingTelegramSalesDashboard
                             ? '…'
                             : `${telegramSalesDashboard?.reminders.pendingReviewReminderConverted || 0} fulfilled after reminder`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejected follow-ups</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.rejectedFollowUpSent || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.reminders.rejectedFollowUpConverted || 0} retried after reminder`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Retry nudges</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.retryReminderSent || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.reminders.retryReminderConverted || 0} resumed after reminder`}
                         </p>
                       </div>
                     </div>
@@ -1371,13 +1398,18 @@ export default function AnalyticsPage() {
                       ) : telegramSalesDashboard && telegramSalesDashboard.paymentMethods.length > 0 ? (
                         telegramSalesDashboard.paymentMethods.map((method) => (
                           <div key={method.paymentMethodCode || method.paymentMethodLabel} className="ops-mini-tile">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">{method.paymentMethodLabel}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {method.orders} orders • {method.fulfilled} fulfilled
-                                </p>
-                              </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{method.paymentMethodLabel}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {method.orders} orders • {method.fulfilled} fulfilled
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {method.orders > 0
+                                  ? `${Math.round(method.conversionRate)}% conversion`
+                                  : 'No conversions yet'}
+                              </p>
+                            </div>
                               <Badge variant="outline">{method.paymentMethodCode || 'custom'}</Badge>
                             </div>
                             <div className="mt-3 space-y-1">

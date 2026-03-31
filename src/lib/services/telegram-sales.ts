@@ -60,6 +60,8 @@ export const telegramSalesSettingsSchema = z.object({
   supportLink: z.string().trim().max(500).optional().default(''),
   paymentReminderHours: z.number().int().min(1).max(168).default(3),
   pendingReviewReminderHours: z.number().int().min(1).max(168).default(6),
+  rejectedOrderReminderHours: z.number().int().min(1).max(336).default(12),
+  retryOrderReminderHours: z.number().int().min(1).max(336).default(8),
   unpaidOrderExpiryHours: z.number().int().min(1).max(720).default(24),
   paymentInstructions: z.string().max(2000).optional().default(''),
   localizedPaymentInstructions: z.record(z.string(), z.string()).optional().default({}),
@@ -325,6 +327,8 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     supportLink: '',
     paymentReminderHours: 3,
     pendingReviewReminderHours: 6,
+    rejectedOrderReminderHours: 12,
+    retryOrderReminderHours: 8,
     unpaidOrderExpiryHours: 24,
     paymentInstructions: DEFAULT_PAYMENT_INSTRUCTIONS_EN,
     localizedPaymentInstructions: {
@@ -353,6 +357,16 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     Number.isFinite(next.pendingReviewReminderHours)
       ? next.pendingReviewReminderHours
       : defaults.pendingReviewReminderHours;
+  const rejectedOrderReminderHours =
+    typeof next.rejectedOrderReminderHours === 'number' &&
+    Number.isFinite(next.rejectedOrderReminderHours)
+      ? next.rejectedOrderReminderHours
+      : defaults.rejectedOrderReminderHours;
+  const retryOrderReminderHours =
+    typeof next.retryOrderReminderHours === 'number' &&
+    Number.isFinite(next.retryOrderReminderHours)
+      ? next.retryOrderReminderHours
+      : defaults.retryOrderReminderHours;
   const unpaidOrderExpiryHours =
     typeof next.unpaidOrderExpiryHours === 'number' && Number.isFinite(next.unpaidOrderExpiryHours)
       ? Math.max(next.unpaidOrderExpiryHours, paymentReminderHours)
@@ -366,6 +380,8 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     supportLink: next.supportLink?.trim() || '',
     paymentReminderHours,
     pendingReviewReminderHours,
+    rejectedOrderReminderHours,
+    retryOrderReminderHours,
     unpaidOrderExpiryHours,
     paymentInstructions: next.paymentInstructions || defaults.paymentInstructions,
     localizedPaymentInstructions: normalizeLocalizedTemplateMap(next.localizedPaymentInstructions),

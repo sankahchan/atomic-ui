@@ -1001,6 +1001,8 @@ export const analyticsRouter = router({
             retentionSource: true,
             paymentReminderSentAt: true,
             reviewReminderSentAt: true,
+            rejectedFollowUpSentAt: true,
+            retryReminderSentAt: true,
             paymentSubmittedAt: true,
             paymentProofRevision: true,
             reviewedAt: true,
@@ -1097,6 +1099,10 @@ export const analyticsRouter = router({
         paymentReminderConverted: 0,
         pendingReviewReminderSent: 0,
         pendingReviewReminderConverted: 0,
+        rejectedFollowUpSent: 0,
+        rejectedFollowUpConverted: 0,
+        retryReminderSent: 0,
+        retryReminderConverted: 0,
       };
       const retention = {
         retriedOrders: 0,
@@ -1159,6 +1165,11 @@ export const analyticsRouter = router({
           }
         }
       }
+      const retrySourceOrderIds = new Set(
+        orders
+          .map((order) => order.retryOfOrderId)
+          .filter((orderId): orderId is string => Boolean(orderId)),
+      );
 
       for (const order of orders) {
         if (order.kind === 'NEW') {
@@ -1236,6 +1247,23 @@ export const analyticsRouter = router({
           reminders.pendingReviewReminderSent += 1;
           if (order.status === 'FULFILLED' || order.reviewedAt) {
             reminders.pendingReviewReminderConverted += 1;
+          }
+        }
+        if (order.rejectedFollowUpSentAt) {
+          reminders.rejectedFollowUpSent += 1;
+          if (retrySourceOrderIds.has(order.id)) {
+            reminders.rejectedFollowUpConverted += 1;
+          }
+        }
+        if (order.retryReminderSentAt) {
+          reminders.retryReminderSent += 1;
+          if (
+            order.paymentSubmittedAt ||
+            order.reviewedAt ||
+            order.fulfilledAt ||
+            !['AWAITING_PAYMENT_METHOD', 'AWAITING_PAYMENT_PROOF'].includes(order.status)
+          ) {
+            reminders.retryReminderConverted += 1;
           }
         }
 
@@ -1435,6 +1463,7 @@ export const analyticsRouter = router({
             planName: plan.planName,
             orders: plan.orders,
             fulfilled: plan.fulfilled,
+            conversionRate: plan.orders > 0 ? (plan.fulfilled / plan.orders) * 100 : 0,
             revenueByCurrency: Array.from(plan.revenueByCurrency.entries())
               .map(([currency, amount]) => ({ currency, amount }))
               .sort((left, right) => right.amount - left.amount),
@@ -1452,6 +1481,7 @@ export const analyticsRouter = router({
             paymentMethodLabel: method.paymentMethodLabel,
             orders: method.orders,
             fulfilled: method.fulfilled,
+            conversionRate: method.orders > 0 ? (method.fulfilled / method.orders) * 100 : 0,
             revenueByCurrency: Array.from(method.revenueByCurrency.entries())
               .map(([currency, amount]) => ({ currency, amount }))
               .sort((left, right) => right.amount - left.amount),
