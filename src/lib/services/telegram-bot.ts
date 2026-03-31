@@ -202,12 +202,14 @@ const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
 const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 const TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX = 'server-review';
 const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
+const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 
 type TelegramLocaleSelectorContext = 'start' | 'switch';
 type TelegramOrderReviewAction = 'approve' | 'reject';
 type TelegramOrderUserAction = 'pl' | 'ky' | 'sv' | 'pm' | 'pay' | 'up' | 'st' | 'ca' | 'by';
 type TelegramServerChangeReviewAction = 'approve' | 'reject';
 type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
+type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'ca';
 
 function buildTelegramLocaleSelectorKeyboard(
   context: TelegramLocaleSelectorContext,
@@ -393,6 +395,38 @@ function parseTelegramServerChangeActionCallbackData(data?: string | null) {
   };
 }
 
+function buildTelegramDynamicSupportActionCallbackData(
+  action: TelegramDynamicSupportUserAction,
+  primary: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
+    : `${TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX}:${action}:${primary}`;
+}
+
+function parseTelegramDynamicSupportActionCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action = parts[1];
+  if (!['rg', 'rv', 'is', 'ca'].includes(action)) {
+    return null;
+  }
+
+  return {
+    action: action as TelegramDynamicSupportUserAction,
+    primary: parts[2]?.trim() || '',
+    secondary: parts[3]?.trim() || null,
+  };
+}
+
 function getFlagEmoji(countryCode: string) {
   const codePoints = countryCode
     .toUpperCase()
@@ -561,6 +595,59 @@ function getTelegramUi(locale: SupportedLocale) {
     openSubscriptionUrl: isMyanmar ? 'Subscription URL ဖွင့်မည်' : 'Open Subscription URL',
     openClientEndpoint: isMyanmar ? 'Client Endpoint ဖွင့်မည်' : 'Open Client Endpoint',
     getSupport: isMyanmar ? 'အကူအညီ ရယူမည်' : 'Get Support',
+    premiumLabel: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
+    premiumStableLink: isMyanmar
+      ? 'တည်ငြိမ်သော premium link တစ်ခုဖြင့် ဆက်သွယ်နိုင်ပါသည်။'
+      : 'Connect with one stable premium link.',
+    premiumAutoFailover: isMyanmar
+      ? 'Server တစ်ခု ပြဿနာရှိပါက auto failover ဖြင့် ပြန်ရွေးပေးနိုင်ပါသည်။'
+      : 'If one server has trouble, routing can fail over automatically.',
+    premiumPreferredRegionSummary: (label: string) =>
+      isMyanmar
+        ? `ဦးစားပေး region: ${label}`
+        : `Preferred region: ${label}`,
+    premiumPreferredServerSummary: (label: string) =>
+      isMyanmar
+        ? `ဦးစားပေး server pool: ${label}`
+        : `Preferred server pool: ${label}`,
+    premiumSupportActionsTitle: isMyanmar
+      ? 'Premium support shortcut များ'
+      : 'Premium support shortcuts',
+    premiumChangeRegion: isMyanmar ? 'Preferred region ပြောင်းရန်' : 'Change preferred region',
+    premiumReportRouteIssue: isMyanmar ? 'Premium route issue တိုင်ကြားရန်' : 'Report premium route issue',
+    premiumRegionPrompt: (keyName: string, available: string) =>
+      isMyanmar
+        ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး region ကို ရွေးပါ။\n\nရွေးချယ်နိုင်သော region များ: ${available}\n\nဤတောင်းဆိုချက်ကို admin ထံပို့ပြီး manual review ပြုလုပ်ပါမည်။`
+        : `🌍 Choose the preferred region for <b>${keyName}</b>.\n\nAvailable regions: ${available}\n\nThis request will be sent to the admin for manual review.`,
+    premiumNoRegions: isMyanmar
+      ? 'ℹ️ ဤ premium key အတွက် ရွေးချယ်နိုင်သော region မရှိသေးပါ။ Admin/support ကို ဆက်သွယ်ပေးပါ။'
+      : 'ℹ️ There are no region choices configured for this premium key yet. Please contact admin/support.',
+    premiumRegionRequestSubmitted: (keyName: string, regionLabel: string) =>
+      isMyanmar
+        ? `📨 <b>${keyName}</b> အတွက် preferred region ကို <b>${regionLabel}</b> ဟု တောင်းဆိုထားပါသည်။ Admin က စစ်ဆေးပြီး ပြန်လည်အကြောင်းကြားပါမည်။`
+        : `📨 The preferred region for <b>${keyName}</b> was requested as <b>${regionLabel}</b>. The admin will review it and follow up.`,
+    premiumRouteIssueSubmitted: (keyName: string) =>
+      isMyanmar
+        ? `🚨 <b>${keyName}</b> အတွက် premium route issue ကို admin ထံ ပို့ပြီးပါပြီ။ နောက်ဆက်တွဲအတွက် support ကိုလည်း အသုံးပြုနိုင်ပါသည်။`
+        : `🚨 A premium route issue report for <b>${keyName}</b> has been sent to the admin. You can also use support for follow-up.`,
+    premiumSupportRequestSent: isMyanmar
+      ? 'Premium support request ကို ပို့ပြီးပါပြီ။'
+      : 'Premium support request sent.',
+    premiumSupportRequestNotFound: isMyanmar
+      ? '❌ Premium key ကို မတွေ့ပါ။ /mykeys မှ ပြန်ရွေးပေးပါ။'
+      : '❌ Premium key not found. Choose it again from /mykeys.',
+    premiumSupportCancelled: isMyanmar
+      ? 'Premium support action ကို ပယ်ဖျက်လိုက်ပါပြီ။'
+      : 'Premium support action cancelled.',
+    premiumRegionUnknown: isMyanmar ? 'Auto / admin review' : 'Auto / admin review',
+    premiumReviewAlertTitle: isMyanmar
+      ? '💎 <b>Premium dynamic key support request</b>'
+      : '💎 <b>Premium dynamic key support request</b>',
+    premiumIssueTypeRegion: isMyanmar ? 'Preferred region change' : 'Preferred region change',
+    premiumIssueTypeRoute: isMyanmar ? 'Premium route issue' : 'Premium route issue',
+    premiumCurrentPoolLabel: isMyanmar ? 'Current premium pool' : 'Current premium pool',
+    premiumRequestedRegionLabel: isMyanmar ? 'Requested region' : 'Requested region',
+    premiumReviewPanelLabel: isMyanmar ? 'Dynamic key page ဖွင့်ရန်' : 'Open dynamic key page',
     accessShareFallback: isMyanmar
       ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် နောက်ဆုံး connection အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
       : 'Open the share page below for install steps, manual setup, and the latest connection details.',
@@ -1339,6 +1426,19 @@ async function buildTelegramOrderStatusMessage(input: {
         publicSlug: true,
         dynamicUrl: true,
         sharePageEnabled: true,
+        type: true,
+        preferredServerIdsJson: true,
+        preferredCountryCodesJson: true,
+        accessKeys: {
+          select: {
+            server: {
+              select: {
+                name: true,
+                countryCode: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -1348,8 +1448,15 @@ async function buildTelegramOrderStatusMessage(input: {
         'telegram_order_status',
         locale,
       );
+      const poolSummary = formatTelegramDynamicPoolSummary(dynamicKey, ui);
 
       lines.push('', `${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`);
+      lines.push(`💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`);
+      lines.push(`✨ ${ui.premiumStableLink}`);
+      if (dynamicKey.type === 'SELF_MANAGED') {
+        lines.push(`⚡ ${ui.premiumAutoFailover}`);
+      }
+      lines.push(`🧭 ${escapeHtml(poolSummary)}`);
 
       if (dynamicKey.sharePageEnabled && sharePageUrl) {
         lines.push(`🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
@@ -1847,6 +1954,82 @@ function buildTelegramServerChangePendingKeyboard(
       },
     ]);
   }
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramDynamicPremiumSupportKeyboard(
+  dynamicAccessKeyId: string,
+  locale: SupportedLocale,
+  supportLink?: string | null,
+) {
+  const ui = getTelegramUi(locale);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: ui.premiumChangeRegion,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', dynamicAccessKeyId),
+      },
+    ],
+    [
+      {
+        text: ui.premiumReportRouteIssue,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', dynamicAccessKeyId),
+      },
+    ],
+  ];
+
+  if (supportLink) {
+    rows.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  rows.push([
+    {
+      text: ui.orderActionCancel,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('ca', dynamicAccessKeyId),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+function buildTelegramDynamicPremiumRegionKeyboard(input: {
+  dynamicAccessKeyId: string;
+  locale: SupportedLocale;
+  regionCodes: string[];
+  supportLink?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = input.regionCodes
+    .slice(0, 8)
+    .map((countryCode) => [
+      {
+        text: truncateTelegramButtonLabel(
+          `${getFlagEmoji(countryCode)} ${countryCode}`,
+          38,
+        ),
+        callback_data: buildTelegramDynamicSupportActionCallbackData(
+          'rv',
+          input.dynamicAccessKeyId,
+          countryCode,
+        ),
+      },
+    ]);
+
+  if (input.supportLink) {
+    rows.push([{ text: ui.getSupport, url: input.supportLink }]);
+  }
+
+  rows.push([
+    {
+      text: ui.orderActionCancel,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('ca', input.dynamicAccessKeyId),
+    },
+  ]);
 
   return {
     inline_keyboard: rows,
@@ -3706,6 +3889,63 @@ async function loadDynamicAccessKeyForMessaging(dynamicAccessKeyId: string) {
   });
 }
 
+type TelegramDynamicRoutingSource = {
+  preferredCountryCodesJson?: string | null;
+  preferredServerIdsJson?: string | null;
+  accessKeys: Array<{
+    server?: {
+      countryCode?: string | null;
+    } | null;
+  }>;
+};
+
+function getDynamicKeyRegionChoices(
+  key: TelegramDynamicRoutingSource,
+) {
+  const routing = parseDynamicRoutingPreferences({
+    preferredCountryCodesJson: key.preferredCountryCodesJson,
+  });
+  const preferred = routing.preferredCountryCodes
+    .filter(Boolean)
+    .map((code) => code.toUpperCase());
+  const attached = Array.from(
+    new Set(
+      key.accessKeys
+        .map((attachedKey) => attachedKey.server?.countryCode?.toUpperCase())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  return Array.from(new Set([...preferred, ...attached]));
+}
+
+function formatTelegramDynamicPoolSummary(
+  key: TelegramDynamicRoutingSource,
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  const routing = parseDynamicRoutingPreferences({
+    preferredServerIdsJson: key.preferredServerIdsJson,
+    preferredCountryCodesJson: key.preferredCountryCodesJson,
+  });
+
+  if (routing.preferredCountryCodes.length > 0) {
+    return ui.premiumPreferredRegionSummary(routing.preferredCountryCodes.join(', '));
+  }
+
+  if (routing.preferredServerIds.length > 0) {
+    return ui.premiumPreferredServerSummary(
+      `${routing.preferredServerIds.length} preferred server${routing.preferredServerIds.length === 1 ? '' : 's'}`,
+    );
+  }
+
+  const attachedRegions = getDynamicKeyRegionChoices(key);
+  if (attachedRegions.length > 0) {
+    return ui.premiumPreferredRegionSummary(attachedRegions.join(', '));
+  }
+
+  return ui.coverageAutoSelected;
+}
+
 function resolveTelegramChatIdForKey(key: {
   telegramId?: string | null;
   user?: { telegramChatId?: string | null } | null;
@@ -4266,6 +4506,80 @@ async function buildTelegramServerChangePanelUrl(requestId: string) {
     'http://localhost:3000';
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
   return `${origin}${basePath}/dashboard/notifications?serverChangeRequest=${encodeURIComponent(requestId)}`;
+}
+
+async function buildTelegramDynamicKeyPanelUrl(dynamicAccessKeyId: string) {
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3000';
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  return `${origin}${basePath}/dashboard/dynamic-keys/${encodeURIComponent(dynamicAccessKeyId)}`;
+}
+
+async function sendTelegramPremiumSupportAlert(input: {
+  dynamicAccessKeyId: string;
+  requestType: 'REGION_CHANGE' | 'ROUTE_ISSUE';
+  telegramChatId: string;
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  locale: SupportedLocale;
+  requestedRegionCode?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config || config.adminChatIds.length === 0) {
+    return;
+  }
+
+  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
+  if (!key) {
+    return;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const panelUrl = await buildTelegramDynamicKeyPanelUrl(key.id);
+  const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
+  const lines = [
+    ui.premiumReviewAlertTitle,
+    '',
+    `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+    `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(input.telegramUserId)}</code>`,
+    `${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(key.status)}</b>`,
+    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
+    `${ui.customerMessage}: <b>${escapeHtml(input.requestType === 'REGION_CHANGE' ? ui.premiumIssueTypeRegion : ui.premiumIssueTypeRoute)}</b>`,
+    input.requestedRegionCode
+      ? `${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(input.requestedRegionCode)}</b>`
+      : '',
+    '',
+    `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  for (const adminChatId of config.adminChatIds) {
+    await sendTelegramMessage(config.botToken, adminChatId, lines, {
+      replyMarkup: {
+        inline_keyboard: [[{ text: ui.premiumReviewPanelLabel, url: panelUrl }]],
+      },
+    });
+  }
+
+  await writeAuditLog({
+    action: 'TELEGRAM_PREMIUM_SUPPORT_REQUESTED',
+    entity: 'DYNAMIC_ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      requestType: input.requestType,
+      telegramChatId: input.telegramChatId,
+      telegramUserId: input.telegramUserId,
+      telegramUsername: input.telegramUsername ?? null,
+      requestedRegionCode: input.requestedRegionCode ?? null,
+      panelUrl,
+    },
+  });
 }
 
 function appendTelegramOrderAdminNote(existingNote?: string | null, nextNote?: string | null) {
@@ -5919,6 +6233,8 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     );
   const supportLink = await getTelegramSupportLink();
   const attachedCount = key.accessKeys.length;
+  const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
+  const preferredRegions = getDynamicKeyRegionChoices(key);
   const uniqueServers = Array.from(
     new Set(
       key.accessKeys
@@ -5935,6 +6251,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   const lines = [
     reasonTitle,
     '',
+    `💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`,
     `🔁 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
     `🧭 ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
     `🖥 ${ui.backendsLabel}: ${attachedCount} attached key(s)`,
@@ -5942,6 +6259,11 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     `📈 ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
     `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
     key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
+    '',
+    `✨ ${ui.premiumStableLink}`,
+    key.type === 'SELF_MANAGED' ? `⚡ ${ui.premiumAutoFailover}` : '',
+    `🧭 ${poolSummary}`,
+    preferredRegions.length > 0 ? `🌐 ${ui.premiumPreferredRegionSummary(preferredRegions.join(', '))}` : '',
     '',
     welcomeMessage
       ? escapeHtml(welcomeMessage)
@@ -5957,7 +6279,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
   lines.push(`⚡ ${ui.outlineClientUrlLabel}: ${outlineClientUrl}`);
 
-  const inlineKeyboard: Array<Array<{ text: string; url: string }>> = [];
+  const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
   if (key.sharePageEnabled && sharePageUrl) {
     inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
   }
@@ -5976,6 +6298,19 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       },
     ]);
   }
+
+  inlineKeyboard.push([
+    {
+      text: ui.premiumChangeRegion,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
+    },
+  ]);
+  inlineKeyboard.push([
+    {
+      text: ui.premiumReportRouteIssue,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
+    },
+  ]);
 
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
@@ -7196,11 +7531,14 @@ async function handleMyKeysCommand(
 
   for (const key of dynamicKeys) {
     const { sharePageUrl } = getDynamicKeyMessagingUrls(key, 'telegram_mykeys', locale);
+    const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
       `  ${ui.idLabel}: <code>${key.id}</code>`,
+      `  ${ui.planLabel}: ${escapeHtml(ui.premiumLabel)}`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
       `  ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
+      `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
       sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
       '',
     );
@@ -7216,6 +7554,16 @@ async function handleMyKeysCommand(
       {
         text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
         callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic'),
+      },
+    ]);
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.premiumChangeRegion}: ${key.name}`, 38),
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
+      },
+      {
+        text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 38),
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
       },
     ]);
   }
@@ -8010,6 +8358,160 @@ async function handleTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
               ui.serverChangeCancelled,
+            );
+            return null;
+          }
+        }
+      } catch (error) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          (error as Error).message,
+        );
+        return null;
+      }
+    }
+
+    const dynamicSupportAction = parseTelegramDynamicSupportActionCallbackData(callbackQuery.data);
+    if (dynamicSupportAction) {
+      const locale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+      const ui = getTelegramUi(locale);
+      const supportLink = await getTelegramSupportLink();
+
+      try {
+        const dynamicKey = (await findLinkedDynamicAccessKeys(chatId, callbackQuery.from.id, true)).find(
+          (key) => key.id === dynamicSupportAction.primary,
+        );
+
+        if (!dynamicKey) {
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            ui.premiumSupportRequestNotFound,
+          );
+          return null;
+        }
+
+        switch (dynamicSupportAction.action) {
+          case 'rg': {
+            const regionCodes = getDynamicKeyRegionChoices(dynamicKey);
+            if (regionCodes.length === 0) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.premiumNoRegions,
+                {
+                  replyMarkup: buildTelegramDynamicPremiumSupportKeyboard(
+                    dynamicKey.id,
+                    locale,
+                    supportLink,
+                  ),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.premiumNoRegions,
+              );
+              return null;
+            }
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.premiumRegionPrompt(dynamicKey.name, regionCodes.join(', ')),
+              {
+                replyMarkup: buildTelegramDynamicPremiumRegionKeyboard({
+                  dynamicAccessKeyId: dynamicKey.id,
+                  locale,
+                  regionCodes,
+                  supportLink,
+                }),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.premiumSupportRequestSent,
+            );
+            return null;
+          }
+          case 'rv': {
+            const regionCode = dynamicSupportAction.secondary?.toUpperCase() || null;
+            const regionCodes = getDynamicKeyRegionChoices(dynamicKey);
+            if (!regionCode || !regionCodes.includes(regionCode)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.invalidServerChoice,
+              );
+              return null;
+            }
+
+            await sendTelegramPremiumSupportAlert({
+              dynamicAccessKeyId: dynamicKey.id,
+              requestType: 'REGION_CHANGE',
+              telegramChatId: String(chatId),
+              telegramUserId: String(callbackQuery.from.id),
+              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+              requestedRegionCode: regionCode,
+            });
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.premiumRegionRequestSubmitted(dynamicKey.name, regionCode),
+              {
+                replyMarkup: buildTelegramDynamicPremiumSupportKeyboard(
+                  dynamicKey.id,
+                  locale,
+                  supportLink,
+                ),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.premiumSupportRequestSent,
+            );
+            return null;
+          }
+          case 'is': {
+            await sendTelegramPremiumSupportAlert({
+              dynamicAccessKeyId: dynamicKey.id,
+              requestType: 'ROUTE_ISSUE',
+              telegramChatId: String(chatId),
+              telegramUserId: String(callbackQuery.from.id),
+              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+            });
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.premiumRouteIssueSubmitted(dynamicKey.name),
+              {
+                replyMarkup: buildTelegramDynamicPremiumSupportKeyboard(
+                  dynamicKey.id,
+                  locale,
+                  supportLink,
+                ),
+              },
+            );
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.premiumSupportRequestSent,
+            );
+            return null;
+          }
+          case 'ca': {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.premiumSupportCancelled,
             );
             return null;
           }

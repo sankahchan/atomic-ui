@@ -1961,6 +1961,10 @@ function TelegramSalesWorkflowCard() {
     () => new Map((templatesQuery.data || []).map((template) => [template.id, template])),
     [templatesQuery.data],
   );
+  const premiumDynamicTemplates = useMemo(
+    () => (dynamicTemplatesQuery.data || []).filter((template) => template.type === 'SELF_MANAGED'),
+    [dynamicTemplatesQuery.data],
+  );
   const dynamicTemplatesById = useMemo(
     () => new Map((dynamicTemplatesQuery.data || []).map((template) => [template.id, template])),
     [dynamicTemplatesQuery.data],
@@ -2010,6 +2014,13 @@ function TelegramSalesWorkflowCard() {
     deliveryType: isMyanmar ? 'Delivery type' : 'Delivery type',
     accessKeyDelivery: isMyanmar ? 'Normal access key' : 'Normal access key',
     dynamicKeyDelivery: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
+    premiumTemplateOnlyHint: isMyanmar
+      ? 'Premium plan များအတွက် self-managed dynamic template များကိုသာ ပြသပါမည်။'
+      : 'Premium plans only show self-managed dynamic templates.',
+    premiumPool: isMyanmar ? 'Premium pool' : 'Premium pool',
+    stableLink: isMyanmar ? 'Stable link' : 'Stable link',
+    autoFailover: isMyanmar ? 'Auto failover' : 'Auto failover',
+    preferredRouting: isMyanmar ? 'Preferred routing' : 'Preferred routing',
     template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
     dynamicTemplate: isMyanmar ? 'အသုံးပြုမည့် dynamic template' : 'Dynamic template to apply',
     noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
@@ -2158,12 +2169,20 @@ function TelegramSalesWorkflowCard() {
         : template.preferredCountryCodes.length > 0
           ? template.preferredCountryCodes.join(', ')
           : salesUi.autoSelectServer;
+      const benefitBadges = [
+        salesUi.stableLink,
+        template.type === 'SELF_MANAGED' ? salesUi.autoFailover : null,
+        template.preferredCountryCodes.length > 0 || template.preferredServerIds.length > 0
+          ? salesUi.preferredRouting
+          : null,
+      ].filter(Boolean) as string[];
 
       return (
         <div className="mt-3 rounded-xl border border-border/50 bg-background/40 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className={cn('font-medium', compact ? 'text-xs' : 'text-sm')}>{template.name}</p>
             <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">{salesUi.dynamicKeyDelivery}</Badge>
               <Badge variant="outline">{template.type === 'SELF_MANAGED' ? 'Self-managed' : 'Manual'}</Badge>
               {template.subscriptionTheme ? (
                 <Badge variant="outline">{template.subscriptionTheme}</Badge>
@@ -2173,6 +2192,14 @@ function TelegramSalesWorkflowCard() {
           {template.description ? (
             <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
           ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant="outline">{salesUi.premiumPool}: {serverSummary}</Badge>
+            {benefitBadges.map((badge) => (
+              <Badge key={badge} variant="outline">
+                {badge}
+              </Badge>
+            ))}
+          </div>
           <div className={cn('mt-3 grid gap-2', compact ? 'sm:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4')}>
             <div className="rounded-lg border border-border/40 p-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -3119,9 +3146,14 @@ function TelegramSalesWorkflowCard() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
-                            {(dynamicTemplatesQuery.data || []).map((template) => (
+                            {premiumDynamicTemplates.map((template) => (
                               <SelectItem key={template.id} value={template.id}>
                                 {template.name}
+                                {template.preferredCountryCodes.length > 0
+                                  ? ` • ${template.preferredCountryCodes.join(', ')}`
+                                  : template.preferredServerIds.length > 0
+                                    ? ` • ${template.preferredServerIds.length} preferred server${template.preferredServerIds.length === 1 ? '' : 's'}`
+                                    : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -3149,6 +3181,9 @@ function TelegramSalesWorkflowCard() {
                           </SelectContent>
                         </Select>
                       )}
+                      {plan.deliveryType === 'DYNAMIC_KEY' ? (
+                        <p className="text-xs text-muted-foreground">{salesUi.premiumTemplateOnlyHint}</p>
+                      ) : null}
                       {renderTemplateSummary(plan.deliveryType, plan.templateId, plan.dynamicTemplateId, true)}
                     </div>
                   </div>
