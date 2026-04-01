@@ -398,6 +398,7 @@ export const usersRouter = router({
             },
           },
           orderBy: [
+            { refundAssignedAt: 'asc' },
             { refundRequestedAt: 'desc' },
             { createdAt: 'desc' },
           ],
@@ -435,6 +436,9 @@ export const usersRouter = router({
           return {
             ...order,
             customerLedgerId,
+            refundAssignedReviewerUserId: order.refundAssignedReviewerUserId,
+            refundAssignedReviewerEmail: order.refundAssignedReviewerEmail,
+            refundAssignedAt: order.refundAssignedAt,
             usedBytes: refundEligibility.usedBytes.toString(),
             fulfilledPaidPurchaseCount: refundEligibility.fulfilledPaidPurchaseCount,
             refundEligible: refundEligibility.eligible,
@@ -454,6 +458,238 @@ export const usersRouter = router({
           canManage: canUserManageFinance(ctx.user, financeControls),
         },
       };
+    }),
+
+  claimRefundRequest: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        claimed: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const controls = await getFinanceControls();
+      if (!canUserManageFinance(ctx.user, controls)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage refund review assignments.',
+        });
+      }
+
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          refundRequestStatus: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          refundAssignedAt: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found.',
+        });
+      }
+
+      if (order.refundRequestStatus !== 'PENDING') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only pending refund requests can be claimed.',
+        });
+      }
+
+      if (input.claimed) {
+        if (
+          order.refundAssignedReviewerUserId &&
+          order.refundAssignedReviewerUserId !== ctx.user.id
+        ) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `This refund request is already claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`,
+          });
+        }
+
+        const claimedOrder = await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            refundAssignedReviewerUserId: ctx.user.id,
+            refundAssignedReviewerEmail: ctx.user.email || null,
+            refundAssignedAt: new Date(),
+          },
+          select: {
+            id: true,
+            orderCode: true,
+            refundAssignedReviewerUserId: true,
+            refundAssignedReviewerEmail: true,
+            refundAssignedAt: true,
+          },
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'TELEGRAM_ORDER_REFUND_CLAIMED',
+          entity: 'TELEGRAM_ORDER',
+          entityId: order.id,
+          details: {
+            orderCode: order.orderCode,
+            refundAssignedReviewerEmail: ctx.user.email || null,
+          },
+        });
+
+        return claimedOrder;
+      }
+
+      if (
+        order.refundAssignedReviewerUserId &&
+        order.refundAssignedReviewerUserId !== ctx.user.id
+      ) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `This refund request is claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`,
+        });
+      }
+
+      const releasedOrder = await db.telegramOrder.update({
+        where: { id: order.id },
+        data: {
+          refundAssignedReviewerUserId: null,
+          refundAssignedReviewerEmail: null,
+          refundAssignedAt: null,
+        },
+        select: {
+          id: true,
+          orderCode: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          refundAssignedAt: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ORDER_REFUND_RELEASED',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          previousRefundAssignedReviewerEmail: order.refundAssignedReviewerEmail || null,
+        },
+      });
+
+      return releasedOrder;
+    }),
+
+  assignRefundReviewer: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        reviewerUserId: z.string().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const controls = await getFinanceControls();
+      if (!canUserManageFinance(ctx.user, controls)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage refund review assignments.',
+        });
+      }
+
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          refundRequestStatus: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          refundAssignedAt: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found.',
+        });
+      }
+
+      if (order.refundRequestStatus !== 'PENDING') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only pending refund requests can be reassigned.',
+        });
+      }
+
+      let nextReviewer: { id: string; email: string; role: string } | null = null;
+      if (input.reviewerUserId) {
+        nextReviewer = await db.user.findUnique({
+          where: { id: input.reviewerUserId },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        });
+
+        if (!nextReviewer || nextReviewer.role !== 'ADMIN') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selected reviewer is not a valid admin.',
+          });
+        }
+      }
+
+      const isUnchanged =
+        (nextReviewer?.id || null) === (order.refundAssignedReviewerUserId || null) &&
+        (nextReviewer?.email || null) === (order.refundAssignedReviewerEmail || null);
+
+      if (isUnchanged) {
+        return {
+          id: order.id,
+          orderCode: order.orderCode,
+          refundAssignedReviewerUserId: order.refundAssignedReviewerUserId,
+          refundAssignedReviewerEmail: order.refundAssignedReviewerEmail,
+          refundAssignedAt: order.refundAssignedAt,
+        };
+      }
+
+      const updatedOrder = await db.telegramOrder.update({
+        where: { id: order.id },
+        data: {
+          refundAssignedReviewerUserId: nextReviewer?.id || null,
+          refundAssignedReviewerEmail: nextReviewer?.email || null,
+          refundAssignedAt: nextReviewer ? new Date() : null,
+        },
+        select: {
+          id: true,
+          orderCode: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          refundAssignedAt: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: nextReviewer ? 'TELEGRAM_ORDER_REFUND_REASSIGNED' : 'TELEGRAM_ORDER_REFUND_UNASSIGNED',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          previousRefundAssignedReviewerEmail: order.refundAssignedReviewerEmail || null,
+          refundAssignedReviewerEmail: nextReviewer?.email || null,
+        },
+      });
+
+      return updatedOrder;
     }),
 
   runFinanceDigestNow: adminProcedure.mutation(async ({ ctx }) => {
@@ -502,6 +738,9 @@ export const usersRouter = router({
           approvedDynamicKeyId: true,
           targetDynamicKeyId: true,
           refundRequestStatus: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          locale: true,
         },
       });
 
@@ -512,6 +751,17 @@ export const usersRouter = router({
         });
       }
       if (input.action === 'REFUND') {
+        if (
+          order.refundRequestStatus === 'PENDING' &&
+          order.refundAssignedReviewerUserId &&
+          order.refundAssignedReviewerUserId !== ctx.user.id
+        ) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `This refund request is claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`,
+          });
+        }
+
         const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
 
         if (!refundEligibility.eligible) {
@@ -563,6 +813,18 @@ export const usersRouter = router({
               input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
                 ? ctx.user.email || null
                 : undefined,
+            refundAssignedReviewerUserId:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? null
+                : undefined,
+            refundAssignedReviewerEmail:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? null
+                : undefined,
+            refundAssignedAt:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? null
+                : undefined,
           },
         }),
         db.telegramOrderFinanceAction.create({
@@ -597,6 +859,9 @@ export const usersRouter = router({
           chatId: order.telegramChatId || order.telegramUserId,
           orderCode: order.orderCode,
           approved: true,
+          amount,
+          currency,
+          locale: order.locale,
         });
       }
 
@@ -637,6 +902,9 @@ export const usersRouter = router({
           telegramUserId: true,
           telegramChatId: true,
           refundRequestStatus: true,
+          refundAssignedReviewerUserId: true,
+          refundAssignedReviewerEmail: true,
+          locale: true,
         },
       });
 
@@ -651,6 +919,16 @@ export const usersRouter = router({
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'There is no pending refund request for this order.',
+        });
+      }
+
+      if (
+        order.refundAssignedReviewerUserId &&
+        order.refundAssignedReviewerUserId !== ctx.user.id
+      ) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `This refund request is claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`,
         });
       }
 
@@ -691,6 +969,9 @@ export const usersRouter = router({
               refundRequestReviewedAt: new Date(),
               refundRequestReviewedByUserId: ctx.user.id,
               refundRequestReviewerEmail: ctx.user.email || null,
+              refundAssignedReviewerUserId: null,
+              refundAssignedReviewerEmail: null,
+              refundAssignedAt: null,
             },
           }),
           db.telegramOrderFinanceAction.create({
@@ -715,6 +996,9 @@ export const usersRouter = router({
             refundRequestReviewedAt: new Date(),
             refundRequestReviewedByUserId: ctx.user.id,
             refundRequestReviewerEmail: ctx.user.email || null,
+            refundAssignedReviewerUserId: null,
+            refundAssignedReviewerEmail: null,
+            refundAssignedAt: null,
           },
         });
       }
@@ -741,6 +1025,9 @@ export const usersRouter = router({
         orderCode: order.orderCode,
         approved: input.action === 'APPROVE',
         customerMessage,
+        amount: order.priceAmount,
+        currency: order.priceCurrency,
+        locale: order.locale,
       });
 
       return {

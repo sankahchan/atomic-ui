@@ -94,6 +94,7 @@ export default function UsersPage() {
   const [refundReviewCustomerMessage, setRefundReviewCustomerMessage] = useState('');
 
   const { data: users, refetch, isLoading } = trpc.users.list.useQuery();
+  const currentUserQuery = trpc.auth.me.useQuery();
   const financeControlsQuery = trpc.users.getFinanceControls.useQuery();
   const refundQueueQuery = trpc.users.getRefundQueue.useQuery({
     status: refundQueueStatus,
@@ -121,6 +122,11 @@ export default function UsersPage() {
     (total, user) => total + ((user as { _count?: { accessKeys?: number } })._count?.accessKeys || 0),
     0
   );
+  const adminUsers = useMemo(
+    () => userList.filter((user) => user.role === 'ADMIN'),
+    [userList],
+  );
+  const currentReviewerId = currentUserQuery.data?.id ?? null;
   const refundQueue = refundQueueQuery.data?.orders || [];
   const refundQueueSummary = refundQueueQuery.data?.summary;
   const refundReasonPresets = useMemo(
@@ -223,6 +229,36 @@ export default function UsersPage() {
       });
     },
   });
+  const claimRefundRequestMutation = trpc.users.claimRefundRequest.useMutation({
+    onSuccess: async (_result, variables) => {
+      await refundQueueQuery.refetch();
+      toast({
+        title: variables.claimed ? 'Refund request claimed' : 'Refund request released',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Refund assignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const assignRefundReviewerMutation = trpc.users.assignRefundReviewer.useMutation({
+    onSuccess: async () => {
+      await refundQueueQuery.refetch();
+      toast({
+        title: 'Refund reviewer updated',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Refund reassignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const updateAdminScopeMutation = trpc.users.updateAdminScope.useMutation({
     onSuccess: async (updated) => {
@@ -287,6 +323,12 @@ export default function UsersPage() {
       setRefundReviewCustomerMessage(preset.customerMessage);
     }
   };
+
+  const isRefundClaimedByCurrentUser = (order: (typeof refundQueue)[number]) =>
+    Boolean(order.refundAssignedReviewerUserId && currentReviewerId && order.refundAssignedReviewerUserId === currentReviewerId);
+
+  const isRefundClaimedByOtherUser = (order: (typeof refundQueue)[number]) =>
+    Boolean(order.refundAssignedReviewerUserId && (!currentReviewerId || order.refundAssignedReviewerUserId !== currentReviewerId));
 
   return (
     <div className="space-y-6">
@@ -645,6 +687,13 @@ export default function UsersPage() {
                         <Badge variant="outline">{order.refundRequestStatus}</Badge>
                         <Badge variant="secondary">{order.kind}</Badge>
                         <Badge variant="outline">{order.financeStatus}</Badge>
+                        {order.refundAssignedReviewerEmail ? (
+                          <Badge variant={isRefundClaimedByCurrentUser(order) ? 'default' : 'outline'}>
+                            {isRefundClaimedByCurrentUser(order)
+                              ? `Claimed by you`
+                              : `Claimed by ${order.refundAssignedReviewerEmail}`}
+                          </Badge>
+                        ) : null}
                         {order.refundReviewReasonCode ? (
                           <Badge variant="outline">
                             {resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode}
@@ -685,6 +734,10 @@ export default function UsersPage() {
                             {order.refundRequestReviewedAt ? formatDateTime(order.refundRequestReviewedAt) : '—'}
                           </p>
                           <p>
+                            <span className="font-medium text-foreground">Claimed:</span>{' '}
+                            {order.refundAssignedAt ? formatDateTime(order.refundAssignedAt) : '—'}
+                          </p>
+                          <p>
                             <span className="font-medium text-foreground">Reviewer:</span>{' '}
                             {order.refundRequestReviewerEmail || '—'}
                           </p>
@@ -716,9 +769,58 @@ export default function UsersPage() {
                       ) : null}
                       {order.refundRequestStatus === 'PENDING' ? (
                         <>
+                          <div className="grid gap-2">
+                            {!order.refundAssignedReviewerUserId ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={!refundQueueQuery.data?.permissions.canManage || claimRefundRequestMutation.isPending}
+                                onClick={() => claimRefundRequestMutation.mutate({ orderId: order.id, claimed: true })}
+                              >
+                                Claim refund
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                  !refundQueueQuery.data?.permissions.canManage ||
+                                  claimRefundRequestMutation.isPending ||
+                                  isRefundClaimedByOtherUser(order)
+                                }
+                                onClick={() => claimRefundRequestMutation.mutate({ orderId: order.id, claimed: false })}
+                              >
+                                Release claim
+                              </Button>
+                            )}
+
+                            <Select
+                              value={order.refundAssignedReviewerUserId || 'unassigned'}
+                              onValueChange={(value) =>
+                                assignRefundReviewerMutation.mutate({
+                                  orderId: order.id,
+                                  reviewerUserId: value === 'unassigned' ? null : value,
+                                })
+                              }
+                              disabled={!refundQueueQuery.data?.permissions.canManage || assignRefundReviewerMutation.isPending}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assign reviewer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {adminUsers.map((admin) => (
+                                  <SelectItem key={admin.id} value={admin.id}>
+                                    {admin.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <Button
                             size="sm"
-                            disabled={!refundQueueQuery.data?.permissions.canManage}
+                            variant={isRefundClaimedByOtherUser(order) ? 'outline' : 'default'}
+                            disabled={!refundQueueQuery.data?.permissions.canManage || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'APPROVE')}
                           >
                             Approve request
@@ -726,11 +828,16 @@ export default function UsersPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={!refundQueueQuery.data?.permissions.canManage}
+                            disabled={!refundQueueQuery.data?.permissions.canManage || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'REJECT')}
                           >
                             Decline request
                           </Button>
+                          {isRefundClaimedByOtherUser(order) ? (
+                            <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.03]">
+                              This refund request is currently owned by {order.refundAssignedReviewerEmail || 'another admin'}.
+                            </div>
+                          ) : null}
                         </>
                       ) : (
                         <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.03]">

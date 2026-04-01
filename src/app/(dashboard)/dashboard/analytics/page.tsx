@@ -1,7 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  Area as RechartsArea,
+  AreaChart as RechartsAreaChart,
+  Bar as RechartsBar,
+  BarChart as RechartsBarChart,
+  CartesianGrid as RechartsCartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis as RechartsXAxis,
+  YAxis as RechartsYAxis,
+} from 'recharts';
 import { trpc } from '@/lib/trpc';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +42,7 @@ import {
   Share2,
   TrendingUp,
   Users,
+  Wallet,
   Zap,
 } from 'lucide-react';
 
@@ -168,6 +180,59 @@ function downloadCsvFile(filename: string, csv: string) {
   URL.revokeObjectURL(url);
 }
 
+function formatCompactFinanceAxisValue(value: number) {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}m`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
+  return String(Math.round(value));
+}
+
+function FinanceChartTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+  label?: string;
+  valueFormatter: (value: number, seriesLabel: string) => string;
+}) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-[164px] rounded-2xl border border-cyan-400/18 bg-[rgba(5,12,26,0.94)] p-3 text-white shadow-[0_18px_36px_rgba(1,6,20,0.55)] backdrop-blur-xl">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/55">
+        {label}
+      </p>
+      <div className="mt-2 space-y-1.5">
+        {payload.map((item) => (
+          <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
+            <span className="inline-flex items-center gap-2 text-cyan-50/80">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: item.color || 'rgba(34,211,238,0.95)' }}
+              />
+              {item.name || 'Value'}
+            </span>
+            <span className="font-medium text-cyan-200">
+              {valueFormatter(item.value || 0, item.name || 'Value')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { t } = useLocale();
   const { toast } = useToast();
@@ -266,6 +331,27 @@ export default function AnalyticsPage() {
     t('days.saturday') || 'Sat',
   ];
   const hours = Array.from({ length: 24 }, (_, i) => i);
+  const primaryRevenueCurrency = useMemo(() => {
+    const entries = monthlyBusinessDashboard
+      ? Object.entries(monthlyBusinessDashboard.summary.totalRevenueByCurrency)
+      : [];
+    if (entries.length === 0) {
+      return 'MMK';
+    }
+    return entries.sort((left, right) => right[1] - left[1])[0]?.[0] || 'MMK';
+  }, [monthlyBusinessDashboard]);
+  const financeTrendRows = useMemo(
+    () =>
+      (monthlyBusinessDashboard?.months || []).map((month) => ({
+        label: month.label,
+        revenue:
+          month.revenueByCurrency.find((entry) => entry.currency === primaryRevenueCurrency)?.amount || 0,
+        renewals: month.renewalOrders,
+        newOrders: month.newOrders,
+        churn: month.churnSignals,
+      })),
+    [monthlyBusinessDashboard, primaryRevenueCurrency],
+  );
 
   return (
     <TooltipProvider>
@@ -1638,6 +1724,133 @@ export default function AnalyticsPage() {
                     ? `${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta} vs previous month`
                     : 'Uses expired, depleted, disabled, and archived churn signals'}
                 </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-[1.3rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                <div className="mb-3 space-y-1">
+                  <p className="text-sm font-semibold">Revenue trend</p>
+                  <p className="text-xs text-muted-foreground">
+                    {monthlyBusinessDashboard && Object.keys(monthlyBusinessDashboard.summary.totalRevenueByCurrency).length > 1
+                      ? `Showing ${primaryRevenueCurrency} revenue to keep the chart readable when multiple currencies are active.`
+                      : `Monthly revenue trend in ${primaryRevenueCurrency}.`}
+                  </p>
+                </div>
+                {loadingMonthlyBusinessDashboard ? (
+                  <div className="ops-chart-empty h-[240px]">Loading finance chart...</div>
+                ) : financeTrendRows.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <RechartsAreaChart data={financeTrendRows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="financeRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(34,197,94,0.75)" stopOpacity={0.55} />
+                          <stop offset="100%" stopColor="rgba(34,197,94,0.15)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <RechartsCartesianGrid strokeDasharray="2 10" stroke="rgba(125, 211, 252, 0.12)" vertical={false} />
+                      <RechartsXAxis
+                        dataKey="label"
+                        stroke="rgba(186, 230, 253, 0.58)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                      />
+                      <RechartsYAxis
+                        stroke="rgba(186, 230, 253, 0.44)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={formatCompactFinanceAxisValue}
+                        width={48}
+                        tickMargin={6}
+                      />
+                      <RechartsTooltip
+                        content={
+                          <FinanceChartTooltip
+                            valueFormatter={(value) => formatRevenueLabel(primaryRevenueCurrency, value)}
+                          />
+                        }
+                      />
+                      <RechartsArea
+                        type="monotone"
+                        dataKey="revenue"
+                        name="Revenue"
+                        stroke="rgba(34,197,94,0.95)"
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#financeRevenueGradient)"
+                        dot={false}
+                      />
+                    </RechartsAreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="ops-chart-empty h-[240px]">
+                    <div className="space-y-2 text-center">
+                      <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                      <p className="font-medium text-foreground">No finance trend yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Monthly fulfilled-order revenue will appear here.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[1.3rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                <div className="mb-3 space-y-1">
+                  <p className="text-sm font-semibold">Renewal vs churn trend</p>
+                  <p className="text-xs text-muted-foreground">
+                    Compare new paid orders, renewals, and churn signals month over month.
+                  </p>
+                </div>
+                {loadingMonthlyBusinessDashboard ? (
+                  <div className="ops-chart-empty h-[240px]">Loading finance chart...</div>
+                ) : financeTrendRows.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <RechartsBarChart data={financeTrendRows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                      <RechartsCartesianGrid strokeDasharray="2 10" stroke="rgba(125, 211, 252, 0.12)" vertical={false} />
+                      <RechartsXAxis
+                        dataKey="label"
+                        stroke="rgba(186, 230, 253, 0.58)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                      />
+                      <RechartsYAxis
+                        stroke="rgba(186, 230, 253, 0.44)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={formatCompactFinanceAxisValue}
+                        width={44}
+                        tickMargin={6}
+                      />
+                      <RechartsTooltip
+                        content={
+                          <FinanceChartTooltip
+                            valueFormatter={(value, seriesLabel) => `${Math.round(value)} ${seriesLabel.toLowerCase()}`}
+                          />
+                        }
+                      />
+                      <RechartsBar dataKey="newOrders" name="New paid" fill="rgba(34,211,238,0.92)" radius={[6, 6, 0, 0]} />
+                      <RechartsBar dataKey="renewals" name="Renewals" fill="rgba(168,85,247,0.92)" radius={[6, 6, 0, 0]} />
+                      <RechartsBar dataKey="churn" name="Churn" fill="rgba(251,191,36,0.92)" radius={[6, 6, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="ops-chart-empty h-[240px]">
+                    <div className="space-y-2 text-center">
+                      <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                      <p className="font-medium text-foreground">No trend history yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Renewal and churn signals will appear once monthly data builds up.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

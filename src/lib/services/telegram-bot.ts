@@ -2385,7 +2385,7 @@ async function handleTelegramOrderTextMessage(input: {
             template,
           });
 
-          await db.telegramOrder.update({
+          const finalTrialOrder = await db.telegramOrder.update({
             where: { id: updatedOrder.id },
             data: {
               status: 'FULFILLED',
@@ -2398,14 +2398,13 @@ async function handleTelegramOrderTextMessage(input: {
           try {
             const config = await getTelegramConfig();
             if (config) {
-              await sendTelegramMessage(
-                config.botToken,
-                updatedOrder.telegramChatId,
-                ui.orderApproved(updatedOrder.orderCode),
-                {
-                  replyMarkup: getCommandKeyboard(false),
-                },
-              );
+              await sendTelegramOrderReceiptConfirmation({
+                chatId: updatedOrder.telegramChatId,
+                locale,
+                order: finalTrialOrder,
+                deliveredKeyName: key.name,
+                isTrial: true,
+              });
             }
 
             await sendAccessKeySharePageToTelegram({
@@ -2836,6 +2835,253 @@ async function cancelStaleTelegramConversationOrders(chatId: number, telegramUse
       updatedAt: new Date(),
     },
   });
+}
+
+function formatTelegramReceiptPriceLabel(order: {
+  priceLabel?: string | null;
+  priceAmount?: number | null;
+  priceCurrency?: string | null;
+}) {
+  if (order.priceLabel?.trim()) {
+    return order.priceLabel.trim();
+  }
+
+  if (typeof order.priceAmount === 'number' && Number.isFinite(order.priceAmount) && order.priceAmount > 0) {
+    const normalizedCurrency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+    const formattedAmount = new Intl.NumberFormat('en-US').format(order.priceAmount);
+    return normalizedCurrency === 'MMK'
+      ? `${formattedAmount} Kyat`
+      : `${formattedAmount} ${normalizedCurrency}`;
+  }
+
+  return null;
+}
+
+function buildTelegramOrderReceiptMessage(input: {
+  order: {
+    orderCode: string;
+    priceLabel?: string | null;
+    priceAmount?: number | null;
+    priceCurrency?: string | null;
+    planName?: string | null;
+    planCode?: string | null;
+    paymentMethodLabel?: string | null;
+    durationMonths?: number | null;
+    durationDays?: number | null;
+    requestedName?: string | null;
+    selectedServerName?: string | null;
+    selectedServerCountryCode?: string | null;
+    deliveryType?: string | null;
+  };
+  locale: SupportedLocale;
+  deliveredKeyName: string;
+  isTrial?: boolean;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const typeLabel = input.isTrial
+    ? ui.receiptTypeTrial
+    : input.order.deliveryType === 'DYNAMIC_KEY'
+      ? ui.receiptTypePremium
+      : ui.receiptTypeStandard;
+  const statusLabel = input.isTrial ? ui.receiptStatusTrial : ui.receiptStatusPaid;
+  const durationLabel = input.order.durationMonths
+    ? input.locale === 'my'
+      ? `${input.order.durationMonths} လ`
+      : `${input.order.durationMonths} month${input.order.durationMonths === 1 ? '' : 's'}`
+    : input.order.durationDays
+      ? input.locale === 'my'
+        ? `${input.order.durationDays} ရက်`
+        : `${input.order.durationDays} day${input.order.durationDays === 1 ? '' : 's'}`
+      : null;
+  const priceLabel = formatTelegramReceiptPriceLabel(input.order);
+  const serverLabel = input.order.selectedServerName
+    ? `${input.order.selectedServerName}${input.order.selectedServerCountryCode ? ` ${getFlagEmoji(input.order.selectedServerCountryCode)}` : ''}`
+    : null;
+
+  return [
+    ui.receiptTitle,
+    '',
+    `${ui.orderCodeLabel}: <b>${escapeHtml(input.order.orderCode)}</b>`,
+    `${ui.receiptNumberLabel}: <code>RCPT-${escapeHtml(input.order.orderCode)}</code>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(statusLabel)}</b>`,
+    `${ui.receiptTypeLabel}: <b>${escapeHtml(typeLabel)}</b>`,
+    input.order.planName || input.order.planCode
+      ? `${ui.planLabel}: <b>${escapeHtml(input.order.planName || input.order.planCode || '')}</b>`
+      : '',
+    priceLabel ? `${ui.priceLabel}: <b>${escapeHtml(priceLabel)}</b>` : '',
+    input.order.paymentMethodLabel
+      ? `${ui.paymentMethodLabel}: <b>${escapeHtml(input.order.paymentMethodLabel)}</b>`
+      : '',
+    durationLabel ? `${ui.durationLabel}: <b>${escapeHtml(durationLabel)}</b>` : '',
+    serverLabel ? `${ui.preferredServerLabel}: <b>${escapeHtml(serverLabel)}</b>` : '',
+    input.order.requestedName
+      ? `${ui.requestedNameLabel}: <b>${escapeHtml(input.order.requestedName)}</b>`
+      : '',
+    `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,
+    '',
+    escapeHtml(ui.receiptFooter),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function sendTelegramOrderReceiptConfirmation(input: {
+  chatId: string;
+  locale: SupportedLocale;
+  order: Parameters<typeof buildTelegramOrderReceiptMessage>[0]['order'];
+  deliveredKeyName: string;
+  isTrial?: boolean;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return false;
+  }
+
+  return sendTelegramMessage(
+    config.botToken,
+    input.chatId,
+    buildTelegramOrderReceiptMessage(input),
+    {
+      replyMarkup: getCommandKeyboard(false),
+    },
+  );
+}
+
+async function listTelegramRecipientChatIdsForServer(serverId: string) {
+  const [accessKeys, dynamicKeys] = await Promise.all([
+    db.accessKey.findMany({
+      where: {
+        serverId,
+        status: { in: ['ACTIVE', 'PENDING', 'DISABLED'] },
+      },
+      select: {
+        telegramId: true,
+        user: {
+          select: {
+            telegramChatId: true,
+          },
+        },
+      },
+    }),
+    db.dynamicAccessKey.findMany({
+      where: {
+        status: 'ACTIVE',
+        accessKeys: {
+          some: {
+            serverId,
+          },
+        },
+      },
+      select: {
+        telegramId: true,
+        user: {
+          select: {
+            telegramChatId: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return Array.from(
+    new Set(
+      [...accessKeys, ...dynamicKeys]
+        .flatMap((record) => [record.telegramId, record.user?.telegramChatId])
+        .filter((value): value is string => Boolean(value && value.trim())),
+    ),
+  );
+}
+
+async function resolveTelegramAdminServerTarget(
+  argsText: string,
+  locale: SupportedLocale,
+  allowTrailingMessage = false,
+) {
+  const input = argsText.trim();
+  if (!input) {
+    return {
+      server: null as null,
+      remainder: '',
+      error:
+        locale === 'my'
+          ? 'အသုံးပြုပုံ: /serverdown <server>, /maintenance <server>, /serverupdate <server> <message>, /serverrecovered <server> [message]'
+          : 'Usage: /serverdown <server>, /maintenance <server>, /serverupdate <server> <message>, /serverrecovered <server> [message]',
+    };
+  }
+
+  const servers = await db.server.findMany({
+    select: {
+      id: true,
+      name: true,
+      lifecycleMode: true,
+    },
+    orderBy: [{ name: 'asc' }],
+  });
+
+  const normalizedInput = input.toLowerCase();
+  const exact = servers.find(
+    (server) =>
+      server.id.toLowerCase() === normalizedInput || server.name.trim().toLowerCase() === normalizedInput,
+  );
+  if (exact && !allowTrailingMessage) {
+    return { server: exact, remainder: '', error: null };
+  }
+
+  if (allowTrailingMessage) {
+    const byId = servers.find((server) => normalizedInput.startsWith(`${server.id.toLowerCase()} `) || server.id.toLowerCase() === normalizedInput);
+    if (byId) {
+      return {
+        server: byId,
+        remainder: input.slice(byId.id.length).trim(),
+        error: null,
+      };
+    }
+
+    const nameMatches = servers
+      .filter((server) => {
+        const name = server.name.trim().toLowerCase();
+        return normalizedInput === name || normalizedInput.startsWith(`${name} `);
+      })
+      .sort((left, right) => right.name.length - left.name.length);
+
+    if (nameMatches.length === 1) {
+      const server = nameMatches[0];
+      return {
+        server,
+        remainder: input.slice(server.name.length).trim(),
+        error: null,
+      };
+    }
+  }
+
+  if (exact) {
+    return { server: exact, remainder: '', error: null };
+  }
+
+  const partialMatches = servers.filter((server) =>
+    server.name.trim().toLowerCase().includes(normalizedInput),
+  );
+  if (partialMatches.length === 1 && !allowTrailingMessage) {
+    return { server: partialMatches[0], remainder: '', error: null };
+  }
+
+  if (partialMatches.length > 1 && !allowTrailingMessage) {
+    return {
+      server: null as null,
+      remainder: '',
+      error: [
+        locale === 'my' ? 'Server အများအပြား ကိုက်ညီနေပါသည်။ တိတိကျကျ အသုံးပြုပါ:' : 'Multiple servers matched. Use one exact name:',
+        '',
+        ...partialMatches.slice(0, 8).map((server) => `• <code>${escapeHtml(server.id)}</code> — ${escapeHtml(server.name)}`),
+      ].join('\n'),
+    };
+  }
+
+  return {
+    server: null as null,
+    remainder: '',
+    error: locale === 'my' ? `❌ Server မတွေ့ပါ။` : `❌ Server not found.`,
+  };
 }
 
 export async function runTelegramSalesOrderCycle() {
@@ -4456,14 +4702,13 @@ export async function approveTelegramOrder(input: {
     try {
       const config = await getTelegramConfig();
       if (config) {
-        await sendTelegramMessage(
-          config.botToken,
-          order.telegramChatId,
-          ui.orderApproved(order.orderCode),
-          {
-            replyMarkup: getCommandKeyboard(false),
-          },
-        );
+        await sendTelegramOrderReceiptConfirmation({
+          chatId: order.telegramChatId,
+          locale,
+          order: finalOrder,
+          deliveredKeyName: key.name,
+          isTrial: false,
+        });
       }
 
       deliveryResult = isDynamic
@@ -7373,6 +7618,207 @@ async function handleBackupCommand(
   }
 }
 
+async function handleServerDownCommand(argsText: string, locale: SupportedLocale): Promise<string> {
+  const resolved = await resolveTelegramAdminServerTarget(argsText, locale);
+  if (!resolved.server) {
+    return resolved.error;
+  }
+
+  const chatIds = await listTelegramRecipientChatIdsForServer(resolved.server.id);
+  if (chatIds.length === 0) {
+    return locale === 'my'
+      ? `ℹ️ <b>${escapeHtml(resolved.server.name)}</b> အတွက် Telegram ချိတ်ထားသော user မရှိပါ။`
+      : `ℹ️ There are no Telegram-linked users for <b>${escapeHtml(resolved.server.name)}</b>.`;
+  }
+
+  const { markServerOutageDetected } = await import('@/lib/services/server-outage');
+  await markServerOutageDetected({
+    serverId: resolved.server.id,
+    cause: 'MANUAL_OUTAGE',
+    gracePeriodHours: 3,
+  });
+
+  const result = await sendServerIssueNoticeToTelegram({
+    chatIds,
+    serverName: resolved.server.name,
+    noticeType: 'DOWNTIME',
+    message:
+      locale === 'my'
+        ? 'ဤ server တွင် ပြဿနာရှိနေပါသည်။ အစားထိုး server သို့ ပြောင်းပေးရန် သို့မဟုတ် recovery update ပို့ရန် ၂ မှ ၃ နာရီခန့် စောင့်ပေးပါ။'
+        : 'This server is currently having an issue. Please wait about 2 to 3 hours while we prepare a replacement or recovery update.',
+  });
+  await (db as any).serverOutageState.updateMany({
+    where: {
+      serverId: resolved.server.id,
+      recoveredAt: null,
+    },
+    data: {
+      userAlertSentAt: new Date(),
+    },
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SERVER_DOWN_NOTICE_SENT',
+    entity: 'SERVER',
+    entityId: resolved.server.id,
+    details: {
+      serverName: resolved.server.name,
+      sentToTelegramUsers: result.sentCount,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `🚨 <b>${escapeHtml(resolved.server.name)}</b> အတွက် downtime notice ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။`
+    : `🚨 Sent a downtime notice for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentCount} Telegram user(s).`;
+}
+
+async function handleMaintenanceCommand(argsText: string, locale: SupportedLocale): Promise<string> {
+  const resolved = await resolveTelegramAdminServerTarget(argsText, locale);
+  if (!resolved.server) {
+    return resolved.error;
+  }
+
+  const chatIds = await listTelegramRecipientChatIdsForServer(resolved.server.id);
+  if (chatIds.length === 0) {
+    return locale === 'my'
+      ? `ℹ️ <b>${escapeHtml(resolved.server.name)}</b> အတွက် Telegram ချိတ်ထားသော user မရှိပါ။`
+      : `ℹ️ There are no Telegram-linked users for <b>${escapeHtml(resolved.server.name)}</b>.`;
+  }
+
+  await db.server.update({
+    where: { id: resolved.server.id },
+    data: {
+      lifecycleMode: 'MAINTENANCE',
+      lifecycleChangedAt: new Date(),
+    },
+  });
+
+  const { markServerOutageDetected } = await import('@/lib/services/server-outage');
+  await markServerOutageDetected({
+    serverId: resolved.server.id,
+    cause: 'MANUAL_OUTAGE',
+    gracePeriodHours: 3,
+  });
+
+  const result = await sendServerIssueNoticeToTelegram({
+    chatIds,
+    serverName: resolved.server.name,
+    noticeType: 'MAINTENANCE',
+    message:
+      locale === 'my'
+        ? 'ဤ server အတွက် planned maintenance စတင်ထားပါသည်။ အစားထိုး server သို့ ပြောင်းပေးရန် သို့မဟုတ် maintenance ပြီးဆုံးရန် ၂ မှ ၃ နာရီခန့် စောင့်ပေးပါ။'
+        : 'Planned maintenance has started for this server. Please wait about 2 to 3 hours while we complete maintenance or prepare a replacement.',
+  });
+  await (db as any).serverOutageState.updateMany({
+    where: {
+      serverId: resolved.server.id,
+      recoveredAt: null,
+    },
+    data: {
+      userAlertSentAt: new Date(),
+    },
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SERVER_MAINTENANCE_NOTICE_SENT',
+    entity: 'SERVER',
+    entityId: resolved.server.id,
+    details: {
+      serverName: resolved.server.name,
+      sentToTelegramUsers: result.sentCount,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `🛠️ <b>${escapeHtml(resolved.server.name)}</b> အတွက် maintenance notice ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။`
+    : `🛠️ Sent a maintenance notice for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentCount} Telegram user(s).`;
+}
+
+async function handleServerUpdateCommand(argsText: string, locale: SupportedLocale): Promise<string> {
+  const resolved = await resolveTelegramAdminServerTarget(argsText, locale, true);
+  if (!resolved.server) {
+    return resolved.error;
+  }
+  if (!resolved.remainder || resolved.remainder.trim().length < 6) {
+    return locale === 'my'
+      ? 'အသုံးပြုပုံ: /serverupdate <server> <message>'
+      : 'Usage: /serverupdate <server> <message>';
+  }
+
+  const { sendServerOutageFollowUp } = await import('@/lib/services/server-outage');
+  const result = await sendServerOutageFollowUp({
+    serverId: resolved.server.id,
+    message: resolved.remainder,
+    markRecovered: false,
+    createdByName: 'telegram-admin',
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SERVER_OUTAGE_FOLLOW_UP',
+    entity: 'SERVER',
+    entityId: resolved.server.id,
+    details: {
+      serverName: resolved.server.name,
+      message: resolved.remainder,
+      sentToTelegramUsers: result.sentToTelegramUsers,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `📣 <b>${escapeHtml(resolved.server.name)}</b> အတွက် follow-up update ကို user ${result.sentToTelegramUsers} ယောက်ထံ ပို့ပြီးပါပြီ။`
+    : `📣 Sent an outage follow-up for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
+}
+
+async function handleServerRecoveredCommand(argsText: string, locale: SupportedLocale): Promise<string> {
+  const resolved = await resolveTelegramAdminServerTarget(argsText, locale, true);
+  if (!resolved.server) {
+    return resolved.error;
+  }
+
+  if ((resolved.server.lifecycleMode || '') === 'MAINTENANCE') {
+    await db.server.update({
+      where: { id: resolved.server.id },
+      data: {
+        lifecycleMode: 'ACTIVE',
+        lifecycleChangedAt: new Date(),
+      },
+    });
+  }
+
+  const recoveryMessage =
+    resolved.remainder?.trim() ||
+    (locale === 'my'
+      ? 'Server ပြဿနာကို ဖြေရှင်းပြီးပါပြီ။ ယခု VPN key ကို ထပ်မံအသုံးပြုနိုင်ပါသည်။'
+      : 'The server issue has been resolved. You can try using your VPN key again now.');
+
+  const { sendServerOutageFollowUp } = await import('@/lib/services/server-outage');
+  const result = await sendServerOutageFollowUp({
+    serverId: resolved.server.id,
+    message: recoveryMessage,
+    markRecovered: true,
+    createdByName: 'telegram-admin',
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SERVER_OUTAGE_RECOVERED',
+    entity: 'SERVER',
+    entityId: resolved.server.id,
+    details: {
+      serverName: resolved.server.name,
+      message: recoveryMessage,
+      sentToTelegramUsers: result.sentToTelegramUsers,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `✅ <b>${escapeHtml(resolved.server.name)}</b> အတွက် recovery update ကို user ${result.sentToTelegramUsers} ယောက်ထံ ပို့ပြီးပါပြီ။`
+    : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
+}
+
 async function handleHelpCommand(
   chatId: number,
   botToken: string,
@@ -7429,6 +7875,10 @@ async function handleHelpCommand(
 /disable &lt;key-id&gt; - Key ကို ပိတ်မည်
 /enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
 /resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
+/serverdown &lt;server&gt; - Server downtime notice ပို့မည်
+/maintenance &lt;server&gt; - Maintenance notice ပို့မည်
+/serverupdate &lt;server&gt; &lt;message&gt; - Follow-up update ပို့မည်
+/serverrecovered &lt;server&gt; [message] - Recovery update ပို့မည်
 /sysinfo - System resource usage
 /backup - Backup ဖန်တီးပြီး ဒေါင်းလုဒ်ဆွဲမည်`
       : `\n\n<b>Admin Commands</b>
@@ -7438,6 +7888,10 @@ async function handleHelpCommand(
 /disable &lt;key-id&gt; - Disable a key
 /enable &lt;key-id&gt; - Re-enable a key
 /resend &lt;key-id&gt; - Resend the share page
+/serverdown &lt;server&gt; - Send a downtime notice
+/maintenance &lt;server&gt; - Send a maintenance notice
+/serverupdate &lt;server&gt; &lt;message&gt; - Send a follow-up update
+/serverrecovered &lt;server&gt; [message] - Send a recovery update
 /sysinfo - System resource usage
 /backup - Create and download a backup`;
   }
@@ -9338,6 +9792,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return isAdmin ? handleAdminToggleCommand(argsText, true, locale) : ui.adminOnly;
     case 'resend':
       return isAdmin ? handleResendCommand(argsText, locale) : ui.adminOnly;
+    case 'serverdown':
+      return isAdmin ? handleServerDownCommand(argsText, locale) : ui.adminOnly;
+    case 'maintenance':
+      return isAdmin ? handleMaintenanceCommand(argsText, locale) : ui.adminOnly;
+    case 'serverupdate':
+      return isAdmin ? handleServerUpdateCommand(argsText, locale) : ui.adminOnly;
+    case 'serverrecovered':
+      return isAdmin ? handleServerRecoveredCommand(argsText, locale) : ui.adminOnly;
     case 'sysinfo':
       return isAdmin ? handleSysInfoCommand(chatId, config.botToken, locale) : ui.adminOnly;
     case 'backup':

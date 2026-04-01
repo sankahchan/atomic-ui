@@ -604,6 +604,7 @@ export async function runServerOutageCycle() {
 
   for (const state of states) {
     const stillImpacted =
+      state.cause === 'MANUAL_OUTAGE' ||
       state.server.lifecycleMode === 'MAINTENANCE' ||
       state.server.isActive === false ||
       state.server.healthCheck?.lastStatus === 'DOWN';

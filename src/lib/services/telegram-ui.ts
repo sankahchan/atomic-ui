@@ -496,6 +496,18 @@ export function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Access details ကို ယခု ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
         : `✅ Order <b>${code}</b> has been approved. Your access details will be delivered in the next message.`,
+    receiptTitle: isMyanmar ? '🧾 <b>ငွေပေးချေမှု အတည်ပြုလက်ခံစာ</b>' : '🧾 <b>Payment receipt</b>',
+    refundReceiptTitle: isMyanmar ? '🧾 <b>Refund confirmation</b>' : '🧾 <b>Refund confirmation</b>',
+    receiptNumberLabel: isMyanmar ? 'Receipt' : 'Receipt',
+    receiptTypeLabel: isMyanmar ? 'အမျိုးအစား' : 'Type',
+    receiptStatusPaid: isMyanmar ? 'Paid & delivered' : 'Paid & delivered',
+    receiptStatusTrial: isMyanmar ? 'Free trial delivered' : 'Free trial delivered',
+    receiptTypeStandard: isMyanmar ? 'Standard key' : 'Standard key',
+    receiptTypePremium: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
+    receiptTypeTrial: isMyanmar ? 'Free trial key' : 'Free trial key',
+    receiptFooter: isMyanmar
+      ? 'Share page၊ client URL နှင့် setup details ကို နောက်မက်ဆေ့ခ်ျတွင် ဆက်လက် ပို့ပါမည်။'
+      : 'The share page, client URL, and setup details will be delivered in the next message.',
     orderSupportHint: isMyanmar
       ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
       : 'Before approval, you can cancel the current order at any time with /cancel.',

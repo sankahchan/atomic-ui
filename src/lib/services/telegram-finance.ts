@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
   hasFinanceConfigureScope,
   hasFinanceManageScope,
   normalizeAdminScope,
 } from '@/lib/admin-scope';
+import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_FINANCE_DIGEST_STATE_KEY = 'telegram_finance_digest_last_run';
@@ -494,21 +496,34 @@ export async function sendTelegramRefundDecisionMessage(input: {
   orderCode: string;
   approved: boolean;
   customerMessage?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  locale?: SupportedLocale | string | null;
 }) {
   const telegramConfig = await getTelegramAdminConfig();
   if (!telegramConfig) {
     return false;
   }
 
-  const lines = input.approved
-    ? [
-        `✅ Order <b>${input.orderCode}</b> refund was approved.`,
-        input.customerMessage || 'The refund has been recorded. Please contact admin if you need more details.',
-      ]
-    : [
-        `❌ Refund request for order <b>${input.orderCode}</b> was not approved.`,
-        input.customerMessage || 'Please contact admin/support for more information about this refund request.',
-      ];
+  const locale = coerceSupportedLocale(typeof input.locale === 'string' ? input.locale : undefined) || 'en';
+  const ui = getTelegramUi(locale);
+  const amountLabel =
+    typeof input.amount === 'number' && Number.isFinite(input.amount)
+      ? `${input.amount.toLocaleString('en-US')} ${(input.currency || 'MMK').trim().toUpperCase() === 'MMK' ? 'Kyat' : (input.currency || 'MMK').trim().toUpperCase()}`
+      : null;
+  const lines = [
+    ui.refundReceiptTitle,
+    '',
+    `${ui.orderCodeLabel}: <b>${escapeHtml(input.orderCode)}</b>`,
+    `${ui.receiptNumberLabel}: <code>RFND-${escapeHtml(input.orderCode)}</code>`,
+    `${ui.statusLineLabel}: <b>${input.approved ? escapeHtml(ui.refundStatusApproved) : escapeHtml(ui.refundStatusRejected)}</b>`,
+    amountLabel ? `${ui.priceLabel}: <b>${escapeHtml(amountLabel)}</b>` : '',
+    input.customerMessage?.trim() ? `${ui.customerMessage}: ${escapeHtml(input.customerMessage.trim())}` : '',
+    '',
+    input.approved
+      ? escapeHtml(ui.refundApprovedHelp)
+      : escapeHtml(ui.refundRejectedHelp),
+  ].filter(Boolean);
 
-  return sendTelegramMessageLite(telegramConfig.botToken, input.chatId, lines.filter(Boolean).join('\n\n'));
+  return sendTelegramMessageLite(telegramConfig.botToken, input.chatId, lines.join('\n'));
 }

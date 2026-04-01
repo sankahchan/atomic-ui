@@ -315,6 +315,9 @@ model TelegramOrder {
   refundRequestMessage String?
   refundRequestCustomerMessage String?
   refundReviewReasonCode String?
+  refundAssignedReviewerUserId String?
+  refundAssignedReviewerEmail String?
+  refundAssignedAt        DateTime?
   refundRequestReviewedAt DateTime?
   refundRequestReviewedByUserId String?
   refundRequestReviewerEmail String?
@@ -335,6 +338,7 @@ model TelegramOrder {
   @@index([financeStatus, createdAt])
   @@index([financeUpdatedByUserId, financeUpdatedAt])
   @@index([refundRequestStatus, refundRequestedAt])
+  @@index([refundAssignedReviewerUserId, refundRequestStatus, refundRequestedAt])
   @@index([assignedReviewerUserId, status, createdAt])
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])
