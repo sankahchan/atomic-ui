@@ -30,6 +30,7 @@ model User {
   email          String   @unique
   passwordHash   String? // Nullable for passwordless/magic link flow if we go that route
   role           String   @default("USER") // Valid: ADMIN, USER
+  adminScope     String?  // Valid for ADMIN role: OWNER, ADMIN, FINANCE, SUPPORT
   telegramChatId String? // Telegram chat ID for bot notifications
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

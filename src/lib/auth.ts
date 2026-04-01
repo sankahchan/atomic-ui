@@ -26,6 +26,7 @@ export interface SessionPayload {
   userId: string;
   email: string;
   role: string;
+  adminScope?: string | null;
   exp: number;
 }
 
@@ -33,6 +34,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
+  adminScope?: string | null;
 }
 
 export interface SessionMetadata {
@@ -65,6 +67,7 @@ export async function createSession(
   email: string,
   role: string,
   metadata?: SessionMetadata,
+  adminScope?: string | null,
 ): Promise<string> {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
@@ -75,6 +78,7 @@ export async function createSession(
     userId,
     email,
     role,
+    adminScope: adminScope || null,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -144,6 +148,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         id: true,
         email: true,
         role: true,
+        adminScope: true,
         passwordHash: false, // Explicitly exclude hash
       },
     });
@@ -154,6 +159,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       id: user.id,
       email: user.email || '',
       role: user.role,
+      adminScope: user.adminScope,
     };
   } catch {
     return null;
@@ -255,5 +261,6 @@ export async function authenticateUser(
     id: user.id,
     email: user.email || '',
     role: user.role,
+    adminScope: user.adminScope,
   };
 }

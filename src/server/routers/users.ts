@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
+import { ADMIN_SCOPE_VALUES, isOwnerLikeAdmin, normalizeAdminScope } from '@/lib/admin-scope';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getRefundReasonPreset } from '@/lib/finance';
@@ -24,6 +25,7 @@ export const usersRouter = router({
         id: true,
         email: true,
         role: true,
+        adminScope: true,
         createdAt: true,
         _count: {
           select: { accessKeys: true },
@@ -42,6 +44,7 @@ export const usersRouter = router({
           id: true,
           email: true,
           role: true,
+          adminScope: true,
           telegramChatId: true,
           createdAt: true,
           accessKeys: {
@@ -217,6 +220,98 @@ export const usersRouter = router({
           canConfigure: canUserConfigureFinance(ctx.user, financeControls),
         },
       };
+    }),
+
+  updateAdminScope: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        adminScope: z.enum(ADMIN_SCOPE_VALUES),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isOwnerLikeAdmin(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only owner-level admins can update admin scopes.',
+        });
+      }
+
+      const target = await db.user.findUnique({
+        where: { id: input.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          adminScope: true,
+        },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
+      }
+
+      if (target.role !== 'ADMIN') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only admin accounts can have an admin scope.',
+        });
+      }
+
+      const nextScope = normalizeAdminScope(input.adminScope);
+      if (!nextScope) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Invalid admin scope.',
+        });
+      }
+
+      const currentIsOwnerLike = isOwnerLikeAdmin(target.adminScope);
+      if (currentIsOwnerLike && nextScope !== 'OWNER') {
+        const ownerCount = await db.user.count({
+          where: {
+            role: 'ADMIN',
+            OR: [{ adminScope: 'OWNER' }, { adminScope: null }],
+          },
+        });
+        if (ownerCount <= 1) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'At least one owner-level admin must remain.',
+          });
+        }
+      }
+
+      const updated = await db.user.update({
+        where: { id: target.id },
+        data: {
+          adminScope: nextScope,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          adminScope: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'USER_ADMIN_SCOPE_UPDATE',
+        entity: 'USER',
+        entityId: target.id,
+        details: {
+          email: target.email,
+          previousScope: normalizeAdminScope(target.adminScope) || 'OWNER',
+          nextScope,
+        },
+      });
+
+      return updated;
     }),
 
   getFinanceControls: adminProcedure.query(async ({ ctx }) => {

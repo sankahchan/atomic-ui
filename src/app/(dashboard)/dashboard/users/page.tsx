@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { ADMIN_SCOPE_VALUES, getAdminScopeLabel, normalizeAdminScope } from '@/lib/admin-scope';
 import { trpc } from '@/lib/trpc';
 import { getRefundReasonPreset, listRefundReasonPresets, resolveRefundReasonPresetLabel, type RefundReviewAction } from '@/lib/finance';
 import { formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -29,6 +30,7 @@ import { ExternalLink, Key, Loader2, Plus, Search, Send, Shield, Trash2, User, U
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
 type RefundQueueFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+type AdminScopeValue = (typeof ADMIN_SCOPE_VALUES)[number];
 
 function formatMoney(amount: number | null | undefined, currency: string | null | undefined) {
   if (typeof amount !== 'number' || !Number.isFinite(amount)) {
@@ -109,6 +111,11 @@ export default function UsersPage() {
   }, [roleFilter, search, userList]);
 
   const adminCount = userList.filter((user) => user.role === 'ADMIN').length;
+  const ownerCount = userList.filter(
+    (user) =>
+      user.role === 'ADMIN' &&
+      (!normalizeAdminScope(user.adminScope) || normalizeAdminScope(user.adminScope) === 'OWNER'),
+  ).length;
   const clientCount = userList.filter((user) => user.role === 'CLIENT').length;
   const assignedKeyCount = userList.reduce(
     (total, user) => total + ((user as { _count?: { accessKeys?: number } })._count?.accessKeys || 0),
@@ -217,6 +224,23 @@ export default function UsersPage() {
     },
   });
 
+  const updateAdminScopeMutation = trpc.users.updateAdminScope.useMutation({
+    onSuccess: async (updated) => {
+      await refetch();
+      toast({
+        title: 'Admin scope updated',
+        description: `${updated.email} is now ${getAdminScopeLabel(updated.adminScope)}.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Admin scope update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   useEffect(() => {
     const controls = financeControlsQuery.data;
     if (!controls) {
@@ -295,7 +319,7 @@ export default function UsersPage() {
               <UserStatCard
                 label="Admins"
                 value={adminCount}
-                helper="Accounts with dashboard-level access."
+                helper={`${ownerCount} owner-level admin${ownerCount === 1 ? '' : 's'} configured.`}
               />
               <UserStatCard
                 label="Clients"
@@ -415,7 +439,7 @@ export default function UsersPage() {
 
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="finance-owner-emails">Owner emails</Label>
+                        <Label htmlFor="finance-owner-emails">Legacy owner email allowlist</Label>
                         <Input
                           id="finance-owner-emails"
                           placeholder="owner@example.com, second-owner@example.com"
@@ -423,11 +447,11 @@ export default function UsersPage() {
                           onChange={(event) => setFinanceOwnerEmails(event.target.value)}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Leave blank to let any admin configure finance controls.
+                          Prefer assigning the `Owner` admin scope below. Leave blank to avoid legacy email overrides.
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="finance-operator-emails">Finance operator emails</Label>
+                        <Label htmlFor="finance-operator-emails">Legacy finance operator allowlist</Label>
                         <Input
                           id="finance-operator-emails"
                           placeholder="finance@example.com, reviewer@example.com"
@@ -435,7 +459,7 @@ export default function UsersPage() {
                           onChange={(event) => setFinanceOperatorEmails(event.target.value)}
                         />
                         <p className="text-xs text-muted-foreground">
-                          These admins can verify, refund, and credit orders.
+                          Prefer assigning the `Finance` admin scope below. These emails remain as a compatibility fallback.
                         </p>
                       </div>
                       <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
@@ -772,6 +796,7 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Admin scope</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Assigned keys</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -780,13 +805,13 @@ export default function UsersPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={6} className="h-24 text-center">
                         Loading users...
                       </TableCell>
                     </TableRow>
                   ) : filteredUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={6} className="h-24 text-center">
                         {userList.length === 0 ? 'No users found.' : 'No users match the current filters.'}
                       </TableCell>
                     </TableRow>
@@ -812,6 +837,33 @@ export default function UsersPage() {
                             <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
                               {user.role}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {user.role === 'ADMIN' ? (
+                              <Select
+                                value={normalizeAdminScope(user.adminScope) || 'OWNER'}
+                                onValueChange={(value) =>
+                                  updateAdminScopeMutation.mutate({
+                                    userId: user.id,
+                                    adminScope: value as AdminScopeValue,
+                                  })
+                                }
+                                disabled={updateAdminScopeMutation.isPending}
+                              >
+                                <SelectTrigger className="w-[150px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ADMIN_SCOPE_VALUES.map((scope) => (
+                                    <SelectItem key={scope} value={scope}>
+                                      {getAdminScopeLabel(scope)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                           <TableCell>
@@ -905,6 +957,33 @@ export default function UsersPage() {
                       </p>
                     </div>
                   </div>
+
+                  {user.role === 'ADMIN' ? (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Admin scope</p>
+                      <Select
+                        value={normalizeAdminScope(user.adminScope) || 'OWNER'}
+                        onValueChange={(value) =>
+                          updateAdminScopeMutation.mutate({
+                            userId: user.id,
+                            adminScope: value as AdminScopeValue,
+                          })
+                        }
+                        disabled={updateAdminScopeMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ADMIN_SCOPE_VALUES.map((scope) => (
+                            <SelectItem key={scope} value={scope}>
+                              {getAdminScopeLabel(scope)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
 
                   <Button asChild variant="outline" className="w-full rounded-full">
                     <Link href={`/dashboard/users/${user.id}`}>

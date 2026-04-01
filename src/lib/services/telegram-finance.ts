@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import {
+  hasFinanceConfigureScope,
+  hasFinanceManageScope,
+  normalizeAdminScope,
+} from '@/lib/admin-scope';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_FINANCE_DIGEST_STATE_KEY = 'telegram_finance_digest_last_run';
@@ -69,10 +74,18 @@ export async function getFinanceControls() {
 }
 
 export function canUserConfigureFinance(
-  user: { role?: string | null; email?: string | null } | null | undefined,
+  user: { role?: string | null; email?: string | null; adminScope?: string | null } | null | undefined,
   controls: FinanceControls,
 ) {
   if (!user || user.role !== 'ADMIN') {
+    return false;
+  }
+
+  if (hasFinanceConfigureScope(user.adminScope)) {
+    return true;
+  }
+
+  if (normalizeAdminScope(user.adminScope)) {
     return false;
   }
 
@@ -84,10 +97,18 @@ export function canUserConfigureFinance(
 }
 
 export function canUserManageFinance(
-  user: { role?: string | null; email?: string | null } | null | undefined,
+  user: { role?: string | null; email?: string | null; adminScope?: string | null } | null | undefined,
   controls: FinanceControls,
 ) {
   if (!user || user.role !== 'ADMIN') {
+    return false;
+  }
+
+  if (hasFinanceManageScope(user.adminScope)) {
+    return true;
+  }
+
+  if (normalizeAdminScope(user.adminScope)) {
     return false;
   }
 
