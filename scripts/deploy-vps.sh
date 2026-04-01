@@ -56,6 +56,8 @@ restart_service() {
 trap restart_service ERR
 
 systemctl stop "${SERVICE_NAME}"
+npx prisma db push
+npx prisma generate
 NODE_HEAP_MB="${NODE_HEAP_MB}" PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 trap - ERR
 
