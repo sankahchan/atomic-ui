@@ -666,7 +666,7 @@ export const keysRouter = router({
         });
       }
 
-      const [supportActivity, openIncidents, auditTrail] = await Promise.all([
+      const [supportActivity, openIncidents, auditTrail, billingHistory] = await Promise.all([
         db.auditLog.findMany({
           where: {
             entity: 'ACCESS_KEY',
@@ -726,6 +726,39 @@ export const keysRouter = router({
             userId: true,
           },
         }),
+        db.telegramOrder.findMany({
+          where: {
+            OR: [
+              { targetAccessKeyId: key.id },
+              { approvedAccessKeyId: key.id },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          select: {
+            id: true,
+            orderCode: true,
+            kind: true,
+            status: true,
+            planCode: true,
+            planName: true,
+            priceAmount: true,
+            priceCurrency: true,
+            paymentMethodCode: true,
+            paymentMethodLabel: true,
+            requestedEmail: true,
+            retentionSource: true,
+            reviewedAt: true,
+            fulfilledAt: true,
+            rejectedAt: true,
+            createdAt: true,
+            reviewedBy: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        }),
       ]);
 
       return {
@@ -741,6 +774,10 @@ export const keysRouter = router({
         auditTrail: auditTrail.map((entry) => ({
           ...entry,
           details: entry.details ? JSON.parse(entry.details) : null,
+        })),
+        billingHistory: billingHistory.map((order) => ({
+          ...order,
+          reviewedByEmail: order.reviewedBy?.email || null,
         })),
         openIncidents,
       };

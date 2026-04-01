@@ -15,6 +15,9 @@ export const telegramSalesPlanCodeSchema = z.enum([
   'trial_1d_3gb',
   '1m_150gb',
   '2m_300gb',
+  'premium_1m_unlimited',
+  'premium_3m_unlimited',
+  'premium_6m_unlimited',
   '3plus_unlimited',
 ]);
 
@@ -265,10 +268,28 @@ function defaultPlans(): TelegramSalesPlan[] {
       unlimitedQuota: false,
     },
     {
-      code: '3plus_unlimited',
+      code: 'premium_1m_unlimited',
       enabled: true,
-      label: '3+ Months / Unlimited',
-      localizedLabels: { my: '၃ လနှင့်အထက် / Unlimited' },
+      label: 'Premium / 1 Month / Unlimited',
+      localizedLabels: { my: 'Premium / ၁ လ / Unlimited' },
+      priceAmount: null,
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: {},
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 1,
+      minDurationMonths: null,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+    {
+      code: 'premium_3m_unlimited',
+      enabled: true,
+      label: 'Premium / 3 Months / Unlimited',
+      localizedLabels: { my: 'Premium / ၃ လ / Unlimited' },
       priceAmount: null,
       priceCurrency: 'MMK',
       priceLabel: '',
@@ -279,6 +300,24 @@ function defaultPlans(): TelegramSalesPlan[] {
       fixedDurationDays: null,
       fixedDurationMonths: null,
       minDurationMonths: 3,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+    {
+      code: 'premium_6m_unlimited',
+      enabled: true,
+      label: 'Premium / 6 Months / Unlimited',
+      localizedLabels: { my: 'Premium / ၆ လ / Unlimited' },
+      priceAmount: null,
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: {},
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 6,
+      minDurationMonths: null,
       dataLimitGB: null,
       unlimitedQuota: true,
     },
@@ -378,6 +417,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
       ? Math.max(next.unpaidOrderExpiryHours, paymentReminderHours)
       : defaults.unpaidOrderExpiryHours;
   const plansByCode = new Map(next.plans.map((plan) => [plan.code, plan]));
+  const legacyPremiumOverride = plansByCode.get('3plus_unlimited');
   const paymentMethodsByCode = new Map(next.paymentMethods.map((method) => [method.code, method]));
 
   return {
@@ -415,7 +455,11 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
       };
     }),
     plans: defaults.plans.map((fallbackPlan) => {
-      const override = plansByCode.get(fallbackPlan.code);
+      const override =
+        plansByCode.get(fallbackPlan.code) ||
+        (!plansByCode.has(fallbackPlan.code) && fallbackPlan.code === 'premium_3m_unlimited'
+          ? legacyPremiumOverride
+          : undefined);
       if (!override) {
         return fallbackPlan;
       }
@@ -469,6 +513,14 @@ export function resolveTelegramSalesPlan(
   settings: TelegramSalesSettings,
   code: TelegramSalesPlanCode,
 ): TelegramSalesPlan | null {
+  if (code === '3plus_unlimited') {
+    return (
+      settings.plans.find((plan) => plan.code === 'premium_3m_unlimited') ||
+      settings.plans.find((plan) => plan.code === code) ||
+      null
+    );
+  }
+
   return settings.plans.find((plan) => plan.code === code) || null;
 }
 

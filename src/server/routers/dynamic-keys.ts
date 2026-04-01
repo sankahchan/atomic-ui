@@ -863,6 +863,40 @@ export const dynamicKeysRouter = router({
         });
       }
 
+      const billingHistory = await db.telegramOrder.findMany({
+        where: {
+          OR: [
+            { targetDynamicKeyId: dak.id },
+            { approvedDynamicKeyId: dak.id },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: {
+          id: true,
+          orderCode: true,
+          kind: true,
+          status: true,
+          planCode: true,
+          planName: true,
+          priceAmount: true,
+          priceCurrency: true,
+          paymentMethodCode: true,
+          paymentMethodLabel: true,
+          requestedEmail: true,
+          retentionSource: true,
+          reviewedAt: true,
+          fulfilledAt: true,
+          rejectedAt: true,
+          createdAt: true,
+          reviewedBy: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      });
+
       return {
         id: dak.id,
         name: dak.name,
@@ -925,6 +959,10 @@ export const dynamicKeysRouter = router({
         pinExpiresAt: pinState.pinExpiresAt,
         appliedTemplateId: dak.appliedTemplateId,
         appliedTemplate: dak.appliedTemplate,
+        billingHistory: billingHistory.map((order) => ({
+          ...order,
+          reviewedByEmail: order.reviewedBy?.email || null,
+        })),
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };

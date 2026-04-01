@@ -99,6 +99,9 @@ import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { useLocale } from '@/hooks/use-locale';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
+import {
+  TelegramBillingHistoryCard,
+} from '@/components/telegram/telegram-billing-history-card';
 
 /**
  * Status badge configuration
@@ -2359,10 +2362,11 @@ function SupportWorkflowCard({
  * buttons for common management tasks.
  */
 export default function KeyDetailPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
   const keyId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -3430,6 +3434,22 @@ export default function KeyDetailPage() {
               distributionLinks={(key as any).distributionLinks ?? []}
               auditTrail={(key as any).auditTrail ?? []}
               onUpdated={() => refetch()}
+            />
+          ) : null}
+          {isAdmin ? (
+            <TelegramBillingHistoryCard
+              title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
+              description={
+                isMyanmar
+                  ? 'ဤ key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
+                  : 'Review Telegram orders, renewals, and billing events related to this key.'
+              }
+              orders={(key as any).billingHistory ?? []}
+              emptyLabel={
+                isMyanmar
+                  ? 'ဤ key အတွက် Telegram billing history မရှိသေးပါ။'
+                  : 'No Telegram billing history for this key yet.'
+              }
             />
           ) : null}
           {isAdmin ? (

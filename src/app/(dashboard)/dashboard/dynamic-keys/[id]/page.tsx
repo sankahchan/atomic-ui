@@ -88,6 +88,7 @@ import {
 import { themeList, getTheme, subscriptionThemeIds } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
+import { TelegramBillingHistoryCard } from '@/components/telegram/telegram-billing-history-card';
 import {
   DynamicRoutingPreferencesEditor,
   type DynamicRoutingPreferenceMode,
@@ -2909,9 +2910,10 @@ function AccessDistributionCard({
 export default function DynamicKeyDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const dakId = params.id as string;
+  const isMyanmar = locale === 'my';
 
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
@@ -3803,6 +3805,21 @@ export default function DynamicKeyDetailPage() {
           />
 
           <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
+
+          <TelegramBillingHistoryCard
+            title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
+            description={
+              isMyanmar
+                ? 'ဤ premium dynamic key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
+                : 'Review Telegram orders, renewals, and billing events related to this premium dynamic key.'
+            }
+            orders={(dak as any).billingHistory ?? []}
+            emptyLabel={
+              isMyanmar
+                ? 'ဤ premium dynamic key အတွက် Telegram billing history မရှိသေးပါ။'
+                : 'No Telegram billing history for this premium dynamic key yet.'
+            }
+          />
 
           <DynamicKeyTemplateCard
             dak={{

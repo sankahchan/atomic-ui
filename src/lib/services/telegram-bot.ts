@@ -12992,6 +12992,8 @@ export async function sendTelegramSalesDigestToAdmins(input?: {
           unclaimed: 'Unclaimed pending',
           myQueue: 'Claim လုပ်ထားသော orders',
           revenue: 'ဝင်ငွေ',
+          trend: 'ယခင် 24 နာရီနှင့် နှိုင်းယှဉ်မှု',
+          revenueDelta: 'ဝင်ငွေ အပြောင်းအလဲ',
           topReasons: 'အများဆုံး reject reason များ',
           topMethods: 'အသုံးအများဆုံး payment method များ',
           none: 'မရှိ',
@@ -13008,114 +13010,165 @@ export async function sendTelegramSalesDigestToAdmins(input?: {
           unclaimed: 'Unclaimed pending',
           myQueue: 'Claimed pending',
           revenue: 'Revenue',
+          trend: 'Trend vs previous 24h',
+          revenueDelta: 'Revenue delta',
           topReasons: 'Top rejection reasons',
           topMethods: 'Top payment methods',
           none: 'None',
         };
 
-  const orders = await db.telegramOrder.findMany({
-    where: {
-      createdAt: {
-        gte: since,
+  const previousSince = new Date(since.getTime() - 24 * 60 * 60 * 1000);
+  const [orders, previousOrders] = await Promise.all([
+    db.telegramOrder.findMany({
+      where: {
+        createdAt: {
+          gte: since,
+        },
       },
-    },
-    select: {
-      id: true,
-      status: true,
-      priceAmount: true,
-      priceCurrency: true,
-      paymentMethodLabel: true,
-      paymentMethodCode: true,
-      rejectionReasonCode: true,
-      assignedReviewerEmail: true,
-      assignedReviewerUserId: true,
-      paymentSubmittedAt: true,
-      duplicateProofOrderCode: true,
-      paymentProofRevision: true,
-      retryOfOrderId: true,
-      telegramUserId: true,
-      telegramChatId: true,
-      requestedEmail: true,
-      createdAt: true,
-    },
-    orderBy: [{ createdAt: 'desc' }],
-  });
-
-  const summary = {
-    created: orders.length,
-    pending: 0,
-    fulfilled: 0,
-    rejected: 0,
-    awaitingPayment: 0,
-    highRiskPending: 0,
-    unclaimedPending: 0,
-    claimedPending: 0,
-  };
-  const revenueByCurrency = new Map<string, number>();
-  const rejectionReasons = new Map<string, number>();
-  const paymentMethods = new Map<string, number>();
+      select: {
+        id: true,
+        status: true,
+        priceAmount: true,
+        priceCurrency: true,
+        paymentMethodLabel: true,
+        paymentMethodCode: true,
+        rejectionReasonCode: true,
+        assignedReviewerEmail: true,
+        assignedReviewerUserId: true,
+        paymentSubmittedAt: true,
+        duplicateProofOrderCode: true,
+        paymentProofRevision: true,
+        retryOfOrderId: true,
+        telegramUserId: true,
+        telegramChatId: true,
+        requestedEmail: true,
+        createdAt: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    }),
+    db.telegramOrder.findMany({
+      where: {
+        createdAt: {
+          gte: previousSince,
+          lt: since,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        priceAmount: true,
+        priceCurrency: true,
+        paymentMethodLabel: true,
+        paymentMethodCode: true,
+        rejectionReasonCode: true,
+        assignedReviewerEmail: true,
+        assignedReviewerUserId: true,
+        paymentSubmittedAt: true,
+        duplicateProofOrderCode: true,
+        paymentProofRevision: true,
+        retryOfOrderId: true,
+        telegramUserId: true,
+        telegramChatId: true,
+        requestedEmail: true,
+        createdAt: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    }),
+  ]);
 
   const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() || null;
 
-  for (const order of orders) {
-    const identityOrders = orders.filter((candidate) => {
-      if (candidate.id === order.id) {
-        return false;
-      }
-      if (candidate.telegramUserId && candidate.telegramUserId === order.telegramUserId) {
-        return true;
-      }
-      if (candidate.telegramChatId && candidate.telegramChatId === order.telegramChatId) {
-        return true;
-      }
-      const orderEmail = normalizeEmail(order.requestedEmail);
-      const candidateEmail = normalizeEmail(candidate.requestedEmail);
-      return Boolean(orderEmail && candidateEmail && orderEmail === candidateEmail);
-    });
-    const risk = computeTelegramOrderDigestRisk({
-      order,
-      identityOrders,
-    });
+  const summarizeOrders = (
+    digestOrders: typeof orders,
+  ) => {
+    const summary = {
+      created: digestOrders.length,
+      pending: 0,
+      fulfilled: 0,
+      rejected: 0,
+      awaitingPayment: 0,
+      highRiskPending: 0,
+      unclaimedPending: 0,
+      claimedPending: 0,
+    };
+    const revenueByCurrency = new Map<string, number>();
+    const rejectionReasons = new Map<string, number>();
+    const paymentMethods = new Map<string, number>();
 
-    switch (order.status) {
-      case 'PENDING_REVIEW':
-        summary.pending += 1;
-        if (risk.riskLevel === 'HIGH' || risk.riskLevel === 'CRITICAL') {
-          summary.highRiskPending += 1;
+    for (const order of digestOrders) {
+      const identityOrders = digestOrders.filter((candidate) => {
+        if (candidate.id === order.id) {
+          return false;
         }
-        if (order.assignedReviewerUserId) {
-          summary.claimedPending += 1;
-        } else {
-          summary.unclaimedPending += 1;
+        if (candidate.telegramUserId && candidate.telegramUserId === order.telegramUserId) {
+          return true;
         }
-        break;
-      case 'FULFILLED':
-        summary.fulfilled += 1;
-        if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
-          const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
-          revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        if (candidate.telegramChatId && candidate.telegramChatId === order.telegramChatId) {
+          return true;
         }
-        break;
-      case 'REJECTED':
-        summary.rejected += 1;
-        rejectionReasons.set(
-          order.rejectionReasonCode?.trim() || 'custom',
-          (rejectionReasons.get(order.rejectionReasonCode?.trim() || 'custom') || 0) + 1,
-        );
-        break;
-      case 'AWAITING_PAYMENT_METHOD':
-      case 'AWAITING_PAYMENT_PROOF':
-        summary.awaitingPayment += 1;
-        break;
-      default:
-        break;
+        const orderEmail = normalizeEmail(order.requestedEmail);
+        const candidateEmail = normalizeEmail(candidate.requestedEmail);
+        return Boolean(orderEmail && candidateEmail && orderEmail === candidateEmail);
+      });
+      const risk = computeTelegramOrderDigestRisk({
+        order,
+        identityOrders,
+      });
+
+      switch (order.status) {
+        case 'PENDING_REVIEW':
+          summary.pending += 1;
+          if (risk.riskLevel === 'HIGH' || risk.riskLevel === 'CRITICAL') {
+            summary.highRiskPending += 1;
+          }
+          if (order.assignedReviewerUserId) {
+            summary.claimedPending += 1;
+          } else {
+            summary.unclaimedPending += 1;
+          }
+          break;
+        case 'FULFILLED':
+          summary.fulfilled += 1;
+          if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+            const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+            revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + order.priceAmount);
+          }
+          break;
+        case 'REJECTED':
+          summary.rejected += 1;
+          rejectionReasons.set(
+            order.rejectionReasonCode?.trim() || 'custom',
+            (rejectionReasons.get(order.rejectionReasonCode?.trim() || 'custom') || 0) + 1,
+          );
+          break;
+        case 'AWAITING_PAYMENT_METHOD':
+        case 'AWAITING_PAYMENT_PROOF':
+          summary.awaitingPayment += 1;
+          break;
+        default:
+          break;
+      }
+
+      if (order.paymentMethodLabel || order.paymentMethodCode) {
+        const key = order.paymentMethodLabel || order.paymentMethodCode || 'Unknown';
+        paymentMethods.set(key, (paymentMethods.get(key) || 0) + 1);
+      }
     }
 
-    if (order.paymentMethodLabel || order.paymentMethodCode) {
-      const key = order.paymentMethodLabel || order.paymentMethodCode || 'Unknown';
-      paymentMethods.set(key, (paymentMethods.get(key) || 0) + 1);
-    }
-  }
+    return {
+      summary,
+      revenueByCurrency,
+      rejectionReasons,
+      paymentMethods,
+    };
+  };
+
+  const currentWindow = summarizeOrders(orders);
+  const previousWindow = summarizeOrders(previousOrders);
+  const summary = currentWindow.summary;
+  const revenueByCurrency = currentWindow.revenueByCurrency;
+  const rejectionReasons = currentWindow.rejectionReasons;
+  const paymentMethods = currentWindow.paymentMethods;
 
   const revenueLabel = Array.from(revenueByCurrency.entries())
     .sort((left, right) => right[1] - left[1])
@@ -13135,6 +13188,30 @@ export async function sendTelegramSalesDigestToAdmins(input?: {
     .map(([label, count]) => `${label} (${count})`)
     .join(' • ') || ui.none;
 
+  const formatDelta = (value: number) => {
+    if (value === 0) {
+      return '0';
+    }
+    return value > 0 ? `+${value}` : `${value}`;
+  };
+  const revenueCurrencies = Array.from(
+    new Set([
+      ...Array.from(revenueByCurrency.keys()),
+      ...Array.from(previousWindow.revenueByCurrency.keys()),
+    ]),
+  );
+  const revenueDeltaLabel =
+    revenueCurrencies
+      .map((currency) => {
+        const current = revenueByCurrency.get(currency) || 0;
+        const previous = previousWindow.revenueByCurrency.get(currency) || 0;
+        const delta = current - previous;
+        const formatted = new Intl.NumberFormat(locale === 'my' ? 'my-MM' : 'en-US').format(Math.abs(delta));
+        const prefix = delta === 0 ? '0' : delta > 0 ? `+${formatted}` : `-${formatted}`;
+        return `${prefix} ${currency}`;
+      })
+      .join(' • ') || ui.none;
+
   const message = [
     ui.title,
     '',
@@ -13148,6 +13225,14 @@ export async function sendTelegramSalesDigestToAdmins(input?: {
     `${ui.unclaimed}: ${summary.unclaimedPending}`,
     `${ui.myQueue}: ${summary.claimedPending}`,
     `${ui.revenue}: ${revenueLabel}`,
+    '',
+    ui.trend,
+    `${ui.created}: ${formatDelta(summary.created - previousWindow.summary.created)}`,
+    `${ui.pending}: ${formatDelta(summary.pending - previousWindow.summary.pending)}`,
+    `${ui.fulfilled}: ${formatDelta(summary.fulfilled - previousWindow.summary.fulfilled)}`,
+    `${ui.rejected}: ${formatDelta(summary.rejected - previousWindow.summary.rejected)}`,
+    `${ui.revenueDelta}: ${revenueDeltaLabel}`,
+    '',
     `${ui.topReasons}: ${topReasons}`,
     `${ui.topMethods}: ${topMethods}`,
   ].join('\n');
@@ -13168,6 +13253,18 @@ export async function sendTelegramSalesDigestToAdmins(input?: {
       highRiskPending: summary.highRiskPending,
       unclaimedPending: summary.unclaimedPending,
       claimedPending: summary.claimedPending,
+      trend: {
+        created: summary.created - previousWindow.summary.created,
+        pending: summary.pending - previousWindow.summary.pending,
+        fulfilled: summary.fulfilled - previousWindow.summary.fulfilled,
+        rejected: summary.rejected - previousWindow.summary.rejected,
+        revenueByCurrency: Object.fromEntries(
+          revenueCurrencies.map((currency) => [
+            currency,
+            (revenueByCurrency.get(currency) || 0) - (previousWindow.revenueByCurrency.get(currency) || 0),
+          ]),
+        ),
+      },
     },
   });
 

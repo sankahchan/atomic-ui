@@ -10,6 +10,7 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -195,7 +196,14 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   showLanguageSelectorOnStart: true,
 };
 
-type TelegramSalesPlanCode = 'trial_1d_3gb' | '1m_150gb' | '2m_300gb' | '3plus_unlimited';
+type TelegramSalesPlanCode =
+  | 'trial_1d_3gb'
+  | '1m_150gb'
+  | '2m_300gb'
+  | 'premium_1m_unlimited'
+  | 'premium_3m_unlimited'
+  | 'premium_6m_unlimited'
+  | '3plus_unlimited';
 
 type TelegramSalesPlanForm = {
   code: TelegramSalesPlanCode;
@@ -776,10 +784,10 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       unlimitedQuota: false,
     },
     {
-      code: '3plus_unlimited',
+      code: 'premium_1m_unlimited',
       enabled: true,
-      label: '3+ Months / Unlimited',
-      localizedLabels: { en: '3+ Months / Unlimited', my: '၃ လနှင့်အထက် / Unlimited' },
+      label: 'Premium / 1 Month / Unlimited',
+      localizedLabels: { en: 'Premium / 1 Month / Unlimited', my: 'Premium / ၁ လ / Unlimited' },
       priceAmount: '',
       priceCurrency: 'MMK',
       priceLabel: '',
@@ -788,8 +796,44 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       templateId: null,
       dynamicTemplateId: null,
       fixedDurationDays: null,
-      fixedDurationMonths: null,
-      minDurationMonths: 3,
+      fixedDurationMonths: 1,
+      minDurationMonths: null,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+    {
+      code: 'premium_3m_unlimited',
+      enabled: true,
+      label: 'Premium / 3 Months / Unlimited',
+      localizedLabels: { en: 'Premium / 3 Months / Unlimited', my: 'Premium / ၃ လ / Unlimited' },
+      priceAmount: '',
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 3,
+      minDurationMonths: null,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+    {
+      code: 'premium_6m_unlimited',
+      enabled: true,
+      label: 'Premium / 6 Months / Unlimited',
+      localizedLabels: { en: 'Premium / 6 Months / Unlimited', my: 'Premium / ၆ လ / Unlimited' },
+      priceAmount: '',
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 6,
+      minDurationMonths: null,
       dataLimitGB: null,
       unlimitedQuota: true,
     },
@@ -2158,9 +2202,13 @@ function ChannelCard({
 function TelegramSalesWorkflowCard() {
   const { toast } = useToast();
   const { locale } = useLocale();
+  const searchParams = useSearchParams();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const currentUserQuery = trpc.auth.me.useQuery();
+  const reviewersQuery = trpc.telegramBot.listOrderReviewers.useQuery(undefined, {
+    staleTime: 60_000,
+  });
   const settingsQuery = trpc.telegramBot.getSalesConfig.useQuery();
   const templatesQuery = trpc.templates.list.useQuery();
   const dynamicTemplatesQuery = trpc.dynamicKeys.listTemplates.useQuery();
@@ -2173,6 +2221,7 @@ function TelegramSalesWorkflowCard() {
   const [reviewPlanCode, setReviewPlanCode] = useState<TelegramSalesPlanCode | ''>('');
   const [reviewDurationMonths, setReviewDurationMonths] = useState('');
   const [reviewSelectedServerId, setReviewSelectedServerId] = useState('auto');
+  const [reviewAssignedReviewerId, setReviewAssignedReviewerId] = useState('unassigned');
   const [proofPreviewOpen, setProofPreviewOpen] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
@@ -2181,6 +2230,7 @@ function TelegramSalesWorkflowCard() {
     'ALL' | 'UNCLAIMED' | 'HIGH_RISK' | 'PREMIUM' | 'MY_QUEUE' | 'OLDEST'
   >('ALL');
   const deferredOrderSearch = useDeferredValue(orderSearch.trim());
+  const orderCodeParam = searchParams.get('orderCode')?.trim() || '';
   const ordersQuery = trpc.telegramBot.listOrders.useQuery(
     {
       limit: 50,
@@ -2369,6 +2419,13 @@ function TelegramSalesWorkflowCard() {
       ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
       : 'Review customer context and linked keys before approving.',
     reviewerAssignment: isMyanmar ? 'Reviewer assignment' : 'Reviewer assignment',
+    reviewer: isMyanmar ? 'Reviewer' : 'Reviewer',
+    updateReviewer: isMyanmar ? 'Reviewer ကို အပ်ဒိတ်လုပ်မည်' : 'Update reviewer',
+    assignToMe: isMyanmar ? 'ကိုယ့်ထံ assign လုပ်မည်' : 'Assign to me',
+    reviewerUpdated: isMyanmar ? 'Reviewer ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Reviewer updated',
+    reviewerUpdatedDesc: isMyanmar
+      ? 'Order reviewer assignment ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
+      : 'The order reviewer assignment was updated.',
     claimOrder: isMyanmar ? 'Claim' : 'Claim',
     releaseOrder: isMyanmar ? 'Release' : 'Release',
     claimedBy: isMyanmar ? 'Claimed by' : 'Claimed by',
@@ -2714,6 +2771,14 @@ function TelegramSalesWorkflowCard() {
   };
 
   useEffect(() => {
+    if (!orderCodeParam || orderSearch.trim().length > 0) {
+      return;
+    }
+
+    setOrderSearch(orderCodeParam);
+  }, [orderCodeParam, orderSearch]);
+
+  useEffect(() => {
     if (!settingsQuery.data) {
       return;
     }
@@ -2776,7 +2841,11 @@ function TelegramSalesWorkflowCard() {
         };
       }),
       plans: DEFAULT_TELEGRAM_SALES_SETTINGS.plans.map((fallbackPlan) => {
-        const override = settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code);
+        const override =
+          settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code) ||
+          (fallbackPlan.code === 'premium_3m_unlimited'
+            ? settingsQuery.data.plans.find((plan) => plan.code === '3plus_unlimited')
+            : undefined);
         return {
           ...fallbackPlan,
           ...override,
@@ -3069,6 +3138,23 @@ function TelegramSalesWorkflowCard() {
       });
     },
   });
+  const assignOrderReviewerMutation = trpc.telegramBot.assignOrderReviewer.useMutation({
+    onSuccess: async (result) => {
+      await utils.telegramBot.listOrders.invalidate();
+      setReviewAssignedReviewerId(result.assignedReviewerUserId || 'unassigned');
+      toast({
+        title: salesUi.reviewerUpdated,
+        description: salesUi.reviewerUpdatedDesc,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: salesUi.updateFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const updatePlan = (
     planCode: TelegramSalesPlanCode,
@@ -3266,7 +3352,11 @@ function TelegramSalesWorkflowCard() {
     : null;
   const selectedOrderId = selectedOrder?.id ?? null;
   const selectedOrderRejectionReasonCode = selectedOrder?.rejectionReasonCode ?? null;
-  const selectedOrderPlanCode = (selectedOrder?.planCode as TelegramSalesPlanCode | null) ?? null;
+  const selectedOrderPlanCode = (
+    (selectedOrder?.planCode === '3plus_unlimited'
+      ? 'premium_3m_unlimited'
+      : selectedOrder?.planCode) as TelegramSalesPlanCode | null
+  ) ?? null;
   const selectedOrderDurationMonths = selectedOrder?.durationMonths ?? null;
   const selectedOrderSelectedServerId = selectedOrder?.selectedServerId ?? null;
   const selectedOrderProofUrl = selectedOrder
@@ -3403,6 +3493,13 @@ function TelegramSalesWorkflowCard() {
     claimOrderMutation.mutate({ orderId, claimed });
   };
 
+  const handleAssignOrderReviewer = (orderId: string, reviewerUserId: string | null) => {
+    assignOrderReviewerMutation.mutate({
+      orderId,
+      reviewerUserId,
+    });
+  };
+
   const handleApplyOrderMacro = (
     orderId: string,
     macro:
@@ -3421,6 +3518,7 @@ function TelegramSalesWorkflowCard() {
       setReviewPlanCode('');
       setReviewDurationMonths('');
       setReviewSelectedServerId('auto');
+      setReviewAssignedReviewerId('unassigned');
       return;
     }
 
@@ -3430,12 +3528,14 @@ function TelegramSalesWorkflowCard() {
     setReviewPlanCode(selectedOrderPlanCode || '');
     setReviewDurationMonths(selectedOrderDurationMonths ? String(selectedOrderDurationMonths) : '');
     setReviewSelectedServerId(selectedOrderSelectedServerId || 'auto');
+    setReviewAssignedReviewerId(selectedOrder?.assignedReviewerUserId || 'unassigned');
   }, [
     selectedOrderId,
     selectedOrderRejectionReasonCode,
     selectedOrderPlanCode,
     selectedOrderDurationMonths,
     selectedOrderSelectedServerId,
+    selectedOrder?.assignedReviewerUserId,
     selectedOrder?.duplicateProofOrderCode,
     reviewTarget?.mode,
   ]);
@@ -5242,27 +5342,77 @@ function TelegramSalesWorkflowCard() {
                     ) : null}
                   </div>
                   {selectedOrder.status === 'PENDING_REVIEW' ? (
-                    !selectedOrder.assignedReviewerUserId ? (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => handleClaimOrder(selectedOrder.id, true)}
-                        disabled={claimOrderMutation.isPending}
-                      >
-                        <KeyRound className="mr-2 h-4 w-4" />
-                        {salesUi.claimOrder}
-                      </Button>
-                    ) : isOrderClaimedByCurrentUser(selectedOrder) ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleClaimOrder(selectedOrder.id, false)}
-                        disabled={claimOrderMutation.isPending}
-                      >
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        {salesUi.releaseOrder}
-                      </Button>
-                    ) : null
+                    <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                      <div className="flex flex-wrap gap-2">
+                        {!selectedOrder.assignedReviewerUserId ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => handleClaimOrder(selectedOrder.id, true)}
+                            disabled={claimOrderMutation.isPending}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {salesUi.claimOrder}
+                          </Button>
+                        ) : isOrderClaimedByCurrentUser(selectedOrder) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleClaimOrder(selectedOrder.id, false)}
+                            disabled={claimOrderMutation.isPending}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            {salesUi.releaseOrder}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleAssignOrderReviewer(selectedOrder.id, currentReviewerId || null)}
+                          disabled={!currentReviewerId || assignOrderReviewerMutation.isPending}
+                        >
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          {salesUi.assignToMe}
+                        </Button>
+                      </div>
+                      <div className="flex w-full flex-col gap-2 sm:min-w-[260px]">
+                        <Label className="text-xs text-muted-foreground">{salesUi.reviewer}</Label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Select
+                            value={reviewAssignedReviewerId}
+                            onValueChange={setReviewAssignedReviewerId}
+                          >
+                            <SelectTrigger className="w-full sm:flex-1">
+                              <SelectValue placeholder={salesUi.unassigned} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">{salesUi.unassigned}</SelectItem>
+                              {(reviewersQuery.data || []).map((reviewer) => (
+                                <SelectItem key={reviewer.id} value={reviewer.id}>
+                                  {reviewer.email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              handleAssignOrderReviewer(
+                                selectedOrder.id,
+                                reviewAssignedReviewerId === 'unassigned' ? null : reviewAssignedReviewerId,
+                              )
+                            }
+                            disabled={assignOrderReviewerMutation.isPending}
+                          >
+                            {assignOrderReviewerMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            {salesUi.updateReviewer}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               </div>

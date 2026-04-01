@@ -804,6 +804,26 @@ export const telegramBotRouter = router({
       });
     }),
 
+  listOrderReviewers: adminProcedure.query(async () => {
+    const reviewers = await db.user.findMany({
+      where: {
+        role: 'ADMIN',
+      },
+      orderBy: [{ email: 'asc' }],
+      select: {
+        id: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    return reviewers.map((reviewer) => ({
+      id: reviewer.id,
+      email: reviewer.email,
+      role: reviewer.role,
+    }));
+  }),
+
   claimOrder: adminProcedure
     .input(
       z.object({
@@ -820,6 +840,7 @@ export const telegramBotRouter = router({
           status: true,
           assignedReviewerUserId: true,
           assignedReviewerEmail: true,
+          assignedAt: true,
         },
       });
 
@@ -910,6 +931,104 @@ export const telegramBotRouter = router({
       });
 
       return releasedOrder;
+    }),
+
+  assignOrderReviewer: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        reviewerUserId: z.string().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          status: true,
+          assignedReviewerUserId: true,
+          assignedReviewerEmail: true,
+          assignedAt: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found.',
+        });
+      }
+
+      if (order.status !== 'PENDING_REVIEW') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only pending-review orders can be reassigned.',
+        });
+      }
+
+      let nextReviewer: { id: string; email: string; role: string } | null = null;
+      if (input.reviewerUserId) {
+        nextReviewer = await db.user.findUnique({
+          where: { id: input.reviewerUserId },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
+        });
+
+        if (!nextReviewer || nextReviewer.role !== 'ADMIN') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selected reviewer is not a valid admin.',
+          });
+        }
+      }
+
+      const isUnchanged =
+        (nextReviewer?.id || null) === (order.assignedReviewerUserId || null) &&
+        (nextReviewer?.email || null) === (order.assignedReviewerEmail || null);
+
+      if (isUnchanged) {
+        return {
+          id: order.id,
+          orderCode: order.orderCode,
+          assignedReviewerUserId: order.assignedReviewerUserId,
+          assignedReviewerEmail: order.assignedReviewerEmail,
+          assignedAt: order.assignedAt,
+        };
+      }
+
+      const updatedOrder = await db.telegramOrder.update({
+        where: { id: order.id },
+        data: {
+          assignedReviewerUserId: nextReviewer?.id || null,
+          assignedReviewerEmail: nextReviewer?.email || null,
+          assignedAt: nextReviewer ? new Date() : null,
+        },
+        select: {
+          id: true,
+          orderCode: true,
+          assignedReviewerUserId: true,
+          assignedReviewerEmail: true,
+          assignedAt: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: nextReviewer ? 'TELEGRAM_ORDER_REASSIGNED' : 'TELEGRAM_ORDER_UNASSIGNED',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          previousAssignedReviewerEmail: order.assignedReviewerEmail || null,
+          assignedReviewerEmail: nextReviewer?.email || null,
+        },
+      });
+
+      return updatedOrder;
     }),
 
   applyOrderMacro: adminProcedure
