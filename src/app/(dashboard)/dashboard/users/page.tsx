@@ -30,6 +30,8 @@ import { ExternalLink, Key, Loader2, Plus, Search, Send, Shield, Trash2, User, U
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
 type RefundQueueFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+type RefundQueueAssignmentFilter = 'ALL' | 'UNCLAIMED' | 'MINE' | 'CLAIMED';
+type RefundQueueSort = 'REQUESTED_DESC' | 'REQUESTED_ASC' | 'AMOUNT_DESC';
 type AdminScopeValue = (typeof ADMIN_SCOPE_VALUES)[number];
 
 function formatMoney(amount: number | null | undefined, currency: string | null | undefined) {
@@ -79,6 +81,8 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [financeDialogOpen, setFinanceDialogOpen] = useState(false);
   const [refundQueueStatus, setRefundQueueStatus] = useState<RefundQueueFilter>('PENDING');
+  const [refundQueueAssignment, setRefundQueueAssignment] = useState<RefundQueueAssignmentFilter>('ALL');
+  const [refundQueueSort, setRefundQueueSort] = useState<RefundQueueSort>('REQUESTED_DESC');
   const [financeOwnerEmails, setFinanceOwnerEmails] = useState('');
   const [financeOperatorEmails, setFinanceOperatorEmails] = useState('');
   const [financeDigestEnabled, setFinanceDigestEnabled] = useState(false);
@@ -98,6 +102,8 @@ export default function UsersPage() {
   const financeControlsQuery = trpc.users.getFinanceControls.useQuery();
   const refundQueueQuery = trpc.users.getRefundQueue.useQuery({
     status: refundQueueStatus,
+    assignment: refundQueueAssignment,
+    sort: refundQueueSort,
     limit: 24,
   });
   const userList = useMemo(() => users ?? [], [users]);
@@ -132,6 +138,15 @@ export default function UsersPage() {
   const refundReasonPresets = useMemo(
     () => listRefundReasonPresets(refundReviewDialog?.action),
     [refundReviewDialog?.action],
+  );
+  const quickRefundMacros = useMemo(
+    () =>
+      [
+        getRefundReasonPreset('approved_policy_eligible'),
+        getRefundReasonPreset('reject_usage_over_5gb'),
+        getRefundReasonPreset('reject_purchase_count'),
+      ].filter((preset): preset is NonNullable<ReturnType<typeof getRefundReasonPreset>> => Boolean(preset)),
+    [],
   );
 
   const createMutation = trpc.users.createClient.useMutation({
@@ -329,6 +344,34 @@ export default function UsersPage() {
 
   const isRefundClaimedByOtherUser = (order: (typeof refundQueue)[number]) =>
     Boolean(order.refundAssignedReviewerUserId && (!currentReviewerId || order.refundAssignedReviewerUserId !== currentReviewerId));
+
+  const runRefundMacro = (order: (typeof refundQueue)[number], presetCode: string) => {
+    const preset = getRefundReasonPreset(presetCode);
+    if (!preset) {
+      return;
+    }
+
+    reviewRefundRequestMutation.mutate({
+      orderId: order.id,
+      action: preset.action,
+      reasonPresetCode: preset.code,
+      note: preset.adminNote,
+      customerMessage: preset.customerMessage,
+    });
+  };
+
+  const formatRefundMacroLabel = (presetCode: string) => {
+    switch (presetCode) {
+      case 'approved_policy_eligible':
+        return 'Quick approve';
+      case 'reject_usage_over_5gb':
+        return 'Reject > 5 GB';
+      case 'reject_purchase_count':
+        return 'Reject < 4 paid';
+      default:
+        return getRefundReasonPreset(presetCode)?.label || presetCode;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -645,7 +688,7 @@ export default function UsersPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 px-0 pb-0">
-          <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_auto] md:items-end">
+          <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_220px_220px_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="refund-status-filter">Refund status</Label>
               <Select value={refundQueueStatus} onValueChange={(value) => setRefundQueueStatus(value as RefundQueueFilter)}>
@@ -657,6 +700,36 @@ export default function UsersPage() {
                   <SelectItem value="APPROVED">Approved</SelectItem>
                   <SelectItem value="REJECTED">Rejected</SelectItem>
                   <SelectItem value="ALL">All refund requests</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-assignment-filter">Reviewer ownership</Label>
+              <Select
+                value={refundQueueAssignment}
+                onValueChange={(value) => setRefundQueueAssignment(value as RefundQueueAssignmentFilter)}
+              >
+                <SelectTrigger id="refund-assignment-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All assignments</SelectItem>
+                  <SelectItem value="UNCLAIMED">Unclaimed</SelectItem>
+                  <SelectItem value="MINE">Claimed by me</SelectItem>
+                  <SelectItem value="CLAIMED">Claimed by any reviewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-sort-filter">Queue order</Label>
+              <Select value={refundQueueSort} onValueChange={(value) => setRefundQueueSort(value as RefundQueueSort)}>
+                <SelectTrigger id="refund-sort-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="REQUESTED_DESC">Newest first</SelectItem>
+                  <SelectItem value="REQUESTED_ASC">Oldest first</SelectItem>
+                  <SelectItem value="AMOUNT_DESC">Highest value first</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -769,6 +842,28 @@ export default function UsersPage() {
                       ) : null}
                       {order.refundRequestStatus === 'PENDING' ? (
                         <>
+                          <div className="grid gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              Quick macros
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {quickRefundMacros.map((preset) => (
+                                <Button
+                                  key={preset.code}
+                                  size="sm"
+                                  variant={preset.action === 'APPROVE' ? 'secondary' : 'outline'}
+                                  disabled={
+                                    !refundQueueQuery.data?.permissions.canManage ||
+                                    isRefundClaimedByOtherUser(order) ||
+                                    reviewRefundRequestMutation.isPending
+                                  }
+                                  onClick={() => runRefundMacro(order, preset.code)}
+                                >
+                                  {formatRefundMacroLabel(preset.code)}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
                           <div className="grid gap-2">
                             {!order.refundAssignedReviewerUserId ? (
                               <Button

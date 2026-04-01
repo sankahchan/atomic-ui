@@ -54,6 +54,16 @@ function FinanceStatusBadge({ status }: { status: string }) {
   );
 }
 
+type FinanceTimelineEvent = {
+  id: string;
+  at: Date;
+  title: string;
+  detail: string;
+  tone: 'default' | 'positive' | 'warning' | 'danger';
+  orderCode?: string;
+  href?: string;
+};
+
 export default function UserLedgerPage() {
   const params = useParams();
   const userId = params.id as string;
@@ -131,6 +141,113 @@ export default function UserLedgerPage() {
     return summary.refundedByCurrency
       .map((entry) => formatMoney(entry.amount, entry.currency))
       .join(' • ');
+  }, [ledgerQuery.data]);
+
+  const financeTimeline = useMemo<FinanceTimelineEvent[]>(() => {
+    if (!ledgerQuery.data) {
+      return [];
+    }
+
+    const events: FinanceTimelineEvent[] = [];
+
+    for (const order of ledgerQuery.data.telegramOrders) {
+      const orderHref = withBasePath(
+        `/dashboard/notifications?orderCode=${encodeURIComponent(order.orderCode)}`,
+      );
+      const orderAmountLabel = formatMoney(order.priceAmount, order.priceCurrency);
+      const planLabel = order.planName || order.planCode || 'Unknown plan';
+
+      events.push({
+        id: `${order.id}:created`,
+        at: new Date(order.createdAt),
+        title: 'Order created',
+        detail: `${order.orderCode} • ${planLabel} • ${orderAmountLabel}`,
+        tone: 'default',
+        orderCode: order.orderCode,
+        href: orderHref,
+      });
+
+      if (order.status === 'FULFILLED' && order.reviewedAt) {
+        events.push({
+          id: `${order.id}:fulfilled`,
+          at: new Date(order.reviewedAt),
+          title: order.kind === 'TRIAL' ? 'Trial delivered' : 'Receipt delivered',
+          detail: `${order.orderCode} • ${order.kind === 'TRIAL' ? 'Free trial access sent' : `Paid access delivered for ${planLabel}`}`,
+          tone: 'positive',
+          orderCode: order.orderCode,
+          href: orderHref,
+        });
+      }
+
+      if (order.refundRequestedAt) {
+        events.push({
+          id: `${order.id}:refund-requested`,
+          at: new Date(order.refundRequestedAt),
+          title: 'Refund requested',
+          detail: `${order.orderCode}${order.refundRequestMessage ? ` • ${order.refundRequestMessage}` : ''}`,
+          tone: 'warning',
+          orderCode: order.orderCode,
+          href: orderHref,
+        });
+      }
+
+      if (order.refundRequestReviewedAt && order.refundRequestStatus) {
+        events.push({
+          id: `${order.id}:refund-reviewed`,
+          at: new Date(order.refundRequestReviewedAt),
+          title:
+            order.refundRequestStatus === 'APPROVED'
+              ? 'Refund approved'
+              : 'Refund declined',
+          detail: [
+            order.orderCode,
+            order.refundReviewReasonCode
+              ? resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode
+              : null,
+            order.refundRequestCustomerMessage || null,
+          ]
+            .filter(Boolean)
+            .join(' • '),
+          tone: order.refundRequestStatus === 'APPROVED' ? 'positive' : 'danger',
+          orderCode: order.orderCode,
+          href: orderHref,
+        });
+      }
+
+      for (const action of order.financeActions) {
+        const actionAmount = formatMoney(action.amount, action.currency || order.priceCurrency);
+        events.push({
+          id: `${action.id}:finance-action`,
+          at: new Date(action.createdAt),
+          title:
+            action.actionType === 'VERIFY'
+              ? 'Payment verified'
+              : action.actionType === 'REFUND'
+                ? 'Refund recorded'
+                : 'Credit applied',
+          detail: [
+            order.orderCode,
+            actionAmount !== '—' ? actionAmount : null,
+            action.createdBy?.email || null,
+            action.note || null,
+          ]
+            .filter(Boolean)
+            .join(' • '),
+          tone:
+            action.actionType === 'VERIFY'
+              ? 'positive'
+              : action.actionType === 'REFUND'
+                ? 'danger'
+                : 'warning',
+          orderCode: order.orderCode,
+          href: orderHref,
+        });
+      }
+    }
+
+    return events
+      .sort((left, right) => right.at.getTime() - left.at.getTime())
+      .slice(0, 24);
   }, [ledgerQuery.data]);
 
   if (ledgerQuery.isLoading) {
@@ -532,6 +649,63 @@ export default function UserLedgerPage() {
                   ))
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-primary" />
+                Finance timeline
+              </CardTitle>
+              <CardDescription>
+                Follow payments, receipts, refund requests, decisions, credits, and finance actions for this customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {financeTimeline.length === 0 ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  No finance events have been recorded for this customer yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {financeTimeline.map((event) => {
+                    const toneClass =
+                      event.tone === 'positive'
+                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
+                        : event.tone === 'warning'
+                          ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                          : event.tone === 'danger'
+                            ? 'border-red-500/20 bg-red-500/10 text-red-100'
+                            : 'border-border/60 bg-background/40 text-muted-foreground dark:bg-white/[0.03]';
+
+                    return (
+                      <div key={event.id} className={`rounded-[1rem] border px-4 py-3 ${toneClass}`}>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-foreground">{event.title}</p>
+                              {event.orderCode ? <Badge variant="outline">{event.orderCode}</Badge> : null}
+                            </div>
+                            <p className="text-sm">{event.detail}</p>
+                          </div>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <p className="text-xs text-muted-foreground">{formatDateTime(event.at)}</p>
+                            {event.href ? (
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={event.href}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Open order
+                                </Link>
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -370,15 +370,36 @@ export const usersRouter = router({
     .input(
       z.object({
         status: z.enum(['ALL', 'PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+        assignment: z.enum(['ALL', 'UNCLAIMED', 'MINE', 'CLAIMED']).default('ALL'),
+        sort: z.enum(['REQUESTED_DESC', 'REQUESTED_ASC', 'AMOUNT_DESC']).default('REQUESTED_DESC'),
         limit: z.number().int().min(1).max(100).default(25),
       }),
     )
     .query(async ({ ctx, input }) => {
       const financeControls = await getFinanceControls();
-      const where =
+      const statusWhere =
         input.status === 'ALL'
           ? { refundRequestStatus: { in: ['PENDING', 'APPROVED', 'REJECTED'] } }
           : { refundRequestStatus: input.status };
+      const assignmentWhere =
+        input.assignment === 'UNCLAIMED'
+          ? { refundAssignedReviewerUserId: null }
+          : input.assignment === 'MINE'
+            ? { refundAssignedReviewerUserId: ctx.user.id }
+            : input.assignment === 'CLAIMED'
+              ? { refundAssignedReviewerUserId: { not: null } }
+              : undefined;
+      const where = assignmentWhere
+        ? {
+            AND: [statusWhere, assignmentWhere],
+          }
+        : statusWhere;
+      const orderBy =
+        input.sort === 'REQUESTED_ASC'
+          ? [{ refundRequestedAt: 'asc' as const }, { createdAt: 'asc' as const }]
+          : input.sort === 'AMOUNT_DESC'
+            ? [{ priceAmount: 'desc' as const }, { refundRequestedAt: 'asc' as const }, { createdAt: 'asc' as const }]
+            : [{ refundAssignedAt: 'asc' as const }, { refundRequestedAt: 'desc' as const }, { createdAt: 'desc' as const }];
 
       const [orders, pendingCount, approvedCount, rejectedCount] = await Promise.all([
         db.telegramOrder.findMany({
@@ -397,11 +418,7 @@ export const usersRouter = router({
               },
             },
           },
-          orderBy: [
-            { refundAssignedAt: 'asc' },
-            { refundRequestedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
+          orderBy,
           take: input.limit,
         }),
         db.telegramOrder.count({ where: { refundRequestStatus: 'PENDING' } }),
