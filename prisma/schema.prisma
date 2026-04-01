@@ -313,6 +313,7 @@ model TelegramOrder {
   refundRequestStatus  String?
   refundRequestMessage String?
   refundRequestCustomerMessage String?
+  refundReviewReasonCode String?
   refundRequestReviewedAt DateTime?
   refundRequestReviewedByUserId String?
   refundRequestReviewerEmail String?

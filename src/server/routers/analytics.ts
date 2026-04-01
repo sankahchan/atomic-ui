@@ -50,6 +50,39 @@ function calculateSlope(data: { x: number; y: number }[]): number {
   return (n * sumXY - sumX * sumY) / denominator;
 }
 
+function csvEscape(value: unknown) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const normalized =
+    value instanceof Date
+      ? value.toISOString()
+      : typeof value === 'bigint'
+        ? value.toString()
+        : String(value);
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+function buildCsv(rows: Array<Record<string, unknown>>) {
+  if (rows.length === 0) {
+    return '';
+  }
+
+  const headers = Array.from(
+    rows.reduce((set, row) => {
+      Object.keys(row).forEach((key) => set.add(key));
+      return set;
+    }, new Set<string>()),
+  );
+
+  const lines = [
+    headers.map((header) => csvEscape(header)).join(','),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(',')),
+  ];
+
+  return lines.join('\n');
+}
+
 export const analyticsRouter = router({
   /**
    * Get traffic statistics for a specific key (legacy endpoint).
@@ -1538,6 +1571,269 @@ export const analyticsRouter = router({
             (left, right) => right.count - left.count,
           ),
         },
+      };
+    }),
+
+  financeCsvExport: adminProcedure
+    .input(
+      z.object({
+        kind: z.enum(['orders', 'actions', 'monthly']).default('orders'),
+        range: timeRangeSchema.default('30d'),
+        months: z.number().int().min(3).max(12).default(6),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const now = new Date();
+      const cutoff = getDateCutoff(input.range);
+
+      if (input.kind === 'orders') {
+        const orders = await db.telegramOrder.findMany({
+          where: {
+            OR: [
+              { createdAt: { gte: cutoff } },
+              { fulfilledAt: { gte: cutoff } },
+              { refundRequestedAt: { gte: cutoff } },
+              { financeUpdatedAt: { gte: cutoff } },
+            ],
+          },
+          orderBy: [{ createdAt: 'desc' }],
+          select: {
+            orderCode: true,
+            kind: true,
+            status: true,
+            financeStatus: true,
+            telegramUsername: true,
+            telegramUserId: true,
+            requestedEmail: true,
+            planCode: true,
+            planName: true,
+            deliveryType: true,
+            priceAmount: true,
+            priceCurrency: true,
+            paymentMethodCode: true,
+            paymentMethodLabel: true,
+            paymentSubmittedAt: true,
+            reviewedAt: true,
+            fulfilledAt: true,
+            refundRequestStatus: true,
+            refundRequestedAt: true,
+            refundRequestReviewedAt: true,
+            refundReviewReasonCode: true,
+            retentionSource: true,
+            createdAt: true,
+            financeUpdatedAt: true,
+          },
+        });
+
+        const rows = orders.map((order) => ({
+          orderCode: order.orderCode,
+          kind: order.kind,
+          status: order.status,
+          financeStatus: order.financeStatus,
+          telegramUsername: order.telegramUsername || '',
+          telegramUserId: order.telegramUserId,
+          requestedEmail: order.requestedEmail || '',
+          planCode: order.planCode || '',
+          planName: order.planName || '',
+          deliveryType: order.deliveryType,
+          priceAmount: order.priceAmount ?? '',
+          priceCurrency: order.priceCurrency || '',
+          paymentMethodCode: order.paymentMethodCode || '',
+          paymentMethodLabel: order.paymentMethodLabel || '',
+          paymentSubmittedAt: order.paymentSubmittedAt,
+          reviewedAt: order.reviewedAt,
+          fulfilledAt: order.fulfilledAt,
+          refundRequestStatus: order.refundRequestStatus || '',
+          refundRequestedAt: order.refundRequestedAt,
+          refundRequestReviewedAt: order.refundRequestReviewedAt,
+          refundReviewReasonCode: order.refundReviewReasonCode || '',
+          retentionSource: order.retentionSource || '',
+          createdAt: order.createdAt,
+          financeUpdatedAt: order.financeUpdatedAt,
+        }));
+
+        return {
+          filename: `finance-orders-${input.range}-${now.toISOString().slice(0, 10)}.csv`,
+          csv: buildCsv(rows),
+        };
+      }
+
+      if (input.kind === 'actions') {
+        const actions = await db.telegramOrderFinanceAction.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+          include: {
+            order: {
+              select: {
+                orderCode: true,
+                kind: true,
+                status: true,
+                financeStatus: true,
+                telegramUsername: true,
+                telegramUserId: true,
+                requestedEmail: true,
+                planCode: true,
+                planName: true,
+              },
+            },
+            createdBy: {
+              select: {
+                email: true,
+              },
+            },
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        });
+
+        const rows = actions.map((action) => ({
+          createdAt: action.createdAt,
+          actionType: action.actionType,
+          amount: action.amount ?? '',
+          currency: action.currency || '',
+          note: action.note || '',
+          reviewerEmail: action.createdBy?.email || '',
+          orderCode: action.order.orderCode,
+          orderKind: action.order.kind,
+          orderStatus: action.order.status,
+          financeStatus: action.order.financeStatus,
+          telegramUsername: action.order.telegramUsername || '',
+          telegramUserId: action.order.telegramUserId,
+          requestedEmail: action.order.requestedEmail || '',
+          planCode: action.order.planCode || '',
+          planName: action.order.planName || '',
+        }));
+
+        return {
+          filename: `finance-actions-${input.range}-${now.toISOString().slice(0, 10)}.csv`,
+          csv: buildCsv(rows),
+        };
+      }
+
+      const firstMonthStart = new Date(now.getFullYear(), now.getMonth() - input.months + 1, 1);
+      const [fulfilledOrders, archivedKeys, currentChurnedAccessKeys, currentChurnedDynamicKeys] =
+        await Promise.all([
+          db.telegramOrder.findMany({
+            where: {
+              status: 'FULFILLED',
+              fulfilledAt: { gte: firstMonthStart },
+            },
+            select: {
+              kind: true,
+              fulfilledAt: true,
+              priceAmount: true,
+              priceCurrency: true,
+            },
+          }),
+          db.archivedKey.findMany({
+            where: {
+              archivedAt: { gte: firstMonthStart },
+              archiveReason: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              archivedAt: true,
+            },
+          }),
+          db.accessKey.findMany({
+            where: {
+              updatedAt: { gte: firstMonthStart },
+              status: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              id: true,
+              updatedAt: true,
+            },
+          }),
+          db.dynamicAccessKey.findMany({
+            where: {
+              updatedAt: { gte: firstMonthStart },
+              status: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              updatedAt: true,
+            },
+          }),
+        ]);
+
+      const months = Array.from({ length: input.months }).map((_, index) => {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - (input.months - 1 - index), 1);
+        const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+        return {
+          key,
+          label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          revenueByCurrency: new Map<string, number>(),
+          fulfilledOrders: 0,
+          renewalOrders: 0,
+          newOrders: 0,
+          churnSignals: 0,
+        };
+      });
+
+      const monthMap = new Map(months.map((month) => [month.key, month]));
+      const seenCurrentAccessChurn = new Set<string>();
+
+      for (const order of fulfilledOrders) {
+        if (!order.fulfilledAt) continue;
+        const key = `${order.fulfilledAt.getFullYear()}-${String(order.fulfilledAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(key);
+        if (!month) continue;
+        month.fulfilledOrders += 1;
+        if (order.kind === 'RENEW') {
+          month.renewalOrders += 1;
+        } else {
+          month.newOrders += 1;
+        }
+        if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+          const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+          month.revenueByCurrency.set(currency, (month.revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        }
+      }
+
+      for (const archivedKey of archivedKeys) {
+        const key = `${archivedKey.archivedAt.getFullYear()}-${String(archivedKey.archivedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(key);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      for (const key of currentChurnedAccessKeys) {
+        if (seenCurrentAccessChurn.has(key.id)) {
+          continue;
+        }
+        seenCurrentAccessChurn.add(key.id);
+        const monthKey = `${key.updatedAt.getFullYear()}-${String(key.updatedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(monthKey);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      for (const key of currentChurnedDynamicKeys) {
+        const monthKey = `${key.updatedAt.getFullYear()}-${String(key.updatedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(monthKey);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      const rows = months.map((month) => {
+        const row: Record<string, unknown> = {
+          month: month.label,
+          fulfilledOrders: month.fulfilledOrders,
+          renewalOrders: month.renewalOrders,
+          newOrders: month.newOrders,
+          churnSignals: month.churnSignals,
+        };
+        for (const [currency, amount] of Array.from(month.revenueByCurrency.entries())) {
+          row[`revenue_${currency}`] = amount;
+        }
+        return row;
+      });
+
+      return {
+        filename: `finance-monthly-${input.months}m-${now.toISOString().slice(0, 10)}.csv`,
+        csv: buildCsv(rows),
       };
     }),
 

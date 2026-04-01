@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
+import { getRefundReasonPreset, listRefundReasonPresets, resolveRefundReasonPresetLabel, type RefundReviewAction } from '@/lib/finance';
+import { formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,10 +23,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ExternalLink, Key, Loader2, Plus, Search, Send, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
+type RefundQueueFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+function formatMoney(amount: number | null | undefined, currency: string | null | undefined) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return '—';
+  }
+
+  const normalizedCurrency = (currency || 'MMK').trim().toUpperCase();
+  const formatted = new Intl.NumberFormat('en-US').format(amount);
+  if (normalizedCurrency === 'MMK') {
+    return `${formatted} Kyat`;
+  }
+  if (normalizedCurrency === 'USD') {
+    return `$${formatted}`;
+  }
+  return `${formatted} ${normalizedCurrency}`;
+}
 
 function UserStatCard({
   label,
@@ -56,14 +76,27 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [financeDialogOpen, setFinanceDialogOpen] = useState(false);
+  const [refundQueueStatus, setRefundQueueStatus] = useState<RefundQueueFilter>('PENDING');
   const [financeOwnerEmails, setFinanceOwnerEmails] = useState('');
   const [financeOperatorEmails, setFinanceOperatorEmails] = useState('');
   const [financeDigestEnabled, setFinanceDigestEnabled] = useState(false);
   const [financeDigestHour, setFinanceDigestHour] = useState('21');
   const [financeDigestMinute, setFinanceDigestMinute] = useState('0');
+  const [refundReviewDialog, setRefundReviewDialog] = useState<{
+    orderId: string;
+    orderCode: string;
+    action: RefundReviewAction;
+  } | null>(null);
+  const [refundReasonPresetCode, setRefundReasonPresetCode] = useState('');
+  const [refundReviewNote, setRefundReviewNote] = useState('');
+  const [refundReviewCustomerMessage, setRefundReviewCustomerMessage] = useState('');
 
   const { data: users, refetch, isLoading } = trpc.users.list.useQuery();
   const financeControlsQuery = trpc.users.getFinanceControls.useQuery();
+  const refundQueueQuery = trpc.users.getRefundQueue.useQuery({
+    status: refundQueueStatus,
+    limit: 24,
+  });
   const userList = useMemo(() => users ?? [], [users]);
 
   const filteredUsers = useMemo(() => {
@@ -80,6 +113,12 @@ export default function UsersPage() {
   const assignedKeyCount = userList.reduce(
     (total, user) => total + ((user as { _count?: { accessKeys?: number } })._count?.accessKeys || 0),
     0
+  );
+  const refundQueue = refundQueueQuery.data?.orders || [];
+  const refundQueueSummary = refundQueueQuery.data?.summary;
+  const refundReasonPresets = useMemo(
+    () => listRefundReasonPresets(refundReviewDialog?.action),
+    [refundReviewDialog?.action],
   );
 
   const createMutation = trpc.users.createClient.useMutation({
@@ -157,6 +196,27 @@ export default function UsersPage() {
     },
   });
 
+  const reviewRefundRequestMutation = trpc.users.reviewRefundRequest.useMutation({
+    onSuccess: async () => {
+      await refundQueueQuery.refetch();
+      toast({
+        title: 'Refund request updated',
+        description: 'The customer refund request status was updated.',
+      });
+      setRefundReviewDialog(null);
+      setRefundReasonPresetCode('');
+      setRefundReviewNote('');
+      setRefundReviewCustomerMessage('');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Refund review failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   useEffect(() => {
     const controls = financeControlsQuery.data;
     if (!controls) {
@@ -179,6 +239,29 @@ export default function UsersPage() {
 
   const handleDelete = (id: string, email: string) => {
     setUserToDelete({ id, email });
+  };
+
+  const openRefundReviewDialog = (
+    orderId: string,
+    orderCode: string,
+    action: RefundReviewAction,
+  ) => {
+    const defaultPreset =
+      action === 'APPROVE' ? 'approved_policy_eligible' : 'reject_manual_review';
+    const preset = getRefundReasonPreset(defaultPreset);
+    setRefundReviewDialog({ orderId, orderCode, action });
+    setRefundReasonPresetCode(defaultPreset);
+    setRefundReviewNote(preset?.adminNote || '');
+    setRefundReviewCustomerMessage(preset?.customerMessage || '');
+  };
+
+  const applyRefundPreset = (code: string) => {
+    setRefundReasonPresetCode(code);
+    const preset = getRefundReasonPreset(code);
+    if (preset) {
+      setRefundReviewNote(preset.adminNote);
+      setRefundReviewCustomerMessage(preset.customerMessage);
+    }
   };
 
   return (
@@ -469,6 +552,178 @@ export default function UsersPage() {
 
       <Card className="ops-panel">
         <CardHeader className="px-0 pt-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Wallet className="h-5 w-5 text-primary" />
+                Refund review queue
+              </CardTitle>
+              <CardDescription>
+                Review pending refund requests, apply presets, and open the linked customer ledger when more context is needed.
+              </CardDescription>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pending</p>
+                <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.pending || 0}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Approved</p>
+                <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.approved || 0}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejected</p>
+                <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.rejected || 0}</p>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 px-0 pb-0">
+          <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_auto] md:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="refund-status-filter">Refund status</Label>
+              <Select value={refundQueueStatus} onValueChange={(value) => setRefundQueueStatus(value as RefundQueueFilter)}>
+                <SelectTrigger id="refund-status-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">Pending review</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                  <SelectItem value="ALL">All refund requests</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="ops-table-meta">
+              {refundQueue.length} refund request{refundQueue.length === 1 ? '' : 's'}
+            </div>
+          </div>
+
+          {refundQueueQuery.isLoading ? (
+            <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+              Loading refund queue...
+            </div>
+          ) : refundQueue.length === 0 ? (
+            <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+              No refund requests match the current filter.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {refundQueue.map((order) => (
+                <div
+                  key={order.id}
+                  className="rounded-[1.2rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{order.orderCode}</p>
+                        <Badge variant="outline">{order.refundRequestStatus}</Badge>
+                        <Badge variant="secondary">{order.kind}</Badge>
+                        <Badge variant="outline">{order.financeStatus}</Badge>
+                        {order.refundReviewReasonCode ? (
+                          <Badge variant="outline">
+                            {resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <p>
+                            <span className="font-medium text-foreground">Customer:</span>{' '}
+                            {order.requestedEmail || order.telegramUsername || order.telegramUserId}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Plan:</span>{' '}
+                            {order.planName || order.planCode || '—'}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Amount:</span>{' '}
+                            {formatMoney(order.priceAmount, order.priceCurrency)}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Key usage:</span>{' '}
+                            {formatBytes(BigInt(order.usedBytes || '0'))}
+                          </p>
+                        </div>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <p>
+                            <span className="font-medium text-foreground">Requested:</span>{' '}
+                            {order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : '—'}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Paid purchases:</span>{' '}
+                            {order.fulfilledPaidPurchaseCount}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Reviewed:</span>{' '}
+                            {order.refundRequestReviewedAt ? formatDateTime(order.refundRequestReviewedAt) : '—'}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Reviewer:</span>{' '}
+                            {order.refundRequestReviewerEmail || '—'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {order.refundBlockedReason ? (
+                        <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                          <span className="font-medium">Policy note:</span> {order.refundBlockedReason}
+                        </div>
+                      ) : null}
+
+                      {order.refundRequestCustomerMessage ? (
+                        <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                          <span className="font-medium text-foreground">Customer-facing message:</span>{' '}
+                          {order.refundRequestCustomerMessage}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-col gap-2 lg:w-[220px]">
+                      {order.customerLedgerId ? (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/dashboard/users/${order.customerLedgerId}`}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open ledger
+                          </Link>
+                        </Button>
+                      ) : null}
+                      {order.refundRequestStatus === 'PENDING' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={!refundQueueQuery.data?.permissions.canManage}
+                            onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'APPROVE')}
+                          >
+                            Approve request
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!refundQueueQuery.data?.permissions.canManage}
+                            onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'REJECT')}
+                          >
+                            Decline request
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.03]">
+                          Updated {order.refundRequestReviewedAt ? formatRelativeTime(order.refundRequestReviewedAt) : 'recently'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="ops-panel">
+        <CardHeader className="px-0 pt-0">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-5 w-5 text-primary" />
             User inventory
@@ -682,6 +937,92 @@ export default function UsersPage() {
           deleteMutation.mutate({ id: userToDelete.id });
         }}
       />
+
+      <Dialog
+        open={!!refundReviewDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRefundReviewDialog(null);
+            setRefundReasonPresetCode('');
+            setRefundReviewNote('');
+            setRefundReviewCustomerMessage('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {refundReviewDialog?.action === 'APPROVE' ? 'Approve refund request' : 'Reject refund request'}
+            </DialogTitle>
+            <DialogDescription>
+              Review {refundReviewDialog?.orderCode || 'this order'} with a preset, then adjust the admin note or customer message before sending the decision.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="refund-reason-preset">Reason preset</Label>
+              <Select value={refundReasonPresetCode} onValueChange={applyRefundPreset}>
+                <SelectTrigger id="refund-reason-preset">
+                  <SelectValue placeholder="Choose a preset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {refundReasonPresets.map((preset) => (
+                    <SelectItem key={preset.code} value={preset.code}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-review-note">Admin note</Label>
+              <Textarea
+                id="refund-review-note"
+                value={refundReviewNote}
+                onChange={(event) => setRefundReviewNote(event.target.value)}
+                placeholder="Internal finance note"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-customer-message">Customer message</Label>
+              <Textarea
+                id="refund-customer-message"
+                value={refundReviewCustomerMessage}
+                onChange={(event) => setRefundReviewCustomerMessage(event.target.value)}
+                placeholder="Message sent to the customer in Telegram"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundReviewDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={refundReviewDialog?.action === 'APPROVE' ? 'default' : 'destructive'}
+              disabled={!refundReviewDialog || reviewRefundRequestMutation.isPending}
+              onClick={() => {
+                if (!refundReviewDialog) {
+                  return;
+                }
+                reviewRefundRequestMutation.mutate({
+                  orderId: refundReviewDialog.orderId,
+                  action: refundReviewDialog.action,
+                  reasonPresetCode: refundReasonPresetCode || null,
+                  note: refundReviewNote || null,
+                  customerMessage: refundReviewCustomerMessage || null,
+                });
+              }}
+            >
+              {reviewRefundRequestMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {refundReviewDialog?.action === 'APPROVE' ? 'Approve refund' : 'Reject refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

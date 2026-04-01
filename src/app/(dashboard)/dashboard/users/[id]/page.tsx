@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import { formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
 import { withBasePath } from '@/lib/base-path';
@@ -341,6 +342,18 @@ export default function UserLedgerPage() {
                               </div>
                             ) : null}
 
+                            {order.refundRequestStatus && order.refundRequestStatus !== 'PENDING' ? (
+                              <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                                <span className="font-medium text-foreground">Refund review:</span>{' '}
+                                {order.refundRequestStatus}
+                                {order.refundRequestReviewedAt ? ` • ${formatDateTime(order.refundRequestReviewedAt)}` : ''}
+                                {order.refundReviewReasonCode
+                                  ? ` • ${resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode}`
+                                  : ''}
+                                {order.refundRequestCustomerMessage ? ` • ${order.refundRequestCustomerMessage}` : ''}
+                              </div>
+                            ) : null}
+
                             {latestFinanceAction ? (
                               <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
                                 <span className="font-medium text-foreground">Latest finance action:</span>{' '}
@@ -418,6 +431,7 @@ export default function UserLedgerPage() {
                                     reviewRefundRequestMutation.mutate({
                                       orderId: order.id,
                                       action: 'APPROVE',
+                                      reasonPresetCode: 'approved_policy_eligible',
                                     })
                                   }
                                 >
@@ -431,6 +445,7 @@ export default function UserLedgerPage() {
                                     reviewRefundRequestMutation.mutate({
                                       orderId: order.id,
                                       action: 'REJECT',
+                                      reasonPresetCode: 'reject_manual_review',
                                     })
                                   }
                                 >

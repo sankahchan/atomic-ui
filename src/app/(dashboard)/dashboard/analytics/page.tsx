@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrafficChart } from '@/components/ui/traffic-chart';
 import { useLocale } from '@/hooks/use-locale';
+import { useToast } from '@/hooks/use-toast';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag } from '@/lib/utils';
 import {
   Activity,
@@ -24,6 +25,7 @@ import {
   Gauge,
   Info,
   Key,
+  Loader2,
   QrCode,
   Send,
   Share2,
@@ -156,8 +158,19 @@ function getShareEventLabel(eventType: string) {
   }
 }
 
+function downloadCsvFile(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function AnalyticsPage() {
   const { t } = useLocale();
+  const { toast } = useToast();
   const [days, setDays] = useState(30);
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
   const [shareRange, setShareRange] = useState<'24h' | '7d' | '30d'>('7d');
@@ -189,6 +202,22 @@ export default function AnalyticsPage() {
     trpc.analytics.monthlyBusinessDashboard.useQuery({
       months: 6,
     });
+  const financeExportMutation = trpc.analytics.financeCsvExport.useMutation({
+    onSuccess: (result) => {
+      downloadCsvFile(result.filename, result.csv);
+      toast({
+        title: 'Finance export ready',
+        description: `${result.filename} downloaded.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Finance export failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const totalTraffic =
     trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) ?? BigInt(0);
@@ -344,6 +373,57 @@ export default function AnalyticsPage() {
                     </span>
                     <span className="text-xs text-muted-foreground">Open</span>
                   </Link>
+                </div>
+
+                <div className="space-y-2 rounded-[1.2rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Finance exports
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={financeExportMutation.isPending}
+                    onClick={() =>
+                      financeExportMutation.mutate({
+                        kind: 'orders',
+                        range: telegramSalesRange,
+                        months: 6,
+                      })
+                    }
+                  >
+                    {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export order ledger CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={financeExportMutation.isPending}
+                    onClick={() =>
+                      financeExportMutation.mutate({
+                        kind: 'actions',
+                        range: telegramSalesRange,
+                        months: 6,
+                      })
+                    }
+                  >
+                    {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export finance actions CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={financeExportMutation.isPending}
+                    onClick={() =>
+                      financeExportMutation.mutate({
+                        kind: 'monthly',
+                        range: telegramSalesRange,
+                        months: 6,
+                      })
+                    }
+                  >
+                    {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export monthly revenue CSV
+                  </Button>
                 </div>
               </div>
 

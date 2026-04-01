@@ -77,6 +77,7 @@ import {
   evaluateTelegramOrderRefundEligibility,
   sendTelegramRefundRequestAlert,
 } from '@/lib/services/telegram-finance';
+import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import {
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramLocaleSelectorKeyboard,
@@ -1006,9 +1007,27 @@ function getTelegramUi(locale: SupportedLocale) {
       : 'There are no refund-eligible orders right now. You need more than 3 paid purchases, a fulfilled paid order, and usage at or below 5 GB.',
     refundRequestStatusLabel: isMyanmar ? 'Refund request' : 'Refund request',
     refundRequestedAtLabel: isMyanmar ? 'Refund requested' : 'Refund requested',
+    refundReviewedAtLabel: isMyanmar ? 'Refund reviewed' : 'Refund reviewed',
+    refundReasonLabel: isMyanmar ? 'Refund reason' : 'Refund reason',
     refundStatusPending: isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending review',
     refundStatusApproved: isMyanmar ? 'အတည်ပြုပြီး' : 'Approved',
     refundStatusRejected: isMyanmar ? 'ငြင်းပယ်ထားသည်' : 'Rejected',
+    refundPendingHelp: isMyanmar
+      ? 'Refund request ကို finance review စောင့်နေပါသည်။ အခြေအနေပြောင်းလဲသည့်အခါ ဤ chat မှာ update ရပါမည်။'
+      : 'Your refund request is waiting for finance review. You will get an update here when the status changes.',
+    refundApprovedHelp: isMyanmar
+      ? 'Refund ကို finance team မှ မှတ်တမ်းတင်ပြီးပါပြီ။ နောက်ထပ် အသေးစိတ်လိုပါက /support ကို အသုံးပြုပါ။'
+      : 'The refund has been recorded by the finance team. Use /support if you need more details.',
+    refundRejectedHelp: isMyanmar
+      ? 'Refund request ကို မအတည်ပြုနိုင်သေးပါ။ လိုအပ်ပါက admin/support ကို ဆက်သွယ်နိုင်ပါသည်။'
+      : 'This refund request was not approved. Contact admin/support if you need more help.',
+    refundCenterTitle: isMyanmar ? '💸 <b>Refund center</b>' : '💸 <b>Refund center</b>',
+    refundRecentRequestsTitle: isMyanmar
+      ? 'လက်ရှိ refund request အခြေအနေ'
+      : 'Recent refund request status',
+    refundEligibleSectionTitle: isMyanmar
+      ? 'Refund တောင်းဆိုနိုင်သော orders'
+      : 'Eligible orders you can request now',
     refundAlreadyRequested: (code: string) =>
       isMyanmar
         ? `Refund request အတွက် order <b>${code}</b> ကို စောင့်ဆိုင်းနေပါသည်။`
@@ -1664,6 +1683,24 @@ async function listRefundEligibleTelegramOrders(
     .slice(0, limit);
 }
 
+async function listRecentTelegramRefundRequests(
+  chatId: number,
+  telegramUserId: number,
+  limit = 5,
+) {
+  return db.telegramOrder.findMany({
+    where: {
+      OR: [
+        { telegramChatId: String(chatId) },
+        { telegramUserId: String(telegramUserId) },
+      ],
+      refundRequestStatus: { in: ['PENDING', 'APPROVED', 'REJECTED'] },
+    },
+    orderBy: [{ refundRequestedAt: 'desc' }, { createdAt: 'desc' }],
+    take: limit,
+  });
+}
+
 async function buildTelegramOrderStatusMessage(input: {
   order: Awaited<ReturnType<typeof findTelegramOrderForUser>>;
   locale: SupportedLocale;
@@ -1775,12 +1812,36 @@ async function buildTelegramOrderStatusMessage(input: {
     );
   }
 
+  if (order.refundRequestReviewedAt) {
+    lines.push(
+      `${ui.refundReviewedAtLabel}: ${escapeHtml(
+        formatTelegramDateTime(order.refundRequestReviewedAt, locale),
+      )}`,
+    );
+  }
+
+  if (order.refundReviewReasonCode) {
+    lines.push(
+      `${ui.refundReasonLabel}: ${escapeHtml(
+        resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode,
+      )}`,
+    );
+  }
+
   if (order.customerMessage?.trim()) {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(order.customerMessage.trim()));
   }
 
   if (order.refundRequestCustomerMessage?.trim()) {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(order.refundRequestCustomerMessage.trim()));
+  }
+
+  if (order.refundRequestStatus === 'PENDING') {
+    lines.push('', escapeHtml(ui.refundPendingHelp));
+  } else if (order.refundRequestStatus === 'APPROVED') {
+    lines.push('', escapeHtml(ui.refundApprovedHelp));
+  } else if (order.refundRequestStatus === 'REJECTED') {
+    lines.push('', escapeHtml(ui.refundRejectedHelp));
   }
 
   lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
@@ -2028,25 +2089,56 @@ async function handleRefundCommand(
   botToken: string,
 ) {
   const ui = getTelegramUi(locale);
-  const refundableOrders = await listRefundEligibleTelegramOrders(chatId, telegramUserId, 3);
+  const [refundableOrders, recentRefundRequests] = await Promise.all([
+    listRefundEligibleTelegramOrders(chatId, telegramUserId, 3),
+    listRecentTelegramRefundRequests(chatId, telegramUserId, 5),
+  ]);
 
-  if (refundableOrders.length === 0) {
+  if (refundableOrders.length === 0 && recentRefundRequests.length === 0) {
     return [ui.refundNoEligibleOrders, '', ui.refundPolicySummary].join('\n');
   }
 
   const summaryLines = [
-    ui.refundEligibleOrdersTitle,
+    ui.refundCenterTitle,
     '',
     ui.refundPolicySummary,
-    '',
-    ...refundableOrders.map(({ order, refundEligibility }, index) =>
-      `${index + 1}. ${escapeHtml(formatTelegramOrderStateLine(order))} • ${escapeHtml(
-        formatBytes(refundEligibility.usedBytes),
-      )}`,
-    ),
-    '',
-    ui.refundEligibleOrdersHint,
   ];
+
+  if (recentRefundRequests.length > 0) {
+    summaryLines.push(
+      '',
+      `<b>${ui.refundRecentRequestsTitle}</b>`,
+      ...recentRefundRequests.map((order) => {
+        const details = [
+          escapeHtml(order.orderCode),
+          escapeHtml(formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || '', ui)),
+        ];
+        if (order.refundRequestedAt) {
+          details.push(escapeHtml(formatTelegramDateTime(order.refundRequestedAt, locale)));
+        }
+        if (order.refundReviewReasonCode) {
+          details.push(
+            escapeHtml(resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode),
+          );
+        }
+        return `• ${details.join(' • ')}`;
+      }),
+    );
+  }
+
+  if (refundableOrders.length > 0) {
+    summaryLines.push(
+      '',
+      `<b>${ui.refundEligibleSectionTitle}</b>`,
+      ...refundableOrders.map(({ order, refundEligibility }, index) =>
+        `${index + 1}. ${escapeHtml(formatTelegramOrderStateLine(order))} • ${escapeHtml(
+          formatBytes(refundEligibility.usedBytes),
+        )}`,
+      ),
+      '',
+      ui.refundEligibleOrdersHint,
+    );
+  }
   const summaryMessage = summaryLines.join('\n');
   const sentSummary = await sendTelegramMessage(botToken, chatId, summaryMessage);
 
@@ -12381,11 +12473,12 @@ async function handleTelegramCallbackQuery(
             }
 
             if (order.refundRequestStatus === 'PENDING') {
-              await sendTelegramMessage(
-                config.botToken,
+              await sendTelegramOrderStatusCard({
+                botToken: config.botToken,
                 chatId,
-                ui.refundAlreadyRequested(order.orderCode),
-              );
+                order,
+                locale,
+              });
               await answerTelegramCallbackQuery(
                 config.botToken,
                 callbackQuery.id,
@@ -12395,14 +12488,12 @@ async function handleTelegramCallbackQuery(
             }
 
             if (order.refundRequestStatus === 'APPROVED') {
-              await sendTelegramMessage(
-                config.botToken,
+              await sendTelegramOrderStatusCard({
+                botToken: config.botToken,
                 chatId,
-                ui.refundRequestApproved(
-                  order.orderCode,
-                  order.refundRequestCustomerMessage,
-                ),
-              );
+                order,
+                locale,
+              });
               await answerTelegramCallbackQuery(
                 config.botToken,
                 callbackQuery.id,
@@ -12412,14 +12503,12 @@ async function handleTelegramCallbackQuery(
             }
 
             if (order.refundRequestStatus === 'REJECTED') {
-              await sendTelegramMessage(
-                config.botToken,
+              await sendTelegramOrderStatusCard({
+                botToken: config.botToken,
                 chatId,
-                ui.refundRequestRejected(
-                  order.orderCode,
-                  order.refundRequestCustomerMessage,
-                ),
-              );
+                order,
+                locale,
+              });
               await answerTelegramCallbackQuery(
                 config.botToken,
                 callbackQuery.id,
@@ -12457,6 +12546,7 @@ async function handleTelegramCallbackQuery(
                 refundRequestStatus: 'PENDING',
                 refundRequestMessage: null,
                 refundRequestCustomerMessage: null,
+                refundReviewReasonCode: null,
                 refundRequestReviewedAt: null,
                 refundRequestReviewedByUserId: null,
                 refundRequestReviewerEmail: null,

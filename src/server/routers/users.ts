@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { getRefundReasonPreset } from '@/lib/finance';
 import {
   canUserConfigureFinance,
   canUserManageFinance,
@@ -266,6 +267,96 @@ export const usersRouter = router({
         permissions: {
           canManage: canUserManageFinance(ctx.user, normalized),
           canConfigure: canUserConfigureFinance(ctx.user, normalized),
+      },
+    };
+  }),
+
+  getRefundQueue: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(['ALL', 'PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+        limit: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const financeControls = await getFinanceControls();
+      const where =
+        input.status === 'ALL'
+          ? { refundRequestStatus: { in: ['PENDING', 'APPROVED', 'REJECTED'] } }
+          : { refundRequestStatus: input.status };
+
+      const [orders, pendingCount, approvedCount, rejectedCount] = await Promise.all([
+        db.telegramOrder.findMany({
+          where,
+          include: {
+            reviewedBy: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+            financeUpdatedBy: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: [
+            { refundRequestedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: input.limit,
+        }),
+        db.telegramOrder.count({ where: { refundRequestStatus: 'PENDING' } }),
+        db.telegramOrder.count({ where: { refundRequestStatus: 'APPROVED' } }),
+        db.telegramOrder.count({ where: { refundRequestStatus: 'REJECTED' } }),
+      ]);
+
+      const emailMatches = Array.from(
+        new Set(
+          orders
+            .map((order) => order.requestedEmail?.trim().toLowerCase())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+      const matchedUsers = emailMatches.length
+        ? await db.user.findMany({
+            where: { email: { in: emailMatches } },
+            select: { id: true, email: true },
+          })
+        : [];
+      const usersByEmail = new Map(
+        matchedUsers.map((user) => [user.email.trim().toLowerCase(), user.id]),
+      );
+
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
+          const customerLedgerId = order.requestedEmail
+            ? usersByEmail.get(order.requestedEmail.trim().toLowerCase()) || null
+            : null;
+
+          return {
+            ...order,
+            customerLedgerId,
+            usedBytes: refundEligibility.usedBytes.toString(),
+            fulfilledPaidPurchaseCount: refundEligibility.fulfilledPaidPurchaseCount,
+            refundEligible: refundEligibility.eligible,
+            refundBlockedReason: refundEligibility.reason,
+          };
+        }),
+      );
+
+      return {
+        orders: enrichedOrders,
+        summary: {
+          pending: pendingCount,
+          approved: approvedCount,
+          rejected: rejectedCount,
+        },
+        permissions: {
+          canManage: canUserManageFinance(ctx.user, financeControls),
         },
       };
     }),
@@ -361,6 +452,10 @@ export const usersRouter = router({
               input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
                 ? 'APPROVED'
                 : order.refundRequestStatus,
+            refundReviewReasonCode:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? 'approved_manual_exception'
+                : undefined,
             refundRequestReviewedAt:
               input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
                 ? new Date()
@@ -421,6 +516,7 @@ export const usersRouter = router({
       z.object({
         orderId: z.string(),
         action: z.enum(['APPROVE', 'REJECT']),
+        reasonPresetCode: z.string().trim().max(120).optional().nullable(),
         note: z.string().trim().max(500).optional().nullable(),
         customerMessage: z.string().trim().max(500).optional().nullable(),
       }),
@@ -463,8 +559,17 @@ export const usersRouter = router({
         });
       }
 
-      const note = input.note?.trim() || null;
-      const customerMessage = input.customerMessage?.trim() || null;
+      const preset = getRefundReasonPreset(input.reasonPresetCode?.trim() || null);
+      if (preset && preset.action !== input.action) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Refund reason preset does not match the chosen action.',
+        });
+      }
+
+      const note = input.note?.trim() || preset?.adminNote || null;
+      const customerMessage = input.customerMessage?.trim() || preset?.customerMessage || null;
+      const reasonPresetCode = preset?.code || null;
 
       if (input.action === 'APPROVE') {
         const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
@@ -487,6 +592,7 @@ export const usersRouter = router({
               refundRequestStatus: 'APPROVED',
               refundRequestMessage: note,
               refundRequestCustomerMessage: customerMessage,
+              refundReviewReasonCode: reasonPresetCode,
               refundRequestReviewedAt: new Date(),
               refundRequestReviewedByUserId: ctx.user.id,
               refundRequestReviewerEmail: ctx.user.email || null,
@@ -510,6 +616,7 @@ export const usersRouter = router({
             refundRequestStatus: 'REJECTED',
             refundRequestMessage: note,
             refundRequestCustomerMessage: customerMessage,
+            refundReviewReasonCode: reasonPresetCode,
             refundRequestReviewedAt: new Date(),
             refundRequestReviewedByUserId: ctx.user.id,
             refundRequestReviewerEmail: ctx.user.email || null,
@@ -528,6 +635,7 @@ export const usersRouter = router({
         entityId: order.id,
         details: {
           orderCode: order.orderCode,
+          reasonPresetCode,
           note,
           customerMessage,
         },
