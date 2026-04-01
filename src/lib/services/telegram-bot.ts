@@ -73,6 +73,30 @@ import {
   type TelegramSalesPlan,
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
+import {
+  evaluateTelegramOrderRefundEligibility,
+  sendTelegramRefundRequestAlert,
+} from '@/lib/services/telegram-finance';
+import {
+  buildTelegramDynamicSupportActionCallbackData,
+  buildTelegramLocaleSelectorKeyboard,
+  buildTelegramLocaleSelectorMessage,
+  buildTelegramOrderActionCallbackData,
+  buildTelegramOrderReviewCallbackData,
+  buildTelegramServerChangeActionCallbackData,
+  buildTelegramServerChangeReviewCallbackData,
+  getCommandKeyboard,
+  isDynamicRenewalActionSecondary,
+  parseTelegramDynamicSupportActionCallbackData,
+  parseTelegramLocaleCallbackData,
+  parseTelegramOrderActionCallbackData,
+  parseTelegramOrderReviewCallbackData,
+  parseTelegramServerChangeActionCallbackData,
+  parseTelegramServerChangeReviewCallbackData,
+  resolveTelegramRetentionSourceFromBuyAction,
+  resolveTelegramRetentionSourceFromRenewAction,
+  type TelegramRetentionSource,
+} from '@/lib/services/telegram-callbacks';
 import { computeArchiveAfterAt } from '@/lib/access-key-policies';
 import {
   buildPublicSlugSuggestionCandidates,
@@ -273,327 +297,6 @@ function computeTelegramOrderDigestRisk(input: {
     riskScore,
     riskLevel,
     riskReasons: Array.from(new Set(reasons)),
-  };
-}
-
-function getCommandKeyboard(isAdmin: boolean) {
-  const keyboard = [
-    [{ text: '/buy' }, { text: '/trial' }],
-    [{ text: '/renew' }, { text: '/orders' }],
-    [{ text: '/mykeys' }, { text: '/usage' }],
-    [{ text: '/sub' }, { text: '/server' }],
-    [{ text: '/premium' }, { text: '/supportstatus' }],
-    [{ text: '/support' }, { text: '/language' }],
-    [{ text: '/cancel' }],
-    [{ text: '/help' }],
-  ];
-
-  if (isAdmin) {
-    keyboard.push([{ text: '/status' }, { text: '/expiring' }]);
-    keyboard.push([{ text: '/find' }, { text: '/sysinfo' }]);
-  }
-
-  return {
-    keyboard,
-    resize_keyboard: true,
-    one_time_keyboard: false,
-  };
-}
-
-const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
-const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
-const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
-const TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX = 'server-review';
-const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
-const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
-
-type TelegramLocaleSelectorContext = 'start' | 'switch';
-type TelegramOrderReviewAction = 'approve' | 'reject';
-type TelegramOrderUserAction =
-  | 'pl'
-  | 'ky'
-  | 'sv'
-  | 'pm'
-  | 'pay'
-  | 'up'
-  | 'st'
-  | 'ca'
-  | 'by'
-  | 'rt';
-type TelegramServerChangeReviewAction = 'approve' | 'reject';
-type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
-type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
-type TelegramRetentionSource =
-  | 'trial_expiry'
-  | 'trial_expired'
-  | 'renewal_7d'
-  | 'renewal_3d'
-  | 'renewal_manual'
-  | 'premium_renewal_7d'
-  | 'premium_renewal_3d'
-  | 'expired_recovery'
-  | 'order_retry';
-
-function buildTelegramLocaleSelectorKeyboard(
-  context: TelegramLocaleSelectorContext,
-  startArgs?: string,
-) {
-  const suffix = startArgs ? `:${startArgs}` : '';
-  return {
-    inline_keyboard: [[
-      { text: 'English', callback_data: `${TELEGRAM_LOCALE_CALLBACK_PREFIX}:en:${context}${suffix}` },
-      { text: 'မြန်မာ', callback_data: `${TELEGRAM_LOCALE_CALLBACK_PREFIX}:my:${context}${suffix}` },
-    ]],
-  };
-}
-
-function buildTelegramLocaleSelectorMessage(context: TelegramLocaleSelectorContext) {
-  if (context === 'switch') {
-    return '🌐 Choose your language / ဘာသာစကား ရွေးချယ်ပါ';
-  }
-
-  return [
-    '👋 Welcome to Atomic-UI Telegram Bot',
-    '🌐 Choose your language to continue.',
-    '',
-    '👋 Atomic-UI Telegram bot မှ ကြိုဆိုပါတယ်',
-    '🌐 ဆက်လုပ်ရန် ဘာသာစကား ရွေးချယ်ပါ။',
-  ].join('\n');
-}
-
-function parseTelegramLocaleCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length < 3 || parts[0] !== TELEGRAM_LOCALE_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const locale = coerceSupportedLocale(parts[1]);
-  const context = parts[2] === 'switch' ? 'switch' : parts[2] === 'start' ? 'start' : null;
-  if (!locale || !context) {
-    return null;
-  }
-
-  return {
-    locale,
-    context,
-    startArgs: parts.slice(3).join(':').trim(),
-  } as const;
-}
-
-function buildTelegramOrderReviewCallbackData(
-  action: TelegramOrderReviewAction,
-  orderId: string,
-) {
-  return `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}`;
-}
-
-function parseTelegramOrderReviewCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length !== 3 || parts[0] !== TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const action =
-    parts[1] === 'approve'
-      ? 'approve'
-      : parts[1] === 'reject'
-        ? 'reject'
-        : null;
-  const orderId = parts[2]?.trim();
-
-  if (!action || !orderId) {
-    return null;
-  }
-
-  return {
-    action,
-    orderId,
-  } as const;
-}
-
-function buildTelegramOrderActionCallbackData(
-  action: TelegramOrderUserAction,
-  primary: string,
-  secondary?: string,
-) {
-  return secondary
-    ? `${TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
-    : `${TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
-}
-
-function parseTelegramOrderActionCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length < 3 || parts[0] !== TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const action = parts[1];
-  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'ca', 'by', 'rt'].includes(action)) {
-    return null;
-  }
-
-  return {
-    action: action as TelegramOrderUserAction,
-    primary: parts[2]?.trim() || '',
-    secondary: parts[3]?.trim() || null,
-  };
-}
-
-function normalizeTelegramRetentionSource(
-  value?: string | null,
-): TelegramRetentionSource | null {
-  switch (value) {
-    case 'trial_expiry':
-    case 'trial_expired':
-    case 'renewal_7d':
-    case 'renewal_3d':
-    case 'renewal_manual':
-    case 'premium_renewal_7d':
-    case 'premium_renewal_3d':
-    case 'expired_recovery':
-    case 'order_retry':
-      return value;
-    default:
-      return null;
-  }
-}
-
-function isDynamicRenewalActionSecondary(value?: string | null) {
-  return value === 'dynamic' || value?.startsWith('dynamic_') || false;
-}
-
-function resolveTelegramRetentionSourceFromBuyAction(
-  secondary?: string | null,
-): TelegramRetentionSource | null {
-  return normalizeTelegramRetentionSource(secondary);
-}
-
-function resolveTelegramRetentionSourceFromRenewAction(
-  secondary?: string | null,
-): TelegramRetentionSource | null {
-  switch (secondary) {
-    case 'renewal_7d':
-    case 'renewal_3d':
-    case 'renewal_manual':
-    case 'expired_recovery':
-      return secondary;
-    case 'dynamic_renewal_7d':
-      return 'premium_renewal_7d';
-    case 'dynamic_renewal_3d':
-      return 'premium_renewal_3d';
-    default:
-      return null;
-  }
-}
-
-function buildTelegramServerChangeReviewCallbackData(
-  action: TelegramServerChangeReviewAction,
-  requestId: string,
-) {
-  return `${TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX}:${action}:${requestId}`;
-}
-
-function parseTelegramServerChangeReviewCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length !== 3 || parts[0] !== TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const action =
-    parts[1] === 'approve'
-      ? 'approve'
-      : parts[1] === 'reject'
-        ? 'reject'
-        : null;
-  const requestId = parts[2]?.trim();
-
-  if (!action || !requestId) {
-    return null;
-  }
-
-  return {
-    action,
-    requestId,
-  } as const;
-}
-
-function buildTelegramServerChangeActionCallbackData(
-  action: TelegramServerChangeUserAction,
-  primary: string,
-  secondary?: string,
-) {
-  return secondary
-    ? `${TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
-    : `${TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
-}
-
-function parseTelegramServerChangeActionCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length < 3 || parts[0] !== TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const action = parts[1];
-  if (!['ky', 'sv', 'st', 'ca'].includes(action)) {
-    return null;
-  }
-
-  return {
-    action: action as TelegramServerChangeUserAction,
-    primary: parts[2]?.trim() || '',
-    secondary: parts[3]?.trim() || null,
-  };
-}
-
-function buildTelegramDynamicSupportActionCallbackData(
-  action: TelegramDynamicSupportUserAction,
-  primary: string,
-  secondary?: string,
-) {
-  return secondary
-    ? `${TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
-    : `${TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX}:${action}:${primary}`;
-}
-
-function parseTelegramDynamicSupportActionCallbackData(data?: string | null) {
-  if (!data) {
-    return null;
-  }
-
-  const parts = data.split(':');
-  if (parts.length < 3 || parts[0] !== TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX) {
-    return null;
-  }
-
-  const action = parts[1];
-  if (!['rg', 'rv', 'is', 'st', 'rp', 'ca'].includes(action)) {
-    return null;
-  }
-
-  return {
-    action: action as TelegramDynamicSupportUserAction,
-    primary: parts[2]?.trim() || '',
-    secondary: parts[3]?.trim() || null,
   };
 }
 
@@ -1046,8 +749,8 @@ function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /premium - premium key support shortcut များကို ကြည့်ရန်\n• /supportstatus - premium support request အခြေအနေကို စစ်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /mykeys - view your linked keys\n• /premium - open premium support shortcuts\n• /supportstatus - check your premium support request status\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /premium - premium key support shortcut များကို ကြည့်ရန်\n• /supportstatus - premium support request အခြေအနေကို စစ်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /refund - view refund-eligible orders\n• /mykeys - view your linked keys\n• /premium - open premium support shortcuts\n• /supportstatus - check your premium support request status\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
@@ -1261,6 +964,7 @@ function getTelegramUi(locale: SupportedLocale) {
     orderActionPayNow: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Pay now',
     orderActionUploadProof: isMyanmar ? 'Screenshot ပို့ရန်' : 'Upload screenshot',
     orderActionCheckStatus: isMyanmar ? 'အခြေအနေ စစ်ရန်' : 'Check status',
+    orderActionRequestRefund: isMyanmar ? 'Refund တောင်းဆိုရန်' : 'Request refund',
     orderActionCancel: isMyanmar ? 'Order ပယ်ရန်' : 'Cancel order',
     orderActionRetryOrder: isMyanmar ? 'Order ကို ဆက်လုပ်ရန်' : 'Retry order',
     orderActionBuyNewKey: isMyanmar ? 'အသစ်ဝယ်ရန်' : 'Buy new key',
@@ -1288,6 +992,39 @@ function getTelegramUi(locale: SupportedLocale) {
       : 'This order is not ready for payment proof yet.',
     orderActionStatusMissing: isMyanmar ? 'Order ကို မတွေ့ပါ။' : 'Order not found.',
     orderActionSent: isMyanmar ? 'အသေးစိတ်ကို Telegram တွင် ပို့ပြီးပါပြီ။' : 'Details sent in Telegram.',
+    refundPolicySummary: isMyanmar
+      ? 'Refund ကို fulfilled paid orders အတွက်သာ တောင်းဆိုနိုင်ပြီး paid purchase ၃ ကြိမ်ကျော်ရမည်။ အသုံးပြုမှု 5 GB ကျော်သွားလျှင် refund မရနိုင်တော့ပါ။'
+      : 'Refunds are available only on fulfilled paid orders after more than 3 paid purchases. Once usage goes above 5 GB, the refund option closes automatically.',
+    refundEligibleOrdersTitle: isMyanmar
+      ? '💸 <b>Refund တောင်းဆိုနိုင်သော orders</b>'
+      : '💸 <b>Refund-eligible orders</b>',
+    refundEligibleOrdersHint: isMyanmar
+      ? 'အောက်ပါ order card များထဲမှ Request refund ကိုနှိပ်ပြီး refund request တင်နိုင်ပါသည်။'
+      : 'Tap Request refund on one of the order cards below to submit a refund request.',
+    refundNoEligibleOrders: isMyanmar
+      ? 'Refund တောင်းဆိုနိုင်သော order မရှိသေးပါ။ Paid purchase ၃ ကြိမ်ကျော်ပြီး fulfilled order ဖြစ်ရမည်၊ အသုံးပြုမှု 5 GB အောက်တွင် ရှိရမည်။'
+      : 'There are no refund-eligible orders right now. You need more than 3 paid purchases, a fulfilled paid order, and usage at or below 5 GB.',
+    refundRequestStatusLabel: isMyanmar ? 'Refund request' : 'Refund request',
+    refundRequestedAtLabel: isMyanmar ? 'Refund requested' : 'Refund requested',
+    refundStatusPending: isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending review',
+    refundStatusApproved: isMyanmar ? 'အတည်ပြုပြီး' : 'Approved',
+    refundStatusRejected: isMyanmar ? 'ငြင်းပယ်ထားသည်' : 'Rejected',
+    refundAlreadyRequested: (code: string) =>
+      isMyanmar
+        ? `Refund request အတွက် order <b>${code}</b> ကို စောင့်ဆိုင်းနေပါသည်။`
+        : `Order <b>${code}</b> already has a pending refund request.`,
+    refundRequested: (code: string) =>
+      isMyanmar
+        ? `💸 Order <b>${code}</b> အတွက် refund request ကို ပို့ပြီးပါပြီ။ Admin review ပြီးသည်နှင့် အခြေအနေကို ဤ chat တွင် ပြန်ကြားပါမည်။`
+        : `💸 Refund request sent for order <b>${code}</b>. You will get an update here after admin review.`,
+    refundRequestRejected: (code: string, customerMessage?: string | null) =>
+      isMyanmar
+        ? `❌ Order <b>${code}</b> အတွက် refund request ကို မအတည်ပြုနိုင်ပါ။${customerMessage ? `\n\n${customerMessage}` : ''}`
+        : `❌ Refund request for order <b>${code}</b> was not approved.${customerMessage ? `\n\n${customerMessage}` : ''}`,
+    refundRequestApproved: (code: string, customerMessage?: string | null) =>
+      isMyanmar
+        ? `✅ Order <b>${code}</b> အတွက် refund ကို အတည်ပြုပြီးပါပြီ။${customerMessage ? `\n\n${customerMessage}` : ''}`
+        : `✅ Refund approved for order <b>${code}</b>.${customerMessage ? `\n\n${customerMessage}` : ''}`,
     myKeysRenewHint: isMyanmar
       ? 'အောက်ပါ button များဖြင့် key ကို တိုက်ရိုက် သက်တမ်းတိုးနိုင်ပါသည်။'
       : 'Use the buttons below to renew a specific key directly.',
@@ -1610,6 +1347,22 @@ function formatTelegramOrderStatusLabel(status: string, ui: ReturnType<typeof ge
   }
 }
 
+function formatTelegramRefundRequestStatusLabel(
+  status: string,
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  switch (status) {
+    case 'PENDING':
+      return ui.refundStatusPending;
+    case 'APPROVED':
+      return ui.refundStatusApproved;
+    case 'REJECTED':
+      return ui.refundStatusRejected;
+    default:
+      return status;
+  }
+}
+
 function formatTelegramOrderKindLabel(kind: string, ui: ReturnType<typeof getTelegramUi>) {
   return kind === 'RENEW' ? ui.orderKindRenew : ui.orderKindNew;
 }
@@ -1879,6 +1632,38 @@ async function findTelegramOrderForUser(input: {
   });
 }
 
+async function listRefundEligibleTelegramOrders(
+  chatId: number,
+  telegramUserId: number,
+  limit = 3,
+) {
+  const orders = await db.telegramOrder.findMany({
+    where: {
+      OR: [
+        { telegramChatId: String(chatId) },
+        { telegramUserId: String(telegramUserId) },
+      ],
+      status: 'FULFILLED',
+      priceAmount: { gt: 0 },
+    },
+    orderBy: [{ fulfilledAt: 'desc' }, { createdAt: 'desc' }],
+    take: Math.max(limit * 4, 12),
+  });
+
+  const evaluated = await Promise.all(orders.map(async (order) => ({
+    order,
+    refundEligibility: await evaluateTelegramOrderRefundEligibility(order),
+  })));
+
+  return evaluated
+    .filter(({ order, refundEligibility }) =>
+      refundEligibility.eligible &&
+      !order.refundRequestStatus &&
+      order.financeStatus !== 'REFUNDED',
+    )
+    .slice(0, limit);
+}
+
 async function buildTelegramOrderStatusMessage(input: {
   order: Awaited<ReturnType<typeof findTelegramOrderForUser>>;
   locale: SupportedLocale;
@@ -1974,8 +1759,28 @@ async function buildTelegramOrderStatusMessage(input: {
     );
   }
 
+  if (order.refundRequestStatus) {
+    lines.push(
+      `${ui.refundRequestStatusLabel}: <b>${escapeHtml(
+        formatTelegramRefundRequestStatusLabel(order.refundRequestStatus, ui),
+      )}</b>`,
+    );
+  }
+
+  if (order.refundRequestedAt) {
+    lines.push(
+      `${ui.refundRequestedAtLabel}: ${escapeHtml(
+        formatTelegramDateTime(order.refundRequestedAt, locale),
+      )}`,
+    );
+  }
+
   if (order.customerMessage?.trim()) {
     lines.push('', `${ui.customerMessage}:`, escapeHtml(order.customerMessage.trim()));
+  }
+
+  if (order.refundRequestCustomerMessage?.trim()) {
+    lines.push('', `${ui.customerMessage}:`, escapeHtml(order.refundRequestCustomerMessage.trim()));
   }
 
   lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
@@ -2214,6 +2019,47 @@ async function handleOrderStatusCommand(
   });
 
   return sent ? null : text;
+}
+
+async function handleRefundCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+) {
+  const ui = getTelegramUi(locale);
+  const refundableOrders = await listRefundEligibleTelegramOrders(chatId, telegramUserId, 3);
+
+  if (refundableOrders.length === 0) {
+    return [ui.refundNoEligibleOrders, '', ui.refundPolicySummary].join('\n');
+  }
+
+  const summaryLines = [
+    ui.refundEligibleOrdersTitle,
+    '',
+    ui.refundPolicySummary,
+    '',
+    ...refundableOrders.map(({ order, refundEligibility }, index) =>
+      `${index + 1}. ${escapeHtml(formatTelegramOrderStateLine(order))} • ${escapeHtml(
+        formatBytes(refundEligibility.usedBytes),
+      )}`,
+    ),
+    '',
+    ui.refundEligibleOrdersHint,
+  ];
+  const summaryMessage = summaryLines.join('\n');
+  const sentSummary = await sendTelegramMessage(botToken, chatId, summaryMessage);
+
+  for (const { order } of refundableOrders) {
+    await sendTelegramOrderStatusCard({
+      botToken,
+      chatId,
+      order,
+      locale,
+    });
+  }
+
+  return sentSummary ? null : summaryMessage;
 }
 
 function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines: string[]) {
@@ -3178,6 +3024,22 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
           },
         ]);
       }
+    }
+  }
+
+  if (
+    input.order.status === 'FULFILLED' &&
+    !input.order.refundRequestStatus &&
+    input.order.financeStatus !== 'REFUNDED'
+  ) {
+    const refundEligibility = await evaluateTelegramOrderRefundEligibility(input.order);
+    if (refundEligibility.eligible) {
+      rows.push([
+        {
+          text: ui.orderActionRequestRefund,
+          callback_data: buildTelegramOrderActionCallbackData('rf', input.order.id),
+        },
+      ]);
     }
   }
 
@@ -11134,6 +10996,7 @@ async function handleHelpCommand(
 /trial - ၁ ရက် 3 GB free trial ရယူမည်
 /orders - မိမိ order များကို ကြည့်မည်
 /order [code] - order အခြေအနေ အသေးစိတ်ကြည့်မည်
+/refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
 /premium - premium key support shortcut များကို ကြည့်မည်
@@ -11152,6 +11015,7 @@ async function handleHelpCommand(
 /trial - Claim the 1-day 3 GB free trial
 /orders - Show your recent orders
 /order [code] - Show one order status
+/refund - Show refund-eligible orders
 /usage - Fetch your usage and QR/setup info
 /mykeys - List linked keys and IDs
 /premium - Open premium support shortcuts
@@ -12501,6 +12365,141 @@ async function handleTelegramCallbackQuery(
             );
             return null;
           }
+          case 'rf': {
+            const order = await findTelegramOrderByIdForUser({
+              orderId: userOrderAction.primary,
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            if (!order) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+
+            if (order.refundRequestStatus === 'PENDING') {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.refundAlreadyRequested(order.orderCode),
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
+
+            if (order.refundRequestStatus === 'APPROVED') {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.refundRequestApproved(
+                  order.orderCode,
+                  order.refundRequestCustomerMessage,
+                ),
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
+
+            if (order.refundRequestStatus === 'REJECTED') {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                ui.refundRequestRejected(
+                  order.orderCode,
+                  order.refundRequestCustomerMessage,
+                ),
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
+
+            const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
+            if (!refundEligibility.eligible) {
+              await sendTelegramMessage(
+                config.botToken,
+                chatId,
+                [
+                  ui.refundNoEligibleOrders,
+                  '',
+                  refundEligibility.reason ? escapeHtml(refundEligibility.reason) : ui.refundPolicySummary,
+                ].join('\n'),
+                {
+                  replyMarkup: getCommandKeyboard(isAdmin),
+                },
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionSent,
+              );
+              return null;
+            }
+
+            const updatedOrder = await db.telegramOrder.update({
+              where: { id: order.id },
+              data: {
+                refundRequestedAt: new Date(),
+                refundRequestStatus: 'PENDING',
+                refundRequestMessage: null,
+                refundRequestCustomerMessage: null,
+                refundRequestReviewedAt: null,
+                refundRequestReviewedByUserId: null,
+                refundRequestReviewerEmail: null,
+              },
+            });
+
+            await writeAuditLog({
+              action: 'TELEGRAM_ORDER_REFUND_REQUEST_CREATE',
+              entity: 'TELEGRAM_ORDER',
+              entityId: order.id,
+              details: {
+                orderCode: order.orderCode,
+                telegramUserId: String(callbackQuery.from.id),
+                telegramChatId: String(chatId),
+              },
+            });
+
+            await sendTelegramRefundRequestAlert({
+              orderId: order.id,
+              orderCode: order.orderCode,
+              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
+              telegramUserId: String(callbackQuery.from.id),
+            });
+
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              ui.refundRequested(order.orderCode),
+              {
+                replyMarkup: await buildTelegramOrderStatusReplyMarkup({
+                  order: updatedOrder,
+                  locale,
+                }),
+              },
+            );
+
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionSent,
+            );
+            return null;
+          }
           case 'ca': {
             const order = await findTelegramOrderByIdForUser({
               orderId: userOrderAction.primary,
@@ -12835,6 +12834,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleOrdersCommand(chatId, telegramUserId, locale, config.botToken);
     case 'order':
       return handleOrderStatusCommand(chatId, telegramUserId, argsText, locale, config.botToken);
+    case 'refund':
+      return handleRefundCommand(chatId, telegramUserId, locale, config.botToken);
     case 'usage':
     case 'mykey':
     case 'key':

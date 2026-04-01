@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Key, Loader2, Plus, Search, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
+import { ExternalLink, Key, Loader2, Plus, Search, Send, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
 
@@ -55,8 +55,15 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<{ id: string; email: string } | null>(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
+  const [financeDialogOpen, setFinanceDialogOpen] = useState(false);
+  const [financeOwnerEmails, setFinanceOwnerEmails] = useState('');
+  const [financeOperatorEmails, setFinanceOperatorEmails] = useState('');
+  const [financeDigestEnabled, setFinanceDigestEnabled] = useState(false);
+  const [financeDigestHour, setFinanceDigestHour] = useState('21');
+  const [financeDigestMinute, setFinanceDigestMinute] = useState('0');
 
   const { data: users, refetch, isLoading } = trpc.users.list.useQuery();
+  const financeControlsQuery = trpc.users.getFinanceControls.useQuery();
   const userList = useMemo(() => users ?? [], [users]);
 
   const filteredUsers = useMemo(() => {
@@ -113,6 +120,54 @@ export default function UsersPage() {
       setDeletingUserId(null);
     },
   });
+
+  const updateFinanceControlsMutation = trpc.users.updateFinanceControls.useMutation({
+    onSuccess: async () => {
+      await financeControlsQuery.refetch();
+      toast({
+        title: 'Finance controls updated',
+        description: 'Finance permissions and digest settings were saved.',
+      });
+      setFinanceDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Finance controls failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const runFinanceDigestMutation = trpc.users.runFinanceDigestNow.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: result.skipped ? 'Finance digest skipped' : 'Finance digest sent',
+        description: result.skipped
+          ? `Reason: ${result.reason || 'n/a'}`
+          : `Delivered to ${result.adminChats ?? 0} admin chat(s).`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Finance digest failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    const controls = financeControlsQuery.data;
+    if (!controls) {
+      return;
+    }
+    setFinanceOwnerEmails((controls.ownerEmails || []).join(', '));
+    setFinanceOperatorEmails((controls.operatorEmails || []).join(', '));
+    setFinanceDigestEnabled(Boolean(controls.dailyFinanceDigestEnabled));
+    setFinanceDigestHour(String(controls.dailyFinanceDigestHour ?? 21));
+    setFinanceDigestMinute(String(controls.dailyFinanceDigestMinute ?? 0));
+  }, [financeControlsQuery.data]);
 
   const handleCreate = () => {
     if (!newUserEmail || !newUserPassword) return;
@@ -257,6 +312,133 @@ export default function UsersPage() {
                   </span>
                   <span className="text-xs text-muted-foreground">Open</span>
                 </Link>
+                <Dialog open={financeDialogOpen} onOpenChange={setFinanceDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button type="button" className="ops-action-tile text-left">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        Finance controls
+                      </span>
+                      <span className="text-xs text-muted-foreground">Manage</span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Finance controls</DialogTitle>
+                      <DialogDescription>
+                        Limit who can refund or credit Telegram orders, and control the daily finance digest.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="finance-owner-emails">Owner emails</Label>
+                        <Input
+                          id="finance-owner-emails"
+                          placeholder="owner@example.com, second-owner@example.com"
+                          value={financeOwnerEmails}
+                          onChange={(event) => setFinanceOwnerEmails(event.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Leave blank to let any admin configure finance controls.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="finance-operator-emails">Finance operator emails</Label>
+                        <Input
+                          id="finance-operator-emails"
+                          placeholder="finance@example.com, reviewer@example.com"
+                          value={financeOperatorEmails}
+                          onChange={(event) => setFinanceOperatorEmails(event.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          These admins can verify, refund, and credit orders.
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Daily finance digest</p>
+                          <p className="text-xs text-muted-foreground">
+                            Send revenue, refund, credit, and pending refund-request summaries to admin chats.
+                          </p>
+                        </div>
+                        <Select value={financeDigestEnabled ? 'enabled' : 'disabled'} onValueChange={(value) => setFinanceDigestEnabled(value === 'enabled')}>
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="enabled">Enabled</SelectItem>
+                            <SelectItem value="disabled">Disabled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="finance-digest-hour">Digest hour</Label>
+                          <Input
+                            id="finance-digest-hour"
+                            inputMode="numeric"
+                            value={financeDigestHour}
+                            onChange={(event) => setFinanceDigestHour(event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="finance-digest-minute">Digest minute</Label>
+                          <Input
+                            id="finance-digest-minute"
+                            inputMode="numeric"
+                            value={financeDigestMinute}
+                            onChange={(event) => setFinanceDigestMinute(event.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:justify-between">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => runFinanceDigestMutation.mutate()}
+                        disabled={!financeControlsQuery.data?.permissions.canManage || runFinanceDigestMutation.isPending}
+                      >
+                        {runFinanceDigestMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="mr-2 h-4 w-4" />
+                        )}
+                        Send digest now
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setFinanceDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            updateFinanceControlsMutation.mutate({
+                              ownerEmails: financeOwnerEmails
+                                .split(',')
+                                .map((value) => value.trim())
+                                .filter(Boolean),
+                              operatorEmails: financeOperatorEmails
+                                .split(',')
+                                .map((value) => value.trim())
+                                .filter(Boolean),
+                              dailyFinanceDigestEnabled: financeDigestEnabled,
+                              dailyFinanceDigestHour: Math.min(23, Math.max(0, Number(financeDigestHour) || 0)),
+                              dailyFinanceDigestMinute: Math.min(59, Math.max(0, Number(financeDigestMinute) || 0)),
+                            })
+                          }
+                          disabled={!financeControlsQuery.data?.permissions.canConfigure || updateFinanceControlsMutation.isPending}
+                        >
+                          {updateFinanceControlsMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Save finance controls
+                        </Button>
+                      </div>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 

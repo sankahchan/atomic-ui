@@ -309,6 +309,13 @@ model TelegramOrder {
   reviewedAt           DateTime?
   fulfilledAt          DateTime?
   rejectedAt           DateTime?
+  refundRequestedAt    DateTime?
+  refundRequestStatus  String?
+  refundRequestMessage String?
+  refundRequestCustomerMessage String?
+  refundRequestReviewedAt DateTime?
+  refundRequestReviewedByUserId String?
+  refundRequestReviewerEmail String?
   financeStatus        String   @default("OPEN") // OPEN, VERIFIED, REFUNDED, CREDITED
   financeNote          String?
   financeUpdatedAt     DateTime?
@@ -325,6 +332,7 @@ model TelegramOrder {
   @@index([reviewedByUserId, status])
   @@index([financeStatus, createdAt])
   @@index([financeUpdatedByUserId, financeUpdatedAt])
+  @@index([refundRequestStatus, refundRequestedAt])
   @@index([assignedReviewerUserId, status, createdAt])
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])

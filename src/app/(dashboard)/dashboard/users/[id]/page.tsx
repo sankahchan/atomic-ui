@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, BadgeDollarSign, Coins, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldAlert, UserRound, Wallet } from 'lucide-react';
+import { AlertTriangle, BadgeDollarSign, Coins, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldAlert, Wallet, XCircle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,6 +93,23 @@ export default function UserLedgerPage() {
     },
   });
 
+  const reviewRefundRequestMutation = trpc.users.reviewRefundRequest.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Refund request updated',
+        description: 'The customer was notified about the refund request decision.',
+      });
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Refund review failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const revenueSummary = useMemo(() => {
     const summary = ledgerQuery.data?.summary;
     if (!summary || summary.revenueByCurrency.length === 0) {
@@ -142,7 +159,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests } =
+  const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, financePermissions } =
     ledgerQuery.data;
 
   return (
@@ -214,6 +231,11 @@ export default function UserLedgerPage() {
               </p>
             </div>
           </div>
+          {!financePermissions.canManage ? (
+            <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -257,6 +279,11 @@ export default function UserLedgerPage() {
                               {order.refundEligible ? (
                                 <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                                   Refund eligible
+                                </Badge>
+                              ) : null}
+                              {order.refundRequestStatus ? (
+                                <Badge variant="outline">
+                                  Refund request: {order.refundRequestStatus}
                                 </Badge>
                               ) : null}
                             </div>
@@ -306,6 +333,14 @@ export default function UserLedgerPage() {
                               </div>
                             ) : null}
 
+                            {order.refundRequestStatus === 'PENDING' ? (
+                              <div className="rounded-[1rem] border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+                                <span className="font-medium">Refund requested:</span>{' '}
+                                {order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : 'Pending review'}
+                                {order.refundRequestMessage ? ` • ${order.refundRequestMessage}` : ''}
+                              </div>
+                            ) : null}
+
                             {latestFinanceAction ? (
                               <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
                                 <span className="font-medium text-foreground">Latest finance action:</span>{' '}
@@ -327,6 +362,7 @@ export default function UserLedgerPage() {
                             {order.financeStatus === 'OPEN' ? (
                               <Button
                                 size="sm"
+                                disabled={!financePermissions.canManage}
                                 onClick={() =>
                                   setFinanceDialog({
                                     orderId: order.id,
@@ -343,6 +379,7 @@ export default function UserLedgerPage() {
                             <Button
                               size="sm"
                               variant="secondary"
+                              disabled={!financePermissions.canManage}
                               onClick={() =>
                                 setFinanceDialog({
                                   orderId: order.id,
@@ -358,7 +395,7 @@ export default function UserLedgerPage() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              disabled={!order.refundEligible}
+                              disabled={!financePermissions.canManage || !order.refundEligible}
                               onClick={() =>
                                 setFinanceDialog({
                                   orderId: order.id,
@@ -371,6 +408,37 @@ export default function UserLedgerPage() {
                             >
                               Refund
                             </Button>
+                            {order.refundRequestStatus === 'PENDING' ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  disabled={!financePermissions.canManage || reviewRefundRequestMutation.isPending}
+                                  onClick={() =>
+                                    reviewRefundRequestMutation.mutate({
+                                      orderId: order.id,
+                                      action: 'APPROVE',
+                                    })
+                                  }
+                                >
+                                  Approve request
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!financePermissions.canManage || reviewRefundRequestMutation.isPending}
+                                  onClick={() =>
+                                    reviewRefundRequestMutation.mutate({
+                                      orderId: order.id,
+                                      action: 'REJECT',
+                                    })
+                                  }
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Decline request
+                                </Button>
+                              </>
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -605,7 +673,7 @@ export default function UserLedgerPage() {
                       : undefined,
                 });
               }}
-              disabled={reconcileMutation.isPending}
+              disabled={reconcileMutation.isPending || !financePermissions.canManage}
             >
               {reconcileMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save

@@ -3,83 +3,18 @@ import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
-import { adminProcedure, protectedProcedure, router } from '../trpc';
-
-const REFUND_USAGE_LIMIT_BYTES = BigInt(5 * 1024 * 1024 * 1024);
-
-function resolveOrderLinkedUsageBytes(input: {
-  order: {
-    approvedAccessKeyId?: string | null;
-    targetAccessKeyId?: string | null;
-    approvedDynamicKeyId?: string | null;
-    targetDynamicKeyId?: string | null;
-  };
-  accessKeyUsageById: Map<string, bigint>;
-  dynamicKeyUsageById: Map<string, bigint>;
-}) {
-  const accessKeyId = input.order.approvedAccessKeyId || input.order.targetAccessKeyId;
-  if (accessKeyId && input.accessKeyUsageById.has(accessKeyId)) {
-    return input.accessKeyUsageById.get(accessKeyId) || BigInt(0);
-  }
-
-  const dynamicKeyId = input.order.approvedDynamicKeyId || input.order.targetDynamicKeyId;
-  if (dynamicKeyId && input.dynamicKeyUsageById.has(dynamicKeyId)) {
-    return input.dynamicKeyUsageById.get(dynamicKeyId) || BigInt(0);
-  }
-
-  return BigInt(0);
-}
-
-function evaluateRefundEligibility(input: {
-  order: {
-    status: string;
-    financeStatus: string;
-    priceAmount?: number | null;
-    telegramUserId: string;
-  };
-  fulfilledPaidPurchaseCount: number;
-  usedBytes: bigint;
-}) {
-  if (input.order.status !== 'FULFILLED') {
-    return {
-      eligible: false,
-      reason: 'Only fulfilled orders can be refunded.',
-    };
-  }
-
-  if (!input.order.priceAmount || input.order.priceAmount <= 0) {
-    return {
-      eligible: false,
-      reason: 'Only paid orders can be refunded.',
-    };
-  }
-
-  if (input.order.financeStatus === 'REFUNDED') {
-    return {
-      eligible: false,
-      reason: 'This order was already refunded.',
-    };
-  }
-
-  if (input.fulfilledPaidPurchaseCount <= 3) {
-    return {
-      eligible: false,
-      reason: 'Refunds are only available after more than 3 paid purchases.',
-    };
-  }
-
-  if (input.usedBytes > REFUND_USAGE_LIMIT_BYTES) {
-    return {
-      eligible: false,
-      reason: 'Refunds close automatically once usage goes above 5 GB.',
-    };
-  }
-
-  return {
-    eligible: true,
-    reason: null,
-  };
-}
+import {
+  canUserConfigureFinance,
+  canUserManageFinance,
+  evaluateTelegramOrderRefundEligibility,
+  FINANCE_SETTINGS_KEY,
+  financeControlsSchema,
+  getFinanceControls,
+  normalizeFinanceControlsSettings,
+  runTelegramFinanceDigestCycle,
+  sendTelegramRefundDecisionMessage,
+} from '@/lib/services/telegram-finance';
+import { adminProcedure, router } from '../trpc';
 
 export const usersRouter = router({
   list: adminProcedure.query(async () => {
@@ -99,7 +34,7 @@ export const usersRouter = router({
 
   getLedger: adminProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const user = await db.user.findUnique({
         where: { id: input.id },
         select: {
@@ -153,6 +88,8 @@ export const usersRouter = router({
         });
       }
 
+      const financeControls = await getFinanceControls();
+
       const accessKeyIds = user.accessKeys.map((key) => key.id);
       const dynamicKeyIds = user.dynamicAccessKeys.map((key) => key.id);
 
@@ -194,41 +131,8 @@ export const usersRouter = router({
         orderBy: { createdAt: 'desc' },
       });
 
-      const orderAccessKeyIds = Array.from(
-        new Set(
-          telegramOrders
-            .flatMap((order) => [order.approvedAccessKeyId, order.targetAccessKeyId])
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-      const orderDynamicKeyIds = Array.from(
-        new Set(
-          telegramOrders
-            .flatMap((order) => [order.approvedDynamicKeyId, order.targetDynamicKeyId])
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-
-      const [relatedAccessKeys, relatedDynamicKeys, serverChangeRequests, premiumSupportRequests] =
+      const [serverChangeRequests, premiumSupportRequests] =
         await Promise.all([
-          orderAccessKeyIds.length > 0
-            ? db.accessKey.findMany({
-                where: { id: { in: orderAccessKeyIds } },
-                select: {
-                  id: true,
-                  usedBytes: true,
-                },
-              })
-            : Promise.resolve([]),
-          orderDynamicKeyIds.length > 0
-            ? db.dynamicAccessKey.findMany({
-                where: { id: { in: orderDynamicKeyIds } },
-                select: {
-                  id: true,
-                  usedBytes: true,
-                },
-              })
-            : Promise.resolve([]),
           accessKeyIds.length > 0
             ? db.telegramServerChangeRequest.findMany({
                 where: { accessKeyId: { in: accessKeyIds } },
@@ -256,50 +160,12 @@ export const usersRouter = router({
             : Promise.resolve([]),
         ]);
 
-      const accessKeyUsageById = new Map(relatedAccessKeys.map((key) => [key.id, key.usedBytes]));
-      const dynamicKeyUsageById = new Map(relatedDynamicKeys.map((key) => [key.id, key.usedBytes]));
-
-      const fulfilledCounts = await db.telegramOrder.groupBy({
-        by: ['telegramUserId'],
-        where: {
-          telegramUserId: {
-            in: Array.from(
-              new Set(
-                telegramOrders
-                  .map((order) => order.telegramUserId)
-                  .filter((value): value is string => value.trim().length > 0),
-              ),
-            ),
-          },
-          status: 'FULFILLED',
-          priceAmount: { gt: 0 },
-        },
-        _count: {
-          _all: true,
-        },
-      });
-
-      const fulfilledPurchaseCountByTelegramUserId = new Map(
-        fulfilledCounts.map((entry) => [entry.telegramUserId, entry._count._all]),
-      );
-
       const revenueByCurrency = new Map<string, number>();
       const refundedByCurrency = new Map<string, number>();
       let refundEligibleCount = 0;
 
-      const orders = telegramOrders.map((order) => {
-        const usedBytes = resolveOrderLinkedUsageBytes({
-          order,
-          accessKeyUsageById,
-          dynamicKeyUsageById,
-        });
-        const fulfilledPaidPurchaseCount =
-          fulfilledPurchaseCountByTelegramUserId.get(order.telegramUserId) || 0;
-        const refundEligibility = evaluateRefundEligibility({
-          order,
-          fulfilledPaidPurchaseCount,
-          usedBytes,
-        });
+      const orders = await Promise.all(telegramOrders.map(async (order) => {
+        const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
 
         if (refundEligibility.eligible) {
           refundEligibleCount += 1;
@@ -315,12 +181,12 @@ export const usersRouter = router({
 
         return {
           ...order,
-          usedBytes: usedBytes.toString(),
-          fulfilledPaidPurchaseCount,
+          usedBytes: refundEligibility.usedBytes.toString(),
+          fulfilledPaidPurchaseCount: refundEligibility.fulfilledPaidPurchaseCount,
           refundEligible: refundEligibility.eligible,
           refundBlockedReason: refundEligibility.reason,
         };
-      });
+      }));
 
       return {
         user,
@@ -345,8 +211,76 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
+        financePermissions: {
+          canManage: canUserManageFinance(ctx.user, financeControls),
+          canConfigure: canUserConfigureFinance(ctx.user, financeControls),
+        },
       };
     }),
+
+  getFinanceControls: adminProcedure.query(async ({ ctx }) => {
+    const controls = await getFinanceControls();
+    return {
+      ...controls,
+      permissions: {
+        canManage: canUserManageFinance(ctx.user, controls),
+        canConfigure: canUserConfigureFinance(ctx.user, controls),
+      },
+    };
+  }),
+
+  updateFinanceControls: adminProcedure
+    .input(financeControlsSchema)
+    .mutation(async ({ ctx, input }) => {
+      const current = await getFinanceControls();
+      if (!canUserConfigureFinance(ctx.user, current)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only finance owners can update finance controls.',
+        });
+      }
+
+      const normalized = normalizeFinanceControlsSettings(input);
+      await db.settings.upsert({
+        where: { key: FINANCE_SETTINGS_KEY },
+        create: {
+          key: FINANCE_SETTINGS_KEY,
+          value: JSON.stringify(normalized),
+        },
+        update: {
+          value: JSON.stringify(normalized),
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'FINANCE_CONTROLS_UPDATE',
+        entity: 'SETTINGS',
+        entityId: FINANCE_SETTINGS_KEY,
+        details: normalized,
+      });
+
+      return {
+        ...normalized,
+        permissions: {
+          canManage: canUserManageFinance(ctx.user, normalized),
+          canConfigure: canUserConfigureFinance(ctx.user, normalized),
+        },
+      };
+    }),
+
+  runFinanceDigestNow: adminProcedure.mutation(async ({ ctx }) => {
+    const controls = await getFinanceControls();
+    if (!canUserManageFinance(ctx.user, controls)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'You do not have permission to send the finance digest.',
+      });
+    }
+
+    return runTelegramFinanceDigestCycle({ now: new Date(), force: true });
+  }),
 
   reconcileTelegramOrder: adminProcedure
     .input(
@@ -358,6 +292,14 @@ export const usersRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const controls = await getFinanceControls();
+      if (!canUserManageFinance(ctx.user, controls)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage finance actions.',
+        });
+      }
+
       const order = await db.telegramOrder.findUnique({
         where: { id: input.orderId },
         select: {
@@ -368,10 +310,12 @@ export const usersRouter = router({
           priceAmount: true,
           priceCurrency: true,
           telegramUserId: true,
+          telegramChatId: true,
           approvedAccessKeyId: true,
           targetAccessKeyId: true,
           approvedDynamicKeyId: true,
           targetDynamicKeyId: true,
+          refundRequestStatus: true,
         },
       });
 
@@ -381,36 +325,8 @@ export const usersRouter = router({
           message: 'Telegram order not found',
         });
       }
-
-      const [accessKey, dynamicKey, fulfilledPurchaseCount] = await Promise.all([
-        order.approvedAccessKeyId || order.targetAccessKeyId
-          ? db.accessKey.findUnique({
-              where: { id: order.approvedAccessKeyId || order.targetAccessKeyId || '' },
-              select: { usedBytes: true },
-            })
-          : Promise.resolve(null),
-        order.approvedDynamicKeyId || order.targetDynamicKeyId
-          ? db.dynamicAccessKey.findUnique({
-              where: { id: order.approvedDynamicKeyId || order.targetDynamicKeyId || '' },
-              select: { usedBytes: true },
-            })
-          : Promise.resolve(null),
-        db.telegramOrder.count({
-          where: {
-            telegramUserId: order.telegramUserId,
-            status: 'FULFILLED',
-            priceAmount: { gt: 0 },
-          },
-        }),
-      ]);
-
-      const usedBytes = accessKey?.usedBytes || dynamicKey?.usedBytes || BigInt(0);
       if (input.action === 'REFUND') {
-        const refundEligibility = evaluateRefundEligibility({
-          order,
-          fulfilledPaidPurchaseCount: fulfilledPurchaseCount,
-          usedBytes,
-        });
+        const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
 
         if (!refundEligibility.eligible) {
           throw new TRPCError({
@@ -441,6 +357,22 @@ export const usersRouter = router({
             financeNote: note,
             financeUpdatedAt: new Date(),
             financeUpdatedByUserId: ctx.user.id,
+            refundRequestStatus:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? 'APPROVED'
+                : order.refundRequestStatus,
+            refundRequestReviewedAt:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? new Date()
+                : undefined,
+            refundRequestReviewedByUserId:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? ctx.user.id
+                : undefined,
+            refundRequestReviewerEmail:
+              input.action === 'REFUND' && order.refundRequestStatus === 'PENDING'
+                ? ctx.user.email || null
+                : undefined,
           },
         }),
         db.telegramOrderFinanceAction.create({
@@ -470,9 +402,147 @@ export const usersRouter = router({
         },
       });
 
+      if (input.action === 'REFUND' && order.refundRequestStatus === 'PENDING') {
+        await sendTelegramRefundDecisionMessage({
+          chatId: order.telegramChatId || order.telegramUserId,
+          orderCode: order.orderCode,
+          approved: true,
+        });
+      }
+
       return {
         success: true,
         financeStatus,
+      };
+    }),
+
+  reviewRefundRequest: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        action: z.enum(['APPROVE', 'REJECT']),
+        note: z.string().trim().max(500).optional().nullable(),
+        customerMessage: z.string().trim().max(500).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const controls = await getFinanceControls();
+      if (!canUserManageFinance(ctx.user, controls)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to review refund requests.',
+        });
+      }
+
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          status: true,
+          financeStatus: true,
+          priceAmount: true,
+          priceCurrency: true,
+          telegramUserId: true,
+          telegramChatId: true,
+          refundRequestStatus: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found',
+        });
+      }
+
+      if (order.refundRequestStatus !== 'PENDING') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'There is no pending refund request for this order.',
+        });
+      }
+
+      const note = input.note?.trim() || null;
+      const customerMessage = input.customerMessage?.trim() || null;
+
+      if (input.action === 'APPROVE') {
+        const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
+        if (!refundEligibility.eligible) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: refundEligibility.reason || 'This order is not eligible for refund.',
+          });
+        }
+
+        const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+        await db.$transaction([
+          db.telegramOrder.update({
+            where: { id: order.id },
+            data: {
+              financeStatus: 'REFUNDED',
+              financeNote: note,
+              financeUpdatedAt: new Date(),
+              financeUpdatedByUserId: ctx.user.id,
+              refundRequestStatus: 'APPROVED',
+              refundRequestMessage: note,
+              refundRequestCustomerMessage: customerMessage,
+              refundRequestReviewedAt: new Date(),
+              refundRequestReviewedByUserId: ctx.user.id,
+              refundRequestReviewerEmail: ctx.user.email || null,
+            },
+          }),
+          db.telegramOrderFinanceAction.create({
+            data: {
+              orderId: order.id,
+              actionType: 'REFUND',
+              amount: order.priceAmount ?? null,
+              currency,
+              note,
+              createdByUserId: ctx.user.id,
+            },
+          }),
+        ]);
+      } else {
+        await db.telegramOrder.update({
+          where: { id: order.id },
+          data: {
+            refundRequestStatus: 'REJECTED',
+            refundRequestMessage: note,
+            refundRequestCustomerMessage: customerMessage,
+            refundRequestReviewedAt: new Date(),
+            refundRequestReviewedByUserId: ctx.user.id,
+            refundRequestReviewerEmail: ctx.user.email || null,
+          },
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action:
+          input.action === 'APPROVE'
+            ? 'TELEGRAM_ORDER_REFUND_REQUEST_APPROVE'
+            : 'TELEGRAM_ORDER_REFUND_REQUEST_REJECT',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          note,
+          customerMessage,
+        },
+      });
+
+      await sendTelegramRefundDecisionMessage({
+        chatId: order.telegramChatId || order.telegramUserId,
+        orderCode: order.orderCode,
+        approved: input.action === 'APPROVE',
+        customerMessage,
+      });
+
+      return {
+        success: true,
+        status: input.action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
       };
     }),
 

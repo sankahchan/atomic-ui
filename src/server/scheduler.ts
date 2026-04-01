@@ -29,6 +29,7 @@ import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
+import { runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
 import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
@@ -263,6 +264,18 @@ export function initScheduler() {
         }
     });
 
+    // 16. Telegram finance digest delivery (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runTelegramFinanceDigestCycle();
+            if (!result.skipped) {
+                logger.info(`Telegram finance digest delivered to ${result.adminChats} admin chat(s)`);
+            }
+        } catch (error) {
+            logger.error('Telegram finance digest cycle failed', error);
+        }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
@@ -312,6 +325,15 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Initial Telegram sales order cycle failed', error);
+        }
+
+        try {
+            const result = await runTelegramFinanceDigestCycle();
+            if (!result.skipped) {
+                logger.info(`Initial Telegram finance digest delivered to ${result.adminChats} admin chat(s)`);
+            }
+        } catch (error) {
+            logger.error('Initial Telegram finance digest cycle failed', error);
         }
 
         // Ensure health check records exist for all servers
