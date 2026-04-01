@@ -33,6 +33,7 @@ import {
   rejectTelegramOrder,
   rejectTelegramServerChangeRequest,
   replyTelegramPremiumSupportRequest,
+  runTelegramSalesDigestCycle,
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
@@ -911,6 +912,92 @@ export const telegramBotRouter = router({
       return releasedOrder;
     }),
 
+  applyOrderMacro: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        macro: z.enum([
+          'APPROVE_QUICK',
+          'REJECT_DUPLICATE',
+          'REJECT_BLURRY',
+          'REJECT_WRONG_AMOUNT',
+          'REJECT_WRONG_METHOD',
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const order = await ensureTelegramOrderAssignmentAccess({
+        orderId: input.orderId,
+        userId: ctx.user.id,
+      });
+
+      if (order.status !== 'PENDING_REVIEW') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only pending-review orders can use review macros.',
+        });
+      }
+
+      if (input.macro === 'APPROVE_QUICK') {
+        const result = await approveTelegramOrder({
+          orderId: input.orderId,
+          reviewedByUserId: ctx.user.id,
+          reviewerName: ctx.user.email || undefined,
+          adminNote: 'Approved with quick-review macro.',
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          action: 'TELEGRAM_ORDER_MACRO_APPLIED',
+          entity: 'TELEGRAM_ORDER',
+          entityId: input.orderId,
+          details: {
+            orderCode: order.orderCode,
+            macro: input.macro,
+          },
+        });
+
+        return {
+          action: 'APPROVED' as const,
+          result,
+        };
+      }
+
+      const reasonCode =
+        input.macro === 'REJECT_DUPLICATE'
+          ? 'duplicate_payment'
+          : input.macro === 'REJECT_BLURRY'
+            ? 'proof_unclear'
+            : input.macro === 'REJECT_WRONG_AMOUNT'
+              ? 'amount_mismatch'
+              : 'wrong_payment_method';
+
+      const result = await rejectTelegramOrder({
+        orderId: input.orderId,
+        reviewedByUserId: ctx.user.id,
+        reviewerName: ctx.user.email || undefined,
+        adminNote: `Rejected with quick-review macro: ${reasonCode}.`,
+        reasonCode,
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'TELEGRAM_ORDER_MACRO_APPLIED',
+        entity: 'TELEGRAM_ORDER',
+        entityId: input.orderId,
+        details: {
+          orderCode: order.orderCode,
+          macro: input.macro,
+          reasonCode,
+        },
+      });
+
+      return {
+        action: 'REJECTED' as const,
+        result,
+      };
+    }),
+
   listServerChangeRequests: adminProcedure
     .input(
       z
@@ -1487,6 +1574,19 @@ export const telegramBotRouter = router({
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: `Telegram digest skipped: ${result.reason}`,
+      });
+    }
+
+    return result;
+  }),
+
+  runSalesDigestNow: adminProcedure.mutation(async () => {
+    const result = await runTelegramSalesDigestCycle({ force: true });
+
+    if (result.skipped) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Telegram sales digest skipped: ${result.reason}`,
       });
     }
 

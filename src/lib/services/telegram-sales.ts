@@ -58,6 +58,9 @@ export const telegramSalesSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   allowRenewals: z.boolean().default(true),
   supportLink: z.string().trim().max(500).optional().default(''),
+  dailySalesDigestEnabled: z.boolean().default(false),
+  dailySalesDigestHour: z.number().int().min(0).max(23).default(20),
+  dailySalesDigestMinute: z.number().int().min(0).max(59).default(0),
   paymentReminderHours: z.number().int().min(1).max(168).default(3),
   pendingReviewReminderHours: z.number().int().min(1).max(168).default(6),
   rejectedOrderReminderHours: z.number().int().min(1).max(336).default(12),
@@ -325,6 +328,9 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     enabled: false,
     allowRenewals: true,
     supportLink: '',
+    dailySalesDigestEnabled: false,
+    dailySalesDigestHour: 20,
+    dailySalesDigestMinute: 0,
     paymentReminderHours: 3,
     pendingReviewReminderHours: 6,
     rejectedOrderReminderHours: 12,
@@ -378,6 +384,15 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     enabled: next.enabled,
     allowRenewals: next.allowRenewals,
     supportLink: next.supportLink?.trim() || '',
+    dailySalesDigestEnabled: Boolean(next.dailySalesDigestEnabled),
+    dailySalesDigestHour:
+      typeof next.dailySalesDigestHour === 'number' && Number.isFinite(next.dailySalesDigestHour)
+        ? Math.min(23, Math.max(0, next.dailySalesDigestHour))
+        : defaults.dailySalesDigestHour,
+    dailySalesDigestMinute:
+      typeof next.dailySalesDigestMinute === 'number' && Number.isFinite(next.dailySalesDigestMinute)
+        ? Math.min(59, Math.max(0, next.dailySalesDigestMinute))
+        : defaults.dailySalesDigestMinute,
     paymentReminderHours,
     pendingReviewReminderHours,
     rejectedOrderReminderHours,

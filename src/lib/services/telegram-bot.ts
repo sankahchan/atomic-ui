@@ -57,6 +57,7 @@ import {
   generateTelegramOrderCode,
   getTelegramSalesSettings,
   getTelegramRejectionReasonPreset,
+  resolveTelegramRejectionReasonLabel,
   listEnabledTelegramSalesPaymentMethods,
   resolveTelegramRejectionReasonMessage,
   resolveTelegramSalesPaymentMethod,
@@ -86,6 +87,7 @@ import { replaceAccessKeyServer } from '@/lib/services/server-migration';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TELEGRAM_SALES_DIGEST_STATE_KEY = 'telegram_sales_digest_last_run';
 
 type TelegramParseMode = 'HTML' | 'Markdown';
 
@@ -143,6 +145,15 @@ export interface TelegramUpdate {
 type TelegramMessage = NonNullable<TelegramUpdate['message']>;
 type TelegramCallbackQuery = NonNullable<TelegramUpdate['callback_query']>;
 
+type TelegramOrderDigestRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type TelegramOrderDigestRiskReason =
+  | 'duplicate_proof'
+  | 'repeated_rejections'
+  | 'payment_history_mismatch'
+  | 'retry_pattern'
+  | 'multiple_open_orders'
+  | 'resubmitted_proof';
+
 export interface TelegramConfig {
   botToken: string;
   botUsername?: string;
@@ -172,6 +183,97 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function isSameLocalDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function computeTelegramOrderDigestRisk(input: {
+  order: {
+    id: string;
+    duplicateProofOrderCode?: string | null;
+    paymentProofRevision?: number | null;
+    retryOfOrderId?: string | null;
+  };
+  identityOrders: Array<{
+    id: string;
+    status: string;
+    createdAt: Date;
+    rejectionReasonCode?: string | null;
+    retryOfOrderId?: string | null;
+  }>;
+}) {
+  let score = 0;
+  const reasons: TelegramOrderDigestRiskReason[] = [];
+  const now = Date.now();
+  const previousOrders = input.identityOrders.filter((candidate) => candidate.id !== input.order.id);
+  const previousRejectedOrders = previousOrders.filter((candidate) => candidate.status === 'REJECTED');
+  const recentRejectedOrders = previousRejectedOrders.filter(
+    (candidate) => now - candidate.createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000,
+  );
+  const mismatchHistoryCount = previousRejectedOrders.filter(
+    (candidate) =>
+      candidate.rejectionReasonCode === 'wrong_payment_method' ||
+      candidate.rejectionReasonCode === 'amount_mismatch',
+  ).length;
+  const retryCount = input.identityOrders.filter((candidate) => Boolean(candidate.retryOfOrderId)).length;
+  const openOrders = input.identityOrders.filter((candidate) =>
+    TELEGRAM_ORDER_ACTIVE_STATUSES.includes(candidate.status as TelegramOrderActiveStatus),
+  ).length;
+
+  if (input.order.duplicateProofOrderCode) {
+    score += 45;
+    reasons.push('duplicate_proof');
+  }
+
+  if ((input.order.paymentProofRevision ?? 0) > 1) {
+    score += 10;
+    reasons.push('resubmitted_proof');
+  }
+
+  if (recentRejectedOrders.length >= 2 || previousRejectedOrders.length >= 3) {
+    score += 20;
+    reasons.push('repeated_rejections');
+  } else if (previousRejectedOrders.length >= 1) {
+    score += 10;
+    reasons.push('repeated_rejections');
+  }
+
+  if (mismatchHistoryCount >= 1) {
+    score += 10;
+    reasons.push('payment_history_mismatch');
+  }
+
+  if (input.order.retryOfOrderId || retryCount >= 2) {
+    score += input.order.retryOfOrderId ? 15 : 10;
+    reasons.push('retry_pattern');
+  }
+
+  if (openOrders > 1) {
+    score += 10;
+    reasons.push('multiple_open_orders');
+  }
+
+  const riskScore = Math.min(100, score);
+  const riskLevel: TelegramOrderDigestRiskLevel =
+    riskScore >= 70
+      ? 'CRITICAL'
+      : riskScore >= 45
+        ? 'HIGH'
+        : riskScore >= 20
+          ? 'MEDIUM'
+          : 'LOW';
+
+  return {
+    riskScore,
+    riskLevel,
+    riskReasons: Array.from(new Set(reasons)),
+  };
 }
 
 function getCommandKeyboard(isAdmin: boolean) {
@@ -5501,6 +5603,8 @@ export async function runTelegramSalesOrderCycle() {
       premiumRenewalReminded: 0,
       premiumExpired: 0,
       expired: 0,
+      salesDigestSent: false,
+      salesDigestAdminChats: 0,
       errors: [] as string[],
     };
   }
@@ -5601,6 +5705,8 @@ export async function runTelegramSalesOrderCycle() {
   let premiumRenewalReminded = 0;
   let premiumExpired = 0;
   let expired = 0;
+  let salesDigestSent = false;
+  let salesDigestAdminChats = 0;
   const errors: string[] = [];
 
   for (const order of orders) {
@@ -6055,6 +6161,16 @@ export async function runTelegramSalesOrderCycle() {
     }
   }
 
+  try {
+    const digestResult = await runTelegramSalesDigestCycle({ now });
+    if (!digestResult.skipped) {
+      salesDigestSent = true;
+      salesDigestAdminChats = digestResult.adminChats;
+    }
+  } catch (error) {
+    errors.push(`sales-digest:${(error as Error).message}`);
+  }
+
   return {
     skipped: false,
     reminded,
@@ -6065,6 +6181,8 @@ export async function runTelegramSalesOrderCycle() {
     premiumRenewalReminded,
     premiumExpired,
     expired,
+    salesDigestSent,
+    salesDigestAdminChats,
     errors,
   };
 }
@@ -12834,5 +12952,297 @@ export async function sendTelegramDigestToAdmins(input?: {
     sent: true as const,
     adminChats: config.adminChatIds.length,
     lookbackHours,
+  };
+}
+
+export async function sendTelegramSalesDigestToAdmins(input?: {
+  now?: Date;
+}) {
+  const now = input?.now || new Date();
+  const [config, salesSettings] = await Promise.all([
+    getTelegramConfig(),
+    getTelegramSalesSettings(),
+  ]);
+
+  if (!config) {
+    return { sent: false as const, reason: 'not-configured' as const };
+  }
+
+  if (config.adminChatIds.length === 0) {
+    return { sent: false as const, reason: 'no-admin-chats' as const };
+  }
+
+  if (!salesSettings.enabled) {
+    return { sent: false as const, reason: 'sales-disabled' as const };
+  }
+
+  const locale = config.defaultLanguage || (await getTelegramDefaultLocale());
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const ui =
+    locale === 'my'
+      ? {
+          title: '💸 <b>Telegram Sales Digest</b>',
+          window: 'အချိန်ကာလ: နောက်ဆုံး 24 နာရီ',
+          created: 'Order အသစ်များ',
+          pending: 'Pending review',
+          fulfilled: 'Fulfilled',
+          rejected: 'Rejected',
+          awaitingPayment: 'Awaiting payment',
+          highRisk: 'High-risk pending',
+          unclaimed: 'Unclaimed pending',
+          myQueue: 'Claim လုပ်ထားသော orders',
+          revenue: 'ဝင်ငွေ',
+          topReasons: 'အများဆုံး reject reason များ',
+          topMethods: 'အသုံးအများဆုံး payment method များ',
+          none: 'မရှိ',
+        }
+      : {
+          title: '💸 <b>Telegram Sales Digest</b>',
+          window: 'Window: last 24 hours',
+          created: 'New orders',
+          pending: 'Pending review',
+          fulfilled: 'Fulfilled',
+          rejected: 'Rejected',
+          awaitingPayment: 'Awaiting payment',
+          highRisk: 'High-risk pending',
+          unclaimed: 'Unclaimed pending',
+          myQueue: 'Claimed pending',
+          revenue: 'Revenue',
+          topReasons: 'Top rejection reasons',
+          topMethods: 'Top payment methods',
+          none: 'None',
+        };
+
+  const orders = await db.telegramOrder.findMany({
+    where: {
+      createdAt: {
+        gte: since,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      priceAmount: true,
+      priceCurrency: true,
+      paymentMethodLabel: true,
+      paymentMethodCode: true,
+      rejectionReasonCode: true,
+      assignedReviewerEmail: true,
+      assignedReviewerUserId: true,
+      paymentSubmittedAt: true,
+      duplicateProofOrderCode: true,
+      paymentProofRevision: true,
+      retryOfOrderId: true,
+      telegramUserId: true,
+      telegramChatId: true,
+      requestedEmail: true,
+      createdAt: true,
+    },
+    orderBy: [{ createdAt: 'desc' }],
+  });
+
+  const summary = {
+    created: orders.length,
+    pending: 0,
+    fulfilled: 0,
+    rejected: 0,
+    awaitingPayment: 0,
+    highRiskPending: 0,
+    unclaimedPending: 0,
+    claimedPending: 0,
+  };
+  const revenueByCurrency = new Map<string, number>();
+  const rejectionReasons = new Map<string, number>();
+  const paymentMethods = new Map<string, number>();
+
+  const normalizeEmail = (value?: string | null) => value?.trim().toLowerCase() || null;
+
+  for (const order of orders) {
+    const identityOrders = orders.filter((candidate) => {
+      if (candidate.id === order.id) {
+        return false;
+      }
+      if (candidate.telegramUserId && candidate.telegramUserId === order.telegramUserId) {
+        return true;
+      }
+      if (candidate.telegramChatId && candidate.telegramChatId === order.telegramChatId) {
+        return true;
+      }
+      const orderEmail = normalizeEmail(order.requestedEmail);
+      const candidateEmail = normalizeEmail(candidate.requestedEmail);
+      return Boolean(orderEmail && candidateEmail && orderEmail === candidateEmail);
+    });
+    const risk = computeTelegramOrderDigestRisk({
+      order,
+      identityOrders,
+    });
+
+    switch (order.status) {
+      case 'PENDING_REVIEW':
+        summary.pending += 1;
+        if (risk.riskLevel === 'HIGH' || risk.riskLevel === 'CRITICAL') {
+          summary.highRiskPending += 1;
+        }
+        if (order.assignedReviewerUserId) {
+          summary.claimedPending += 1;
+        } else {
+          summary.unclaimedPending += 1;
+        }
+        break;
+      case 'FULFILLED':
+        summary.fulfilled += 1;
+        if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+          const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+          revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        }
+        break;
+      case 'REJECTED':
+        summary.rejected += 1;
+        rejectionReasons.set(
+          order.rejectionReasonCode?.trim() || 'custom',
+          (rejectionReasons.get(order.rejectionReasonCode?.trim() || 'custom') || 0) + 1,
+        );
+        break;
+      case 'AWAITING_PAYMENT_METHOD':
+      case 'AWAITING_PAYMENT_PROOF':
+        summary.awaitingPayment += 1;
+        break;
+      default:
+        break;
+    }
+
+    if (order.paymentMethodLabel || order.paymentMethodCode) {
+      const key = order.paymentMethodLabel || order.paymentMethodCode || 'Unknown';
+      paymentMethods.set(key, (paymentMethods.get(key) || 0) + 1);
+    }
+  }
+
+  const revenueLabel = Array.from(revenueByCurrency.entries())
+    .sort((left, right) => right[1] - left[1])
+    .map(([currency, amount]) => {
+      const formatted = new Intl.NumberFormat(locale === 'my' ? 'my-MM' : 'en-US').format(amount);
+      return `${formatted} ${currency}`;
+    })
+    .join(' • ') || ui.none;
+  const topReasons = Array.from(rejectionReasons.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([code, count]) => `${resolveTelegramRejectionReasonLabel(code, locale)} (${count})`)
+    .join(' • ') || ui.none;
+  const topMethods = Array.from(paymentMethods.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([label, count]) => `${label} (${count})`)
+    .join(' • ') || ui.none;
+
+  const message = [
+    ui.title,
+    '',
+    ui.window,
+    `${ui.created}: ${summary.created}`,
+    `${ui.pending}: ${summary.pending}`,
+    `${ui.fulfilled}: ${summary.fulfilled}`,
+    `${ui.rejected}: ${summary.rejected}`,
+    `${ui.awaitingPayment}: ${summary.awaitingPayment}`,
+    `${ui.highRisk}: ${summary.highRiskPending}`,
+    `${ui.unclaimed}: ${summary.unclaimedPending}`,
+    `${ui.myQueue}: ${summary.claimedPending}`,
+    `${ui.revenue}: ${revenueLabel}`,
+    `${ui.topReasons}: ${topReasons}`,
+    `${ui.topMethods}: ${topMethods}`,
+  ].join('\n');
+
+  for (const adminChatId of config.adminChatIds) {
+    await sendTelegramMessage(config.botToken, adminChatId, message);
+  }
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SALES_DIGEST_SENT',
+    entity: 'TELEGRAM',
+    details: {
+      adminChats: config.adminChatIds.length,
+      created: summary.created,
+      pending: summary.pending,
+      fulfilled: summary.fulfilled,
+      rejected: summary.rejected,
+      highRiskPending: summary.highRiskPending,
+      unclaimedPending: summary.unclaimedPending,
+      claimedPending: summary.claimedPending,
+    },
+  });
+
+  return {
+    sent: true as const,
+    adminChats: config.adminChatIds.length,
+    summary,
+  };
+}
+
+export async function runTelegramSalesDigestCycle(input?: {
+  force?: boolean;
+  now?: Date;
+}) {
+  const force = input?.force ?? false;
+  const now = input?.now ?? new Date();
+  const settings = await getTelegramSalesSettings();
+
+  if (!settings.enabled) {
+    return { skipped: true as const, reason: 'sales-disabled' };
+  }
+
+  if (!force && !settings.dailySalesDigestEnabled) {
+    return { skipped: true as const, reason: 'disabled' };
+  }
+
+  const config = await getTelegramConfig();
+  if (!config) {
+    return { skipped: true as const, reason: 'not-configured' };
+  }
+
+  if (config.adminChatIds.length === 0) {
+    return { skipped: true as const, reason: 'no-admin-chats' };
+  }
+
+  const lastRun = await db.settings.findUnique({
+    where: { key: TELEGRAM_SALES_DIGEST_STATE_KEY },
+    select: { value: true },
+  });
+
+  if (!force) {
+    const scheduled = new Date(now);
+    scheduled.setHours(settings.dailySalesDigestHour ?? 20, settings.dailySalesDigestMinute ?? 0, 0, 0);
+
+    if (now.getTime() < scheduled.getTime()) {
+      return { skipped: true as const, reason: 'scheduled-time-not-reached' };
+    }
+
+    if (lastRun?.value) {
+      const lastRunAt = new Date(lastRun.value);
+      if (!Number.isNaN(lastRunAt.getTime()) && isSameLocalDay(lastRunAt, now)) {
+        return { skipped: true as const, reason: 'already-ran-today' };
+      }
+    }
+  }
+
+  const result = await sendTelegramSalesDigestToAdmins({ now });
+  if (!result.sent) {
+    return { skipped: true as const, reason: result.reason };
+  }
+
+  await db.settings.upsert({
+    where: { key: TELEGRAM_SALES_DIGEST_STATE_KEY },
+    create: {
+      key: TELEGRAM_SALES_DIGEST_STATE_KEY,
+      value: now.toISOString(),
+    },
+    update: {
+      value: now.toISOString(),
+    },
+  });
+
+  return {
+    skipped: false as const,
+    adminChats: result.adminChats,
+    summary: result.summary,
   };
 }

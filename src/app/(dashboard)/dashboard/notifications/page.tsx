@@ -244,6 +244,9 @@ type TelegramSalesSettingsForm = {
   enabled: boolean;
   allowRenewals: boolean;
   supportLink: string;
+  dailySalesDigestEnabled: boolean;
+  dailySalesDigestHour: number;
+  dailySalesDigestMinute: number;
   paymentReminderHours: string;
   pendingReviewReminderHours: string;
   rejectedOrderReminderHours: string;
@@ -668,6 +671,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   enabled: false,
   allowRenewals: true,
   supportLink: '',
+  dailySalesDigestEnabled: false,
+  dailySalesDigestHour: 20,
+  dailySalesDigestMinute: 0,
   paymentReminderHours: '3',
   pendingReviewReminderHours: '6',
   rejectedOrderReminderHours: '12',
@@ -2171,6 +2177,9 @@ function TelegramSalesWorkflowCard() {
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [kindFilter, setKindFilter] = useState<'ALL' | 'NEW' | 'RENEW'>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<
+    'ALL' | 'UNCLAIMED' | 'HIGH_RISK' | 'PREMIUM' | 'MY_QUEUE' | 'OLDEST'
+  >('ALL');
   const deferredOrderSearch = useDeferredValue(orderSearch.trim());
   const ordersQuery = trpc.telegramBot.listOrders.useQuery(
     {
@@ -2368,6 +2377,36 @@ function TelegramSalesWorkflowCard() {
     unassigned: isMyanmar ? 'Unassigned' : 'Unassigned',
     claimSuccess: isMyanmar ? 'Order ကို claim လုပ်ပြီးပါပြီ' : 'Order claimed',
     releaseSuccess: isMyanmar ? 'Order claim ကို လွှတ်ပြီးပါပြီ' : 'Order released',
+    salesDigest: isMyanmar ? 'Daily sales digest' : 'Daily sales digest',
+    salesDigestDesc: isMyanmar
+      ? 'Telegram admin chat များသို့ sales summary ကို နေ့စဉ် ပို့မည်။'
+      : 'Send a daily Telegram sales summary to the configured admin chats.',
+    salesDigestHour: isMyanmar ? 'Sales digest hour' : 'Sales digest hour',
+    salesDigestMinute: isMyanmar ? 'Sales digest minute' : 'Sales digest minute',
+    sendSalesDigestNow: isMyanmar ? 'Sales digest ကို ယခု ပို့မည်' : 'Send sales digest now',
+    salesDigestSent: isMyanmar ? 'Sales digest ပို့ပြီးပါပြီ' : 'Sales digest sent',
+    salesDigestFailed: isMyanmar ? 'Sales digest မပို့နိုင်ပါ' : 'Sales digest failed',
+    salesDigestSentDesc: (count: number) =>
+      isMyanmar ? `Admin chat ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
+    priorityQueue: isMyanmar ? 'Priority queue' : 'Priority queue',
+    reviewerWorkload: isMyanmar ? 'Reviewer workload' : 'Reviewer workload',
+    queueAll: isMyanmar ? 'All' : 'All',
+    queueUnclaimed: isMyanmar ? 'Unclaimed' : 'Unclaimed',
+    queueHighRisk: isMyanmar ? 'High risk' : 'High risk',
+    queuePremium: isMyanmar ? 'Premium' : 'Premium',
+    queueMine: isMyanmar ? 'My queue' : 'My queue',
+    queueOldest: isMyanmar ? 'Oldest first' : 'Oldest first',
+    highRiskPending: isMyanmar ? 'High-risk pending' : 'High-risk pending',
+    myClaimed: isMyanmar ? 'My claimed' : 'My claimed',
+    claimedByOthers: isMyanmar ? 'Claimed by others' : 'Claimed by others',
+    quickApprove: isMyanmar ? 'Quick approve' : 'Quick approve',
+    macroRejectDuplicate: isMyanmar ? 'Reject duplicate' : 'Reject duplicate',
+    macroRejectBlurry: isMyanmar ? 'Reject blurry' : 'Reject blurry',
+    macroRejectAmount: isMyanmar ? 'Wrong amount' : 'Wrong amount',
+    macroRejectMethod: isMyanmar ? 'Wrong method' : 'Wrong method',
+    macroApplied: isMyanmar ? 'Review macro applied' : 'Review macro applied',
+    macroApplyFailed: isMyanmar ? 'Review macro failed' : 'Review macro failed',
+    noAssignedReviewers: isMyanmar ? 'No claimed pending orders yet.' : 'No claimed pending orders yet.',
     riskLabel: isMyanmar ? 'Risk score' : 'Risk score',
     riskLow: isMyanmar ? 'Low' : 'Low',
     riskMedium: isMyanmar ? 'Medium' : 'Medium',
@@ -2683,6 +2722,13 @@ function TelegramSalesWorkflowCard() {
       enabled: settingsQuery.data.enabled ?? false,
       allowRenewals: settingsQuery.data.allowRenewals ?? true,
       supportLink: settingsQuery.data.supportLink || DEFAULT_TELEGRAM_SALES_SETTINGS.supportLink,
+      dailySalesDigestEnabled:
+        settingsQuery.data.dailySalesDigestEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestEnabled,
+      dailySalesDigestHour:
+        settingsQuery.data.dailySalesDigestHour ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestHour,
+      dailySalesDigestMinute:
+        settingsQuery.data.dailySalesDigestMinute ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestMinute,
       paymentReminderHours: String(
         settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
       ),
@@ -2835,6 +2881,38 @@ function TelegramSalesWorkflowCard() {
     onError: (error) => {
       toast({
         title: isMyanmar ? 'Order assignment failed' : 'Order assignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const applyOrderMacroMutation = trpc.telegramBot.applyOrderMacro.useMutation({
+    onSuccess: async (result) => {
+      await utils.telegramBot.listOrders.invalidate();
+      toast({
+        title: salesUi.macroApplied,
+        description:
+          result.action === 'APPROVED' ? salesUi.approveSuccess : salesUi.rejectSuccess,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: salesUi.macroApplyFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const runSalesDigestMutation = trpc.telegramBot.runSalesDigestNow.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: salesUi.salesDigestSent,
+        description: salesUi.salesDigestSentDesc(result.adminChats ?? 0),
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: salesUi.salesDigestFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -3038,6 +3116,9 @@ function TelegramSalesWorkflowCard() {
       enabled: form.enabled,
       allowRenewals: form.allowRenewals,
       supportLink: form.supportLink.trim(),
+      dailySalesDigestEnabled: form.dailySalesDigestEnabled,
+      dailySalesDigestHour: form.dailySalesDigestHour,
+      dailySalesDigestMinute: form.dailySalesDigestMinute,
       paymentReminderHours: (() => {
         const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
@@ -3116,32 +3197,73 @@ function TelegramSalesWorkflowCard() {
     });
   };
 
-  const pendingOrders = ((ordersQuery.data || []).filter(
-    (order) => order.status === 'PENDING_REVIEW',
-  ) as TelegramOrderRow[]);
-  const matchedOrders = useMemo(
-    () =>
-      [...(((ordersQuery.data || []) as TelegramOrderRow[]))].sort((left, right) => {
-        const pendingDelta =
-          Number(right.status === 'PENDING_REVIEW') - Number(left.status === 'PENDING_REVIEW');
-        if (pendingDelta !== 0) {
-          return pendingDelta;
-        }
-
-        const riskDelta = (right.riskScore || 0) - (left.riskScore || 0);
-        if (riskDelta !== 0) {
-          return riskDelta;
-        }
-
-        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-      }),
+  const currentReviewerId = currentUserQuery.data?.id ?? null;
+  const allOrders = useMemo(
+    () => ((ordersQuery.data || []) as TelegramOrderRow[]),
     [ordersQuery.data],
   );
+  const pendingOrders = allOrders.filter((order) => order.status === 'PENDING_REVIEW');
+  const matchedOrders = useMemo(() => {
+    const filtered = [...allOrders].filter((order) => {
+      switch (priorityFilter) {
+        case 'UNCLAIMED':
+          return order.status === 'PENDING_REVIEW' && !order.assignedReviewerUserId;
+        case 'HIGH_RISK':
+          return (
+            order.status === 'PENDING_REVIEW' &&
+            (order.riskLevel === 'HIGH' || order.riskLevel === 'CRITICAL')
+          );
+        case 'PREMIUM':
+          return order.status === 'PENDING_REVIEW' && order.deliveryType === 'DYNAMIC_KEY';
+        case 'MY_QUEUE':
+          return (
+            order.status === 'PENDING_REVIEW' &&
+            Boolean(currentReviewerId && order.assignedReviewerUserId === currentReviewerId)
+          );
+        case 'OLDEST':
+        case 'ALL':
+        default:
+          return true;
+      }
+    });
+
+    return filtered.sort((left, right) => {
+      if (priorityFilter === 'OLDEST') {
+        const leftTime = new Date(left.paymentSubmittedAt || left.createdAt).getTime();
+        const rightTime = new Date(right.paymentSubmittedAt || right.createdAt).getTime();
+        return leftTime - rightTime;
+      }
+
+      const pendingDelta =
+        Number(right.status === 'PENDING_REVIEW') - Number(left.status === 'PENDING_REVIEW');
+      if (pendingDelta !== 0) {
+        return pendingDelta;
+      }
+
+      const mineDelta =
+        Number(Boolean(currentReviewerId && right.assignedReviewerUserId === currentReviewerId)) -
+        Number(Boolean(currentReviewerId && left.assignedReviewerUserId === currentReviewerId));
+      if (mineDelta !== 0) {
+        return mineDelta;
+      }
+
+      const unclaimedDelta =
+        Number(!right.assignedReviewerUserId) - Number(!left.assignedReviewerUserId);
+      if (unclaimedDelta !== 0) {
+        return unclaimedDelta;
+      }
+
+      const riskDelta = (right.riskScore || 0) - (left.riskScore || 0);
+      if (riskDelta !== 0) {
+        return riskDelta;
+      }
+
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+    });
+  }, [allOrders, currentReviewerId, priorityFilter]);
   const selectedOrder = reviewTarget
     ? matchedOrders.find((order) => order.id === reviewTarget.orderId) || null
     : null;
-  const currentReviewerId = currentUserQuery.data?.id ?? null;
-  const currentReviewerEmail = currentUserQuery.data?.email ?? null;
   const selectedOrderId = selectedOrder?.id ?? null;
   const selectedOrderRejectionReasonCode = selectedOrder?.rejectionReasonCode ?? null;
   const selectedOrderPlanCode = (selectedOrder?.planCode as TelegramSalesPlanCode | null) ?? null;
@@ -3173,6 +3295,49 @@ function TelegramSalesWorkflowCard() {
     },
     { pending: 0, fulfilled: 0, rejected: 0, newOrders: 0, renewals: 0 },
   );
+  const queueMetrics = useMemo(
+    () => ({
+      pending: pendingOrders.length,
+      unclaimed: pendingOrders.filter((order) => !order.assignedReviewerUserId).length,
+      myClaimed: pendingOrders.filter(
+        (order) => Boolean(currentReviewerId && order.assignedReviewerUserId === currentReviewerId),
+      ).length,
+      claimedByOthers: pendingOrders.filter(
+        (order) => Boolean(order.assignedReviewerUserId && order.assignedReviewerUserId !== currentReviewerId),
+      ).length,
+      highRisk: pendingOrders.filter(
+        (order) => order.riskLevel === 'HIGH' || order.riskLevel === 'CRITICAL',
+      ).length,
+      premium: pendingOrders.filter((order) => order.deliveryType === 'DYNAMIC_KEY').length,
+    }),
+    [pendingOrders, currentReviewerId],
+  );
+  const reviewerWorkload = useMemo(() => {
+    const workload = new Map<string, { label: string; count: number; mine: boolean }>();
+    for (const order of pendingOrders) {
+      if (!order.assignedReviewerEmail) {
+        continue;
+      }
+      const key = order.assignedReviewerUserId || order.assignedReviewerEmail;
+      const current = workload.get(key) || {
+        label: order.assignedReviewerEmail,
+        count: 0,
+        mine: Boolean(currentReviewerId && order.assignedReviewerUserId === currentReviewerId),
+      };
+      current.count += 1;
+      current.mine = Boolean(currentReviewerId && order.assignedReviewerUserId === currentReviewerId);
+      workload.set(key, current);
+    }
+    return Array.from(workload.values()).sort((left, right) => {
+      if (Number(right.mine) !== Number(left.mine)) {
+        return Number(right.mine) - Number(left.mine);
+      }
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+      return left.label.localeCompare(right.label);
+    });
+  }, [pendingOrders, currentReviewerId]);
   const describeQuota = (order: TelegramOrderRow) => {
     if (order.unlimitedQuota) {
       return isMyanmar ? 'Unlimited quota' : 'Unlimited quota';
@@ -3236,6 +3401,18 @@ function TelegramSalesWorkflowCard() {
 
   const handleClaimOrder = (orderId: string, claimed: boolean) => {
     claimOrderMutation.mutate({ orderId, claimed });
+  };
+
+  const handleApplyOrderMacro = (
+    orderId: string,
+    macro:
+      | 'APPROVE_QUICK'
+      | 'REJECT_DUPLICATE'
+      | 'REJECT_BLURRY'
+      | 'REJECT_WRONG_AMOUNT'
+      | 'REJECT_WRONG_METHOD',
+  ) => {
+    applyOrderMacroMutation.mutate({ orderId, macro });
   };
 
   useEffect(() => {
@@ -3312,6 +3489,68 @@ function TelegramSalesWorkflowCard() {
               placeholder="https://t.me/your_support"
             />
             <p className="text-xs text-muted-foreground">{salesUi.supportLinkDesc}</p>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.salesDigest}</p>
+                <p className="text-xs text-muted-foreground">{salesUi.salesDigestDesc}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.dailySalesDigestEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, dailySalesDigestEnabled: checked }))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => runSalesDigestMutation.mutate()}
+                  disabled={runSalesDigestMutation.isPending}
+                >
+                  {runSalesDigestMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  {salesUi.sendSalesDigestNow}
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{salesUi.salesDigestHour}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={String(form.dailySalesDigestHour)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      dailySalesDigestHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)),
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{salesUi.salesDigestMinute}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={String(form.dailySalesDigestMinute)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      dailySalesDigestMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)),
+                    }))
+                  }
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
@@ -3875,6 +4114,87 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.priorityQueue}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.pending}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.queueUnclaimed}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.unclaimed}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.myClaimed}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.myClaimed}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.claimedByOthers}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.claimedByOthers}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.highRiskPending}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.highRisk}</p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{salesUi.queuePremium}</p>
+              <p className="mt-2 text-2xl font-semibold">{queueMetrics.premium}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{salesUi.priorityQueue}</Badge>
+                {([
+                  ['ALL', salesUi.queueAll],
+                  ['UNCLAIMED', salesUi.queueUnclaimed],
+                  ['HIGH_RISK', salesUi.queueHighRisk],
+                  ['PREMIUM', salesUi.queuePremium],
+                  ['MY_QUEUE', salesUi.queueMine],
+                  ['OLDEST', salesUi.queueOldest],
+                ] as const).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={priorityFilter === value ? 'default' : 'outline'}
+                    onClick={() => setPriorityFilter(value)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isMyanmar
+                  ? 'Pending review orders များကို unclaimed, high risk, premium နှင့် oldest-first အလိုက် ချက်ချင်း စစ်ဆေးနိုင်ပါသည်။'
+                  : 'Review pending orders instantly by unclaimed, high risk, premium, or oldest-first priority.'}
+              </p>
+            </div>
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">{salesUi.reviewerWorkload}</p>
+                <Badge variant="outline">{reviewerWorkload.length}</Badge>
+              </div>
+              <div className="space-y-2">
+                {reviewerWorkload.length > 0 ? (
+                  reviewerWorkload.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.mine ? salesUi.claimedByMe : salesUi.claimedBy}
+                        </p>
+                      </div>
+                      <Badge variant={item.mine ? 'default' : 'secondary'}>{item.count}</Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">{salesUi.noAssignedReviewers}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Badge variant={pendingOrders.length > 0 ? 'default' : 'secondary'}>
               {salesUi.pendingTitle}: {pendingOrders.length}
@@ -3948,59 +4268,106 @@ function TelegramSalesWorkflowCard() {
                       </p>
                     </div>
                     {order.status === 'PENDING_REVIEW' ? (
-                      <div className="flex flex-wrap gap-2">
-                        {!order.assignedReviewerUserId ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {!order.assignedReviewerUserId ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleClaimOrder(order.id, true)}
+                              disabled={claimOrderMutation.isPending}
+                            >
+                              <KeyRound className="mr-2 h-4 w-4" />
+                              {salesUi.claimOrder}
+                            </Button>
+                          ) : isOrderClaimedByCurrentUser(order) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleClaimOrder(order.id, false)}
+                              disabled={claimOrderMutation.isPending}
+                            >
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              {salesUi.releaseOrder}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
-                            variant="secondary"
-                            onClick={() => handleClaimOrder(order.id, true)}
-                            disabled={claimOrderMutation.isPending}
+                            onClick={() => {
+                              setReviewTarget({ orderId: order.id, mode: 'approve' });
+                              setReviewNote(order.adminNote || '');
+                              setReviewCustomerMessage(order.customerMessage || '');
+                              setReviewReasonCode(
+                                order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
+                              );
+                            }}
+                            disabled={isOrderClaimedByOtherUser(order)}
                           >
-                            <KeyRound className="mr-2 h-4 w-4" />
-                            {salesUi.claimOrder}
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            {salesUi.approve}
                           </Button>
-                        ) : isOrderClaimedByCurrentUser(order) ? (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleClaimOrder(order.id, false)}
-                            disabled={claimOrderMutation.isPending}
+                            onClick={() => {
+                              setReviewTarget({ orderId: order.id, mode: 'reject' });
+                              setReviewNote(order.adminNote || '');
+                              setReviewCustomerMessage(order.customerMessage || '');
+                              setReviewReasonCode(
+                                order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
+                              );
+                            }}
+                            disabled={isOrderClaimedByOtherUser(order)}
                           >
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            {salesUi.releaseOrder}
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            {salesUi.reject}
                           </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setReviewTarget({ orderId: order.id, mode: 'approve' });
-                            setReviewNote(order.adminNote || '');
-                            setReviewCustomerMessage(order.customerMessage || '');
-                            setReviewReasonCode(
-                              order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
-                            );
-                          }}
-                          disabled={isOrderClaimedByOtherUser(order)}
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          {salesUi.approve}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setReviewTarget({ orderId: order.id, mode: 'reject' });
-                            setReviewNote(order.adminNote || '');
-                            setReviewCustomerMessage(order.customerMessage || '');
-                            setReviewReasonCode(
-                              order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
-                            );
-                          }}
-                          disabled={isOrderClaimedByOtherUser(order)}
-                        >
-                          <AlertTriangle className="mr-2 h-4 w-4" />
-                          {salesUi.reject}
-                        </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleApplyOrderMacro(order.id, 'APPROVE_QUICK')}
+                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            {salesUi.quickApprove}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleApplyOrderMacro(
+                                order.id,
+                                order.duplicateProofOrderCode ? 'REJECT_DUPLICATE' : 'REJECT_BLURRY',
+                              )
+                            }
+                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                          >
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            {order.duplicateProofOrderCode
+                              ? salesUi.macroRejectDuplicate
+                              : salesUi.macroRejectBlurry}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleApplyOrderMacro(order.id, 'REJECT_WRONG_AMOUNT')}
+                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                          >
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            {salesUi.macroRejectAmount}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleApplyOrderMacro(order.id, 'REJECT_WRONG_METHOD')}
+                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                          >
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            {salesUi.macroRejectMethod}
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
                   </div>

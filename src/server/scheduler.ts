@@ -235,12 +235,13 @@ export function initScheduler() {
                     result.trialReminded > 0 ||
                     result.premiumRenewalReminded > 0 ||
                     result.premiumExpired > 0 ||
+                    result.salesDigestSent ||
                     result.expired > 0 ||
                     result.errors.length > 0
                 )
             ) {
                 logger.info(
-                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.errors.length} errors`,
+                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.salesDigestSent ? `${result.salesDigestAdminChats} sales digest chat(s)` : '0 sales digest chat(s)'}, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {
