@@ -200,6 +200,8 @@ type TelegramSalesPlanCode =
   | 'trial_1d_3gb'
   | '1m_150gb'
   | '2m_300gb'
+  | 'premium_1m_200gb'
+  | 'premium_1m_500gb'
   | 'premium_1m_unlimited'
   | 'premium_3m_unlimited'
   | 'premium_6m_unlimited'
@@ -784,10 +786,46 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       unlimitedQuota: false,
     },
     {
-      code: 'premium_1m_unlimited',
+      code: 'premium_1m_200gb',
       enabled: true,
-      label: 'Premium / 1 Month / Unlimited',
-      localizedLabels: { en: 'Premium / 1 Month / Unlimited', my: 'Premium / ၁ လ / Unlimited' },
+      label: 'Premium / 1 Month / 200 GB',
+      localizedLabels: { en: 'Premium / 1 Month / 200 GB', my: 'Premium / ၁ လ / 200 GB' },
+      priceAmount: '6000',
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 1,
+      minDurationMonths: null,
+      dataLimitGB: 200,
+      unlimitedQuota: false,
+    },
+    {
+      code: 'premium_1m_500gb',
+      enabled: true,
+      label: 'Premium / 1 Month / 500 GB',
+      localizedLabels: { en: 'Premium / 1 Month / 500 GB', my: 'Premium / ၁ လ / 500 GB' },
+      priceAmount: '13000',
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: 1,
+      minDurationMonths: null,
+      dataLimitGB: 500,
+      unlimitedQuota: false,
+    },
+    {
+      code: 'premium_1m_unlimited',
+      enabled: false,
+      label: 'Premium / 1 Month / Unlimited (Legacy)',
+      localizedLabels: { en: 'Premium / 1 Month / Unlimited (Legacy)', my: 'Premium / ၁ လ / Unlimited (Legacy)' },
       priceAmount: '',
       priceCurrency: 'MMK',
       priceLabel: '',
@@ -803,9 +841,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
     },
     {
       code: 'premium_3m_unlimited',
-      enabled: true,
-      label: 'Premium / 3 Months / Unlimited',
-      localizedLabels: { en: 'Premium / 3 Months / Unlimited', my: 'Premium / ၃ လ / Unlimited' },
+      enabled: false,
+      label: 'Premium / 3 Months / Unlimited (Legacy)',
+      localizedLabels: { en: 'Premium / 3 Months / Unlimited (Legacy)', my: 'Premium / ၃ လ / Unlimited (Legacy)' },
       priceAmount: '',
       priceCurrency: 'MMK',
       priceLabel: '',
@@ -821,9 +859,9 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
     },
     {
       code: 'premium_6m_unlimited',
-      enabled: true,
-      label: 'Premium / 6 Months / Unlimited',
-      localizedLabels: { en: 'Premium / 6 Months / Unlimited', my: 'Premium / ၆ လ / Unlimited' },
+      enabled: false,
+      label: 'Premium / 6 Months / Unlimited (Legacy)',
+      localizedLabels: { en: 'Premium / 6 Months / Unlimited (Legacy)', my: 'Premium / ၆ လ / Unlimited (Legacy)' },
       priceAmount: '',
       priceCurrency: 'MMK',
       priceLabel: '',
@@ -834,6 +872,24 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       fixedDurationDays: null,
       fixedDurationMonths: 6,
       minDurationMonths: null,
+      dataLimitGB: null,
+      unlimitedQuota: true,
+    },
+    {
+      code: '3plus_unlimited',
+      enabled: false,
+      label: 'Premium / 3+ Months / Unlimited (Legacy)',
+      localizedLabels: { en: 'Premium / 3+ Months / Unlimited (Legacy)', my: 'Premium / ၃ လနှင့်အထက် / Unlimited (Legacy)' },
+      priceAmount: '',
+      priceCurrency: 'MMK',
+      priceLabel: '',
+      localizedPriceLabels: { en: '', my: '' },
+      deliveryType: 'DYNAMIC_KEY',
+      templateId: null,
+      dynamicTemplateId: null,
+      fixedDurationDays: null,
+      fixedDurationMonths: null,
+      minDurationMonths: 3,
       dataLimitGB: null,
       unlimitedQuota: true,
     },
@@ -2841,11 +2897,7 @@ function TelegramSalesWorkflowCard() {
         };
       }),
       plans: DEFAULT_TELEGRAM_SALES_SETTINGS.plans.map((fallbackPlan) => {
-        const override =
-          settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code) ||
-          (fallbackPlan.code === 'premium_3m_unlimited'
-            ? settingsQuery.data.plans.find((plan) => plan.code === '3plus_unlimited')
-            : undefined);
+        const override = settingsQuery.data.plans.find((plan) => plan.code === fallbackPlan.code);
         return {
           ...fallbackPlan,
           ...override,
@@ -3353,9 +3405,7 @@ function TelegramSalesWorkflowCard() {
   const selectedOrderId = selectedOrder?.id ?? null;
   const selectedOrderRejectionReasonCode = selectedOrder?.rejectionReasonCode ?? null;
   const selectedOrderPlanCode = (
-    (selectedOrder?.planCode === '3plus_unlimited'
-      ? 'premium_3m_unlimited'
-      : selectedOrder?.planCode) as TelegramSalesPlanCode | null
+    selectedOrder?.planCode as TelegramSalesPlanCode | null
   ) ?? null;
   const selectedOrderDurationMonths = selectedOrder?.durationMonths ?? null;
   const selectedOrderSelectedServerId = selectedOrder?.selectedServerId ?? null;

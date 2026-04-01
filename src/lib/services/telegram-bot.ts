@@ -1149,6 +1149,15 @@ function getTelegramUi(locale: SupportedLocale) {
     renewNoMatch: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော linked key မရှိပါ။` : `❌ No linked key matched "${query}".`,
     renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
     buyDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ key အသစ် မမှာယူနိုင်သေးပါ။' : 'ℹ️ New key orders are not available through Telegram right now.',
+    buyStandardSummary: isMyanmar
+      ? '🔑 <b>Standard key</b> သည် ပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်သော regular key ဖြစ်ပြီး စျေးနှုန်းသက်သာပါသည်။'
+      : '🔑 <b>Standard key</b> is the regular lower-cost option for normal daily usage.',
+    buyPremiumSummary: isMyanmar
+      ? '💎 <b>Premium key</b> သည် dynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် premium support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
+      : '💎 <b>Premium key</b> gives you dynamic routing, better stability, auto failover, and premium support benefits.',
+    buyPlanChooseHint: isMyanmar
+      ? 'မဝယ်မီ Standard နှင့် Premium အကြား ကွာခြားချက်ကို အောက်တွင် ဖော်ပြထားပါသည်။'
+      : 'Before you buy, the difference between Standard and Premium is explained below.',
     renewDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ renewal မလုပ်နိုင်သေးပါ။' : 'ℹ️ Renewals are not available through Telegram right now.',
     activeOrderPendingReview: (code: string) =>
       isMyanmar
@@ -1499,7 +1508,7 @@ async function getSubscriptionDefaults() {
   };
 }
 
-async function getTelegramSupportLink() {
+export async function getTelegramSupportLink() {
   const [salesSettings, defaults] = await Promise.all([
     getTelegramSalesSettings(),
     getSubscriptionDefaults(),
@@ -4107,6 +4116,11 @@ async function handleBuyCommand(
   });
   const lines = [
     ui.orderPlanPrompt(order.orderCode),
+    '',
+    ui.buyPlanChooseHint,
+    ui.buyStandardSummary,
+    ui.buyPremiumSummary,
+    '',
     ...enabledPlans.map((plan, index) => {
       const label = resolveTelegramSalesPlanLabel(plan, locale);
       const price = resolveTelegramSalesPriceLabel(plan, locale);
@@ -5164,6 +5178,54 @@ export async function sendAdminAlert(
   for (const chatId of config.adminChatIds) {
     await sendTelegramMessage(config.botToken, chatId, message, options);
   }
+}
+
+export async function sendServerIssueNoticeToTelegram(input: {
+  chatIds: string[];
+  serverName: string;
+  noticeType: 'ISSUE' | 'DOWNTIME' | 'MAINTENANCE';
+  message: string;
+}) {
+  const config = await getTelegramConfig();
+  if (!config || input.chatIds.length === 0) {
+    return {
+      sentCount: 0,
+    };
+  }
+
+  const supportLink = await getTelegramSupportLink();
+  const prefix =
+    input.noticeType === 'DOWNTIME'
+      ? '🚨 <b>Server downtime notice</b>'
+      : input.noticeType === 'MAINTENANCE'
+        ? '🛠 <b>Server maintenance notice</b>'
+        : '⚠️ <b>Server issue notice</b>';
+  const lines = [
+    prefix,
+    '',
+    `🖥 <b>${escapeHtml(input.serverName)}</b>`,
+    escapeHtml(input.message.trim()),
+  ];
+
+  const uniqueChatIds = Array.from(
+    new Set(input.chatIds.map((chatId) => chatId.trim()).filter((chatId) => chatId.length > 0)),
+  );
+
+  let sentCount = 0;
+  for (const chatId of uniqueChatIds) {
+    const sent = await sendTelegramMessage(config.botToken, chatId, lines.join('\n'), {
+      replyMarkup: supportLink
+        ? {
+            inline_keyboard: [[{ text: 'Support', url: supportLink }]],
+          }
+        : undefined,
+    });
+    if (sent) {
+      sentCount += 1;
+    }
+  }
+
+  return { sentCount };
 }
 
 /**
@@ -7222,6 +7284,7 @@ export async function approveTelegramOrder(input: {
         ? await sendDynamicKeySharePageToTelegram({
             dynamicAccessKeyId: key.id,
             chatId: order.telegramChatId,
+            planName: order.planName,
             reason: order.kind === 'RENEW' ? 'RESENT' : 'CREATED',
             source: 'telegram_order',
           })
@@ -8571,6 +8634,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
 export async function sendDynamicKeySharePageToTelegram(input: {
   dynamicAccessKeyId: string;
   chatId?: string | number | null;
+  planName?: string | null;
   reason?:
     | 'CREATED'
     | 'RESENT'
@@ -8653,11 +8717,12 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       ? uniqueServers.slice(0, 3).join(', ') + (uniqueServers.length > 3 ? ` +${uniqueServers.length - 3} more` : '')
       : ui.coverageAutoSelected;
   const reasonTitle = ui.dynamicReasonTitle(input.reason);
+  const premiumPlanLabel = input.planName?.trim() || ui.premiumLabel;
 
   const lines = [
     reasonTitle,
     '',
-    `💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`,
+    `💎 ${ui.planLabel}: <b>${escapeHtml(premiumPlanLabel)}</b>`,
     `🔁 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
     `🧭 ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
     `🖥 ${ui.backendsLabel}: ${attachedCount} attached key(s)`,

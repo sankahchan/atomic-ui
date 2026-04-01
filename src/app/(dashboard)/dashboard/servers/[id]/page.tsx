@@ -246,6 +246,10 @@ export default function ServerDetailPage() {
   const [outageFollowUpMessage, setOutageFollowUpMessage] = useState(
     'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
   );
+  const [manualNoticeType, setManualNoticeType] = useState<'ISSUE' | 'DOWNTIME' | 'MAINTENANCE'>('ISSUE');
+  const [manualNoticeMessage, setManualNoticeMessage] = useState(
+    'We found an issue on this server. Please wait while we stabilize the route. We will update you again if a replacement is needed.',
+  );
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
@@ -360,6 +364,21 @@ export default function ServerDetailPage() {
     onError: (error) => {
       toast({
         title: 'Failed to send outage update',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const manualNoticeMutation = trpc.servers.sendTelegramIssueNotice.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Telegram issue notice sent',
+        description: `Sent the update to ${result.sentCount} user(s).`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to send Telegram notice',
         description: error.message,
         variant: 'destructive',
       });
@@ -1365,6 +1384,69 @@ export default function ServerDetailPage() {
                   There is no active outage on this server right now.
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-primary" />
+                Manual Telegram notice
+              </CardTitle>
+              <CardDescription>
+                Send a direct downtime or issue update to all Telegram-linked users on this server.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Notice type</Label>
+                <Select
+                  value={manualNoticeType}
+                  onValueChange={(value) =>
+                    setManualNoticeType(value as 'ISSUE' | 'DOWNTIME' | 'MAINTENANCE')
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ISSUE">Issue</SelectItem>
+                    <SelectItem value="DOWNTIME">Downtime</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="manualNoticeMessage">Message</Label>
+                <Textarea
+                  id="manualNoticeMessage"
+                  rows={4}
+                  value={manualNoticeMessage}
+                  onChange={(event) => setManualNoticeMessage(event.target.value)}
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                The Telegram bot will include the configured support button automatically if a support link is available.
+              </p>
+
+              <Button
+                type="button"
+                disabled={manualNoticeMutation.isPending || manualNoticeMessage.trim().length < 10}
+                onClick={() =>
+                  manualNoticeMutation.mutate({
+                    serverId,
+                    noticeType: manualNoticeType,
+                    message: manualNoticeMessage,
+                  })
+                }
+              >
+                {manualNoticeMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Send Telegram notice
+              </Button>
             </CardContent>
           </Card>
 

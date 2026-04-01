@@ -22,7 +22,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Key, Loader2, Plus, Search, Shield, Trash2, User, Users } from 'lucide-react';
+import { ExternalLink, Key, Loader2, Plus, Search, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
 
@@ -250,6 +250,13 @@ export default function UsersPage() {
                   </span>
                   <span className="text-xs text-muted-foreground">Open</span>
                 </Link>
+                <Link href="/dashboard/analytics" className="ops-action-tile">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    Revenue overview
+                  </span>
+                  <span className="text-xs text-muted-foreground">Open</span>
+                </Link>
               </div>
             </div>
 
@@ -377,20 +384,28 @@ export default function UsersPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => handleDelete(user.id, user.email || 'Unknown')}
-                              disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)}
-                              title={user.role === 'ADMIN' ? 'Cannot delete admin' : 'Delete user'}
-                            >
-                              {deleteMutation.isPending && deletingUserId === user.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button asChild variant="outline" size="sm">
+                                <Link href={`/dashboard/users/${user.id}`}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Ledger
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => handleDelete(user.id, user.email || 'Unknown')}
+                                disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)}
+                                title={user.role === 'ADMIN' ? 'Cannot delete admin' : 'Delete user'}
+                              >
+                                {deleteMutation.isPending && deletingUserId === user.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -453,6 +468,13 @@ export default function UsersPage() {
                       </p>
                     </div>
                   </div>
+
+                  <Button asChild variant="outline" className="w-full rounded-full">
+                    <Link href={`/dashboard/users/${user.id}`}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open ledger
+                    </Link>
+                  </Button>
                 </div>
               );
             }}

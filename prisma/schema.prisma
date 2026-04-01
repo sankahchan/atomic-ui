@@ -38,7 +38,9 @@ model User {
   accessKeys         AccessKey[]
   dynamicAccessKeys  DynamicAccessKey[]
   telegramLinkTokens TelegramLinkToken[]
-  reviewedTelegramOrders TelegramOrder[]
+  reviewedTelegramOrders TelegramOrder[] @relation("ReviewedTelegramOrders")
+  financeUpdatedTelegramOrders TelegramOrder[] @relation("TelegramOrderFinanceUpdatedBy")
+  createdTelegramOrderFinanceActions TelegramOrderFinanceAction[] @relation("CreatedTelegramOrderFinanceActions")
   reviewedTelegramPremiumSupportRequests TelegramPremiumSupportRequest[] @relation("ReviewedTelegramPremiumSupportRequests")
   sessions           Session[]
 }
@@ -303,21 +305,47 @@ model TelegramOrder {
   assignedReviewerEmail String?
   assignedAt           DateTime?
   reviewedByUserId     String?
-  reviewedBy           User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedBy           User?    @relation("ReviewedTelegramOrders", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   reviewedAt           DateTime?
   fulfilledAt          DateTime?
   rejectedAt           DateTime?
+  financeStatus        String   @default("OPEN") // OPEN, VERIFIED, REFUNDED, CREDITED
+  financeNote          String?
+  financeUpdatedAt     DateTime?
+  financeUpdatedByUserId String?
+  financeUpdatedBy     User?    @relation("TelegramOrderFinanceUpdatedBy", fields: [financeUpdatedByUserId], references: [id], onDelete: SetNull)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  financeActions       TelegramOrderFinanceAction[]
 
   @@index([telegramChatId, status, createdAt])
   @@index([telegramUserId, status, createdAt])
   @@index([status, createdAt])
   @@index([reviewedByUserId, status])
+  @@index([financeStatus, createdAt])
+  @@index([financeUpdatedByUserId, financeUpdatedAt])
   @@index([assignedReviewerUserId, status, createdAt])
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])
   @@index([paymentProofUniqueId, createdAt])
+}
+
+model TelegramOrderFinanceAction {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           TelegramOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actionType      String
+  amount          Int?
+  currency        String?
+  note            String?
+  createdByUserId String?
+  createdBy       User?         @relation("CreatedTelegramOrderFinanceActions", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([actionType, createdAt])
+  @@index([createdByUserId, createdAt])
 }
 
 model TelegramServerChangeRequest {

@@ -1595,6 +1595,107 @@ export const serversRouter = router({
       return result;
     }),
 
+  sendTelegramIssueNotice: adminProcedure
+    .input(
+      z.object({
+        serverId: z.string(),
+        noticeType: z.enum(['ISSUE', 'DOWNTIME', 'MAINTENANCE']).default('ISSUE'),
+        message: z.string().trim().min(10).max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const server = await db.server.findUnique({
+        where: { id: input.serverId },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!server) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Server not found',
+        });
+      }
+
+      const [accessKeys, dynamicKeys] = await Promise.all([
+        db.accessKey.findMany({
+          where: {
+            serverId: input.serverId,
+            status: { in: ['ACTIVE', 'PENDING', 'DISABLED'] },
+          },
+          select: {
+            telegramId: true,
+            user: {
+              select: {
+                telegramChatId: true,
+              },
+            },
+          },
+        }),
+        db.dynamicAccessKey.findMany({
+          where: {
+            status: 'ACTIVE',
+            accessKeys: {
+              some: {
+                serverId: input.serverId,
+              },
+            },
+          },
+          select: {
+            telegramId: true,
+            user: {
+              select: {
+                telegramChatId: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      const chatIds = Array.from(
+        new Set(
+          [...accessKeys, ...dynamicKeys]
+            .flatMap((record) => [record.telegramId, record.user?.telegramChatId])
+            .filter((value): value is string => Boolean(value && value.trim())),
+        ),
+      );
+
+      if (chatIds.length === 0) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'No Telegram-linked users were found for this server.',
+        });
+      }
+
+      const { sendServerIssueNoticeToTelegram } = await import('@/lib/services/telegram-bot');
+      const result = await sendServerIssueNoticeToTelegram({
+        chatIds,
+        serverName: server.name,
+        noticeType: input.noticeType,
+        message: input.message,
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_TELEGRAM_NOTICE_SENT',
+        entity: 'SERVER',
+        entityId: input.serverId,
+        details: {
+          noticeType: input.noticeType,
+          message: input.message,
+          sentToTelegramUsers: result.sentCount,
+        },
+      });
+
+      return {
+        ...result,
+        recipients: chatIds.length,
+      };
+    }),
+
   /**
    * Migrate access keys from one server to another.
    * Creates new keys on the target, updates DB, and optionally deletes from source.

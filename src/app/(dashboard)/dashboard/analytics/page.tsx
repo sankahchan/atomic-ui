@@ -185,6 +185,10 @@ export default function AnalyticsPage() {
       range: telegramSalesRange,
       limit: 6,
     });
+  const { data: monthlyBusinessDashboard, isLoading: loadingMonthlyBusinessDashboard } =
+    trpc.analytics.monthlyBusinessDashboard.useQuery({
+      months: 6,
+    });
 
   const totalTraffic =
     trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) ?? BigInt(0);
@@ -1496,6 +1500,113 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="ops-panel xl:col-span-3">
+          <CardHeader className="px-0 pt-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Monthly finance dashboard
+                </CardTitle>
+                <CardDescription>
+                  Revenue, renewals, and churn signals for the last 6 months.
+                </CardDescription>
+              </div>
+              <Badge variant="outline">6 months</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 px-0 pb-0">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Total revenue
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {loadingMonthlyBusinessDashboard
+                    ? '…'
+                    : monthlyBusinessDashboard
+                      ? Object.entries(monthlyBusinessDashboard.summary.totalRevenueByCurrency)
+                          .map(([currency, amount]) => formatRevenueLabel(currency, amount))
+                          .join(' • ') || 'No revenue'
+                      : 'No revenue'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Fulfilled Telegram order revenue.</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Renewals
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {loadingMonthlyBusinessDashboard ? '…' : monthlyBusinessDashboard?.summary.totalRenewals || 0}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {monthlyBusinessDashboard?.summary.monthOverMonth
+                    ? `${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta} vs previous month`
+                    : 'No month-over-month comparison yet'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Churn signal
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {loadingMonthlyBusinessDashboard ? '…' : monthlyBusinessDashboard?.summary.totalChurnSignals || 0}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {monthlyBusinessDashboard?.summary.monthOverMonth
+                    ? `${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta} vs previous month`
+                    : 'Uses expired, depleted, disabled, and archived churn signals'}
+                </p>
+              </div>
+            </div>
+
+            <div className="ops-data-shell">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Revenue</TableHead>
+                    <TableHead>New paid</TableHead>
+                    <TableHead>Renewals</TableHead>
+                    <TableHead>Churn signal</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingMonthlyBusinessDashboard ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        Loading monthly business metrics...
+                      </TableCell>
+                    </TableRow>
+                  ) : monthlyBusinessDashboard && monthlyBusinessDashboard.months.length > 0 ? (
+                    monthlyBusinessDashboard.months.map((month) => (
+                      <TableRow key={month.key}>
+                        <TableCell className="font-medium">{month.label}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {month.revenueByCurrency.length > 0
+                            ? month.revenueByCurrency
+                                .map((entry) => formatRevenueLabel(entry.currency, entry.amount))
+                                .join(' • ')
+                            : 'No revenue'}
+                        </TableCell>
+                        <TableCell>{month.newOrders}</TableCell>
+                        <TableCell>{month.renewalOrders}</TableCell>
+                        <TableCell>{month.churnSignals}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        No monthly finance data yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card className="ops-panel">

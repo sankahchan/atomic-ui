@@ -1541,6 +1541,169 @@ export const analyticsRouter = router({
       };
     }),
 
+  monthlyBusinessDashboard: adminProcedure
+    .input(
+      z.object({
+        months: z.number().int().min(3).max(12).default(6),
+      }),
+    )
+    .query(async ({ input }) => {
+      const now = new Date();
+      const firstMonthStart = new Date(now.getFullYear(), now.getMonth() - input.months + 1, 1);
+
+      const [fulfilledOrders, archivedKeys, currentChurnedAccessKeys, currentChurnedDynamicKeys] =
+        await Promise.all([
+          db.telegramOrder.findMany({
+            where: {
+              status: 'FULFILLED',
+              fulfilledAt: { gte: firstMonthStart },
+            },
+            select: {
+              kind: true,
+              fulfilledAt: true,
+              priceAmount: true,
+              priceCurrency: true,
+            },
+          }),
+          db.archivedKey.findMany({
+            where: {
+              archivedAt: { gte: firstMonthStart },
+              archiveReason: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              archivedAt: true,
+            },
+          }),
+          db.accessKey.findMany({
+            where: {
+              updatedAt: { gte: firstMonthStart },
+              status: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              id: true,
+              updatedAt: true,
+            },
+          }),
+          db.dynamicAccessKey.findMany({
+            where: {
+              updatedAt: { gte: firstMonthStart },
+              status: { in: ['EXPIRED', 'DEPLETED', 'DISABLED'] },
+            },
+            select: {
+              id: true,
+              updatedAt: true,
+            },
+          }),
+        ]);
+
+      const months = Array.from({ length: input.months }).map((_, index) => {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - (input.months - 1 - index), 1);
+        const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+        return {
+          key,
+          label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          revenueByCurrency: new Map<string, number>(),
+          fulfilledOrders: 0,
+          renewalOrders: 0,
+          newOrders: 0,
+          churnSignals: 0,
+        };
+      });
+
+      const monthMap = new Map(months.map((month) => [month.key, month]));
+      const seenCurrentAccessChurn = new Set<string>();
+
+      for (const order of fulfilledOrders) {
+        if (!order.fulfilledAt) {
+          continue;
+        }
+        const key = `${order.fulfilledAt.getFullYear()}-${String(order.fulfilledAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(key);
+        if (!month) {
+          continue;
+        }
+
+        month.fulfilledOrders += 1;
+        if (order.kind === 'RENEW') {
+          month.renewalOrders += 1;
+        } else {
+          month.newOrders += 1;
+        }
+        if (typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+          const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+          month.revenueByCurrency.set(currency, (month.revenueByCurrency.get(currency) || 0) + order.priceAmount);
+        }
+      }
+
+      for (const archivedKey of archivedKeys) {
+        const key = `${archivedKey.archivedAt.getFullYear()}-${String(archivedKey.archivedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(key);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      for (const key of currentChurnedAccessKeys) {
+        if (seenCurrentAccessChurn.has(key.id)) {
+          continue;
+        }
+        seenCurrentAccessChurn.add(key.id);
+        const monthKey = `${key.updatedAt.getFullYear()}-${String(key.updatedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(monthKey);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      for (const key of currentChurnedDynamicKeys) {
+        const monthKey = `${key.updatedAt.getFullYear()}-${String(key.updatedAt.getMonth() + 1).padStart(2, '0')}`;
+        const month = monthMap.get(monthKey);
+        if (month) {
+          month.churnSignals += 1;
+        }
+      }
+
+      const rows = months.map((month) => ({
+        key: month.key,
+        label: month.label,
+        fulfilledOrders: month.fulfilledOrders,
+        renewalOrders: month.renewalOrders,
+        newOrders: month.newOrders,
+        churnSignals: month.churnSignals,
+        revenueByCurrency: Array.from(month.revenueByCurrency.entries()).map(([currency, amount]) => ({
+          currency,
+          amount,
+        })),
+      }));
+
+      const latest = rows[rows.length - 1] || null;
+      const previous = rows[rows.length - 2] || null;
+      const sumRevenue = (row: (typeof rows)[number] | null) =>
+        (row?.revenueByCurrency || []).reduce((total, entry) => total + entry.amount, 0);
+
+      return {
+        months: rows,
+        summary: {
+          totalRevenueByCurrency: rows.reduce<Record<string, number>>((acc, row) => {
+            for (const entry of row.revenueByCurrency) {
+              acc[entry.currency] = (acc[entry.currency] || 0) + entry.amount;
+            }
+            return acc;
+          }, {}),
+          totalRenewals: rows.reduce((total, row) => total + row.renewalOrders, 0),
+          totalChurnSignals: rows.reduce((total, row) => total + row.churnSignals, 0),
+          latestMonthLabel: latest?.label || null,
+          monthOverMonth: latest && previous
+            ? {
+                revenueDelta: sumRevenue(latest) - sumRevenue(previous),
+                renewalDelta: latest.renewalOrders - previous.renewalOrders,
+                churnDelta: latest.churnSignals - previous.churnSignals,
+              }
+            : null,
+        },
+      };
+    }),
+
   /**
    * Get overall analytics summary
    */
