@@ -638,11 +638,11 @@ export function getTelegramUi(locale: SupportedLocale) {
     ordersReviewTitle: isMyanmar ? '🕐 <b>Being reviewed</b>' : '🕐 <b>Being reviewed</b>',
     ordersCompletedTitle: isMyanmar ? '✅ <b>Completed</b>' : '✅ <b>Completed</b>',
     ordersEmpty: isMyanmar ? 'ℹ️ ဤ Telegram account အတွက် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။' : 'ℹ️ There are no orders for this Telegram account yet. Start with /buy or /renew.',
-    ordersHint: isMyanmar ? 'ပိုအသေးစိတ်ကြည့်ရန် /order <order-code> သို့မဟုတ် /order ကို အသုံးပြုပါ။' : 'Use /order <order-code> or /order to view one order in detail.',
+    ordersHint: isMyanmar ? 'ပိုအသေးစိတ်ကြည့်ရန် /order ORDER-CODE သို့မဟုတ် /order ကို အသုံးပြုပါ။' : 'Use /order ORDER-CODE or /order to view one order in detail.',
     ordersLatestActiveHint: isMyanmar
       ? 'သင်၏ နောက်ဆုံး active order ကို အောက်တွင် အသေးစိတ်ပြထားပါသည်။'
       : 'Your most recent active order is shown in detail below.',
-    orderStatusUsage: isMyanmar ? 'အသုံးပြုပုံ: /order သို့မဟုတ် /order <ORDER-CODE>' : 'Usage: /order or /order <ORDER-CODE>',
+    orderStatusUsage: isMyanmar ? 'အသုံးပြုပုံ: /order သို့မဟုတ် /order ORDER-CODE' : 'Usage: /order or /order ORDER-CODE',
     orderStatusNotFound: (code: string) =>
       isMyanmar
         ? `❌ <b>${code}</b> နှင့် ကိုက်ညီသော order မတွေ့ပါ။`
@@ -714,19 +714,19 @@ export function getTelegramUi(locale: SupportedLocale) {
     keysLabel: isMyanmar ? 'Key များ' : 'Keys',
     expiringNone: (days: number) => isMyanmar ? `✅ နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key မရှိပါ။` : `✅ No keys are expiring in the next ${days} day(s).`,
     expiringTitle: (days: number) => isMyanmar ? `⏳ <b>နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key များ</b>` : `⏳ <b>Keys expiring in the next ${days} day(s)</b>`,
-    findUsage: isMyanmar ? '🔎 အသုံးပြုပုံ: /find <name, email, Telegram ID, key ID, or Outline ID>' : '🔎 Usage: /find <name, email, Telegram ID, key ID, or Outline ID>',
+    findUsage: isMyanmar ? '🔎 အသုံးပြုပုံ: /find NAME_OR_KEY_ID' : '🔎 Usage: /find NAME_OR_KEY_ID',
     findKeyFound: isMyanmar ? '🔎 <b>Key ကို တွေ့ရှိပါသည်</b>' : '🔎 <b>Key found</b>',
     findNoMatches: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော access key မရှိပါ။` : `❌ No access keys matched "${query}".`,
     findMatches: (query: string) => isMyanmar ? `🔎 <b>"${query}" အတွက် ကိုက်ညီမှုများ</b>` : `🔎 <b>Matches for "${query}"</b>`,
     findProvideQuery: isMyanmar ? '❌ Key ID သို့မဟုတ် ရှာဖွေရန် စာသားတစ်ခု ထည့်ပါ။' : '❌ Please provide a key identifier or search term.',
     adminOnly: isMyanmar ? '❌ ဤ command ကို administrator များသာ အသုံးပြုနိုင်ပါသည်။' : '❌ This command is only available to administrators.',
-    enableUsage: isMyanmar ? 'အသုံးပြုပုံ: /enable <key-id>' : 'Usage: /enable <key-id>',
-    disableUsage: isMyanmar ? 'အသုံးပြုပုံ: /disable <key-id>' : 'Usage: /disable <key-id>',
+    enableUsage: isMyanmar ? 'အသုံးပြုပုံ: /enable KEY-ID' : 'Usage: /enable KEY-ID',
+    disableUsage: isMyanmar ? 'အသုံးပြုပုံ: /disable KEY-ID' : 'Usage: /disable KEY-ID',
     multiMatchUseIds: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ အောက်ပါ ID များထဲမှ တစ်ခုကို တိတိကျကျ အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one of these exact IDs:',
     keyNotFound: isMyanmar ? '❌ Key မတွေ့ပါ။' : '❌ Key not found.',
     keyEnabled: (name: string) => isMyanmar ? `✅ <b>${name}</b> ကို ပြန်ဖွင့်ပြီးပါပြီ။` : `✅ Re-enabled <b>${name}</b>.`,
     keyDisabled: (name: string) => isMyanmar ? `⛔ <b>${name}</b> ကို ပိတ်လိုက်ပါပြီ။` : `⛔ Disabled <b>${name}</b>.`,
-    resendUsage: isMyanmar ? 'အသုံးပြုပုံ: /resend <key-id>' : 'Usage: /resend <key-id>',
+    resendUsage: isMyanmar ? 'အသုံးပြုပုံ: /resend KEY-ID' : 'Usage: /resend KEY-ID',
     resendMulti: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ တိတိကျကျ ID တစ်ခုကို အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one exact ID:',
     resendFailed: (message: string) => isMyanmar ? `❌ ပြန်ပို့မှု မအောင်မြင်ပါ: ${message}` : `❌ Failed to resend: ${message}`,
     resendSuccess: (name: string) => isMyanmar ? `📨 <b>${name}</b> အတွက် share page ကို ပြန်ပို့ပြီးပါပြီ။` : `📨 Resent the share page for <b>${name}</b>.`,

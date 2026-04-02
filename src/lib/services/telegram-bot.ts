@@ -3032,8 +3032,8 @@ async function resolveTelegramAdminServerTarget(
       remainder: '',
       error:
         locale === 'my'
-          ? 'အသုံးပြုပုံ: /serverdown <server>, /maintenance <server>, /serverupdate <server> <message>, /serverrecovered <server> [message]'
-          : 'Usage: /serverdown <server>, /maintenance <server>, /serverupdate <server> <message>, /serverrecovered <server> [message]',
+          ? 'အသုံးပြုပုံ: /serverdown SERVER, /maintenance SERVER, /serverupdate SERVER MESSAGE, /serverrecovered SERVER [MESSAGE]'
+          : 'Usage: /serverdown SERVER, /maintenance SERVER, /serverupdate SERVER MESSAGE, /serverrecovered SERVER [MESSAGE]',
     };
   }
 
@@ -7771,8 +7771,8 @@ async function handleServerUpdateCommand(argsText: string, locale: SupportedLoca
   }
   if (!resolved.remainder || resolved.remainder.trim().length < 6) {
     return locale === 'my'
-      ? 'အသုံးပြုပုံ: /serverupdate <server> <message>'
-      : 'Usage: /serverupdate <server> <message>';
+      ? 'အသုံးပြုပုံ: /serverupdate SERVER MESSAGE'
+      : 'Usage: /serverupdate SERVER MESSAGE';
   }
 
   const { sendServerOutageFollowUp } = await import('@/lib/services/server-outage');
@@ -8026,8 +8026,8 @@ async function parseTelegramAdminAnnouncementArgs(
 ): Promise<TelegramAdminAnnouncementParseResult> {
   const usage =
     locale === 'my'
-      ? 'အသုံးပြုပုံ: /announce <active|standard|premium|trial> [type=info|announcement|promo|new_server|maintenance] [tag=<tag>] [server=<id>] [region=<CC>] [support=yes|no] :: <title> :: <message>'
-      : 'Usage: /announce <active|standard|premium|trial> [type=info|announcement|promo|new_server|maintenance] [tag=<tag>] [server=<id>] [region=<CC>] [support=yes|no] :: <title> :: <message>';
+      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] :: TITLE :: MESSAGE'
+      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] :: TITLE :: MESSAGE';
   const parts = argsText
     .split('::')
     .map((part) => part.trim())
@@ -8258,8 +8258,8 @@ async function handleScheduleAnnouncementCommand(
   const [rawSchedule, ...restTokens] = argsText.trim().split(/\s+/);
   if (!rawSchedule || restTokens.length === 0) {
     return locale === 'my'
-      ? 'အသုံးပြုပုံ: /scheduleannouncement <yyyy-mm-ddThh:mm> <audience> [filters] :: <title> :: <message>'
-      : 'Usage: /scheduleannouncement <yyyy-mm-ddThh:mm> <audience> [filters] :: <title> :: <message>';
+      ? 'အသုံးပြုပုံ: /scheduleannouncement YYYY-MM-DDThh:mm AUDIENCE [filters] :: TITLE :: MESSAGE'
+      : 'Usage: /scheduleannouncement YYYY-MM-DDThh:mm AUDIENCE [filters] :: TITLE :: MESSAGE';
   }
 
   const scheduledFor = new Date(rawSchedule);
@@ -8522,8 +8522,8 @@ async function handleClaimRefundCommand(
   const query = argsText.trim();
   if (!query) {
     return locale === 'my'
-      ? 'အသုံးပြုပုံ: /claimrefund <order-code>'
-      : 'Usage: /claimrefund <order-code>';
+      ? 'အသုံးပြုပုံ: /claimrefund ORDER-CODE'
+      : 'Usage: /claimrefund ORDER-CODE';
   }
 
   const order = await db.telegramOrder.findFirst({
@@ -8588,8 +8588,8 @@ async function handleReassignRefundCommand(
   const reviewerQuery = reviewerTokens.join(' ').trim();
   if (!orderQuery || !reviewerQuery) {
     return locale === 'my'
-      ? 'အသုံးပြုပုံ: /reassignrefund <order-code> <admin-email|query>'
-      : 'Usage: /reassignrefund <order-code> <admin-email|query>';
+      ? 'အသုံးပြုပုံ: /reassignrefund ORDER-CODE ADMIN-EMAIL-OR-QUERY'
+      : 'Usage: /reassignrefund ORDER-CODE ADMIN-EMAIL-OR-QUERY';
   }
 
   const order = await db.telegramOrder.findFirst({
