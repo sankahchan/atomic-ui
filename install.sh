@@ -31,6 +31,9 @@ ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
 PANEL_DOMAIN_INPUT="${PANEL_DOMAIN:-}"
 PUBLIC_SHARE_DOMAIN_INPUT="${PUBLIC_SHARE_DOMAIN:-}"
 ALLOW_IP_FALLBACK_INPUT="${ALLOW_IP_FALLBACK:-true}"
+DEFAULT_ADMIN_USERNAME_INPUT="${DEFAULT_ADMIN_USERNAME:-admin}"
+DEFAULT_ADMIN_PASSWORD_INPUT="${DEFAULT_ADMIN_PASSWORD:-admin123}"
+TELEGRAM_BOT_TOKEN_INPUT="${TELEGRAM_BOT_TOKEN:-}"
 
 normalize_bool() {
     case "${1,,}" in
@@ -252,6 +255,12 @@ if grep -q "^LOG_LEVEL=" .env; then
     sed -i "s|^LOG_LEVEL=.*|LOG_LEVEL=info|g" .env
 else
     echo "LOG_LEVEL=info" >> .env
+fi
+
+set_env_var "DEFAULT_ADMIN_USERNAME" "${DEFAULT_ADMIN_USERNAME_INPUT}"
+set_env_var "DEFAULT_ADMIN_PASSWORD" "${DEFAULT_ADMIN_PASSWORD_INPUT}"
+if [ -n "${TELEGRAM_BOT_TOKEN_INPUT}" ]; then
+    set_env_var "TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN_INPUT}"
 fi
 
 # Get server IP
@@ -562,9 +571,9 @@ fi
 echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
 echo -e "${CYAN}│${NC}"
-echo -e "${CYAN}│${NC}  ${YELLOW}Default login credentials:${NC}"
-echo -e "${CYAN}│${NC}  Username: ${GREEN}admin${NC}"
-echo -e "${CYAN}│${NC}  Password: ${GREEN}admin123${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Initial login credentials:${NC}"
+echo -e "${CYAN}│${NC}  Username: ${GREEN}${DEFAULT_ADMIN_USERNAME_INPUT}${NC}"
+echo -e "${CYAN}│${NC}  Password: ${GREEN}${DEFAULT_ADMIN_PASSWORD_INPUT}${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${RED}⚠ IMPORTANT: Change the password after first login!${NC}"
 echo -e "${CYAN}│${NC}  ${RED}⚠ SAVE YOUR PANEL PATH - You need it to access the panel!${NC}"

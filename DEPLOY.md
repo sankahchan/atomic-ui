@@ -65,6 +65,31 @@ Look for the generated admin credentials in the install/setup output.
 
 This path matches the way the panel is running on your existing VPS.
 
+### 0. Fresh VPS bootstrap from your workstation
+
+For a brand-new VPS, prefer the remote bootstrap wrapper instead of hand-running the install steps:
+
+```bash
+BOOTSTRAP_HOST=your-server-ip \
+BOOTSTRAP_PASSWORD=your-password \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
+Domain example:
+
+```bash
+BOOTSTRAP_HOST=your-server-ip \
+BOOTSTRAP_PASSWORD=your-password \
+BOOTSTRAP_ACME_EMAIL=you@example.com \
+BOOTSTRAP_PANEL_DOMAIN=admin.example.com \
+BOOTSTRAP_PUBLIC_SHARE_DOMAIN=share.example.com \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
+See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the full checklist and all supported inputs.
+
 ### 1. First-time install
 
 ```bash
@@ -79,7 +104,7 @@ npm run env:check -- --env-file=.env
 NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 ```
 
-Or use the one-command installer, which now prefers HTTPS by default:
+Or use the one-command installer directly from inside the VPS, which now prefers HTTPS by default:
 
 ```bash
 sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)

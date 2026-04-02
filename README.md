@@ -79,6 +79,19 @@ sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com AC
 
 For production deployment details, see [DEPLOY.md](DEPLOY.md).
 
+### Fresh VPS bootstrap from your workstation
+
+If you are provisioning a brand-new VPS remotely, use the bootstrap wrapper instead of running the install steps manually:
+
+```bash
+BOOTSTRAP_HOST=your-server-ip \
+BOOTSTRAP_PASSWORD=your-password \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
+See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the domain/HTTPS examples and the full preflight checklist.
+
 ## Environment variables
 
 Set these in `.env` before production use:
