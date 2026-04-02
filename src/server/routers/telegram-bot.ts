@@ -25,11 +25,11 @@ import {
   telegramSalesSettingsSchema,
 } from '@/lib/services/telegram-sales';
 import {
-  getTelegramConfig,
-  getTelegramSupportLink,
-  sendTelegramMessage,
-} from '@/lib/services/telegram-runtime';
-import { escapeHtml } from '@/lib/services/telegram-ui';
+  dispatchTelegramAnnouncement,
+  getTelegramAnnouncementAudienceMap,
+  type TelegramAnnouncementAudience,
+  type TelegramAnnouncementType,
+} from '@/lib/services/telegram-announcements';
 import {
   approveTelegramOrder,
   approveTelegramPremiumSupportRequest,
@@ -65,9 +65,6 @@ type TelegramOrderRiskReason =
   | 'multiple_open_orders'
   | 'resubmitted_proof';
 
-type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS';
-type TelegramAnnouncementType = 'INFO' | 'ANNOUNCEMENT' | 'PROMO' | 'NEW_SERVER' | 'MAINTENANCE';
-
 const telegramAnnouncementAudienceSchema = z.enum([
   'ACTIVE_USERS',
   'STANDARD_USERS',
@@ -83,96 +80,7 @@ const telegramAnnouncementTypeSchema = z.enum([
   'MAINTENANCE',
 ]);
 
-function parseCsvTags(value?: string | null) {
-  return new Set(
-    (value || '')
-      .split(',')
-      .map((tag) => tag.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
-
-function uniqueStrings(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
-}
-
-async function getTelegramAnnouncementAudienceMap() {
-  const [accessKeys, dynamicKeys] = await Promise.all([
-    db.accessKey.findMany({
-      where: {
-        status: { in: ['ACTIVE', 'PENDING'] },
-      },
-      select: {
-        telegramId: true,
-        tags: true,
-        user: {
-          select: {
-            telegramChatId: true,
-          },
-        },
-      },
-    }),
-    db.dynamicAccessKey.findMany({
-      where: {
-        status: 'ACTIVE',
-      },
-      select: {
-        telegramId: true,
-        user: {
-          select: {
-            telegramChatId: true,
-          },
-        },
-      },
-    }),
-  ]);
-
-  const standardChats = uniqueStrings(
-    accessKeys
-      .filter((key) => !parseCsvTags(key.tags).has('trial'))
-      .flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
-  );
-  const trialChats = uniqueStrings(
-    accessKeys
-      .filter((key) => parseCsvTags(key.tags).has('trial'))
-      .flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
-  );
-  const premiumChats = uniqueStrings(
-    dynamicKeys.flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
-  );
-  const activeChats = uniqueStrings([...standardChats, ...trialChats, ...premiumChats]);
-
-  return {
-    ACTIVE_USERS: activeChats,
-    STANDARD_USERS: standardChats,
-    PREMIUM_USERS: premiumChats,
-    TRIAL_USERS: trialChats,
-  } satisfies Record<TelegramAnnouncementAudience, string[]>;
-}
-
-function buildTelegramAnnouncementMessage(input: {
-  type: TelegramAnnouncementType;
-  title: string;
-  message: string;
-}) {
-  const heading =
-    input.type === 'PROMO'
-      ? '🎁 <b>Special offer</b>'
-      : input.type === 'NEW_SERVER'
-        ? '🛰️ <b>New server update</b>'
-        : input.type === 'MAINTENANCE'
-          ? '🛠 <b>Service update</b>'
-          : input.type === 'INFO'
-            ? 'ℹ️ <b>Information</b>'
-            : '📣 <b>Announcement</b>';
-
-  return [
-    heading,
-    '',
-    `<b>${escapeHtml(input.title.trim())}</b>`,
-    escapeHtml(input.message.trim()),
-  ].join('\n');
-}
+const telegramAnnouncementTemplateNameSchema = z.string().trim().min(2).max(80);
 
 function computeTelegramOrderRisk(input: {
   order: {
@@ -1845,17 +1753,10 @@ export const telegramBotRouter = router({
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         includeSupportButton: z.boolean().default(true),
+        scheduledFor: z.string().datetime().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const config = await getTelegramConfig();
-      if (!config?.botToken) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Telegram bot is not configured.',
-        });
-      }
-
       const audienceMap = await getTelegramAnnouncementAudienceMap();
       const chatIds = audienceMap[input.audience];
       if (chatIds.length === 0) {
@@ -1865,35 +1766,55 @@ export const telegramBotRouter = router({
         });
       }
 
-      const supportLink = input.includeSupportButton ? await getTelegramSupportLink() : null;
-      const message = buildTelegramAnnouncementMessage({
-        type: input.type,
-        title: input.title,
-        message: input.message,
+      const scheduledFor = input.scheduledFor ? new Date(input.scheduledFor) : null;
+      if (scheduledFor && Number.isNaN(scheduledFor.getTime())) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Invalid schedule time.',
+        });
+      }
+
+      const announcement = await db.telegramAnnouncement.create({
+        data: {
+          audience: input.audience,
+          type: input.type,
+          title: input.title.trim(),
+          message: input.message.trim(),
+          includeSupportButton: input.includeSupportButton,
+          status: scheduledFor && scheduledFor.getTime() > Date.now() ? 'SCHEDULED' : 'PROCESSING',
+          scheduledFor,
+          totalRecipients: chatIds.length,
+          createdByUserId: ctx.user.id,
+          createdByEmail: ctx.user.email ?? null,
+        },
       });
 
       let sentCount = 0;
       let failedCount = 0;
-      for (const chatId of chatIds) {
-        const sent = await sendTelegramMessage(config.botToken, chatId, message, {
-          replyMarkup: supportLink
-            ? {
-                inline_keyboard: [[{ text: 'Support', url: supportLink }]],
-              }
-            : undefined,
+      let status = announcement.status;
+      let scheduled = status === 'SCHEDULED';
+
+      if (!scheduled) {
+        const result = await dispatchTelegramAnnouncement({
+          announcementId: announcement.id,
         });
-        if (sent) {
-          sentCount += 1;
-        } else {
-          failedCount += 1;
+        if (result.skipped) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Announcement skipped: ${result.reason}`,
+          });
         }
+        sentCount = result.sentCount;
+        failedCount = result.failedCount;
+        status = result.status;
       }
 
       await writeAuditLog({
         userId: ctx.user.id,
         ip: ctx.clientIp,
-        action: 'TELEGRAM_ANNOUNCEMENT_SEND',
+        action: scheduled ? 'TELEGRAM_ANNOUNCEMENT_SCHEDULE' : 'TELEGRAM_ANNOUNCEMENT_SEND',
         entity: 'TELEGRAM',
+        entityId: announcement.id,
         details: {
           audience: input.audience,
           type: input.type,
@@ -1901,13 +1822,199 @@ export const telegramBotRouter = router({
           includeSupportButton: input.includeSupportButton,
           sentCount,
           failedCount,
+          scheduledFor: scheduledFor?.toISOString() ?? null,
         },
       });
 
       return {
+        announcementId: announcement.id,
         audience: input.audience,
         sentCount,
         failedCount,
+        scheduled,
+        status,
       };
+    }),
+
+  listAnnouncementHistory: adminProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(50).default(10),
+        })
+        .optional(),
+    )
+    .query(async ({ input }) => {
+      const announcements = await db.telegramAnnouncement.findMany({
+        orderBy: [{ createdAt: 'desc' }],
+        take: input?.limit ?? 10,
+        include: {
+          deliveries: {
+            where: { status: 'FAILED' },
+            orderBy: [{ updatedAt: 'desc' }],
+            take: 5,
+            select: {
+              id: true,
+              chatId: true,
+              error: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+
+      return announcements;
+    }),
+
+  dispatchScheduledAnnouncement: adminProcedure
+    .input(
+      z.object({
+        announcementId: z.string().cuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const announcement = await db.telegramAnnouncement.findUnique({
+        where: { id: input.announcementId },
+        select: {
+          id: true,
+          status: true,
+          title: true,
+        },
+      });
+
+      if (!announcement) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Announcement not found.',
+        });
+      }
+
+      const result = await dispatchTelegramAnnouncement({
+        announcementId: input.announcementId,
+      });
+      if (result.skipped) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Announcement skipped: ${result.reason}`,
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_DISPATCH',
+        entity: 'TELEGRAM',
+        entityId: input.announcementId,
+        details: {
+          title: announcement.title,
+          sentCount: result.sentCount,
+          failedCount: result.failedCount,
+        },
+      });
+
+      return result;
+    }),
+
+  resendAnnouncementFailed: adminProcedure
+    .input(
+      z.object({
+        announcementId: z.string().cuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const failedCount = await db.telegramAnnouncementDelivery.count({
+        where: {
+          announcementId: input.announcementId,
+          status: 'FAILED',
+        },
+      });
+
+      if (failedCount === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No failed deliveries to resend.',
+        });
+      }
+
+      const result = await dispatchTelegramAnnouncement({
+        announcementId: input.announcementId,
+        resendFailedOnly: true,
+      });
+      if (result.skipped) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Announcement skipped: ${result.reason}`,
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_RESEND_FAILED',
+        entity: 'TELEGRAM',
+        entityId: input.announcementId,
+        details: {
+          resentFailedCount: failedCount,
+          sentDelta: result.sentDelta,
+          failedDelta: result.failedDelta,
+        },
+      });
+
+      return result;
+    }),
+
+  listAnnouncementTemplates: adminProcedure.query(async () => {
+    return db.telegramAnnouncementTemplate.findMany({
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  }),
+
+  saveAnnouncementTemplate: adminProcedure
+    .input(
+      z.object({
+        templateId: z.string().cuid().optional(),
+        name: telegramAnnouncementTemplateNameSchema,
+        audience: telegramAnnouncementAudienceSchema.default('ACTIVE_USERS'),
+        type: telegramAnnouncementTypeSchema.default('ANNOUNCEMENT'),
+        title: z.string().trim().min(3).max(120),
+        message: z.string().trim().min(10).max(2000),
+        includeSupportButton: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const data = {
+        name: input.name.trim(),
+        audience: input.audience,
+        type: input.type,
+        title: input.title.trim(),
+        message: input.message.trim(),
+        includeSupportButton: input.includeSupportButton,
+        createdByUserId: ctx.user.id,
+        createdByEmail: ctx.user.email ?? null,
+      };
+
+      if (input.templateId) {
+        return db.telegramAnnouncementTemplate.update({
+          where: { id: input.templateId },
+          data,
+        });
+      }
+
+      return db.telegramAnnouncementTemplate.create({
+        data,
+      });
+    }),
+
+  deleteAnnouncementTemplate: adminProcedure
+    .input(
+      z.object({
+        templateId: z.string().cuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db.telegramAnnouncementTemplate.delete({
+        where: { id: input.templateId },
+      });
+      return { success: true };
     }),
 });

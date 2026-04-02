@@ -174,6 +174,45 @@ type TelegramSettings = {
 type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS';
 type TelegramAnnouncementType = 'INFO' | 'ANNOUNCEMENT' | 'PROMO' | 'NEW_SERVER' | 'MAINTENANCE';
 
+type TelegramAnnouncementTemplateRow = {
+  id: string;
+  name: string;
+  audience: TelegramAnnouncementAudience;
+  type: TelegramAnnouncementType;
+  title: string;
+  message: string;
+  includeSupportButton: boolean;
+  createdByEmail?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type TelegramAnnouncementHistoryRow = {
+  id: string;
+  audience: TelegramAnnouncementAudience;
+  type: TelegramAnnouncementType;
+  title: string;
+  message: string;
+  includeSupportButton: boolean;
+  status: string;
+  scheduledFor?: Date | null;
+  lastAttemptedAt?: Date | null;
+  sentAt?: Date | null;
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  createdByUserId?: string | null;
+  createdByEmail?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deliveries: Array<{
+    id: string;
+    chatId: string;
+    error?: string | null;
+    updatedAt: Date;
+  }>;
+};
+
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   botToken: '',
   botUsername: '',
@@ -1114,6 +1153,25 @@ function TelegramBotSetupCard() {
     announcementSent: isMyanmar ? 'Announcement ပို့ပြီးပါပြီ' : 'Announcement sent',
     announcementFailed: isMyanmar ? 'Announcement ပို့မရပါ' : 'Announcement failed',
     recipientsLabel: isMyanmar ? 'လက်ခံသူ' : 'Recipients',
+    announcementScheduleAt: isMyanmar ? 'ပို့မည့် အချိန်' : 'Schedule for',
+    announcementScheduleHint: isMyanmar ? 'အချိန် သတ်မှတ်ထားပါက နောက်မှ ပို့ပါမည်။' : 'Set a future time to send it later.',
+    announcementScheduleNow: isMyanmar ? 'အချိန်ဇယားဖြင့် သိမ်းမည်' : 'Schedule',
+    announcementTemplateName: isMyanmar ? 'Template အမည်' : 'Template name',
+    announcementSaveTemplate: isMyanmar ? 'Template အဖြစ် သိမ်းမည်' : 'Save template',
+    announcementTemplateSaved: isMyanmar ? 'Template သိမ်းပြီးပါပြီ' : 'Template saved',
+    announcementTemplateDeleted: isMyanmar ? 'Template ဖျက်ပြီးပါပြီ' : 'Template deleted',
+    announcementTemplatesTitle: isMyanmar ? 'Saved templates' : 'Saved templates',
+    announcementTemplatesDesc: isMyanmar ? 'အကြိမ်ကြိမ်အသုံးပြုမည့် announcement များကို template အဖြစ် သိမ်းနိုင်သည်။' : 'Save reusable announcement presets for discounts, new servers, maintenance, and more.',
+    announcementHistoryTitle: isMyanmar ? 'Announcement history' : 'Announcement history',
+    announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော announcement များ၊ schedule များနှင့် failed deliveries များကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
+    announcementApplyTemplate: isMyanmar ? 'Template သုံးမည်' : 'Use template',
+    announcementDeleteTemplate: isMyanmar ? 'Template ဖျက်မည်' : 'Delete template',
+    announcementNoTemplates: isMyanmar ? 'Saved template မရှိသေးပါ။' : 'No saved templates yet.',
+    announcementNoHistory: isMyanmar ? 'Announcement history မရှိသေးပါ။' : 'No announcements sent yet.',
+    announcementResendFailed: isMyanmar ? 'Failed များကို ပြန်ပို့မည်' : 'Resend failed',
+    announcementSendScheduledNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
+    announcementScheduled: isMyanmar ? 'Schedule လုပ်ပြီးပါပြီ' : 'Announcement scheduled',
+    announcementScheduledDesc: (when: string) => isMyanmar ? `${when} တွင် ပို့မည်။` : `Scheduled for ${when}.`,
   };
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSettings.useQuery();
@@ -1127,6 +1185,8 @@ function TelegramBotSetupCard() {
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
+  const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
+  const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -1240,14 +1300,86 @@ function TelegramBotSetupCard() {
     },
   });
   const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery();
+  const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery();
+  const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery({ limit: 12 });
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.telegramBot.listAnnouncementHistory.invalidate(),
+        utils.telegramBot.getAnnouncementAudienceCounts.invalidate(),
+      ]);
       toast({
-        title: telegramUi.announcementSent,
-        description: `${result.sentCount} ${telegramUi.recipientsLabel.toLowerCase()}${result.failedCount > 0 ? ` · ${result.failedCount} failed` : ''}`,
+        title: result.scheduled ? telegramUi.announcementScheduled : telegramUi.announcementSent,
+        description: result.scheduled
+          ? telegramUi.announcementScheduledDesc(
+              announcementScheduledFor ? formatDateTime(new Date(announcementScheduledFor)) : '',
+            )
+          : `${result.sentCount} ${telegramUi.recipientsLabel.toLowerCase()}${result.failedCount > 0 ? ` · ${result.failedCount} failed` : ''}`,
       });
       setAnnouncementTitle('');
       setAnnouncementMessage('');
+      setAnnouncementScheduledFor('');
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const saveAnnouncementTemplateMutation = trpc.telegramBot.saveAnnouncementTemplate.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listAnnouncementTemplates.invalidate();
+      toast({
+        title: telegramUi.announcementTemplateSaved,
+      });
+      setAnnouncementTemplateName('');
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const deleteAnnouncementTemplateMutation = trpc.telegramBot.deleteAnnouncementTemplate.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listAnnouncementTemplates.invalidate();
+      toast({
+        title: telegramUi.announcementTemplateDeleted,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const resendAnnouncementFailedMutation = trpc.telegramBot.resendAnnouncementFailed.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listAnnouncementHistory.invalidate();
+      toast({
+        title: telegramUi.announcementSent,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const dispatchScheduledAnnouncementMutation = trpc.telegramBot.dispatchScheduledAnnouncement.useMutation({
+    onSuccess: async () => {
+      await utils.telegramBot.listAnnouncementHistory.invalidate();
+      toast({
+        title: telegramUi.announcementSent,
+      });
     },
     onError: (error) => {
       toast({
@@ -1261,6 +1393,8 @@ function TelegramBotSetupCard() {
   const isSaving = saveSettingsMutation.isPending;
   const hasToken = form.botToken.trim().length > 0;
   const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
+  const announcementTemplates = (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[];
+  const announcementHistory = (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[];
   const webhookUrl =
     typeof window === 'undefined'
       ? ''
@@ -1780,6 +1914,17 @@ function TelegramBotSetupCard() {
                 />
               </div>
 
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="telegram-announcement-scheduled-for">{telegramUi.announcementScheduleAt}</Label>
+                <Input
+                  id="telegram-announcement-scheduled-for"
+                  type="datetime-local"
+                  value={announcementScheduledFor}
+                  onChange={(event) => setAnnouncementScheduledFor(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementScheduleHint}</p>
+              </div>
+
               <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
                 <div>
                   <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
@@ -1806,6 +1951,7 @@ function TelegramBotSetupCard() {
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
                       includeSupportButton: announcementIncludeSupportButton,
+                      scheduledFor: null,
                     })
                   }
                   disabled={
@@ -1823,6 +1969,219 @@ function TelegramBotSetupCard() {
                   )}
                   {telegramUi.sendAnnouncementNow}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() =>
+                    sendAnnouncementMutation.mutate({
+                      audience: announcementAudience,
+                      type: announcementType,
+                      title: announcementTitle.trim(),
+                      message: announcementMessage.trim(),
+                      includeSupportButton: announcementIncludeSupportButton,
+                      scheduledFor: announcementScheduledFor
+                        ? new Date(announcementScheduledFor).toISOString()
+                        : null,
+                    })
+                  }
+                  disabled={
+                    !hasToken ||
+                    sendAnnouncementMutation.isPending ||
+                    !announcementScheduledFor ||
+                    Number.isNaN(new Date(announcementScheduledFor).getTime()) ||
+                    announcementTitle.trim().length < 3 ||
+                    announcementMessage.trim().length < 10 ||
+                    announcementAudienceCount === 0
+                  }
+                >
+                  {sendAnnouncementMutation.isPending && announcementScheduledFor ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Clock className="mr-2 h-4 w-4" />
+                  )}
+                  {telegramUi.announcementScheduleNow}
+                </Button>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.announcementTemplatesTitle}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementTemplatesDesc}</p>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={announcementTemplateName}
+                    onChange={(event) => setAnnouncementTemplateName(event.target.value)}
+                    placeholder={telegramUi.announcementTemplateName}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      saveAnnouncementTemplateMutation.mutate({
+                        name: announcementTemplateName.trim(),
+                        audience: announcementAudience,
+                        type: announcementType,
+                        title: announcementTitle.trim(),
+                        message: announcementMessage.trim(),
+                        includeSupportButton: announcementIncludeSupportButton,
+                      })
+                    }
+                    disabled={
+                      saveAnnouncementTemplateMutation.isPending ||
+                      announcementTemplateName.trim().length < 2 ||
+                      announcementTitle.trim().length < 3 ||
+                      announcementMessage.trim().length < 10
+                    }
+                  >
+                    {saveAnnouncementTemplateMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    {telegramUi.announcementSaveTemplate}
+                  </Button>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {announcementTemplates.length ? (
+                    announcementTemplates.map((template) => (
+                      <div
+                        key={template.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{template.name}</p>
+                            <p className="text-xs text-muted-foreground">{template.title}</p>
+                          </div>
+                          <Badge variant="outline">{template.type}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setAnnouncementAudience(template.audience);
+                              setAnnouncementType(template.type);
+                              setAnnouncementTitle(template.title);
+                              setAnnouncementMessage(template.message);
+                              setAnnouncementIncludeSupportButton(template.includeSupportButton);
+                            }}
+                          >
+                            {telegramUi.announcementApplyTemplate}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              deleteAnnouncementTemplateMutation.mutate({
+                                templateId: template.id,
+                              })
+                            }
+                            disabled={deleteAnnouncementTemplateMutation.isPending}
+                          >
+                            {telegramUi.announcementDeleteTemplate}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{telegramUi.announcementNoTemplates}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  {announcementHistory.length ? (
+                    announcementHistory.map((announcement) => (
+                      <div
+                        key={announcement.id}
+                        className="rounded-2xl border border-border/60 bg-background/70 p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{announcement.title}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{announcement.message}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">{announcement.type}</Badge>
+                            <Badge variant="outline">{announcement.status}</Badge>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                          <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
+                          <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
+                          <p>Created: {formatDateTime(announcement.createdAt)}</p>
+                          <p>
+                            {announcement.scheduledFor
+                              ? `Scheduled: ${formatDateTime(announcement.scheduledFor)}`
+                              : announcement.sentAt
+                                ? `Sent: ${formatDateTime(announcement.sentAt)}`
+                                : `Updated: ${formatDateTime(announcement.updatedAt)}`}
+                          </p>
+                        </div>
+                        {announcement.deliveries.length > 0 ? (
+                          <div className="mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
+                            <p className="text-xs font-medium text-foreground">Recent failures</p>
+                            <div className="mt-2 space-y-2">
+                              {announcement.deliveries.map((delivery) => (
+                                <div key={delivery.id} className="rounded-xl border border-border/50 px-3 py-2 text-xs text-muted-foreground">
+                                  <p>Chat: {delivery.chatId}</p>
+                                  <p>Error: {delivery.error || 'send-failed'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {announcement.status === 'SCHEDULED' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                dispatchScheduledAnnouncementMutation.mutate({
+                                  announcementId: announcement.id,
+                                })
+                              }
+                              disabled={dispatchScheduledAnnouncementMutation.isPending}
+                            >
+                              {telegramUi.announcementSendScheduledNow}
+                            </Button>
+                          ) : null}
+                          {announcement.failedCount > 0 ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                resendAnnouncementFailedMutation.mutate({
+                                  announcementId: announcement.id,
+                                })
+                              }
+                              disabled={resendAnnouncementFailedMutation.isPending}
+                            >
+                              {telegramUi.announcementResendFailed}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

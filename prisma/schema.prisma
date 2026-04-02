@@ -455,6 +455,65 @@ model TelegramUserProfile {
   @@index([telegramChatId])
 }
 
+model TelegramAnnouncement {
+  id                   String   @id @default(cuid())
+  audience             String
+  type                 String
+  title                String
+  message              String
+  includeSupportButton Boolean  @default(true)
+  status               String   @default("DRAFT") // DRAFT, SCHEDULED, PROCESSING, SENT, PARTIAL, FAILED, CANCELLED
+  scheduledFor         DateTime?
+  lastAttemptedAt      DateTime?
+  sentAt               DateTime?
+  totalRecipients      Int      @default(0)
+  sentCount            Int      @default(0)
+  failedCount          Int      @default(0)
+  createdByUserId      String?
+  createdByEmail       String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  deliveries           TelegramAnnouncementDelivery[]
+
+  @@index([status, scheduledFor])
+  @@index([createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model TelegramAnnouncementDelivery {
+  id              String   @id @default(cuid())
+  announcementId  String
+  announcement    TelegramAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  chatId          String
+  status          String   @default("PENDING") // PENDING, SENT, FAILED
+  error           String?
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([announcementId, chatId])
+  @@index([announcementId, status])
+  @@index([chatId, createdAt])
+}
+
+model TelegramAnnouncementTemplate {
+  id                   String   @id @default(cuid())
+  name                 String
+  audience             String
+  type                 String
+  title                String
+  message              String
+  includeSupportButton Boolean  @default(true)
+  createdByUserId      String?
+  createdByEmail       String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
 model TelegramPremiumSupportReply {
   id                String   @id @default(cuid())
   requestId         String

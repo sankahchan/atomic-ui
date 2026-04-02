@@ -30,6 +30,7 @@ import { syncIncidentState } from '@/lib/services/incidents';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
+import { runTelegramAnnouncementCycle } from '@/lib/services/telegram-announcements';
 import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
@@ -276,6 +277,18 @@ export function initScheduler() {
         }
     });
 
+    // 17. Scheduled Telegram announcements (Every 5 minutes)
+    cron.schedule('*/5 * * * *', async () => {
+        try {
+            const result = await runTelegramAnnouncementCycle();
+            if (!result.skipped) {
+                logger.info(`Telegram announcements: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
+            }
+        } catch (error) {
+            logger.error('Telegram announcement cycle failed', error);
+        }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
@@ -334,6 +347,15 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Initial Telegram finance digest cycle failed', error);
+        }
+
+        try {
+            const result = await runTelegramAnnouncementCycle();
+            if (!result.skipped) {
+                logger.info(`Initial Telegram announcement cycle: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
+            }
+        } catch (error) {
+            logger.error('Initial Telegram announcement cycle failed', error);
         }
 
         // Ensure health check records exist for all servers
