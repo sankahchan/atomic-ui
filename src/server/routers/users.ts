@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
-import { ADMIN_SCOPE_VALUES, hasUserManageScope, isOwnerLikeAdmin, normalizeAdminScope } from '@/lib/admin-scope';
+import {
+  ADMIN_SCOPE_VALUES,
+  hasTelegramReviewManageScope,
+  hasUserManageScope,
+  isOwnerLikeAdmin,
+  normalizeAdminScope,
+} from '@/lib/admin-scope';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getRefundReasonPreset } from '@/lib/finance';
@@ -146,7 +152,7 @@ export const usersRouter = router({
         orderBy: { createdAt: 'desc' },
       });
 
-      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog] =
+      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog, telegramProfile] =
         await Promise.all([
           accessKeyIds.length > 0
             ? db.telegramServerChangeRequest.findMany({
@@ -182,7 +188,6 @@ export const usersRouter = router({
                   announcement: true,
                 },
                 orderBy: [{ createdAt: 'desc' }],
-                take: 12,
               })
             : Promise.resolve([]),
           accessKeyIds.length > 0
@@ -202,6 +207,16 @@ export const usersRouter = router({
                 take: 12,
               })
             : Promise.resolve([]),
+          customerChatIds.length > 0
+            ? db.telegramUserProfile.findFirst({
+                where: {
+                  OR: [
+                    { telegramChatId: { in: customerChatIds } },
+                    { telegramUserId: { in: customerChatIds } },
+                  ],
+                },
+              })
+            : Promise.resolve(null),
         ]);
 
       const revenueByCurrency = new Map<string, number>();
@@ -232,8 +247,31 @@ export const usersRouter = router({
         };
       }));
 
+      const announcementReadCount = announcementDeliveries.filter((delivery) => Boolean(delivery.readAt)).length;
+      const announcementPinnedCount = announcementDeliveries.filter((delivery) => delivery.isPinned).length;
+      const announcementOpenCount = announcementDeliveries.reduce(
+        (sum, delivery) => sum + delivery.openCount,
+        0,
+      );
+      const announcementClickCount = announcementDeliveries.reduce(
+        (sum, delivery) => sum + delivery.clickCount,
+        0,
+      );
+
       return {
         user,
+        telegramProfile: telegramProfile
+          ? {
+              telegramUserId: telegramProfile.telegramUserId,
+              telegramChatId: telegramProfile.telegramChatId,
+              username: telegramProfile.username,
+              locale: telegramProfile.locale,
+              allowPromoAnnouncements: telegramProfile.allowPromoAnnouncements,
+              allowMaintenanceNotices: telegramProfile.allowMaintenanceNotices,
+              allowReceiptNotifications: telegramProfile.allowReceiptNotifications,
+              allowSupportUpdates: telegramProfile.allowSupportUpdates,
+            }
+          : null,
         summary: {
           activeAccessKeys: user.accessKeys.filter((key) => key.status === 'ACTIVE').length,
           activeDynamicKeys: user.dynamicAccessKeys.filter((key) => key.status === 'ACTIVE').length,
@@ -255,17 +293,29 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
-            customerNotifications: {
-              announcements: announcementDeliveries.map((delivery) => ({
-                id: delivery.id,
-                chatId: delivery.chatId,
-                status: delivery.status,
-                isPinned: delivery.isPinned,
-                error: delivery.error,
-                readAt: delivery.readAt,
-                openCount: delivery.openCount,
-                clickCount: delivery.clickCount,
-                lastOpenedAt: delivery.lastOpenedAt,
+        customerNotifications: {
+          summary: {
+            totalAnnouncements: announcementDeliveries.length,
+            readCount: announcementReadCount,
+            unreadCount: Math.max(0, announcementDeliveries.length - announcementReadCount),
+            pinnedCount: announcementPinnedCount,
+            openCount: announcementOpenCount,
+            clickCount: announcementClickCount,
+            readRate: announcementDeliveries.length > 0 ? announcementReadCount / announcementDeliveries.length : 0,
+            clickRate: announcementDeliveries.length > 0 ? announcementClickCount / announcementDeliveries.length : 0,
+          },
+          announcements: announcementDeliveries
+            .slice(0, 24)
+            .map((delivery) => ({
+              id: delivery.id,
+              chatId: delivery.chatId,
+              status: delivery.status,
+              isPinned: delivery.isPinned,
+              error: delivery.error,
+              readAt: delivery.readAt,
+              openCount: delivery.openCount,
+              clickCount: delivery.clickCount,
+              lastOpenedAt: delivery.lastOpenedAt,
               lastClickedAt: delivery.lastClickedAt,
               sentAt: delivery.sentAt,
               createdAt: delivery.createdAt,
@@ -287,6 +337,107 @@ export const usersRouter = router({
           canConfigure: canUserConfigureFinance(ctx.user, financeControls),
         },
       };
+    }),
+
+  updateNotificationPreferences: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        allowPromoAnnouncements: z.boolean(),
+        allowMaintenanceNotices: z.boolean(),
+        allowReceiptNotifications: z.boolean(),
+        allowSupportUpdates: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update customer notification preferences.',
+        });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: input.userId },
+        select: {
+          id: true,
+          telegramChatId: true,
+          accessKeys: {
+            select: { telegramId: true },
+            take: 1,
+          },
+          dynamicAccessKeys: {
+            select: { telegramId: true },
+            take: 1,
+          },
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found.',
+        });
+      }
+
+      const telegramIdentifier =
+        user.telegramChatId ||
+        user.accessKeys[0]?.telegramId ||
+        user.dynamicAccessKeys[0]?.telegramId;
+
+      if (!telegramIdentifier) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This customer does not have a linked Telegram profile yet.',
+        });
+      }
+
+      const existingProfile = await db.telegramUserProfile.findFirst({
+        where: {
+          OR: [
+            { telegramChatId: telegramIdentifier },
+            { telegramUserId: telegramIdentifier },
+          ],
+        },
+        select: {
+          telegramUserId: true,
+          telegramChatId: true,
+        },
+      });
+
+      if (!existingProfile) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram notification preferences are not available until the user starts the bot.',
+        });
+      }
+
+      await db.telegramUserProfile.update({
+        where: { telegramUserId: existingProfile.telegramUserId },
+        data: {
+          telegramChatId: existingProfile.telegramChatId || telegramIdentifier,
+          allowPromoAnnouncements: input.allowPromoAnnouncements,
+          allowMaintenanceNotices: input.allowMaintenanceNotices,
+          allowReceiptNotifications: input.allowReceiptNotifications,
+          allowSupportUpdates: input.allowSupportUpdates,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'USER_NOTIFICATION_PREFERENCES_UPDATE',
+        entity: 'USER',
+        entityId: input.userId,
+        details: {
+          allowPromoAnnouncements: input.allowPromoAnnouncements,
+          allowMaintenanceNotices: input.allowMaintenanceNotices,
+          allowReceiptNotifications: input.allowReceiptNotifications,
+          allowSupportUpdates: input.allowSupportUpdates,
+        },
+      });
+
+      return { success: true };
     }),
 
   updateAdminScope: adminProcedure

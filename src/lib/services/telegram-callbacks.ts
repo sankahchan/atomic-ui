@@ -17,6 +17,11 @@ export type TelegramOrderUserAction =
 export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
+export type TelegramNotificationPreferenceKey =
+  | 'promo'
+  | 'maintenance'
+  | 'receipt'
+  | 'support';
 export type TelegramRetentionSource =
   | 'trial_expiry'
   | 'trial_expired'
@@ -34,6 +39,7 @@ const TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX = 'ord';
 const TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX = 'server-review';
 const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
+const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 
 export function getCommandKeyboard(isAdmin: boolean) {
   const keyboard = [
@@ -43,8 +49,9 @@ export function getCommandKeyboard(isAdmin: boolean) {
     [{ text: '/usage' }, { text: '/inbox' }],
     [{ text: '/sub' }, { text: '/server' }],
     [{ text: '/premium' }, { text: '/supportstatus' }],
-    [{ text: '/support' }, { text: '/language' }],
+    [{ text: '/support' }, { text: '/notifications' }],
     [{ text: '/cancel' }, { text: '/help' }],
+    [{ text: '/language' }],
   ];
 
   if (isAdmin) {
@@ -322,4 +329,32 @@ export function parseTelegramDynamicSupportActionCallbackData(data?: string | nu
     primary: parts[2]?.trim() || '',
     secondary: parts[3]?.trim() || null,
   };
+}
+
+export function buildTelegramNotificationPreferenceCallbackData(
+  preference: TelegramNotificationPreferenceKey,
+  enabled: boolean,
+) {
+  return `${TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX}:${preference}:${enabled ? 'on' : 'off'}`;
+}
+
+export function parseTelegramNotificationPreferenceCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const preference = parts[1];
+  if (!['promo', 'maintenance', 'receipt', 'support'].includes(preference)) {
+    return null;
+  }
+
+  return {
+    preference: preference as TelegramNotificationPreferenceKey,
+    enabled: parts[2] === 'on',
+  } as const;
 }

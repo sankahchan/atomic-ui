@@ -181,23 +181,28 @@ type TelegramSettings = {
   showLanguageSelectorOnStart: boolean;
 };
 
-type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS';
+type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS' | 'DIRECT_USER';
 type TelegramAnnouncementType = 'INFO' | 'ANNOUNCEMENT' | 'PROMO' | 'NEW_SERVER' | 'MAINTENANCE';
+type TelegramAnnouncementCardStyle = 'DEFAULT' | 'PROMO' | 'PREMIUM' | 'OPERATIONS';
+type TelegramAnnouncementRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY';
+type TelegramAnnouncementPanelAudience = Exclude<TelegramAnnouncementAudience, 'DIRECT_USER'>;
 
 type TelegramAnnouncementTemplateRow = {
   id: string;
   name: string;
-  audience: TelegramAnnouncementAudience;
+  audience: TelegramAnnouncementPanelAudience;
   type: TelegramAnnouncementType;
   targetTag?: string | null;
   targetServerId?: string | null;
   targetServerName?: string | null;
   targetCountryCode?: string | null;
+  cardStyle: TelegramAnnouncementCardStyle;
   title: string;
   message: string;
   heroImageUrl?: string | null;
   includeSupportButton: boolean;
   pinToInbox: boolean;
+  recurrenceType?: TelegramAnnouncementRecurrenceType | null;
   createdByEmail?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -211,6 +216,9 @@ type TelegramAnnouncementHistoryRow = {
   targetServerId?: string | null;
   targetServerName?: string | null;
   targetCountryCode?: string | null;
+  targetDirectUserLabel?: string | null;
+  targetDirectChatId?: string | null;
+  cardStyle: TelegramAnnouncementCardStyle;
   title: string;
   message: string;
   heroImageUrl?: string | null;
@@ -227,6 +235,8 @@ type TelegramAnnouncementHistoryRow = {
   resendRecoveredCount?: number;
   createdByUserId?: string | null;
   createdByEmail?: string | null;
+  recurrenceType?: TelegramAnnouncementRecurrenceType | null;
+  recurrenceParentId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deliveries: Array<{
@@ -282,11 +292,12 @@ type TelegramAnnouncementAnalytics = {
 };
 
 function buildTelegramAnnouncementTemplateCommand(input: {
-  audience: TelegramAnnouncementAudience;
+  audience: TelegramAnnouncementPanelAudience;
   type: TelegramAnnouncementType;
   title: string;
   message: string;
   includeSupportButton: boolean;
+  cardStyle?: TelegramAnnouncementCardStyle;
   targetTag?: string | null;
   targetServerId?: string | null;
   targetCountryCode?: string | null;
@@ -297,12 +308,61 @@ function buildTelegramAnnouncementTemplateCommand(input: {
     title: input.title,
     message: input.message,
     includeSupportButton: input.includeSupportButton,
+    cardStyle: input.cardStyle,
     filters: {
       tag: input.targetTag || null,
       serverId: input.targetServerId || null,
       countryCode: input.targetCountryCode || null,
     },
   });
+}
+
+function getAnnouncementCardStyleLabel(
+  cardStyle: TelegramAnnouncementCardStyle,
+  isMyanmar: boolean,
+) {
+  switch (cardStyle) {
+    case 'PROMO':
+      return isMyanmar ? 'Promo card' : 'Promo card';
+    case 'PREMIUM':
+      return isMyanmar ? 'Premium card' : 'Premium card';
+    case 'OPERATIONS':
+      return isMyanmar ? 'Operations card' : 'Operations card';
+    case 'DEFAULT':
+    default:
+      return isMyanmar ? 'Default card' : 'Default card';
+  }
+}
+
+function getAnnouncementCardPreviewClass(cardStyle: TelegramAnnouncementCardStyle) {
+  switch (cardStyle) {
+    case 'PROMO':
+      return 'border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-background to-rose-500/10';
+    case 'PREMIUM':
+      return 'border-cyan-500/30 bg-gradient-to-br from-cyan-500/15 via-background to-blue-500/10';
+    case 'OPERATIONS':
+      return 'border-orange-500/30 bg-gradient-to-br from-orange-500/15 via-background to-yellow-500/10';
+    case 'DEFAULT':
+    default:
+      return 'border-blue-500/20 bg-gradient-to-br from-blue-500/10 via-background to-background';
+  }
+}
+
+function getAnnouncementRecurrenceLabel(
+  recurrenceType: TelegramAnnouncementRecurrenceType | null | undefined,
+  isMyanmar: boolean,
+) {
+  switch (recurrenceType) {
+    case 'DAILY':
+      return isMyanmar ? 'နေ့စဉ်' : 'Daily';
+    case 'WEEKLY':
+      return isMyanmar ? 'အပတ်စဉ်' : 'Weekly';
+    case 'NONE':
+    case null:
+    case undefined:
+    default:
+      return isMyanmar ? 'တစ်ကြိမ်သာ' : 'One-time';
+  }
 }
 
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
@@ -1244,6 +1304,15 @@ function TelegramBotSetupCard() {
     announcementTargetServer: isMyanmar ? 'Server ဖြင့် target' : 'Target by server',
     announcementTargetRegion: isMyanmar ? 'Region ဖြင့် target' : 'Target by region',
     announcementAllTargets: isMyanmar ? 'အားလုံး' : 'All',
+    announcementCardStyle: isMyanmar ? 'Card style' : 'Card style',
+    announcementCardPreview: isMyanmar ? 'Card preview' : 'Card preview',
+    announcementCardPreviewDesc: isMyanmar
+      ? 'Telegram တွင် ပို့မည့် branded card preview ကို ကြည့်နိုင်သည်။'
+      : 'Preview the branded card style that will be sent to Telegram.',
+    announcementRecurrence: isMyanmar ? 'Repeat schedule' : 'Repeat schedule',
+    announcementOneTime: isMyanmar ? 'တစ်ကြိမ်သာ' : 'One-time',
+    announcementDaily: isMyanmar ? 'နေ့စဉ်' : 'Daily',
+    announcementWeekly: isMyanmar ? 'အပတ်စဉ်' : 'Weekly',
     includeSupportButton: isMyanmar ? 'Support button ထည့်မည်' : 'Include support button',
     sendAnnouncementNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
     announcementSent: isMyanmar ? 'Announcement ပို့ပြီးပါပြီ' : 'Announcement sent',
@@ -1304,8 +1373,9 @@ function TelegramBotSetupCard() {
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
-  const [announcementAudience, setAnnouncementAudience] = useState<TelegramAnnouncementAudience>('ACTIVE_USERS');
+  const [announcementAudience, setAnnouncementAudience] = useState<TelegramAnnouncementPanelAudience>('ACTIVE_USERS');
   const [announcementType, setAnnouncementType] = useState<TelegramAnnouncementType>('ANNOUNCEMENT');
+  const [announcementCardStyle, setAnnouncementCardStyle] = useState<TelegramAnnouncementCardStyle>('DEFAULT');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [announcementHeroImageUrl, setAnnouncementHeroImageUrl] = useState('');
@@ -1313,6 +1383,8 @@ function TelegramBotSetupCard() {
   const [announcementPinToInbox, setAnnouncementPinToInbox] = useState(false);
   const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
   const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
+  const [announcementRecurrenceType, setAnnouncementRecurrenceType] =
+    useState<TelegramAnnouncementRecurrenceType>('NONE');
   const [announcementTargetTag, setAnnouncementTargetTag] = useState('ALL');
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
@@ -1430,9 +1502,12 @@ function TelegramBotSetupCard() {
     },
   });
   const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery({
-    tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
-    serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
-    countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+    filters: {
+      tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+      serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
+      countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+    },
+    type: announcementType,
   });
   const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery();
   const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery();
@@ -1459,8 +1534,10 @@ function TelegramBotSetupCard() {
       setAnnouncementTitle('');
       setAnnouncementMessage('');
       setAnnouncementHeroImageUrl('');
+      setAnnouncementCardStyle('DEFAULT');
       setAnnouncementPinToInbox(false);
       setAnnouncementScheduledFor('');
+      setAnnouncementRecurrenceType('NONE');
     },
     onError: (error) => {
       toast({
@@ -1581,7 +1658,9 @@ function TelegramBotSetupCard() {
           message,
           audience: preset.audience,
           type: preset.type,
+          cardStyle: preset.cardStyle,
           includeSupportButton: preset.includeSupportButton,
+          recurrenceType: preset.recurrenceType || 'NONE',
           targetTag: preset.filters?.tag || null,
           targetServerId: preset.filters?.serverId || null,
           targetCountryCode: preset.filters?.countryCode || null,
@@ -1591,6 +1670,7 @@ function TelegramBotSetupCard() {
             title,
             message,
             includeSupportButton: preset.includeSupportButton,
+            cardStyle: preset.cardStyle,
             targetTag: preset.filters?.tag || null,
             targetServerId: preset.filters?.serverId || null,
             targetCountryCode: preset.filters?.countryCode || null,
@@ -2057,7 +2137,7 @@ function TelegramBotSetupCard() {
                   <Label>{telegramUi.announcementAudience}</Label>
                   <Select
                     value={announcementAudience}
-                    onValueChange={(value: TelegramAnnouncementAudience) => setAnnouncementAudience(value)}
+                    onValueChange={(value: TelegramAnnouncementPanelAudience) => setAnnouncementAudience(value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -2097,6 +2177,51 @@ function TelegramBotSetupCard() {
                       <SelectItem value="PROMO">{isMyanmar ? 'Discount / Promo' : 'Discount / Promo'}</SelectItem>
                       <SelectItem value="NEW_SERVER">{isMyanmar ? 'New server' : 'New server'}</SelectItem>
                       <SelectItem value="MAINTENANCE">{isMyanmar ? 'Maintenance' : 'Maintenance'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementCardStyle}</Label>
+                  <Select
+                    value={announcementCardStyle}
+                    onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementCardStyle(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DEFAULT">
+                        {getAnnouncementCardStyleLabel('DEFAULT', isMyanmar)}
+                      </SelectItem>
+                      <SelectItem value="PROMO">
+                        {getAnnouncementCardStyleLabel('PROMO', isMyanmar)}
+                      </SelectItem>
+                      <SelectItem value="PREMIUM">
+                        {getAnnouncementCardStyleLabel('PREMIUM', isMyanmar)}
+                      </SelectItem>
+                      <SelectItem value="OPERATIONS">
+                        {getAnnouncementCardStyleLabel('OPERATIONS', isMyanmar)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementRecurrence}</Label>
+                  <Select
+                    value={announcementRecurrenceType}
+                    onValueChange={(value: TelegramAnnouncementRecurrenceType) => setAnnouncementRecurrenceType(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">{telegramUi.announcementOneTime}</SelectItem>
+                      <SelectItem value="DAILY">{telegramUi.announcementDaily}</SelectItem>
+                      <SelectItem value="WEEKLY">{telegramUi.announcementWeekly}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2200,6 +2325,47 @@ function TelegramBotSetupCard() {
                 <p className="text-xs text-muted-foreground">{telegramUi.announcementScheduleHint}</p>
               </div>
 
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.announcementCardPreview}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementCardPreviewDesc}</p>
+                </div>
+                <div
+                  className={cn(
+                    'mt-3 overflow-hidden rounded-2xl border p-4',
+                    getAnnouncementCardPreviewClass(announcementCardStyle),
+                  )}
+                >
+                  {announcementHeroImageUrl.trim() ? (
+                    <div className="mb-3 overflow-hidden rounded-xl border border-white/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={announcementHeroImageUrl.trim()}
+                        alt={announcementTitle.trim() || 'Announcement preview'}
+                        className="h-36 w-full object-cover"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">{getAnnouncementCardStyleLabel(announcementCardStyle, isMyanmar)}</Badge>
+                    <Badge variant="outline">{announcementType}</Badge>
+                    <Badge variant="outline">
+                      {getAnnouncementRecurrenceLabel(announcementRecurrenceType, isMyanmar)}
+                    </Badge>
+                    {announcementPinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
+                  </div>
+                  <p className="mt-3 text-lg font-semibold">
+                    {announcementTitle.trim() || (isMyanmar ? 'Announcement title preview' : 'Announcement title preview')}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {announcementMessage.trim() ||
+                      (isMyanmar
+                        ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message preview ကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။'
+                        : 'This is where the branded Telegram announcement preview appears.')}
+                  </p>
+                </div>
+              </div>
+
               <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
                 <div>
                   <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
@@ -2242,6 +2408,7 @@ function TelegramBotSetupCard() {
                       type: announcementType,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
+                      cardStyle: announcementCardStyle,
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       pinToInbox: announcementPinToInbox,
@@ -2272,10 +2439,12 @@ function TelegramBotSetupCard() {
                       filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
+                      cardStyle: announcementCardStyle,
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       pinToInbox: announcementPinToInbox,
                       scheduledFor: null,
+                      recurrenceType: announcementRecurrenceType,
                     })
                   }
                   disabled={
@@ -2305,12 +2474,14 @@ function TelegramBotSetupCard() {
                       filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
+                      cardStyle: announcementCardStyle,
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       pinToInbox: announcementPinToInbox,
                       scheduledFor: announcementScheduledFor
                         ? new Date(announcementScheduledFor).toISOString()
                         : null,
+                      recurrenceType: announcementRecurrenceType,
                     })
                   }
                   disabled={
@@ -2353,6 +2524,14 @@ function TelegramBotSetupCard() {
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="outline">{preset.type}</Badge>
                           <Badge variant="outline">{preset.audience}</Badge>
+                          <Badge variant="outline">
+                            {getAnnouncementCardStyleLabel(preset.cardStyle, isMyanmar)}
+                          </Badge>
+                          {preset.recurrenceType && preset.recurrenceType !== 'NONE' ? (
+                            <Badge variant="secondary">
+                              {getAnnouncementRecurrenceLabel(preset.recurrenceType, isMyanmar)}
+                            </Badge>
+                          ) : null}
                           {preset.targetTag ? <Badge variant="secondary">Tag: {preset.targetTag}</Badge> : null}
                           {preset.targetCountryCode ? <Badge variant="secondary">Region: {preset.targetCountryCode}</Badge> : null}
                         </div>
@@ -2379,10 +2558,12 @@ function TelegramBotSetupCard() {
                             setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
                             setAnnouncementTitle(preset.title);
                             setAnnouncementMessage(preset.message);
+                            setAnnouncementCardStyle(preset.cardStyle);
                             setAnnouncementHeroImageUrl('');
                             setAnnouncementIncludeSupportButton(preset.includeSupportButton);
                             setAnnouncementPinToInbox(false);
                             setAnnouncementScheduledFor('');
+                            setAnnouncementRecurrenceType(preset.recurrenceType);
                           }}
                         >
                           {telegramUi.announcementApplyTemplate}
@@ -2412,8 +2593,10 @@ function TelegramBotSetupCard() {
                               },
                               title: preset.title,
                               message: preset.message,
+                              cardStyle: preset.cardStyle,
                               includeSupportButton: preset.includeSupportButton,
                               pinToInbox: false,
+                              recurrenceType: preset.recurrenceType,
                             })
                           }
                           disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending}
@@ -2450,9 +2633,11 @@ function TelegramBotSetupCard() {
                         filters: announcementFilters,
                         title: announcementTitle.trim(),
                         message: announcementMessage.trim(),
+                        cardStyle: announcementCardStyle,
                         heroImageUrl: announcementHeroImageUrl.trim() || null,
                         includeSupportButton: announcementIncludeSupportButton,
                         pinToInbox: announcementPinToInbox,
+                        recurrenceType: announcementRecurrenceType,
                       })
                     }
                     disabled={
@@ -2486,6 +2671,14 @@ function TelegramBotSetupCard() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{template.type}</Badge>
+                            <Badge variant="outline">
+                              {getAnnouncementCardStyleLabel(template.cardStyle, isMyanmar)}
+                            </Badge>
+                            {template.recurrenceType && template.recurrenceType !== 'NONE' ? (
+                              <Badge variant="secondary">
+                                {getAnnouncementRecurrenceLabel(template.recurrenceType, isMyanmar)}
+                              </Badge>
+                            ) : null}
                             {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                           </div>
                         </div>
@@ -2512,6 +2705,7 @@ function TelegramBotSetupCard() {
                               type: template.type,
                               title: template.title,
                               message: template.message,
+                              cardStyle: template.cardStyle,
                               includeSupportButton: template.includeSupportButton,
                               targetTag: template.targetTag,
                               targetServerId: template.targetServerId,
@@ -2532,10 +2726,12 @@ function TelegramBotSetupCard() {
                               setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
                               setAnnouncementTitle(template.title);
                               setAnnouncementMessage(template.message);
+                              setAnnouncementCardStyle(template.cardStyle);
                               setAnnouncementHeroImageUrl(template.heroImageUrl || '');
                               setAnnouncementIncludeSupportButton(template.includeSupportButton);
                               setAnnouncementPinToInbox(template.pinToInbox);
                               setAnnouncementScheduledFor('');
+                              setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
                             }}
                           >
                             {telegramUi.announcementApplyTemplate}
@@ -2551,6 +2747,7 @@ function TelegramBotSetupCard() {
                                   type: template.type,
                                   title: template.title,
                                   message: template.message,
+                                  cardStyle: template.cardStyle,
                                   includeSupportButton: template.includeSupportButton,
                                   targetTag: template.targetTag,
                                   targetServerId: template.targetServerId,
@@ -2736,11 +2933,22 @@ function TelegramBotSetupCard() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{announcement.type}</Badge>
+                            <Badge variant="outline">
+                              {getAnnouncementCardStyleLabel(announcement.cardStyle, isMyanmar)}
+                            </Badge>
                             <Badge variant="outline">{announcement.status}</Badge>
+                            {announcement.recurrenceType && announcement.recurrenceType !== 'NONE' ? (
+                              <Badge variant="secondary">
+                                {getAnnouncementRecurrenceLabel(announcement.recurrenceType, isMyanmar)}
+                              </Badge>
+                            ) : null}
                             {announcement.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                           </div>
                         </div>
-                        {(announcement.targetTag || announcement.targetServerName || announcement.targetCountryCode) ? (
+                        {(announcement.targetTag ||
+                          announcement.targetServerName ||
+                          announcement.targetCountryCode ||
+                          announcement.targetDirectUserLabel) ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {announcement.targetTag ? (
                               <Badge variant="secondary">Tag: {announcement.targetTag}</Badge>
@@ -2750,6 +2958,9 @@ function TelegramBotSetupCard() {
                             ) : null}
                             {announcement.targetCountryCode ? (
                               <Badge variant="secondary">Region: {announcement.targetCountryCode}</Badge>
+                            ) : null}
+                            {announcement.targetDirectUserLabel ? (
+                              <Badge variant="secondary">User: {announcement.targetDirectUserLabel}</Badge>
                             ) : null}
                           </div>
                         ) : null}

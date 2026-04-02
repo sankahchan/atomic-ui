@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -124,6 +125,23 @@ export default function UserLedgerPage() {
     onError: (error) => {
       toast({
         title: 'Refund review failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateNotificationPreferencesMutation = trpc.users.updateNotificationPreferences.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Notification preferences saved',
+        description: 'The customer notification settings were updated.',
+      });
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Preference update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -338,7 +356,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, financePermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, financePermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -836,7 +854,16 @@ export default function UserLedgerPage() {
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                 <p className="text-muted-foreground">Telegram chat</p>
-                <p className="mt-1 font-medium">{user.telegramChatId || 'Not linked'}</p>
+                <p className="mt-1 font-medium">{telegramProfile?.telegramChatId || user.telegramChatId || 'Not linked'}</p>
+              </div>
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <p className="text-muted-foreground">Telegram profile</p>
+                <p className="mt-1 font-medium">
+                  {telegramProfile?.username ? `@${telegramProfile.username}` : 'No username'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Locale: {telegramProfile?.locale || 'Not set'}
+                </p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                 <p className="text-muted-foreground">Joined</p>
@@ -856,6 +883,115 @@ export default function UserLedgerPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Delivery analytics
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {customerNotifications.summary.totalAnnouncements}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {customerNotifications.summary.readCount} read • {customerNotifications.summary.unreadCount} unread
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {customerNotifications.summary.openCount} opens • {customerNotifications.summary.clickCount} clicks
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Engagement
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {Math.round(customerNotifications.summary.readRate * 100)}%
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Read rate • {Math.round(customerNotifications.summary.clickRate * 100)}% click rate
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {customerNotifications.summary.pinnedCount} pinned notices delivered
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Notification preferences</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Control what this customer receives in Telegram. Users can also change these via /notifications.
+                    </p>
+                  </div>
+                  {!telegramProfile ? (
+                    <Badge variant="outline">Telegram profile required</Badge>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {[
+                    {
+                      key: 'allowPromoAnnouncements' as const,
+                      label: 'Promotions and discounts',
+                      description: 'Promo broadcasts and discounted-plan offers.',
+                      checked: telegramProfile?.allowPromoAnnouncements ?? true,
+                    },
+                    {
+                      key: 'allowMaintenanceNotices' as const,
+                      label: 'Maintenance and server updates',
+                      description: 'Maintenance, downtime, and new-server notices.',
+                      checked: telegramProfile?.allowMaintenanceNotices ?? true,
+                    },
+                    {
+                      key: 'allowReceiptNotifications' as const,
+                      label: 'Receipts and refund confirmations',
+                      description: 'Receipt, refund, and finance confirmation messages.',
+                      checked: telegramProfile?.allowReceiptNotifications ?? true,
+                    },
+                    {
+                      key: 'allowSupportUpdates' as const,
+                      label: 'Support updates',
+                      description: 'Direct support follow-up and status notices.',
+                      checked: telegramProfile?.allowSupportUpdates ?? true,
+                    },
+                  ].map((preference) => (
+                    <div key={preference.key} className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-border/60 bg-background/50 px-3 py-2 dark:bg-white/[0.02]">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{preference.label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{preference.description}</p>
+                      </div>
+                      <Switch
+                        checked={preference.checked}
+                        disabled={!telegramProfile || updateNotificationPreferencesMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          if (!telegramProfile) {
+                            return;
+                          }
+
+                          updateNotificationPreferencesMutation.mutate({
+                            userId,
+                            allowPromoAnnouncements:
+                              preference.key === 'allowPromoAnnouncements'
+                                ? checked
+                                : telegramProfile.allowPromoAnnouncements,
+                            allowMaintenanceNotices:
+                              preference.key === 'allowMaintenanceNotices'
+                                ? checked
+                                : telegramProfile.allowMaintenanceNotices,
+                            allowReceiptNotifications:
+                              preference.key === 'allowReceiptNotifications'
+                                ? checked
+                                : telegramProfile.allowReceiptNotifications,
+                            allowSupportUpdates:
+                              preference.key === 'allowSupportUpdates'
+                                ? checked
+                                : telegramProfile.allowSupportUpdates,
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <p className="mb-2 text-sm font-medium">Telegram announcements</p>
                 {announcementDeliveries.length === 0 ? (

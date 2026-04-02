@@ -12,7 +12,8 @@ export type TelegramAnnouncementAudience =
   | 'ACTIVE_USERS'
   | 'STANDARD_USERS'
   | 'PREMIUM_USERS'
-  | 'TRIAL_USERS';
+  | 'TRIAL_USERS'
+  | 'DIRECT_USER';
 
 export type TelegramAnnouncementType =
   | 'INFO'
@@ -20,6 +21,14 @@ export type TelegramAnnouncementType =
   | 'PROMO'
   | 'NEW_SERVER'
   | 'MAINTENANCE';
+
+export type TelegramAnnouncementCardStyle =
+  | 'DEFAULT'
+  | 'PROMO'
+  | 'PREMIUM'
+  | 'OPERATIONS';
+
+export type TelegramAnnouncementRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY';
 
 export type TelegramAnnouncementFilters = {
   tag?: string | null;
@@ -65,6 +74,118 @@ function matchesAnnouncementFilters(
     return false;
   }
   return true;
+}
+
+function normalizeAnnouncementCardStyle(
+  value?: string | null,
+): TelegramAnnouncementCardStyle {
+  switch ((value || '').trim().toUpperCase()) {
+    case 'PROMO':
+      return 'PROMO';
+    case 'PREMIUM':
+      return 'PREMIUM';
+    case 'OPERATIONS':
+    case 'OPS':
+      return 'OPERATIONS';
+    default:
+      return 'DEFAULT';
+  }
+}
+
+function normalizeAnnouncementRecurrenceType(
+  value?: string | null,
+): TelegramAnnouncementRecurrenceType {
+  switch ((value || '').trim().toUpperCase()) {
+    case 'DAILY':
+      return 'DAILY';
+    case 'WEEKLY':
+      return 'WEEKLY';
+    default:
+      return 'NONE';
+  }
+}
+
+function shouldRespectAnnouncementPreference(type: TelegramAnnouncementType) {
+  return type === 'PROMO' || type === 'MAINTENANCE' || type === 'NEW_SERVER';
+}
+
+function isAnnouncementAllowedForProfile(
+  profile: {
+    allowPromoAnnouncements: boolean;
+    allowMaintenanceNotices: boolean;
+  } | null | undefined,
+  type: TelegramAnnouncementType,
+) {
+  if (!profile || !shouldRespectAnnouncementPreference(type)) {
+    return true;
+  }
+
+  if (type === 'PROMO') {
+    return profile.allowPromoAnnouncements;
+  }
+
+  return profile.allowMaintenanceNotices;
+}
+
+export async function resolveTelegramAnnouncementRecipients(input: {
+  audience: TelegramAnnouncementAudience;
+  type: TelegramAnnouncementType;
+  filters?: TelegramAnnouncementFilters;
+  directChatId?: string | null;
+  bypassPreferences?: boolean;
+}) {
+  if (input.directChatId?.trim()) {
+    return [input.directChatId.trim()];
+  }
+
+  const audienceMap = await getTelegramAnnouncementAudienceMap(input.filters);
+  const chatIds =
+    input.audience === 'DIRECT_USER' ? [] : audienceMap[input.audience] || [];
+
+  if (input.bypassPreferences || chatIds.length === 0 || !shouldRespectAnnouncementPreference(input.type)) {
+    return chatIds;
+  }
+
+  const profiles = await db.telegramUserProfile.findMany({
+    where: {
+      telegramChatId: {
+        in: chatIds,
+      },
+    },
+    select: {
+      telegramChatId: true,
+      allowPromoAnnouncements: true,
+      allowMaintenanceNotices: true,
+    },
+  });
+
+  const profileMap = new Map(
+    profiles
+      .filter((profile) => Boolean(profile.telegramChatId))
+      .map((profile) => [profile.telegramChatId as string, profile]),
+  );
+
+  return chatIds.filter((chatId) =>
+    isAnnouncementAllowedForProfile(profileMap.get(chatId), input.type),
+  );
+}
+
+export function computeNextTelegramAnnouncementRun(input: {
+  recurrenceType?: string | null;
+  scheduledFor?: Date | null;
+  now?: Date;
+}) {
+  const recurrenceType = normalizeAnnouncementRecurrenceType(input.recurrenceType);
+  if (recurrenceType === 'NONE') {
+    return null;
+  }
+
+  const anchor = input.scheduledFor ? new Date(input.scheduledFor) : new Date(input.now || new Date());
+  if (recurrenceType === 'DAILY') {
+    return new Date(anchor.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return new Date(anchor.getTime() + 7 * 24 * 60 * 60 * 1000);
 }
 
 export async function getTelegramAnnouncementAudienceMap(filters?: TelegramAnnouncementFilters) {
@@ -167,6 +288,7 @@ export async function getTelegramAnnouncementAudienceMap(filters?: TelegramAnnou
     STANDARD_USERS: standardChats,
     PREMIUM_USERS: premiumChats,
     TRIAL_USERS: trialChats,
+    DIRECT_USER: [],
   } satisfies Record<TelegramAnnouncementAudience, string[]>;
 }
 
@@ -259,22 +381,40 @@ export function buildTelegramAnnouncementMessage(input: {
   type: TelegramAnnouncementType;
   title: string;
   message: string;
+  cardStyle?: TelegramAnnouncementCardStyle | string | null;
   preview?: boolean;
 }) {
+  const cardStyle = normalizeAnnouncementCardStyle(input.cardStyle);
   const heading =
-    input.type === 'PROMO'
-      ? '🎁 <b>Special offer</b>'
-      : input.type === 'NEW_SERVER'
-        ? '🛰️ <b>New server update</b>'
-        : input.type === 'MAINTENANCE'
+    cardStyle === 'PREMIUM'
+      ? '💠 <b>Premium update</b>'
+      : cardStyle === 'PROMO'
+        ? '🎁 <b>Special offer</b>'
+        : cardStyle === 'OPERATIONS'
           ? '🛠 <b>Service update</b>'
-          : input.type === 'INFO'
-            ? 'ℹ️ <b>Information</b>'
-            : '📣 <b>Announcement</b>';
+          : input.type === 'PROMO'
+            ? '🎁 <b>Special offer</b>'
+            : input.type === 'NEW_SERVER'
+              ? '🛰️ <b>New server update</b>'
+              : input.type === 'MAINTENANCE'
+                ? '🛠 <b>Service update</b>'
+                : input.type === 'INFO'
+                  ? 'ℹ️ <b>Information</b>'
+                  : '📣 <b>Announcement</b>';
+
+  const accentLine =
+    cardStyle === 'PREMIUM'
+      ? '━━━━━━━━━━━━ PREMIUM ━━━━━━━━━━━━'
+      : cardStyle === 'PROMO'
+        ? '━━━━━━━━━━━━ OFFER ━━━━━━━━━━━━━━'
+        : cardStyle === 'OPERATIONS'
+          ? '━━━━━━━━━━━━ STATUS ━━━━━━━━━━━━━'
+          : null;
 
   const bodyLines = [
     ...(input.preview ? ['🧪 <b>Preview</b>', ''] : []),
     heading,
+    ...(accentLine ? [accentLine] : []),
     '',
     `<b>${escapeHtml(input.title.trim())}</b>`,
     escapeHtml(input.message.trim()),
@@ -296,6 +436,7 @@ export async function sendTelegramAnnouncementPreview(input: {
   title: string;
   message: string;
   heroImageUrl?: string | null;
+  cardStyle?: TelegramAnnouncementCardStyle | string | null;
   includeSupportButton?: boolean;
   pinToInbox?: boolean;
 }) {
@@ -311,6 +452,7 @@ export async function sendTelegramAnnouncementPreview(input: {
     message: input.pinToInbox
       ? `${input.message.trim()}\n\nThis notice will be pinned in the customer inbox.`
       : input.message,
+    cardStyle: input.cardStyle,
     preview: true,
   });
   const keyboardRows = [];
@@ -376,13 +518,17 @@ export async function dispatchTelegramAnnouncement(input: {
   }
 
   const audience = announcement.audience as TelegramAnnouncementAudience;
-  const chatIds = (
-    await getTelegramAnnouncementAudienceMap({
+  const chatIds = await resolveTelegramAnnouncementRecipients({
+    audience,
+    type: announcement.type as TelegramAnnouncementType,
+    filters: {
       tag: announcement.targetTag,
       serverId: announcement.targetServerId,
       countryCode: announcement.targetCountryCode,
-    })
-  )[audience] || [];
+    },
+    directChatId: announcement.targetDirectChatId,
+    bypassPreferences: Boolean(announcement.targetDirectChatId),
+  });
 
   if (chatIds.length === 0) {
     await db.telegramAnnouncement.update({
@@ -477,6 +623,7 @@ export async function dispatchTelegramAnnouncement(input: {
     type: announcement.type as TelegramAnnouncementType,
     title: announcement.title,
     message: announcement.message,
+    cardStyle: announcement.cardStyle,
   });
 
   let sentDelta = 0;
@@ -561,6 +708,75 @@ export async function dispatchTelegramAnnouncement(input: {
   };
 }
 
+export async function dispatchTelegramAnnouncementSchedule(input: {
+  announcementId: string;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const announcement = await db.telegramAnnouncement.findUnique({
+    where: { id: input.announcementId },
+  });
+
+  if (!announcement) {
+    return { skipped: true as const, reason: 'not-found' as const };
+  }
+
+  const recurrenceType = normalizeAnnouncementRecurrenceType(announcement.recurrenceType);
+  const isRecurringParent = recurrenceType !== 'NONE' && !announcement.recurrenceParentId;
+
+  if (!isRecurringParent) {
+    return dispatchTelegramAnnouncement({
+      announcementId: input.announcementId,
+      now,
+    });
+  }
+
+  const occurrence = await db.telegramAnnouncement.create({
+    data: {
+      audience: announcement.audience,
+      type: announcement.type,
+      targetTag: announcement.targetTag,
+      targetServerId: announcement.targetServerId,
+      targetServerName: announcement.targetServerName,
+      targetCountryCode: announcement.targetCountryCode,
+      targetDirectChatId: announcement.targetDirectChatId,
+      targetDirectUserLabel: announcement.targetDirectUserLabel,
+      title: announcement.title,
+      message: announcement.message,
+      heroImageUrl: announcement.heroImageUrl,
+      cardStyle: announcement.cardStyle,
+      includeSupportButton: announcement.includeSupportButton,
+      pinToInbox: announcement.pinToInbox,
+      status: 'PROCESSING',
+      scheduledFor: now,
+      recurrenceParentId: announcement.id,
+      createdByUserId: announcement.createdByUserId,
+      createdByEmail: announcement.createdByEmail,
+    },
+  });
+
+  const result = await dispatchTelegramAnnouncement({
+    announcementId: occurrence.id,
+    now,
+  });
+
+  await db.telegramAnnouncement.update({
+    where: { id: announcement.id },
+    data: {
+      status: 'SCHEDULED',
+      scheduledFor: computeNextTelegramAnnouncementRun({
+        recurrenceType,
+        scheduledFor: announcement.scheduledFor || now,
+        now,
+      }),
+      lastAttemptedAt: now,
+      sentAt: result.skipped ? announcement.sentAt : now,
+    },
+  });
+
+  return result;
+}
+
 export async function runTelegramAnnouncementCycle(input?: {
   now?: Date;
 }) {
@@ -583,7 +799,7 @@ export async function runTelegramAnnouncementCycle(input?: {
   let failed = 0;
 
   for (const announcement of dueAnnouncements) {
-    const result = await dispatchTelegramAnnouncement({
+    const result = await dispatchTelegramAnnouncementSchedule({
       announcementId: announcement.id,
       now,
     });

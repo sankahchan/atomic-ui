@@ -31,10 +31,14 @@ import {
 } from '@/lib/services/telegram-sales';
 import {
   dispatchTelegramAnnouncement,
+  dispatchTelegramAnnouncementSchedule,
   getTelegramAnnouncementAudienceMap,
   listTelegramAnnouncementTargetOptions,
+  resolveTelegramAnnouncementRecipients,
   sendTelegramAnnouncementPreview,
   type TelegramAnnouncementAudience,
+  type TelegramAnnouncementCardStyle,
+  type TelegramAnnouncementRecurrenceType,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
 import {
@@ -85,6 +89,17 @@ const telegramAnnouncementTypeSchema = z.enum([
   'PROMO',
   'NEW_SERVER',
   'MAINTENANCE',
+]);
+const telegramAnnouncementCardStyleSchema = z.enum([
+  'DEFAULT',
+  'PROMO',
+  'PREMIUM',
+  'OPERATIONS',
+]);
+const telegramAnnouncementRecurrenceTypeSchema = z.enum([
+  'NONE',
+  'DAILY',
+  'WEEKLY',
 ]);
 
 const telegramAnnouncementTemplateNameSchema = z.string().trim().min(2).max(80);
@@ -1790,15 +1805,44 @@ export const telegramBotRouter = router({
   }),
 
   getAnnouncementAudienceCounts: adminProcedure
-    .input(telegramAnnouncementTargetFiltersSchema.optional())
+    .input(
+      z.object({
+        filters: telegramAnnouncementTargetFiltersSchema.optional(),
+        type: telegramAnnouncementTypeSchema.default('ANNOUNCEMENT'),
+      }).optional(),
+    )
     .query(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
-      const audienceMap = await getTelegramAnnouncementAudienceMap(input);
+      const filters = input?.filters;
       return {
-        ACTIVE_USERS: audienceMap.ACTIVE_USERS.length,
-        STANDARD_USERS: audienceMap.STANDARD_USERS.length,
-        PREMIUM_USERS: audienceMap.PREMIUM_USERS.length,
-        TRIAL_USERS: audienceMap.TRIAL_USERS.length,
+        ACTIVE_USERS: (
+          await resolveTelegramAnnouncementRecipients({
+            audience: 'ACTIVE_USERS',
+            type: input?.type || 'ANNOUNCEMENT',
+            filters,
+          })
+        ).length,
+        STANDARD_USERS: (
+          await resolveTelegramAnnouncementRecipients({
+            audience: 'STANDARD_USERS',
+            type: input?.type || 'ANNOUNCEMENT',
+            filters,
+          })
+        ).length,
+        PREMIUM_USERS: (
+          await resolveTelegramAnnouncementRecipients({
+            audience: 'PREMIUM_USERS',
+            type: input?.type || 'ANNOUNCEMENT',
+            filters,
+          })
+        ).length,
+        TRIAL_USERS: (
+          await resolveTelegramAnnouncementRecipients({
+            audience: 'TRIAL_USERS',
+            type: input?.type || 'ANNOUNCEMENT',
+            filters,
+          })
+        ).length,
       };
     }),
 
@@ -1816,15 +1860,20 @@ export const telegramBotRouter = router({
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
+        cardStyle: telegramAnnouncementCardStyleSchema.default('DEFAULT'),
         includeSupportButton: z.boolean().default(true),
         pinToInbox: z.boolean().default(false),
         scheduledFor: z.string().datetime().nullable().optional(),
+        recurrenceType: telegramAnnouncementRecurrenceTypeSchema.default('NONE'),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
-      const audienceMap = await getTelegramAnnouncementAudienceMap(input.filters);
-      const chatIds = audienceMap[input.audience];
+      const chatIds = await resolveTelegramAnnouncementRecipients({
+        audience: input.audience,
+        type: input.type,
+        filters: input.filters,
+      });
       if (chatIds.length === 0) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -1837,6 +1886,12 @@ export const telegramBotRouter = router({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Invalid schedule time.',
+        });
+      }
+      if (input.recurrenceType !== 'NONE' && !scheduledFor) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Recurring announcements require a scheduled time.',
         });
       }
 
@@ -1858,10 +1913,12 @@ export const telegramBotRouter = router({
           title: input.title.trim(),
           message: input.message.trim(),
           heroImageUrl: input.heroImageUrl?.trim() || null,
+          cardStyle: input.cardStyle,
           includeSupportButton: input.includeSupportButton,
           pinToInbox: input.pinToInbox,
           status: scheduledFor && scheduledFor.getTime() > Date.now() ? 'SCHEDULED' : 'PROCESSING',
           scheduledFor,
+          recurrenceType: input.recurrenceType === 'NONE' ? null : input.recurrenceType,
           totalRecipients: chatIds.length,
           createdByUserId: ctx.user.id,
           createdByEmail: ctx.user.email ?? null,
@@ -1903,8 +1960,10 @@ export const telegramBotRouter = router({
           sentCount,
           failedCount,
           scheduledFor: scheduledFor?.toISOString() ?? null,
+          recurrenceType: input.recurrenceType,
           filters: input.filters ?? null,
           heroImageUrl: input.heroImageUrl?.trim() || null,
+          cardStyle: input.cardStyle,
         },
       });
 
@@ -1925,6 +1984,7 @@ export const telegramBotRouter = router({
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
+        cardStyle: telegramAnnouncementCardStyleSchema.default('DEFAULT'),
         includeSupportButton: z.boolean().default(true),
         pinToInbox: z.boolean().default(false),
       }),
@@ -1951,6 +2011,7 @@ export const telegramBotRouter = router({
         title: input.title,
         message: input.message,
         heroImageUrl: input.heroImageUrl,
+        cardStyle: input.cardStyle,
         includeSupportButton: input.includeSupportButton,
         pinToInbox: input.pinToInbox,
       });
@@ -1972,6 +2033,7 @@ export const telegramBotRouter = router({
           title: input.title,
           includeSupportButton: input.includeSupportButton,
           pinToInbox: input.pinToInbox,
+          cardStyle: input.cardStyle,
         },
       });
 
@@ -2169,7 +2231,7 @@ export const telegramBotRouter = router({
         });
       }
 
-      const result = await dispatchTelegramAnnouncement({
+      const result = await dispatchTelegramAnnouncementSchedule({
         announcementId: input.announcementId,
       });
       if (result.skipped) {
@@ -2262,8 +2324,10 @@ export const telegramBotRouter = router({
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
+        cardStyle: telegramAnnouncementCardStyleSchema.default('DEFAULT'),
         includeSupportButton: z.boolean().default(true),
         pinToInbox: z.boolean().default(false),
+        recurrenceType: telegramAnnouncementRecurrenceTypeSchema.default('NONE'),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -2285,8 +2349,10 @@ export const telegramBotRouter = router({
         title: input.title.trim(),
         message: input.message.trim(),
         heroImageUrl: input.heroImageUrl?.trim() || null,
+        cardStyle: input.cardStyle,
         includeSupportButton: input.includeSupportButton,
         pinToInbox: input.pinToInbox,
+        recurrenceType: input.recurrenceType === 'NONE' ? null : input.recurrenceType,
         createdByUserId: ctx.user.id,
         createdByEmail: ctx.user.email ?? null,
       };

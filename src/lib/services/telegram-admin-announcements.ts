@@ -3,7 +3,9 @@ import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import {
   dispatchTelegramAnnouncement,
-  getTelegramAnnouncementAudienceMap,
+  resolveTelegramAnnouncementRecipients,
+  type TelegramAnnouncementCardStyle,
+  type TelegramAnnouncementRecurrenceType,
   type TelegramAnnouncementAudience,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
@@ -49,14 +51,51 @@ function resolveTelegramAnnouncementTypeToken(value?: string | null): TelegramAn
   }
 }
 
+function resolveTelegramAnnouncementCardStyleToken(
+  value?: string | null,
+): TelegramAnnouncementCardStyle | null {
+  switch ((value || '').trim().toLowerCase()) {
+    case '':
+    case 'default':
+      return 'DEFAULT';
+    case 'promo':
+      return 'PROMO';
+    case 'premium':
+      return 'PREMIUM';
+    case 'ops':
+    case 'operations':
+      return 'OPERATIONS';
+    default:
+      return null;
+  }
+}
+
+function resolveTelegramAnnouncementRecurrenceToken(
+  value?: string | null,
+): TelegramAnnouncementRecurrenceType | null {
+  switch ((value || '').trim().toLowerCase()) {
+    case '':
+    case 'none':
+      return 'NONE';
+    case 'daily':
+      return 'DAILY';
+    case 'weekly':
+      return 'WEEKLY';
+    default:
+      return null;
+  }
+}
+
 type TelegramAdminAnnouncementParseError = { error: string };
 type TelegramAdminAnnouncementParseSuccess = {
   error: null;
   audience: TelegramAnnouncementAudience;
   type: TelegramAnnouncementType;
+  cardStyle: TelegramAnnouncementCardStyle;
   title: string;
   message: string;
   includeSupportButton: boolean;
+  pinToInbox: boolean;
   filters: {
     tag: string | null;
     serverId: string | null;
@@ -79,13 +118,103 @@ function formatTelegramAnnouncementTargetSummary(input: {
   tag?: string | null;
   serverName?: string | null;
   countryCode?: string | null;
+  directUserLabel?: string | null;
 }) {
   const parts = [
+    input.directUserLabel ? `user=${input.directUserLabel}` : null,
     input.tag ? `tag=${input.tag}` : null,
     input.serverName ? `server=${input.serverName}` : null,
     input.countryCode ? `region=${input.countryCode}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(' • ') : 'all matching users';
+}
+
+async function resolveSingleTelegramAnnouncementRecipient(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalizedUsername = trimmed.replace(/^@/, '').toLowerCase();
+  const directNumeric = /^\d+$/.test(trimmed) ? trimmed : null;
+
+  const [profile, user, accessKey, dynamicKey] = await Promise.all([
+    db.telegramUserProfile.findFirst({
+      where: {
+        OR: [
+          directNumeric
+            ? { telegramChatId: directNumeric }
+            : undefined,
+          directNumeric
+            ? { telegramUserId: directNumeric }
+            : undefined,
+          { username: normalizedUsername },
+        ].filter(Boolean) as any,
+      },
+      select: {
+        telegramChatId: true,
+        telegramUserId: true,
+        username: true,
+      },
+    }),
+    db.user.findFirst({
+      where: {
+        OR: [
+          { email: trimmed.toLowerCase() },
+          directNumeric ? { telegramChatId: directNumeric } : undefined,
+        ].filter(Boolean) as any,
+      },
+      select: {
+        email: true,
+        telegramChatId: true,
+      },
+    }),
+    db.accessKey.findFirst({
+      where: {
+        OR: [
+          { email: { equals: trimmed.toLowerCase() } },
+          directNumeric ? { telegramId: directNumeric } : undefined,
+        ].filter(Boolean) as any,
+      },
+      select: {
+        email: true,
+        telegramId: true,
+      },
+    }),
+    db.dynamicAccessKey.findFirst({
+      where: {
+        OR: [
+          { email: { equals: trimmed.toLowerCase() } },
+          directNumeric ? { telegramId: directNumeric } : undefined,
+        ].filter(Boolean) as any,
+      },
+      select: {
+        email: true,
+        telegramId: true,
+      },
+    }),
+  ]);
+
+  const chatId =
+    profile?.telegramChatId ||
+    user?.telegramChatId ||
+    accessKey?.telegramId ||
+    dynamicKey?.telegramId ||
+    directNumeric;
+
+  if (!chatId) {
+    return null;
+  }
+
+  const label =
+    profile?.username
+      ? `@${profile.username}`
+      : user?.email || accessKey?.email || dynamicKey?.email || chatId;
+
+  return {
+    chatId,
+    label,
+  };
 }
 
 async function parseTelegramAdminAnnouncementArgs(
@@ -94,8 +223,8 @@ async function parseTelegramAdminAnnouncementArgs(
 ): Promise<TelegramAdminAnnouncementParseResult> {
   const usage =
     locale === 'my'
-      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] :: TITLE :: MESSAGE'
-      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] :: TITLE :: MESSAGE';
+      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE'
+      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE';
   const parts = argsText
     .split('::')
     .map((part) => part.trim())
@@ -114,7 +243,9 @@ async function parseTelegramAdminAnnouncementArgs(
   }
 
   let type: TelegramAnnouncementType = 'ANNOUNCEMENT';
+  let cardStyle: TelegramAnnouncementCardStyle = 'DEFAULT';
   let includeSupportButton = true;
+  let pinToInbox = false;
   let tag: string | null = null;
   let serverId: string | null = null;
   let countryCode: string | null = null;
@@ -137,6 +268,15 @@ async function parseTelegramAdminAnnouncementArgs(
       continue;
     }
 
+    if (key === 'style' || key === 'card') {
+      const resolvedStyle = resolveTelegramAnnouncementCardStyleToken(rawValue);
+      if (!resolvedStyle) {
+        return { error: usage } satisfies TelegramAdminAnnouncementParseResult;
+      }
+      cardStyle = resolvedStyle;
+      continue;
+    }
+
     if (key === 'tag') {
       tag = rawValue.toLowerCase();
       continue;
@@ -149,6 +289,11 @@ async function parseTelegramAdminAnnouncementArgs(
 
     if (key === 'support') {
       includeSupportButton = !['no', 'false', '0'].includes(rawValue.toLowerCase());
+      continue;
+    }
+
+    if (key === 'pin') {
+      pinToInbox = ['yes', 'true', '1'].includes(rawValue.toLowerCase());
       continue;
     }
 
@@ -182,9 +327,11 @@ async function parseTelegramAdminAnnouncementArgs(
     error: null,
     audience,
     type,
+    cardStyle,
     title,
     message,
     includeSupportButton,
+    pinToInbox,
     filters: {
       tag,
       serverId,
@@ -216,6 +363,7 @@ export async function handleAnnouncementsCommand(locale: SupportedLocale) {
       `• <b>${escapeHtml(announcement.title)}</b>`,
       `  ${escapeHtml(announcement.type)} • ${escapeHtml(announcement.status)} • ${announcement.sentCount}/${announcement.totalRecipients}`,
       `  ${formatTelegramAnnouncementTargetSummary({
+        directUserLabel: announcement.targetDirectUserLabel,
         tag: announcement.targetTag,
         serverName: announcement.targetServerName,
         countryCode: announcement.targetCountryCode,
@@ -235,8 +383,8 @@ export async function handleScheduleAnnouncementCommand(
   const [rawSchedule, ...restTokens] = argsText.trim().split(/\s+/);
   if (!rawSchedule || restTokens.length === 0) {
     return locale === 'my'
-      ? 'အသုံးပြုပုံ: /scheduleannouncement YYYY-MM-DDThh:mm AUDIENCE [filters] :: TITLE :: MESSAGE'
-      : 'Usage: /scheduleannouncement YYYY-MM-DDThh:mm AUDIENCE [filters] :: TITLE :: MESSAGE';
+      ? 'အသုံးပြုပုံ: /scheduleannouncement YYYY-MM-DDThh:mm [repeat=daily|weekly] AUDIENCE [filters] :: TITLE :: MESSAGE'
+      : 'Usage: /scheduleannouncement YYYY-MM-DDThh:mm [repeat=daily|weekly] AUDIENCE [filters] :: TITLE :: MESSAGE';
   }
 
   const scheduledFor = new Date(rawSchedule);
@@ -246,13 +394,30 @@ export async function handleScheduleAnnouncementCommand(
       : 'Choose a valid future time at least one minute from now.';
   }
 
+  let recurrenceType: TelegramAnnouncementRecurrenceType = 'NONE';
+  if (restTokens[0]?.startsWith('repeat=')) {
+    const rawRepeat = restTokens.shift()?.split('=').slice(1).join('=');
+    const resolvedRecurrence = resolveTelegramAnnouncementRecurrenceToken(rawRepeat);
+    if (!resolvedRecurrence || resolvedRecurrence === 'NONE') {
+      return locale === 'my'
+        ? 'repeat=daily သို့မဟုတ် repeat=weekly ကို အသုံးပြုပါ။'
+        : 'Use repeat=daily or repeat=weekly.';
+    }
+    recurrenceType = resolvedRecurrence;
+  }
+
   const parsed = await parseTelegramAdminAnnouncementArgs(restTokens.join(' '), locale);
   if (!isTelegramAdminAnnouncementParseSuccess(parsed)) {
     return parsed.error;
   }
 
-  const audienceMap = await getTelegramAnnouncementAudienceMap(parsed.filters);
-  const totalRecipients = audienceMap[parsed.audience]?.length || 0;
+  const totalRecipients = (
+    await resolveTelegramAnnouncementRecipients({
+      audience: parsed.audience,
+      type: parsed.type,
+      filters: parsed.filters,
+    })
+  ).length;
   if (totalRecipients === 0) {
     return locale === 'my'
       ? 'ဤ target အတွက် ပို့ရန် Telegram user မတွေ့ပါ။'
@@ -265,9 +430,12 @@ export async function handleScheduleAnnouncementCommand(
       type: parsed.type,
       title: parsed.title,
       message: parsed.message,
+      cardStyle: parsed.cardStyle,
       includeSupportButton: parsed.includeSupportButton,
+      pinToInbox: parsed.pinToInbox,
       status: 'SCHEDULED',
       scheduledFor,
+      recurrenceType: recurrenceType === 'NONE' ? null : recurrenceType,
       createdByEmail: 'telegram-admin',
       targetTag: parsed.filters.tag,
       targetServerId: parsed.filters.serverId,
@@ -284,15 +452,17 @@ export async function handleScheduleAnnouncementCommand(
     details: {
       audience: parsed.audience,
       type: parsed.type,
+      cardStyle: parsed.cardStyle,
       filters: parsed.filters,
       scheduledFor: scheduledFor.toISOString(),
+      recurrenceType,
       via: 'telegram_bot',
     },
   });
 
   return locale === 'my'
-    ? `🗓️ Announcement ကို ${formatTelegramDateTime(scheduledFor, locale)} တွင် ပို့ရန် schedule လုပ်ပြီးပါပြီ။`
-    : `🗓️ Scheduled the announcement for ${formatTelegramDateTime(scheduledFor, locale)}.`;
+    ? `🗓️ Announcement ကို ${formatTelegramDateTime(scheduledFor, locale)} တွင်${recurrenceType === 'DAILY' ? ' နေ့စဉ်' : recurrenceType === 'WEEKLY' ? ' အပတ်စဉ်' : ''} ပို့ရန် schedule လုပ်ပြီးပါပြီ။`
+    : `🗓️ Scheduled the announcement for ${formatTelegramDateTime(scheduledFor, locale)}${recurrenceType === 'DAILY' ? ' and repeat it daily' : recurrenceType === 'WEEKLY' ? ' and repeat it weekly' : ''}.`;
 }
 
 export async function handleAnnounceCommand(argsText: string, locale: SupportedLocale) {
@@ -301,8 +471,13 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
     return parsed.error;
   }
 
-  const audienceMap = await getTelegramAnnouncementAudienceMap(parsed.filters);
-  const totalRecipients = audienceMap[parsed.audience]?.length || 0;
+  const totalRecipients = (
+    await resolveTelegramAnnouncementRecipients({
+      audience: parsed.audience,
+      type: parsed.type,
+      filters: parsed.filters,
+    })
+  ).length;
   if (totalRecipients === 0) {
     return locale === 'my'
       ? 'ဤ target အတွက် ပို့ရန် Telegram user မတွေ့ပါ။'
@@ -315,7 +490,9 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
       type: parsed.type,
       title: parsed.title,
       message: parsed.message,
+      cardStyle: parsed.cardStyle,
       includeSupportButton: parsed.includeSupportButton,
+      pinToInbox: parsed.pinToInbox,
       status: 'SCHEDULED',
       scheduledFor: new Date(),
       createdByEmail: 'telegram-admin',
@@ -344,6 +521,7 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
     details: {
       audience: parsed.audience,
       type: parsed.type,
+      cardStyle: parsed.cardStyle,
       filters: parsed.filters,
       sentCount: result.sentCount,
       failedCount: result.failedCount,
@@ -354,4 +532,126 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
   return locale === 'my'
     ? `📣 Announcement ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။${result.failedCount > 0 ? ` failed: ${result.failedCount}` : ''}`
     : `📣 Sent the announcement to ${result.sentCount} user(s).${result.failedCount > 0 ? ` Failed: ${result.failedCount}.` : ''}`;
+}
+
+export async function handleAnnounceUserCommand(
+  argsText: string,
+  locale: SupportedLocale,
+) {
+  const usage =
+    locale === 'my'
+      ? 'အသုံးပြုပုံ: /announceuser CHAT-ID|EMAIL|@USERNAME [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [support=yes|no] :: TITLE :: MESSAGE'
+      : 'Usage: /announceuser CHAT-ID|EMAIL|@USERNAME [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [support=yes|no] :: TITLE :: MESSAGE';
+
+  const parts = argsText
+    .split('::')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 3) {
+    return usage;
+  }
+
+  const [targetPart, title, ...messageParts] = parts;
+  const message = messageParts.join(' :: ').trim();
+  const tokens = targetPart.split(/\s+/).filter(Boolean);
+  const recipientQuery = tokens.shift();
+  if (!recipientQuery || title.length < 3 || message.length < 10) {
+    return usage;
+  }
+
+  const recipient = await resolveSingleTelegramAnnouncementRecipient(recipientQuery);
+  if (!recipient) {
+    return locale === 'my'
+      ? 'Telegram recipient ကို မတွေ့ပါ။ Chat ID, email, သို့မဟုတ် @username ကို အသုံးပြုပါ။'
+      : 'Telegram recipient not found. Use a chat ID, email, or @username.';
+  }
+
+  let type: TelegramAnnouncementType = 'ANNOUNCEMENT';
+  let cardStyle: TelegramAnnouncementCardStyle = 'DEFAULT';
+  let includeSupportButton = true;
+  let pinToInbox = true;
+
+  for (const token of tokens) {
+    const [rawKey, ...rawValueParts] = token.split('=');
+    const key = rawKey?.trim().toLowerCase();
+    const rawValue = rawValueParts.join('=').trim();
+    if (!key || !rawValue) {
+      continue;
+    }
+
+    if (key === 'type') {
+      const resolvedType = resolveTelegramAnnouncementTypeToken(rawValue);
+      if (!resolvedType) {
+        return usage;
+      }
+      type = resolvedType;
+      continue;
+    }
+
+    if (key === 'style' || key === 'card') {
+      const resolvedStyle = resolveTelegramAnnouncementCardStyleToken(rawValue);
+      if (!resolvedStyle) {
+        return usage;
+      }
+      cardStyle = resolvedStyle;
+      continue;
+    }
+
+    if (key === 'support') {
+      includeSupportButton = !['no', 'false', '0'].includes(rawValue.toLowerCase());
+      continue;
+    }
+
+    if (key === 'pin') {
+      pinToInbox = ['yes', 'true', '1'].includes(rawValue.toLowerCase());
+    }
+  }
+
+  const announcement = await db.telegramAnnouncement.create({
+    data: {
+      audience: 'DIRECT_USER',
+      type,
+      targetDirectChatId: recipient.chatId,
+      targetDirectUserLabel: recipient.label,
+      title,
+      message,
+      cardStyle,
+      includeSupportButton,
+      pinToInbox,
+      status: 'SCHEDULED',
+      scheduledFor: new Date(),
+      createdByEmail: 'telegram-admin',
+      totalRecipients: 1,
+    },
+  });
+
+  const result = await dispatchTelegramAnnouncement({
+    announcementId: announcement.id,
+    now: new Date(),
+  });
+
+  if (result.skipped) {
+    return locale === 'my'
+      ? 'Message ကို မပို့နိုင်ပါ။ Telegram settings ကို စစ်ဆေးပါ။'
+      : 'The direct Telegram message could not be sent. Check the Telegram configuration.';
+  }
+
+  await writeAuditLog({
+    action: 'TELEGRAM_ADMIN_DIRECT_ANNOUNCEMENT_SENT',
+    entity: 'TELEGRAM_ANNOUNCEMENT',
+    entityId: announcement.id,
+    details: {
+      audience: 'DIRECT_USER',
+      recipient: recipient.label,
+      recipientChatId: recipient.chatId,
+      type,
+      cardStyle,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `📨 ${escapeHtml(recipient.label)} ထံ message ကို ပို့ပြီးပါပြီ။`
+    : `📨 Sent the message to ${escapeHtml(recipient.label)}.`;
 }

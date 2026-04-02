@@ -13,11 +13,24 @@ export type TelegramAnnouncementPresetType =
   | 'NEW_SERVER'
   | 'MAINTENANCE';
 
+export type TelegramAnnouncementPresetCardStyle =
+  | 'DEFAULT'
+  | 'PROMO'
+  | 'PREMIUM'
+  | 'OPERATIONS';
+
+export type TelegramAnnouncementPresetRecurrenceType =
+  | 'NONE'
+  | 'DAILY'
+  | 'WEEKLY';
+
 export type TelegramAnnouncementPreset = {
   code: string;
   audience: TelegramAnnouncementPresetAudience;
   type: TelegramAnnouncementPresetType;
+  cardStyle: TelegramAnnouncementPresetCardStyle;
   includeSupportButton: boolean;
+  recurrenceType?: TelegramAnnouncementPresetRecurrenceType;
   filters?: {
     tag?: string | null;
     serverId?: string | null;
@@ -33,6 +46,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'new_server_active',
     audience: 'ACTIVE_USERS',
     type: 'NEW_SERVER',
+    cardStyle: 'OPERATIONS',
     includeSupportButton: true,
     name: {
       en: 'New server launch',
@@ -51,6 +65,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'maintenance_active',
     audience: 'ACTIVE_USERS',
     type: 'MAINTENANCE',
+    cardStyle: 'OPERATIONS',
     includeSupportButton: true,
     name: {
       en: 'Planned maintenance',
@@ -69,6 +84,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'downtime_active',
     audience: 'ACTIVE_USERS',
     type: 'INFO',
+    cardStyle: 'OPERATIONS',
     includeSupportButton: true,
     name: {
       en: 'Server issue notice',
@@ -87,6 +103,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'discount_active',
     audience: 'ACTIVE_USERS',
     type: 'PROMO',
+    cardStyle: 'PROMO',
     includeSupportButton: true,
     name: {
       en: 'Discount offer',
@@ -105,6 +122,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'premium_active',
     audience: 'ACTIVE_USERS',
     type: 'PROMO',
+    cardStyle: 'PREMIUM',
     includeSupportButton: true,
     name: {
       en: 'Premium promo',
@@ -123,6 +141,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'trial_to_paid',
     audience: 'TRIAL_USERS',
     type: 'PROMO',
+    cardStyle: 'PROMO',
     includeSupportButton: true,
     name: {
       en: 'Trial upgrade',
@@ -141,6 +160,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'renewal_active',
     audience: 'ACTIVE_USERS',
     type: 'INFO',
+    cardStyle: 'DEFAULT',
     includeSupportButton: true,
     name: {
       en: 'Renewal reminder',
@@ -159,6 +179,7 @@ export const TELEGRAM_ANNOUNCEMENT_PRESETS: TelegramAnnouncementPreset[] = [
     code: 'telegram_users',
     audience: 'ACTIVE_USERS',
     type: 'INFO',
+    cardStyle: 'DEFAULT',
     includeSupportButton: true,
     filters: {
       tag: 'tele',
@@ -248,6 +269,7 @@ export function buildTelegramAnnouncementCommand(input: {
   title: string;
   message: string;
   includeSupportButton?: boolean;
+  cardStyle?: TelegramAnnouncementPresetCardStyle;
   filters?: {
     tag?: string | null;
     serverId?: string | null;
@@ -266,6 +288,9 @@ export function buildTelegramAnnouncementCommand(input: {
   }
   if (input.filters?.countryCode) {
     parts.push(`region=${input.filters.countryCode.toUpperCase()}`);
+  }
+  if (input.cardStyle && input.cardStyle !== 'DEFAULT') {
+    parts.push(`style=${resolveTelegramAnnouncementCardStyleToken(input.cardStyle)}`);
   }
 
   parts.push(`support=${input.includeSupportButton === false ? 'no' : 'yes'}`);
@@ -300,5 +325,19 @@ function resolveTelegramAnnouncementTypeToken(type: TelegramAnnouncementPresetTy
     case 'ANNOUNCEMENT':
     default:
       return 'announcement';
+  }
+}
+
+function resolveTelegramAnnouncementCardStyleToken(style: TelegramAnnouncementPresetCardStyle) {
+  switch (style) {
+    case 'PROMO':
+      return 'promo';
+    case 'PREMIUM':
+      return 'premium';
+    case 'OPERATIONS':
+      return 'ops';
+    case 'DEFAULT':
+    default:
+      return 'default';
   }
 }

@@ -25,6 +25,7 @@ export {
 } from '@/lib/services/telegram-admin-core';
 export {
   handleAnnounceCommand,
+  handleAnnounceUserCommand,
   handleAnnouncementsCommand,
   handleScheduleAnnouncementCommand,
 } from '@/lib/services/telegram-admin-announcements';
@@ -553,6 +554,7 @@ export function buildTelegramHelpMessage(input: {
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
 /inbox - announcement နှင့် key notice များကို ကြည့်မည်
+/notifications - notice preference များကို ပြောင်းမည်
 /premium - premium key support shortcut များကို ကြည့်မည်
 /supportstatus - premium support request အခြေအနေကို ကြည့်မည်
 /sub - Share page များကို လက်ခံမည်
@@ -573,6 +575,7 @@ export function buildTelegramHelpMessage(input: {
 /usage - Fetch your usage and QR/setup info
 /mykeys - List linked keys and IDs
 /inbox - Show your recent notices and announcements
+/notifications - Manage your notice preferences
 /premium - Open premium support shortcuts
 /supportstatus - Check your premium support request status
 /sub - Receive your share pages
@@ -592,9 +595,10 @@ export function buildTelegramHelpMessage(input: {
 /enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
 /resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
 /announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Announcement ပို့မည်
+/announceuser &lt;user&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - User တစ်ယောက်ထံသာ message ပို့မည်
 /announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
 /announcehistory - announcement history ကို ကြည့်မည်
-/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
+/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
 /finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
 /sendfinance - Finance digest ကို ယခုချက်ချင်း ပို့မည်
 /refunds - pending refund request များကို ကြည့်မည်
@@ -614,9 +618,10 @@ export function buildTelegramHelpMessage(input: {
 /enable &lt;key-id&gt; - Re-enable a key
 /resend &lt;key-id&gt; - Resend the share page
 /announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send an announcement
+/announceuser &lt;user&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send to one Telegram user
 /announcements - Show recent announcements
 /announcehistory - Show recent announcement history
-/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
+/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
 /finance - Show the finance summary
 /sendfinance - Send the finance digest now
 /refunds - Show pending refund requests

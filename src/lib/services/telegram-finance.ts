@@ -7,6 +7,7 @@ import {
   hasFinanceManageScope,
   normalizeAdminScope,
 } from '@/lib/admin-scope';
+import { getTelegramNotificationPreferences } from '@/lib/services/telegram-runtime';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -521,6 +522,13 @@ export async function sendTelegramRefundDecisionMessage(input: {
 
   const locale = coerceSupportedLocale(typeof input.locale === 'string' ? input.locale : undefined) || 'en';
   const ui = getTelegramUi(locale);
+  const preferences = await getTelegramNotificationPreferences({
+    telegramUserId: input.chatId,
+    telegramChatId: input.chatId,
+  });
+  if (!preferences.receipt) {
+    return true;
+  }
   const amountLabel =
     typeof input.amount === 'number' && Number.isFinite(input.amount)
       ? `${input.amount.toLocaleString('en-US')} ${(input.currency || 'MMK').trim().toUpperCase() === 'MMK' ? 'Kyat' : (input.currency || 'MMK').trim().toUpperCase()}`

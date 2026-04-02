@@ -117,6 +117,82 @@ export async function upsertTelegramUserProfile(input: {
   });
 }
 
+export type TelegramNotificationPreferenceKey =
+  | 'promo'
+  | 'maintenance'
+  | 'receipt'
+  | 'support';
+
+export function getTelegramNotificationPreferenceLabel(
+  key: TelegramNotificationPreferenceKey,
+  locale: SupportedLocale,
+) {
+  const isMyanmar = locale === 'my';
+  switch (key) {
+    case 'promo':
+      return isMyanmar ? 'Promotion notice' : 'Promotion notices';
+    case 'maintenance':
+      return isMyanmar ? 'Maintenance notice' : 'Maintenance notices';
+    case 'receipt':
+      return isMyanmar ? 'Receipt notice' : 'Receipt notices';
+    case 'support':
+      return isMyanmar ? 'Support update' : 'Support updates';
+    default:
+      return key;
+  }
+}
+
+export function getTelegramNotificationPreferenceField(
+  key: TelegramNotificationPreferenceKey,
+) {
+  switch (key) {
+    case 'promo':
+      return 'allowPromoAnnouncements' as const;
+    case 'maintenance':
+      return 'allowMaintenanceNotices' as const;
+    case 'receipt':
+      return 'allowReceiptNotifications' as const;
+    case 'support':
+      return 'allowSupportUpdates' as const;
+    default:
+      return 'allowPromoAnnouncements' as const;
+  }
+}
+
+export async function updateTelegramNotificationPreference(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  preference: TelegramNotificationPreferenceKey;
+  enabled: boolean;
+}) {
+  const field = getTelegramNotificationPreferenceField(input.preference);
+  return db.telegramUserProfile.upsert({
+    where: { telegramUserId: input.telegramUserId },
+    create: {
+      telegramUserId: input.telegramUserId,
+      telegramChatId: input.telegramChatId || null,
+      [field]: input.enabled,
+    },
+    update: {
+      telegramChatId: input.telegramChatId || null,
+      [field]: input.enabled,
+    },
+  });
+}
+
+export async function getTelegramNotificationPreferences(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+}) {
+  const profile = await getTelegramUserProfile(input.telegramUserId, input.telegramChatId || null);
+  return {
+    promo: profile?.allowPromoAnnouncements ?? true,
+    maintenance: profile?.allowMaintenanceNotices ?? true,
+    receipt: profile?.allowReceiptNotifications ?? true,
+    support: profile?.allowSupportUpdates ?? true,
+  };
+}
+
 export async function setTelegramPendingPremiumReply(input: {
   telegramUserId: string;
   telegramChatId?: string | null;

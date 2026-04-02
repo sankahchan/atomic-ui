@@ -447,6 +447,10 @@ model TelegramUserProfile {
   username       String?
   displayName    String?
   locale         String?
+  allowPromoAnnouncements   Boolean  @default(true)
+  allowMaintenanceNotices   Boolean  @default(true)
+  allowReceiptNotifications Boolean  @default(true)
+  allowSupportUpdates       Boolean  @default(true)
   pendingPremiumSupportRequestId String?
   pendingPremiumReplyStartedAt DateTime?
   createdAt      DateTime @default(now())
@@ -463,13 +467,18 @@ model TelegramAnnouncement {
   targetServerId       String?
   targetServerName     String?
   targetCountryCode    String?
+  targetDirectChatId   String?
+  targetDirectUserLabel String?
   title                String
   message              String
   heroImageUrl         String?
+  cardStyle            String   @default("DEFAULT")
   includeSupportButton Boolean  @default(true)
   pinToInbox           Boolean  @default(false)
   status               String   @default("DRAFT") // DRAFT, SCHEDULED, PROCESSING, SENT, PARTIAL, FAILED, CANCELLED
   scheduledFor         DateTime?
+  recurrenceType       String?
+  recurrenceParentId   String?
   lastAttemptedAt      DateTime?
   sentAt               DateTime?
   totalRecipients      Int      @default(0)
@@ -490,6 +499,8 @@ model TelegramAnnouncement {
   @@index([targetServerId, status, createdAt])
   @@index([targetCountryCode, status, createdAt])
   @@index([targetTag, status, createdAt])
+  @@index([targetDirectChatId, status, createdAt])
+  @@index([recurrenceParentId, createdAt])
 }
 
 model TelegramAnnouncementDelivery {
@@ -527,8 +538,10 @@ model TelegramAnnouncementTemplate {
   title                String
   message              String
   heroImageUrl         String?
+  cardStyle            String   @default("DEFAULT")
   includeSupportButton Boolean  @default(true)
   pinToInbox           Boolean  @default(false)
+  recurrenceType       String?
   createdByUserId      String?
   createdByEmail       String?
   createdAt            DateTime @default(now())

@@ -146,6 +146,7 @@ import {
   buildTelegramHelpMessage,
   handleAdminToggleCommand,
   handleAnnounceCommand,
+  handleAnnounceUserCommand,
   handleAnnouncementsCommand,
   handleBackupCommand,
   handleClaimRefundCommand,
@@ -179,6 +180,8 @@ import {
   getTelegramConversationLocale,
   getTelegramDefaultLocale,
   getTelegramPendingPremiumReply,
+  getTelegramNotificationPreferenceLabel,
+  getTelegramNotificationPreferences,
   getTelegramSupportLink,
   getTelegramUserProfile,
   loadAccessKeyForMessaging,
@@ -192,6 +195,7 @@ import {
   sendTelegramMessage,
   sendTelegramPhoto,
   sendTelegramPhotoUrl,
+  updateTelegramNotificationPreference,
   setTelegramPendingPremiumReply,
   setTelegramUserLocale,
   upsertTelegramUserProfile,
@@ -215,6 +219,7 @@ import {
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramLocaleSelectorKeyboard,
   buildTelegramLocaleSelectorMessage,
+  buildTelegramNotificationPreferenceCallbackData,
   buildTelegramOrderActionCallbackData,
   buildTelegramOrderReviewCallbackData,
   buildTelegramServerChangeActionCallbackData,
@@ -223,6 +228,7 @@ import {
   isDynamicRenewalActionSecondary,
   parseTelegramDynamicSupportActionCallbackData,
   parseTelegramLocaleCallbackData,
+  parseTelegramNotificationPreferenceCallbackData,
   parseTelegramOrderActionCallbackData,
   parseTelegramOrderReviewCallbackData,
   parseTelegramServerChangeActionCallbackData,
@@ -1062,6 +1068,29 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
   const supportLink = await getTelegramSupportLink();
 
   if (input.order.status === 'FULFILLED') {
+    if ((input.order.priceAmount || 0) > 0) {
+      rows.push([
+        {
+          text: ui.receiptActionPrintable,
+          url: buildTelegramFinanceDocumentUrl({
+            orderCode: input.order.orderCode,
+            type: input.order.financeStatus === 'REFUNDED' ? 'refund' : 'receipt',
+            format: 'html',
+          }),
+        },
+      ]);
+      rows.push([
+        {
+          text: ui.receiptActionDownloadPdf,
+          url: buildTelegramFinanceDocumentUrl({
+            orderCode: input.order.orderCode,
+            type: input.order.financeStatus === 'REFUNDED' ? 'refund' : 'receipt',
+            format: 'pdf',
+          }),
+        },
+      ]);
+    }
+
     const relatedAccessKeyId = input.order.approvedAccessKeyId || input.order.targetAccessKeyId;
     if (relatedAccessKeyId) {
       const key = await db.accessKey.findUnique({
@@ -3006,6 +3035,18 @@ async function sendTelegramOrderReceiptConfirmation(input: {
   const config = await getTelegramConfig();
   if (!config) {
     return false;
+  }
+
+  const telegramUserId =
+    'telegramUserId' in input.order && typeof input.order.telegramUserId === 'string'
+      ? input.order.telegramUserId
+      : input.chatId;
+  const preferences = await getTelegramNotificationPreferences({
+    telegramUserId,
+    telegramChatId: input.chatId,
+  });
+  if (!preferences.receipt) {
+    return true;
   }
 
   return sendTelegramMessage(
@@ -6673,6 +6714,62 @@ async function handleEmailLink(
   return ui.emailLinked(keys.length);
 }
 
+function buildTelegramNotificationPreferencesKeyboard(
+  locale: SupportedLocale,
+  preferences: Awaited<ReturnType<typeof getTelegramNotificationPreferences>>,
+) {
+  const renderToggle = (key: 'promo' | 'maintenance' | 'receipt' | 'support') => {
+    const enabled = preferences[key];
+    const label = getTelegramNotificationPreferenceLabel(key, locale);
+    return {
+      text: `${enabled ? '✅' : '⚪️'} ${label}`,
+      callback_data: buildTelegramNotificationPreferenceCallbackData(key, !enabled),
+    };
+  };
+
+  return {
+    inline_keyboard: [
+      [renderToggle('promo')],
+      [renderToggle('maintenance')],
+      [renderToggle('receipt')],
+      [renderToggle('support')],
+    ],
+  };
+}
+
+async function handleNotificationPreferencesCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+) {
+  const preferences = await getTelegramNotificationPreferences({
+    telegramUserId: String(telegramUserId),
+    telegramChatId: String(chatId),
+  });
+
+  const lines = [
+    locale === 'my'
+      ? '🔔 <b>Notification preferences</b>'
+      : '🔔 <b>Notification preferences</b>',
+    '',
+    `• ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
+    '',
+    locale === 'my'
+      ? 'အောက်ပါ button များဖြင့် ON/OFF ပြောင်းနိုင်ပါသည်။'
+      : 'Use the buttons below to turn each type on or off.',
+  ];
+
+  await sendTelegramMessage(botToken, chatId, lines.join('\n'), {
+    replyMarkup: buildTelegramNotificationPreferencesKeyboard(locale, preferences),
+  });
+
+  return null;
+}
+
 async function handleInboxCommand(
   chatId: number,
   telegramUserId: number,
@@ -6852,6 +6949,57 @@ async function handleTelegramCallbackQuery(
   const isAdmin = adminActor.isAdmin;
 
   if (!parsed) {
+    const notificationPreferenceAction = parseTelegramNotificationPreferenceCallbackData(callbackQuery.data);
+    if (notificationPreferenceAction) {
+      const locale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+
+      await updateTelegramNotificationPreference({
+        telegramUserId: String(callbackQuery.from.id),
+        telegramChatId: String(chatId),
+        preference: notificationPreferenceAction.preference,
+        enabled: notificationPreferenceAction.enabled,
+      });
+
+      const preferences = await getTelegramNotificationPreferences({
+        telegramUserId: String(callbackQuery.from.id),
+        telegramChatId: String(chatId),
+      });
+
+      await answerTelegramCallbackQuery(
+        config.botToken,
+        callbackQuery.id,
+        notificationPreferenceAction.enabled
+          ? locale === 'my'
+            ? 'Notification ကို ဖွင့်ပြီးပါပြီ'
+            : 'Notification enabled'
+          : locale === 'my'
+            ? 'Notification ကို ပိတ်ပြီးပါပြီ'
+            : 'Notification disabled',
+      );
+
+      await sendTelegramMessage(
+        config.botToken,
+        chatId,
+        [
+          locale === 'my'
+            ? '🔔 <b>Notification preferences</b>'
+            : '🔔 <b>Notification preferences</b>',
+          '',
+          `• ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
+          `• ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
+          `• ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
+          `• ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
+        ].join('\n'),
+        {
+          replyMarkup: buildTelegramNotificationPreferencesKeyboard(locale, preferences),
+        },
+      );
+      return null;
+    }
+
     const userServerChangeAction = parseTelegramServerChangeActionCallbackData(callbackQuery.data);
     if (userServerChangeAction) {
       const locale = await getTelegramConversationLocale({
@@ -8661,6 +8809,9 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       });
     case 'inbox':
       return handleInboxCommand(chatId, telegramUserId, argsText, locale);
+    case 'notifications':
+    case 'prefs':
+      return handleNotificationPreferencesCommand(chatId, telegramUserId, locale, config.botToken);
     case 'usage':
     case 'mykey':
     case 'key':
@@ -8794,6 +8945,12 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         return telegramAdminScopeDeniedMessage({ locale, area: 'announcement' });
       }
       return handleAnnouncementsCommand(locale);
+    case 'announceuser':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasTelegramAnnouncementManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'announcement' });
+      }
+      return handleAnnounceUserCommand(argsText, locale);
     case 'scheduleannouncement':
       if (!isAdmin) return ui.adminOnly;
       if (!hasTelegramAnnouncementManageScope(adminActor.scope)) {
