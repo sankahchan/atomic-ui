@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, BadgeDollarSign, Bell, Coins, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldAlert, Wallet, XCircle } from 'lucide-react';
+import { AlertTriangle, BadgeDollarSign, Bell, Coins, ExternalLink, KeyRound, Loader2, MessageSquare, RefreshCw, Save, Send, ShieldAlert, Wallet, XCircle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -88,6 +89,13 @@ export default function UserLedgerPage() {
   } | null>(null);
   const [financeAmount, setFinanceAmount] = useState('');
   const [financeNote, setFinanceNote] = useState('');
+  const [crmDirectMessage, setCrmDirectMessage] = useState('');
+  const [crmIncludeSupportButton, setCrmIncludeSupportButton] = useState(true);
+  const [crmSupportNote, setCrmSupportNote] = useState('');
+  const [crmOutageServerName, setCrmOutageServerName] = useState('');
+  const [crmOutageMessage, setCrmOutageMessage] = useState('');
+  const [crmShareTarget, setCrmShareTarget] = useState('');
+  const [crmReceiptOrderId, setCrmReceiptOrderId] = useState('');
 
   const ledgerQuery = trpc.users.getLedger.useQuery(
     { id: userId },
@@ -148,6 +156,92 @@ export default function UserLedgerPage() {
     },
   });
 
+  const sendDirectTelegramMessageMutation = trpc.users.sendDirectTelegramMessage.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Telegram message sent',
+        description: 'The direct customer message was delivered.',
+      });
+      setCrmDirectMessage('');
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram message failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resendTelegramOrderReceiptMutation = trpc.users.resendTelegramOrderReceipt.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Receipt resent',
+        description: 'The Telegram receipt was sent again.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Receipt resend failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resendCustomerSharePageMutation = trpc.users.resendCustomerSharePage.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Share page resent',
+        description: 'The customer received the share page again in Telegram.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Share resend failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const sendCustomerOutageUpdateMutation = trpc.users.sendCustomerOutageUpdate.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Outage update sent',
+        description: 'The customer received the outage update in Telegram.',
+      });
+      setCrmOutageMessage('');
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Outage update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const addSupportNoteMutation = trpc.users.addSupportNote.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Support note added',
+        description: 'The internal support note was saved.',
+      });
+      setCrmSupportNote('');
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Support note failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const revenueSummary = useMemo(() => {
     const summary = ledgerQuery.data?.summary;
     if (!summary || summary.revenueByCurrency.length === 0) {
@@ -169,6 +263,36 @@ export default function UserLedgerPage() {
       .map((entry) => formatMoney(entry.amount, entry.currency))
       .join(' • ');
   }, [ledgerQuery.data]);
+
+  useEffect(() => {
+    if (!ledgerQuery.data) {
+      return;
+    }
+
+    if (!crmShareTarget) {
+      const firstAccessKey = ledgerQuery.data.accessKeys[0];
+      const firstDynamicKey = ledgerQuery.data.dynamicKeys[0];
+      if (firstAccessKey) {
+        setCrmShareTarget(`ACCESS_KEY:${firstAccessKey.id}`);
+      } else if (firstDynamicKey) {
+        setCrmShareTarget(`DYNAMIC_KEY:${firstDynamicKey.id}`);
+      }
+    }
+
+    if (!crmReceiptOrderId) {
+      const firstReceiptOrder = ledgerQuery.data.telegramOrders.find((order) => order.status === 'FULFILLED');
+      if (firstReceiptOrder) {
+        setCrmReceiptOrderId(firstReceiptOrder.id);
+      }
+    }
+
+    if (!crmOutageServerName) {
+      const firstServerName = ledgerQuery.data.accessKeys[0]?.server?.name;
+      if (firstServerName) {
+        setCrmOutageServerName(firstServerName);
+      }
+    }
+  }, [ledgerQuery.data, crmOutageServerName, crmReceiptOrderId, crmShareTarget]);
 
   const financeTimeline = useMemo<FinanceTimelineEvent[]>(() => {
     if (!ledgerQuery.data) {
@@ -324,6 +448,16 @@ export default function UserLedgerPage() {
       });
     }
 
+    for (const note of ledgerQuery.data.supportNotes) {
+      events.push({
+        id: `support-note:${note.id}`,
+        at: new Date(note.createdAt),
+        title: note.kind === 'OUTAGE_UPDATE' ? 'Outage update sent' : note.kind === 'DIRECT_MESSAGE' ? 'Direct Telegram message' : 'Internal support note',
+        detail: `${note.note}${note.createdBy?.email ? ` • ${note.createdBy.email}` : ''}`,
+        tone: note.kind === 'OUTAGE_UPDATE' ? 'warning' : 'default',
+      });
+    }
+
     return events
       .sort((left, right) => right.at.getTime() - left.at.getTime())
       .slice(0, 24);
@@ -356,7 +490,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, financePermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, supportNotes, financePermissions, crmPermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -367,6 +501,10 @@ export default function UserLedgerPage() {
     }
     return new Date(right.sentAt || right.createdAt).getTime() - new Date(left.sentAt || left.createdAt).getTime();
   });
+  type SupportNoteItem = (typeof supportNotes)[number];
+  type KeyNoticeItem = (typeof customerNotifications.keyNotices)[number];
+  type ServerChangeRequestItem = (typeof serverChangeRequests)[number];
+  type PremiumSupportRequestItem = (typeof premiumSupportRequests)[number];
 
   return (
     <div className="space-y-6">
@@ -875,6 +1013,234 @@ export default function UserLedgerPage() {
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                CRM action center
+              </CardTitle>
+              <CardDescription>
+                Send direct Telegram updates, resend delivery assets, and keep internal support notes from one place.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Direct Telegram message</p>
+                    <p className="text-xs text-muted-foreground">Send a one-off support or service message to this customer.</p>
+                  </div>
+                  <Switch
+                    checked={crmIncludeSupportButton}
+                    onCheckedChange={setCrmIncludeSupportButton}
+                    disabled={!crmPermissions.canMessageCustomer}
+                  />
+                </div>
+                <Textarea
+                  className="mt-3 min-h-[110px]"
+                  value={crmDirectMessage}
+                  onChange={(event) => setCrmDirectMessage(event.target.value)}
+                  placeholder="Write a direct Telegram message for this customer…"
+                  disabled={!crmPermissions.canMessageCustomer}
+                />
+                <Button
+                  className="mt-3 w-full"
+                  disabled={
+                    !crmPermissions.canMessageCustomer ||
+                    sendDirectTelegramMessageMutation.isPending ||
+                    crmDirectMessage.trim().length < 3
+                  }
+                  onClick={() =>
+                    sendDirectTelegramMessageMutation.mutate({
+                      userId,
+                      message: crmDirectMessage.trim(),
+                      includeSupportButton: crmIncludeSupportButton,
+                    })
+                  }
+                >
+                  {sendDirectTelegramMessageMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Send direct message
+                </Button>
+              </div>
+
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <p className="text-sm font-medium">Delivery actions</p>
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-2">
+                    <Label>Resend receipt</Label>
+                    <Select value={crmReceiptOrderId} onValueChange={setCrmReceiptOrderId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a fulfilled order" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {telegramOrders.filter((order) => order.status === 'FULFILLED').map((order) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.orderCode} • {order.planName || order.planCode || 'Order'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={!crmPermissions.canMessageCustomer || resendTelegramOrderReceiptMutation.isPending || !crmReceiptOrderId}
+                      onClick={() => resendTelegramOrderReceiptMutation.mutate({ orderId: crmReceiptOrderId })}
+                    >
+                      {resendTelegramOrderReceiptMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      Resend receipt in Telegram
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Resend share page</Label>
+                    <Select value={crmShareTarget} onValueChange={setCrmShareTarget}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a key" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accessKeys.map((key) => (
+                          <SelectItem key={`ACCESS_KEY:${key.id}`} value={`ACCESS_KEY:${key.id}`}>
+                            Standard • {key.name}
+                          </SelectItem>
+                        ))}
+                        {dynamicKeys.map((key) => (
+                          <SelectItem key={`DYNAMIC_KEY:${key.id}`} value={`DYNAMIC_KEY:${key.id}`}>
+                            Premium • {key.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={!crmPermissions.canMessageCustomer || resendCustomerSharePageMutation.isPending || !crmShareTarget}
+                      onClick={() => {
+                        const [keyType, keyId] = crmShareTarget.split(':');
+                        if (!keyType || !keyId) {
+                          return;
+                        }
+                        resendCustomerSharePageMutation.mutate({
+                          keyType: keyType as 'ACCESS_KEY' | 'DYNAMIC_KEY',
+                          keyId,
+                        });
+                      }}
+                    >
+                      {resendCustomerSharePageMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                      )}
+                      Resend share page
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <p className="text-sm font-medium">Outage update</p>
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-2">
+                    <Label>Server or service name</Label>
+                    <Input
+                      value={crmOutageServerName}
+                      onChange={(event) => setCrmOutageServerName(event.target.value)}
+                      placeholder="SG, US, Premium pool, Service update…"
+                      disabled={!crmPermissions.canSendOutageUpdate}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Outage or maintenance message</Label>
+                    <Textarea
+                      className="min-h-[100px]"
+                      value={crmOutageMessage}
+                      onChange={(event) => setCrmOutageMessage(event.target.value)}
+                      placeholder="We are checking a server issue for you. Please wait 2 to 3 hours while we complete recovery…"
+                      disabled={!crmPermissions.canSendOutageUpdate}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={
+                      !crmPermissions.canSendOutageUpdate ||
+                      sendCustomerOutageUpdateMutation.isPending ||
+                      crmOutageServerName.trim().length < 1 ||
+                      crmOutageMessage.trim().length < 5
+                    }
+                    onClick={() =>
+                      sendCustomerOutageUpdateMutation.mutate({
+                        userId,
+                        noticeType: 'ISSUE',
+                        serverName: crmOutageServerName.trim(),
+                        message: crmOutageMessage.trim(),
+                      })
+                    }
+                  >
+                    {sendCustomerOutageUpdateMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <AlertTriangle className="mr-2 h-4 w-4" />
+                    )}
+                    Send outage update
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <p className="text-sm font-medium">Internal support note</p>
+                <Textarea
+                  className="mt-3 min-h-[100px]"
+                  value={crmSupportNote}
+                  onChange={(event) => setCrmSupportNote(event.target.value)}
+                  placeholder="Write an internal note for future support context…"
+                  disabled={!crmPermissions.canAddSupportNote}
+                />
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  disabled={!crmPermissions.canAddSupportNote || addSupportNoteMutation.isPending || crmSupportNote.trim().length < 3}
+                  onClick={() =>
+                    addSupportNoteMutation.mutate({
+                      userId,
+                      note: crmSupportNote.trim(),
+                    })
+                  }
+                >
+                  {addSupportNoteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Save support note
+                </Button>
+                {supportNotes.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {supportNotes.slice(0, 5).map((note: SupportNoteItem) => (
+                      <div key={note.id} className="rounded-xl border border-border/50 p-3 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-foreground">{note.kind}</span>
+                          <span>{formatRelativeTime(note.createdAt)}</span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap">{note.note}</p>
+                        {note.createdBy?.email ? (
+                          <p className="mt-1 text-[11px] text-muted-foreground">By {note.createdBy.email}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
                 Customer notifications
               </CardTitle>
@@ -1041,7 +1407,7 @@ export default function UserLedgerPage() {
                   <p className="text-sm text-muted-foreground">No key notification logs recorded yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {customerNotifications.keyNotices.map((log) => (
+                    {customerNotifications.keyNotices.map((log: KeyNoticeItem) => (
                       <div key={log.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{log.event}</p>
@@ -1128,7 +1494,7 @@ export default function UserLedgerPage() {
                   <p className="text-sm text-muted-foreground">No server change requests yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {serverChangeRequests.map((request) => (
+                    {serverChangeRequests.map((request: ServerChangeRequestItem) => (
                       <div key={request.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{request.requestCode}</p>
@@ -1150,7 +1516,7 @@ export default function UserLedgerPage() {
                   <p className="text-sm text-muted-foreground">No premium support requests yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {premiumSupportRequests.map((request) => (
+                    {premiumSupportRequests.map((request: PremiumSupportRequestItem) => (
                       <div key={request.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{request.requestCode}</p>

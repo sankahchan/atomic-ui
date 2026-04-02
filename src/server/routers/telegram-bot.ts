@@ -1861,6 +1861,8 @@ export const telegramBotRouter = router({
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
         cardStyle: telegramAnnouncementCardStyleSchema.default('DEFAULT'),
+        templateId: z.string().cuid().optional().nullable(),
+        templateName: z.string().trim().min(2).max(120).optional().nullable(),
         includeSupportButton: z.boolean().default(true),
         pinToInbox: z.boolean().default(false),
         scheduledFor: z.string().datetime().nullable().optional(),
@@ -1901,11 +1903,20 @@ export const telegramBotRouter = router({
             select: { id: true, name: true, countryCode: true },
           })
         : null;
+      const template =
+        input.templateId
+          ? await db.telegramAnnouncementTemplate.findUnique({
+              where: { id: input.templateId },
+              select: { id: true, name: true },
+            })
+          : null;
 
       const announcement = await db.telegramAnnouncement.create({
         data: {
           audience: input.audience,
           type: input.type,
+          templateId: template?.id || null,
+          templateName: template?.name || input.templateName?.trim() || null,
           targetTag: input.filters?.tag?.trim().toLowerCase() || null,
           targetServerId: targetServer?.id || null,
           targetServerName: targetServer?.name || null,
@@ -1961,6 +1972,8 @@ export const telegramBotRouter = router({
           failedCount,
           scheduledFor: scheduledFor?.toISOString() ?? null,
           recurrenceType: input.recurrenceType,
+          templateId: template?.id || null,
+          templateName: template?.name || input.templateName?.trim() || null,
           filters: input.filters ?? null,
           heroImageUrl: input.heroImageUrl?.trim() || null,
           cardStyle: input.cardStyle,
@@ -2088,6 +2101,7 @@ export const telegramBotRouter = router({
         Date.now() -
           (range === '7d' ? 7 : range === '90d' ? 90 : 30) * 24 * 60 * 60 * 1000,
       );
+      const attributionWindowMs = 7 * 24 * 60 * 60 * 1000;
 
       const announcements = await db.telegramAnnouncement.findMany({
         where: {
@@ -2096,7 +2110,9 @@ export const telegramBotRouter = router({
         include: {
           deliveries: {
             select: {
+              chatId: true,
               status: true,
+              sentAt: true,
               openCount: true,
               clickCount: true,
             },
@@ -2104,6 +2120,37 @@ export const telegramBotRouter = router({
         },
         orderBy: [{ createdAt: 'desc' }],
       });
+
+      const attributedChatIds = Array.from(
+        new Set(
+          announcements
+            .filter((announcement) => announcement.type === 'PROMO')
+            .flatMap((announcement) => announcement.deliveries.map((delivery) => delivery.chatId))
+            .filter(Boolean),
+        ),
+      );
+      const attributedOrders = attributedChatIds.length
+        ? await db.telegramOrder.findMany({
+            where: {
+              telegramChatId: { in: attributedChatIds },
+              createdAt: {
+                gte: new Date(cutoff.getTime() - attributionWindowMs),
+              },
+              status: {
+                notIn: ['CANCELLED', 'REJECTED'],
+              },
+            },
+            select: {
+              id: true,
+              telegramChatId: true,
+              createdAt: true,
+              priceAmount: true,
+              priceCurrency: true,
+              orderCode: true,
+            },
+            orderBy: [{ createdAt: 'desc' }],
+          })
+        : [];
 
       const byType = new Map<string, {
         announcements: number;
@@ -2118,6 +2165,30 @@ export const telegramBotRouter = router({
         totalRecipients: number;
         sentCount: number;
         failedCount: number;
+        attributedOrders: number;
+        attributedRevenue: Map<string, number>;
+      }>();
+      const byTemplate = new Map<string, {
+        templateId: string | null;
+        templateName: string;
+        announcements: number;
+        totalRecipients: number;
+        sentCount: number;
+        failedCount: number;
+        openCount: number;
+        clickCount: number;
+        attributedOrders: number;
+        attributedRevenue: Map<string, number>;
+      }>();
+      const sendTimeHints = new Map<number, {
+        hour: number;
+        sentCount: number;
+        openCount: number;
+        clickCount: number;
+      }>();
+      const attributedByAnnouncement = new Map<string, {
+        orders: number;
+        revenue: Map<string, number>;
       }>();
 
       let totalRecipients = 0;
@@ -2127,6 +2198,57 @@ export const telegramBotRouter = router({
       let totalClickCount = 0;
       let resendAttempts = 0;
       let resendRecovered = 0;
+      let promoAttributedOrders = 0;
+      const promoAttributedRevenue = new Map<string, number>();
+
+      for (const order of attributedOrders) {
+        const matchingDeliveries = announcements
+          .filter((announcement) => announcement.type === 'PROMO')
+          .flatMap((announcement) =>
+            announcement.deliveries
+              .filter(
+                (delivery) =>
+                  delivery.chatId === order.telegramChatId &&
+                  delivery.status === 'SENT' &&
+                  delivery.sentAt &&
+                  delivery.sentAt.getTime() <= order.createdAt.getTime() &&
+                  order.createdAt.getTime() - delivery.sentAt.getTime() <= attributionWindowMs,
+              )
+              .map((delivery) => ({
+                announcementId: announcement.id,
+                audience: announcement.audience,
+                templateId: announcement.templateId,
+                templateName: announcement.templateName,
+                sentAt: delivery.sentAt as Date,
+              })),
+          )
+          .sort((left, right) => right.sentAt.getTime() - left.sentAt.getTime());
+
+        const attributed = matchingDeliveries[0];
+        if (!attributed) {
+          continue;
+        }
+
+        const revenueCurrency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+        const revenueAmount = order.priceAmount || 0;
+        const announcementSummary = attributedByAnnouncement.get(attributed.announcementId) || {
+          orders: 0,
+          revenue: new Map<string, number>(),
+        };
+        announcementSummary.orders += 1;
+        if (revenueAmount > 0) {
+          announcementSummary.revenue.set(
+            revenueCurrency,
+            (announcementSummary.revenue.get(revenueCurrency) || 0) + revenueAmount,
+          );
+          promoAttributedRevenue.set(
+            revenueCurrency,
+            (promoAttributedRevenue.get(revenueCurrency) || 0) + revenueAmount,
+          );
+        }
+        attributedByAnnouncement.set(attributed.announcementId, announcementSummary);
+        promoAttributedOrders += 1;
+      }
 
       for (const announcement of announcements) {
         totalRecipients += announcement.totalRecipients;
@@ -2153,21 +2275,74 @@ export const telegramBotRouter = router({
           totalRecipients: 0,
           sentCount: 0,
           failedCount: 0,
+          attributedOrders: 0,
+          attributedRevenue: new Map<string, number>(),
         };
         audienceSummary.announcements += 1;
         audienceSummary.totalRecipients += announcement.totalRecipients;
         audienceSummary.sentCount += announcement.sentCount;
         audienceSummary.failedCount += announcement.failedCount;
 
+        const templateKey = announcement.templateId || announcement.templateName || `adhoc:${announcement.type}`;
+        const templateSummary = byTemplate.get(templateKey) || {
+          templateId: announcement.templateId || null,
+          templateName: announcement.templateName || 'Ad hoc',
+          announcements: 0,
+          totalRecipients: 0,
+          sentCount: 0,
+          failedCount: 0,
+          openCount: 0,
+          clickCount: 0,
+          attributedOrders: 0,
+          attributedRevenue: new Map<string, number>(),
+        };
+        templateSummary.announcements += 1;
+        templateSummary.totalRecipients += announcement.totalRecipients;
+        templateSummary.sentCount += announcement.sentCount;
+        templateSummary.failedCount += announcement.failedCount;
+
         for (const delivery of announcement.deliveries) {
           totalOpenCount += delivery.openCount;
           totalClickCount += delivery.clickCount;
           typeSummary.openCount += delivery.openCount;
           typeSummary.clickCount += delivery.clickCount;
+          templateSummary.openCount += delivery.openCount;
+          templateSummary.clickCount += delivery.clickCount;
+
+          if (delivery.status === 'SENT' && delivery.sentAt) {
+            const hour = delivery.sentAt.getHours();
+            const hint = sendTimeHints.get(hour) || {
+              hour,
+              sentCount: 0,
+              openCount: 0,
+              clickCount: 0,
+            };
+            hint.sentCount += 1;
+            hint.openCount += delivery.openCount;
+            hint.clickCount += delivery.clickCount;
+            sendTimeHints.set(hour, hint);
+          }
+        }
+
+        const attributedSummary = attributedByAnnouncement.get(announcement.id);
+        if (attributedSummary) {
+          audienceSummary.attributedOrders += attributedSummary.orders;
+          templateSummary.attributedOrders += attributedSummary.orders;
+          for (const [currency, amount] of Array.from(attributedSummary.revenue.entries())) {
+            audienceSummary.attributedRevenue.set(
+              currency,
+              (audienceSummary.attributedRevenue.get(currency) || 0) + amount,
+            );
+            templateSummary.attributedRevenue.set(
+              currency,
+              (templateSummary.attributedRevenue.get(currency) || 0) + amount,
+            );
+          }
         }
 
         byType.set(announcement.type, typeSummary);
         byAudience.set(announcement.audience, audienceSummary);
+        byTemplate.set(templateKey, templateSummary);
       }
 
       return {
@@ -2185,6 +2360,11 @@ export const telegramBotRouter = router({
           resendAttempts,
           resendRecovered,
           resendRecoveryRate: resendAttempts > 0 ? resendRecovered / resendAttempts : 0,
+          promoAttributedOrders,
+          promoAttributedRevenue: Array.from(promoAttributedRevenue.entries()).map(([currency, amount]) => ({
+            currency,
+            amount,
+          })),
         },
         byType: Array.from(byType.entries())
           .map(([type, summary]) => ({
@@ -2200,10 +2380,39 @@ export const telegramBotRouter = router({
           .map(([audience, summary]) => ({
             audience,
             ...summary,
+            attributedRevenue: Array.from(summary.attributedRevenue.entries()).map(([currency, amount]) => ({
+              currency,
+              amount,
+            })),
             deliverySuccessRate:
               summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
+            conversionRate:
+              summary.sentCount > 0 ? summary.attributedOrders / summary.sentCount : 0,
           }))
           .sort((left, right) => right.sentCount - left.sentCount || left.audience.localeCompare(right.audience)),
+        byTemplate: Array.from(byTemplate.values())
+          .map((summary) => ({
+            ...summary,
+            attributedRevenue: Array.from(summary.attributedRevenue.entries()).map(([currency, amount]) => ({
+              currency,
+              amount,
+            })),
+            deliverySuccessRate:
+              summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
+            openRate: summary.sentCount > 0 ? summary.openCount / summary.sentCount : 0,
+            clickRate: summary.sentCount > 0 ? summary.clickCount / summary.sentCount : 0,
+            conversionRate:
+              summary.sentCount > 0 ? summary.attributedOrders / summary.sentCount : 0,
+          }))
+          .sort((left, right) => right.attributedOrders - left.attributedOrders || right.sentCount - left.sentCount),
+        bestSendTimes: Array.from(sendTimeHints.values())
+          .map((entry) => ({
+            ...entry,
+            openRate: entry.sentCount > 0 ? entry.openCount / entry.sentCount : 0,
+            clickRate: entry.sentCount > 0 ? entry.clickCount / entry.sentCount : 0,
+          }))
+          .sort((left, right) => right.clickRate - left.clickRate || right.openRate - left.openRate || right.sentCount - left.sentCount)
+          .slice(0, 5),
       };
     }),
 

@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
+import { coerceSupportedLocale } from '@/lib/i18n/config';
 import {
   ADMIN_SCOPE_VALUES,
+  hasOutageManageScope,
   hasTelegramReviewManageScope,
   hasUserManageScope,
   isOwnerLikeAdmin,
@@ -22,7 +24,69 @@ import {
   runTelegramFinanceDigestCycle,
   sendTelegramRefundDecisionMessage,
 } from '@/lib/services/telegram-finance';
+import {
+  sendAccessKeySharePageToTelegram,
+  sendDynamicKeySharePageToTelegram,
+  sendTelegramOrderReceiptConfirmation,
+} from '@/lib/services/telegram-bot';
+import {
+  getTelegramConfig,
+  getTelegramSupportLink,
+  sendServerIssueNoticeToTelegram,
+  sendTelegramMessage,
+} from '@/lib/services/telegram-runtime';
 import { adminProcedure, router } from '../trpc';
+
+async function resolveCustomerTelegramDestination(userId: string) {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      telegramChatId: true,
+      accessKeys: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+          publicSlug: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+      },
+      dynamicAccessKeys: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+          publicSlug: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+      },
+    },
+  });
+
+  if (!user) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User not found.',
+    });
+  }
+
+  const destinationChatId =
+    user.telegramChatId ||
+    user.accessKeys.find((key) => Boolean(key.telegramId))?.telegramId ||
+    user.dynamicAccessKeys.find((key) => Boolean(key.telegramId))?.telegramId ||
+    null;
+
+  return {
+    user,
+    destinationChatId,
+  };
+}
 
 export const usersRouter = router({
   list: adminProcedure.query(async () => {
@@ -152,7 +216,7 @@ export const usersRouter = router({
         orderBy: { createdAt: 'desc' },
       });
 
-      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog, telegramProfile] =
+      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog, telegramProfile, supportNotes] =
         await Promise.all([
           accessKeyIds.length > 0
             ? db.telegramServerChangeRequest.findMany({
@@ -217,7 +281,23 @@ export const usersRouter = router({
                 },
               })
             : Promise.resolve(null),
+          db.customerSupportNote.findMany({
+            where: { userId: user.id },
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: [{ createdAt: 'desc' }],
+            take: 24,
+          }),
         ]);
+      type AnnouncementDeliveryItem = (typeof announcementDeliveries)[number];
+      type KeyNotificationLogItem = (typeof keyNotificationLog)[number];
+      type SupportNoteItem = (typeof supportNotes)[number];
 
       const revenueByCurrency = new Map<string, number>();
       const refundedByCurrency = new Map<string, number>();
@@ -247,14 +327,14 @@ export const usersRouter = router({
         };
       }));
 
-      const announcementReadCount = announcementDeliveries.filter((delivery) => Boolean(delivery.readAt)).length;
-      const announcementPinnedCount = announcementDeliveries.filter((delivery) => delivery.isPinned).length;
+      const announcementReadCount = announcementDeliveries.filter((delivery: AnnouncementDeliveryItem) => Boolean(delivery.readAt)).length;
+      const announcementPinnedCount = announcementDeliveries.filter((delivery: AnnouncementDeliveryItem) => delivery.isPinned).length;
       const announcementOpenCount = announcementDeliveries.reduce(
-        (sum, delivery) => sum + delivery.openCount,
+        (sum: number, delivery: AnnouncementDeliveryItem) => sum + delivery.openCount,
         0,
       );
       const announcementClickCount = announcementDeliveries.reduce(
-        (sum, delivery) => sum + delivery.clickCount,
+        (sum: number, delivery: AnnouncementDeliveryItem) => sum + delivery.clickCount,
         0,
       );
 
@@ -306,7 +386,7 @@ export const usersRouter = router({
           },
           announcements: announcementDeliveries
             .slice(0, 24)
-            .map((delivery) => ({
+            .map((delivery: AnnouncementDeliveryItem) => ({
               id: delivery.id,
               chatId: delivery.chatId,
               status: delivery.status,
@@ -321,7 +401,7 @@ export const usersRouter = router({
               createdAt: delivery.createdAt,
               announcement: delivery.announcement,
             })),
-          keyNotices: keyNotificationLog.map((log) => ({
+          keyNotices: keyNotificationLog.map((log: KeyNotificationLogItem) => ({
             id: log.id,
             event: log.event,
             message: log.message,
@@ -332,9 +412,22 @@ export const usersRouter = router({
             accessKeyName: log.accessKey?.name || null,
           })),
         },
+        supportNotes: supportNotes.map((note: SupportNoteItem) => ({
+          id: note.id,
+          kind: note.kind,
+          note: note.note,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+          createdBy: note.createdBy,
+        })),
         financePermissions: {
           canManage: canUserManageFinance(ctx.user, financeControls),
           canConfigure: canUserConfigureFinance(ctx.user, financeControls),
+        },
+        crmPermissions: {
+          canMessageCustomer: hasTelegramReviewManageScope(ctx.user.adminScope),
+          canSendOutageUpdate: hasOutageManageScope(ctx.user.adminScope),
+          canAddSupportNote: hasTelegramReviewManageScope(ctx.user.adminScope),
         },
       };
     }),
@@ -438,6 +531,351 @@ export const usersRouter = router({
       });
 
       return { success: true };
+    }),
+
+  sendDirectTelegramMessage: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        message: z.string().trim().min(3).max(2000),
+        includeSupportButton: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to send customer Telegram messages.',
+        });
+      }
+
+      const config = await getTelegramConfig();
+      if (!config?.botToken) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Telegram bot is not configured.',
+        });
+      }
+
+      const { user, destinationChatId } = await resolveCustomerTelegramDestination(input.userId);
+      if (!destinationChatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This customer does not have a linked Telegram chat yet.',
+        });
+      }
+
+      const supportLink = input.includeSupportButton ? await getTelegramSupportLink() : null;
+      const sent = await sendTelegramMessage(
+        config.botToken,
+        destinationChatId,
+        [`💬 <b>Message from admin</b>`, '', input.message.trim()].join('\n'),
+        supportLink
+          ? {
+              replyMarkup: {
+                inline_keyboard: [[{ text: 'Support', url: supportLink }]],
+              },
+            }
+          : undefined,
+      );
+
+      if (!sent) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram message could not be delivered.',
+        });
+      }
+
+      await db.customerSupportNote.create({
+        data: {
+          userId: user.id,
+          createdByUserId: ctx.user.id,
+          kind: 'DIRECT_MESSAGE',
+          note: input.message.trim(),
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_TELEGRAM_MESSAGE_SENT',
+        entity: 'USER',
+        entityId: user.id,
+        details: {
+          destinationChatId,
+          includeSupportButton: input.includeSupportButton,
+        },
+      });
+
+      return { success: true };
+    }),
+
+  resendTelegramOrderReceipt: adminProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to resend Telegram receipts.',
+        });
+      }
+
+      const order = await db.telegramOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderCode: true,
+          status: true,
+          locale: true,
+          telegramChatId: true,
+          telegramUserId: true,
+          planName: true,
+          planCode: true,
+          priceLabel: true,
+          priceAmount: true,
+          priceCurrency: true,
+          paymentMethodLabel: true,
+          durationMonths: true,
+          durationDays: true,
+          requestedName: true,
+          selectedServerName: true,
+          selectedServerCountryCode: true,
+          deliveryType: true,
+          approvedAccessKeyId: true,
+          approvedDynamicKeyId: true,
+        },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Telegram order not found.',
+        });
+      }
+
+      if (order.status !== 'FULFILLED') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Only fulfilled orders can resend a receipt.',
+        });
+      }
+
+      const [accessKey, dynamicKey] = await Promise.all([
+        order.approvedAccessKeyId
+          ? db.accessKey.findUnique({
+              where: { id: order.approvedAccessKeyId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+        order.approvedDynamicKeyId
+          ? db.dynamicAccessKey.findUnique({
+              where: { id: order.approvedDynamicKeyId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      const destinationChatId = order.telegramChatId || order.telegramUserId;
+      if (!destinationChatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This order is not linked to a Telegram chat.',
+        });
+      }
+
+      const deliveredKeyName = accessKey?.name || dynamicKey?.name;
+      if (!deliveredKeyName) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'The delivered key could not be resolved for this receipt.',
+        });
+      }
+
+      const sent = await sendTelegramOrderReceiptConfirmation({
+        chatId: destinationChatId,
+        locale: coerceSupportedLocale(order.locale) || 'en',
+        order,
+        deliveredKeyName,
+        isTrial: order.priceAmount === 0,
+      });
+
+      if (!sent) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Receipt resend failed.',
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_RECEIPT_RESENT',
+        entity: 'TELEGRAM_ORDER',
+        entityId: order.id,
+        details: {
+          orderCode: order.orderCode,
+          destinationChatId,
+        },
+      });
+
+      return { success: true };
+    }),
+
+  resendCustomerSharePage: adminProcedure
+    .input(
+      z.object({
+        keyType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY']),
+        keyId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to resend customer share pages.',
+        });
+      }
+
+      if (input.keyType === 'ACCESS_KEY') {
+        await sendAccessKeySharePageToTelegram({
+          accessKeyId: input.keyId,
+          reason: 'RESENT',
+          source: 'crm_action_center',
+        });
+      } else {
+        await sendDynamicKeySharePageToTelegram({
+          dynamicAccessKeyId: input.keyId,
+          reason: 'RESENT',
+          source: 'crm_action_center',
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_SHARE_PAGE_RESENT',
+        entity: input.keyType,
+        entityId: input.keyId,
+        details: {
+          via: 'crm_action_center',
+        },
+      });
+
+      return { success: true };
+    }),
+
+  sendCustomerOutageUpdate: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        noticeType: z.enum(['ISSUE', 'DOWNTIME', 'MAINTENANCE']).default('ISSUE'),
+        serverName: z.string().trim().min(1).max(120),
+        message: z.string().trim().min(5).max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasOutageManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to send outage updates.',
+        });
+      }
+
+      const { user, destinationChatId } = await resolveCustomerTelegramDestination(input.userId);
+      if (!destinationChatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This customer does not have a linked Telegram chat yet.',
+        });
+      }
+
+      const result = await sendServerIssueNoticeToTelegram({
+        chatIds: [destinationChatId],
+        serverName: input.serverName.trim(),
+        noticeType: input.noticeType,
+        message: input.message.trim(),
+      });
+
+      if (result.sentCount === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Outage update could not be delivered.',
+        });
+      }
+
+      await db.customerSupportNote.create({
+        data: {
+          userId: user.id,
+          createdByUserId: ctx.user.id,
+          kind: 'OUTAGE_UPDATE',
+          note: `${input.serverName.trim()} • ${input.message.trim()}`,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_OUTAGE_UPDATE_SENT',
+        entity: 'USER',
+        entityId: user.id,
+        details: {
+          destinationChatId,
+          noticeType: input.noticeType,
+          serverName: input.serverName.trim(),
+        },
+      });
+
+      return { success: true };
+    }),
+
+  addSupportNote: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        note: z.string().trim().min(3).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to add support notes.',
+        });
+      }
+
+      const note = await db.customerSupportNote.create({
+        data: {
+          userId: input.userId,
+          createdByUserId: ctx.user.id,
+          kind: 'INTERNAL',
+          note: input.note.trim(),
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_SUPPORT_NOTE_CREATED',
+        entity: 'USER',
+        entityId: input.userId,
+        details: {
+          noteId: note.id,
+        },
+      });
+
+      return note;
     }),
 
   updateAdminScope: adminProcedure

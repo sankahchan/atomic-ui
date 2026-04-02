@@ -735,6 +735,8 @@ export async function dispatchTelegramAnnouncementSchedule(input: {
     data: {
       audience: announcement.audience,
       type: announcement.type,
+      templateId: announcement.templateId,
+      templateName: announcement.templateName,
       targetTag: announcement.targetTag,
       targetServerId: announcement.targetServerId,
       targetServerName: announcement.targetServerName,

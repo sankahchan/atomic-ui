@@ -268,6 +268,8 @@ type TelegramAnnouncementAnalytics = {
     resendAttempts: number;
     resendRecovered: number;
     resendRecoveryRate: number;
+    promoAttributedOrders: number;
+    promoAttributedRevenue: Array<{ currency: string; amount: number }>;
   };
   byType: Array<{
     type: string;
@@ -288,8 +290,45 @@ type TelegramAnnouncementAnalytics = {
     sentCount: number;
     failedCount: number;
     deliverySuccessRate: number;
+    attributedOrders: number;
+    attributedRevenue: Array<{ currency: string; amount: number }>;
+    conversionRate: number;
+  }>;
+  byTemplate: Array<{
+    templateId: string | null;
+    templateName: string;
+    announcements: number;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    openCount: number;
+    clickCount: number;
+    attributedOrders: number;
+    attributedRevenue: Array<{ currency: string; amount: number }>;
+    deliverySuccessRate: number;
+    openRate: number;
+    clickRate: number;
+    conversionRate: number;
+  }>;
+  bestSendTimes: Array<{
+    hour: number;
+    sentCount: number;
+    openCount: number;
+    clickCount: number;
+    openRate: number;
+    clickRate: number;
   }>;
 };
+
+function formatAnnouncementMoney(amount: number | null | undefined, currency: string | null | undefined) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return '—';
+  }
+
+  const normalizedCurrency = (currency || 'MMK').trim().toUpperCase();
+  const formatted = new Intl.NumberFormat('en-US').format(amount);
+  return normalizedCurrency === 'MMK' ? `${formatted} Kyat` : `${formatted} ${normalizedCurrency}`;
+}
 
 function buildTelegramAnnouncementTemplateCommand(input: {
   audience: TelegramAnnouncementPanelAudience;
@@ -1382,6 +1421,8 @@ function TelegramBotSetupCard() {
   const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
   const [announcementPinToInbox, setAnnouncementPinToInbox] = useState(false);
   const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
+  const [announcementSourceTemplateId, setAnnouncementSourceTemplateId] = useState<string | null>(null);
+  const [announcementSourceTemplateName, setAnnouncementSourceTemplateName] = useState<string | null>(null);
   const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
   const [announcementRecurrenceType, setAnnouncementRecurrenceType] =
     useState<TelegramAnnouncementRecurrenceType>('NONE');
@@ -1538,6 +1579,8 @@ function TelegramBotSetupCard() {
       setAnnouncementPinToInbox(false);
       setAnnouncementScheduledFor('');
       setAnnouncementRecurrenceType('NONE');
+      setAnnouncementSourceTemplateId(null);
+      setAnnouncementSourceTemplateName(null);
     },
     onError: (error) => {
       toast({
@@ -2440,6 +2483,8 @@ function TelegramBotSetupCard() {
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
                       cardStyle: announcementCardStyle,
+                      templateId: announcementSourceTemplateId,
+                      templateName: announcementSourceTemplateName,
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       pinToInbox: announcementPinToInbox,
@@ -2475,6 +2520,8 @@ function TelegramBotSetupCard() {
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
                       cardStyle: announcementCardStyle,
+                      templateId: announcementSourceTemplateId,
+                      templateName: announcementSourceTemplateName,
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       pinToInbox: announcementPinToInbox,
@@ -2564,6 +2611,8 @@ function TelegramBotSetupCard() {
                             setAnnouncementPinToInbox(false);
                             setAnnouncementScheduledFor('');
                             setAnnouncementRecurrenceType(preset.recurrenceType);
+                            setAnnouncementSourceTemplateId(null);
+                            setAnnouncementSourceTemplateName(preset.name);
                           }}
                         >
                           {telegramUi.announcementApplyTemplate}
@@ -2732,6 +2781,8 @@ function TelegramBotSetupCard() {
                               setAnnouncementPinToInbox(template.pinToInbox);
                               setAnnouncementScheduledFor('');
                               setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
+                              setAnnouncementSourceTemplateId(template.id);
+                              setAnnouncementSourceTemplateName(template.name);
                             }}
                           >
                             {telegramUi.announcementApplyTemplate}
@@ -2902,6 +2953,103 @@ function TelegramBotSetupCard() {
                             ))
                           )}
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">Template performance</p>
+                          <Badge variant="outline">
+                            {announcementAnalytics.totals.promoAttributedOrders} attributed orders
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Promo attribution revenue:{' '}
+                          {announcementAnalytics.totals.promoAttributedRevenue.length > 0
+                            ? announcementAnalytics.totals.promoAttributedRevenue
+                                .map((entry) => formatAnnouncementMoney(entry.amount, entry.currency))
+                                .join(' • ')
+                            : '0'}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.byTemplate.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.byTemplate.map((entry) => (
+                              <div key={entry.templateId || entry.templateName} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{entry.templateName}</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.conversionRate * 100)}% conv.
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedOrders} orders •{' '}
+                                  {entry.attributedRevenue.length > 0
+                                    ? entry.attributedRevenue
+                                        .map((value) => formatAnnouncementMoney(value.amount, value.currency))
+                                        .join(' • ')
+                                    : '0 revenue'}
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-sm font-medium">Audience conversion</p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.byAudience.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.byAudience.map((entry) => (
+                              <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{entry.audience}</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.conversionRate * 100)}% conv.
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedOrders} attributed orders •{' '}
+                                  {entry.attributedRevenue.length > 0
+                                    ? entry.attributedRevenue
+                                        .map((value) => formatAnnouncementMoney(value.amount, value.currency))
+                                        .join(' • ')
+                                    : '0 revenue'}
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <p className="text-sm font-medium">Best send time hints</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        {announcementAnalytics.bestSendTimes.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                        ) : (
+                          announcementAnalytics.bestSendTimes.map((entry) => (
+                            <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
+                              <p className="text-sm font-medium">
+                                {String(entry.hour).padStart(2, '0')}:00
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {entry.sentCount} sent
+                              </p>
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                {Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click
+                              </p>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
