@@ -171,6 +171,9 @@ type TelegramSettings = {
   showLanguageSelectorOnStart: boolean;
 };
 
+type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS';
+type TelegramAnnouncementType = 'INFO' | 'ANNOUNCEMENT' | 'PROMO' | 'NEW_SERVER' | 'MAINTENANCE';
+
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   botToken: '',
   botUsername: '',
@@ -1098,6 +1101,19 @@ function TelegramBotSetupCard() {
     userCommands: isMyanmar ? 'အသုံးပြုသူ command များ' : 'User commands',
     adminCommands: isMyanmar ? 'Admin command များ' : 'Admin commands',
     sendDigestNow: isMyanmar ? 'Digest ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
+    announcementTitle: isMyanmar ? 'အသိပေးစာ ပို့ခြင်း' : 'Send announcement',
+    announcementDesc: isMyanmar
+      ? 'Discount, new server, maintenance, သို့မဟုတ် အခြား announcement များကို Telegram အသုံးပြုသူများထံသို့ တိုက်ရိုက်ပို့နိုင်သည်။'
+      : 'Send discounts, new server updates, maintenance notes, or any other manual Telegram announcement to users.',
+    announcementAudience: isMyanmar ? 'ပို့မည့် audience' : 'Audience',
+    announcementType: isMyanmar ? 'Announcement အမျိုးအစား' : 'Announcement type',
+    announcementSubject: isMyanmar ? 'ခေါင်းစဉ်' : 'Title',
+    announcementBody: isMyanmar ? 'မက်ဆေ့ချ်' : 'Message',
+    includeSupportButton: isMyanmar ? 'Support button ထည့်မည်' : 'Include support button',
+    sendAnnouncementNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
+    announcementSent: isMyanmar ? 'Announcement ပို့ပြီးပါပြီ' : 'Announcement sent',
+    announcementFailed: isMyanmar ? 'Announcement ပို့မရပါ' : 'Announcement failed',
+    recipientsLabel: isMyanmar ? 'လက်ခံသူ' : 'Recipients',
   };
   const utils = trpc.useUtils();
   const settingsQuery = trpc.telegramBot.getSettings.useQuery();
@@ -1106,6 +1122,11 @@ function TelegramBotSetupCard() {
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
+  const [announcementAudience, setAnnouncementAudience] = useState<TelegramAnnouncementAudience>('ACTIVE_USERS');
+  const [announcementType, setAnnouncementType] = useState<TelegramAnnouncementType>('ANNOUNCEMENT');
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -1218,9 +1239,28 @@ function TelegramBotSetupCard() {
       });
     },
   });
+  const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery();
+  const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: telegramUi.announcementSent,
+        description: `${result.sentCount} ${telegramUi.recipientsLabel.toLowerCase()}${result.failedCount > 0 ? ` · ${result.failedCount} failed` : ''}`,
+      });
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const isSaving = saveSettingsMutation.isPending;
   const hasToken = form.botToken.trim().length > 0;
+  const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
   const webhookUrl =
     typeof window === 'undefined'
       ? ''
@@ -1655,6 +1695,133 @@ function TelegramBotSetupCard() {
                     <Send className="mr-2 h-4 w-4" />
                   )}
                   {telegramUi.sendDigestNow}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{telegramUi.announcementTitle}</p>
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementDesc}</p>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementAudience}</Label>
+                  <Select
+                    value={announcementAudience}
+                    onValueChange={(value: TelegramAnnouncementAudience) => setAnnouncementAudience(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE_USERS">
+                        {isMyanmar ? 'Active Telegram users' : 'Active Telegram users'}
+                      </SelectItem>
+                      <SelectItem value="STANDARD_USERS">
+                        {isMyanmar ? 'Standard key users' : 'Standard key users'}
+                      </SelectItem>
+                      <SelectItem value="PREMIUM_USERS">
+                        {isMyanmar ? 'Premium users' : 'Premium users'}
+                      </SelectItem>
+                      <SelectItem value="TRIAL_USERS">
+                        {isMyanmar ? 'Trial users' : 'Trial users'}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {telegramUi.recipientsLabel}: {announcementAudienceCountsQuery.isLoading ? '…' : announcementAudienceCount}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementType}</Label>
+                  <Select
+                    value={announcementType}
+                    onValueChange={(value: TelegramAnnouncementType) => setAnnouncementType(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INFO">{isMyanmar ? 'Information' : 'Information'}</SelectItem>
+                      <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'Announcement' : 'Announcement'}</SelectItem>
+                      <SelectItem value="PROMO">{isMyanmar ? 'Discount / Promo' : 'Discount / Promo'}</SelectItem>
+                      <SelectItem value="NEW_SERVER">{isMyanmar ? 'New server' : 'New server'}</SelectItem>
+                      <SelectItem value="MAINTENANCE">{isMyanmar ? 'Maintenance' : 'Maintenance'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="telegram-announcement-title">{telegramUi.announcementSubject}</Label>
+                <Input
+                  id="telegram-announcement-title"
+                  value={announcementTitle}
+                  onChange={(event) => setAnnouncementTitle(event.target.value)}
+                  placeholder={isMyanmar ? 'ဥပမာ - New SG server is ready' : 'Example: New SG server is ready'}
+                />
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="telegram-announcement-message">{telegramUi.announcementBody}</Label>
+                <Textarea
+                  id="telegram-announcement-message"
+                  rows={5}
+                  value={announcementMessage}
+                  onChange={(event) => setAnnouncementMessage(event.target.value)}
+                  placeholder={
+                    isMyanmar
+                      ? 'အသုံးပြုသူများထံ ပို့လိုသော မက်ဆေ့ချ်ကို ဒီနေရာမှာ ရိုက်ပါ။'
+                      : 'Write the manual message you want to send to users here.'
+                  }
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
+                <div>
+                  <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMyanmar
+                      ? 'Support link သတ်မှတ်ထားပါက အောက်ခြေ button အဖြစ် ထည့်ပေးမည်။'
+                      : 'Adds the configured support link as an inline button when available.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={announcementIncludeSupportButton}
+                  onCheckedChange={setAnnouncementIncludeSupportButton}
+                />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="rounded-full"
+                  onClick={() =>
+                    sendAnnouncementMutation.mutate({
+                      audience: announcementAudience,
+                      type: announcementType,
+                      title: announcementTitle.trim(),
+                      message: announcementMessage.trim(),
+                      includeSupportButton: announcementIncludeSupportButton,
+                    })
+                  }
+                  disabled={
+                    !hasToken ||
+                    sendAnnouncementMutation.isPending ||
+                    announcementTitle.trim().length < 3 ||
+                    announcementMessage.trim().length < 10 ||
+                    announcementAudienceCount === 0
+                  }
+                >
+                  {sendAnnouncementMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bell className="mr-2 h-4 w-4" />
+                  )}
+                  {telegramUi.sendAnnouncementNow}
                 </Button>
               </div>
             </div>
