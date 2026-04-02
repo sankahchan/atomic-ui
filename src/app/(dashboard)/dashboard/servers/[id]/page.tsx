@@ -17,6 +17,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import {
+  Line as RechartsLine,
+  LineChart as RechartsLineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis as RechartsXAxis,
+  YAxis as RechartsYAxis,
+  CartesianGrid as RechartsCartesianGrid,
+} from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -273,6 +283,10 @@ export default function ServerDetailPage() {
     { serverId, limit: 6 },
     { enabled: !!serverId },
   );
+  const healthDiagnosticsQuery = trpc.servers.healthDiagnostics.useQuery(
+    { id: serverId, limit: 36 },
+    { enabled: !!serverId },
+  );
   const loadStatsQuery = trpc.servers.getLoadStats.useQuery(undefined, {
     enabled: !!serverId,
   });
@@ -435,6 +449,19 @@ export default function ServerDetailPage() {
   }, [availableOutageTargets, outageTargetServerId, recommendedAssignmentTargetQuery.data]);
 
   const currentOutageState = (server?.outageState as any) || null;
+  const healthDiagnostics = healthDiagnosticsQuery.data;
+  const latencyTrend = useMemo(
+    () =>
+      (healthDiagnostics?.metrics || []).map((row: any) => ({
+        label: new Date(row.recordedAt).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        latencyMs: row.latencyMs,
+        status: row.healthStatus || 'UNKNOWN',
+      })),
+    [healthDiagnostics],
+  );
   const activeOutageIncident = currentOutageState?.incidentId
     ? outageHistoryQuery.data?.find((incident: any) => incident.id === currentOutageState.incidentId) || null
     : null;
@@ -861,6 +888,142 @@ export default function ServerDetailPage() {
                     <span className="text-muted-foreground">{t('server_details.health.failed')}</span>
                     <span className="text-red-500">{server.healthCheck.failedChecks}</span>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-primary" />
+                Latency diagnostics
+              </CardTitle>
+              <CardDescription>
+                Compare live latency against the slow threshold, see repeated-slow behavior, and confirm whether auto-drain or Telegram user notices have triggered.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {healthDiagnosticsQuery.isLoading ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  Loading latency diagnostics…
+                </div>
+              ) : healthDiagnostics ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current reason</p>
+                      <p className="mt-1 text-sm font-medium">{healthDiagnostics.current.reason}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow streak</p>
+                      <p className="mt-1 text-xl font-semibold">{healthDiagnostics.current.slowConsecutiveCount}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Auto-drain at {healthDiagnostics.current.autoDrainThreshold} consecutive slow checks
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-drain</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {healthDiagnostics.current.autoDrainEnabled
+                          ? healthDiagnostics.current.autoDrainActive
+                            ? 'Active now'
+                            : 'Armed'
+                          : 'Disabled'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {healthDiagnostics.current.autoDrainEnabled
+                          ? `Threshold ${healthDiagnostics.current.autoDrainThreshold} slow checks`
+                          : 'No automatic drain'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">User notice</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {healthDiagnostics.current.slowUserAlertSentAt
+                          ? `Sent ${formatRelativeTime(healthDiagnostics.current.slowUserAlertSentAt)}`
+                          : healthDiagnostics.current.userNotifyEnabled
+                            ? `After ${healthDiagnostics.current.userNotifyThreshold} slow checks`
+                            : 'Disabled'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Cooldown {healthDiagnostics.current.userNotifyCooldownMins} min
+                      </p>
+                    </div>
+                  </div>
+
+                  {healthDiagnostics.current.status === 'SLOW' ? (
+                    <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                      <span className="font-medium">Slow-server reason:</span> {healthDiagnostics.current.reason}
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">Threshold {healthDiagnostics.current.thresholdMs}ms</Badge>
+                      <Badge variant="outline">UP {healthDiagnostics.statusBreakdown.up}</Badge>
+                      <Badge variant="outline">SLOW {healthDiagnostics.statusBreakdown.slow}</Badge>
+                      <Badge variant="outline">DOWN {healthDiagnostics.statusBreakdown.down}</Badge>
+                    </div>
+                    {latencyTrend.length > 0 ? (
+                      <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsLineChart data={latencyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <RechartsCartesianGrid strokeDasharray="3 10" stroke="rgba(125, 211, 252, 0.1)" vertical={false} />
+                            <RechartsXAxis
+                              dataKey="label"
+                              stroke="rgba(186, 230, 253, 0.58)"
+                              fontSize={10}
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={8}
+                            />
+                            <RechartsYAxis
+                              stroke="rgba(186, 230, 253, 0.44)"
+                              fontSize={10}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(value) => `${Math.round(value)}ms`}
+                              width={52}
+                            />
+                            <RechartsTooltip
+                              content={({ active, payload, label }) =>
+                                active && payload && payload.length ? (
+                                  <div className="rounded-xl border border-cyan-400/18 bg-[rgba(5,12,26,0.94)] p-3 text-xs text-white shadow-[0_18px_36px_rgba(1,6,20,0.55)]">
+                                    <p className="font-semibold text-cyan-100">{label}</p>
+                                    <p className="mt-2">Latency: {payload[0]?.value ? `${payload[0].value}ms` : 'n/a'}</p>
+                                    <p>Status: {payload[0]?.payload?.status || 'UNKNOWN'}</p>
+                                  </div>
+                                ) : null
+                              }
+                            />
+                            <ReferenceLine
+                              y={healthDiagnostics.current.thresholdMs}
+                              stroke="rgba(251,191,36,0.9)"
+                              strokeDasharray="6 6"
+                            />
+                            <RechartsLine
+                              type="monotone"
+                              dataKey="latencyMs"
+                              name="Latency"
+                              stroke="rgba(56,189,248,0.95)"
+                              strokeWidth={2.5}
+                              dot={false}
+                              connectNulls={false}
+                            />
+                          </RechartsLineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                        No latency history yet. New health metrics will appear after a few scheduled checks.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  No health diagnostics available for this server yet.
                 </div>
               )}
             </CardContent>

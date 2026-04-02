@@ -8,7 +8,9 @@
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { createOutlineClient } from '@/lib/outline-api';
+import { writeAuditLog } from '@/lib/audit';
 import { sendAdminAlert } from '@/lib/services/telegram-bot';
+import { sendServerIssueNoticeToTelegram } from '@/lib/services/telegram-runtime';
 import {
   markServerOutageDetected,
   markServerOutageRecovered,
@@ -58,6 +60,171 @@ export async function checkServerHealth(server: {
     }
 }
 
+async function listAffectedTelegramChatIdsForServer(serverId: string) {
+    const [accessKeys, dynamicKeys] = await Promise.all([
+        db.accessKey.findMany({
+            where: {
+                serverId,
+                status: { in: ['ACTIVE', 'PENDING', 'DISABLED'] },
+            },
+            select: {
+                telegramId: true,
+                user: {
+                    select: {
+                        telegramChatId: true,
+                    },
+                },
+            },
+        }),
+        db.dynamicAccessKey.findMany({
+            where: {
+                status: 'ACTIVE',
+                accessKeys: {
+                    some: {
+                        serverId,
+                    },
+                },
+            },
+            select: {
+                telegramId: true,
+                user: {
+                    select: {
+                        telegramChatId: true,
+                    },
+                },
+            },
+        }),
+    ]);
+
+    return Array.from(
+        new Set(
+            [...accessKeys, ...dynamicKeys]
+                .flatMap((record) => [record.telegramId, record.user?.telegramChatId])
+                .filter((value): value is string => Boolean(value && value.trim())),
+        ),
+    );
+}
+
+async function maybeAutoDrainSlowServer(input: {
+    server: {
+        id: string;
+        name: string;
+        lifecycleMode: string | null;
+        healthCheck: {
+            slowAutoDrainEnabled: boolean;
+            slowAutoDrainThreshold: number;
+        } | null;
+    };
+    consecutiveSlowCount: number;
+    latencyMs: number;
+    thresholdMs: number;
+}) {
+    if (!input.server.healthCheck?.slowAutoDrainEnabled) {
+        return false;
+    }
+
+    if (input.consecutiveSlowCount < input.server.healthCheck.slowAutoDrainThreshold) {
+        return false;
+    }
+
+    if ((input.server.lifecycleMode || 'ACTIVE') !== 'ACTIVE') {
+        return false;
+    }
+
+    await db.server.update({
+        where: { id: input.server.id },
+        data: {
+            lifecycleMode: 'DRAINING',
+            lifecycleNote: `Auto-drained after ${input.consecutiveSlowCount} consecutive slow health checks (${input.latencyMs}ms > ${input.thresholdMs}ms).`,
+            lifecycleChangedAt: new Date(),
+        },
+    });
+
+    await writeAuditLog({
+        action: 'SERVER_AUTO_DRAIN_SLOW',
+        entity: 'SERVER',
+        entityId: input.server.id,
+        details: {
+            serverName: input.server.name,
+            consecutiveSlowCount: input.consecutiveSlowCount,
+            latencyMs: input.latencyMs,
+            thresholdMs: input.thresholdMs,
+        },
+    });
+
+    await sendAdminAlert(
+        `🟡 <b>Server auto-drained</b>\n\n<b>${input.server.name}</b> was moved to <b>DRAINING</b> after ${input.consecutiveSlowCount} consecutive slow checks.\nLatency: <b>${input.latencyMs}ms</b> (threshold <b>${input.thresholdMs}ms</b>)`,
+    );
+
+    return true;
+}
+
+async function maybeNotifyUsersAboutSlowServer(input: {
+    server: {
+        id: string;
+        name: string;
+        healthCheck: {
+            slowUserNotifyEnabled: boolean;
+            slowUserNotifyThreshold: number;
+            slowUserNotifyCooldownMins: number;
+            slowUserAlertSentAt: Date | null;
+        } | null;
+    };
+    consecutiveSlowCount: number;
+    latencyMs: number;
+    thresholdMs: number;
+}) {
+    if (!input.server.healthCheck?.slowUserNotifyEnabled) {
+        return false;
+    }
+
+    if (input.consecutiveSlowCount < input.server.healthCheck.slowUserNotifyThreshold) {
+        return false;
+    }
+
+    const cooldownMs = Math.max(15, input.server.healthCheck.slowUserNotifyCooldownMins) * 60_000;
+    const lastSentAt = input.server.healthCheck.slowUserAlertSentAt;
+    if (lastSentAt && Date.now() - lastSentAt.getTime() < cooldownMs) {
+        return false;
+    }
+
+    const chatIds = await listAffectedTelegramChatIdsForServer(input.server.id);
+    if (chatIds.length === 0) {
+        return false;
+    }
+
+    const result = await sendServerIssueNoticeToTelegram({
+        chatIds,
+        serverName: input.server.name,
+        noticeType: 'ISSUE',
+        message: `We detected sustained high latency on this server (${input.latencyMs}ms). Please wait about 2 to 3 hours while we stabilize the route or prepare a replacement if needed.`,
+    });
+
+    if (result.sentCount > 0) {
+        await db.healthCheck.update({
+            where: { serverId: input.server.id },
+            data: {
+                slowUserAlertSentAt: new Date(),
+            },
+        });
+
+        await writeAuditLog({
+            action: 'SERVER_SLOW_USER_NOTICE_SENT',
+            entity: 'SERVER',
+            entityId: input.server.id,
+            details: {
+                serverName: input.server.name,
+                consecutiveSlowCount: input.consecutiveSlowCount,
+                latencyMs: input.latencyMs,
+                thresholdMs: input.thresholdMs,
+                sentToTelegramUsers: result.sentCount,
+            },
+        });
+    }
+
+    return result.sentCount > 0;
+}
+
 /**
  * Run health checks on all enabled servers
  */
@@ -100,10 +267,23 @@ export async function runHealthChecks(): Promise<{
         else if (result.status === 'DOWN') down++;
         else if (result.status === 'SLOW') slow++;
 
+        await db.serverMetric.create({
+            data: {
+                serverId: server.id,
+                healthStatus: result.status,
+                latencyMs: result.latencyMs,
+            },
+        });
+
         // Update the health check record
         if (server.healthCheck) {
             const wasDown = server.healthCheck.lastStatus === 'DOWN';
+            const wasSlow = server.healthCheck.lastStatus === 'SLOW';
             const isNowDown = result.status === 'DOWN';
+            const thresholdMs = server.healthCheck.latencyThresholdMs ?? 500;
+            const consecutiveSlowCount = result.status === 'SLOW'
+                ? (server.healthCheck.slowConsecutiveCount ?? 0) + 1
+                : 0;
 
             await db.healthCheck.update({
                 where: { id: server.healthCheck.id },
@@ -111,6 +291,7 @@ export async function runHealthChecks(): Promise<{
                     lastStatus: result.status,
                     lastLatencyMs: result.latencyMs,
                     lastCheckedAt: new Date(),
+                    slowConsecutiveCount: consecutiveSlowCount,
                     totalChecks: { increment: 1 },
                     successfulChecks: result.status !== 'DOWN' ? { increment: 1 } : undefined,
                     failedChecks: result.status === 'DOWN' ? { increment: 1 } : undefined,
@@ -127,6 +308,12 @@ export async function runHealthChecks(): Promise<{
                 await sendAdminAlert(statusMsg);
             }
 
+            if (!wasSlow && result.status === 'SLOW') {
+                await sendAdminAlert(
+                    `🟡 <b>Server slow</b>\n\n<b>${server.name}</b> is responding with high latency.\nLatency: <b>${result.latencyMs ?? '-'}ms</b> (threshold <b>${thresholdMs}ms</b>)`,
+                );
+            }
+
             if (isNowDown) {
                 await markServerOutageDetected({
                     serverId: server.id,
@@ -134,6 +321,22 @@ export async function runHealthChecks(): Promise<{
                 });
             } else if (wasDown) {
                 await markServerOutageRecovered(server.id);
+            }
+
+            if (result.status === 'SLOW' && typeof result.latencyMs === 'number') {
+                await maybeAutoDrainSlowServer({
+                    server,
+                    consecutiveSlowCount,
+                    latencyMs: result.latencyMs,
+                    thresholdMs,
+                });
+
+                await maybeNotifyUsersAboutSlowServer({
+                    server,
+                    consecutiveSlowCount,
+                    latencyMs: result.latencyMs,
+                    thresholdMs,
+                });
             }
         }
     }

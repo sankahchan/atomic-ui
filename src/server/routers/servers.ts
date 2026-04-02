@@ -211,6 +211,104 @@ export const serversRouter = router({
       };
     }),
 
+  healthDiagnostics: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        limit: z.number().int().min(12).max(96).default(36),
+      }),
+    )
+    .query(async ({ input }) => {
+      const server = await db.server.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          lifecycleMode: true,
+          healthCheck: {
+            select: {
+              lastStatus: true,
+              lastLatencyMs: true,
+              lastCheckedAt: true,
+              latencyThresholdMs: true,
+              slowConsecutiveCount: true,
+              slowAutoDrainEnabled: true,
+              slowAutoDrainThreshold: true,
+              slowUserNotifyEnabled: true,
+              slowUserNotifyThreshold: true,
+              slowUserNotifyCooldownMins: true,
+              slowUserAlertSentAt: true,
+            },
+          },
+        },
+      });
+
+      if (!server) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Server not found',
+        });
+      }
+
+      const metrics = await db.serverMetric.findMany({
+        where: { serverId: input.id },
+        orderBy: { recordedAt: 'desc' },
+        take: input.limit,
+        select: {
+          recordedAt: true,
+          healthStatus: true,
+          latencyMs: true,
+        },
+      });
+
+      const recentRows = metrics.slice(0, 12);
+      const statusBreakdown = recentRows.reduce(
+        (acc, row) => {
+          const key = (row.healthStatus || 'UNKNOWN') as 'UP' | 'DOWN' | 'SLOW' | 'UNKNOWN';
+          if (key === 'UP') acc.up += 1;
+          else if (key === 'DOWN') acc.down += 1;
+          else if (key === 'SLOW') acc.slow += 1;
+          else acc.unknown += 1;
+          return acc;
+        },
+        { up: 0, down: 0, slow: 0, unknown: 0 },
+      );
+
+      const currentStatus = server.healthCheck?.lastStatus || 'UNKNOWN';
+      const currentLatency = server.healthCheck?.lastLatencyMs ?? null;
+      const threshold = server.healthCheck?.latencyThresholdMs ?? 500;
+      const reason =
+        currentStatus === 'SLOW' && typeof currentLatency === 'number'
+          ? `${currentLatency}ms > ${threshold}ms threshold`
+          : currentStatus === 'DOWN'
+            ? 'Health probe could not reach the server'
+            : currentStatus === 'UP' && typeof currentLatency === 'number'
+              ? `${currentLatency}ms within ${threshold}ms threshold`
+              : 'No recent health probe';
+
+      return {
+        current: {
+          status: currentStatus,
+          latencyMs: currentLatency,
+          thresholdMs: threshold,
+          lastCheckedAt: server.healthCheck?.lastCheckedAt ?? null,
+          slowConsecutiveCount: server.healthCheck?.slowConsecutiveCount ?? 0,
+          autoDrainEnabled: server.healthCheck?.slowAutoDrainEnabled ?? true,
+          autoDrainThreshold: server.healthCheck?.slowAutoDrainThreshold ?? 3,
+          autoDrainActive:
+            (server.lifecycleMode || 'ACTIVE') === 'DRAINING' &&
+            (server.healthCheck?.slowConsecutiveCount ?? 0) >= (server.healthCheck?.slowAutoDrainThreshold ?? 3),
+          userNotifyEnabled: server.healthCheck?.slowUserNotifyEnabled ?? true,
+          userNotifyThreshold: server.healthCheck?.slowUserNotifyThreshold ?? 3,
+          userNotifyCooldownMins: server.healthCheck?.slowUserNotifyCooldownMins ?? 180,
+          slowUserAlertSentAt: server.healthCheck?.slowUserAlertSentAt ?? null,
+          reason,
+        },
+        statusBreakdown,
+        metrics: metrics.reverse(),
+      };
+    }),
+
   /**
    * Add a new Outline server to Atomic-UI.
    * 
