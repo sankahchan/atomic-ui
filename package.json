@@ -23,6 +23,7 @@
     "password:change": "tsx scripts/change-password.ts",
     "test": "tsx --test src/**/*.test.ts",
     "smoke": "tsx scripts/smoke-test.ts",
+    "smoke:telegram": "tsx scripts/smoke-test-telegram.ts",
     "env:check": "tsx scripts/validate-production.ts",
     "deploy:vps": "bash scripts/deploy-vps.sh",
     "postinstall": "prisma generate"

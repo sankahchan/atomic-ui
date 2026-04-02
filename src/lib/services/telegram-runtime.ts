@@ -9,6 +9,7 @@ import {
   DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
   DEFAULT_TELEGRAM_WELCOME_MESSAGES,
 } from '@/lib/services/telegram-copy';
+import { sanitizeTelegramHtmlMessage } from '@/lib/services/telegram-message-validation';
 import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 
@@ -397,14 +398,24 @@ export async function sendTelegramMessage(
   text: string,
   options: SendMessageOptions = {},
 ): Promise<boolean> {
+  const parseMode = options.parseMode || 'HTML';
+  const preparedMessage =
+    parseMode === 'HTML' ? sanitizeTelegramHtmlMessage(text) : { text, changed: false, invalidTags: [] };
+
+  if (preparedMessage.changed) {
+    console.warn(
+      `Sanitized Telegram HTML message for ${chatId}; escaped unsupported tags: ${preparedMessage.invalidTags.join(', ')}`,
+    );
+  }
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
-        parse_mode: options.parseMode || 'HTML',
+        text: preparedMessage.text,
+        parse_mode: parseMode,
         reply_markup: options.replyMarkup,
         disable_web_page_preview: options.disableWebPagePreview ?? true,
       }),
@@ -512,14 +523,25 @@ export async function sendTelegramPhoto(
   photo: Buffer,
   caption?: string,
 ) {
+  const preparedCaption =
+    caption && caption.trim()
+      ? sanitizeTelegramHtmlMessage(caption)
+      : null;
+
+  if (preparedCaption?.changed) {
+    console.warn(
+      `Sanitized Telegram HTML caption for ${chatId}; escaped unsupported tags: ${preparedCaption.invalidTags.join(', ')}`,
+    );
+  }
+
   try {
     const formData = new FormData();
     formData.append('chat_id', chatId.toString());
     const blob = new Blob([new Uint8Array(photo)], { type: 'image/png' });
     formData.append('photo', blob, 'qrcode.png');
 
-    if (caption) {
-      formData.append('caption', caption);
+    if (preparedCaption?.text) {
+      formData.append('caption', preparedCaption.text);
       formData.append('parse_mode', 'HTML');
     }
 
@@ -551,6 +573,17 @@ export async function sendTelegramPhotoUrl(
     return false;
   }
 
+  const preparedCaption =
+    caption && caption.trim()
+      ? sanitizeTelegramHtmlMessage(caption)
+      : null;
+
+  if (preparedCaption?.changed) {
+    console.warn(
+      `Sanitized Telegram HTML photo-url caption for ${chatId}; escaped unsupported tags: ${preparedCaption.invalidTags.join(', ')}`,
+    );
+  }
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
       method: 'POST',
@@ -560,8 +593,8 @@ export async function sendTelegramPhotoUrl(
       body: JSON.stringify({
         chat_id: chatId.toString(),
         photo: trimmedPhotoUrl,
-        caption,
-        parse_mode: caption ? 'HTML' : undefined,
+        caption: preparedCaption?.text,
+        parse_mode: preparedCaption?.text ? 'HTML' : undefined,
         reply_markup: options?.replyMarkup,
       }),
     });
@@ -585,14 +618,25 @@ export async function sendTelegramDocument(
   filename: string,
   caption?: string,
 ) {
+  const preparedCaption =
+    caption && caption.trim()
+      ? sanitizeTelegramHtmlMessage(caption)
+      : null;
+
+  if (preparedCaption?.changed) {
+    console.warn(
+      `Sanitized Telegram HTML document caption for ${chatId}; escaped unsupported tags: ${preparedCaption.invalidTags.join(', ')}`,
+    );
+  }
+
   try {
     const formData = new FormData();
     formData.append('chat_id', chatId.toString());
     const blob = new Blob([new Uint8Array(document)], { type: 'application/octet-stream' });
     formData.append('document', blob, filename);
 
-    if (caption) {
-      formData.append('caption', caption);
+    if (preparedCaption?.text) {
+      formData.append('caption', preparedCaption.text);
       formData.append('parse_mode', 'HTML');
     }
 
