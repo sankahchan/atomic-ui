@@ -259,6 +259,7 @@ export function buildTelegramAnnouncementMessage(input: {
   type: TelegramAnnouncementType;
   title: string;
   message: string;
+  preview?: boolean;
 }) {
   const heading =
     input.type === 'PROMO'
@@ -272,6 +273,7 @@ export function buildTelegramAnnouncementMessage(input: {
             : '📣 <b>Announcement</b>';
 
   const bodyLines = [
+    ...(input.preview ? ['🧪 <b>Preview</b>', ''] : []),
     heading,
     '',
     `<b>${escapeHtml(input.title.trim())}</b>`,
@@ -286,6 +288,55 @@ export function buildTelegramAnnouncementMessage(input: {
   }
 
   return bodyLines.join('\n');
+}
+
+export async function sendTelegramAnnouncementPreview(input: {
+  chatId: string | number;
+  type: TelegramAnnouncementType;
+  title: string;
+  message: string;
+  heroImageUrl?: string | null;
+  includeSupportButton?: boolean;
+  pinToInbox?: boolean;
+}) {
+  const config = await getTelegramConfig();
+  if (!config?.botToken) {
+    return { sent: false as const, reason: 'not-configured' as const };
+  }
+
+  const supportLink = input.includeSupportButton ? await getTelegramSupportLink() : null;
+  const message = buildTelegramAnnouncementMessage({
+    type: input.type,
+    title: input.title,
+    message: input.pinToInbox
+      ? `${input.message.trim()}\n\nThis notice will be pinned in the customer inbox.`
+      : input.message,
+    preview: true,
+  });
+  const keyboardRows = [];
+  if (supportLink) {
+    keyboardRows.push([{ text: 'Support', url: supportLink }]);
+  }
+  const replyMarkup = keyboardRows.length > 0 ? { inline_keyboard: keyboardRows } : undefined;
+
+  const sent = input.heroImageUrl?.trim()
+    ? await sendTelegramPhotoUrl(
+        config.botToken,
+        input.chatId,
+        input.heroImageUrl.trim(),
+        message,
+        replyMarkup ? { replyMarkup } : undefined,
+      )
+    : await sendTelegramMessage(
+        config.botToken,
+        input.chatId,
+        message,
+        replyMarkup ? { replyMarkup } : undefined,
+      );
+
+  return sent
+    ? { sent: true as const }
+    : { sent: false as const, reason: 'send-failed' as const };
 }
 
 function getAnnouncementStatusFromCounts(sentCount: number, failedCount: number) {
@@ -366,9 +417,19 @@ export async function dispatchTelegramAnnouncement(input: {
         announcementId: announcement.id,
         chatId,
         status: 'PENDING',
+        isPinned: announcement.pinToInbox,
       })),
     });
   }
+
+  await db.telegramAnnouncementDelivery.updateMany({
+    where: {
+      announcementId: announcement.id,
+    },
+    data: {
+      isPinned: announcement.pinToInbox,
+    },
+  });
 
   await db.telegramAnnouncement.update({
     where: { id: announcement.id },

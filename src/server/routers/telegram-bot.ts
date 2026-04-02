@@ -33,6 +33,7 @@ import {
   dispatchTelegramAnnouncement,
   getTelegramAnnouncementAudienceMap,
   listTelegramAnnouncementTargetOptions,
+  sendTelegramAnnouncementPreview,
   type TelegramAnnouncementAudience,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
@@ -1816,6 +1817,7 @@ export const telegramBotRouter = router({
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
         includeSupportButton: z.boolean().default(true),
+        pinToInbox: z.boolean().default(false),
         scheduledFor: z.string().datetime().nullable().optional(),
       }),
     )
@@ -1857,6 +1859,7 @@ export const telegramBotRouter = router({
           message: input.message.trim(),
           heroImageUrl: input.heroImageUrl?.trim() || null,
           includeSupportButton: input.includeSupportButton,
+          pinToInbox: input.pinToInbox,
           status: scheduledFor && scheduledFor.getTime() > Date.now() ? 'SCHEDULED' : 'PROCESSING',
           scheduledFor,
           totalRecipients: chatIds.length,
@@ -1896,6 +1899,7 @@ export const telegramBotRouter = router({
           type: input.type,
           title: input.title,
           includeSupportButton: input.includeSupportButton,
+          pinToInbox: input.pinToInbox,
           sentCount,
           failedCount,
           scheduledFor: scheduledFor?.toISOString() ?? null,
@@ -1911,6 +1915,68 @@ export const telegramBotRouter = router({
         failedCount,
         scheduled,
         status,
+      };
+    }),
+
+  previewAnnouncementToSelf: adminProcedure
+    .input(
+      z.object({
+        type: telegramAnnouncementTypeSchema.default('ANNOUNCEMENT'),
+        title: z.string().trim().min(3).max(120),
+        message: z.string().trim().min(10).max(2000),
+        heroImageUrl: z.string().trim().max(1000).optional().nullable(),
+        includeSupportButton: z.boolean().default(true),
+        pinToInbox: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+      const adminUser = await db.user.findUnique({
+        where: { id: ctx.user.id },
+        select: {
+          telegramChatId: true,
+        },
+      });
+
+      if (!adminUser?.telegramChatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Link your Telegram admin chat first before using send-to-self preview.',
+        });
+      }
+
+      const result = await sendTelegramAnnouncementPreview({
+        chatId: adminUser.telegramChatId,
+        type: input.type,
+        title: input.title,
+        message: input.message,
+        heroImageUrl: input.heroImageUrl,
+        includeSupportButton: input.includeSupportButton,
+        pinToInbox: input.pinToInbox,
+      });
+
+      if (!result.sent) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Preview failed: ${result.reason}`,
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_PREVIEW',
+        entity: 'TELEGRAM',
+        details: {
+          type: input.type,
+          title: input.title,
+          includeSupportButton: input.includeSupportButton,
+          pinToInbox: input.pinToInbox,
+        },
+      });
+
+      return {
+        success: true,
       };
     }),
 
@@ -2197,6 +2263,7 @@ export const telegramBotRouter = router({
         message: z.string().trim().min(10).max(2000),
         heroImageUrl: z.string().trim().max(1000).optional().nullable(),
         includeSupportButton: z.boolean().default(true),
+        pinToInbox: z.boolean().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -2219,6 +2286,7 @@ export const telegramBotRouter = router({
         message: input.message.trim(),
         heroImageUrl: input.heroImageUrl?.trim() || null,
         includeSupportButton: input.includeSupportButton,
+        pinToInbox: input.pinToInbox,
         createdByUserId: ctx.user.id,
         createdByEmail: ctx.user.email ?? null,
       };

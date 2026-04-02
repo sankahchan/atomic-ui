@@ -22,6 +22,7 @@ export async function GET(
   await db.telegramAnnouncementDelivery.update({
     where: { id: delivery.id },
     data: {
+      readAt: delivery.readAt || new Date(),
       clickCount: { increment: 1 },
       lastClickedAt: new Date(),
     },

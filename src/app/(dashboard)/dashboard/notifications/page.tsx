@@ -24,6 +24,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import {
+  hasTelegramAnnouncementManageScope,
+  hasTelegramReviewManageScope,
+} from '@/lib/admin-scope';
 import { withBasePath } from '@/lib/base-path';
 import { copyToClipboard } from '@/lib/clipboard';
 import type { LocalizedTemplateMap } from '@/lib/localized-templates';
@@ -193,6 +197,7 @@ type TelegramAnnouncementTemplateRow = {
   message: string;
   heroImageUrl?: string | null;
   includeSupportButton: boolean;
+  pinToInbox: boolean;
   createdByEmail?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -210,6 +215,7 @@ type TelegramAnnouncementHistoryRow = {
   message: string;
   heroImageUrl?: string | null;
   includeSupportButton: boolean;
+  pinToInbox: boolean;
   status: string;
   scheduledFor?: Date | null;
   lastAttemptedAt?: Date | null;
@@ -1246,6 +1252,8 @@ function TelegramBotSetupCard() {
     announcementScheduleAt: isMyanmar ? 'ပို့မည့် အချိန်' : 'Schedule for',
     announcementScheduleHint: isMyanmar ? 'အချိန် သတ်မှတ်ထားပါက နောက်မှ ပို့ပါမည်။' : 'Set a future time to send it later.',
     announcementScheduleNow: isMyanmar ? 'အချိန်ဇယားဖြင့် သိမ်းမည်' : 'Schedule',
+    announcementPreviewSelf: isMyanmar ? 'ကိုယ့် Telegram သို့ preview ပို့မည်' : 'Preview to myself',
+    announcementPreviewSent: isMyanmar ? 'Preview ပို့ပြီးပါပြီ' : 'Preview sent',
     announcementTemplateName: isMyanmar ? 'Template အမည်' : 'Template name',
     announcementSaveTemplate: isMyanmar ? 'Template အဖြစ် သိမ်းမည်' : 'Save template',
     announcementTemplateSaved: isMyanmar ? 'Template သိမ်းပြီးပါပြီ' : 'Template saved',
@@ -1260,6 +1268,10 @@ function TelegramBotSetupCard() {
     announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော announcement များ၊ schedule များနှင့် failed deliveries များကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
     announcementHeroImage: isMyanmar ? 'Hero image URL' : 'Hero image URL',
     announcementHeroImageHint: isMyanmar ? 'Telegram တွင် image card အဖြစ် ပို့လိုပါက image URL ကို ထည့်ပါ။' : 'Add an image URL to send the announcement as a branded Telegram image card.',
+    announcementPinToInbox: isMyanmar ? 'Inbox တွင် pin လုပ်မည်' : 'Pin in customer inbox',
+    announcementPinToInboxHint: isMyanmar
+      ? 'ဤ announcement ကို customer inbox ထိပ်တွင် အရေးကြီး notice အဖြစ် ပြပါမည်။'
+      : 'Keep this announcement pinned near the top of the customer inbox.',
     announcementAnalyticsTitle: isMyanmar ? 'Delivery analytics' : 'Delivery analytics',
     announcementAnalyticsDesc: isMyanmar ? 'Open/click performance၊ audience success rate နှင့် resend recovery ကို ကြည့်နိုင်သည်။' : 'Track delivery success, opens, clicks, and resend recovery for announcements.',
     announcementAnalyticsRange: isMyanmar ? 'Analytics window' : 'Analytics window',
@@ -1285,6 +1297,7 @@ function TelegramBotSetupCard() {
     announcementScheduledDesc: (when: string) => isMyanmar ? `${when} တွင် ပို့မည်။` : `Scheduled for ${when}.`,
   };
   const utils = trpc.useUtils();
+  const currentUserQuery = trpc.auth.me.useQuery();
   const settingsQuery = trpc.telegramBot.getSettings.useQuery();
   const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
     refetchInterval: 30_000,
@@ -1297,6 +1310,7 @@ function TelegramBotSetupCard() {
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [announcementHeroImageUrl, setAnnouncementHeroImageUrl] = useState('');
   const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
+  const [announcementPinToInbox, setAnnouncementPinToInbox] = useState(false);
   const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
   const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
   const [announcementTargetTag, setAnnouncementTargetTag] = useState('ALL');
@@ -1426,6 +1440,7 @@ function TelegramBotSetupCard() {
   const announcementAnalyticsQuery = trpc.telegramBot.getAnnouncementAnalytics.useQuery({
     range: announcementAnalyticsRange,
   });
+  const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
     onSuccess: async (result) => {
       await Promise.all([
@@ -1444,7 +1459,23 @@ function TelegramBotSetupCard() {
       setAnnouncementTitle('');
       setAnnouncementMessage('');
       setAnnouncementHeroImageUrl('');
+      setAnnouncementPinToInbox(false);
       setAnnouncementScheduledFor('');
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const previewAnnouncementToSelfMutation = trpc.telegramBot.previewAnnouncementToSelf.useMutation({
+    onSuccess: () => {
+      toast({
+        title: telegramUi.announcementPreviewSent,
+        description: 'Sent to your linked Telegram admin chat.',
+      });
     },
     onError: (error) => {
       toast({
@@ -2184,7 +2215,53 @@ function TelegramBotSetupCard() {
                 />
               </div>
 
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
+                <div>
+                  <p className="text-sm font-medium">{telegramUi.announcementPinToInbox}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementPinToInboxHint}</p>
+                </div>
+                <Switch
+                  checked={announcementPinToInbox}
+                  onCheckedChange={setAnnouncementPinToInbox}
+                />
+              </div>
+
+              {!canManageAnnouncements ? (
+                <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  Only Owner/Admin scoped accounts can send Telegram announcements from the panel.
+                </div>
+              ) : null}
+
               <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="rounded-full"
+                  onClick={() =>
+                    previewAnnouncementToSelfMutation.mutate({
+                      type: announcementType,
+                      title: announcementTitle.trim(),
+                      message: announcementMessage.trim(),
+                      heroImageUrl: announcementHeroImageUrl.trim() || null,
+                      includeSupportButton: announcementIncludeSupportButton,
+                      pinToInbox: announcementPinToInbox,
+                    })
+                  }
+                  disabled={
+                    !hasToken ||
+                    !canManageAnnouncements ||
+                    previewAnnouncementToSelfMutation.isPending ||
+                    announcementTitle.trim().length < 3 ||
+                    announcementMessage.trim().length < 10
+                  }
+                >
+                  {previewAnnouncementToSelfMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <TestTube className="mr-2 h-4 w-4" />
+                  )}
+                  {telegramUi.announcementPreviewSelf}
+                </Button>
                 <Button
                   type="button"
                   className="rounded-full"
@@ -2197,11 +2274,13 @@ function TelegramBotSetupCard() {
                       message: announcementMessage.trim(),
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
+                      pinToInbox: announcementPinToInbox,
                       scheduledFor: null,
                     })
                   }
                   disabled={
                     !hasToken ||
+                    !canManageAnnouncements ||
                     sendAnnouncementMutation.isPending ||
                     announcementTitle.trim().length < 3 ||
                     announcementMessage.trim().length < 10 ||
@@ -2228,6 +2307,7 @@ function TelegramBotSetupCard() {
                       message: announcementMessage.trim(),
                       heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
+                      pinToInbox: announcementPinToInbox,
                       scheduledFor: announcementScheduledFor
                         ? new Date(announcementScheduledFor).toISOString()
                         : null,
@@ -2235,6 +2315,7 @@ function TelegramBotSetupCard() {
                   }
                   disabled={
                     !hasToken ||
+                    !canManageAnnouncements ||
                     sendAnnouncementMutation.isPending ||
                     !announcementScheduledFor ||
                     Number.isNaN(new Date(announcementScheduledFor).getTime()) ||
@@ -2300,6 +2381,7 @@ function TelegramBotSetupCard() {
                             setAnnouncementMessage(preset.message);
                             setAnnouncementHeroImageUrl('');
                             setAnnouncementIncludeSupportButton(preset.includeSupportButton);
+                            setAnnouncementPinToInbox(false);
                             setAnnouncementScheduledFor('');
                           }}
                         >
@@ -2331,9 +2413,10 @@ function TelegramBotSetupCard() {
                               title: preset.title,
                               message: preset.message,
                               includeSupportButton: preset.includeSupportButton,
+                              pinToInbox: false,
                             })
                           }
-                          disabled={saveAnnouncementTemplateMutation.isPending}
+                          disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending}
                         >
                           <Save className="mr-2 h-4 w-4" />
                           {telegramUi.announcementSavePreset}
@@ -2369,9 +2452,11 @@ function TelegramBotSetupCard() {
                         message: announcementMessage.trim(),
                         heroImageUrl: announcementHeroImageUrl.trim() || null,
                         includeSupportButton: announcementIncludeSupportButton,
+                        pinToInbox: announcementPinToInbox,
                       })
                     }
                     disabled={
+                      !canManageAnnouncements ||
                       saveAnnouncementTemplateMutation.isPending ||
                       announcementTemplateName.trim().length < 2 ||
                       announcementTitle.trim().length < 3 ||
@@ -2399,7 +2484,10 @@ function TelegramBotSetupCard() {
                             <p className="text-sm font-medium">{template.name}</p>
                             <p className="text-xs text-muted-foreground">{template.title}</p>
                           </div>
-                          <Badge variant="outline">{template.type}</Badge>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">{template.type}</Badge>
+                            {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
+                          </div>
                         </div>
                         {(template.targetTag || template.targetServerName || template.targetCountryCode) ? (
                           <div className="flex flex-wrap gap-2">
@@ -2446,6 +2534,7 @@ function TelegramBotSetupCard() {
                               setAnnouncementMessage(template.message);
                               setAnnouncementHeroImageUrl(template.heroImageUrl || '');
                               setAnnouncementIncludeSupportButton(template.includeSupportButton);
+                              setAnnouncementPinToInbox(template.pinToInbox);
                               setAnnouncementScheduledFor('');
                             }}
                           >
@@ -2648,6 +2737,7 @@ function TelegramBotSetupCard() {
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{announcement.type}</Badge>
                             <Badge variant="outline">{announcement.status}</Badge>
+                            {announcement.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                           </div>
                         </div>
                         {(announcement.targetTag || announcement.targetServerName || announcement.targetCountryCode) ? (
@@ -3334,6 +3424,8 @@ function TelegramSalesWorkflowCard() {
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const currentUserQuery = trpc.auth.me.useQuery();
+  const canManageSalesSettings = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
+  const canManageTelegramReviews = hasTelegramReviewManageScope(currentUserQuery.data?.adminScope);
   const reviewersQuery = trpc.telegramBot.listOrderReviewers.useQuery(undefined, {
     staleTime: 60_000,
   });
@@ -4730,7 +4822,7 @@ function TelegramSalesWorkflowCard() {
                   type="button"
                   variant="outline"
                   onClick={() => runSalesDigestMutation.mutate()}
-                  disabled={runSalesDigestMutation.isPending}
+                  disabled={!canManageSalesSettings || runSalesDigestMutation.isPending}
                 >
                   {runSalesDigestMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -5249,7 +5341,7 @@ function TelegramSalesWorkflowCard() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSaveConfig} disabled={saveConfigMutation.isPending}>
+            <Button onClick={handleSaveConfig} disabled={!canManageSalesSettings || saveConfigMutation.isPending}>
               {saveConfigMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -5270,6 +5362,13 @@ function TelegramSalesWorkflowCard() {
           <CardDescription>{salesUi.markForReview}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!canManageTelegramReviews ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+              {isMyanmar
+                ? 'Telegram review action များကို အသုံးပြုရန် Owner, Admin သို့မဟုတ် Support scope လိုအပ်ပါသည်။'
+                : 'Owner, Admin, or Support scope is required to manage Telegram review actions.'}
+            </div>
+          ) : null}
           <div className="grid gap-3 lg:grid-cols-[1.4fr,0.8fr,0.8fr]">
             <div className="space-y-2">
               <Label>{salesUi.reviewQueue}</Label>
@@ -5497,7 +5596,7 @@ function TelegramSalesWorkflowCard() {
                               size="sm"
                               variant="secondary"
                               onClick={() => handleClaimOrder(order.id, true)}
-                              disabled={claimOrderMutation.isPending}
+                              disabled={!canManageTelegramReviews || claimOrderMutation.isPending}
                             >
                               <KeyRound className="mr-2 h-4 w-4" />
                               {salesUi.claimOrder}
@@ -5507,7 +5606,7 @@ function TelegramSalesWorkflowCard() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleClaimOrder(order.id, false)}
-                              disabled={claimOrderMutation.isPending}
+                              disabled={!canManageTelegramReviews || claimOrderMutation.isPending}
                             >
                               <RotateCcw className="mr-2 h-4 w-4" />
                               {salesUi.releaseOrder}
@@ -5523,7 +5622,7 @@ function TelegramSalesWorkflowCard() {
                                 order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
                               );
                             }}
-                            disabled={isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || isOrderClaimedByOtherUser(order)}
                           >
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             {salesUi.approve}
@@ -5539,7 +5638,7 @@ function TelegramSalesWorkflowCard() {
                                 order.rejectionReasonCode || (order.duplicateProofOrderCode ? 'duplicate_payment' : 'custom'),
                               );
                             }}
-                            disabled={isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || isOrderClaimedByOtherUser(order)}
                           >
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             {salesUi.reject}
@@ -5550,7 +5649,7 @@ function TelegramSalesWorkflowCard() {
                             size="sm"
                             variant="secondary"
                             onClick={() => handleApplyOrderMacro(order.id, 'APPROVE_QUICK')}
-                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
                           >
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             {salesUi.quickApprove}
@@ -5564,7 +5663,7 @@ function TelegramSalesWorkflowCard() {
                                 order.duplicateProofOrderCode ? 'REJECT_DUPLICATE' : 'REJECT_BLURRY',
                               )
                             }
-                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
                           >
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             {order.duplicateProofOrderCode
@@ -5575,7 +5674,7 @@ function TelegramSalesWorkflowCard() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleApplyOrderMacro(order.id, 'REJECT_WRONG_AMOUNT')}
-                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
                           >
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             {salesUi.macroRejectAmount}
@@ -5584,7 +5683,7 @@ function TelegramSalesWorkflowCard() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleApplyOrderMacro(order.id, 'REJECT_WRONG_METHOD')}
-                            disabled={applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
                           >
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             {salesUi.macroRejectMethod}
@@ -5916,6 +6015,7 @@ function TelegramSalesWorkflowCard() {
                           })
                         }
                         disabled={
+                          !canManageTelegramReviews ||
                           approveServerChangeRequestMutation.isPending ||
                           rejectServerChangeRequestMutation.isPending
                         }
@@ -5937,6 +6037,7 @@ function TelegramSalesWorkflowCard() {
                           })
                         }
                         disabled={
+                          !canManageTelegramReviews ||
                           approveServerChangeRequestMutation.isPending ||
                           rejectServerChangeRequestMutation.isPending
                         }
@@ -6186,6 +6287,7 @@ function TelegramSalesWorkflowCard() {
                             setPremiumReviewPinExpires('60');
                             setPremiumAppendNoteToKey(true);
                           }}
+                          disabled={!canManageTelegramReviews}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           {salesUi.premiumApproveRegion}
@@ -6203,6 +6305,7 @@ function TelegramSalesWorkflowCard() {
                             setPremiumReviewPinExpires('60');
                             setPremiumAppendNoteToKey(true);
                           }}
+                          disabled={!canManageTelegramReviews}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           {salesUi.premiumHandleIssue}
@@ -6226,6 +6329,7 @@ function TelegramSalesWorkflowCard() {
                             setPremiumReviewPinExpires('60');
                             setPremiumAppendNoteToKey(false);
                           }}
+                          disabled={!canManageTelegramReviews}
                         >
                           <MessageSquare className="mr-2 h-4 w-4" />
                           {salesUi.premiumReply}
@@ -6248,6 +6352,7 @@ function TelegramSalesWorkflowCard() {
                           setPremiumReviewPinExpires('60');
                           setPremiumAppendNoteToKey(false);
                         }}
+                        disabled={!canManageTelegramReviews}
                       >
                         <AlertTriangle className="mr-2 h-4 w-4" />
                         {salesUi.premiumDismiss}
@@ -6471,7 +6576,7 @@ function TelegramSalesWorkflowCard() {
                             type="button"
                             variant="secondary"
                             onClick={() => handleClaimOrder(selectedOrder.id, true)}
-                            disabled={claimOrderMutation.isPending}
+                            disabled={!canManageTelegramReviews || claimOrderMutation.isPending}
                           >
                             <KeyRound className="mr-2 h-4 w-4" />
                             {salesUi.claimOrder}
@@ -6481,7 +6586,7 @@ function TelegramSalesWorkflowCard() {
                             type="button"
                             variant="outline"
                             onClick={() => handleClaimOrder(selectedOrder.id, false)}
-                            disabled={claimOrderMutation.isPending}
+                            disabled={!canManageTelegramReviews || claimOrderMutation.isPending}
                           >
                             <RotateCcw className="mr-2 h-4 w-4" />
                             {salesUi.releaseOrder}
@@ -6491,7 +6596,7 @@ function TelegramSalesWorkflowCard() {
                           type="button"
                           variant="outline"
                           onClick={() => handleAssignOrderReviewer(selectedOrder.id, currentReviewerId || null)}
-                          disabled={!currentReviewerId || assignOrderReviewerMutation.isPending}
+                          disabled={!canManageTelegramReviews || !currentReviewerId || assignOrderReviewerMutation.isPending}
                         >
                           <KeyRound className="mr-2 h-4 w-4" />
                           {salesUi.assignToMe}
@@ -6525,7 +6630,7 @@ function TelegramSalesWorkflowCard() {
                                 reviewAssignedReviewerId === 'unassigned' ? null : reviewAssignedReviewerId,
                               )
                             }
-                            disabled={assignOrderReviewerMutation.isPending}
+                            disabled={!canManageTelegramReviews || assignOrderReviewerMutation.isPending}
                           >
                             {assignOrderReviewerMutation.isPending ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -6759,7 +6864,7 @@ function TelegramSalesWorkflowCard() {
                           : null,
                     })
                   }
-                  disabled={updateOrderDraftMutation.isPending || isOrderClaimedByOtherUser(selectedOrder)}
+                  disabled={!canManageTelegramReviews || updateOrderDraftMutation.isPending || isOrderClaimedByOtherUser(selectedOrder)}
                 >
                   {updateOrderDraftMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -6857,6 +6962,7 @@ function TelegramSalesWorkflowCard() {
                 });
               }}
               disabled={
+                !canManageTelegramReviews ||
                 approveOrderMutation.isPending ||
                 rejectOrderMutation.isPending ||
                 updateOrderDraftMutation.isPending ||
@@ -7214,6 +7320,7 @@ function TelegramSalesWorkflowCard() {
                 });
               }}
               disabled={
+                !canManageTelegramReviews ||
                 approvePremiumSupportRequestMutation.isPending ||
                 handlePremiumSupportRequestMutation.isPending ||
                 replyPremiumSupportRequestMutation.isPending ||

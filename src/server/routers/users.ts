@@ -255,15 +255,17 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
-          customerNotifications: {
-            announcements: announcementDeliveries.map((delivery) => ({
-              id: delivery.id,
-              chatId: delivery.chatId,
-              status: delivery.status,
-              error: delivery.error,
-              openCount: delivery.openCount,
-              clickCount: delivery.clickCount,
-              lastOpenedAt: delivery.lastOpenedAt,
+            customerNotifications: {
+              announcements: announcementDeliveries.map((delivery) => ({
+                id: delivery.id,
+                chatId: delivery.chatId,
+                status: delivery.status,
+                isPinned: delivery.isPinned,
+                error: delivery.error,
+                readAt: delivery.readAt,
+                openCount: delivery.openCount,
+                clickCount: delivery.clickCount,
+                lastOpenedAt: delivery.lastOpenedAt,
               lastClickedAt: delivery.lastClickedAt,
               sentAt: delivery.sentAt,
               createdAt: delivery.createdAt,
@@ -437,6 +439,7 @@ export const usersRouter = router({
         status: z.enum(['ALL', 'PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
         assignment: z.enum(['ALL', 'UNCLAIMED', 'MINE', 'CLAIMED']).default('ALL'),
         sort: z.enum(['REQUESTED_DESC', 'REQUESTED_ASC', 'AMOUNT_DESC']).default('REQUESTED_DESC'),
+        query: z.string().trim().max(120).optional(),
         limit: z.number().int().min(1).max(100).default(25),
       }),
     )
@@ -454,11 +457,25 @@ export const usersRouter = router({
             : input.assignment === 'CLAIMED'
               ? { refundAssignedReviewerUserId: { not: null } }
               : undefined;
-      const where = assignmentWhere
-        ? {
-            AND: [statusWhere, assignmentWhere],
-          }
-        : statusWhere;
+      const query = input.query?.trim();
+      const filters: Array<Record<string, unknown>> = [statusWhere];
+      if (assignmentWhere) {
+        filters.push(assignmentWhere);
+      }
+      if (query) {
+        filters.push({
+          OR: [
+            { orderCode: { contains: query, mode: 'insensitive' as const } },
+            { requestedEmail: { contains: query, mode: 'insensitive' as const } },
+            { telegramUsername: { contains: query, mode: 'insensitive' as const } },
+            { telegramUserId: { contains: query } },
+            { requestedName: { contains: query, mode: 'insensitive' as const } },
+            { planName: { contains: query, mode: 'insensitive' as const } },
+            { planCode: { contains: query, mode: 'insensitive' as const } },
+          ],
+        });
+      }
+      const where = filters.length === 1 ? filters[0] : { AND: filters };
       const orderBy =
         input.sort === 'REQUESTED_ASC'
           ? [{ refundRequestedAt: 'asc' as const }, { createdAt: 'asc' as const }]

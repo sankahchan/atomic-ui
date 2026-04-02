@@ -64,6 +64,15 @@ type FinanceTimelineEvent = {
   href?: string;
 };
 
+type SupportTimelineEvent = {
+  id: string;
+  at: Date;
+  title: string;
+  detail: string;
+  tone: 'default' | 'warning' | 'danger' | 'positive';
+  href?: string;
+};
+
 export default function UserLedgerPage() {
   const params = useParams();
   const userId = params.id as string;
@@ -250,6 +259,58 @@ export default function UserLedgerPage() {
       .slice(0, 24);
   }, [ledgerQuery.data]);
 
+  const supportTimeline = useMemo<SupportTimelineEvent[]>(() => {
+    if (!ledgerQuery.data) {
+      return [];
+    }
+
+    const events: SupportTimelineEvent[] = [];
+
+    for (const request of ledgerQuery.data.serverChangeRequests) {
+      events.push({
+        id: `server-change:${request.id}`,
+        at: new Date(request.createdAt),
+        title: 'Server change request',
+        detail: `${request.requestCode} • ${request.currentServerName} → ${request.requestedServerName} • ${request.status}`,
+        tone: request.status === 'REJECTED' ? 'danger' : request.status === 'APPROVED' ? 'positive' : 'warning',
+      });
+    }
+
+    for (const request of ledgerQuery.data.premiumSupportRequests) {
+      events.push({
+        id: `premium-support:${request.id}`,
+        at: new Date(request.createdAt),
+        title: 'Premium support request',
+        detail: `${request.requestCode} • ${request.requestType} • ${request.status}${request.followUpPending ? ' • waiting for follow-up' : ''}`,
+        tone: request.status === 'DISMISSED' ? 'danger' : request.status === 'HANDLED' ? 'positive' : 'warning',
+      });
+    }
+
+    for (const delivery of ledgerQuery.data.customerNotifications.announcements) {
+      events.push({
+        id: `announcement:${delivery.id}`,
+        at: new Date(delivery.sentAt || delivery.createdAt),
+        title: delivery.isPinned ? 'Pinned announcement delivered' : 'Announcement delivered',
+        detail: `${delivery.announcement.title} • ${delivery.status}${delivery.readAt ? ' • read' : ' • unread'}`,
+        tone: delivery.isPinned ? 'warning' : 'default',
+      });
+    }
+
+    for (const log of ledgerQuery.data.customerNotifications.keyNotices) {
+      events.push({
+        id: `notice:${log.id}`,
+        at: new Date(log.sentAt),
+        title: log.event,
+        detail: `${log.accessKeyName || 'Unlinked key'} • ${log.status}`,
+        tone: log.status === 'FAILED' ? 'danger' : 'default',
+      });
+    }
+
+    return events
+      .sort((left, right) => right.at.getTime() - left.at.getTime())
+      .slice(0, 24);
+  }, [ledgerQuery.data]);
+
   if (ledgerQuery.isLoading) {
     return (
       <div className="space-y-6">
@@ -279,6 +340,15 @@ export default function UserLedgerPage() {
 
   const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, financePermissions } =
     ledgerQuery.data;
+  const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
+    if (left.isPinned !== right.isPinned) {
+      return left.isPinned ? -1 : 1;
+    }
+    if (Boolean(left.readAt) !== Boolean(right.readAt)) {
+      return left.readAt ? 1 : -1;
+    }
+    return new Date(right.sentAt || right.createdAt).getTime() - new Date(left.sentAt || left.createdAt).getTime();
+  });
 
   return (
     <div className="space-y-6">
@@ -788,15 +858,19 @@ export default function UserLedgerPage() {
             <CardContent className="space-y-4">
               <div>
                 <p className="mb-2 text-sm font-medium">Telegram announcements</p>
-                {customerNotifications.announcements.length === 0 ? (
+                {announcementDeliveries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No announcement deliveries recorded yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {customerNotifications.announcements.map((delivery) => (
+                    {announcementDeliveries.map((delivery) => (
                       <div key={delivery.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{delivery.announcement.title}</p>
-                          <Badge variant="outline">{delivery.status}</Badge>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">{delivery.status}</Badge>
+                            {delivery.isPinned ? <Badge variant="secondary">Pinned</Badge> : null}
+                            {!delivery.readAt ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">Unread</Badge> : null}
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {delivery.announcement.type} • {formatRelativeTime(delivery.sentAt || delivery.createdAt)}
@@ -804,6 +878,7 @@ export default function UserLedgerPage() {
                         <p className="mt-2 text-sm text-muted-foreground">{delivery.announcement.message}</p>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Opens: {delivery.openCount || 0} • Clicks: {delivery.clickCount || 0}
+                          {delivery.readAt ? ` • Read ${formatRelativeTime(delivery.readAt)}` : ' • Not opened yet'}
                         </p>
                         {(delivery.announcement.targetTag || delivery.announcement.targetServerName || delivery.announcement.targetCountryCode) ? (
                           <div className="mt-2 flex flex-wrap gap-2">
@@ -845,6 +920,60 @@ export default function UserLedgerPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+                Support timeline
+              </CardTitle>
+              <CardDescription>
+                One chronological feed for notices, premium requests, outage-related contact, and server-change history.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {supportTimeline.length === 0 ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  No support events have been recorded for this customer yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {supportTimeline.map((event) => {
+                    const toneClass =
+                      event.tone === 'positive'
+                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
+                        : event.tone === 'warning'
+                          ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                          : event.tone === 'danger'
+                            ? 'border-red-500/20 bg-red-500/10 text-red-100'
+                            : 'border-border/60 bg-background/40 text-muted-foreground dark:bg-white/[0.03]';
+
+                    return (
+                      <div key={event.id} className={`rounded-[1rem] border px-4 py-3 ${toneClass}`}>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">{event.title}</p>
+                            <p className="text-sm">{event.detail}</p>
+                          </div>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <p className="text-xs text-muted-foreground">{formatDateTime(event.at)}</p>
+                            {event.href ? (
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={event.href}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Open
+                                </Link>
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 

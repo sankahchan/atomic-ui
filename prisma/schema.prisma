@@ -467,6 +467,7 @@ model TelegramAnnouncement {
   message              String
   heroImageUrl         String?
   includeSupportButton Boolean  @default(true)
+  pinToInbox           Boolean  @default(false)
   status               String   @default("DRAFT") // DRAFT, SCHEDULED, PROCESSING, SENT, PARTIAL, FAILED, CANCELLED
   scheduledFor         DateTime?
   lastAttemptedAt      DateTime?
@@ -497,8 +498,10 @@ model TelegramAnnouncementDelivery {
   announcement    TelegramAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
   chatId          String
   status          String   @default("PENDING") // PENDING, SENT, FAILED
+  isPinned        Boolean  @default(false)
   error           String?
   sentAt          DateTime?
+  readAt          DateTime?
   openCount       Int      @default(0)
   lastOpenedAt    DateTime?
   clickCount      Int      @default(0)
@@ -508,6 +511,7 @@ model TelegramAnnouncementDelivery {
 
   @@unique([announcementId, chatId])
   @@index([announcementId, status])
+  @@index([chatId, isPinned, readAt, createdAt])
   @@index([chatId, createdAt])
 }
 
@@ -524,6 +528,7 @@ model TelegramAnnouncementTemplate {
   message              String
   heroImageUrl         String?
   includeSupportButton Boolean  @default(true)
+  pinToInbox           Boolean  @default(false)
   createdByUserId      String?
   createdByEmail       String?
   createdAt            DateTime @default(now())

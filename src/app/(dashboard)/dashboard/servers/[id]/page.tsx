@@ -39,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
+import { hasOutageManageScope } from '@/lib/admin-scope';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import {
@@ -269,6 +270,8 @@ export default function ServerDetailPage() {
   const [slowUserNotifyEnabled, setSlowUserNotifyEnabled] = useState(true);
   const [slowUserNotifyThreshold, setSlowUserNotifyThreshold] = useState('3');
   const [slowUserNotifyCooldownMins, setSlowUserNotifyCooldownMins] = useState('180');
+  const currentUserQuery = trpc.auth.me.useQuery();
+  const canManageOutages = hasOutageManageScope(currentUserQuery.data?.adminScope);
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
@@ -1199,7 +1202,13 @@ export default function ServerDetailPage() {
                 </p>
               ) : null}
 
-              <Button onClick={handleSaveLifecycle} disabled={lifecycleMutation.isPending}>
+              {!canManageOutages ? (
+                <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                  Only Owner/Admin scoped accounts can change lifecycle and outage controls.
+                </div>
+              ) : null}
+
+              <Button onClick={handleSaveLifecycle} disabled={!canManageOutages || lifecycleMutation.isPending}>
                 {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save Mode
               </Button>
@@ -1345,7 +1354,7 @@ export default function ServerDetailPage() {
                 <p>`User notice` sends a Telegram heads-up only after the configured slow streak.</p>
               </div>
 
-              <Button onClick={handleSaveSlowPolicy} disabled={slowPolicyMutation.isPending}>
+              <Button onClick={handleSaveSlowPolicy} disabled={!canManageOutages || slowPolicyMutation.isPending}>
                 {slowPolicyMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save Slow Policy
               </Button>
@@ -1560,6 +1569,7 @@ export default function ServerDetailPage() {
               <Button
                 variant="destructive"
                 disabled={
+                  !canManageOutages ||
                   outageTargetServerId === 'none' ||
                   outageReplaceMutation.isPending ||
                   outagePreviewQuery.isLoading
@@ -1718,6 +1728,7 @@ export default function ServerDetailPage() {
                       type="button"
                       variant="outline"
                       className="rounded-full"
+                      disabled={!canManageOutages}
                       onClick={() =>
                         setOutageFollowUpMessage(
                           'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
@@ -1730,6 +1741,7 @@ export default function ServerDetailPage() {
                       type="button"
                       variant="outline"
                       className="rounded-full"
+                      disabled={!canManageOutages}
                       onClick={() =>
                         setOutageFollowUpMessage(
                           'The server recovered earlier than expected. Please try using your key again now.',
@@ -1744,7 +1756,7 @@ export default function ServerDetailPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
+                      disabled={!canManageOutages || outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
                       onClick={() =>
                         outageFollowUpMutation.mutate({
                           serverId,
@@ -1761,7 +1773,7 @@ export default function ServerDetailPage() {
                     <Button
                       type="button"
                       className="rounded-full"
-                      disabled={outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
+                      disabled={!canManageOutages || outageFollowUpMutation.isPending || outageFollowUpMessage.trim().length < 10}
                       onClick={() =>
                         outageFollowUpMutation.mutate({
                           serverId,
@@ -1833,7 +1845,7 @@ export default function ServerDetailPage() {
 
               <Button
                 type="button"
-                disabled={manualNoticeMutation.isPending || manualNoticeMessage.trim().length < 10}
+                disabled={!canManageOutages || manualNoticeMutation.isPending || manualNoticeMessage.trim().length < 10}
                 onClick={() =>
                   manualNoticeMutation.mutate({
                     serverId,

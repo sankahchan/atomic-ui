@@ -6676,21 +6676,37 @@ async function handleEmailLink(
 async function handleInboxCommand(
   chatId: number,
   telegramUserId: number,
+  argsText: string,
   locale: SupportedLocale,
 ): Promise<string> {
   const chatIdValue = String(chatId);
   const telegramUserIdValue = String(telegramUserId);
+  const mode = (() => {
+    const normalized = argsText.trim().toLowerCase();
+    if (normalized === 'unread') {
+      return 'UNREAD' as const;
+    }
+    if (normalized === 'pinned' || normalized === 'important') {
+      return 'PINNED' as const;
+    }
+    return 'ALL' as const;
+  })();
   const [announcements, accessKeys] = await Promise.all([
     db.telegramAnnouncementDelivery.findMany({
       where: {
         chatId: chatIdValue,
         status: 'SENT',
+        ...(mode === 'UNREAD'
+          ? { readAt: null }
+          : mode === 'PINNED'
+            ? { isPinned: true }
+            : {}),
       },
       include: {
         announcement: true,
       },
-      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
-      take: 5,
+      orderBy: [{ isPinned: 'desc' }, { readAt: 'asc' }, { sentAt: 'desc' }, { createdAt: 'desc' }],
+      take: 8,
     }),
     db.accessKey.findMany({
       where: {
@@ -6726,6 +6742,22 @@ async function handleInboxCommand(
       })
     : [];
 
+  const unreadAnnouncementIds = announcements
+    .filter((delivery) => delivery.readAt == null)
+    .map((delivery) => delivery.id);
+  if (unreadAnnouncementIds.length > 0) {
+    await db.telegramAnnouncementDelivery.updateMany({
+      where: {
+        id: {
+          in: unreadAnnouncementIds,
+        },
+      },
+      data: {
+        readAt: new Date(),
+      },
+    });
+  }
+
   if (!announcements.length && !keyLogs.length) {
     return locale === 'my'
       ? '📭 မကြာသေးမီက notice သို့မဟုတ် announcement မရှိသေးပါ။'
@@ -6738,17 +6770,30 @@ async function handleInboxCommand(
   ];
 
   if (announcements.length) {
-    lines.push(locale === 'my' ? '<b>Announcement များ</b>' : '<b>Announcements</b>');
+    lines.push(
+      mode === 'PINNED'
+        ? locale === 'my'
+          ? '<b>Pin လုပ်ထားသော announcement များ</b>'
+          : '<b>Pinned announcements</b>'
+        : mode === 'UNREAD'
+          ? locale === 'my'
+            ? '<b>မဖတ်ရသေးသော announcement များ</b>'
+            : '<b>Unread announcements</b>'
+          : locale === 'my'
+            ? '<b>Announcement များ</b>'
+            : '<b>Announcements</b>',
+    );
     for (const delivery of announcements) {
       lines.push(
-        `• <b>${escapeHtml(delivery.announcement.title)}</b>`,
+        `• ${delivery.isPinned ? '📌 ' : ''}<b>${escapeHtml(delivery.announcement.title)}</b>`,
         `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, locale)}`,
+        `  ${delivery.readAt ? (locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
       );
     }
     lines.push('');
   }
 
-  if (keyLogs.length) {
+  if (keyLogs.length && mode === 'ALL') {
     lines.push(locale === 'my' ? '<b>Key Notice များ</b>' : '<b>Key notices</b>');
     for (const log of keyLogs) {
       lines.push(
@@ -6757,6 +6802,13 @@ async function handleInboxCommand(
       );
     }
   }
+
+  lines.push(
+    '',
+    locale === 'my'
+      ? 'Tip: /inbox unread သို့မဟုတ် /inbox pinned ကို အသုံးပြုနိုင်သည်။'
+      : 'Tip: use /inbox unread or /inbox pinned.',
+  );
 
   return lines.join('\n');
 }
@@ -8608,7 +8660,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         sendTelegramOrderStatusCard,
       });
     case 'inbox':
-      return handleInboxCommand(chatId, telegramUserId, locale);
+      return handleInboxCommand(chatId, telegramUserId, argsText, locale);
     case 'usage':
     case 'mykey':
     case 'key':

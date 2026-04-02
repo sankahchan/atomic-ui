@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ADMIN_SCOPE_VALUES, getAdminScopeLabel, normalizeAdminScope } from '@/lib/admin-scope';
+import {
+  ADMIN_SCOPE_VALUES,
+  getAdminScopeLabel,
+  hasFinanceConfigureScope,
+  hasFinanceManageScope,
+  isOwnerLikeAdmin,
+  normalizeAdminScope,
+} from '@/lib/admin-scope';
+import { withBasePath } from '@/lib/base-path';
 import { trpc } from '@/lib/trpc';
 import { getRefundReasonPreset, listRefundReasonPresets, resolveRefundReasonPresetLabel, type RefundReviewAction } from '@/lib/finance';
 import { formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -83,6 +91,7 @@ export default function UsersPage() {
   const [refundQueueStatus, setRefundQueueStatus] = useState<RefundQueueFilter>('PENDING');
   const [refundQueueAssignment, setRefundQueueAssignment] = useState<RefundQueueAssignmentFilter>('ALL');
   const [refundQueueSort, setRefundQueueSort] = useState<RefundQueueSort>('REQUESTED_DESC');
+  const [refundQueueSearch, setRefundQueueSearch] = useState('');
   const [financeOwnerEmails, setFinanceOwnerEmails] = useState('');
   const [financeOperatorEmails, setFinanceOperatorEmails] = useState('');
   const [financeDigestEnabled, setFinanceDigestEnabled] = useState(false);
@@ -104,6 +113,7 @@ export default function UsersPage() {
     status: refundQueueStatus,
     assignment: refundQueueAssignment,
     sort: refundQueueSort,
+    query: refundQueueSearch.trim() || undefined,
     limit: 24,
   });
   const userList = useMemo(() => users ?? [], [users]);
@@ -133,6 +143,9 @@ export default function UsersPage() {
     [userList],
   );
   const currentReviewerId = currentUserQuery.data?.id ?? null;
+  const canManageFinance = hasFinanceManageScope(currentUserQuery.data?.adminScope);
+  const canConfigureFinance = hasFinanceConfigureScope(currentUserQuery.data?.adminScope);
+  const canManageUserScopes = isOwnerLikeAdmin(currentUserQuery.data?.adminScope);
   const refundQueue = refundQueueQuery.data?.orders || [];
   const refundQueueSummary = refundQueueQuery.data?.summary;
   const refundReasonPresets = useMemo(
@@ -591,7 +604,7 @@ export default function UsersPage() {
                         type="button"
                         variant="outline"
                         onClick={() => runFinanceDigestMutation.mutate()}
-                        disabled={!financeControlsQuery.data?.permissions.canManage || runFinanceDigestMutation.isPending}
+                        disabled={!canManageFinance || runFinanceDigestMutation.isPending}
                       >
                         {runFinanceDigestMutation.isPending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -620,7 +633,7 @@ export default function UsersPage() {
                               dailyFinanceDigestMinute: Math.min(59, Math.max(0, Number(financeDigestMinute) || 0)),
                             })
                           }
-                          disabled={!financeControlsQuery.data?.permissions.canConfigure || updateFinanceControlsMutation.isPending}
+                          disabled={!canConfigureFinance || updateFinanceControlsMutation.isPending}
                         >
                           {updateFinanceControlsMutation.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -688,7 +701,7 @@ export default function UsersPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 px-0 pb-0">
-          <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_220px_220px_auto] md:items-end">
+          <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_220px_220px_minmax(220px,1fr)_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="refund-status-filter">Refund status</Label>
               <Select value={refundQueueStatus} onValueChange={(value) => setRefundQueueStatus(value as RefundQueueFilter)}>
@@ -732,6 +745,15 @@ export default function UsersPage() {
                   <SelectItem value="AMOUNT_DESC">Highest value first</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-search-filter">Search</Label>
+              <Input
+                id="refund-search-filter"
+                value={refundQueueSearch}
+                onChange={(event) => setRefundQueueSearch(event.target.value)}
+                placeholder="Order code, email, Telegram, plan..."
+              />
             </div>
             <div className="ops-table-meta">
               {refundQueue.length} refund request{refundQueue.length === 1 ? '' : 's'}
@@ -840,6 +862,28 @@ export default function UsersPage() {
                           </Link>
                         </Button>
                       ) : null}
+                      <Button asChild variant="outline" size="sm">
+                        <a
+                          href={withBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=pdf`)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Receipt PDF
+                        </a>
+                      </Button>
+                      {order.refundRequestStatus === 'APPROVED' || order.financeStatus === 'REFUNDED' ? (
+                        <Button asChild variant="outline" size="sm">
+                          <a
+                            href={withBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=pdf`)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            Refund PDF
+                          </a>
+                        </Button>
+                      ) : null}
                       {order.refundRequestStatus === 'PENDING' ? (
                         <>
                           <div className="grid gap-2">
@@ -853,7 +897,7 @@ export default function UsersPage() {
                                   size="sm"
                                   variant={preset.action === 'APPROVE' ? 'secondary' : 'outline'}
                                   disabled={
-                                    !refundQueueQuery.data?.permissions.canManage ||
+                                    !canManageFinance ||
                                     isRefundClaimedByOtherUser(order) ||
                                     reviewRefundRequestMutation.isPending
                                   }
@@ -869,7 +913,7 @@ export default function UsersPage() {
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                disabled={!refundQueueQuery.data?.permissions.canManage || claimRefundRequestMutation.isPending}
+                                disabled={!canManageFinance || claimRefundRequestMutation.isPending}
                                 onClick={() => claimRefundRequestMutation.mutate({ orderId: order.id, claimed: true })}
                               >
                                 Claim refund
@@ -879,7 +923,7 @@ export default function UsersPage() {
                                 size="sm"
                                 variant="outline"
                                 disabled={
-                                  !refundQueueQuery.data?.permissions.canManage ||
+                                  !canManageFinance ||
                                   claimRefundRequestMutation.isPending ||
                                   isRefundClaimedByOtherUser(order)
                                 }
@@ -897,7 +941,7 @@ export default function UsersPage() {
                                   reviewerUserId: value === 'unassigned' ? null : value,
                                 })
                               }
-                              disabled={!refundQueueQuery.data?.permissions.canManage || assignRefundReviewerMutation.isPending}
+                              disabled={!canManageFinance || assignRefundReviewerMutation.isPending}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Assign reviewer" />
@@ -915,7 +959,7 @@ export default function UsersPage() {
                           <Button
                             size="sm"
                             variant={isRefundClaimedByOtherUser(order) ? 'outline' : 'default'}
-                            disabled={!refundQueueQuery.data?.permissions.canManage || isRefundClaimedByOtherUser(order)}
+                            disabled={!canManageFinance || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'APPROVE')}
                           >
                             Approve request
@@ -923,7 +967,7 @@ export default function UsersPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={!refundQueueQuery.data?.permissions.canManage || isRefundClaimedByOtherUser(order)}
+                            disabled={!canManageFinance || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'REJECT')}
                           >
                             Decline request
@@ -1050,7 +1094,7 @@ export default function UsersPage() {
                                     adminScope: value as AdminScopeValue,
                                   })
                                 }
-                                disabled={updateAdminScopeMutation.isPending}
+                                disabled={!canManageUserScopes || updateAdminScopeMutation.isPending}
                               >
                                 <SelectTrigger className="w-[150px]">
                                   <SelectValue />
@@ -1171,7 +1215,7 @@ export default function UsersPage() {
                             adminScope: value as AdminScopeValue,
                           })
                         }
-                        disabled={updateAdminScopeMutation.isPending}
+                        disabled={!canManageUserScopes || updateAdminScopeMutation.isPending}
                       >
                         <SelectTrigger>
                           <SelectValue />
