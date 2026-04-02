@@ -40,16 +40,18 @@ export function getCommandKeyboard(isAdmin: boolean) {
     [{ text: '/buy' }, { text: '/trial' }],
     [{ text: '/renew' }, { text: '/orders' }],
     [{ text: '/refund' }, { text: '/mykeys' }],
-    [{ text: '/usage' }, { text: '/sub' }],
-    [{ text: '/server' }, { text: '/premium' }],
-    [{ text: '/supportstatus' }, { text: '/support' }],
-    [{ text: '/language' }, { text: '/cancel' }],
-    [{ text: '/help' }],
+    [{ text: '/usage' }, { text: '/inbox' }],
+    [{ text: '/sub' }, { text: '/server' }],
+    [{ text: '/premium' }, { text: '/supportstatus' }],
+    [{ text: '/support' }, { text: '/language' }],
+    [{ text: '/cancel' }, { text: '/help' }],
   ];
 
   if (isAdmin) {
     keyboard.push([{ text: '/status' }, { text: '/expiring' }]);
     keyboard.push([{ text: '/find' }, { text: '/sysinfo' }]);
+    keyboard.push([{ text: '/refunds' }, { text: '/finance' }]);
+    keyboard.push([{ text: '/announcements' }]);
   }
 
   return {

@@ -92,8 +92,15 @@ import {
 } from '@/lib/services/telegram-sales';
 import {
   evaluateTelegramOrderRefundEligibility,
+  getFinanceControls,
   sendTelegramRefundRequestAlert,
 } from '@/lib/services/telegram-finance';
+import {
+  dispatchTelegramAnnouncement,
+  getTelegramAnnouncementAudienceMap,
+  type TelegramAnnouncementAudience,
+  type TelegramAnnouncementType,
+} from '@/lib/services/telegram-announcements';
 import {
   addTelegramPremiumSupportReply,
   buildTelegramDynamicPremiumPendingKeyboard,
@@ -7819,6 +7826,500 @@ async function handleServerRecoveredCommand(argsText: string, locale: SupportedL
     : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
 }
 
+function formatTelegramAdminMoneyMap(entries: Map<string, number>) {
+  if (entries.size === 0) {
+    return '0';
+  }
+
+  return Array.from(entries.entries())
+    .map(([currency, amount]) => `${amount.toLocaleString()} ${currency}`)
+    .join(' • ');
+}
+
+function resolveTelegramAnnouncementAudienceToken(value?: string | null): TelegramAnnouncementAudience | null {
+  switch ((value || '').trim().toLowerCase()) {
+    case 'active':
+    case 'active_users':
+      return 'ACTIVE_USERS';
+    case 'standard':
+    case 'std':
+    case 'standard_users':
+      return 'STANDARD_USERS';
+    case 'premium':
+    case 'premium_users':
+      return 'PREMIUM_USERS';
+    case 'trial':
+    case 'trial_users':
+      return 'TRIAL_USERS';
+    default:
+      return null;
+  }
+}
+
+function resolveTelegramAnnouncementTypeToken(value?: string | null): TelegramAnnouncementType | null {
+  switch ((value || '').trim().toLowerCase()) {
+    case '':
+    case 'announcement':
+      return 'ANNOUNCEMENT';
+    case 'info':
+      return 'INFO';
+    case 'promo':
+    case 'discount':
+      return 'PROMO';
+    case 'new_server':
+    case 'server':
+      return 'NEW_SERVER';
+    case 'maintenance':
+      return 'MAINTENANCE';
+    default:
+      return null;
+  }
+}
+
+type TelegramAdminAnnouncementParseResult =
+  | { error: string }
+  | {
+      error: null;
+      audience: TelegramAnnouncementAudience;
+      type: TelegramAnnouncementType;
+      title: string;
+      message: string;
+      includeSupportButton: boolean;
+      filters: {
+        tag: string | null;
+        serverId: string | null;
+        countryCode: string | null;
+      };
+      serverName: string | null;
+    };
+
+function formatTelegramAnnouncementTargetSummary(input: {
+  tag?: string | null;
+  serverName?: string | null;
+  countryCode?: string | null;
+}) {
+  const parts = [
+    input.tag ? `tag=${input.tag}` : null,
+    input.serverName ? `server=${input.serverName}` : null,
+    input.countryCode ? `region=${input.countryCode}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' • ') : 'all matching users';
+}
+
+async function parseTelegramAdminAnnouncementArgs(
+  argsText: string,
+  locale: SupportedLocale,
+): Promise<TelegramAdminAnnouncementParseResult> {
+  const usage =
+    locale === 'my'
+      ? 'အသုံးပြုပုံ: /announce <active|standard|premium|trial> [type=info|announcement|promo|new_server|maintenance] [tag=<tag>] [server=<id>] [region=<CC>] [support=yes|no] :: <title> :: <message>'
+      : 'Usage: /announce <active|standard|premium|trial> [type=info|announcement|promo|new_server|maintenance] [tag=<tag>] [server=<id>] [region=<CC>] [support=yes|no] :: <title> :: <message>';
+  const parts = argsText
+    .split('::')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 3) {
+    return { error: usage } satisfies TelegramAdminAnnouncementParseResult;
+  }
+
+  const [targetPart, title, ...messageParts] = parts;
+  const message = messageParts.join(' :: ').trim();
+  const tokens = targetPart.split(/\s+/).filter(Boolean);
+  const audience = resolveTelegramAnnouncementAudienceToken(tokens.shift());
+  if (!audience || title.length < 3 || message.length < 10) {
+    return { error: usage } satisfies TelegramAdminAnnouncementParseResult;
+  }
+
+  let type: TelegramAnnouncementType = 'ANNOUNCEMENT';
+  let includeSupportButton = true;
+  let tag: string | null = null;
+  let serverId: string | null = null;
+  let countryCode: string | null = null;
+  let serverName: string | null = null;
+
+  for (const token of tokens) {
+    const [rawKey, ...rawValueParts] = token.split('=');
+    const key = rawKey?.trim().toLowerCase();
+    const rawValue = rawValueParts.join('=').trim();
+    if (!key || !rawValue) {
+      continue;
+    }
+
+    if (key === 'type') {
+      const resolvedType = resolveTelegramAnnouncementTypeToken(rawValue);
+      if (!resolvedType) {
+        return { error: usage } satisfies TelegramAdminAnnouncementParseResult;
+      }
+      type = resolvedType;
+      continue;
+    }
+
+    if (key === 'tag') {
+      tag = rawValue.toLowerCase();
+      continue;
+    }
+
+    if (key === 'region' || key === 'country') {
+      countryCode = rawValue.toUpperCase();
+      continue;
+    }
+
+    if (key === 'support') {
+      includeSupportButton = !['no', 'false', '0'].includes(rawValue.toLowerCase());
+      continue;
+    }
+
+    if (key === 'server') {
+      const serverQuery = rawValue.replace(/_/g, ' ');
+      const candidates = await db.server.findMany({
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: [{ name: 'asc' }],
+      });
+      const normalizedQuery = serverQuery.toLowerCase();
+      const matches = candidates.filter(
+        (candidate) =>
+          candidate.id === rawValue ||
+          candidate.name.trim().toLowerCase() === normalizedQuery ||
+          candidate.name.trim().toLowerCase().includes(normalizedQuery),
+      );
+      if (matches.length !== 1) {
+        return {
+          error:
+            locale === 'my'
+              ? 'server filter အတွက် server id သို့မဟုတ် တိတိကျကျ server name တစ်ခုကို အသုံးပြုပါ။'
+              : 'Use one exact server id or name for the server filter.',
+        } satisfies TelegramAdminAnnouncementParseResult;
+      }
+      serverId = matches[0].id;
+      serverName = matches[0].name;
+    }
+  }
+
+  return {
+    error: null,
+    audience,
+    type,
+    title,
+    message,
+    includeSupportButton,
+    filters: {
+      tag,
+      serverId,
+      countryCode,
+    },
+    serverName,
+  } satisfies TelegramAdminAnnouncementParseResult;
+}
+
+async function handleInboxCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+): Promise<string> {
+  const chatIdValue = String(chatId);
+  const telegramUserIdValue = String(telegramUserId);
+  const [announcements, accessKeys] = await Promise.all([
+    db.telegramAnnouncementDelivery.findMany({
+      where: {
+        chatId: chatIdValue,
+        status: 'SENT',
+      },
+      include: {
+        announcement: true,
+      },
+      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
+      take: 5,
+    }),
+    db.accessKey.findMany({
+      where: {
+        OR: [
+          { telegramId: chatIdValue },
+          { telegramId: telegramUserIdValue },
+          { user: { telegramChatId: chatIdValue } },
+        ],
+      },
+      select: {
+        id: true,
+      },
+      take: 12,
+    }),
+  ]);
+
+  const keyLogs = accessKeys.length
+    ? await db.notificationLog.findMany({
+        where: {
+          accessKeyId: {
+            in: accessKeys.map((key) => key.id),
+          },
+        },
+        include: {
+          accessKey: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: [{ sentAt: 'desc' }],
+        take: 5,
+      })
+    : [];
+
+  if (!announcements.length && !keyLogs.length) {
+    return locale === 'my'
+      ? '📭 မကြာသေးမီက notice သို့မဟုတ် announcement မရှိသေးပါ။'
+      : '📭 No recent notices or announcements yet.';
+  }
+
+  const lines = [
+    locale === 'my' ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>',
+    '',
+  ];
+
+  if (announcements.length) {
+    lines.push(locale === 'my' ? '<b>Announcement များ</b>' : '<b>Announcements</b>');
+    for (const delivery of announcements) {
+      lines.push(
+        `• <b>${escapeHtml(delivery.announcement.title)}</b>`,
+        `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, locale)}`,
+      );
+    }
+    lines.push('');
+  }
+
+  if (keyLogs.length) {
+    lines.push(locale === 'my' ? '<b>Key Notice များ</b>' : '<b>Key notices</b>');
+    for (const log of keyLogs) {
+      lines.push(
+        `• <b>${escapeHtml(log.event)}</b>`,
+        `  ${escapeHtml(log.accessKey?.name || 'Key')} • ${formatTelegramDateTime(log.sentAt, locale)}`,
+      );
+    }
+  }
+
+  return lines.join('\n');
+}
+
+async function handleAnnouncementsCommand(locale: SupportedLocale): Promise<string> {
+  const announcements = await db.telegramAnnouncement.findMany({
+    orderBy: [{ createdAt: 'desc' }],
+    take: 5,
+  });
+
+  if (!announcements.length) {
+    return locale === 'my'
+      ? '📭 Announcement history မရှိသေးပါ။'
+      : '📭 No announcement history yet.';
+  }
+
+  const lines = [
+    locale === 'my' ? '📣 <b>မကြာသေးမီက Announcement များ</b>' : '📣 <b>Recent announcements</b>',
+    '',
+  ];
+
+  for (const announcement of announcements) {
+    lines.push(
+      `• <b>${escapeHtml(announcement.title)}</b>`,
+      `  ${escapeHtml(announcement.type)} • ${escapeHtml(announcement.status)} • ${announcement.sentCount}/${announcement.totalRecipients}`,
+      `  ${formatTelegramAnnouncementTargetSummary({
+        tag: announcement.targetTag,
+        serverName: announcement.targetServerName,
+        countryCode: announcement.targetCountryCode,
+      })}`,
+      `  ${formatTelegramDateTime(announcement.scheduledFor || announcement.sentAt || announcement.createdAt, locale)}`,
+      '',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+async function handleAnnounceCommand(argsText: string, locale: SupportedLocale): Promise<string> {
+  const parsed = await parseTelegramAdminAnnouncementArgs(argsText, locale);
+  if (parsed.error) {
+    return parsed.error;
+  }
+
+  const audienceMap = await getTelegramAnnouncementAudienceMap(parsed.filters);
+  const totalRecipients = audienceMap[parsed.audience]?.length || 0;
+  if (totalRecipients === 0) {
+    return locale === 'my'
+      ? 'ဤ target အတွက် ပို့ရန် Telegram user မတွေ့ပါ။'
+      : 'No Telegram recipients match that audience/filter.';
+  }
+
+  const announcement = await db.telegramAnnouncement.create({
+    data: {
+      audience: parsed.audience,
+      type: parsed.type,
+      title: parsed.title,
+      message: parsed.message,
+      includeSupportButton: parsed.includeSupportButton,
+      status: 'SCHEDULED',
+      scheduledFor: new Date(),
+      createdByEmail: 'telegram-admin',
+      targetTag: parsed.filters.tag,
+      targetServerId: parsed.filters.serverId,
+      targetServerName: parsed.serverName,
+      targetCountryCode: parsed.filters.countryCode,
+    },
+  });
+
+  const result = await dispatchTelegramAnnouncement({
+    announcementId: announcement.id,
+    now: new Date(),
+  });
+
+  if (result.skipped) {
+    return locale === 'my'
+      ? 'Announcement ကို မပို့နိုင်ပါ။ Notification settings ကို စစ်ဆေးပါ။'
+      : 'The announcement could not be sent. Check the Telegram bot configuration.';
+  }
+
+  await writeAuditLog({
+    action: 'TELEGRAM_ADMIN_ANNOUNCEMENT_SENT',
+    entity: 'TELEGRAM_ANNOUNCEMENT',
+    entityId: announcement.id,
+    details: {
+      audience: parsed.audience,
+      type: parsed.type,
+      filters: parsed.filters,
+      sentCount: result.sentCount,
+      failedCount: result.failedCount,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `📣 Announcement ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။${result.failedCount > 0 ? ` failed: ${result.failedCount}` : ''}`
+    : `📣 Sent the announcement to ${result.sentCount} user(s).${result.failedCount > 0 ? ` Failed: ${result.failedCount}.` : ''}`;
+}
+
+async function handleFinanceCommand(locale: SupportedLocale): Promise<string> {
+  const now = new Date();
+  const lookbackStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const [orders, financeActions, pendingRefundRequests, financeControls] = await Promise.all([
+    db.telegramOrder.findMany({
+      where: {
+        OR: [
+          { createdAt: { gte: lookbackStart } },
+          { fulfilledAt: { gte: lookbackStart } },
+          { refundRequestedAt: { gte: lookbackStart } },
+        ],
+      },
+      select: {
+        status: true,
+        kind: true,
+        priceAmount: true,
+        priceCurrency: true,
+        retentionSource: true,
+      },
+    }),
+    db.telegramOrderFinanceAction.findMany({
+      where: {
+        createdAt: { gte: lookbackStart },
+      },
+      select: {
+        actionType: true,
+        amount: true,
+        currency: true,
+      },
+    }),
+    db.telegramOrder.count({
+      where: {
+        refundRequestStatus: 'PENDING',
+      },
+    }),
+    getFinanceControls(),
+  ]);
+
+  const fulfilledOrders = orders.filter((order) => order.status === 'FULFILLED' && (order.priceAmount || 0) > 0);
+  const renewals = fulfilledOrders.filter((order) => order.kind === 'RENEW').length;
+  const revenueByCurrency = new Map<string, number>();
+  for (const order of fulfilledOrders) {
+    const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+    revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + (order.priceAmount || 0));
+  }
+
+  const refundsByCurrency = new Map<string, number>();
+  const creditsByCurrency = new Map<string, number>();
+  let verifiedCount = 0;
+  for (const action of financeActions) {
+    const currency = (action.currency || 'MMK').trim().toUpperCase();
+    if (action.actionType === 'REFUND') {
+      refundsByCurrency.set(currency, (refundsByCurrency.get(currency) || 0) + (action.amount || 0));
+    } else if (action.actionType === 'CREDIT') {
+      creditsByCurrency.set(currency, (creditsByCurrency.get(currency) || 0) + (action.amount || 0));
+    } else if (action.actionType === 'VERIFY') {
+      verifiedCount += 1;
+    }
+  }
+
+  const trialConversions = fulfilledOrders.filter((order) => order.retentionSource === 'trial_expiry').length;
+  return [
+    locale === 'my' ? '💸 <b>Finance အနှစ်ချုပ်</b>' : '💸 <b>Finance summary</b>',
+    '',
+    'Window: last 24 hour(s)',
+    `Paid orders: ${fulfilledOrders.length}`,
+    `Revenue: ${formatTelegramAdminMoneyMap(revenueByCurrency)}`,
+    `Renewals: ${renewals}`,
+    `Verified payments: ${verifiedCount}`,
+    `Refunded: ${formatTelegramAdminMoneyMap(refundsByCurrency)}`,
+    `Credited: ${formatTelegramAdminMoneyMap(creditsByCurrency)}`,
+    `Pending refund requests: ${pendingRefundRequests}`,
+    `Trial → paid conversions: ${trialConversions}`,
+    '',
+    locale === 'my'
+      ? `Daily digest: ${financeControls.dailyFinanceDigestEnabled ? 'ON' : 'OFF'}`
+      : `Daily digest: ${financeControls.dailyFinanceDigestEnabled ? 'ON' : 'OFF'}`,
+  ].join('\n');
+}
+
+async function handleRefundsCommand(locale: SupportedLocale): Promise<string> {
+  const pendingRefunds = await db.telegramOrder.findMany({
+    where: {
+      refundRequestStatus: 'PENDING',
+    },
+    select: {
+      orderCode: true,
+      requestedEmail: true,
+      priceAmount: true,
+      priceCurrency: true,
+      refundRequestedAt: true,
+      refundAssignedReviewerEmail: true,
+    },
+    orderBy: [{ refundRequestedAt: 'asc' }, { createdAt: 'asc' }],
+    take: 5,
+  });
+
+  if (!pendingRefunds.length) {
+    return locale === 'my'
+      ? '✅ Pending refund request မရှိပါ။'
+      : '✅ There are no pending refund requests.';
+  }
+
+  const lines = [
+    locale === 'my' ? '🧾 <b>Pending Refund Requests</b>' : '🧾 <b>Pending refund requests</b>',
+    '',
+  ];
+
+  for (const order of pendingRefunds) {
+    lines.push(
+      `• <b>${escapeHtml(order.orderCode)}</b>`,
+      `  ${order.priceAmount ? `${order.priceAmount.toLocaleString()} ${(order.priceCurrency || 'MMK').toUpperCase()}` : '0'}`,
+      `  ${escapeHtml(order.requestedEmail || 'Unknown customer')}`,
+      `  ${formatTelegramDateTime(order.refundRequestedAt || new Date(), locale)}`,
+      `  ${locale === 'my' ? 'Reviewer' : 'Reviewer'}: ${escapeHtml(order.refundAssignedReviewerEmail || 'Unclaimed')}`,
+      '',
+    );
+  }
+
+  return lines.join('\n');
+}
+
 async function handleHelpCommand(
   chatId: number,
   botToken: string,
@@ -7838,6 +8339,7 @@ async function handleHelpCommand(
 /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
 /usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
 /mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
+/inbox - announcement နှင့် key notice များကို ကြည့်မည်
 /premium - premium key support shortcut များကို ကြည့်မည်
 /supportstatus - premium support request အခြေအနေကို ကြည့်မည်
 /sub - Share page များကို လက်ခံမည်
@@ -7857,6 +8359,7 @@ async function handleHelpCommand(
 /refund - Show refund-eligible orders
 /usage - Fetch your usage and QR/setup info
 /mykeys - List linked keys and IDs
+/inbox - Show your recent notices and announcements
 /premium - Open premium support shortcuts
 /supportstatus - Check your premium support request status
 /sub - Receive your share pages
@@ -7875,6 +8378,10 @@ async function handleHelpCommand(
 /disable &lt;key-id&gt; - Key ကို ပိတ်မည်
 /enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
 /resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
+/announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Announcement ပို့မည်
+/announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
+/finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
+/refunds - pending refund request များကို ကြည့်မည်
 /serverdown &lt;server&gt; - Server downtime notice ပို့မည်
 /maintenance &lt;server&gt; - Maintenance notice ပို့မည်
 /serverupdate &lt;server&gt; &lt;message&gt; - Follow-up update ပို့မည်
@@ -7888,6 +8395,10 @@ async function handleHelpCommand(
 /disable &lt;key-id&gt; - Disable a key
 /enable &lt;key-id&gt; - Re-enable a key
 /resend &lt;key-id&gt; - Resend the share page
+/announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send an announcement
+/announcements - Show recent announcements
+/finance - Show the finance summary
+/refunds - Show pending refund requests
 /serverdown &lt;server&gt; - Send a downtime notice
 /maintenance &lt;server&gt; - Send a maintenance notice
 /serverupdate &lt;server&gt; &lt;message&gt; - Send a follow-up update
@@ -9715,6 +10226,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         sendTelegramMessage,
         sendTelegramOrderStatusCard,
       });
+    case 'inbox':
+      return handleInboxCommand(chatId, telegramUserId, locale);
     case 'usage':
     case 'mykey':
     case 'key':
@@ -9792,6 +10305,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return isAdmin ? handleAdminToggleCommand(argsText, true, locale) : ui.adminOnly;
     case 'resend':
       return isAdmin ? handleResendCommand(argsText, locale) : ui.adminOnly;
+    case 'announce':
+      return isAdmin ? handleAnnounceCommand(argsText, locale) : ui.adminOnly;
+    case 'announcements':
+      return isAdmin ? handleAnnouncementsCommand(locale) : ui.adminOnly;
+    case 'finance':
+      return isAdmin ? handleFinanceCommand(locale) : ui.adminOnly;
+    case 'refunds':
+      return isAdmin ? handleRefundsCommand(locale) : ui.adminOnly;
     case 'serverdown':
       return isAdmin ? handleServerDownCommand(argsText, locale) : ui.adminOnly;
     case 'maintenance':

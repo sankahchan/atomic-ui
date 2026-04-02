@@ -459,6 +459,10 @@ model TelegramAnnouncement {
   id                   String   @id @default(cuid())
   audience             String
   type                 String
+  targetTag            String?
+  targetServerId       String?
+  targetServerName     String?
+  targetCountryCode    String?
   title                String
   message              String
   includeSupportButton Boolean  @default(true)
@@ -479,6 +483,9 @@ model TelegramAnnouncement {
   @@index([status, scheduledFor])
   @@index([createdAt])
   @@index([createdByUserId, createdAt])
+  @@index([targetServerId, status, createdAt])
+  @@index([targetCountryCode, status, createdAt])
+  @@index([targetTag, status, createdAt])
 }
 
 model TelegramAnnouncementDelivery {
@@ -502,6 +509,10 @@ model TelegramAnnouncementTemplate {
   name                 String
   audience             String
   type                 String
+  targetTag            String?
+  targetServerId       String?
+  targetServerName     String?
+  targetCountryCode    String?
   title                String
   message              String
   includeSupportButton Boolean  @default(true)

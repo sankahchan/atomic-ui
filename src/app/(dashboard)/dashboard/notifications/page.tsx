@@ -179,6 +179,10 @@ type TelegramAnnouncementTemplateRow = {
   name: string;
   audience: TelegramAnnouncementAudience;
   type: TelegramAnnouncementType;
+  targetTag?: string | null;
+  targetServerId?: string | null;
+  targetServerName?: string | null;
+  targetCountryCode?: string | null;
   title: string;
   message: string;
   includeSupportButton: boolean;
@@ -191,6 +195,10 @@ type TelegramAnnouncementHistoryRow = {
   id: string;
   audience: TelegramAnnouncementAudience;
   type: TelegramAnnouncementType;
+  targetTag?: string | null;
+  targetServerId?: string | null;
+  targetServerName?: string | null;
+  targetCountryCode?: string | null;
   title: string;
   message: string;
   includeSupportButton: boolean;
@@ -211,6 +219,12 @@ type TelegramAnnouncementHistoryRow = {
     error?: string | null;
     updatedAt: Date;
   }>;
+};
+
+type TelegramAnnouncementTargetOptions = {
+  tags: Array<{ value: string; count: number }>;
+  servers: Array<{ value: string; label: string; countryCode?: string | null; count: number }>;
+  regions: Array<{ value: string; count: number }>;
 };
 
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
@@ -1148,6 +1162,10 @@ function TelegramBotSetupCard() {
     announcementType: isMyanmar ? 'Announcement အမျိုးအစား' : 'Announcement type',
     announcementSubject: isMyanmar ? 'ခေါင်းစဉ်' : 'Title',
     announcementBody: isMyanmar ? 'မက်ဆေ့ချ်' : 'Message',
+    announcementTargetTag: isMyanmar ? 'Tag ဖြင့် target' : 'Target by tag',
+    announcementTargetServer: isMyanmar ? 'Server ဖြင့် target' : 'Target by server',
+    announcementTargetRegion: isMyanmar ? 'Region ဖြင့် target' : 'Target by region',
+    announcementAllTargets: isMyanmar ? 'အားလုံး' : 'All',
     includeSupportButton: isMyanmar ? 'Support button ထည့်မည်' : 'Include support button',
     sendAnnouncementNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
     announcementSent: isMyanmar ? 'Announcement ပို့ပြီးပါပြီ' : 'Announcement sent',
@@ -1187,6 +1205,9 @@ function TelegramBotSetupCard() {
   const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
   const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
   const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
+  const [announcementTargetTag, setAnnouncementTargetTag] = useState('ALL');
+  const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
+  const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -1299,7 +1320,12 @@ function TelegramBotSetupCard() {
       });
     },
   });
-  const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery();
+  const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery({
+    tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+    serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
+    countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+  });
+  const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery();
   const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery();
   const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery({ limit: 12 });
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
@@ -1392,9 +1418,19 @@ function TelegramBotSetupCard() {
 
   const isSaving = saveSettingsMutation.isPending;
   const hasToken = form.botToken.trim().length > 0;
+  const announcementFilters = {
+    tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+    serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
+    countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+  };
   const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
   const announcementTemplates = (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[];
   const announcementHistory = (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[];
+  const announcementTargetOptions = (announcementTargetOptionsQuery.data ?? {
+    tags: [],
+    servers: [],
+    regions: [],
+  }) as TelegramAnnouncementTargetOptions;
   const webhookUrl =
     typeof window === 'undefined'
       ? ''
@@ -1808,12 +1844,14 @@ function TelegramBotSetupCard() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {telegramUi.userCommands}: <code>/start</code>, <code>/buy</code>, <code>/renew</code>,{' '}
                 <code>/orders</code>, <code>/order</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
-                <code>/usage</code>, <code>/server</code>, <code>/support</code>, <code>/language</code>
+                <code>/usage</code>, <code>/inbox</code>, <code>/server</code>, <code>/support</code>,{' '}
+                <code>/language</code>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
-                <code>/enable</code>, <code>/resend</code>, <code>/status</code>, <code>/sysinfo</code>,{' '}
-                <code>/backup</code>
+                <code>/enable</code>, <code>/resend</code>, <code>/announce</code>,{' '}
+                <code>/announcements</code>, <code>/finance</code>, <code>/refunds</code>,{' '}
+                <code>/status</code>, <code>/sysinfo</code>, <code>/backup</code>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -1889,6 +1927,57 @@ function TelegramBotSetupCard() {
                 </div>
               </div>
 
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementTargetTag}</Label>
+                  <Select value={announcementTargetTag} onValueChange={setAnnouncementTargetTag}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                      {announcementTargetOptions.tags.map((tag) => (
+                        <SelectItem key={tag.value} value={tag.value}>
+                          {tag.value} ({tag.count})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementTargetServer}</Label>
+                  <Select value={announcementTargetServerId} onValueChange={setAnnouncementTargetServerId}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                      {announcementTargetOptions.servers.map((server) => (
+                        <SelectItem key={server.value} value={server.value}>
+                          {server.label}{server.countryCode ? ` (${server.countryCode})` : ''} ({server.count})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{telegramUi.announcementTargetRegion}</Label>
+                  <Select value={announcementTargetCountryCode} onValueChange={setAnnouncementTargetCountryCode}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                      {announcementTargetOptions.regions.map((region) => (
+                        <SelectItem key={region.value} value={region.value}>
+                          {region.value} ({region.count})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="mt-3 space-y-2">
                 <Label htmlFor="telegram-announcement-title">{telegramUi.announcementSubject}</Label>
                 <Input
@@ -1948,6 +2037,7 @@ function TelegramBotSetupCard() {
                     sendAnnouncementMutation.mutate({
                       audience: announcementAudience,
                       type: announcementType,
+                      filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
                       includeSupportButton: announcementIncludeSupportButton,
@@ -1977,6 +2067,7 @@ function TelegramBotSetupCard() {
                     sendAnnouncementMutation.mutate({
                       audience: announcementAudience,
                       type: announcementType,
+                      filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
                       includeSupportButton: announcementIncludeSupportButton,
@@ -2024,6 +2115,7 @@ function TelegramBotSetupCard() {
                         name: announcementTemplateName.trim(),
                         audience: announcementAudience,
                         type: announcementType,
+                        filters: announcementFilters,
                         title: announcementTitle.trim(),
                         message: announcementMessage.trim(),
                         includeSupportButton: announcementIncludeSupportButton,
@@ -2059,6 +2151,19 @@ function TelegramBotSetupCard() {
                           </div>
                           <Badge variant="outline">{template.type}</Badge>
                         </div>
+                        {(template.targetTag || template.targetServerName || template.targetCountryCode) ? (
+                          <div className="flex flex-wrap gap-2">
+                            {template.targetTag ? (
+                              <Badge variant="secondary">Tag: {template.targetTag}</Badge>
+                            ) : null}
+                            {template.targetServerName ? (
+                              <Badge variant="secondary">Server: {template.targetServerName}</Badge>
+                            ) : null}
+                            {template.targetCountryCode ? (
+                              <Badge variant="secondary">Region: {template.targetCountryCode}</Badge>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -2067,6 +2172,9 @@ function TelegramBotSetupCard() {
                             onClick={() => {
                               setAnnouncementAudience(template.audience);
                               setAnnouncementType(template.type);
+                              setAnnouncementTargetTag(template.targetTag || 'ALL');
+                              setAnnouncementTargetServerId(template.targetServerId || 'ALL');
+                              setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
                               setAnnouncementTitle(template.title);
                               setAnnouncementMessage(template.message);
                               setAnnouncementIncludeSupportButton(template.includeSupportButton);
@@ -2119,6 +2227,19 @@ function TelegramBotSetupCard() {
                             <Badge variant="outline">{announcement.status}</Badge>
                           </div>
                         </div>
+                        {(announcement.targetTag || announcement.targetServerName || announcement.targetCountryCode) ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {announcement.targetTag ? (
+                              <Badge variant="secondary">Tag: {announcement.targetTag}</Badge>
+                            ) : null}
+                            {announcement.targetServerName ? (
+                              <Badge variant="secondary">Server: {announcement.targetServerName}</Badge>
+                            ) : null}
+                            {announcement.targetCountryCode ? (
+                              <Badge variant="secondary">Region: {announcement.targetCountryCode}</Badge>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                           <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
                           <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>

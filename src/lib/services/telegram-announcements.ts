@@ -19,6 +19,12 @@ export type TelegramAnnouncementType =
   | 'NEW_SERVER'
   | 'MAINTENANCE';
 
+export type TelegramAnnouncementFilters = {
+  tag?: string | null;
+  serverId?: string | null;
+  countryCode?: string | null;
+};
+
 function parseCsvTags(value?: string | null) {
   return new Set(
     (value || '')
@@ -32,8 +38,36 @@ function uniqueStrings(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 }
 
-export async function getTelegramAnnouncementAudienceMap() {
-  const [accessKeys, dynamicKeys] = await Promise.all([
+function normalizeAnnouncementFilters(filters?: TelegramAnnouncementFilters) {
+  const tag = filters?.tag?.trim().toLowerCase() || null;
+  const serverId = filters?.serverId?.trim() || null;
+  const countryCode = filters?.countryCode?.trim().toUpperCase() || null;
+  return { tag, serverId, countryCode };
+}
+
+function matchesAnnouncementFilters(
+  input: {
+    tags?: string | null;
+    serverId?: string | null;
+    countryCode?: string | null;
+  },
+  filters: ReturnType<typeof normalizeAnnouncementFilters>,
+) {
+  if (filters.tag && !parseCsvTags(input.tags).has(filters.tag)) {
+    return false;
+  }
+  if (filters.serverId && input.serverId !== filters.serverId) {
+    return false;
+  }
+  if (filters.countryCode && (input.countryCode || '').toUpperCase() !== filters.countryCode) {
+    return false;
+  }
+  return true;
+}
+
+export async function getTelegramAnnouncementAudienceMap(filters?: TelegramAnnouncementFilters) {
+  const normalizedFilters = normalizeAnnouncementFilters(filters);
+  const [accessKeys, dynamicKeys, servers] = await Promise.all([
     db.accessKey.findMany({
       where: {
         status: { in: ['ACTIVE', 'PENDING'] },
@@ -41,6 +75,12 @@ export async function getTelegramAnnouncementAudienceMap() {
       select: {
         telegramId: true,
         tags: true,
+        serverId: true,
+        server: {
+          select: {
+            countryCode: true,
+          },
+        },
         user: {
           select: {
             telegramChatId: true,
@@ -54,6 +94,8 @@ export async function getTelegramAnnouncementAudienceMap() {
       },
       select: {
         telegramId: true,
+        tags: true,
+        lastResolvedServerId: true,
         user: {
           select: {
             telegramChatId: true,
@@ -61,20 +103,60 @@ export async function getTelegramAnnouncementAudienceMap() {
         },
       },
     }),
+    db.server.findMany({
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+      },
+    }),
   ]);
+  const serverMap = new Map(servers.map((server) => [server.id, server]));
 
   const standardChats = uniqueStrings(
     accessKeys
       .filter((key) => !parseCsvTags(key.tags).has('trial'))
+      .filter((key) =>
+        matchesAnnouncementFilters(
+          {
+            tags: key.tags,
+            serverId: key.serverId,
+            countryCode: key.server?.countryCode || null,
+          },
+          normalizedFilters,
+        ),
+      )
       .flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
   );
   const trialChats = uniqueStrings(
     accessKeys
       .filter((key) => parseCsvTags(key.tags).has('trial'))
+      .filter((key) =>
+        matchesAnnouncementFilters(
+          {
+            tags: key.tags,
+            serverId: key.serverId,
+            countryCode: key.server?.countryCode || null,
+          },
+          normalizedFilters,
+        ),
+      )
       .flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
   );
   const premiumChats = uniqueStrings(
-    dynamicKeys.flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
+    dynamicKeys
+      .filter((key) => {
+        const resolvedServer = key.lastResolvedServerId ? serverMap.get(key.lastResolvedServerId) : null;
+        return matchesAnnouncementFilters(
+          {
+            tags: key.tags,
+            serverId: key.lastResolvedServerId || null,
+            countryCode: resolvedServer?.countryCode || null,
+          },
+          normalizedFilters,
+        );
+      })
+      .flatMap((key) => [key.telegramId, key.user?.telegramChatId]),
   );
   const activeChats = uniqueStrings([...standardChats, ...trialChats, ...premiumChats]);
 
@@ -84,6 +166,91 @@ export async function getTelegramAnnouncementAudienceMap() {
     PREMIUM_USERS: premiumChats,
     TRIAL_USERS: trialChats,
   } satisfies Record<TelegramAnnouncementAudience, string[]>;
+}
+
+export async function listTelegramAnnouncementTargetOptions() {
+  const [accessKeys, dynamicKeys, servers] = await Promise.all([
+    db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+      },
+      select: {
+        tags: true,
+        serverId: true,
+        server: {
+          select: {
+            name: true,
+            countryCode: true,
+          },
+        },
+      },
+    }),
+    db.dynamicAccessKey.findMany({
+      where: {
+        status: 'ACTIVE',
+      },
+      select: {
+        tags: true,
+        lastResolvedServerId: true,
+      },
+    }),
+    db.server.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+      },
+      orderBy: [{ name: 'asc' }],
+    }),
+  ]);
+
+  const serverMap = new Map(servers.map((server) => [server.id, server]));
+  const tagCounts = new Map<string, number>();
+  const serverCounts = new Map<string, number>();
+  const regionCounts = new Map<string, number>();
+
+  for (const key of accessKeys) {
+    for (const tag of Array.from(parseCsvTags(key.tags))) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+    if (key.serverId) {
+      serverCounts.set(key.serverId, (serverCounts.get(key.serverId) || 0) + 1);
+    }
+    if (key.server?.countryCode) {
+      const countryCode = key.server.countryCode.toUpperCase();
+      regionCounts.set(countryCode, (regionCounts.get(countryCode) || 0) + 1);
+    }
+  }
+
+  for (const key of dynamicKeys) {
+    for (const tag of Array.from(parseCsvTags(key.tags))) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+    if (key.lastResolvedServerId) {
+      serverCounts.set(key.lastResolvedServerId, (serverCounts.get(key.lastResolvedServerId) || 0) + 1);
+      const resolvedServer = serverMap.get(key.lastResolvedServerId);
+      if (resolvedServer?.countryCode) {
+        const countryCode = resolvedServer.countryCode.toUpperCase();
+        regionCounts.set(countryCode, (regionCounts.get(countryCode) || 0) + 1);
+      }
+    }
+  }
+
+  return {
+    tags: Array.from(tagCounts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .map(([value, count]) => ({ value, count })),
+    servers: servers.map((server) => ({
+      value: server.id,
+      label: server.name,
+      countryCode: server.countryCode || null,
+      count: serverCounts.get(server.id) || 0,
+    })),
+    regions: Array.from(regionCounts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .map(([value, count]) => ({ value, count })),
+  };
 }
 
 export function buildTelegramAnnouncementMessage(input: {
@@ -146,9 +313,14 @@ export async function dispatchTelegramAnnouncement(input: {
     return { skipped: true as const, reason: 'not-configured' };
   }
 
-  const audienceMap = await getTelegramAnnouncementAudienceMap();
   const audience = announcement.audience as TelegramAnnouncementAudience;
-  const chatIds = audienceMap[audience] || [];
+  const chatIds = (
+    await getTelegramAnnouncementAudienceMap({
+      tag: announcement.targetTag,
+      serverId: announcement.targetServerId,
+      countryCode: announcement.targetCountryCode,
+    })
+  )[audience] || [];
 
   if (chatIds.length === 0) {
     await db.telegramAnnouncement.update({

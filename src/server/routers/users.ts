@@ -52,6 +52,7 @@ export const usersRouter = router({
               id: true,
               name: true,
               status: true,
+              telegramId: true,
               tags: true,
               usedBytes: true,
               dataLimitBytes: true,
@@ -73,6 +74,7 @@ export const usersRouter = router({
               id: true,
               name: true,
               status: true,
+              telegramId: true,
               tags: true,
               usedBytes: true,
               dataLimitBytes: true,
@@ -96,6 +98,15 @@ export const usersRouter = router({
 
       const accessKeyIds = user.accessKeys.map((key) => key.id);
       const dynamicKeyIds = user.dynamicAccessKeys.map((key) => key.id);
+      const customerChatIds = Array.from(
+        new Set(
+          [
+            user.telegramChatId,
+            ...user.accessKeys.map((key) => key.telegramId),
+            ...user.dynamicAccessKeys.map((key) => key.telegramId),
+          ].filter((value): value is string => Boolean(value && value.trim())),
+        ),
+      );
 
       const telegramOrders = await db.telegramOrder.findMany({
         where: {
@@ -135,7 +146,7 @@ export const usersRouter = router({
         orderBy: { createdAt: 'desc' },
       });
 
-      const [serverChangeRequests, premiumSupportRequests] =
+      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog] =
         await Promise.all([
           accessKeyIds.length > 0
             ? db.telegramServerChangeRequest.findMany({
@@ -160,6 +171,35 @@ export const usersRouter = router({
                   dismissedAt: true,
                   followUpPending: true,
                 },
+              })
+            : Promise.resolve([]),
+          customerChatIds.length > 0
+            ? db.telegramAnnouncementDelivery.findMany({
+                where: {
+                  chatId: { in: customerChatIds },
+                },
+                include: {
+                  announcement: true,
+                },
+                orderBy: [{ createdAt: 'desc' }],
+                take: 12,
+              })
+            : Promise.resolve([]),
+          accessKeyIds.length > 0
+            ? db.notificationLog.findMany({
+                where: {
+                  accessKeyId: { in: accessKeyIds },
+                },
+                include: {
+                  accessKey: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+                orderBy: [{ sentAt: 'desc' }],
+                take: 12,
               })
             : Promise.resolve([]),
         ]);
@@ -215,6 +255,27 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
+        customerNotifications: {
+          announcements: announcementDeliveries.map((delivery) => ({
+            id: delivery.id,
+            chatId: delivery.chatId,
+            status: delivery.status,
+            error: delivery.error,
+            sentAt: delivery.sentAt,
+            createdAt: delivery.createdAt,
+            announcement: delivery.announcement,
+          })),
+          keyNotices: keyNotificationLog.map((log) => ({
+            id: log.id,
+            event: log.event,
+            message: log.message,
+            status: log.status,
+            error: log.error,
+            sentAt: log.sentAt,
+            accessKeyId: log.accessKeyId,
+            accessKeyName: log.accessKey?.name || null,
+          })),
+        },
         financePermissions: {
           canManage: canUserManageFinance(ctx.user, financeControls),
           canConfigure: canUserConfigureFinance(ctx.user, financeControls),

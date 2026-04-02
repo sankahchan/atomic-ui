@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, BadgeDollarSign, Coins, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldAlert, Wallet, XCircle } from 'lucide-react';
+import { AlertTriangle, BadgeDollarSign, Bell, Coins, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldAlert, Wallet, XCircle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -277,7 +277,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, financePermissions } =
+  const { user, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, financePermissions } =
     ledgerQuery.data;
 
   return (
@@ -731,6 +731,76 @@ export default function UserLedgerPage() {
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                 <p className="text-muted-foreground">Joined</p>
                 <p className="mt-1 font-medium">{formatDateTime(user.createdAt)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" />
+                Customer notifications
+              </CardTitle>
+              <CardDescription>
+                Announcement deliveries and key notices recently sent to this customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="mb-2 text-sm font-medium">Telegram announcements</p>
+                {customerNotifications.announcements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No announcement deliveries recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {customerNotifications.announcements.map((delivery) => (
+                      <div key={delivery.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{delivery.announcement.title}</p>
+                          <Badge variant="outline">{delivery.status}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {delivery.announcement.type} • {formatRelativeTime(delivery.sentAt || delivery.createdAt)}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">{delivery.announcement.message}</p>
+                        {(delivery.announcement.targetTag || delivery.announcement.targetServerName || delivery.announcement.targetCountryCode) ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {delivery.announcement.targetTag ? (
+                              <Badge variant="secondary">Tag: {delivery.announcement.targetTag}</Badge>
+                            ) : null}
+                            {delivery.announcement.targetServerName ? (
+                              <Badge variant="secondary">Server: {delivery.announcement.targetServerName}</Badge>
+                            ) : null}
+                            {delivery.announcement.targetCountryCode ? (
+                              <Badge variant="secondary">Region: {delivery.announcement.targetCountryCode}</Badge>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">Key notices</p>
+                {customerNotifications.keyNotices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No key notification logs recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {customerNotifications.keyNotices.map((log) => (
+                      <div key={log.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{log.event}</p>
+                          <Badge variant="outline">{log.status}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {log.accessKeyName || 'Unlinked key'} • {formatRelativeTime(log.sentAt)}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">{log.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

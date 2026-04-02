@@ -27,6 +27,7 @@ import {
 import {
   dispatchTelegramAnnouncement,
   getTelegramAnnouncementAudienceMap,
+  listTelegramAnnouncementTargetOptions,
   type TelegramAnnouncementAudience,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
@@ -81,6 +82,11 @@ const telegramAnnouncementTypeSchema = z.enum([
 ]);
 
 const telegramAnnouncementTemplateNameSchema = z.string().trim().min(2).max(80);
+const telegramAnnouncementTargetFiltersSchema = z.object({
+  tag: z.string().trim().min(1).max(64).nullable().optional(),
+  serverId: z.string().trim().min(1).max(64).nullable().optional(),
+  countryCode: z.string().trim().length(2).nullable().optional(),
+});
 
 function computeTelegramOrderRisk(input: {
   order: {
@@ -1735,8 +1741,10 @@ export const telegramBotRouter = router({
     return result;
   }),
 
-  getAnnouncementAudienceCounts: adminProcedure.query(async () => {
-    const audienceMap = await getTelegramAnnouncementAudienceMap();
+  getAnnouncementAudienceCounts: adminProcedure
+    .input(telegramAnnouncementTargetFiltersSchema.optional())
+    .query(async ({ input }) => {
+    const audienceMap = await getTelegramAnnouncementAudienceMap(input);
     return {
       ACTIVE_USERS: audienceMap.ACTIVE_USERS.length,
       STANDARD_USERS: audienceMap.STANDARD_USERS.length,
@@ -1745,11 +1753,16 @@ export const telegramBotRouter = router({
     };
   }),
 
+  listAnnouncementTargetOptions: adminProcedure.query(async () => {
+    return listTelegramAnnouncementTargetOptions();
+  }),
+
   sendAnnouncement: adminProcedure
     .input(
       z.object({
         audience: telegramAnnouncementAudienceSchema.default('ACTIVE_USERS'),
         type: telegramAnnouncementTypeSchema.default('ANNOUNCEMENT'),
+        filters: telegramAnnouncementTargetFiltersSchema.optional(),
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         includeSupportButton: z.boolean().default(true),
@@ -1757,7 +1770,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const audienceMap = await getTelegramAnnouncementAudienceMap();
+      const audienceMap = await getTelegramAnnouncementAudienceMap(input.filters);
       const chatIds = audienceMap[input.audience];
       if (chatIds.length === 0) {
         throw new TRPCError({
@@ -1774,10 +1787,21 @@ export const telegramBotRouter = router({
         });
       }
 
+      const targetServer = input.filters?.serverId
+        ? await db.server.findUnique({
+            where: { id: input.filters.serverId },
+            select: { id: true, name: true, countryCode: true },
+          })
+        : null;
+
       const announcement = await db.telegramAnnouncement.create({
         data: {
           audience: input.audience,
           type: input.type,
+          targetTag: input.filters?.tag?.trim().toLowerCase() || null,
+          targetServerId: targetServer?.id || null,
+          targetServerName: targetServer?.name || null,
+          targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,
           title: input.title.trim(),
           message: input.message.trim(),
           includeSupportButton: input.includeSupportButton,
@@ -1823,6 +1847,7 @@ export const telegramBotRouter = router({
           sentCount,
           failedCount,
           scheduledFor: scheduledFor?.toISOString() ?? null,
+          filters: input.filters ?? null,
         },
       });
 
@@ -1976,16 +2001,27 @@ export const telegramBotRouter = router({
         name: telegramAnnouncementTemplateNameSchema,
         audience: telegramAnnouncementAudienceSchema.default('ACTIVE_USERS'),
         type: telegramAnnouncementTypeSchema.default('ANNOUNCEMENT'),
+        filters: telegramAnnouncementTargetFiltersSchema.optional(),
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
         includeSupportButton: z.boolean().default(true),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const targetServer = input.filters?.serverId
+        ? await db.server.findUnique({
+            where: { id: input.filters.serverId },
+            select: { id: true, name: true, countryCode: true },
+          })
+        : null;
       const data = {
         name: input.name.trim(),
         audience: input.audience,
         type: input.type,
+        targetTag: input.filters?.tag?.trim().toLowerCase() || null,
+        targetServerId: targetServer?.id || null,
+        targetServerName: targetServer?.name || null,
+        targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,
         title: input.title.trim(),
         message: input.message.trim(),
         includeSupportButton: input.includeSupportButton,
