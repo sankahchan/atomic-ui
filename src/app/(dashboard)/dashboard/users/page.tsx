@@ -1242,6 +1242,22 @@ export default function UsersPage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <Label>Quick macros</Label>
+              <div className="flex flex-wrap gap-2">
+                {refundReasonPresets.map((preset) => (
+                  <Button
+                    key={preset.code}
+                    type="button"
+                    size="sm"
+                    variant={refundReasonPresetCode === preset.code ? 'default' : 'outline'}
+                    onClick={() => applyRefundPreset(preset.code)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="refund-reason-preset">Reason preset</Label>
               <Select value={refundReasonPresetCode} onValueChange={applyRefundPreset}>
                 <SelectTrigger id="refund-reason-preset">

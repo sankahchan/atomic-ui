@@ -102,6 +102,7 @@ import { ClientEndpointTestCard } from '@/components/subscription/client-endpoin
 import {
   TelegramBillingHistoryCard,
 } from '@/components/telegram/telegram-billing-history-card';
+import { TELEGRAM_SUPPORT_REPLY_MACROS } from '@/lib/telegram-presets';
 
 /**
  * Status badge configuration
@@ -2034,6 +2035,10 @@ function SupportWorkflowCard({
     errorTitle: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
     supportDialogTitle: isMyanmar ? 'Support message ပို့ရန်' : 'Send support message',
     supportDialogDesc: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့မည့် support message ကို ရေးပါ။' : 'Write the support message to send to this user.',
+    supportMacrosTitle: isMyanmar ? 'Quick reply macros' : 'Quick reply macros',
+    supportMacrosDesc: isMyanmar
+      ? 'မကြာခဏပို့လေ့ရှိသော reply template များကို ရွေးပြီး message ထဲသို့ ထည့်နိုင်သည်။'
+      : 'Load a common support reply into the message box, then adjust it if needed.',
     supportPlaceholder: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့လိုသော message ကို ရေးပါ...' : 'Write the message you want to send to this user...',
     supportRequired: isMyanmar ? 'Support message ကို ရေးပါ။' : 'Enter a support message.',
     reportDialogTitle: isMyanmar ? 'ပြဿနာ တင်ပြရန်' : 'Report a problem',
@@ -2062,6 +2067,11 @@ function SupportWorkflowCard({
   const [supportMessage, setSupportMessage] = useState('');
   const [problemSummary, setProblemSummary] = useState('');
   const [problemSeverity, setProblemSeverity] = useState<'critical' | 'warning' | 'info'>('warning');
+  const supportReplyMacros = TELEGRAM_SUPPORT_REPLY_MACROS.map((macro) => ({
+    code: macro.code,
+    label: macro.label[isMyanmar ? 'my' : 'en'],
+    message: macro.message[isMyanmar ? 'my' : 'en'],
+  }));
 
   const resendAccessMutation = trpc.keys.resendAccess.useMutation({
     onSuccess: () => {
@@ -2277,6 +2287,23 @@ function SupportWorkflowCard({
             <DialogTitle>{supportUi.supportDialogTitle}</DialogTitle>
             <DialogDescription>{supportUi.supportDialogDesc}</DialogDescription>
           </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{supportUi.supportMacrosTitle}</p>
+            <p className="text-xs text-muted-foreground">{supportUi.supportMacrosDesc}</p>
+            <div className="flex flex-wrap gap-2">
+              {supportReplyMacros.map((macro) => (
+                <Button
+                  key={macro.code}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSupportMessage(macro.message)}
+                >
+                  {macro.label}
+                </Button>
+              ))}
+            </div>
+          </div>
           <Textarea
             value={supportMessage}
             onChange={(event) => setSupportMessage(event.target.value)}

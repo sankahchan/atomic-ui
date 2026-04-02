@@ -1820,19 +1820,38 @@ async function handleBuyCommand(
     telegramUserId,
     settings,
   });
+  const standardPlanLines = enabledPlans
+    .filter((plan) => plan.deliveryType === 'ACCESS_KEY' && plan.code !== 'trial_1d_3gb')
+    .map((plan) => {
+      const label = resolveTelegramSalesPlanLabel(plan, locale);
+      const price = resolveTelegramSalesPriceLabel(plan, locale);
+      return price ? `• ${label} - ${price}` : `• ${label}`;
+    });
+  const premiumPlanLines = enabledPlans
+    .filter((plan) => plan.deliveryType === 'DYNAMIC_KEY')
+    .map((plan) => {
+      const label = resolveTelegramSalesPlanLabel(plan, locale);
+      const price = resolveTelegramSalesPriceLabel(plan, locale);
+      return price ? `• ${label} - ${price}` : `• ${label}`;
+    });
   const lines = [
     ui.orderPlanPrompt(order.orderCode),
     '',
     ui.buyPlanChooseHint,
+    '',
     ui.buyStandardSummary,
+    ...(standardPlanLines.length ? ['', `${ui.buyStandardPlansTitle}:`, ...standardPlanLines] : []),
+    '',
     ui.buyPremiumSummary,
+    ui.buyPremiumUpsell,
+    ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
     '',
     ...enabledPlans.map((plan, index) => {
       const label = resolveTelegramSalesPlanLabel(plan, locale);
       const price = resolveTelegramSalesPriceLabel(plan, locale);
       return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
     }),
-  ];
+  ].filter(Boolean);
   const message = buildTelegramSalesPlanPromptText(locale, lines);
   const sent = await sendTelegramMessage(botToken, chatId, message, {
     replyMarkup: buildTelegramPlanSelectionKeyboard({

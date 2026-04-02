@@ -25,7 +25,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { withBasePath } from '@/lib/base-path';
+import { copyToClipboard } from '@/lib/clipboard';
 import type { LocalizedTemplateMap } from '@/lib/localized-templates';
+import {
+  TELEGRAM_ANNOUNCEMENT_PRESETS,
+  buildTelegramAnnouncementCommand,
+} from '@/lib/telegram-presets';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import {
@@ -54,6 +59,7 @@ import {
   Save,
   Eye,
   Download,
+  Copy,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 
@@ -268,6 +274,30 @@ type TelegramAnnouncementAnalytics = {
     deliverySuccessRate: number;
   }>;
 };
+
+function buildTelegramAnnouncementTemplateCommand(input: {
+  audience: TelegramAnnouncementAudience;
+  type: TelegramAnnouncementType;
+  title: string;
+  message: string;
+  includeSupportButton: boolean;
+  targetTag?: string | null;
+  targetServerId?: string | null;
+  targetCountryCode?: string | null;
+}) {
+  return buildTelegramAnnouncementCommand({
+    audience: input.audience,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    includeSupportButton: input.includeSupportButton,
+    filters: {
+      tag: input.targetTag || null,
+      serverId: input.targetServerId || null,
+      countryCode: input.targetCountryCode || null,
+    },
+  });
+}
 
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   botToken: '',
@@ -1222,6 +1252,10 @@ function TelegramBotSetupCard() {
     announcementTemplateDeleted: isMyanmar ? 'Template ဖျက်ပြီးပါပြီ' : 'Template deleted',
     announcementTemplatesTitle: isMyanmar ? 'Saved templates' : 'Saved templates',
     announcementTemplatesDesc: isMyanmar ? 'အကြိမ်ကြိမ်အသုံးပြုမည့် announcement များကို template အဖြစ် သိမ်းနိုင်သည်။' : 'Save reusable announcement presets for discounts, new servers, maintenance, and more.',
+    announcementPresetTemplatesTitle: isMyanmar ? 'Quick template presets' : 'Quick template presets',
+    announcementPresetTemplatesDesc: isMyanmar
+      ? 'အသင့်သုံး announcement template များကို form ထဲသို့ ထည့်နိုင်သလို Telegram admin command အဖြစ် copy လည်း လုပ်နိုင်သည်။'
+      : 'Load ready-to-send announcement presets into the form or copy them as exact Telegram admin commands.',
     announcementHistoryTitle: isMyanmar ? 'Announcement history' : 'Announcement history',
     announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော announcement များ၊ schedule များနှင့် failed deliveries များကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
     announcementHeroImage: isMyanmar ? 'Hero image URL' : 'Hero image URL',
@@ -1238,6 +1272,10 @@ function TelegramBotSetupCard() {
     announcementByType: isMyanmar ? 'By announcement type' : 'By announcement type',
     announcementByAudience: isMyanmar ? 'By audience' : 'By audience',
     announcementApplyTemplate: isMyanmar ? 'Template သုံးမည်' : 'Use template',
+    announcementSavePreset: isMyanmar ? 'Preset ကို သိမ်းမည်' : 'Save preset',
+    announcementCopyCommand: isMyanmar ? 'Command ကို copy လုပ်မည်' : 'Copy command',
+    announcementCommandCopied: isMyanmar ? 'Announcement command ကို copy လုပ်ပြီးပါပြီ' : 'Announcement command copied',
+    announcementCommandPreview: isMyanmar ? 'Telegram command' : 'Telegram command',
     announcementDeleteTemplate: isMyanmar ? 'Template ဖျက်မည်' : 'Delete template',
     announcementNoTemplates: isMyanmar ? 'Saved template မရှိသေးပါ။' : 'No saved templates yet.',
     announcementNoHistory: isMyanmar ? 'Announcement history မရှိသေးပါ။' : 'No announcements sent yet.',
@@ -1500,10 +1538,44 @@ function TelegramBotSetupCard() {
     servers: [],
     regions: [],
   }) as TelegramAnnouncementTargetOptions;
+  const announcementPresetTemplates = useMemo(
+    () =>
+      TELEGRAM_ANNOUNCEMENT_PRESETS.map((preset) => {
+        const title = preset.title[isMyanmar ? 'my' : 'en'];
+        const message = preset.message[isMyanmar ? 'my' : 'en'];
+        return {
+          code: preset.code,
+          name: preset.name[isMyanmar ? 'my' : 'en'],
+          title,
+          message,
+          audience: preset.audience,
+          type: preset.type,
+          includeSupportButton: preset.includeSupportButton,
+          targetTag: preset.filters?.tag || null,
+          targetServerId: preset.filters?.serverId || null,
+          targetCountryCode: preset.filters?.countryCode || null,
+          command: buildTelegramAnnouncementTemplateCommand({
+            audience: preset.audience,
+            type: preset.type,
+            title,
+            message,
+            includeSupportButton: preset.includeSupportButton,
+            targetTag: preset.filters?.tag || null,
+            targetServerId: preset.filters?.serverId || null,
+            targetCountryCode: preset.filters?.countryCode || null,
+          }),
+        };
+      }),
+    [isMyanmar],
+  );
   const webhookUrl =
     typeof window === 'undefined'
       ? ''
       : `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
+
+  const copyAnnouncementCommand = async (command: string) => {
+    await copyToClipboard(command, telegramUi.announcementCommandCopied, telegramUi.announcementCommandPreview);
+  };
 
   const handleSave = () => {
     const adminChatIds = adminChatIdsInput
@@ -2182,6 +2254,98 @@ function TelegramBotSetupCard() {
 
               <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
                 <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.announcementPresetTemplatesTitle}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementPresetTemplatesDesc}</p>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {announcementPresetTemplates.map((preset) => (
+                    <div
+                      key={preset.code}
+                      className="rounded-2xl border border-border/60 bg-background/70 p-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{preset.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{preset.title}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{preset.type}</Badge>
+                          <Badge variant="outline">{preset.audience}</Badge>
+                          {preset.targetTag ? <Badge variant="secondary">Tag: {preset.targetTag}</Badge> : null}
+                          {preset.targetCountryCode ? <Badge variant="secondary">Region: {preset.targetCountryCode}</Badge> : null}
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">{preset.message}</p>
+                      <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {telegramUi.announcementCommandPreview}
+                        </p>
+                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                          {preset.command}
+                        </pre>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAnnouncementAudience(preset.audience);
+                            setAnnouncementType(preset.type);
+                            setAnnouncementTargetTag(preset.targetTag || 'ALL');
+                            setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
+                            setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
+                            setAnnouncementTitle(preset.title);
+                            setAnnouncementMessage(preset.message);
+                            setAnnouncementHeroImageUrl('');
+                            setAnnouncementIncludeSupportButton(preset.includeSupportButton);
+                            setAnnouncementScheduledFor('');
+                          }}
+                        >
+                          {telegramUi.announcementApplyTemplate}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void copyAnnouncementCommand(preset.command)}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          {telegramUi.announcementCopyCommand}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            saveAnnouncementTemplateMutation.mutate({
+                              name: preset.name,
+                              audience: preset.audience,
+                              type: preset.type,
+                              filters: {
+                                tag: preset.targetTag,
+                                serverId: preset.targetServerId,
+                                countryCode: preset.targetCountryCode,
+                              },
+                              title: preset.title,
+                              message: preset.message,
+                              includeSupportButton: preset.includeSupportButton,
+                            })
+                          }
+                          disabled={saveAnnouncementTemplateMutation.isPending}
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          {telegramUi.announcementSavePreset}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="space-y-1">
                   <p className="text-sm font-medium">{telegramUi.announcementTemplatesTitle}</p>
                   <p className="text-xs text-muted-foreground">{telegramUi.announcementTemplatesDesc}</p>
                 </div>
@@ -2250,6 +2414,23 @@ function TelegramBotSetupCard() {
                             ) : null}
                           </div>
                         ) : null}
+                        <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {telegramUi.announcementCommandPreview}
+                          </p>
+                          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                            {buildTelegramAnnouncementTemplateCommand({
+                              audience: template.audience,
+                              type: template.type,
+                              title: template.title,
+                              message: template.message,
+                              includeSupportButton: template.includeSupportButton,
+                              targetTag: template.targetTag,
+                              targetServerId: template.targetServerId,
+                              targetCountryCode: template.targetCountryCode,
+                            })}
+                          </pre>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -2265,9 +2446,32 @@ function TelegramBotSetupCard() {
                               setAnnouncementMessage(template.message);
                               setAnnouncementHeroImageUrl(template.heroImageUrl || '');
                               setAnnouncementIncludeSupportButton(template.includeSupportButton);
+                              setAnnouncementScheduledFor('');
                             }}
                           >
                             {telegramUi.announcementApplyTemplate}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void copyAnnouncementCommand(
+                                buildTelegramAnnouncementTemplateCommand({
+                                  audience: template.audience,
+                                  type: template.type,
+                                  title: template.title,
+                                  message: template.message,
+                                  includeSupportButton: template.includeSupportButton,
+                                  targetTag: template.targetTag,
+                                  targetServerId: template.targetServerId,
+                                  targetCountryCode: template.targetCountryCode,
+                                }),
+                              )
+                            }
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            {telegramUi.announcementCopyCommand}
                           </Button>
                           <Button
                             type="button"

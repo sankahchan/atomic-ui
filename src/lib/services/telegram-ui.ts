@@ -391,14 +391,19 @@ export function getTelegramUi(locale: SupportedLocale) {
     renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
     buyDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ key အသစ် မမှာယူနိုင်သေးပါ။' : 'ℹ️ New key orders are not available through Telegram right now.',
     buyStandardSummary: isMyanmar
-      ? '🔑 <b>Standard key</b> သည် ပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်သော regular key ဖြစ်ပြီး စျေးနှုန်းသက်သာပါသည်။'
-      : '🔑 <b>Standard key</b> is the regular lower-cost option for normal daily usage.',
+      ? '🔑 <b>Standard key</b> သည် ပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်သော regular key ဖြစ်ပြီး စျေးနှုန်းသက်သာကာ server တစ်ခုအပေါ် အခြေခံပါသည်။'
+      : '🔑 <b>Standard key</b> is the lower-cost option for normal daily use and typically stays on one selected server.',
     buyPremiumSummary: isMyanmar
-      ? '💎 <b>Premium key</b> သည် dynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် premium support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
-      : '💎 <b>Premium key</b> gives you dynamic routing, better stability, auto failover, and premium support benefits.',
+      ? '💎 <b>Premium key</b> သည် dynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် priority support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
+      : '💎 <b>Premium key</b> gives you dynamic routing, better stability, auto failover, and priority support.',
     buyPlanChooseHint: isMyanmar
-      ? 'မဝယ်မီ Standard နှင့် Premium အကြား ကွာခြားချက်ကို အောက်တွင် ဖော်ပြထားပါသည်။'
-      : 'Before you buy, the difference between Standard and Premium is explained below.',
+      ? 'မဝယ်မီ Standard နှင့် Premium အကြား ကွာခြားချက်နှင့် available package များကို အောက်တွင် ကြည့်နိုင်ပါသည်။'
+      : 'Before you buy, review the difference between Standard and Premium and the available packages below.',
+    buyStandardPlansTitle: isMyanmar ? 'Standard packages' : 'Standard packages',
+    buyPremiumPlansTitle: isMyanmar ? 'Premium packages' : 'Premium packages',
+    buyPremiumUpsell: isMyanmar
+      ? 'Premium ကို ရွေးချယ်ပါက stable link၊ region flexibility နှင့် support ပိုကောင်းကောင်း ရရှိပါမည်။'
+      : 'Choose Premium if you want a more stable link, better region flexibility, and stronger support.',
     renewDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ renewal မလုပ်နိုင်သေးပါ။' : 'ℹ️ Renewals are not available through Telegram right now.',
     activeOrderPendingReview: (code: string) =>
       isMyanmar
