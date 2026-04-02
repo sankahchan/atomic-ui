@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
-import { ADMIN_SCOPE_VALUES, isOwnerLikeAdmin, normalizeAdminScope } from '@/lib/admin-scope';
+import { ADMIN_SCOPE_VALUES, hasUserManageScope, isOwnerLikeAdmin, normalizeAdminScope } from '@/lib/admin-scope';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getRefundReasonPreset } from '@/lib/finance';
@@ -255,16 +255,20 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
-        customerNotifications: {
-          announcements: announcementDeliveries.map((delivery) => ({
-            id: delivery.id,
-            chatId: delivery.chatId,
-            status: delivery.status,
-            error: delivery.error,
-            sentAt: delivery.sentAt,
-            createdAt: delivery.createdAt,
-            announcement: delivery.announcement,
-          })),
+          customerNotifications: {
+            announcements: announcementDeliveries.map((delivery) => ({
+              id: delivery.id,
+              chatId: delivery.chatId,
+              status: delivery.status,
+              error: delivery.error,
+              openCount: delivery.openCount,
+              clickCount: delivery.clickCount,
+              lastOpenedAt: delivery.lastOpenedAt,
+              lastClickedAt: delivery.lastClickedAt,
+              sentAt: delivery.sentAt,
+              createdAt: delivery.createdAt,
+              announcement: delivery.announcement,
+            })),
           keyNotices: keyNotificationLog.map((log) => ({
             id: log.id,
             event: log.event,
@@ -1122,6 +1126,12 @@ export const usersRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!hasUserManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only owner-level admins can create users.',
+        });
+      }
       const existingUser = await db.user.findUnique({
         where: { email: input.email },
       });
@@ -1166,6 +1176,12 @@ export const usersRouter = router({
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      if (!hasUserManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only owner-level admins can delete users.',
+        });
+      }
       if (input.id === ctx.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -1199,6 +1215,12 @@ export const usersRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!hasUserManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only owner-level admins can reset passwords.',
+        });
+      }
       const passwordHash = await hashPassword(input.newPassword);
 
       await db.user.update({

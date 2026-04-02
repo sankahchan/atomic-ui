@@ -10,6 +10,11 @@ import { router, adminProcedure, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { writeAuditLog } from '@/lib/audit';
+import {
+  hasNotificationManageScope,
+  hasTelegramAnnouncementManageScope,
+  hasTelegramReviewManageScope,
+} from '@/lib/admin-scope';
 import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
@@ -87,6 +92,24 @@ const telegramAnnouncementTargetFiltersSchema = z.object({
   serverId: z.string().trim().min(1).max(64).nullable().optional(),
   countryCode: z.string().trim().length(2).nullable().optional(),
 });
+
+function assertTelegramReviewScope(scope?: string | null) {
+  if (!hasTelegramReviewManageScope(scope)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to manage Telegram review workflows.',
+    });
+  }
+}
+
+function assertTelegramAnnouncementScope(scope?: string | null) {
+  if (!hasTelegramAnnouncementManageScope(scope)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to manage Telegram announcements or bot operations.',
+    });
+  }
+}
 
 function computeTelegramOrderRisk(input: {
   order: {
@@ -306,7 +329,8 @@ export const telegramBotRouter = router({
    */
   updateSettings: adminProcedure
     .input(telegramSettingsSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       await db.settings.upsert({
         where: { key: 'telegram_bot' },
         create: {
@@ -340,7 +364,8 @@ export const telegramBotRouter = router({
 
   updateSalesConfig: adminProcedure
     .input(telegramSalesSettingsSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const normalized = normalizeTelegramSalesSettings(input);
 
       await db.settings.upsert({
@@ -368,7 +393,8 @@ export const telegramBotRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const limit = input?.limit ?? 25;
       const statuses = input?.statuses?.filter(Boolean);
       const kinds = input?.kinds?.filter(Boolean);
@@ -833,7 +859,8 @@ export const telegramBotRouter = router({
       });
     }),
 
-  listOrderReviewers: adminProcedure.query(async () => {
+  listOrderReviewers: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramReviewScope(ctx.user.adminScope);
     const reviewers = await db.user.findMany({
       where: {
         role: 'ADMIN',
@@ -861,6 +888,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const order = await db.telegramOrder.findUnique({
         where: { id: input.orderId },
         select: {
@@ -970,6 +998,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const order = await db.telegramOrder.findUnique({
         where: { id: input.orderId },
         select: {
@@ -1074,6 +1103,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const order = await ensureTelegramOrderAssignmentAccess({
         orderId: input.orderId,
         userId: ctx.user.id,
@@ -1156,7 +1186,8 @@ export const telegramBotRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const limit = input?.limit ?? 25;
       const statuses = input?.statuses?.filter(Boolean);
       const query = input?.query?.trim();
@@ -1241,7 +1272,8 @@ export const telegramBotRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       const limit = input?.limit ?? 25;
       const statuses = input?.statuses?.filter(Boolean);
       const requestTypes = input?.requestTypes?.filter(Boolean);
@@ -1399,6 +1431,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return replyTelegramPremiumSupportRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1416,6 +1449,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       await ensureTelegramOrderAssignmentAccess({
         orderId: input.orderId,
         userId: ctx.user.id,
@@ -1438,6 +1472,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       await ensureTelegramOrderAssignmentAccess({
         orderId: input.orderId,
         userId: ctx.user.id,
@@ -1462,6 +1497,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       await ensureTelegramOrderAssignmentAccess({
         orderId: input.orderId,
         userId: ctx.user.id,
@@ -1484,6 +1520,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return approveTelegramServerChangeRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1501,6 +1538,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return rejectTelegramServerChangeRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1523,6 +1561,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return approveTelegramPremiumSupportRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1548,6 +1587,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return handleTelegramPremiumSupportRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1569,6 +1609,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramReviewScope(ctx.user.adminScope);
       return dismissTelegramPremiumSupportRequest({
         requestId: input.requestId,
         reviewedByUserId: ctx.user.id,
@@ -1583,7 +1624,8 @@ export const telegramBotRouter = router({
    */
   testConnection: adminProcedure
     .input(z.object({ botToken: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       try {
         const response = await fetch(`https://api.telegram.org/bot${input.botToken}/getMe`);
         const data = await response.json();
@@ -1612,7 +1654,8 @@ export const telegramBotRouter = router({
   /**
    * Get webhook info.
    */
-  getWebhookInfo: adminProcedure.query(async () => {
+  getWebhookInfo: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     const settings = await db.settings.findUnique({
       where: { key: 'telegram_bot' },
     });
@@ -1647,7 +1690,8 @@ export const telegramBotRouter = router({
    */
   setWebhook: adminProcedure
     .input(z.object({ webhookUrl: z.string().url() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const settings = await db.settings.findUnique({
         where: { key: 'telegram_bot' },
       });
@@ -1695,7 +1739,8 @@ export const telegramBotRouter = router({
   /**
    * Delete webhook.
    */
-  deleteWebhook: adminProcedure.mutation(async () => {
+  deleteWebhook: adminProcedure.mutation(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     const settings = await db.settings.findUnique({
       where: { key: 'telegram_bot' },
     });
@@ -1715,7 +1760,8 @@ export const telegramBotRouter = router({
     return { success: data.ok };
   }),
 
-  runDigestNow: adminProcedure.mutation(async () => {
+  runDigestNow: adminProcedure.mutation(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     const result = await runTelegramDigestCycle({ force: true });
 
     if (result.skipped) {
@@ -1728,7 +1774,8 @@ export const telegramBotRouter = router({
     return result;
   }),
 
-  runSalesDigestNow: adminProcedure.mutation(async () => {
+  runSalesDigestNow: adminProcedure.mutation(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     const result = await runTelegramSalesDigestCycle({ force: true });
 
     if (result.skipped) {
@@ -1743,17 +1790,19 @@ export const telegramBotRouter = router({
 
   getAnnouncementAudienceCounts: adminProcedure
     .input(telegramAnnouncementTargetFiltersSchema.optional())
-    .query(async ({ input }) => {
-    const audienceMap = await getTelegramAnnouncementAudienceMap(input);
-    return {
-      ACTIVE_USERS: audienceMap.ACTIVE_USERS.length,
-      STANDARD_USERS: audienceMap.STANDARD_USERS.length,
-      PREMIUM_USERS: audienceMap.PREMIUM_USERS.length,
-      TRIAL_USERS: audienceMap.TRIAL_USERS.length,
-    };
-  }),
+    .query(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+      const audienceMap = await getTelegramAnnouncementAudienceMap(input);
+      return {
+        ACTIVE_USERS: audienceMap.ACTIVE_USERS.length,
+        STANDARD_USERS: audienceMap.STANDARD_USERS.length,
+        PREMIUM_USERS: audienceMap.PREMIUM_USERS.length,
+        TRIAL_USERS: audienceMap.TRIAL_USERS.length,
+      };
+    }),
 
-  listAnnouncementTargetOptions: adminProcedure.query(async () => {
+  listAnnouncementTargetOptions: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     return listTelegramAnnouncementTargetOptions();
   }),
 
@@ -1765,11 +1814,13 @@ export const telegramBotRouter = router({
         filters: telegramAnnouncementTargetFiltersSchema.optional(),
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
+        heroImageUrl: z.string().trim().max(1000).optional().nullable(),
         includeSupportButton: z.boolean().default(true),
         scheduledFor: z.string().datetime().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const audienceMap = await getTelegramAnnouncementAudienceMap(input.filters);
       const chatIds = audienceMap[input.audience];
       if (chatIds.length === 0) {
@@ -1804,6 +1855,7 @@ export const telegramBotRouter = router({
           targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,
           title: input.title.trim(),
           message: input.message.trim(),
+          heroImageUrl: input.heroImageUrl?.trim() || null,
           includeSupportButton: input.includeSupportButton,
           status: scheduledFor && scheduledFor.getTime() > Date.now() ? 'SCHEDULED' : 'PROCESSING',
           scheduledFor,
@@ -1848,6 +1900,7 @@ export const telegramBotRouter = router({
           failedCount,
           scheduledFor: scheduledFor?.toISOString() ?? null,
           filters: input.filters ?? null,
+          heroImageUrl: input.heroImageUrl?.trim() || null,
         },
       });
 
@@ -1869,7 +1922,8 @@ export const telegramBotRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const announcements = await db.telegramAnnouncement.findMany({
         orderBy: [{ createdAt: 'desc' }],
         take: input?.limit ?? 10,
@@ -1891,6 +1945,140 @@ export const telegramBotRouter = router({
       return announcements;
     }),
 
+  getAnnouncementAnalytics: adminProcedure
+    .input(
+      z
+        .object({
+          range: z.enum(['7d', '30d', '90d']).default('30d'),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+      const range = input?.range || '30d';
+      const cutoff = new Date(
+        Date.now() -
+          (range === '7d' ? 7 : range === '90d' ? 90 : 30) * 24 * 60 * 60 * 1000,
+      );
+
+      const announcements = await db.telegramAnnouncement.findMany({
+        where: {
+          OR: [{ createdAt: { gte: cutoff } }, { sentAt: { gte: cutoff } }],
+        },
+        include: {
+          deliveries: {
+            select: {
+              status: true,
+              openCount: true,
+              clickCount: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }],
+      });
+
+      const byType = new Map<string, {
+        announcements: number;
+        totalRecipients: number;
+        sentCount: number;
+        failedCount: number;
+        openCount: number;
+        clickCount: number;
+      }>();
+      const byAudience = new Map<string, {
+        announcements: number;
+        totalRecipients: number;
+        sentCount: number;
+        failedCount: number;
+      }>();
+
+      let totalRecipients = 0;
+      let totalSent = 0;
+      let totalFailed = 0;
+      let totalOpenCount = 0;
+      let totalClickCount = 0;
+      let resendAttempts = 0;
+      let resendRecovered = 0;
+
+      for (const announcement of announcements) {
+        totalRecipients += announcement.totalRecipients;
+        totalSent += announcement.sentCount;
+        totalFailed += announcement.failedCount;
+        resendAttempts += announcement.resendAttemptCount;
+        resendRecovered += announcement.resendRecoveredCount;
+
+        const typeSummary = byType.get(announcement.type) || {
+          announcements: 0,
+          totalRecipients: 0,
+          sentCount: 0,
+          failedCount: 0,
+          openCount: 0,
+          clickCount: 0,
+        };
+        typeSummary.announcements += 1;
+        typeSummary.totalRecipients += announcement.totalRecipients;
+        typeSummary.sentCount += announcement.sentCount;
+        typeSummary.failedCount += announcement.failedCount;
+
+        const audienceSummary = byAudience.get(announcement.audience) || {
+          announcements: 0,
+          totalRecipients: 0,
+          sentCount: 0,
+          failedCount: 0,
+        };
+        audienceSummary.announcements += 1;
+        audienceSummary.totalRecipients += announcement.totalRecipients;
+        audienceSummary.sentCount += announcement.sentCount;
+        audienceSummary.failedCount += announcement.failedCount;
+
+        for (const delivery of announcement.deliveries) {
+          totalOpenCount += delivery.openCount;
+          totalClickCount += delivery.clickCount;
+          typeSummary.openCount += delivery.openCount;
+          typeSummary.clickCount += delivery.clickCount;
+        }
+
+        byType.set(announcement.type, typeSummary);
+        byAudience.set(announcement.audience, audienceSummary);
+      }
+
+      return {
+        range,
+        totals: {
+          announcements: announcements.length,
+          recipients: totalRecipients,
+          sentCount: totalSent,
+          failedCount: totalFailed,
+          openCount: totalOpenCount,
+          clickCount: totalClickCount,
+          deliverySuccessRate: totalRecipients > 0 ? totalSent / totalRecipients : 0,
+          openRate: totalSent > 0 ? totalOpenCount / totalSent : 0,
+          clickRate: totalSent > 0 ? totalClickCount / totalSent : 0,
+          resendAttempts,
+          resendRecovered,
+          resendRecoveryRate: resendAttempts > 0 ? resendRecovered / resendAttempts : 0,
+        },
+        byType: Array.from(byType.entries())
+          .map(([type, summary]) => ({
+            type,
+            ...summary,
+            deliverySuccessRate:
+              summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
+            openRate: summary.sentCount > 0 ? summary.openCount / summary.sentCount : 0,
+            clickRate: summary.sentCount > 0 ? summary.clickCount / summary.sentCount : 0,
+          }))
+          .sort((left, right) => right.sentCount - left.sentCount || left.type.localeCompare(right.type)),
+        byAudience: Array.from(byAudience.entries())
+          .map(([audience, summary]) => ({
+            audience,
+            ...summary,
+            deliverySuccessRate:
+              summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
+          }))
+          .sort((left, right) => right.sentCount - left.sentCount || left.audience.localeCompare(right.audience)),
+      };
+    }),
+
   dispatchScheduledAnnouncement: adminProcedure
     .input(
       z.object({
@@ -1898,6 +2086,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const announcement = await db.telegramAnnouncement.findUnique({
         where: { id: input.announcementId },
         select: {
@@ -1947,6 +2136,7 @@ export const telegramBotRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const failedCount = await db.telegramAnnouncementDelivery.count({
         where: {
           announcementId: input.announcementId,
@@ -1988,7 +2178,8 @@ export const telegramBotRouter = router({
       return result;
     }),
 
-  listAnnouncementTemplates: adminProcedure.query(async () => {
+  listAnnouncementTemplates: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     return db.telegramAnnouncementTemplate.findMany({
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
@@ -2004,10 +2195,12 @@ export const telegramBotRouter = router({
         filters: telegramAnnouncementTargetFiltersSchema.optional(),
         title: z.string().trim().min(3).max(120),
         message: z.string().trim().min(10).max(2000),
+        heroImageUrl: z.string().trim().max(1000).optional().nullable(),
         includeSupportButton: z.boolean().default(true),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       const targetServer = input.filters?.serverId
         ? await db.server.findUnique({
             where: { id: input.filters.serverId },
@@ -2024,6 +2217,7 @@ export const telegramBotRouter = router({
         targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,
         title: input.title.trim(),
         message: input.message.trim(),
+        heroImageUrl: input.heroImageUrl?.trim() || null,
         includeSupportButton: input.includeSupportButton,
         createdByUserId: ctx.user.id,
         createdByEmail: ctx.user.email ?? null,
@@ -2047,7 +2241,8 @@ export const telegramBotRouter = router({
         templateId: z.string().cuid(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
       await db.telegramAnnouncementTemplate.delete({
         where: { id: input.templateId },
       });

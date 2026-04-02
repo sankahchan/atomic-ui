@@ -42,3 +42,33 @@ export function isOwnerLikeAdmin(scope?: string | null) {
   const normalized = normalizeAdminScope(scope);
   return normalized === null || normalized === 'OWNER';
 }
+
+function isOwnerOrAdminScope(scope?: string | null) {
+  const normalized = normalizeAdminScope(scope);
+  return normalized === null || normalized === 'OWNER' || normalized === 'ADMIN';
+}
+
+export function hasNotificationViewScope(scope?: string | null) {
+  return Boolean(normalizeAdminScope(scope) || scope == null);
+}
+
+export function hasNotificationManageScope(scope?: string | null) {
+  return isOwnerOrAdminScope(scope);
+}
+
+export function hasOutageManageScope(scope?: string | null) {
+  return isOwnerOrAdminScope(scope);
+}
+
+export function hasTelegramReviewManageScope(scope?: string | null) {
+  const normalized = normalizeAdminScope(scope);
+  return normalized === null || normalized === 'OWNER' || normalized === 'ADMIN' || normalized === 'SUPPORT';
+}
+
+export function hasTelegramAnnouncementManageScope(scope?: string | null) {
+  return isOwnerOrAdminScope(scope);
+}
+
+export function hasUserManageScope(scope?: string | null) {
+  return isOwnerLikeAdmin(scope);
+}

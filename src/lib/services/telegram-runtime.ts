@@ -542,10 +542,13 @@ export async function sendTelegramPhotoUrl(
   chatId: number | string,
   photoUrl: string,
   caption?: string,
+  options?: {
+    replyMarkup?: Record<string, unknown>;
+  },
 ) {
   const trimmedPhotoUrl = photoUrl.trim();
   if (!trimmedPhotoUrl) {
-    return;
+    return false;
   }
 
   try {
@@ -559,15 +562,19 @@ export async function sendTelegramPhotoUrl(
         photo: trimmedPhotoUrl,
         caption,
         parse_mode: caption ? 'HTML' : undefined,
+        reply_markup: options?.replyMarkup,
       }),
     });
 
     if (!response.ok) {
       const data = await response.json();
       console.error(`Failed to send Telegram photo URL to ${chatId}:`, data.description);
+      return false;
     }
+    return true;
   } catch (error) {
     console.error(`Error sending Telegram photo URL to ${chatId}:`, error);
+    return false;
   }
 }
 

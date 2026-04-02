@@ -38,6 +38,8 @@ const publicRoutes = [
   '/api/sub/',              // Alternative Subscription API
   '/api/health',            // Health check endpoint
   '/api/health-check',      // Background server checks (cron/manual secret)
+  '/api/finance/receipt',   // Printable public receipt/refund confirmation
+  '/api/telegram/announcements/', // Public announcement open/click tracking
   '/api/telegram/webhook',  // Telegram webhook from external service
   '/api/trpc/auth.login',   // Login API endpoint
   '/api/trpc/auth.getAdminLoginApprovalStatus',

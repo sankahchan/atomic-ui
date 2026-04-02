@@ -12,6 +12,7 @@
 
 import { z } from 'zod';
 import { router, protectedProcedure, adminProcedure, publicProcedure } from '../trpc';
+import { hasOutageManageScope } from '@/lib/admin-scope';
 import { db } from '@/lib/db';
 import { createOutlineClient, parseOutlineConfig } from '@/lib/outline-api';
 import { TRPCError } from '@trpc/server';
@@ -84,6 +85,15 @@ const parseConfigSchema = z.object({
 const MIN_SESSION_KEEPALIVE_BYTES = 64 * 1024;
 // Require the same stronger burst before refreshing "last seen".
 const MIN_MEANINGFUL_ACTIVITY_BYTES = 64 * 1024;
+
+function assertOutageManageScope(scope?: string | null) {
+  if (!hasOutageManageScope(scope)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to manage server lifecycle or outage controls.',
+    });
+  }
+}
 
 export const serversRouter = router({
   /**
@@ -355,6 +365,7 @@ export const serversRouter = router({
   create: adminProcedure
     .input(createServerSchema)
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       // Create an Outline client to test the connection
       const client = createOutlineClient(input.apiUrl, input.apiCertSha256);
 
@@ -471,6 +482,7 @@ export const serversRouter = router({
   update: adminProcedure
     .input(updateServerSchema)
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const { id, tagIds, ...data } = input;
 
       // Check if the server exists
@@ -549,6 +561,7 @@ export const serversRouter = router({
   updateSlowPolicy: adminProcedure
     .input(updateSlowPolicySchema)
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const existing = await db.server.findUnique({
         where: { id: input.serverId },
         select: {
@@ -632,6 +645,7 @@ export const serversRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const existing = await db.server.findUnique({
         where: { id: input.id },
         select: {
@@ -707,6 +721,7 @@ export const serversRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       if (input.sourceServerId === input.targetServerId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -758,6 +773,7 @@ export const serversRouter = router({
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const server = await db.server.findUnique({
         where: { id: input.id },
       });
@@ -1778,6 +1794,7 @@ export const serversRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const { sendServerOutageFollowUp } = await import('@/lib/services/server-outage');
       const result = await sendServerOutageFollowUp({
         serverId: input.serverId,
@@ -1812,6 +1829,7 @@ export const serversRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       const server = await db.server.findUnique({
         where: { id: input.serverId },
         select: {
@@ -1917,7 +1935,8 @@ export const serversRouter = router({
         deleteFromSource: z.boolean().default(true),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertOutageManageScope(ctx.user.adminScope);
       if (input.sourceServerId === input.targetServerId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

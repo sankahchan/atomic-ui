@@ -465,6 +465,7 @@ model TelegramAnnouncement {
   targetCountryCode    String?
   title                String
   message              String
+  heroImageUrl         String?
   includeSupportButton Boolean  @default(true)
   status               String   @default("DRAFT") // DRAFT, SCHEDULED, PROCESSING, SENT, PARTIAL, FAILED, CANCELLED
   scheduledFor         DateTime?
@@ -473,6 +474,8 @@ model TelegramAnnouncement {
   totalRecipients      Int      @default(0)
   sentCount            Int      @default(0)
   failedCount          Int      @default(0)
+  resendAttemptCount   Int      @default(0)
+  resendRecoveredCount Int      @default(0)
   createdByUserId      String?
   createdByEmail       String?
   createdAt            DateTime @default(now())
@@ -496,6 +499,10 @@ model TelegramAnnouncementDelivery {
   status          String   @default("PENDING") // PENDING, SENT, FAILED
   error           String?
   sentAt          DateTime?
+  openCount       Int      @default(0)
+  lastOpenedAt    DateTime?
+  clickCount      Int      @default(0)
+  lastClickedAt   DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -515,6 +522,7 @@ model TelegramAnnouncementTemplate {
   targetCountryCode    String?
   title                String
   message              String
+  heroImageUrl         String?
   includeSupportButton Boolean  @default(true)
   createdByUserId      String?
   createdByEmail       String?

@@ -185,6 +185,7 @@ type TelegramAnnouncementTemplateRow = {
   targetCountryCode?: string | null;
   title: string;
   message: string;
+  heroImageUrl?: string | null;
   includeSupportButton: boolean;
   createdByEmail?: string | null;
   createdAt: Date;
@@ -201,6 +202,7 @@ type TelegramAnnouncementHistoryRow = {
   targetCountryCode?: string | null;
   title: string;
   message: string;
+  heroImageUrl?: string | null;
   includeSupportButton: boolean;
   status: string;
   scheduledFor?: Date | null;
@@ -209,6 +211,8 @@ type TelegramAnnouncementHistoryRow = {
   totalRecipients: number;
   sentCount: number;
   failedCount: number;
+  resendAttemptCount?: number;
+  resendRecoveredCount?: number;
   createdByUserId?: string | null;
   createdByEmail?: string | null;
   createdAt: Date;
@@ -225,6 +229,44 @@ type TelegramAnnouncementTargetOptions = {
   tags: Array<{ value: string; count: number }>;
   servers: Array<{ value: string; label: string; countryCode?: string | null; count: number }>;
   regions: Array<{ value: string; count: number }>;
+};
+
+type TelegramAnnouncementAnalytics = {
+  range: '7d' | '30d' | '90d';
+  totals: {
+    announcements: number;
+    recipients: number;
+    sentCount: number;
+    failedCount: number;
+    openCount: number;
+    clickCount: number;
+    deliverySuccessRate: number;
+    openRate: number;
+    clickRate: number;
+    resendAttempts: number;
+    resendRecovered: number;
+    resendRecoveryRate: number;
+  };
+  byType: Array<{
+    type: string;
+    announcements: number;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    openCount: number;
+    clickCount: number;
+    deliverySuccessRate: number;
+    openRate: number;
+    clickRate: number;
+  }>;
+  byAudience: Array<{
+    audience: string;
+    announcements: number;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    deliverySuccessRate: number;
+  }>;
 };
 
 const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
@@ -1182,6 +1224,19 @@ function TelegramBotSetupCard() {
     announcementTemplatesDesc: isMyanmar ? 'အကြိမ်ကြိမ်အသုံးပြုမည့် announcement များကို template အဖြစ် သိမ်းနိုင်သည်။' : 'Save reusable announcement presets for discounts, new servers, maintenance, and more.',
     announcementHistoryTitle: isMyanmar ? 'Announcement history' : 'Announcement history',
     announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော announcement များ၊ schedule များနှင့် failed deliveries များကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
+    announcementHeroImage: isMyanmar ? 'Hero image URL' : 'Hero image URL',
+    announcementHeroImageHint: isMyanmar ? 'Telegram တွင် image card အဖြစ် ပို့လိုပါက image URL ကို ထည့်ပါ။' : 'Add an image URL to send the announcement as a branded Telegram image card.',
+    announcementAnalyticsTitle: isMyanmar ? 'Delivery analytics' : 'Delivery analytics',
+    announcementAnalyticsDesc: isMyanmar ? 'Open/click performance၊ audience success rate နှင့် resend recovery ကို ကြည့်နိုင်သည်။' : 'Track delivery success, opens, clicks, and resend recovery for announcements.',
+    announcementAnalyticsRange: isMyanmar ? 'Analytics window' : 'Analytics window',
+    announcementOpens: isMyanmar ? 'Open များ' : 'Opens',
+    announcementClicks: isMyanmar ? 'Clicks' : 'Clicks',
+    announcementOpenRate: isMyanmar ? 'Open rate' : 'Open rate',
+    announcementClickRate: isMyanmar ? 'Click rate' : 'Click rate',
+    announcementSuccessRate: isMyanmar ? 'Success rate' : 'Success rate',
+    announcementResendRecovery: isMyanmar ? 'Resend recovery' : 'Resend recovery',
+    announcementByType: isMyanmar ? 'By announcement type' : 'By announcement type',
+    announcementByAudience: isMyanmar ? 'By audience' : 'By audience',
     announcementApplyTemplate: isMyanmar ? 'Template သုံးမည်' : 'Use template',
     announcementDeleteTemplate: isMyanmar ? 'Template ဖျက်မည်' : 'Delete template',
     announcementNoTemplates: isMyanmar ? 'Saved template မရှိသေးပါ။' : 'No saved templates yet.',
@@ -1202,12 +1257,14 @@ function TelegramBotSetupCard() {
   const [announcementType, setAnnouncementType] = useState<TelegramAnnouncementType>('ANNOUNCEMENT');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementHeroImageUrl, setAnnouncementHeroImageUrl] = useState('');
   const [announcementIncludeSupportButton, setAnnouncementIncludeSupportButton] = useState(true);
   const [announcementTemplateName, setAnnouncementTemplateName] = useState('');
   const [announcementScheduledFor, setAnnouncementScheduledFor] = useState('');
   const [announcementTargetTag, setAnnouncementTargetTag] = useState('ALL');
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
+  const [announcementAnalyticsRange, setAnnouncementAnalyticsRange] = useState<'7d' | '30d' | '90d'>('30d');
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -1328,11 +1385,15 @@ function TelegramBotSetupCard() {
   const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery();
   const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery();
   const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery({ limit: 12 });
+  const announcementAnalyticsQuery = trpc.telegramBot.getAnnouncementAnalytics.useQuery({
+    range: announcementAnalyticsRange,
+  });
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
     onSuccess: async (result) => {
       await Promise.all([
         utils.telegramBot.listAnnouncementHistory.invalidate(),
         utils.telegramBot.getAnnouncementAudienceCounts.invalidate(),
+        utils.telegramBot.getAnnouncementAnalytics.invalidate(),
       ]);
       toast({
         title: result.scheduled ? telegramUi.announcementScheduled : telegramUi.announcementSent,
@@ -1344,6 +1405,7 @@ function TelegramBotSetupCard() {
       });
       setAnnouncementTitle('');
       setAnnouncementMessage('');
+      setAnnouncementHeroImageUrl('');
       setAnnouncementScheduledFor('');
     },
     onError: (error) => {
@@ -1387,7 +1449,10 @@ function TelegramBotSetupCard() {
   });
   const resendAnnouncementFailedMutation = trpc.telegramBot.resendAnnouncementFailed.useMutation({
     onSuccess: async () => {
-      await utils.telegramBot.listAnnouncementHistory.invalidate();
+      await Promise.all([
+        utils.telegramBot.listAnnouncementHistory.invalidate(),
+        utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+      ]);
       toast({
         title: telegramUi.announcementSent,
       });
@@ -1402,7 +1467,10 @@ function TelegramBotSetupCard() {
   });
   const dispatchScheduledAnnouncementMutation = trpc.telegramBot.dispatchScheduledAnnouncement.useMutation({
     onSuccess: async () => {
-      await utils.telegramBot.listAnnouncementHistory.invalidate();
+      await Promise.all([
+        utils.telegramBot.listAnnouncementHistory.invalidate(),
+        utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+      ]);
       toast({
         title: telegramUi.announcementSent,
       });
@@ -1426,6 +1494,7 @@ function TelegramBotSetupCard() {
   const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
   const announcementTemplates = (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[];
   const announcementHistory = (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[];
+  const announcementAnalytics = (announcementAnalyticsQuery.data ?? null) as TelegramAnnouncementAnalytics | null;
   const announcementTargetOptions = (announcementTargetOptionsQuery.data ?? {
     tags: [],
     servers: [],
@@ -1850,7 +1919,10 @@ function TelegramBotSetupCard() {
               <p className="mt-2 text-xs text-muted-foreground">
                 {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
                 <code>/enable</code>, <code>/resend</code>, <code>/announce</code>,{' '}
-                <code>/announcements</code>, <code>/finance</code>, <code>/refunds</code>,{' '}
+                <code>/announcements</code>, <code>/announcehistory</code>, <code>/scheduleannouncement</code>,{' '}
+                <code>/finance</code>, <code>/sendfinance</code>, <code>/refunds</code>,{' '}
+                <code>/claimrefund</code>, <code>/reassignrefund</code>, <code>/serverdown</code>,{' '}
+                <code>/maintenance</code>, <code>/serverupdate</code>, <code>/serverrecovered</code>,{' '}
                 <code>/status</code>, <code>/sysinfo</code>, <code>/backup</code>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -2004,6 +2076,17 @@ function TelegramBotSetupCard() {
               </div>
 
               <div className="mt-3 space-y-2">
+                <Label htmlFor="telegram-announcement-hero-image">{telegramUi.announcementHeroImage}</Label>
+                <Input
+                  id="telegram-announcement-hero-image"
+                  value={announcementHeroImageUrl}
+                  onChange={(event) => setAnnouncementHeroImageUrl(event.target.value)}
+                  placeholder="https://example.com/promo-banner.jpg"
+                />
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementHeroImageHint}</p>
+              </div>
+
+              <div className="mt-3 space-y-2">
                 <Label htmlFor="telegram-announcement-scheduled-for">{telegramUi.announcementScheduleAt}</Label>
                 <Input
                   id="telegram-announcement-scheduled-for"
@@ -2040,6 +2123,7 @@ function TelegramBotSetupCard() {
                       filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
+                      heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       scheduledFor: null,
                     })
@@ -2070,6 +2154,7 @@ function TelegramBotSetupCard() {
                       filters: announcementFilters,
                       title: announcementTitle.trim(),
                       message: announcementMessage.trim(),
+                      heroImageUrl: announcementHeroImageUrl.trim() || null,
                       includeSupportButton: announcementIncludeSupportButton,
                       scheduledFor: announcementScheduledFor
                         ? new Date(announcementScheduledFor).toISOString()
@@ -2118,6 +2203,7 @@ function TelegramBotSetupCard() {
                         filters: announcementFilters,
                         title: announcementTitle.trim(),
                         message: announcementMessage.trim(),
+                        heroImageUrl: announcementHeroImageUrl.trim() || null,
                         includeSupportButton: announcementIncludeSupportButton,
                       })
                     }
@@ -2177,6 +2263,7 @@ function TelegramBotSetupCard() {
                               setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
                               setAnnouncementTitle(template.title);
                               setAnnouncementMessage(template.message);
+                              setAnnouncementHeroImageUrl(template.heroImageUrl || '');
                               setAnnouncementIncludeSupportButton(template.includeSupportButton);
                             }}
                           >
@@ -2205,6 +2292,133 @@ function TelegramBotSetupCard() {
               </div>
 
               <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{telegramUi.announcementAnalyticsTitle}</p>
+                    <p className="text-xs text-muted-foreground">{telegramUi.announcementAnalyticsDesc}</p>
+                  </div>
+                  <div className="w-full sm:w-40">
+                    <Label className="mb-2 block">{telegramUi.announcementAnalyticsRange}</Label>
+                    <Select
+                      value={announcementAnalyticsRange}
+                      onValueChange={(value: '7d' | '30d' | '90d') => setAnnouncementAnalyticsRange(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7d">Last 7 days</SelectItem>
+                        <SelectItem value="30d">Last 30 days</SelectItem>
+                        <SelectItem value="90d">Last 90 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {announcementAnalyticsQuery.isLoading ? (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading analytics…
+                  </div>
+                ) : announcementAnalytics ? (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {telegramUi.announcementSuccessRate}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {Math.round(announcementAnalytics.totals.deliverySuccessRate * 100)}%
+                        </p>
+                        <Progress value={announcementAnalytics.totals.deliverySuccessRate * 100} className="mt-3 h-2" />
+                      </div>
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {telegramUi.announcementOpenRate}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {Math.round(announcementAnalytics.totals.openRate * 100)}%
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {announcementAnalytics.totals.openCount} {telegramUi.announcementOpens.toLowerCase()}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {telegramUi.announcementClickRate}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {Math.round(announcementAnalytics.totals.clickRate * 100)}%
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {announcementAnalytics.totals.clickCount} {telegramUi.announcementClicks.toLowerCase()}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {telegramUi.announcementResendRecovery}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {Math.round(announcementAnalytics.totals.resendRecoveryRate * 100)}%
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {announcementAnalytics.totals.resendRecovered}/{announcementAnalytics.totals.resendAttempts || 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-sm font-medium">{telegramUi.announcementByType}</p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.byType.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.byType.map((entry) => (
+                              <div key={entry.type} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{entry.type}</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.deliverySuccessRate * 100)}%
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-sm font-medium">{telegramUi.announcementByAudience}</p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.byAudience.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.byAudience.map((entry) => (
+                              <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{entry.audience}</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.deliverySuccessRate * 100)}%
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.failedCount} failed
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
                   <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
@@ -2221,6 +2435,11 @@ function TelegramBotSetupCard() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium">{announcement.title}</p>
                             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{announcement.message}</p>
+                            {announcement.heroImageUrl ? (
+                              <p className="mt-2 text-[11px] text-muted-foreground break-all">
+                                Image: {announcement.heroImageUrl}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{announcement.type}</Badge>
@@ -2243,6 +2462,8 @@ function TelegramBotSetupCard() {
                         <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                           <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
                           <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
+                          <p>Resend attempts: {announcement.resendAttemptCount || 0}</p>
+                          <p>Recovered: {announcement.resendRecoveredCount || 0}</p>
                           <p>Created: {formatDateTime(announcement.createdAt)}</p>
                           <p>
                             {announcement.scheduledFor

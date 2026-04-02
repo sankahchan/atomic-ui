@@ -1,7 +1,9 @@
 import { db } from '@/lib/db';
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import {
   getTelegramConfig,
   getTelegramSupportLink,
+  sendTelegramPhotoUrl,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import { escapeHtml } from '@/lib/services/telegram-ui';
@@ -269,12 +271,21 @@ export function buildTelegramAnnouncementMessage(input: {
             ? 'ℹ️ <b>Information</b>'
             : '📣 <b>Announcement</b>';
 
-  return [
+  const bodyLines = [
     heading,
     '',
     `<b>${escapeHtml(input.title.trim())}</b>`,
     escapeHtml(input.message.trim()),
-  ].join('\n');
+  ];
+
+  if (input.type === 'PROMO') {
+    bodyLines.push(
+      '',
+      '<i>Tap the notice card below to keep the offer or announcement details handy.</i>',
+    );
+  }
+
+  return bodyLines.join('\n');
 }
 
 function getAnnouncementStatusFromCounts(sentCount: number, failedCount: number) {
@@ -411,13 +422,26 @@ export async function dispatchTelegramAnnouncement(input: {
   let failedDelta = 0;
 
   for (const delivery of deliveries) {
-    const sent = await sendTelegramMessage(config.botToken, delivery.chatId, message, {
-      replyMarkup: supportLink
-        ? {
-            inline_keyboard: [[{ text: 'Support', url: supportLink }]],
-          }
-        : undefined,
-    });
+    const openUrl = withAbsoluteBasePath(`/api/telegram/announcements/${delivery.id}/open`);
+    const supportUrl = supportLink
+      ? withAbsoluteBasePath(`/api/telegram/announcements/${delivery.id}/click?target=support`)
+      : null;
+    const inlineKeyboard = [
+      [{ text: 'Open notice', url: openUrl }],
+      ...(supportUrl ? [[{ text: 'Support', url: supportUrl }]] : []),
+    ];
+    const replyMarkup = { inline_keyboard: inlineKeyboard };
+    const sent = announcement.heroImageUrl?.trim()
+      ? await sendTelegramPhotoUrl(
+          config.botToken,
+          delivery.chatId,
+          announcement.heroImageUrl.trim(),
+          message,
+          { replyMarkup },
+        )
+      : await sendTelegramMessage(config.botToken, delivery.chatId, message, {
+          replyMarkup,
+        });
 
     await db.telegramAnnouncementDelivery.update({
       where: { id: delivery.id },
@@ -459,6 +483,8 @@ export async function dispatchTelegramAnnouncement(input: {
       totalRecipients: chatIds.length,
       sentCount,
       failedCount,
+      resendAttemptCount: resendFailedOnly ? { increment: 1 } : undefined,
+      resendRecoveredCount: resendFailedOnly && sentDelta > 0 ? { increment: sentDelta } : undefined,
     },
   });
 

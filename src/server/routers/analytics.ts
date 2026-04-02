@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { router, protectedProcedure, adminProcedure } from '../trpc';
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
@@ -1577,7 +1578,7 @@ export const analyticsRouter = router({
   financeCsvExport: adminProcedure
     .input(
       z.object({
-        kind: z.enum(['orders', 'actions', 'monthly']).default('orders'),
+        kind: z.enum(['orders', 'actions', 'monthly', 'receipts', 'refunds']).default('orders'),
         range: timeRangeSchema.default('30d'),
         months: z.number().int().min(3).max(12).default(6),
       }),
@@ -1650,6 +1651,22 @@ export const analyticsRouter = router({
           retentionSource: order.retentionSource || '',
           createdAt: order.createdAt,
           financeUpdatedAt: order.financeUpdatedAt,
+          receiptHtmlUrl:
+            order.status === 'FULFILLED'
+              ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=html`)
+              : '',
+          receiptPdfUrl:
+            order.status === 'FULFILLED'
+              ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=pdf`)
+              : '',
+          refundHtmlUrl:
+            order.financeStatus === 'REFUNDED' || order.refundRequestStatus === 'APPROVED'
+              ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=html`)
+              : '',
+          refundPdfUrl:
+            order.financeStatus === 'REFUNDED' || order.refundRequestStatus === 'APPROVED'
+              ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=pdf`)
+              : '',
         }));
 
         return {
@@ -1707,6 +1724,112 @@ export const analyticsRouter = router({
         return {
           filename: `finance-actions-${input.range}-${now.toISOString().slice(0, 10)}.csv`,
           csv: buildCsv(rows),
+        };
+      }
+
+      if (input.kind === 'receipts') {
+        const receipts = await db.telegramOrder.findMany({
+          where: {
+            status: 'FULFILLED',
+            fulfilledAt: { gte: cutoff },
+          },
+          orderBy: [{ fulfilledAt: 'desc' }],
+          select: {
+            orderCode: true,
+            kind: true,
+            requestedEmail: true,
+            telegramUsername: true,
+            planCode: true,
+            planName: true,
+            deliveryType: true,
+            priceAmount: true,
+            priceCurrency: true,
+            paymentMethodLabel: true,
+            selectedServerName: true,
+            fulfilledAt: true,
+          },
+        });
+
+        return {
+          filename: `finance-receipts-${input.range}-${now.toISOString().slice(0, 10)}.csv`,
+          csv: buildCsv(
+            receipts.map((order) => ({
+              orderCode: order.orderCode,
+              receiptNumber: `RCPT-${order.orderCode}`,
+              kind: order.kind,
+              deliveryType: order.deliveryType,
+              requestedEmail: order.requestedEmail || '',
+              telegramUsername: order.telegramUsername || '',
+              planCode: order.planCode || '',
+              planName: order.planName || '',
+              priceAmount: order.priceAmount ?? '',
+              priceCurrency: order.priceCurrency || '',
+              paymentMethodLabel: order.paymentMethodLabel || '',
+              selectedServerName: order.selectedServerName || '',
+              fulfilledAt: order.fulfilledAt,
+              printableUrl: withAbsoluteBasePath(
+                `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=html`,
+              ),
+              pdfUrl: withAbsoluteBasePath(
+                `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=pdf`,
+              ),
+            })),
+          ),
+        };
+      }
+
+      if (input.kind === 'refunds') {
+        const refunds = await db.telegramOrder.findMany({
+          where: {
+            OR: [
+              { refundRequestedAt: { gte: cutoff } },
+              { refundRequestReviewedAt: { gte: cutoff } },
+              { financeStatus: 'REFUNDED', financeUpdatedAt: { gte: cutoff } },
+            ],
+          },
+          orderBy: [{ refundRequestedAt: 'desc' }, { refundRequestReviewedAt: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            orderCode: true,
+            requestedEmail: true,
+            telegramUsername: true,
+            priceAmount: true,
+            priceCurrency: true,
+            refundRequestStatus: true,
+            refundRequestedAt: true,
+            refundRequestReviewedAt: true,
+            refundReviewReasonCode: true,
+            refundRequestCustomerMessage: true,
+            financeStatus: true,
+            financeUpdatedAt: true,
+          },
+        });
+
+        return {
+          filename: `finance-refunds-${input.range}-${now.toISOString().slice(0, 10)}.csv`,
+          csv: buildCsv(
+            refunds.map((order) => ({
+              orderCode: order.orderCode,
+              requestedEmail: order.requestedEmail || '',
+              telegramUsername: order.telegramUsername || '',
+              priceAmount: order.priceAmount ?? '',
+              priceCurrency: order.priceCurrency || '',
+              refundRequestStatus: order.refundRequestStatus || '',
+              refundRequestedAt: order.refundRequestedAt,
+              refundRequestReviewedAt: order.refundRequestReviewedAt,
+              refundReviewReasonCode: order.refundReviewReasonCode || '',
+              refundCustomerMessage: order.refundRequestCustomerMessage || '',
+              financeStatus: order.financeStatus,
+              financeUpdatedAt: order.financeUpdatedAt,
+              printableUrl:
+                order.financeStatus === 'REFUNDED' || order.refundRequestStatus === 'APPROVED'
+                  ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=html`)
+                  : '',
+              pdfUrl:
+                order.financeStatus === 'REFUNDED' || order.refundRequestStatus === 'APPROVED'
+                  ? withAbsoluteBasePath(`/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=pdf`)
+                  : '',
+            })),
+          ),
         };
       }
 

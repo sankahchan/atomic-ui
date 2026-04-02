@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
   hasFinanceConfigureScope,
@@ -258,7 +259,12 @@ async function getTelegramAdminConfig() {
   return null;
 }
 
-async function sendTelegramMessageLite(botToken: string, chatId: string, text: string) {
+async function sendTelegramMessageLite(
+  botToken: string,
+  chatId: string,
+  text: string,
+  extra?: Record<string, unknown>,
+) {
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendMessage`, {
       method: 'POST',
@@ -268,6 +274,7 @@ async function sendTelegramMessageLite(botToken: string, chatId: string, text: s
         text,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
+        ...extra,
       }),
     });
 
@@ -445,13 +452,20 @@ export async function runTelegramFinanceDigestCycle(input?: { now?: Date; force?
 }
 
 function buildTelegramOrderPanelUrl(orderId: string) {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    'http://localhost:3000';
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${origin}${basePath}/dashboard/notifications?telegramOrder=${encodeURIComponent(orderId)}`;
+  return withAbsoluteBasePath(`/dashboard/notifications?telegramOrder=${encodeURIComponent(orderId)}`);
+}
+
+export function buildTelegramFinanceDocumentUrl(input: {
+  orderCode: string;
+  type: 'receipt' | 'refund';
+  format?: 'html' | 'pdf';
+}) {
+  const params = new URLSearchParams({
+    orderCode: input.orderCode,
+    type: input.type,
+    format: input.format || 'html',
+  });
+  return withAbsoluteBasePath(`/api/finance/receipt?${params.toString()}`);
 }
 
 export async function sendTelegramRefundRequestAlert(input: {
@@ -525,5 +539,20 @@ export async function sendTelegramRefundDecisionMessage(input: {
       : escapeHtml(ui.refundRejectedHelp),
   ].filter(Boolean);
 
-  return sendTelegramMessageLite(telegramConfig.botToken, input.chatId, lines.join('\n'));
+  return sendTelegramMessageLite(telegramConfig.botToken, input.chatId, lines.join('\n'), {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: locale === 'my' ? 'Printable refund' : 'Printable refund', url: buildTelegramFinanceDocumentUrl({
+          orderCode: input.orderCode,
+          type: 'refund',
+          format: 'html',
+        }) }],
+        [{ text: locale === 'my' ? 'Download PDF' : 'Download PDF', url: buildTelegramFinanceDocumentUrl({
+          orderCode: input.orderCode,
+          type: 'refund',
+          format: 'pdf',
+        }) }],
+      ],
+    },
+  });
 }

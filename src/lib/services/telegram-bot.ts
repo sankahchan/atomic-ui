@@ -14,6 +14,12 @@ import path from 'path';
 import archiver from 'archiver';
 import QRCode from 'qrcode';
 import si from 'systeminformation';
+import {
+  hasFinanceManageScope,
+  hasOutageManageScope,
+  hasTelegramAnnouncementManageScope,
+  hasTelegramReviewManageScope,
+} from '@/lib/admin-scope';
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { createOutlineClient } from '@/lib/outline-api';
@@ -91,8 +97,10 @@ import {
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
 import {
+  buildTelegramFinanceDocumentUrl,
   evaluateTelegramOrderRefundEligibility,
   getFinanceControls,
+  runTelegramFinanceDigestCycle,
   sendTelegramRefundRequestAlert,
 } from '@/lib/services/telegram-finance';
 import {
@@ -2949,7 +2957,20 @@ async function sendTelegramOrderReceiptConfirmation(input: {
     input.chatId,
     buildTelegramOrderReceiptMessage(input),
     {
-      replyMarkup: getCommandKeyboard(false),
+      replyMarkup: {
+        inline_keyboard: [
+          [{ text: getTelegramUi(input.locale).receiptActionPrintable, url: buildTelegramFinanceDocumentUrl({
+            orderCode: input.order.orderCode,
+            type: 'receipt',
+            format: 'html',
+          }) }],
+          [{ text: getTelegramUi(input.locale).receiptActionDownloadPdf, url: buildTelegramFinanceDocumentUrl({
+            orderCode: input.order.orderCode,
+            type: 'receipt',
+            format: 'pdf',
+          }) }],
+        ],
+      },
     },
   );
 }
@@ -7836,6 +7857,90 @@ function formatTelegramAdminMoneyMap(entries: Map<string, number>) {
     .join(' • ');
 }
 
+type TelegramAdminActor = {
+  isAdmin: boolean;
+  userId: string | null;
+  email: string | null;
+  scope: string | null;
+};
+
+async function resolveTelegramAdminActor(input: {
+  telegramUserId: number;
+  chatId: number;
+  config: TelegramConfig;
+}): Promise<TelegramAdminActor> {
+  const adminChatMatch =
+    input.config.adminChatIds.includes(String(input.telegramUserId)) ||
+    input.config.adminChatIds.includes(String(input.chatId));
+
+  const linkedAdmin = await db.user.findFirst({
+    where: {
+      role: 'ADMIN',
+      OR: [
+        { telegramChatId: String(input.chatId) },
+        { telegramChatId: String(input.telegramUserId) },
+      ],
+    },
+    select: {
+      id: true,
+      email: true,
+      adminScope: true,
+    },
+  });
+
+  if (linkedAdmin) {
+    return {
+      isAdmin: true,
+      userId: linkedAdmin.id,
+      email: linkedAdmin.email,
+      scope: linkedAdmin.adminScope || null,
+    };
+  }
+
+  if (adminChatMatch) {
+    return {
+      isAdmin: true,
+      userId: null,
+      email: null,
+      scope: 'OWNER',
+    };
+  }
+
+  return {
+    isAdmin: false,
+    userId: null,
+    email: null,
+    scope: null,
+  };
+}
+
+function telegramAdminScopeDeniedMessage(input: {
+  locale: SupportedLocale;
+  area: 'announcement' | 'finance' | 'outage' | 'review';
+}) {
+  const isMyanmar = input.locale === 'my';
+  switch (input.area) {
+    case 'announcement':
+      return isMyanmar
+        ? 'Announcement နှင့် broadcast command များကို အသုံးပြုရန် Owner/Admin scope လိုအပ်သည်။'
+        : 'Owner or Admin scope is required for Telegram announcement commands.';
+    case 'finance':
+      return isMyanmar
+        ? 'Finance command များကို အသုံးပြုရန် Owner/Finance scope လိုအပ်သည်။'
+        : 'Owner or Finance scope is required for Telegram finance commands.';
+    case 'outage':
+      return isMyanmar
+        ? 'Outage command များကို အသုံးပြုရန် Owner/Admin scope လိုအပ်သည်။'
+        : 'Owner or Admin scope is required for outage commands.';
+    case 'review':
+      return isMyanmar
+        ? 'Review command များကို အသုံးပြုရန် Owner/Admin/Support scope လိုအပ်သည်။'
+        : 'Owner, Admin, or Support scope is required for review commands.';
+    default:
+      return isMyanmar ? 'ဤ command ကို အသုံးပြုခွင့်မရှိပါ။' : 'You do not have permission to use this command.';
+  }
+}
+
 function resolveTelegramAnnouncementAudienceToken(value?: string | null): TelegramAnnouncementAudience | null {
   switch ((value || '').trim().toLowerCase()) {
     case 'active':
@@ -7876,22 +7981,31 @@ function resolveTelegramAnnouncementTypeToken(value?: string | null): TelegramAn
   }
 }
 
+type TelegramAdminAnnouncementParseError = { error: string };
+type TelegramAdminAnnouncementParseSuccess = {
+  error: null;
+  audience: TelegramAnnouncementAudience;
+  type: TelegramAnnouncementType;
+  title: string;
+  message: string;
+  includeSupportButton: boolean;
+  filters: {
+    tag: string | null;
+    serverId: string | null;
+    countryCode: string | null;
+  };
+  serverName: string | null;
+};
+
 type TelegramAdminAnnouncementParseResult =
-  | { error: string }
-  | {
-      error: null;
-      audience: TelegramAnnouncementAudience;
-      type: TelegramAnnouncementType;
-      title: string;
-      message: string;
-      includeSupportButton: boolean;
-      filters: {
-        tag: string | null;
-        serverId: string | null;
-        countryCode: string | null;
-      };
-      serverName: string | null;
-    };
+  | TelegramAdminAnnouncementParseError
+  | TelegramAdminAnnouncementParseSuccess;
+
+function isTelegramAdminAnnouncementParseSuccess(
+  value: TelegramAdminAnnouncementParseResult,
+): value is TelegramAdminAnnouncementParseSuccess {
+  return value.error === null;
+}
 
 function formatTelegramAnnouncementTargetSummary(input: {
   tag?: string | null;
@@ -8137,9 +8251,76 @@ async function handleAnnouncementsCommand(locale: SupportedLocale): Promise<stri
   return lines.join('\n');
 }
 
+async function handleScheduleAnnouncementCommand(
+  argsText: string,
+  locale: SupportedLocale,
+): Promise<string> {
+  const [rawSchedule, ...restTokens] = argsText.trim().split(/\s+/);
+  if (!rawSchedule || restTokens.length === 0) {
+    return locale === 'my'
+      ? 'အသုံးပြုပုံ: /scheduleannouncement <yyyy-mm-ddThh:mm> <audience> [filters] :: <title> :: <message>'
+      : 'Usage: /scheduleannouncement <yyyy-mm-ddThh:mm> <audience> [filters] :: <title> :: <message>';
+  }
+
+  const scheduledFor = new Date(rawSchedule);
+  if (Number.isNaN(scheduledFor.getTime()) || scheduledFor.getTime() <= Date.now() + 60_000) {
+    return locale === 'my'
+      ? 'အနည်းဆုံး ၁ မိနစ်အနာဂတ်အချိန်ကို သတ်မှတ်ပါ။'
+      : 'Choose a valid future time at least one minute from now.';
+  }
+
+  const parsed = await parseTelegramAdminAnnouncementArgs(restTokens.join(' '), locale);
+  if (!isTelegramAdminAnnouncementParseSuccess(parsed)) {
+    return parsed.error;
+  }
+
+  const audienceMap = await getTelegramAnnouncementAudienceMap(parsed.filters);
+  const totalRecipients = audienceMap[parsed.audience]?.length || 0;
+  if (totalRecipients === 0) {
+    return locale === 'my'
+      ? 'ဤ target အတွက် ပို့ရန် Telegram user မတွေ့ပါ။'
+      : 'No Telegram recipients match that audience/filter.';
+  }
+
+  const announcement = await db.telegramAnnouncement.create({
+    data: {
+      audience: parsed.audience,
+      type: parsed.type,
+      title: parsed.title,
+      message: parsed.message,
+      includeSupportButton: parsed.includeSupportButton,
+      status: 'SCHEDULED',
+      scheduledFor,
+      createdByEmail: 'telegram-admin',
+      targetTag: parsed.filters.tag,
+      targetServerId: parsed.filters.serverId,
+      targetServerName: parsed.serverName,
+      targetCountryCode: parsed.filters.countryCode,
+      totalRecipients,
+    },
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_ADMIN_ANNOUNCEMENT_SCHEDULED',
+    entity: 'TELEGRAM_ANNOUNCEMENT',
+    entityId: announcement.id,
+    details: {
+      audience: parsed.audience,
+      type: parsed.type,
+      filters: parsed.filters,
+      scheduledFor: scheduledFor.toISOString(),
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `🗓️ Announcement ကို ${formatTelegramDateTime(scheduledFor, locale)} တွင် ပို့ရန် schedule လုပ်ပြီးပါပြီ။`
+    : `🗓️ Scheduled the announcement for ${formatTelegramDateTime(scheduledFor, locale)}.`;
+}
+
 async function handleAnnounceCommand(argsText: string, locale: SupportedLocale): Promise<string> {
   const parsed = await parseTelegramAdminAnnouncementArgs(argsText, locale);
-  if (parsed.error) {
+  if (!isTelegramAdminAnnouncementParseSuccess(parsed)) {
     return parsed.error;
   }
 
@@ -8278,6 +8459,19 @@ async function handleFinanceCommand(locale: SupportedLocale): Promise<string> {
   ].join('\n');
 }
 
+async function handleSendFinanceCommand(locale: SupportedLocale): Promise<string> {
+  const result = await runTelegramFinanceDigestCycle({ now: new Date(), force: true });
+  if (result.skipped) {
+    return locale === 'my'
+      ? `Finance digest ကို မပို့နိုင်ပါ။ reason=${result.reason}`
+      : `Finance digest was skipped. reason=${result.reason}`;
+  }
+
+  return locale === 'my'
+    ? `💸 Finance digest ကို admin chat ${result.adminChats} ခုသို့ ပို့ပြီးပါပြီ။`
+    : `💸 Sent the finance digest to ${result.adminChats} admin chat(s).`;
+}
+
 async function handleRefundsCommand(locale: SupportedLocale): Promise<string> {
   const pendingRefunds = await db.telegramOrder.findMany({
     where: {
@@ -8318,6 +8512,159 @@ async function handleRefundsCommand(locale: SupportedLocale): Promise<string> {
   }
 
   return lines.join('\n');
+}
+
+async function handleClaimRefundCommand(
+  argsText: string,
+  locale: SupportedLocale,
+  actor: TelegramAdminActor,
+): Promise<string> {
+  const query = argsText.trim();
+  if (!query) {
+    return locale === 'my'
+      ? 'အသုံးပြုပုံ: /claimrefund <order-code>'
+      : 'Usage: /claimrefund <order-code>';
+  }
+
+  const order = await db.telegramOrder.findFirst({
+    where: {
+      OR: [{ orderCode: query.toUpperCase() }, { id: query }],
+    },
+    select: {
+      id: true,
+      orderCode: true,
+      refundRequestStatus: true,
+      refundAssignedReviewerUserId: true,
+      refundAssignedReviewerEmail: true,
+    },
+  });
+
+  if (!order) {
+    return locale === 'my' ? 'Refund order မတွေ့ပါ။' : 'Refund order not found.';
+  }
+  if (order.refundRequestStatus !== 'PENDING') {
+    return locale === 'my'
+      ? 'Pending refund request မဟုတ်ပါ။'
+      : 'That order is not waiting for refund review.';
+  }
+  if (order.refundAssignedReviewerUserId && order.refundAssignedReviewerUserId !== actor.userId) {
+    return locale === 'my'
+      ? `ဤ refund request ကို ${order.refundAssignedReviewerEmail || 'အခြား admin'} က claim လုပ်ထားသည်။`
+      : `This refund request is already claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`;
+  }
+
+  await db.telegramOrder.update({
+    where: { id: order.id },
+    data: {
+      refundAssignedReviewerUserId: actor.userId,
+      refundAssignedReviewerEmail: actor.email || 'telegram-admin',
+      refundAssignedAt: new Date(),
+    },
+  });
+
+  await writeAuditLog({
+    userId: actor.userId || undefined,
+    action: 'TELEGRAM_ORDER_REFUND_CLAIMED',
+    entity: 'TELEGRAM_ORDER',
+    entityId: order.id,
+    details: {
+      orderCode: order.orderCode,
+      refundAssignedReviewerEmail: actor.email || 'telegram-admin',
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `🧾 ${order.orderCode} ကို claim လုပ်ပြီးပါပြီ။`
+    : `🧾 Claimed refund request ${order.orderCode}.`;
+}
+
+async function handleReassignRefundCommand(
+  argsText: string,
+  locale: SupportedLocale,
+  actor: TelegramAdminActor,
+): Promise<string> {
+  const [orderQuery, ...reviewerTokens] = argsText.trim().split(/\s+/);
+  const reviewerQuery = reviewerTokens.join(' ').trim();
+  if (!orderQuery || !reviewerQuery) {
+    return locale === 'my'
+      ? 'အသုံးပြုပုံ: /reassignrefund <order-code> <admin-email|query>'
+      : 'Usage: /reassignrefund <order-code> <admin-email|query>';
+  }
+
+  const order = await db.telegramOrder.findFirst({
+    where: {
+      OR: [{ orderCode: orderQuery.toUpperCase() }, { id: orderQuery }],
+    },
+    select: {
+      id: true,
+      orderCode: true,
+      refundRequestStatus: true,
+      refundAssignedReviewerEmail: true,
+    },
+  });
+  if (!order) {
+    return locale === 'my' ? 'Refund order မတွေ့ပါ။' : 'Refund order not found.';
+  }
+  if (order.refundRequestStatus !== 'PENDING') {
+    return locale === 'my'
+      ? 'Pending refund request မဟုတ်ပါ။'
+      : 'That order is not waiting for refund review.';
+  }
+
+  const reviewerQueryNormalized = reviewerQuery.toLowerCase();
+  const candidateAdmins = (await db.user.findMany({
+    where: {
+      role: 'ADMIN',
+    },
+    select: {
+      id: true,
+      email: true,
+    },
+    orderBy: [{ email: 'asc' }],
+  })).filter((candidate) => candidate.email.toLowerCase().includes(reviewerQueryNormalized));
+
+  if (candidateAdmins.length !== 1) {
+    if (candidateAdmins.length === 0) {
+      return locale === 'my'
+        ? 'သတ်မှတ်ထားသော admin reviewer မတွေ့ပါ။'
+        : 'No matching admin reviewer was found.';
+    }
+    return [
+      locale === 'my'
+        ? 'တစ်ဦးတည်းသာ သတ်မှတ်နိုင်ရန် ပိုတိကျသော reviewer query သုံးပါ။'
+        : 'Use a more specific reviewer query; multiple admins matched.',
+      '',
+      ...candidateAdmins.map((candidate) => `• ${candidate.email}`),
+    ].join('\n');
+  }
+
+  const reviewer = candidateAdmins[0];
+  await db.telegramOrder.update({
+    where: { id: order.id },
+    data: {
+      refundAssignedReviewerUserId: reviewer.id,
+      refundAssignedReviewerEmail: reviewer.email,
+      refundAssignedAt: new Date(),
+    },
+  });
+
+  await writeAuditLog({
+    userId: actor.userId || undefined,
+    action: 'TELEGRAM_ORDER_REFUND_REASSIGNED',
+    entity: 'TELEGRAM_ORDER',
+    entityId: order.id,
+    details: {
+      orderCode: order.orderCode,
+      previousRefundAssignedReviewerEmail: order.refundAssignedReviewerEmail || null,
+      refundAssignedReviewerEmail: reviewer.email,
+      via: 'telegram_bot',
+    },
+  });
+
+  return locale === 'my'
+    ? `🧾 ${order.orderCode} ကို ${reviewer.email} သို့ reassign လုပ်ပြီးပါပြီ။`
+    : `🧾 Reassigned ${order.orderCode} to ${reviewer.email}.`;
 }
 
 async function handleHelpCommand(
@@ -8380,8 +8727,13 @@ async function handleHelpCommand(
 /resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
 /announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Announcement ပို့မည်
 /announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
+/announcehistory - announcement history ကို ကြည့်မည်
+/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
 /finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
+/sendfinance - Finance digest ကို ယခုချက်ချင်း ပို့မည်
 /refunds - pending refund request များကို ကြည့်မည်
+/claimrefund &lt;order&gt; - refund request ကို ကိုယ်တိုင် claim လုပ်မည်
+/reassignrefund &lt;order&gt; &lt;admin&gt; - refund reviewer ကို ပြန်သတ်မှတ်မည်
 /serverdown &lt;server&gt; - Server downtime notice ပို့မည်
 /maintenance &lt;server&gt; - Maintenance notice ပို့မည်
 /serverupdate &lt;server&gt; &lt;message&gt; - Follow-up update ပို့မည်
@@ -8397,8 +8749,13 @@ async function handleHelpCommand(
 /resend &lt;key-id&gt; - Resend the share page
 /announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send an announcement
 /announcements - Show recent announcements
+/announcehistory - Show recent announcement history
+/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
 /finance - Show the finance summary
+/sendfinance - Send the finance digest now
 /refunds - Show pending refund requests
+/claimrefund &lt;order&gt; - Claim a pending refund request
+/reassignrefund &lt;order&gt; &lt;admin&gt; - Reassign a refund reviewer
 /serverdown &lt;server&gt; - Send a downtime notice
 /maintenance &lt;server&gt; - Send a maintenance notice
 /serverupdate &lt;server&gt; &lt;message&gt; - Send a follow-up update
@@ -8449,9 +8806,12 @@ async function handleTelegramCallbackQuery(
     return null;
   }
 
-  const isAdmin =
-    config.adminChatIds.includes(String(callbackQuery.from.id)) ||
-    config.adminChatIds.includes(String(chatId));
+  const adminActor = await resolveTelegramAdminActor({
+    telegramUserId: callbackQuery.from.id,
+    chatId,
+    config,
+  });
+  const isAdmin = adminActor.isAdmin;
 
   if (!parsed) {
     const userServerChangeAction = parseTelegramServerChangeActionCallbackData(callbackQuery.data);
@@ -9925,13 +10285,25 @@ async function handleTelegramCallbackQuery(
         );
         return null;
       }
+      if (!hasTelegramReviewManageScope(adminActor.scope)) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          telegramAdminScopeDeniedMessage({ locale: adminLocale, area: 'review' }),
+        );
+        return null;
+      }
 
       try {
         if (serverChangeReviewAction.action === 'approve') {
           const result = await approveTelegramServerChangeRequest({
             requestId: serverChangeReviewAction.requestId,
-            reviewedByUserId: null,
-            reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+            reviewedByUserId: adminActor.userId,
+            reviewerName:
+              adminActor.email ||
+              callbackQuery.from.username ||
+              callbackQuery.from.first_name ||
+              null,
             adminNote: callbackQuery.from.username
               ? `Approved from Telegram by @${callbackQuery.from.username}`
               : `Approved from Telegram by ${callbackQuery.from.first_name}`,
@@ -9945,8 +10317,12 @@ async function handleTelegramCallbackQuery(
         } else {
           const result = await rejectTelegramServerChangeRequest({
             requestId: serverChangeReviewAction.requestId,
-            reviewedByUserId: null,
-            reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+            reviewedByUserId: adminActor.userId,
+            reviewerName:
+              adminActor.email ||
+              callbackQuery.from.username ||
+              callbackQuery.from.first_name ||
+              null,
             adminNote: null,
           });
 
@@ -9986,13 +10362,25 @@ async function handleTelegramCallbackQuery(
       );
       return null;
     }
+    if (!hasTelegramReviewManageScope(adminActor.scope)) {
+      await answerTelegramCallbackQuery(
+        config.botToken,
+        callbackQuery.id,
+        telegramAdminScopeDeniedMessage({ locale: adminLocale, area: 'review' }),
+      );
+      return null;
+    }
 
     try {
       if (orderAction.action === 'approve') {
         const result = await approveTelegramOrder({
           orderId: orderAction.orderId,
-          reviewedByUserId: null,
-          reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+          reviewedByUserId: adminActor.userId,
+          reviewerName:
+            adminActor.email ||
+            callbackQuery.from.username ||
+            callbackQuery.from.first_name ||
+            null,
           adminNote: callbackQuery.from.username
             ? `Approved from Telegram by @${callbackQuery.from.username}`
             : `Approved from Telegram by ${callbackQuery.from.first_name}`,
@@ -10006,8 +10394,12 @@ async function handleTelegramCallbackQuery(
       } else {
         const result = await rejectTelegramOrder({
           orderId: orderAction.orderId,
-          reviewedByUserId: null,
-          reviewerName: callbackQuery.from.username || callbackQuery.from.first_name || null,
+          reviewedByUserId: adminActor.userId,
+          reviewerName:
+            adminActor.email ||
+            callbackQuery.from.username ||
+            callbackQuery.from.first_name ||
+            null,
           adminNote: null,
         });
 
@@ -10171,9 +10563,12 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
   const command = commandMatch[1].toLowerCase();
   const argsText = commandMatch[2] || '';
-  const isAdmin =
-    config.adminChatIds.includes(String(telegramUserId)) ||
-    config.adminChatIds.includes(String(chatId));
+  const adminActor = await resolveTelegramAdminActor({
+    telegramUserId,
+    chatId,
+    config,
+  });
+  const isAdmin = adminActor.isAdmin;
 
   switch (command) {
     case 'start':
@@ -10306,21 +10701,78 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'resend':
       return isAdmin ? handleResendCommand(argsText, locale) : ui.adminOnly;
     case 'announce':
-      return isAdmin ? handleAnnounceCommand(argsText, locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasTelegramAnnouncementManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'announcement' });
+      }
+      return handleAnnounceCommand(argsText, locale);
     case 'announcements':
-      return isAdmin ? handleAnnouncementsCommand(locale) : ui.adminOnly;
+    case 'announcehistory':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasTelegramAnnouncementManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'announcement' });
+      }
+      return handleAnnouncementsCommand(locale);
+    case 'scheduleannouncement':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasTelegramAnnouncementManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'announcement' });
+      }
+      return handleScheduleAnnouncementCommand(argsText, locale);
     case 'finance':
-      return isAdmin ? handleFinanceCommand(locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasFinanceManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'finance' });
+      }
+      return handleFinanceCommand(locale);
+    case 'sendfinance':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasFinanceManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'finance' });
+      }
+      return handleSendFinanceCommand(locale);
     case 'refunds':
-      return isAdmin ? handleRefundsCommand(locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasFinanceManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'finance' });
+      }
+      return handleRefundsCommand(locale);
+    case 'claimrefund':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasFinanceManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'finance' });
+      }
+      return handleClaimRefundCommand(argsText, locale, adminActor);
+    case 'reassignrefund':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasFinanceManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'finance' });
+      }
+      return handleReassignRefundCommand(argsText, locale, adminActor);
     case 'serverdown':
-      return isAdmin ? handleServerDownCommand(argsText, locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasOutageManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'outage' });
+      }
+      return handleServerDownCommand(argsText, locale);
     case 'maintenance':
-      return isAdmin ? handleMaintenanceCommand(argsText, locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasOutageManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'outage' });
+      }
+      return handleMaintenanceCommand(argsText, locale);
     case 'serverupdate':
-      return isAdmin ? handleServerUpdateCommand(argsText, locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasOutageManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'outage' });
+      }
+      return handleServerUpdateCommand(argsText, locale);
     case 'serverrecovered':
-      return isAdmin ? handleServerRecoveredCommand(argsText, locale) : ui.adminOnly;
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasOutageManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'outage' });
+      }
+      return handleServerRecoveredCommand(argsText, locale);
     case 'sysinfo':
       return isAdmin ? handleSysInfoCommand(chatId, config.botToken, locale) : ui.adminOnly;
     case 'backup':

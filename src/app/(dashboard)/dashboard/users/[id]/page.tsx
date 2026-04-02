@@ -292,7 +292,7 @@ export default function UserLedgerPage() {
                 className="ops-pill border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
               >
                 <Wallet className="mr-2 h-3.5 w-3.5" />
-                Customer ledger
+                Customer CRM
               </Badge>
             </div>
 
@@ -305,7 +305,7 @@ export default function UserLedgerPage() {
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{user.email}</h1>
             <p className="text-sm text-muted-foreground sm:text-base">
-              Review keys, Telegram orders, finance actions, refunds, credits, and support history for this customer from one place.
+              Review keys, Telegram orders, refunds, receipts, announcements, support requests, and server-change history for this customer from one place.
             </p>
           </div>
 
@@ -380,6 +380,18 @@ export default function UserLedgerPage() {
                     const latestFinanceAction = order.financeActions[0] || null;
                     const orderHref = withBasePath(
                       `/dashboard/notifications?orderCode=${encodeURIComponent(order.orderCode)}`,
+                    );
+                    const receiptHtmlUrl = withBasePath(
+                      `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=html`,
+                    );
+                    const receiptPdfUrl = withBasePath(
+                      `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=receipt&format=pdf`,
+                    );
+                    const refundHtmlUrl = withBasePath(
+                      `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=html`,
+                    );
+                    const refundPdfUrl = withBasePath(
+                      `/api/finance/receipt?orderCode=${encodeURIComponent(order.orderCode)}&type=refund&format=pdf`,
                     );
 
                     return (
@@ -489,6 +501,34 @@ export default function UserLedgerPage() {
                                 Open order
                               </Link>
                             </Button>
+                            {order.status === 'FULFILLED' ? (
+                              <>
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={receiptHtmlUrl} target="_blank">
+                                    Printable receipt
+                                  </Link>
+                                </Button>
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={receiptPdfUrl} target="_blank">
+                                    Download receipt PDF
+                                  </Link>
+                                </Button>
+                              </>
+                            ) : null}
+                            {order.financeStatus === 'REFUNDED' || order.refundRequestStatus === 'APPROVED' ? (
+                              <>
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={refundHtmlUrl} target="_blank">
+                                    Printable refund
+                                  </Link>
+                                </Button>
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={refundPdfUrl} target="_blank">
+                                    Download refund PDF
+                                  </Link>
+                                </Button>
+                              </>
+                            ) : null}
                             {order.financeStatus === 'OPEN' ? (
                               <Button
                                 size="sm"
@@ -742,7 +782,7 @@ export default function UserLedgerPage() {
                 Customer notifications
               </CardTitle>
               <CardDescription>
-                Announcement deliveries and key notices recently sent to this customer.
+                Announcement deliveries, receipts, and recent key or outage-related notices for this customer.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -762,6 +802,9 @@ export default function UserLedgerPage() {
                           {delivery.announcement.type} • {formatRelativeTime(delivery.sentAt || delivery.createdAt)}
                         </p>
                         <p className="mt-2 text-sm text-muted-foreground">{delivery.announcement.message}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Opens: {delivery.openCount || 0} • Clicks: {delivery.clickCount || 0}
+                        </p>
                         {(delivery.announcement.targetTag || delivery.announcement.targetServerName || delivery.announcement.targetCountryCode) ? (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {delivery.announcement.targetTag ? (
@@ -782,7 +825,7 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Key notices</p>
+                <p className="mb-2 text-sm font-medium">Key and outage notices</p>
                 {customerNotifications.keyNotices.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No key notification logs recorded yet.</p>
                 ) : (

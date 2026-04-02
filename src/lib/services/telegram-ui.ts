@@ -508,6 +508,8 @@ export function getTelegramUi(locale: SupportedLocale) {
     receiptFooter: isMyanmar
       ? 'Share page၊ client URL နှင့် setup details ကို နောက်မက်ဆေ့ခ်ျတွင် ဆက်လက် ပို့ပါမည်။'
       : 'The share page, client URL, and setup details will be delivered in the next message.',
+    receiptActionPrintable: isMyanmar ? 'Printable receipt' : 'Printable receipt',
+    receiptActionDownloadPdf: isMyanmar ? 'PDF ဒေါင်းလုဒ်' : 'Download PDF',
     orderSupportHint: isMyanmar
       ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
       : 'Before approval, you can cancel the current order at any time with /cancel.',

@@ -836,7 +836,7 @@ export default function UsersPage() {
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/dashboard/users/${order.customerLedgerId}`}>
                             <ExternalLink className="mr-2 h-4 w-4" />
-                            Open ledger
+                            Open CRM
                           </Link>
                         </Button>
                       ) : null}
@@ -1079,7 +1079,7 @@ export default function UsersPage() {
                               <Button asChild variant="outline" size="sm">
                                 <Link href={`/dashboard/users/${user.id}`}>
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Ledger
+                                  Open CRM
                                 </Link>
                               </Button>
                               <Button
@@ -1190,7 +1190,7 @@ export default function UsersPage() {
                   <Button asChild variant="outline" className="w-full rounded-full">
                     <Link href={`/dashboard/users/${user.id}`}>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Open ledger
+                      Open CRM
                     </Link>
                   </Button>
                 </div>

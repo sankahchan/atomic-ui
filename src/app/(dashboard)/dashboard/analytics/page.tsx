@@ -510,6 +510,36 @@ export default function AnalyticsPage() {
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     Export monthly revenue CSV
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={financeExportMutation.isPending}
+                    onClick={() =>
+                      financeExportMutation.mutate({
+                        kind: 'receipts',
+                        range: telegramSalesRange,
+                        months: 6,
+                      })
+                    }
+                  >
+                    {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export receipt register CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={financeExportMutation.isPending}
+                    onClick={() =>
+                      financeExportMutation.mutate({
+                        kind: 'refunds',
+                        range: telegramSalesRange,
+                        months: 6,
+                      })
+                    }
+                  >
+                    {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export refund register CSV
+                  </Button>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { adminProcedure, router } from '../trpc';
+import { hasNotificationManageScope, hasNotificationViewScope } from '@/lib/admin-scope';
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import {
@@ -224,8 +225,27 @@ function buildNotificationLogWhere(
   return where;
 }
 
+function assertNotificationViewScope(scope?: string | null) {
+  if (!hasNotificationViewScope(scope)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to view notification operations.',
+    });
+  }
+}
+
+function assertNotificationManageScope(scope?: string | null) {
+  if (!hasNotificationManageScope(scope)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have permission to manage notification operations.',
+    });
+  }
+}
+
 export const notificationsRouter = router({
-  listChannels: adminProcedure.query(async () => {
+  listChannels: adminProcedure.query(async ({ ctx }) => {
+    assertNotificationViewScope(ctx.user.adminScope);
     const channels = await db.notificationChannel.findMany({
       orderBy: { createdAt: 'desc' },
     });
@@ -234,10 +254,14 @@ export const notificationsRouter = router({
       .map((channel) => parseNotificationChannelRecord(channel))
       .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel));
   }),
-  queueStatus: adminProcedure.query(async () => getNotificationQueueStatus()),
+  queueStatus: adminProcedure.query(async ({ ctx }) => {
+    assertNotificationViewScope(ctx.user.adminScope);
+    return getNotificationQueueStatus();
+  }),
   saveChannel: adminProcedure
     .input(saveChannelSchema)
     .mutation(async ({ ctx, input }) => {
+      assertNotificationManageScope(ctx.user.adminScope);
       const existingChannel = input.id
         ? await db.notificationChannel.findUnique({
             where: { id: input.id },
@@ -308,6 +332,7 @@ export const notificationsRouter = router({
   deleteChannel: adminProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      assertNotificationManageScope(ctx.user.adminScope);
       const existingChannel = await db.notificationChannel.findUnique({
         where: { id: input.id },
       });
@@ -339,7 +364,8 @@ export const notificationsRouter = router({
     }),
   listLogs: adminProcedure
     .input(notificationLogFiltersSchema.optional())
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      assertNotificationViewScope(ctx.user.adminScope);
       const page = input?.page ?? 1;
       const pageSize = input?.pageSize ?? 15;
       const where = buildNotificationLogWhere(input);
@@ -441,6 +467,7 @@ export const notificationsRouter = router({
         .optional(),
     )
     .mutation(async ({ ctx, input }) => {
+      assertNotificationManageScope(ctx.user.adminScope);
       const result = await processNotificationQueue({
         limit: input?.limit ?? 25,
       });
@@ -457,7 +484,8 @@ export const notificationsRouter = router({
     }),
   testChannel: adminProcedure
     .input(z.object({ id: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      assertNotificationManageScope(ctx.user.adminScope);
       const channel = await db.notificationChannel.findUnique({
         where: { id: input.id },
       });
@@ -503,6 +531,7 @@ export const notificationsRouter = router({
   retryLog: adminProcedure
     .input(z.object({ logId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      assertNotificationManageScope(ctx.user.adminScope);
       const log = await db.notificationLog.findUnique({
         where: { id: input.logId },
       });
