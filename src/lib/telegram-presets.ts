@@ -33,6 +33,7 @@ export type TelegramAnnouncementPreset = {
   recurrenceType?: TelegramAnnouncementPresetRecurrenceType;
   filters?: {
     tag?: string | null;
+    segment?: string | null;
     serverId?: string | null;
     countryCode?: string | null;
   };
@@ -272,6 +273,7 @@ export function buildTelegramAnnouncementCommand(input: {
   cardStyle?: TelegramAnnouncementPresetCardStyle;
   filters?: {
     tag?: string | null;
+    segment?: string | null;
     serverId?: string | null;
     countryCode?: string | null;
   };
@@ -282,6 +284,9 @@ export function buildTelegramAnnouncementCommand(input: {
 
   if (input.filters?.tag) {
     parts.push(`tag=${input.filters.tag}`);
+  }
+  if (input.filters?.segment) {
+    parts.push(`segment=${input.filters.segment}`);
   }
   if (input.filters?.serverId) {
     parts.push(`server=${input.filters.serverId}`);

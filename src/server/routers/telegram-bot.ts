@@ -105,6 +105,10 @@ const telegramAnnouncementRecurrenceTypeSchema = z.enum([
 const telegramAnnouncementTemplateNameSchema = z.string().trim().min(2).max(80);
 const telegramAnnouncementTargetFiltersSchema = z.object({
   tag: z.string().trim().min(1).max(64).nullable().optional(),
+  segment: z
+    .enum(['TRIAL_TO_PAID', 'PREMIUM_UPSELL', 'RENEWAL_SOON', 'HIGH_VALUE'])
+    .nullable()
+    .optional(),
   serverId: z.string().trim().min(1).max(64).nullable().optional(),
   countryCode: z.string().trim().length(2).nullable().optional(),
 });
@@ -1918,6 +1922,7 @@ export const telegramBotRouter = router({
           templateId: template?.id || null,
           templateName: template?.name || input.templateName?.trim() || null,
           targetTag: input.filters?.tag?.trim().toLowerCase() || null,
+          targetSegment: input.filters?.segment || null,
           targetServerId: targetServer?.id || null,
           targetServerName: targetServer?.name || null,
           targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,
@@ -2552,6 +2557,7 @@ export const telegramBotRouter = router({
         audience: input.audience,
         type: input.type,
         targetTag: input.filters?.tag?.trim().toLowerCase() || null,
+        targetSegment: input.filters?.segment || null,
         targetServerId: targetServer?.id || null,
         targetServerName: targetServer?.name || null,
         targetCountryCode: (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() || null,

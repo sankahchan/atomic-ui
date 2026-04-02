@@ -115,6 +115,7 @@ export const usersRouter = router({
           email: true,
           role: true,
           adminScope: true,
+          marketingTags: true,
           telegramChatId: true,
           createdAt: true,
           accessKeys: {
@@ -370,6 +371,7 @@ export const usersRouter = router({
         },
         accessKeys: user.accessKeys,
         dynamicKeys: user.dynamicAccessKeys,
+        marketingTags: user.marketingTags || '',
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
@@ -428,7 +430,65 @@ export const usersRouter = router({
           canMessageCustomer: hasTelegramReviewManageScope(ctx.user.adminScope),
           canSendOutageUpdate: hasOutageManageScope(ctx.user.adminScope),
           canAddSupportNote: hasTelegramReviewManageScope(ctx.user.adminScope),
+          canManageCustomerTags: hasUserManageScope(ctx.user.adminScope),
         },
+      };
+    }),
+
+  updateMarketingTags: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        marketingTags: z.string().max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasUserManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update customer tags.',
+        });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found.',
+        });
+      }
+
+      const normalizedTags = input.marketingTags
+        .split(',')
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean)
+        .filter((tag, index, values) => values.indexOf(tag) === index)
+        .join(',');
+
+      await db.user.update({
+        where: { id: input.userId },
+        data: {
+          marketingTags: normalizedTags,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_MARKETING_TAGS_UPDATED',
+        entity: 'USER',
+        entityId: input.userId,
+        details: {
+          marketingTags: normalizedTags,
+        },
+      });
+
+      return {
+        marketingTags: normalizedTags,
       };
     }),
 

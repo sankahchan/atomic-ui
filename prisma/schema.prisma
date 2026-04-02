@@ -32,6 +32,7 @@ model User {
   role           String   @default("USER") // Valid: ADMIN, USER
   adminScope     String?  // Valid for ADMIN role: OWNER, ADMIN, FINANCE, SUPPORT
   telegramChatId String? // Telegram chat ID for bot notifications
+  marketingTags  String   @default("") // Comma-separated customer/promotion tags
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -468,6 +469,7 @@ model TelegramAnnouncement {
   templateId           String?
   templateName         String?
   targetTag            String?
+  targetSegment        String?
   targetServerId       String?
   targetServerName     String?
   targetCountryCode    String?
@@ -505,6 +507,7 @@ model TelegramAnnouncement {
   @@index([targetServerId, status, createdAt])
   @@index([targetCountryCode, status, createdAt])
   @@index([targetTag, status, createdAt])
+  @@index([targetSegment, status, createdAt])
   @@index([targetDirectChatId, status, createdAt])
   @@index([recurrenceParentId, createdAt])
 }
@@ -538,6 +541,7 @@ model TelegramAnnouncementTemplate {
   audience             String
   type                 String
   targetTag            String?
+  targetSegment        String?
   targetServerId       String?
   targetServerName     String?
   targetCountryCode    String?
@@ -555,6 +559,7 @@ model TelegramAnnouncementTemplate {
 
   @@index([createdAt])
   @@index([createdByUserId, createdAt])
+  @@index([targetSegment, createdAt])
 }
 
 model CustomerSupportNote {

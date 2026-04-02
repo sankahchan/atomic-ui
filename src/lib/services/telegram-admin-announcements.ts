@@ -98,6 +98,7 @@ type TelegramAdminAnnouncementParseSuccess = {
   pinToInbox: boolean;
   filters: {
     tag: string | null;
+    segment: string | null;
     serverId: string | null;
     countryCode: string | null;
   };
@@ -116,6 +117,7 @@ function isTelegramAdminAnnouncementParseSuccess(
 
 function formatTelegramAnnouncementTargetSummary(input: {
   tag?: string | null;
+  segment?: string | null;
   serverName?: string | null;
   countryCode?: string | null;
   directUserLabel?: string | null;
@@ -123,6 +125,7 @@ function formatTelegramAnnouncementTargetSummary(input: {
   const parts = [
     input.directUserLabel ? `user=${input.directUserLabel}` : null,
     input.tag ? `tag=${input.tag}` : null,
+    input.segment ? `segment=${input.segment}` : null,
     input.serverName ? `server=${input.serverName}` : null,
     input.countryCode ? `region=${input.countryCode}` : null,
   ].filter(Boolean);
@@ -223,8 +226,8 @@ async function parseTelegramAdminAnnouncementArgs(
 ): Promise<TelegramAdminAnnouncementParseResult> {
   const usage =
     locale === 'my'
-      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE'
-      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE';
+      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE'
+      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE';
   const parts = argsText
     .split('::')
     .map((part) => part.trim())
@@ -247,6 +250,7 @@ async function parseTelegramAdminAnnouncementArgs(
   let includeSupportButton = true;
   let pinToInbox = false;
   let tag: string | null = null;
+  let segment: string | null = null;
   let serverId: string | null = null;
   let countryCode: string | null = null;
   let serverName: string | null = null;
@@ -279,6 +283,15 @@ async function parseTelegramAdminAnnouncementArgs(
 
     if (key === 'tag') {
       tag = rawValue.toLowerCase();
+      continue;
+    }
+
+    if (key === 'segment') {
+      const normalizedSegment = rawValue.trim().toUpperCase();
+      if (!['TRIAL_TO_PAID', 'PREMIUM_UPSELL', 'RENEWAL_SOON', 'HIGH_VALUE'].includes(normalizedSegment)) {
+        return { error: usage } satisfies TelegramAdminAnnouncementParseResult;
+      }
+      segment = normalizedSegment;
       continue;
     }
 
@@ -334,6 +347,7 @@ async function parseTelegramAdminAnnouncementArgs(
     pinToInbox,
     filters: {
       tag,
+      segment,
       serverId,
       countryCode,
     },
@@ -365,6 +379,7 @@ export async function handleAnnouncementsCommand(locale: SupportedLocale) {
       `  ${formatTelegramAnnouncementTargetSummary({
         directUserLabel: announcement.targetDirectUserLabel,
         tag: announcement.targetTag,
+        segment: announcement.targetSegment,
         serverName: announcement.targetServerName,
         countryCode: announcement.targetCountryCode,
       })}`,
@@ -438,6 +453,7 @@ export async function handleScheduleAnnouncementCommand(
       recurrenceType: recurrenceType === 'NONE' ? null : recurrenceType,
       createdByEmail: 'telegram-admin',
       targetTag: parsed.filters.tag,
+      targetSegment: parsed.filters.segment,
       targetServerId: parsed.filters.serverId,
       targetServerName: parsed.serverName,
       targetCountryCode: parsed.filters.countryCode,
@@ -497,6 +513,7 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
       scheduledFor: new Date(),
       createdByEmail: 'telegram-admin',
       targetTag: parsed.filters.tag,
+      targetSegment: parsed.filters.segment,
       targetServerId: parsed.filters.serverId,
       targetServerName: parsed.serverName,
       targetCountryCode: parsed.filters.countryCode,

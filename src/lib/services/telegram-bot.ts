@@ -118,6 +118,7 @@ import {
   createTelegramPremiumSupportRequestRecord,
   findTelegramPremiumSupportRequestByIdForUser,
   handlePremiumCommand,
+  handlePremiumRegionStatusCommand,
   handlePremiumSupportFollowUpText,
   handlePremiumSupportStatusCommand,
   listTelegramPremiumSupportRequestsForUser,
@@ -221,6 +222,7 @@ import {
 import {
   runTelegramSalesDigestCycle,
   sendAccessKeyLifecycleTelegramNotification as sendAccessKeyLifecycleTelegramReminder,
+  sendAccessKeyTrialCouponCampaign,
   sendAccessKeyRenewalReminder,
   sendAccessKeyTrialExpiryReminder,
   sendDynamicKeyExpiryTelegramNotification,
@@ -2114,6 +2116,7 @@ export async function runTelegramSalesOrderCycle() {
       pendingReviewReminded: 0,
       rejectedFollowUpReminded: 0,
       retryReminded: 0,
+      trialCouponReminded: 0,
       trialReminded: 0,
       premiumRenewalReminded: 0,
       premiumExpired: 0,
@@ -2128,6 +2131,7 @@ export async function runTelegramSalesOrderCycle() {
   const reminderMs = Math.max(1, settings.paymentReminderHours) * 60 * 60 * 1000;
   const expiryMs = Math.max(settings.unpaidOrderExpiryHours, settings.paymentReminderHours) * 60 * 60 * 1000;
   const trialReminderLeadMs = 6 * 60 * 60 * 1000;
+  const trialCouponLeadMs = Math.max(1, settings.trialCouponLeadHours || 12) * 60 * 60 * 1000;
   const config = await getTelegramConfig();
   const supportLink = config ? await getTelegramSupportLink() : null;
   const orders = await db.telegramOrder.findMany({
@@ -2216,6 +2220,7 @@ export async function runTelegramSalesOrderCycle() {
   let pendingReviewReminded = 0;
   let rejectedFollowUpReminded = 0;
   let retryReminded = 0;
+  let trialCouponReminded = 0;
   let trialReminded = 0;
   let premiumRenewalReminded = 0;
   let premiumExpired = 0;
@@ -2558,6 +2563,58 @@ export async function runTelegramSalesOrderCycle() {
     tagMatchesFilter(candidate.tags || '', 'trial'),
   );
 
+  if (settings.trialCouponEnabled && eligibleTrialCandidates.length > 0) {
+    const couponCandidates = eligibleTrialCandidates.filter(
+      (candidate) =>
+        Boolean(candidate.expiresAt) &&
+        candidate.expiresAt!.getTime() - now.getTime() <= trialCouponLeadMs,
+    );
+
+    if (couponCandidates.length > 0) {
+      const existingCouponLogs = await db.notificationLog.findMany({
+        where: {
+          accessKeyId: { in: couponCandidates.map((candidate) => candidate.id) },
+          event: 'TELEGRAM_TRIAL_COUPON',
+          status: 'SUCCESS',
+        },
+        select: {
+          accessKeyId: true,
+        },
+      });
+
+      const couponSentAccessKeyIds = new Set(
+        existingCouponLogs
+          .map((entry) => entry.accessKeyId)
+          .filter((entry): entry is string => Boolean(entry)),
+      );
+
+      for (const key of couponCandidates) {
+        if (!key.expiresAt || couponSentAccessKeyIds.has(key.id)) {
+          continue;
+        }
+
+        const remainingMs = key.expiresAt.getTime() - now.getTime();
+        const hoursLeft = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)));
+
+        try {
+          const sent = await sendAccessKeyTrialCouponCampaign({
+            accessKeyId: key.id,
+            hoursLeft,
+            couponCode: settings.trialCouponCode,
+            discountLabel: settings.trialCouponDiscountLabel,
+            source: 'trial_coupon',
+          });
+
+          if (sent) {
+            trialCouponReminded += 1;
+          }
+        } catch (error) {
+          errors.push(`trial-coupon:${key.id}:${(error as Error).message}`);
+        }
+      }
+    }
+  }
+
   if (eligibleTrialCandidates.length > 0) {
     const existingReminderLogs = await db.notificationLog.findMany({
       where: {
@@ -2692,6 +2749,7 @@ export async function runTelegramSalesOrderCycle() {
     pendingReviewReminded,
     rejectedFollowUpReminded,
     retryReminded,
+    trialCouponReminded,
     trialReminded,
     premiumRenewalReminded,
     premiumExpired,
@@ -7628,6 +7686,17 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         getTelegramSupportLink,
         findLinkedDynamicAccessKeys,
         getDynamicKeyMessagingUrls,
+        sendTelegramMessage,
+      });
+    case 'premiumregion':
+      return handlePremiumRegionStatusCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        argsText,
+        getTelegramSupportLink,
+        findLinkedDynamicAccessKeys,
         sendTelegramMessage,
       });
     case 'supportstatus':

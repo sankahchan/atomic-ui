@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -846,9 +846,143 @@ function AlertsActivityCard({
   );
 }
 
+function formatDashboardMoney(amount: number | null | undefined, currency: string | null | undefined) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return '—';
+  }
+
+  const normalizedCurrency = (currency || 'MMK').trim().toUpperCase();
+  const formatted = new Intl.NumberFormat('en-US').format(amount);
+  return normalizedCurrency === 'MMK' ? `${formatted} Kyat` : `${formatted} ${normalizedCurrency}`;
+}
+
+function FinanceTrendCards({
+  locale,
+  loading,
+  dashboard,
+}: {
+  locale: string;
+  loading: boolean;
+  dashboard:
+    | {
+        months: Array<{
+          label: string;
+          renewalOrders: number;
+          churnSignals: number;
+          revenueByCurrency: Array<{ currency: string; amount: number }>;
+        }>;
+        summary: {
+          totalRevenueByCurrency: Record<string, number>;
+          totalRenewals: number;
+          totalChurnSignals: number;
+          latestMonthLabel: string | null;
+          monthOverMonth:
+            | {
+                revenueDelta: number;
+                renewalDelta: number;
+                churnDelta: number;
+              }
+            | null;
+        };
+      }
+    | null
+    | undefined;
+}) {
+  const isMyanmar = locale === 'my';
+  const totalRevenueEntries = useMemo(
+    () => Object.entries(dashboard?.summary.totalRevenueByCurrency || {}),
+    [dashboard],
+  );
+  const primaryRevenueEntry = totalRevenueEntries[0] || null;
+  const totalRevenueLabel =
+    totalRevenueEntries.length === 0
+      ? '—'
+      : totalRevenueEntries.length === 1
+        ? formatDashboardMoney(primaryRevenueEntry?.[1], primaryRevenueEntry?.[0])
+        : totalRevenueEntries
+            .slice(0, 2)
+            .map(([currency, amount]) => formatDashboardMoney(amount, currency))
+            .join(' · ');
+  const latestMonth = dashboard?.months[dashboard.months.length - 1] || null;
+  const latestMonthRevenue =
+    latestMonth?.revenueByCurrency?.[0]
+      ? formatDashboardMoney(latestMonth.revenueByCurrency[0].amount, latestMonth.revenueByCurrency[0].currency)
+      : '—';
+  const revenueDelta = dashboard?.summary.monthOverMonth?.revenueDelta ?? null;
+  const renewalDelta = dashboard?.summary.monthOverMonth?.renewalDelta ?? null;
+  const churnDelta = dashboard?.summary.monthOverMonth?.churnDelta ?? null;
+
+  const cards = [
+    {
+      title: isMyanmar ? 'Finance revenue' : 'Finance revenue',
+      value: loading ? '…' : totalRevenueLabel,
+      helper: loading
+        ? isMyanmar
+          ? 'ငွေစာရင်း အချက်အလက်ကို တင်နေသည်'
+          : 'Loading revenue trend'
+        : `${dashboard?.summary.latestMonthLabel || (isMyanmar ? 'နောက်ဆုံးလ' : 'Latest month')}: ${latestMonthRevenue}`,
+      delta:
+        revenueDelta == null
+          ? null
+          : `${revenueDelta >= 0 ? '+' : ''}${formatDashboardMoney(revenueDelta, primaryRevenueEntry?.[0] || 'MMK')}`,
+      tone:
+        revenueDelta == null ? 'neutral' : revenueDelta >= 0 ? 'cyan' : 'amber',
+    },
+    {
+      title: isMyanmar ? 'Renewals' : 'Renewals',
+      value: loading ? '…' : dashboard?.summary.totalRenewals || 0,
+      helper: isMyanmar ? 'လစဉ် renewal လုပ်ထားသော order များ' : 'Renewed paid orders in the selected window',
+      delta:
+        renewalDelta == null
+          ? null
+          : `${renewalDelta >= 0 ? '+' : ''}${renewalDelta} ${isMyanmar ? 'vs ယခင်လ' : 'vs previous month'}`,
+      tone:
+        renewalDelta == null ? 'neutral' : renewalDelta >= 0 ? 'emerald' : 'amber',
+    },
+    {
+      title: isMyanmar ? 'Churn signals' : 'Churn signals',
+      value: loading ? '…' : dashboard?.summary.totalChurnSignals || 0,
+      helper: isMyanmar ? 'Expired / depleted / disabled key signals' : 'Expired, depleted, or disabled key signals',
+      delta:
+        churnDelta == null
+          ? null
+          : `${churnDelta >= 0 ? '+' : ''}${churnDelta} ${isMyanmar ? 'vs ယခင်လ' : 'vs previous month'}`,
+      tone:
+        churnDelta == null ? 'neutral' : churnDelta <= 0 ? 'emerald' : 'amber',
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {cards.map((card) => (
+        <div
+          key={card.title}
+          className={cn(
+            'rounded-[1.45rem] border border-border/60 bg-background/70 p-4 shadow-sm dark:bg-white/[0.03]',
+            card.tone === 'cyan' && 'dark:border-cyan-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+            card.tone === 'emerald' && 'dark:border-emerald-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.14),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+            card.tone === 'amber' && 'dark:border-amber-400/20 dark:bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_55%),linear-gradient(180deg,rgba(5,12,24,0.92),rgba(4,10,22,0.82))]',
+          )}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {card.title}
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight">{card.value}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{card.helper}</p>
+          {card.delta ? (
+            <div className="mt-3 inline-flex rounded-full border border-border/60 bg-background/60 px-3 py-1 text-[11px] font-semibold text-muted-foreground dark:bg-white/[0.03]">
+              {card.delta}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [trafficDays, setTrafficDays] = useState(30);
-  const { t, mounted } = useLocale();
+  const { t, mounted, locale } = useLocale();
   const tf = (key: string, values: Record<string, string | number>) => {
     let text = t(key);
     for (const [name, value] of Object.entries(values)) {
@@ -861,6 +995,8 @@ export default function DashboardPage() {
   const { data: serverStatus, isLoading: serversLoading } = trpc.dashboard.serverStatus.useQuery();
   const { data: activity } = trpc.dashboard.recentActivity.useQuery();
   const { data: trafficHistory, isLoading: trafficLoading } = trpc.dashboard.trafficHistory.useQuery({ days: trafficDays });
+  const { data: monthlyBusinessDashboard, isLoading: financeLoading } =
+    trpc.analytics.monthlyBusinessDashboard.useQuery({ months: 6 });
 
   const totalTraffic = trafficHistory?.reduce((acc, curr) => acc + BigInt(curr.bytes), BigInt(0)) || BigInt(0);
   const totalServerKeys = serverStatus?.reduce((sum, item) => sum + item.keyCount, 0) || 0;
@@ -979,6 +1115,12 @@ export default function DashboardPage() {
                 href="/dashboard/notifications"
               />
             </div>
+
+            <FinanceTrendCards
+              locale={locale}
+              loading={financeLoading}
+              dashboard={monthlyBusinessDashboard}
+            />
 
             <div className="grid gap-4">
               <div className="ops-panel space-y-4">
@@ -1166,6 +1308,12 @@ export default function DashboardPage() {
                 href="/dashboard/notifications"
               />
             </div>
+
+            <FinanceTrendCards
+              locale={locale}
+              loading={financeLoading}
+              dashboard={monthlyBusinessDashboard}
+            />
 
             <TrafficOverviewPanel
               t={t}

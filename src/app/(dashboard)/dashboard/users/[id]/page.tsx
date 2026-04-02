@@ -96,6 +96,7 @@ export default function UserLedgerPage() {
   const [crmOutageMessage, setCrmOutageMessage] = useState('');
   const [crmShareTarget, setCrmShareTarget] = useState('');
   const [crmReceiptOrderId, setCrmReceiptOrderId] = useState('');
+  const [crmMarketingTags, setCrmMarketingTags] = useState('');
 
   const ledgerQuery = trpc.users.getLedger.useQuery(
     { id: userId },
@@ -168,6 +169,24 @@ export default function UserLedgerPage() {
     onError: (error) => {
       toast({
         title: 'Telegram message failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateMarketingTagsMutation = trpc.users.updateMarketingTags.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Customer tags saved',
+        description: 'Promotion tags/segments were updated for this customer.',
+      });
+      setCrmMarketingTags(result.marketingTags || '');
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Customer tags failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -463,6 +482,14 @@ export default function UserLedgerPage() {
       .slice(0, 24);
   }, [ledgerQuery.data]);
 
+  useEffect(() => {
+    if (!ledgerQuery.data) {
+      return;
+    }
+
+    setCrmMarketingTags(ledgerQuery.data.marketingTags || '');
+  }, [ledgerQuery.data]);
+
   if (ledgerQuery.isLoading) {
     return (
       <div className="space-y-6">
@@ -505,6 +532,8 @@ export default function UserLedgerPage() {
   type KeyNoticeItem = (typeof customerNotifications.keyNotices)[number];
   type ServerChangeRequestItem = (typeof serverChangeRequests)[number];
   type PremiumSupportRequestItem = (typeof premiumSupportRequests)[number];
+  type AccessKeyItem = (typeof accessKeys)[number];
+  type DynamicKeyItem = (typeof dynamicKeys)[number];
 
   return (
     <div className="space-y-6">
@@ -865,7 +894,7 @@ export default function UserLedgerPage() {
                     No standard keys assigned.
                   </p>
                 ) : (
-                  accessKeys.map((key) => (
+                  accessKeys.map((key: AccessKeyItem) => (
                     <div key={key.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -895,7 +924,7 @@ export default function UserLedgerPage() {
                     No premium dynamic keys assigned.
                   </p>
                 ) : (
-                  dynamicKeys.map((key) => (
+                  dynamicKeys.map((key: DynamicKeyItem) => (
                     <div key={key.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1103,12 +1132,12 @@ export default function UserLedgerPage() {
                         <SelectValue placeholder="Choose a key" />
                       </SelectTrigger>
                       <SelectContent>
-                        {accessKeys.map((key) => (
+                        {accessKeys.map((key: AccessKeyItem) => (
                           <SelectItem key={`ACCESS_KEY:${key.id}`} value={`ACCESS_KEY:${key.id}`}>
                             Standard • {key.name}
                           </SelectItem>
                         ))}
-                        {dynamicKeys.map((key) => (
+                        {dynamicKeys.map((key: DynamicKeyItem) => (
                           <SelectItem key={`DYNAMIC_KEY:${key.id}`} value={`DYNAMIC_KEY:${key.id}`}>
                             Premium • {key.name}
                           </SelectItem>
@@ -1277,6 +1306,50 @@ export default function UserLedgerPage() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {customerNotifications.summary.pinnedCount} pinned notices delivered
                   </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Customer promotion tags</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Use comma-separated tags like <code>vip</code>, <code>warm_lead</code>, or <code>renewal_focus</code>. These tags appear in Telegram announcement targeting.
+                    </p>
+                  </div>
+                  {!crmPermissions.canManageCustomerTags ? (
+                    <Badge variant="outline">Owner/Admin only</Badge>
+                  ) : null}
+                </div>
+                <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                  <Input
+                    value={crmMarketingTags}
+                    onChange={(event) => setCrmMarketingTags(event.target.value)}
+                    placeholder="vip, warm_lead, renewal_focus"
+                    disabled={!crmPermissions.canManageCustomerTags}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={
+                      !crmPermissions.canManageCustomerTags ||
+                      updateMarketingTagsMutation.isPending
+                    }
+                    onClick={() =>
+                      updateMarketingTagsMutation.mutate({
+                        userId,
+                        marketingTags: crmMarketingTags,
+                      })
+                    }
+                  >
+                    {updateMarketingTagsMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Save tags
+                  </Button>
                 </div>
               </div>
 

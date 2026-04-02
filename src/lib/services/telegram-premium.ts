@@ -11,6 +11,7 @@ import {
   formatTelegramPremiumFollowUpState,
   formatTelegramPremiumSupportStatusLabel,
   formatTelegramPremiumSupportTypeLabel,
+  getDynamicKeyRegionChoices,
   getFlagEmoji,
   getTelegramUi,
   normalizeTelegramPremiumSupportLookupCodes,
@@ -177,6 +178,32 @@ type PremiumMessagingKey = {
   lastResolvedServerId?: string | null;
   accessKeys: Array<{ server?: { id?: string; name: string; countryCode?: string | null } | null }>;
 };
+
+function getPremiumRegionHealthRank(status?: string | null) {
+  switch (status) {
+    case 'UP':
+      return 0;
+    case 'SLOW':
+      return 1;
+    case 'DOWN':
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function formatPremiumRegionHealthLabel(status: string | null | undefined, ui: ReturnType<typeof getTelegramUi>) {
+  switch (status) {
+    case 'UP':
+      return ui.premiumRegionUp;
+    case 'SLOW':
+      return ui.premiumRegionSlow;
+    case 'DOWN':
+      return ui.premiumRegionDown;
+    default:
+      return ui.premiumRegionUnknownStatus;
+  }
+}
 
 export async function createTelegramPremiumSupportRequestRecord(input: {
   chatId: number;
@@ -757,6 +784,184 @@ export async function handlePremiumSupportStatusCommand(input: {
   const message = lines.join('\n');
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: { inline_keyboard: inlineKeyboard.slice(0, 8) },
+  });
+
+  return sent ? null : message;
+}
+
+export async function handlePremiumRegionStatusCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  argsText: string;
+  getTelegramSupportLink: () => Promise<string | null>;
+  findLinkedDynamicAccessKeys: (
+    chatId: number,
+    telegramUserId: number,
+    includeDisabled?: boolean,
+  ) => Promise<
+    Array<
+      PremiumMessagingKey & {
+        status: string;
+      }
+    >
+  >;
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await input.getTelegramSupportLink();
+  const query = input.argsText.trim().toLowerCase();
+  const linkedKeys = (await input.findLinkedDynamicAccessKeys(
+    input.chatId,
+    input.telegramUserId,
+    true,
+  )).filter((key) => ['ACTIVE', 'PENDING', 'DISABLED'].includes(key.status));
+
+  const dynamicKeys = query
+    ? linkedKeys.filter((key) =>
+        [key.id, key.name, key.publicSlug || '']
+          .join(' ')
+          .toLowerCase()
+          .includes(query),
+      )
+    : linkedKeys;
+
+  if (dynamicKeys.length === 0) {
+    return ui.premiumRegionStatusEmpty;
+  }
+
+  const allServerIds = Array.from(
+    new Set(
+      dynamicKeys.flatMap((key) =>
+        key.accessKeys
+          .map((accessKey) => accessKey.server?.id || null)
+          .filter((serverId): serverId is string => Boolean(serverId)),
+      ),
+    ),
+  );
+
+  const healthChecks = allServerIds.length
+    ? await db.healthCheck.findMany({
+        where: {
+          serverId: { in: allServerIds },
+        },
+        select: {
+          serverId: true,
+          lastStatus: true,
+          lastLatencyMs: true,
+          lastCheckedAt: true,
+          latencyThresholdMs: true,
+          server: {
+            select: {
+              id: true,
+              name: true,
+              countryCode: true,
+            },
+          },
+        },
+      })
+    : [];
+  const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+
+  const lines = [ui.premiumRegionStatusTitle, '', ui.premiumRegionStatusHint, ''];
+
+  for (const key of dynamicKeys.slice(0, 4)) {
+    const preferredRegions = getDynamicKeyRegionChoices(key);
+    const attachedServers = key.accessKeys
+      .map((accessKey) => accessKey.server)
+      .filter((server): server is NonNullable<typeof server> => Boolean(server));
+    const currentServer = attachedServers.find((server) => server.id === key.lastResolvedServerId) || null;
+
+    lines.push(`• <b>${escapeHtml(key.name)}</b>`);
+    lines.push(
+      `  ${ui.premiumRegionPreferredLabel}: ${
+        preferredRegions.length
+          ? escapeHtml(preferredRegions.join(', '))
+          : escapeHtml(ui.premiumRegionNoAttached)
+      }`,
+    );
+    lines.push(
+      `  ${ui.premiumRegionCurrentRouteLabel}: ${
+        currentServer
+          ? `${escapeHtml(currentServer.name)} ${getFlagEmoji(currentServer.countryCode || '')}`
+          : escapeHtml(ui.premiumRegionUnknownStatus)
+      }`,
+    );
+    lines.push(`  ${ui.premiumRegionAttachedLabel}: ${attachedServers.length}`);
+
+    if (preferredRegions.length === 0) {
+      lines.push(`  ${escapeHtml(ui.premiumRegionNoAttached)}`, '');
+      continue;
+    }
+
+    for (const regionCode of preferredRegions.slice(0, 6)) {
+      const regionServers = attachedServers.filter(
+        (server) => server.countryCode?.toUpperCase() === regionCode.toUpperCase(),
+      );
+      const regionChecks = regionServers
+        .map((server) => (server.id ? healthByServerId.get(server.id) : null))
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+        .sort((left, right) => {
+          const rankDelta = getPremiumRegionHealthRank(left.lastStatus) - getPremiumRegionHealthRank(right.lastStatus);
+          if (rankDelta !== 0) {
+            return rankDelta;
+          }
+          return (left.lastLatencyMs ?? Number.MAX_SAFE_INTEGER) - (right.lastLatencyMs ?? Number.MAX_SAFE_INTEGER);
+        });
+      const primary = regionChecks[0] || null;
+      const markers: string[] = [];
+      if (currentServer?.countryCode?.toUpperCase() === regionCode.toUpperCase()) {
+        markers.push(ui.premiumRegionCurrentRouteLabel);
+      }
+      if (regionServers.length > 0) {
+        markers.push(`${regionServers.length} server${regionServers.length === 1 ? '' : 's'}`);
+      }
+
+      lines.push(
+        `  ${getFlagEmoji(regionCode)} <b>${escapeHtml(regionCode)}</b> · ${escapeHtml(
+          formatPremiumRegionHealthLabel(primary?.lastStatus, ui),
+        )}${
+          typeof primary?.lastLatencyMs === 'number'
+            ? ` · ${primary.lastLatencyMs}ms / ${primary.latencyThresholdMs}ms`
+            : ''
+        }`,
+      );
+      if (markers.length > 0) {
+        lines.push(`    ${escapeHtml(markers.join(' • '))}`);
+      }
+      if (primary?.server?.name) {
+        lines.push(`    ${escapeHtml(primary.server.name)}`);
+      }
+      if (primary?.lastCheckedAt) {
+        lines.push(
+          `    ${escapeHtml(formatTelegramDateTime(primary.lastCheckedAt, input.locale))}`,
+        );
+      }
+    }
+
+    lines.push('');
+  }
+
+  lines.push(ui.premiumRegionStatusFootnote);
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  const message = lines.join('\n');
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
   });
 
   return sent ? null : message;

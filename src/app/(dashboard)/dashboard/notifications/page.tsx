@@ -185,6 +185,7 @@ type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM
 type TelegramAnnouncementType = 'INFO' | 'ANNOUNCEMENT' | 'PROMO' | 'NEW_SERVER' | 'MAINTENANCE';
 type TelegramAnnouncementCardStyle = 'DEFAULT' | 'PROMO' | 'PREMIUM' | 'OPERATIONS';
 type TelegramAnnouncementRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY';
+type TelegramAnnouncementSegment = 'TRIAL_TO_PAID' | 'PREMIUM_UPSELL' | 'RENEWAL_SOON' | 'HIGH_VALUE';
 type TelegramAnnouncementPanelAudience = Exclude<TelegramAnnouncementAudience, 'DIRECT_USER'>;
 
 type TelegramAnnouncementTemplateRow = {
@@ -193,6 +194,7 @@ type TelegramAnnouncementTemplateRow = {
   audience: TelegramAnnouncementPanelAudience;
   type: TelegramAnnouncementType;
   targetTag?: string | null;
+  targetSegment?: string | null;
   targetServerId?: string | null;
   targetServerName?: string | null;
   targetCountryCode?: string | null;
@@ -213,6 +215,7 @@ type TelegramAnnouncementHistoryRow = {
   audience: TelegramAnnouncementAudience;
   type: TelegramAnnouncementType;
   targetTag?: string | null;
+  targetSegment?: string | null;
   targetServerId?: string | null;
   targetServerName?: string | null;
   targetCountryCode?: string | null;
@@ -249,6 +252,7 @@ type TelegramAnnouncementHistoryRow = {
 
 type TelegramAnnouncementTargetOptions = {
   tags: Array<{ value: string; count: number }>;
+  segments: Array<{ value: string; count: number }>;
   servers: Array<{ value: string; label: string; countryCode?: string | null; count: number }>;
   regions: Array<{ value: string; count: number }>;
 };
@@ -338,6 +342,7 @@ function buildTelegramAnnouncementTemplateCommand(input: {
   includeSupportButton: boolean;
   cardStyle?: TelegramAnnouncementCardStyle;
   targetTag?: string | null;
+  targetSegment?: string | null;
   targetServerId?: string | null;
   targetCountryCode?: string | null;
 }) {
@@ -350,6 +355,7 @@ function buildTelegramAnnouncementTemplateCommand(input: {
     cardStyle: input.cardStyle,
     filters: {
       tag: input.targetTag || null,
+      segment: input.targetSegment || null,
       serverId: input.targetServerId || null,
       countryCode: input.targetCountryCode || null,
     },
@@ -370,6 +376,24 @@ function getAnnouncementCardStyleLabel(
     case 'DEFAULT':
     default:
       return isMyanmar ? 'Default card' : 'Default card';
+  }
+}
+
+function getAnnouncementSegmentLabel(
+  segment: string,
+  isMyanmar: boolean,
+) {
+  switch (segment) {
+    case 'TRIAL_TO_PAID':
+      return isMyanmar ? 'Trial မှ paid သို့' : 'Trial to paid';
+    case 'PREMIUM_UPSELL':
+      return isMyanmar ? 'Premium upsell' : 'Premium upsell';
+    case 'RENEWAL_SOON':
+      return isMyanmar ? 'Renewal မကြာမီ' : 'Renewal soon';
+    case 'HIGH_VALUE':
+      return isMyanmar ? 'တန်ဖိုးမြင့် customer' : 'High-value customer';
+    default:
+      return segment;
   }
 }
 
@@ -490,6 +514,10 @@ type TelegramSalesSettingsForm = {
   dailySalesDigestEnabled: boolean;
   dailySalesDigestHour: number;
   dailySalesDigestMinute: number;
+  trialCouponEnabled: boolean;
+  trialCouponLeadHours: string;
+  trialCouponCode: string;
+  trialCouponDiscountLabel: string;
   paymentReminderHours: string;
   pendingReviewReminderHours: string;
   rejectedOrderReminderHours: string;
@@ -917,6 +945,10 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   dailySalesDigestEnabled: false,
   dailySalesDigestHour: 20,
   dailySalesDigestMinute: 0,
+  trialCouponEnabled: true,
+  trialCouponLeadHours: '12',
+  trialCouponCode: 'TRIAL500',
+  trialCouponDiscountLabel: '500 Kyat off your first paid order',
   paymentReminderHours: '3',
   pendingReviewReminderHours: '6',
   rejectedOrderReminderHours: '12',
@@ -1427,6 +1459,7 @@ function TelegramBotSetupCard() {
   const [announcementRecurrenceType, setAnnouncementRecurrenceType] =
     useState<TelegramAnnouncementRecurrenceType>('NONE');
   const [announcementTargetTag, setAnnouncementTargetTag] = useState('ALL');
+  const [announcementTargetSegment, setAnnouncementTargetSegment] = useState('ALL');
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
   const [announcementAnalyticsRange, setAnnouncementAnalyticsRange] = useState<'7d' | '30d' | '90d'>('30d');
@@ -1545,6 +1578,10 @@ function TelegramBotSetupCard() {
   const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery({
     filters: {
       tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+      segment:
+        announcementTargetSegment === 'ALL'
+          ? null
+          : (announcementTargetSegment as TelegramAnnouncementSegment),
       serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
       countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
     },
@@ -1677,6 +1714,10 @@ function TelegramBotSetupCard() {
   const hasToken = form.botToken.trim().length > 0;
   const announcementFilters = {
     tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+    segment:
+      announcementTargetSegment === 'ALL'
+        ? null
+        : (announcementTargetSegment as TelegramAnnouncementSegment),
     serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
     countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
   };
@@ -1686,6 +1727,7 @@ function TelegramBotSetupCard() {
   const announcementAnalytics = (announcementAnalyticsQuery.data ?? null) as TelegramAnnouncementAnalytics | null;
   const announcementTargetOptions = (announcementTargetOptionsQuery.data ?? {
     tags: [],
+    segments: [],
     servers: [],
     regions: [],
   }) as TelegramAnnouncementTargetOptions;
@@ -1705,6 +1747,7 @@ function TelegramBotSetupCard() {
           includeSupportButton: preset.includeSupportButton,
           recurrenceType: preset.recurrenceType || 'NONE',
           targetTag: preset.filters?.tag || null,
+          targetSegment: preset.filters?.segment || null,
           targetServerId: preset.filters?.serverId || null,
           targetCountryCode: preset.filters?.countryCode || null,
           command: buildTelegramAnnouncementTemplateCommand({
@@ -1715,6 +1758,7 @@ function TelegramBotSetupCard() {
             includeSupportButton: preset.includeSupportButton,
             cardStyle: preset.cardStyle,
             targetTag: preset.filters?.tag || null,
+            targetSegment: preset.filters?.segment || null,
             targetServerId: preset.filters?.serverId || null,
             targetCountryCode: preset.filters?.countryCode || null,
           }),
@@ -2139,7 +2183,8 @@ function TelegramBotSetupCard() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {telegramUi.userCommands}: <code>/start</code>, <code>/buy</code>, <code>/renew</code>,{' '}
                 <code>/orders</code>, <code>/order</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
-                <code>/usage</code>, <code>/inbox</code>, <code>/server</code>, <code>/support</code>,{' '}
+                <code>/usage</code>, <code>/inbox</code>, <code>/notifications</code>, <code>/premium</code>,{' '}
+                <code>/premiumregion</code>, <code>/supportstatus</code>, <code>/server</code>, <code>/support</code>,{' '}
                 <code>/language</code>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
@@ -2270,7 +2315,7 @@ function TelegramBotSetupCard() {
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-2">
                   <Label>{telegramUi.announcementTargetTag}</Label>
                   <Select value={announcementTargetTag} onValueChange={setAnnouncementTargetTag}>
@@ -2282,6 +2327,22 @@ function TelegramBotSetupCard() {
                       {announcementTargetOptions.tags.map((tag) => (
                         <SelectItem key={tag.value} value={tag.value}>
                           {tag.value} ({tag.count})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{isMyanmar ? 'Customer segment' : 'Customer segment'}</Label>
+                  <Select value={announcementTargetSegment} onValueChange={setAnnouncementTargetSegment}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                      {announcementTargetOptions.segments.map((segment) => (
+                        <SelectItem key={segment.value} value={segment.value}>
+                          {getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -2580,6 +2641,11 @@ function TelegramBotSetupCard() {
                             </Badge>
                           ) : null}
                           {preset.targetTag ? <Badge variant="secondary">Tag: {preset.targetTag}</Badge> : null}
+                          {preset.targetSegment ? (
+                            <Badge variant="secondary">
+                              Segment: {getAnnouncementSegmentLabel(preset.targetSegment, isMyanmar)}
+                            </Badge>
+                          ) : null}
                           {preset.targetCountryCode ? <Badge variant="secondary">Region: {preset.targetCountryCode}</Badge> : null}
                         </div>
                       </div>
@@ -2601,6 +2667,7 @@ function TelegramBotSetupCard() {
                             setAnnouncementAudience(preset.audience);
                             setAnnouncementType(preset.type);
                             setAnnouncementTargetTag(preset.targetTag || 'ALL');
+                            setAnnouncementTargetSegment(preset.targetSegment || 'ALL');
                             setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
                             setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
                             setAnnouncementTitle(preset.title);
@@ -2637,6 +2704,7 @@ function TelegramBotSetupCard() {
                               type: preset.type,
                               filters: {
                                 tag: preset.targetTag,
+                                segment: (preset.targetSegment as TelegramAnnouncementSegment | null) || null,
                                 serverId: preset.targetServerId,
                                 countryCode: preset.targetCountryCode,
                               },
@@ -2731,10 +2799,15 @@ function TelegramBotSetupCard() {
                             {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                           </div>
                         </div>
-                        {(template.targetTag || template.targetServerName || template.targetCountryCode) ? (
+                        {(template.targetTag || template.targetSegment || template.targetServerName || template.targetCountryCode) ? (
                           <div className="flex flex-wrap gap-2">
                             {template.targetTag ? (
                               <Badge variant="secondary">Tag: {template.targetTag}</Badge>
+                            ) : null}
+                            {template.targetSegment ? (
+                              <Badge variant="secondary">
+                                Segment: {getAnnouncementSegmentLabel(template.targetSegment, isMyanmar)}
+                              </Badge>
                             ) : null}
                             {template.targetServerName ? (
                               <Badge variant="secondary">Server: {template.targetServerName}</Badge>
@@ -2757,6 +2830,7 @@ function TelegramBotSetupCard() {
                               cardStyle: template.cardStyle,
                               includeSupportButton: template.includeSupportButton,
                               targetTag: template.targetTag,
+                              targetSegment: template.targetSegment,
                               targetServerId: template.targetServerId,
                               targetCountryCode: template.targetCountryCode,
                             })}
@@ -2771,6 +2845,7 @@ function TelegramBotSetupCard() {
                               setAnnouncementAudience(template.audience);
                               setAnnouncementType(template.type);
                               setAnnouncementTargetTag(template.targetTag || 'ALL');
+                              setAnnouncementTargetSegment(template.targetSegment || 'ALL');
                               setAnnouncementTargetServerId(template.targetServerId || 'ALL');
                               setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
                               setAnnouncementTitle(template.title);
@@ -2801,6 +2876,7 @@ function TelegramBotSetupCard() {
                                   cardStyle: template.cardStyle,
                                   includeSupportButton: template.includeSupportButton,
                                   targetTag: template.targetTag,
+                                  targetSegment: template.targetSegment,
                                   targetServerId: template.targetServerId,
                                   targetCountryCode: template.targetCountryCode,
                                 }),
@@ -3094,12 +3170,18 @@ function TelegramBotSetupCard() {
                           </div>
                         </div>
                         {(announcement.targetTag ||
+                          announcement.targetSegment ||
                           announcement.targetServerName ||
                           announcement.targetCountryCode ||
                           announcement.targetDirectUserLabel) ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {announcement.targetTag ? (
                               <Badge variant="secondary">Tag: {announcement.targetTag}</Badge>
+                            ) : null}
+                            {announcement.targetSegment ? (
+                              <Badge variant="secondary">
+                                Segment: {getAnnouncementSegmentLabel(announcement.targetSegment, isMyanmar)}
+                              </Badge>
                             ) : null}
                             {announcement.targetServerName ? (
                               <Badge variant="secondary">Server: {announcement.targetServerName}</Badge>
@@ -4373,6 +4455,16 @@ function TelegramSalesWorkflowCard() {
         settingsQuery.data.dailySalesDigestHour ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestHour,
       dailySalesDigestMinute:
         settingsQuery.data.dailySalesDigestMinute ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestMinute,
+      trialCouponEnabled:
+        settingsQuery.data.trialCouponEnabled ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponEnabled,
+      trialCouponLeadHours: String(
+        settingsQuery.data.trialCouponLeadHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponLeadHours,
+      ),
+      trialCouponCode:
+        settingsQuery.data.trialCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponCode,
+      trialCouponDiscountLabel:
+        settingsQuery.data.trialCouponDiscountLabel ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponDiscountLabel,
       paymentReminderHours: String(
         settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
       ),
@@ -4780,6 +4872,14 @@ function TelegramSalesWorkflowCard() {
       dailySalesDigestEnabled: form.dailySalesDigestEnabled,
       dailySalesDigestHour: form.dailySalesDigestHour,
       dailySalesDigestMinute: form.dailySalesDigestMinute,
+      trialCouponEnabled: form.trialCouponEnabled,
+      trialCouponLeadHours: (() => {
+        const parsed = Number.parseInt(form.trialCouponLeadHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+      })(),
+      trialCouponCode: form.trialCouponCode.trim() || 'TRIAL500',
+      trialCouponDiscountLabel:
+        form.trialCouponDiscountLabel.trim() || '500 Kyat off your first paid order',
       paymentReminderHours: (() => {
         const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
@@ -5300,6 +5400,69 @@ function TelegramSalesWorkflowCard() {
                     }))
                   }
                   placeholder="24"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {isMyanmar ? 'Trial-to-paid coupon campaign' : 'Trial-to-paid coupon campaign'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar
+                    ? 'Trial သက်တမ်းကုန်ရန်နီးသော user များထံ automatic coupon notice ပို့မည်။'
+                    : 'Automatically send a coupon-style upsell message to trial users who are close to expiry.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.trialCouponEnabled}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, trialCouponEnabled: checked }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Send before expiry (hours)' : 'Send before expiry (hours)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.trialCouponLeadHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      trialCouponLeadHours: event.target.value,
+                    }))
+                  }
+                  placeholder="12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Input
+                  value={form.trialCouponCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      trialCouponCode: event.target.value,
+                    }))
+                  }
+                  placeholder="TRIAL500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Input
+                  value={form.trialCouponDiscountLabel}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      trialCouponDiscountLabel: event.target.value,
+                    }))
+                  }
+                  placeholder="500 Kyat off your first paid order"
                 />
               </div>
             </div>

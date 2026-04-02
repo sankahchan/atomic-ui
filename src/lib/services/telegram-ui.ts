@@ -188,12 +188,30 @@ export function getTelegramUi(locale: SupportedLocale) {
       ? 'ချိတ်ထားသော premium dynamic key မရှိသေးပါ။ Premium plan ရယူပြီးနောက် /premium ကို ထပ်မံအသုံးပြုပါ။'
       : 'No premium dynamic key is linked yet. Use /premium again after you receive a premium plan.',
     premiumHubHint: isMyanmar
-      ? 'Preferred region ပြောင်းရန်၊ route issue တိုင်ကြားရန်၊ နှင့် request status ကို /supportstatus ဖြင့် စစ်နိုင်ပါသည်။'
-      : 'Use the buttons below to change preferred region, report route issues, and check request progress with /supportstatus.',
+      ? 'Preferred region ပြောင်းရန်၊ route issue တိုင်ကြားရန်၊ request status ကို /supportstatus ဖြင့် စစ်နိုင်သလို /premiumregion ဖြင့် region အခြေအနေကိုလည်း ကြည့်နိုင်ပါသည်။'
+      : 'Use the buttons below to change preferred region, report route issues, check request progress with /supportstatus, and view live region health with /premiumregion.',
     premiumStatusTitle: isMyanmar ? '🧾 <b>Premium support status</b>' : '🧾 <b>Premium support status</b>',
     premiumStatusEmpty: isMyanmar
       ? 'သင့်အတွက် premium support request မရှိသေးပါ။ Premium key အတွက် /premium သို့မဟုတ် /mykeys ကို အသုံးပြုပြီး request စတင်နိုင်ပါသည်။'
       : 'There are no premium support requests for you yet. Use /premium or /mykeys to start one for your premium key.',
+    premiumRegionStatusTitle: isMyanmar ? '🌍 <b>Premium region status</b>' : '🌍 <b>Premium region status</b>',
+    premiumRegionStatusEmpty: isMyanmar
+      ? 'ချိတ်ထားသော premium dynamic key မရှိသေးပါ။ Premium plan ရယူပြီးနောက် /premiumregion ကို အသုံးပြုပါ။'
+      : 'No premium dynamic key is linked yet. Use /premiumregion after you receive a premium plan.',
+    premiumRegionStatusHint: isMyanmar
+      ? 'Preferred region များ၊ လက်ရှိ route နှင့် region အလိုက် health ကို အောက်တွင် ကြည့်နိုင်ပါသည်။'
+      : 'Use this view to check preferred regions, the current route, and health by region.',
+    premiumRegionCurrentRouteLabel: isMyanmar ? 'Current route' : 'Current route',
+    premiumRegionPreferredLabel: isMyanmar ? 'Preferred regions' : 'Preferred regions',
+    premiumRegionAttachedLabel: isMyanmar ? 'Attached servers' : 'Attached servers',
+    premiumRegionNoAttached: isMyanmar ? 'ချိတ်ထားသော server မရှိသေးပါ' : 'No attached server yet',
+    premiumRegionUp: isMyanmar ? 'ကောင်းမွန်' : 'Healthy',
+    premiumRegionSlow: isMyanmar ? 'နှေးနေသည်' : 'Slow',
+    premiumRegionDown: isMyanmar ? 'မရနိုင်ပါ' : 'Down',
+    premiumRegionUnknownStatus: isMyanmar ? 'မသိရသေး' : 'Unknown',
+    premiumRegionStatusFootnote: isMyanmar
+      ? 'Region အခြေအနေကို နောက်ဆုံး health check အချက်အလက်အပေါ် အခြေခံပြီး ပြထားပါသည်။'
+      : 'Region status is based on the latest server health checks.',
     premiumStatusHint: isMyanmar
       ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new premium support request.',
@@ -287,8 +305,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /inbox - မကြာသေးမီက ပို့ထားသော notice များကို ကြည့်ရန်\n• /notifications - notice preference များကို ပြောင်းရန်\n• /premium - premium key support shortcut များကို ကြည့်ရန်\n• /supportstatus - premium support request အခြေအနေကို စစ်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /refund - view refund-eligible orders\n• /mykeys - view your linked keys\n• /inbox - view your recent notices\n• /notifications - manage your notice preferences\n• /premium - open premium support shortcuts\n• /supportstatus - check your premium support request status\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /inbox - မကြာသေးမီက ပို့ထားသော notice များကို ကြည့်ရန်\n• /notifications - notice preference များကို ပြောင်းရန်\n• /premium - premium key support shortcut များကို ကြည့်ရန်\n• /premiumregion - premium region အခြေအနေကို ကြည့်ရန်\n• /supportstatus - premium support request အခြေအနေကို စစ်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /refund - view refund-eligible orders\n• /mykeys - view your linked keys\n• /inbox - view your recent notices\n• /notifications - manage your notice preferences\n• /premium - open premium support shortcuts\n• /premiumregion - view premium region health\n• /supportstatus - check your premium support request status\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
@@ -493,6 +511,20 @@ export function getTelegramUi(locale: SupportedLocale) {
     trialExpiringUpsell: isMyanmar
       ? 'ဆက်လက် အသုံးပြုလိုပါက အောက်ပါ button ကိုနှိပ်ပြီး paid plan တစ်ခုကို ရွေးချယ်နိုင်ပါသည်။'
       : 'If you want to keep using the service, choose a paid plan with the button below before the trial expires.',
+    trialCouponTitle: isMyanmar
+      ? '🏷 <b>Trial မှ paid plan သို့ အထူး offer</b>'
+      : '🏷 <b>Trial to paid special offer</b>',
+    trialCouponBody: (hoursLeft: number) =>
+      isMyanmar
+        ? `Free trial မကုန်မီ ${hoursLeft} နာရီခန့် ကျန်ရှိနေသေးချိန်မှာ paid plan သို့ ပြောင်းရန် အထူး offer ပို့ပေးထားပါသည်။`
+        : `You still have about ${hoursLeft} hour(s) before the free trial ends, so here is a special offer to move to a paid plan.`,
+    trialCouponOffer: (code: string, label: string) =>
+      isMyanmar
+        ? `Coupon: <b>${code}</b>\nOffer: ${label}`
+        : `Coupon: <b>${code}</b>\nOffer: ${label}`,
+    trialCouponHint: isMyanmar
+      ? 'Paid plan ကို စတင်ရန် Buy new key ကို နှိပ်နိုင်ပါသည်။ Coupon ကို payment screenshot နှင့်အတူ mention လုပ်ပေးပါ။'
+      : 'Tap Buy new key to start a paid order. Mention the coupon code when you send your payment screenshot.',
     orderRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`

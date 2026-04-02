@@ -556,6 +556,7 @@ export function buildTelegramHelpMessage(input: {
 /inbox - announcement နှင့် key notice များကို ကြည့်မည်
 /notifications - notice preference များကို ပြောင်းမည်
 /premium - premium key support shortcut များကို ကြည့်မည်
+/premiumregion - premium region အခြေအနေကို ကြည့်မည်
 /supportstatus - premium support request အခြေအနေကို ကြည့်မည်
 /sub - Share page များကို လက်ခံမည်
 /support - သတ်မှတ်ထားသော support link ကို ကြည့်မည်
@@ -577,6 +578,7 @@ export function buildTelegramHelpMessage(input: {
 /inbox - Show your recent notices and announcements
 /notifications - Manage your notice preferences
 /premium - Open premium support shortcuts
+/premiumregion - View premium region health
 /supportstatus - Check your premium support request status
 /sub - Receive your share pages
 /support - Show the configured support link

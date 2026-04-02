@@ -24,6 +24,7 @@ export type TelegramNotificationPreferenceKey =
   | 'support';
 export type TelegramRetentionSource =
   | 'trial_expiry'
+  | 'trial_coupon'
   | 'trial_expired'
   | 'renewal_7d'
   | 'renewal_3d'
@@ -190,6 +191,7 @@ export function normalizeTelegramRetentionSource(
 ): TelegramRetentionSource | null {
   switch (value) {
     case 'trial_expiry':
+    case 'trial_coupon':
     case 'trial_expired':
     case 'renewal_7d':
     case 'renewal_3d':

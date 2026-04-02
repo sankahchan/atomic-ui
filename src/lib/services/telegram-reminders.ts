@@ -735,6 +735,132 @@ export async function sendAccessKeyTrialExpiryReminder(input: {
   };
 }
 
+export async function sendAccessKeyTrialCouponCampaign(input: {
+  accessKeyId: string;
+  hoursLeft: number;
+  couponCode: string;
+  discountLabel: string;
+  source?: string | null;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key || !key.telegramDeliveryEnabled) {
+    return null;
+  }
+
+  const destinationChatId = resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    return null;
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+  const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+  const sharePageUrl = key.publicSlug
+    ? buildShortShareUrl(key.publicSlug, { source: input.source || 'trial_coupon', lang: locale })
+    : buildSharePageUrl(token, { source: input.source || 'trial_coupon', lang: locale });
+
+  const lines = [
+    ui.trialCouponTitle,
+    '',
+    `🔑 ${escapeHtml(key.name)}`,
+    ui.trialCouponBody(Math.max(1, input.hoursLeft)),
+    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
+    ui.trialCouponHint,
+    '',
+    `${ui.sharePageLabel}: ${sharePageUrl}`,
+  ];
+
+  if (supportLink) {
+    lines.push(`${ui.supportLabel}: ${supportLink}`);
+  }
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: ui.orderActionBuyNewKey,
+        callback_data: buildTelegramOrderActionCallbackData('by', key.id, 'trial_coupon'),
+      },
+    ],
+    [
+      {
+        text: ui.openSharePage,
+        url: sharePageUrl,
+      },
+    ],
+  ];
+
+  if (supportLink) {
+    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+
+  if (!sent) {
+    await db.notificationLog.create({
+      data: {
+        event: 'TELEGRAM_TRIAL_COUPON',
+        message: `Failed to send trial coupon campaign (${input.hoursLeft}h left)`,
+        status: 'FAILED',
+        accessKeyId: key.id,
+      },
+    });
+    return null;
+  }
+
+  await recordSubscriptionPageEvent({
+    accessKeyId: key.id,
+    eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+    source: input.source || 'trial_coupon',
+    metadata: {
+      destinationChatId,
+      notificationType: 'TRIAL_COUPON',
+      hoursLeft: input.hoursLeft,
+      couponCode: input.couponCode,
+      discountLabel: input.discountLabel,
+    },
+  });
+
+  await db.notificationLog.create({
+    data: {
+      event: 'TELEGRAM_TRIAL_COUPON',
+      message: `Sent trial coupon campaign (${input.hoursLeft}h left)`,
+      status: 'SUCCESS',
+      accessKeyId: key.id,
+    },
+  });
+
+  await writeAuditLog({
+    action: 'ACCESS_KEY_TRIAL_COUPON_SENT',
+    entity: 'ACCESS_KEY',
+    entityId: key.id,
+    details: {
+      destinationChatId,
+      sharePageUrl,
+      hoursLeft: input.hoursLeft,
+      couponCode: input.couponCode,
+      discountLabel: input.discountLabel,
+    },
+  });
+
+  return {
+    destinationChatId,
+    sharePageUrl,
+  };
+}
+
 export async function sendTelegramDigestToAdmins(input?: {
   now?: Date;
 }) {

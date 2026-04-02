@@ -1224,6 +1224,7 @@ export const analyticsRouter = router({
 
         switch (order.retentionSource) {
           case 'trial_expiry':
+          case 'trial_coupon':
           case 'trial_expired':
             retention.trialUpsellOrders += 1;
             if (order.status === 'FULFILLED') {
