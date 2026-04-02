@@ -8,6 +8,8 @@ import { generateRandomString } from '@/lib/utils';
 const DEFAULT_OUTAGE_GRACE_HOURS = 3;
 const prisma = db as any;
 
+type ServerOutageCause = 'HEALTH_DOWN' | 'HEALTH_SLOW' | 'MANUAL_OUTAGE';
+
 type AffectedKeySnapshot = {
   id: string;
   name: string;
@@ -244,7 +246,7 @@ async function linkPremiumSupportRequestsToIncident(input: {
 
 async function upsertOutageState(input: {
   serverId: string;
-  cause: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
+  cause: ServerOutageCause;
   gracePeriodHours?: number;
   affectedKeys?: AffectedKeySnapshot[];
 }) {
@@ -289,7 +291,12 @@ async function upsertOutageState(input: {
     await appendOutageIncidentUpdate({
       incidentId: incident.id,
       updateType: 'DETECTED',
-      title: input.cause === 'MANUAL_OUTAGE' ? 'Manual outage started' : 'Outage detected',
+      title:
+        input.cause === 'MANUAL_OUTAGE'
+          ? 'Manual outage started'
+          : input.cause === 'HEALTH_SLOW'
+            ? 'Degraded performance detected'
+            : 'Outage detected',
       message: `${affectedKeys.length} active or pending key(s) are affected.`,
     });
 
@@ -371,7 +378,12 @@ async function upsertOutageState(input: {
     await appendOutageIncidentUpdate({
       incidentId,
       updateType: 'DETECTED',
-      title: input.cause === 'MANUAL_OUTAGE' ? 'Manual outage started' : 'Outage detected',
+      title:
+        input.cause === 'MANUAL_OUTAGE'
+          ? 'Manual outage started'
+          : input.cause === 'HEALTH_SLOW'
+            ? 'Degraded performance detected'
+            : 'Outage detected',
       message: `${affectedKeys.length} active or pending key(s) are affected.`,
     });
   } else {
@@ -426,7 +438,7 @@ async function upsertOutageState(input: {
 
 export async function markServerOutageDetected(input: {
   serverId: string;
-  cause?: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
+  cause?: ServerOutageCause;
   gracePeriodHours?: number;
 }) {
   return upsertOutageState({
@@ -472,7 +484,7 @@ export async function markServerOutageRecovered(serverId: string) {
 }
 
 function buildOutageAlertMessage(input: {
-  cause: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
+  cause: ServerOutageCause;
   serverName: string;
   keyNames: string[];
   gracePeriodHours: number;
@@ -491,6 +503,17 @@ function buildOutageAlertMessage(input: {
         'You do not need to buy a new key right now.',
         'We will send you another message once the replacement or recovery is ready.',
       ]
+    : input.cause === 'HEALTH_SLOW'
+      ? [
+          '⚠️ <b>Server performance issue</b>',
+          '',
+          `The server currently serving your VPN access is responding too slowly: <b>${input.serverName}</b>.`,
+          `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a better route or replacement.`,
+          '',
+          `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
+          'You do not need to buy a new key right now.',
+          'We will send you another message once the replacement is ready.',
+        ]
     : [
         '🚨 <b>Server issue notice</b>',
         '',
@@ -533,7 +556,7 @@ function buildOutageRecoveryMessage(input: {
 }
 
 function buildOutageFollowUpMessage(input: {
-  cause: 'HEALTH_DOWN' | 'MANUAL_OUTAGE';
+  cause: ServerOutageCause;
   serverName: string;
   message: string;
   supportLink?: string | null;
@@ -554,6 +577,13 @@ function buildOutageFollowUpMessage(input: {
           `We are still working on the planned maintenance affecting <b>${input.serverName}</b>.`,
           input.message,
         ]
+      : input.cause === 'HEALTH_SLOW'
+        ? [
+            '⚠️ <b>Performance issue update</b>',
+            '',
+            `We are still working on the degraded performance affecting <b>${input.serverName}</b>.`,
+            input.message,
+          ]
       : [
           '🛠️ <b>Maintenance update</b>',
           '',
@@ -607,7 +637,8 @@ export async function runServerOutageCycle() {
       state.cause === 'MANUAL_OUTAGE' ||
       state.server.lifecycleMode === 'MAINTENANCE' ||
       state.server.isActive === false ||
-      state.server.healthCheck?.lastStatus === 'DOWN';
+      state.server.healthCheck?.lastStatus === 'DOWN' ||
+      (state.cause === 'HEALTH_SLOW' && state.server.healthCheck?.lastStatus === 'SLOW');
 
     if (!stillImpacted) {
       await prisma.serverOutageState.update({
@@ -675,7 +706,12 @@ export async function runServerOutageCycle() {
         config.botToken,
         chatId,
         buildOutageAlertMessage({
-          cause: state.cause === 'MANUAL_OUTAGE' ? 'MANUAL_OUTAGE' : 'HEALTH_DOWN',
+          cause:
+            state.cause === 'MANUAL_OUTAGE'
+              ? 'MANUAL_OUTAGE'
+              : state.cause === 'HEALTH_SLOW'
+                ? 'HEALTH_SLOW'
+                : 'HEALTH_DOWN',
           serverName: state.server.name,
           keyNames,
           gracePeriodHours: state.gracePeriodHours,
@@ -721,6 +757,8 @@ export async function executeServerOutageReplacement(input: {
   targetServerId: string;
   gracePeriodHours?: number;
   notifyUsers?: boolean;
+  cause?: ServerOutageCause;
+  lifecycleMode?: 'DRAINING' | 'MAINTENANCE';
 }) {
   const sourceServer = await db.server.findUnique({
     where: { id: input.sourceServerId },
@@ -753,7 +791,7 @@ export async function executeServerOutageReplacement(input: {
 
   await upsertOutageState({
     serverId: sourceServer.id,
-    cause: 'MANUAL_OUTAGE',
+    cause: input.cause ?? 'MANUAL_OUTAGE',
     gracePeriodHours: input.gracePeriodHours,
     affectedKeys,
   });
@@ -761,7 +799,7 @@ export async function executeServerOutageReplacement(input: {
   await db.server.update({
     where: { id: sourceServer.id },
     data: {
-      lifecycleMode: 'MAINTENANCE',
+      lifecycleMode: input.lifecycleMode ?? 'MAINTENANCE',
       lifecycleChangedAt: new Date(),
     },
   });
@@ -950,6 +988,101 @@ export async function executeServerOutageReplacement(input: {
   };
 }
 
+export async function recommendFallbackTargetForServer(sourceServerId: string) {
+  const [sourceServer, { getServerLoadStats }] = await Promise.all([
+    db.server.findUnique({
+      where: { id: sourceServerId },
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+      },
+    }),
+    import('@/lib/services/load-balancer'),
+  ]);
+
+  if (!sourceServer) {
+    throw new Error('Source server not found.');
+  }
+
+  const [loadStats, healthRows] = await Promise.all([
+    getServerLoadStats(),
+    db.server.findMany({
+      where: { id: { not: sourceServerId } },
+      select: {
+        id: true,
+        countryCode: true,
+        healthCheck: {
+          select: {
+            lastStatus: true,
+            lastLatencyMs: true,
+            latencyThresholdMs: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const healthByServerId = new Map(healthRows.map((row) => [row.id, row]));
+  const candidates = loadStats
+    .filter((candidate) => candidate.serverId !== sourceServerId && candidate.isAssignable)
+    .map((candidate) => {
+      const healthRow = healthByServerId.get(candidate.serverId);
+      const healthStatus = healthRow?.healthCheck?.lastStatus ?? 'UNKNOWN';
+      const sameCountry =
+        Boolean(sourceServer.countryCode) &&
+        Boolean(healthRow?.countryCode) &&
+        sourceServer.countryCode === healthRow?.countryCode;
+      const healthRank =
+        healthStatus === 'UP' ? 0 : healthStatus === 'UNKNOWN' ? 1 : healthStatus === 'SLOW' ? 2 : 3;
+      const reasons = [
+        sameCountry ? `same region as ${sourceServer.name}` : 'best healthy fallback outside the current region',
+        healthStatus === 'UP'
+          ? 'health status is UP'
+          : healthStatus === 'SLOW'
+            ? 'health status is SLOW, but still reachable'
+            : healthStatus === 'DOWN'
+              ? 'health status is DOWN'
+              : 'health status is UNKNOWN',
+        candidate.capacityPercent !== null
+          ? `${candidate.capacityPercent}% capacity used`
+          : 'no max-key cap configured',
+        `${candidate.activeKeyCount} active keys`,
+        `load score ${candidate.loadScore}`,
+      ];
+
+      return {
+        ...candidate,
+        healthStatus,
+        healthLatencyMs: healthRow?.healthCheck?.lastLatencyMs ?? null,
+        healthThresholdMs: healthRow?.healthCheck?.latencyThresholdMs ?? null,
+        sameCountry,
+        healthRank,
+        reasons,
+      };
+    })
+    .filter((candidate) => candidate.healthStatus !== 'DOWN')
+    .sort((left, right) => {
+      if (left.sameCountry !== right.sameCountry) {
+        return left.sameCountry ? -1 : 1;
+      }
+      if (left.healthRank !== right.healthRank) {
+        return left.healthRank - right.healthRank;
+      }
+      if (left.loadScore !== right.loadScore) {
+        return left.loadScore - right.loadScore;
+      }
+      return left.serverName.localeCompare(right.serverName);
+    });
+
+  const selected = candidates[0] || null;
+  return {
+    sourceServer,
+    selected,
+    candidates,
+  };
+}
+
 export async function getServerOutagePreview(input: {
   sourceServerId: string;
   targetServerId: string;
@@ -1049,7 +1182,12 @@ export async function sendServerOutageFollowUp(input: {
   );
   const supportLink = await getSupportLink();
   const message = buildOutageFollowUpMessage({
-    cause: state.cause === 'MANUAL_OUTAGE' ? 'MANUAL_OUTAGE' : 'HEALTH_DOWN',
+    cause:
+      state.cause === 'MANUAL_OUTAGE'
+        ? 'MANUAL_OUTAGE'
+        : state.cause === 'HEALTH_SLOW'
+          ? 'HEALTH_SLOW'
+          : 'HEALTH_DOWN',
     serverName: state.server.name,
     message: input.message.trim(),
     supportLink,

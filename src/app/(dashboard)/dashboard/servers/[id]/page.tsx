@@ -260,6 +260,15 @@ export default function ServerDetailPage() {
   const [manualNoticeMessage, setManualNoticeMessage] = useState(
     'We found an issue on this server. Please wait while we stabilize the route. We will update you again if a replacement is needed.',
   );
+  const [latencyThresholdMs, setLatencyThresholdMs] = useState('500');
+  const [slowAutoDrainEnabled, setSlowAutoDrainEnabled] = useState(true);
+  const [slowAutoDrainThreshold, setSlowAutoDrainThreshold] = useState('3');
+  const [slowAutoMigrateEnabled, setSlowAutoMigrateEnabled] = useState(false);
+  const [slowAutoMigrateThreshold, setSlowAutoMigrateThreshold] = useState('6');
+  const [slowAutoMigrateGraceHours, setSlowAutoMigrateGraceHours] = useState('2');
+  const [slowUserNotifyEnabled, setSlowUserNotifyEnabled] = useState(true);
+  const [slowUserNotifyThreshold, setSlowUserNotifyThreshold] = useState('3');
+  const [slowUserNotifyCooldownMins, setSlowUserNotifyCooldownMins] = useState('180');
 
   // Fetch server details
   const { data: server, isLoading, refetch } = trpc.servers.getById.useQuery(
@@ -292,6 +301,10 @@ export default function ServerDetailPage() {
   });
   const recommendedAssignmentTargetQuery = trpc.servers.recommendAssignmentTarget.useQuery(
     undefined,
+    { enabled: !!serverId },
+  );
+  const recommendedFallbackTargetQuery = trpc.servers.recommendFallbackTarget.useQuery(
+    { sourceServerId: serverId },
     { enabled: !!serverId },
   );
 
@@ -398,6 +411,24 @@ export default function ServerDetailPage() {
       });
     },
   });
+  const slowPolicyMutation = trpc.servers.updateSlowPolicy.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Slow policy updated',
+        description: 'Per-server degradation safeguards were saved.',
+      });
+      refetch();
+      healthDiagnosticsQuery.refetch();
+      recommendedFallbackTargetQuery.refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to update slow policy',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   useEffect(() => {
     if (!server) {
@@ -406,6 +437,15 @@ export default function ServerDetailPage() {
 
     setLifecycleMode(server.lifecycleMode || 'ACTIVE');
     setLifecycleNote(server.lifecycleNote || '');
+    setLatencyThresholdMs(String(server.healthCheck?.latencyThresholdMs ?? 500));
+    setSlowAutoDrainEnabled(server.healthCheck?.slowAutoDrainEnabled ?? true);
+    setSlowAutoDrainThreshold(String(server.healthCheck?.slowAutoDrainThreshold ?? 3));
+    setSlowAutoMigrateEnabled(server.healthCheck?.slowAutoMigrateEnabled ?? false);
+    setSlowAutoMigrateThreshold(String(server.healthCheck?.slowAutoMigrateThreshold ?? 6));
+    setSlowAutoMigrateGraceHours(String(server.healthCheck?.slowAutoMigrateGraceHours ?? 2));
+    setSlowUserNotifyEnabled(server.healthCheck?.slowUserNotifyEnabled ?? true);
+    setSlowUserNotifyThreshold(String(server.healthCheck?.slowUserNotifyThreshold ?? 3));
+    setSlowUserNotifyCooldownMins(String(server.healthCheck?.slowUserNotifyCooldownMins ?? 180));
   }, [server]);
 
   const loadStatsByServerId = useMemo(() => {
@@ -438,7 +478,7 @@ export default function ServerDetailPage() {
       return;
     }
 
-    const recommended = recommendedAssignmentTargetQuery.data;
+    const recommended = recommendedFallbackTargetQuery.data?.selected || recommendedAssignmentTargetQuery.data;
     if (!recommended?.serverId) {
       return;
     }
@@ -446,7 +486,7 @@ export default function ServerDetailPage() {
     if (availableOutageTargets.some((candidate) => candidate.id === recommended.serverId)) {
       setOutageTargetServerId(recommended.serverId);
     }
-  }, [availableOutageTargets, outageTargetServerId, recommendedAssignmentTargetQuery.data]);
+  }, [availableOutageTargets, outageTargetServerId, recommendedAssignmentTargetQuery.data, recommendedFallbackTargetQuery.data]);
 
   const currentOutageState = (server?.outageState as any) || null;
   const healthDiagnostics = healthDiagnosticsQuery.data;
@@ -468,6 +508,7 @@ export default function ServerDetailPage() {
   const activeOutageTotal = activeOutageIncident?.initialAffectedKeyCount ?? currentOutageState?.initialAffectedKeyCount ?? 0;
   const activeOutageMigrated = activeOutageIncident?.migratedKeyCount ?? currentOutageState?.migratedKeyCount ?? 0;
   const activeOutageFailed = activeOutageIncident?.failedKeyCount ?? currentOutageState?.failedKeyCount ?? 0;
+  const recommendedFallbackTarget = recommendedFallbackTargetQuery.data?.selected || healthDiagnostics?.current?.fallbackTarget || null;
   const activeOutageProgress = activeOutageTotal > 0 ? Math.round((activeOutageMigrated / activeOutageTotal) * 100) : 0;
   const currentServerLoad = loadStatsByServerId.get(serverId);
   const recommendedAssignmentTarget = recommendedAssignmentTargetQuery.data || null;
@@ -483,6 +524,21 @@ export default function ServerDetailPage() {
       id: serverId,
       lifecycleMode: lifecycleMode as 'ACTIVE' | 'DRAINING' | 'MAINTENANCE',
       lifecycleNote: lifecycleNote.trim() || undefined,
+    });
+  };
+
+  const handleSaveSlowPolicy = () => {
+    slowPolicyMutation.mutate({
+      serverId,
+      latencyThresholdMs: Number(latencyThresholdMs) || 500,
+      slowAutoDrainEnabled,
+      slowAutoDrainThreshold: Number(slowAutoDrainThreshold) || 3,
+      slowAutoMigrateEnabled,
+      slowAutoMigrateThreshold: Number(slowAutoMigrateThreshold) || 6,
+      slowAutoMigrateGraceHours: Number(slowAutoMigrateGraceHours) || 2,
+      slowUserNotifyEnabled,
+      slowUserNotifyThreshold: Number(slowUserNotifyThreshold) || 3,
+      slowUserNotifyCooldownMins: Number(slowUserNotifyCooldownMins) || 180,
     });
   };
 
@@ -910,7 +966,7 @@ export default function ServerDetailPage() {
                 </div>
               ) : healthDiagnostics ? (
                 <>
-                  <div className="grid gap-3 md:grid-cols-4">
+                  <div className="grid gap-3 md:grid-cols-5">
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current reason</p>
                       <p className="mt-1 text-sm font-medium">{healthDiagnostics.current.reason}</p>
@@ -938,6 +994,17 @@ export default function ServerDetailPage() {
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-migrate</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {healthDiagnostics.current.autoMigrateEnabled
+                          ? `After ${healthDiagnostics.current.autoMigrateThreshold} slow checks`
+                          : 'Disabled'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Wait window {healthDiagnostics.current.autoMigrateGraceHours} hour(s)
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">User notice</p>
                       <p className="mt-1 text-sm font-medium">
                         {healthDiagnostics.current.slowUserAlertSentAt
@@ -951,6 +1018,30 @@ export default function ServerDetailPage() {
                       </p>
                     </div>
                   </div>
+
+                  {healthDiagnostics.current.fallbackTarget ? (
+                    <div className="rounded-[1rem] border border-cyan-500/15 bg-cyan-500/5 px-4 py-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-foreground">
+                            Smart fallback: {healthDiagnostics.current.fallbackTarget.serverName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {healthDiagnostics.current.fallbackTarget.healthStatus || 'UNKNOWN'} health
+                            {typeof healthDiagnostics.current.fallbackTarget.healthLatencyMs === 'number'
+                              ? ` · ${healthDiagnostics.current.fallbackTarget.healthLatencyMs}ms`
+                              : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">load {healthDiagnostics.current.fallbackTarget.loadScore}</Badge>
+                          {healthDiagnostics.current.fallbackTarget.sameCountry ? (
+                            <Badge variant="outline">same region</Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {healthDiagnostics.current.status === 'SLOW' ? (
                     <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
@@ -1111,6 +1202,152 @@ export default function ServerDetailPage() {
               <Button onClick={handleSaveLifecycle} disabled={lifecycleMutation.isPending}>
                 {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save Mode
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-amber-500" />
+                Slow health policy
+              </CardTitle>
+              <CardDescription>
+                Set the per-server threshold for slow health, then decide when to drain, notify users, or auto-migrate keys to the best fallback target.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="latencyThresholdMs">Latency threshold (ms)</Label>
+                  <Input
+                    id="latencyThresholdMs"
+                    type="number"
+                    min={50}
+                    max={5000}
+                    value={latencyThresholdMs}
+                    onChange={(event) => setLatencyThresholdMs(event.target.value)}
+                  />
+                </div>
+                <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                  <p className="font-medium text-foreground">Current fallback</p>
+                  <p className="mt-1">
+                    {recommendedFallbackTarget
+                      ? `${recommendedFallbackTarget.serverName} · load ${recommendedFallbackTarget.loadScore}`
+                      : 'No healthy fallback target is available right now.'}
+                  </p>
+                  {recommendedFallbackTarget?.reasons?.length ? (
+                    <p className="mt-2 text-xs">
+                      {recommendedFallbackTarget.reasons[0]}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-3">
+                <label className="rounded-[1rem] border border-border/60 bg-background/35 p-3 text-sm dark:bg-white/[0.03]">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={slowAutoDrainEnabled}
+                      onChange={(event) => setSlowAutoDrainEnabled(event.target.checked)}
+                      className="mt-1 rounded border-gray-300"
+                    />
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">Auto-drain</p>
+                      <p className="text-muted-foreground">
+                        Stop new assignments when this server stays slow.
+                      </p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={slowAutoDrainThreshold}
+                        onChange={(event) => setSlowAutoDrainThreshold(event.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">Consecutive slow checks before drain.</p>
+                    </div>
+                  </div>
+                </label>
+
+                <label className="rounded-[1rem] border border-border/60 bg-background/35 p-3 text-sm dark:bg-white/[0.03]">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={slowAutoMigrateEnabled}
+                      onChange={(event) => setSlowAutoMigrateEnabled(event.target.checked)}
+                      className="mt-1 rounded border-gray-300"
+                    />
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">Auto-migrate</p>
+                      <p className="text-muted-foreground">
+                        Move affected keys to the smart fallback target after sustained slow health.
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={48}
+                          value={slowAutoMigrateThreshold}
+                          onChange={(event) => setSlowAutoMigrateThreshold(event.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={slowAutoMigrateGraceHours}
+                          onChange={(event) => setSlowAutoMigrateGraceHours(event.target.value)}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Threshold checks, then user wait window in hours.</p>
+                    </div>
+                  </div>
+                </label>
+
+                <label className="rounded-[1rem] border border-border/60 bg-background/35 p-3 text-sm dark:bg-white/[0.03]">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={slowUserNotifyEnabled}
+                      onChange={(event) => setSlowUserNotifyEnabled(event.target.checked)}
+                      className="mt-1 rounded border-gray-300"
+                    />
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">User notice</p>
+                      <p className="text-muted-foreground">
+                        Tell affected Telegram users to wait while the route is stabilized.
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={24}
+                          value={slowUserNotifyThreshold}
+                          onChange={(event) => setSlowUserNotifyThreshold(event.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          min={15}
+                          max={1440}
+                          value={slowUserNotifyCooldownMins}
+                          onChange={(event) => setSlowUserNotifyCooldownMins(event.target.value)}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Threshold checks, then cooldown in minutes.</p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                <p>`Auto-drain` changes the server to `DRAINING` so new assignments stop.</p>
+                <p>`Auto-migrate` uses the smart fallback target and preserves user expiry and usage.</p>
+                <p>`User notice` sends a Telegram heads-up only after the configured slow streak.</p>
+              </div>
+
+              <Button onClick={handleSaveSlowPolicy} disabled={slowPolicyMutation.isPending}>
+                {slowPolicyMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save Slow Policy
               </Button>
             </CardContent>
           </Card>

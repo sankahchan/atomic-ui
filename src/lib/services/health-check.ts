@@ -12,8 +12,10 @@ import { writeAuditLog } from '@/lib/audit';
 import { sendAdminAlert } from '@/lib/services/telegram-bot';
 import { sendServerIssueNoticeToTelegram } from '@/lib/services/telegram-runtime';
 import {
+  executeServerOutageReplacement,
   markServerOutageDetected,
   markServerOutageRecovered,
+  recommendFallbackTargetForServer,
 } from '@/lib/services/server-outage';
 
 export interface HealthCheckResult {
@@ -225,6 +227,95 @@ async function maybeNotifyUsersAboutSlowServer(input: {
     return result.sentCount > 0;
 }
 
+async function maybeAutoMigrateSlowServer(input: {
+    server: {
+        id: string;
+        name: string;
+        lifecycleMode: string | null;
+        outageState?: {
+            recoveredAt: Date | null;
+            migrationTriggeredAt: Date | null;
+        } | null;
+        healthCheck: {
+            slowAutoMigrateEnabled: boolean;
+            slowAutoMigrateThreshold: number;
+            slowAutoMigrateGraceHours: number;
+        } | null;
+    };
+    consecutiveSlowCount: number;
+    latencyMs: number;
+    thresholdMs: number;
+}) {
+    try {
+        if (!input.server.healthCheck?.slowAutoMigrateEnabled) {
+            return false;
+        }
+
+        if (input.consecutiveSlowCount < input.server.healthCheck.slowAutoMigrateThreshold) {
+            return false;
+        }
+
+        if (
+            input.server.outageState &&
+            !input.server.outageState.recoveredAt &&
+            input.server.outageState.migrationTriggeredAt
+        ) {
+            return false;
+        }
+
+        const fallback = await recommendFallbackTargetForServer(input.server.id);
+        if (!fallback.selected) {
+            if (input.consecutiveSlowCount === input.server.healthCheck.slowAutoMigrateThreshold) {
+                await sendAdminAlert(
+                    `🟠 <b>Slow auto-migration blocked</b>\n\n<b>${input.server.name}</b> stayed slow for ${input.consecutiveSlowCount} checks, but no healthy fallback target is currently available.`,
+                );
+            }
+            return false;
+        }
+
+        const result = await executeServerOutageReplacement({
+            sourceServerId: input.server.id,
+            targetServerId: fallback.selected.serverId,
+            gracePeriodHours: input.server.healthCheck.slowAutoMigrateGraceHours,
+            notifyUsers: true,
+            cause: 'HEALTH_SLOW',
+            lifecycleMode: 'DRAINING',
+        });
+
+        await writeAuditLog({
+            action: 'SERVER_AUTO_MIGRATE_SLOW',
+            entity: 'SERVER',
+            entityId: input.server.id,
+            details: {
+                serverName: input.server.name,
+                targetServerId: fallback.selected.serverId,
+                targetServerName: fallback.selected.serverName,
+                consecutiveSlowCount: input.consecutiveSlowCount,
+                latencyMs: input.latencyMs,
+                thresholdMs: input.thresholdMs,
+                migrated: result.migrated,
+                failed: result.failed,
+            },
+        });
+
+        await sendAdminAlert(
+            `🟠 <b>Slow auto-migration started</b>\n\n<b>${input.server.name}</b> stayed slow for ${input.consecutiveSlowCount} checks and is being drained to <b>${fallback.selected.serverName}</b>.\nLatency: <b>${input.latencyMs}ms</b> (threshold <b>${input.thresholdMs}ms</b>)`,
+        );
+
+        return true;
+    } catch (error) {
+        logger.error('Failed to auto-migrate a slow server', {
+            serverId: input.server.id,
+            serverName: input.server.name,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        await sendAdminAlert(
+            `🔴 <b>Slow auto-migration failed</b>\n\n<b>${input.server.name}</b> reached the auto-migration threshold, but the migration could not complete.\nError: <b>${error instanceof Error ? error.message : 'Unknown error'}</b>`,
+        );
+        return false;
+    }
+}
+
 /**
  * Run health checks on all enabled servers
  */
@@ -245,6 +336,12 @@ export async function runHealthChecks(): Promise<{
         },
         include: {
             healthCheck: true,
+            outageState: {
+                select: {
+                    recoveredAt: true,
+                    migrationTriggeredAt: true,
+                },
+            },
         },
     });
 
@@ -325,6 +422,13 @@ export async function runHealthChecks(): Promise<{
 
             if (result.status === 'SLOW' && typeof result.latencyMs === 'number') {
                 await maybeAutoDrainSlowServer({
+                    server,
+                    consecutiveSlowCount,
+                    latencyMs: result.latencyMs,
+                    thresholdMs,
+                });
+
+                await maybeAutoMigrateSlowServer({
                     server,
                     consecutiveSlowCount,
                     latencyMs: result.latencyMs,

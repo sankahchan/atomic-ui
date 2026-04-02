@@ -58,6 +58,19 @@ const updateServerSchema = z.object({
   tagIds: z.array(z.string()).optional(),
 });
 
+const updateSlowPolicySchema = z.object({
+  serverId: z.string(),
+  latencyThresholdMs: z.number().int().min(50).max(5000),
+  slowAutoDrainEnabled: z.boolean(),
+  slowAutoDrainThreshold: z.number().int().min(1).max(24),
+  slowAutoMigrateEnabled: z.boolean(),
+  slowAutoMigrateThreshold: z.number().int().min(1).max(48),
+  slowAutoMigrateGraceHours: z.number().int().min(1).max(12),
+  slowUserNotifyEnabled: z.boolean(),
+  slowUserNotifyThreshold: z.number().int().min(1).max(24),
+  slowUserNotifyCooldownMins: z.number().int().min(15).max(1440),
+});
+
 /**
  * Schema for parsing Outline Manager configuration.
  * This allows users to paste the entire JSON output from installation.
@@ -234,6 +247,9 @@ export const serversRouter = router({
               slowConsecutiveCount: true,
               slowAutoDrainEnabled: true,
               slowAutoDrainThreshold: true,
+              slowAutoMigrateEnabled: true,
+              slowAutoMigrateThreshold: true,
+              slowAutoMigrateGraceHours: true,
               slowUserNotifyEnabled: true,
               slowUserNotifyThreshold: true,
               slowUserNotifyCooldownMins: true,
@@ -277,6 +293,8 @@ export const serversRouter = router({
       const currentStatus = server.healthCheck?.lastStatus || 'UNKNOWN';
       const currentLatency = server.healthCheck?.lastLatencyMs ?? null;
       const threshold = server.healthCheck?.latencyThresholdMs ?? 500;
+      const { recommendFallbackTargetForServer } = await import('@/lib/services/server-outage');
+      const fallbackRecommendation = await recommendFallbackTargetForServer(input.id);
       const reason =
         currentStatus === 'SLOW' && typeof currentLatency === 'number'
           ? `${currentLatency}ms > ${threshold}ms threshold`
@@ -298,15 +316,30 @@ export const serversRouter = router({
           autoDrainActive:
             (server.lifecycleMode || 'ACTIVE') === 'DRAINING' &&
             (server.healthCheck?.slowConsecutiveCount ?? 0) >= (server.healthCheck?.slowAutoDrainThreshold ?? 3),
+          autoMigrateEnabled: server.healthCheck?.slowAutoMigrateEnabled ?? false,
+          autoMigrateThreshold: server.healthCheck?.slowAutoMigrateThreshold ?? 6,
+          autoMigrateGraceHours: server.healthCheck?.slowAutoMigrateGraceHours ?? 2,
           userNotifyEnabled: server.healthCheck?.slowUserNotifyEnabled ?? true,
           userNotifyThreshold: server.healthCheck?.slowUserNotifyThreshold ?? 3,
           userNotifyCooldownMins: server.healthCheck?.slowUserNotifyCooldownMins ?? 180,
           slowUserAlertSentAt: server.healthCheck?.slowUserAlertSentAt ?? null,
           reason,
+          fallbackTarget: fallbackRecommendation.selected,
         },
         statusBreakdown,
         metrics: metrics.reverse(),
       };
+    }),
+
+  recommendFallbackTarget: adminProcedure
+    .input(
+      z.object({
+        sourceServerId: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { recommendFallbackTargetForServer } = await import('@/lib/services/server-outage');
+      return recommendFallbackTargetForServer(input.sourceServerId);
     }),
 
   /**
@@ -511,6 +544,83 @@ export const serversRouter = router({
         ...server,
         tags: server.tags.map((st) => st.tag),
       };
+    }),
+
+  updateSlowPolicy: adminProcedure
+    .input(updateSlowPolicySchema)
+    .mutation(async ({ ctx, input }) => {
+      const existing = await db.server.findUnique({
+        where: { id: input.serverId },
+        select: {
+          id: true,
+          name: true,
+          healthCheck: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Server not found',
+        });
+      }
+
+      const healthCheck = existing.healthCheck
+        ? await db.healthCheck.update({
+            where: { id: existing.healthCheck.id },
+            data: {
+              latencyThresholdMs: input.latencyThresholdMs,
+              slowAutoDrainEnabled: input.slowAutoDrainEnabled,
+              slowAutoDrainThreshold: input.slowAutoDrainThreshold,
+              slowAutoMigrateEnabled: input.slowAutoMigrateEnabled,
+              slowAutoMigrateThreshold: input.slowAutoMigrateThreshold,
+              slowAutoMigrateGraceHours: input.slowAutoMigrateGraceHours,
+              slowUserNotifyEnabled: input.slowUserNotifyEnabled,
+              slowUserNotifyThreshold: input.slowUserNotifyThreshold,
+              slowUserNotifyCooldownMins: input.slowUserNotifyCooldownMins,
+            },
+          })
+        : await db.healthCheck.create({
+            data: {
+              serverId: input.serverId,
+              isEnabled: true,
+              latencyThresholdMs: input.latencyThresholdMs,
+              slowAutoDrainEnabled: input.slowAutoDrainEnabled,
+              slowAutoDrainThreshold: input.slowAutoDrainThreshold,
+              slowAutoMigrateEnabled: input.slowAutoMigrateEnabled,
+              slowAutoMigrateThreshold: input.slowAutoMigrateThreshold,
+              slowAutoMigrateGraceHours: input.slowAutoMigrateGraceHours,
+              slowUserNotifyEnabled: input.slowUserNotifyEnabled,
+              slowUserNotifyThreshold: input.slowUserNotifyThreshold,
+              slowUserNotifyCooldownMins: input.slowUserNotifyCooldownMins,
+            },
+          });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'SERVER_SLOW_POLICY_UPDATE',
+        entity: 'SERVER',
+        entityId: input.serverId,
+        details: {
+          serverName: existing.name,
+          latencyThresholdMs: healthCheck.latencyThresholdMs,
+          slowAutoDrainEnabled: healthCheck.slowAutoDrainEnabled,
+          slowAutoDrainThreshold: healthCheck.slowAutoDrainThreshold,
+          slowAutoMigrateEnabled: healthCheck.slowAutoMigrateEnabled,
+          slowAutoMigrateThreshold: healthCheck.slowAutoMigrateThreshold,
+          slowAutoMigrateGraceHours: healthCheck.slowAutoMigrateGraceHours,
+          slowUserNotifyEnabled: healthCheck.slowUserNotifyEnabled,
+          slowUserNotifyThreshold: healthCheck.slowUserNotifyThreshold,
+          slowUserNotifyCooldownMins: healthCheck.slowUserNotifyCooldownMins,
+        },
+      });
+
+      return healthCheck;
     }),
 
   setLifecycleMode: adminProcedure
@@ -1871,6 +1981,14 @@ export const serversRouter = router({
           isEnabled: s.healthCheck.isEnabled,
           checkIntervalMins: s.healthCheck.checkIntervalMins,
           latencyThresholdMs: s.healthCheck.latencyThresholdMs,
+          slowAutoDrainEnabled: s.healthCheck.slowAutoDrainEnabled,
+          slowAutoDrainThreshold: s.healthCheck.slowAutoDrainThreshold,
+          slowAutoMigrateEnabled: s.healthCheck.slowAutoMigrateEnabled,
+          slowAutoMigrateThreshold: s.healthCheck.slowAutoMigrateThreshold,
+          slowAutoMigrateGraceHours: s.healthCheck.slowAutoMigrateGraceHours,
+          slowUserNotifyEnabled: s.healthCheck.slowUserNotifyEnabled,
+          slowUserNotifyThreshold: s.healthCheck.slowUserNotifyThreshold,
+          slowUserNotifyCooldownMins: s.healthCheck.slowUserNotifyCooldownMins,
         } : null,
       }));
 
@@ -1906,6 +2024,14 @@ export const serversRouter = router({
           isEnabled: z.boolean(),
           checkIntervalMins: z.number().int().positive().optional(),
           latencyThresholdMs: z.number().int().positive().optional(),
+          slowAutoDrainEnabled: z.boolean().optional(),
+          slowAutoDrainThreshold: z.number().int().positive().optional(),
+          slowAutoMigrateEnabled: z.boolean().optional(),
+          slowAutoMigrateThreshold: z.number().int().positive().optional(),
+          slowAutoMigrateGraceHours: z.number().int().positive().optional(),
+          slowUserNotifyEnabled: z.boolean().optional(),
+          slowUserNotifyThreshold: z.number().int().positive().optional(),
+          slowUserNotifyCooldownMins: z.number().int().positive().optional(),
         }).optional().nullable(),
       })),
       skipValidation: z.boolean().default(false),
@@ -1984,6 +2110,14 @@ export const serversRouter = router({
                 isEnabled: serverData.healthCheck.isEnabled,
                 checkIntervalMins: serverData.healthCheck.checkIntervalMins ?? 5,
                 latencyThresholdMs: serverData.healthCheck.latencyThresholdMs ?? 500,
+                slowAutoDrainEnabled: serverData.healthCheck.slowAutoDrainEnabled ?? true,
+                slowAutoDrainThreshold: serverData.healthCheck.slowAutoDrainThreshold ?? 3,
+                slowAutoMigrateEnabled: serverData.healthCheck.slowAutoMigrateEnabled ?? false,
+                slowAutoMigrateThreshold: serverData.healthCheck.slowAutoMigrateThreshold ?? 6,
+                slowAutoMigrateGraceHours: serverData.healthCheck.slowAutoMigrateGraceHours ?? 2,
+                slowUserNotifyEnabled: serverData.healthCheck.slowUserNotifyEnabled ?? true,
+                slowUserNotifyThreshold: serverData.healthCheck.slowUserNotifyThreshold ?? 3,
+                slowUserNotifyCooldownMins: serverData.healthCheck.slowUserNotifyCooldownMins ?? 180,
                 lastStatus: 'UNKNOWN',
               },
             });
