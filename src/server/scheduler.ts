@@ -32,6 +32,7 @@ import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
 import { runTelegramAnnouncementCycle } from '@/lib/services/telegram-announcements';
 import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
+import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-premium';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -294,6 +295,20 @@ export function initScheduler() {
         }
     });
 
+    // 18. Premium region degradation alerts (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runTelegramPremiumRegionAlertCycle();
+            if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
+                logger.info(
+                    `Premium region alerts: ${result.alerted} alerted, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Premium region alert cycle failed', error);
+        }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
@@ -366,6 +381,17 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Initial Telegram announcement cycle failed', error);
+        }
+
+        try {
+            const result = await runTelegramPremiumRegionAlertCycle();
+            if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
+                logger.info(
+                    `Initial premium region alert cycle: ${result.alerted} alerted, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Initial premium region alert cycle failed', error);
         }
 
         // Ensure health check records exist for all servers

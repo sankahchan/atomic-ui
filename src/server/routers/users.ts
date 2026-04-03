@@ -37,6 +37,18 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { adminProcedure, router } from '../trpc';
 
+function parseJsonRecord(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveCustomerTelegramDestination(userId: string) {
   const user = await db.user.findUnique({
     where: { id: userId },
@@ -217,7 +229,7 @@ export const usersRouter = router({
         orderBy: { createdAt: 'desc' },
       });
 
-      const [serverChangeRequests, premiumSupportRequests, announcementDeliveries, keyNotificationLog, telegramProfile, supportNotes] =
+      const [serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, announcementDeliveries, keyNotificationLog, telegramProfile, supportNotes] =
         await Promise.all([
           accessKeyIds.length > 0
             ? db.telegramServerChangeRequest.findMany({
@@ -242,6 +254,24 @@ export const usersRouter = router({
                   dismissedAt: true,
                   followUpPending: true,
                 },
+              })
+            : Promise.resolve([]),
+          dynamicKeyIds.length > 0
+            ? db.dynamicRoutingEvent.findMany({
+                where: {
+                  dynamicAccessKeyId: { in: dynamicKeyIds },
+                  eventType: 'PREFERRED_REGION_DEGRADED',
+                },
+                include: {
+                  dynamicAccessKey: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 12,
               })
             : Promise.resolve([]),
           customerChatIds.length > 0
@@ -375,6 +405,16 @@ export const usersRouter = router({
         telegramOrders: orders,
         serverChangeRequests,
         premiumSupportRequests,
+        premiumRoutingAlerts: premiumRoutingAlerts.map((event) => ({
+          id: event.id,
+          dynamicAccessKeyId: event.dynamicAccessKeyId,
+          dynamicAccessKeyName: event.dynamicAccessKey.name,
+          eventType: event.eventType,
+          severity: event.severity,
+          reason: event.reason,
+          metadata: parseJsonRecord(event.metadata),
+          createdAt: event.createdAt,
+        })),
         customerNotifications: {
           summary: {
             totalAnnouncements: announcementDeliveries.length,

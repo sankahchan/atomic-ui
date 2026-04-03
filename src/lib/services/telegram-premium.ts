@@ -2,8 +2,20 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import {
+  DYNAMIC_ROUTING_EVENT_TYPES,
+  recordDynamicRoutingEvent,
+} from '@/lib/services/dynamic-routing-events';
+import {
   buildTelegramDynamicSupportActionCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  getTelegramConfig,
+  getTelegramNotificationPreferences,
+  getTelegramSupportLink,
+  resolveTelegramChatIdForDynamicKey,
+  resolveTelegramLocaleForRecipient,
+  sendTelegramMessage,
+} from '@/lib/services/telegram-runtime';
 import {
   escapeHtml,
   formatTelegramDateTime,
@@ -169,6 +181,9 @@ async function generateTelegramPremiumSupportRequestCode(): Promise<string> {
 type PremiumMessagingKey = {
   id: string;
   name: string;
+  status?: string;
+  telegramId?: string | null;
+  user?: { telegramChatId?: string | null } | null;
   publicSlug?: string | null;
   dynamicUrl?: string | null;
   sharePageEnabled?: boolean | null;
@@ -177,6 +192,39 @@ type PremiumMessagingKey = {
   preferredCountryCodesJson?: string | null;
   lastResolvedServerId?: string | null;
   accessKeys: Array<{ server?: { id?: string; name: string; countryCode?: string | null } | null }>;
+};
+
+type PremiumRegionHealthCheck = {
+  serverId: string;
+  lastStatus: string | null;
+  lastLatencyMs: number | null;
+  lastCheckedAt: Date | null;
+  latencyThresholdMs: number | null;
+  server: {
+    id: string;
+    name: string;
+    countryCode: string | null;
+  } | null;
+};
+
+type PremiumRegionSummary = {
+  regionCode: string;
+  status: string | null;
+  latencyMs: number | null;
+  latencyThresholdMs: number | null;
+  lastCheckedAt: Date | null;
+  serverCount: number;
+  serverName: string | null;
+  isCurrent: boolean;
+};
+
+type PremiumRegionAnalysis = {
+  preferredRegions: string[];
+  attachedServers: Array<{ id?: string; name: string; countryCode?: string | null }>;
+  currentServer: { id?: string; name: string; countryCode?: string | null } | null;
+  currentSummary: PremiumRegionSummary | null;
+  regionSummaries: PremiumRegionSummary[];
+  suggestedFallbacks: PremiumRegionSummary[];
 };
 
 function getPremiumRegionHealthRank(status?: string | null) {
@@ -203,6 +251,140 @@ function formatPremiumRegionHealthLabel(status: string | null | undefined, ui: R
     default:
       return ui.premiumRegionUnknownStatus;
   }
+}
+
+function summarizeTelegramPremiumRegions(
+  key: PremiumMessagingKey,
+  healthByServerId: Map<string, PremiumRegionHealthCheck>,
+): PremiumRegionAnalysis {
+  const preferredRegions = getDynamicKeyRegionChoices(key).map((code) => code.toUpperCase());
+  const preferredRegionSet = new Set(preferredRegions);
+  const attachedServers = key.accessKeys
+    .map((accessKey) => accessKey.server)
+    .filter((server): server is NonNullable<typeof server> => Boolean(server));
+  const currentServer = attachedServers.find((server) => server.id === key.lastResolvedServerId) || null;
+  const regionCodes = Array.from(
+    new Set(
+      [
+        ...preferredRegions,
+        ...attachedServers
+          .map((server) => server.countryCode?.toUpperCase() || null)
+          .filter((value): value is string => Boolean(value)),
+      ],
+    ),
+  );
+
+  const regionSummaries = regionCodes
+    .map((regionCode) => {
+      const regionServers = attachedServers.filter(
+        (server) => server.countryCode?.toUpperCase() === regionCode,
+      );
+      const regionChecks = regionServers
+        .map((server) => (server.id ? healthByServerId.get(server.id) : null))
+        .filter((entry): entry is PremiumRegionHealthCheck => Boolean(entry))
+        .sort((left, right) => {
+          const rankDelta = getPremiumRegionHealthRank(left.lastStatus) - getPremiumRegionHealthRank(right.lastStatus);
+          if (rankDelta !== 0) {
+            return rankDelta;
+          }
+          return (left.lastLatencyMs ?? Number.MAX_SAFE_INTEGER) - (right.lastLatencyMs ?? Number.MAX_SAFE_INTEGER);
+        });
+      const primary = regionChecks[0] || null;
+
+      return {
+        regionCode,
+        status: primary?.lastStatus || null,
+        latencyMs: primary?.lastLatencyMs ?? null,
+        latencyThresholdMs: primary?.latencyThresholdMs ?? null,
+        lastCheckedAt: primary?.lastCheckedAt ?? null,
+        serverCount: regionServers.length,
+        serverName: primary?.server?.name || regionServers[0]?.name || null,
+        isCurrent: currentServer?.countryCode?.toUpperCase() === regionCode,
+      };
+    })
+    .sort((left, right) => {
+      const preferredDelta = Number(preferredRegionSet.has(left.regionCode)) - Number(preferredRegionSet.has(right.regionCode));
+      if (preferredDelta !== 0) {
+        return preferredDelta * -1;
+      }
+      const currentDelta = Number(right.isCurrent) - Number(left.isCurrent);
+      if (currentDelta !== 0) {
+        return currentDelta;
+      }
+      const rankDelta = getPremiumRegionHealthRank(left.status) - getPremiumRegionHealthRank(right.status);
+      if (rankDelta !== 0) {
+        return rankDelta;
+      }
+      return (left.latencyMs ?? Number.MAX_SAFE_INTEGER) - (right.latencyMs ?? Number.MAX_SAFE_INTEGER);
+    });
+
+  const currentSummary =
+    regionSummaries.find((entry) => entry.isCurrent) ||
+    (currentServer?.countryCode
+      ? regionSummaries.find((entry) => entry.regionCode === currentServer.countryCode?.toUpperCase()) || null
+      : null);
+
+  const suggestedFallbacks = regionSummaries
+    .filter((entry) => !entry.isCurrent)
+    .filter((entry) => entry.status !== 'DOWN')
+    .sort((left, right) => {
+      const leftPreferred = preferredRegionSet.has(left.regionCode) ? 0 : 1;
+      const rightPreferred = preferredRegionSet.has(right.regionCode) ? 0 : 1;
+      if (leftPreferred !== rightPreferred) {
+        return leftPreferred - rightPreferred;
+      }
+      const rankDelta = getPremiumRegionHealthRank(left.status) - getPremiumRegionHealthRank(right.status);
+      if (rankDelta !== 0) {
+        return rankDelta;
+      }
+      return (left.latencyMs ?? Number.MAX_SAFE_INTEGER) - (right.latencyMs ?? Number.MAX_SAFE_INTEGER);
+    })
+    .slice(0, 3);
+
+  return {
+    preferredRegions,
+    attachedServers,
+    currentServer,
+    currentSummary,
+    regionSummaries,
+    suggestedFallbacks,
+  };
+}
+
+function formatPremiumRegionSummaryLine(
+  summary: PremiumRegionSummary,
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  const parts = [
+    `${getFlagEmoji(summary.regionCode)} ${summary.regionCode}`,
+    formatPremiumRegionHealthLabel(summary.status, ui),
+  ];
+
+  if (typeof summary.latencyMs === 'number') {
+    parts.push(
+      typeof summary.latencyThresholdMs === 'number'
+        ? `${summary.latencyMs}ms / ${summary.latencyThresholdMs}ms`
+        : `${summary.latencyMs}ms`,
+    );
+  }
+
+  return parts.join(' • ');
+}
+
+function shouldAlertForPremiumRegionDegradation(analysis: PremiumRegionAnalysis) {
+  if (analysis.currentSummary && ['SLOW', 'DOWN'].includes(analysis.currentSummary.status || '')) {
+    return true;
+  }
+
+  const preferredSummaries = analysis.regionSummaries.filter((entry) =>
+    analysis.preferredRegions.includes(entry.regionCode),
+  );
+
+  return (
+    preferredSummaries.length > 0 &&
+    preferredSummaries.some((entry) => ['SLOW', 'DOWN'].includes(entry.status || '')) &&
+    preferredSummaries.every((entry) => entry.status !== 'UP')
+  );
 }
 
 export async function createTelegramPremiumSupportRequestRecord(input: {
@@ -876,75 +1058,57 @@ export async function handlePremiumRegionStatusCommand(input: {
   const lines = [ui.premiumRegionStatusTitle, '', ui.premiumRegionStatusHint, ''];
 
   for (const key of dynamicKeys.slice(0, 4)) {
-    const preferredRegions = getDynamicKeyRegionChoices(key);
-    const attachedServers = key.accessKeys
-      .map((accessKey) => accessKey.server)
-      .filter((server): server is NonNullable<typeof server> => Boolean(server));
-    const currentServer = attachedServers.find((server) => server.id === key.lastResolvedServerId) || null;
+    const analysis = summarizeTelegramPremiumRegions(key, healthByServerId);
 
     lines.push(`• <b>${escapeHtml(key.name)}</b>`);
     lines.push(
       `  ${ui.premiumRegionPreferredLabel}: ${
-        preferredRegions.length
-          ? escapeHtml(preferredRegions.join(', '))
+        analysis.preferredRegions.length
+          ? escapeHtml(analysis.preferredRegions.join(', '))
           : escapeHtml(ui.premiumRegionNoAttached)
       }`,
     );
     lines.push(
       `  ${ui.premiumRegionCurrentRouteLabel}: ${
-        currentServer
-          ? `${escapeHtml(currentServer.name)} ${getFlagEmoji(currentServer.countryCode || '')}`
+        analysis.currentServer
+          ? `${escapeHtml(analysis.currentServer.name)} ${getFlagEmoji(analysis.currentServer.countryCode || '')}`
           : escapeHtml(ui.premiumRegionUnknownStatus)
       }`,
     );
-    lines.push(`  ${ui.premiumRegionAttachedLabel}: ${attachedServers.length}`);
+    lines.push(`  ${ui.premiumRegionAttachedLabel}: ${analysis.attachedServers.length}`);
 
-    if (preferredRegions.length === 0) {
+    if (analysis.preferredRegions.length === 0) {
       lines.push(`  ${escapeHtml(ui.premiumRegionNoAttached)}`, '');
       continue;
     }
 
-    for (const regionCode of preferredRegions.slice(0, 6)) {
-      const regionServers = attachedServers.filter(
-        (server) => server.countryCode?.toUpperCase() === regionCode.toUpperCase(),
-      );
-      const regionChecks = regionServers
-        .map((server) => (server.id ? healthByServerId.get(server.id) : null))
-        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-        .sort((left, right) => {
-          const rankDelta = getPremiumRegionHealthRank(left.lastStatus) - getPremiumRegionHealthRank(right.lastStatus);
-          if (rankDelta !== 0) {
-            return rankDelta;
-          }
-          return (left.lastLatencyMs ?? Number.MAX_SAFE_INTEGER) - (right.lastLatencyMs ?? Number.MAX_SAFE_INTEGER);
-        });
-      const primary = regionChecks[0] || null;
+    for (const regionSummary of analysis.regionSummaries.slice(0, 6)) {
       const markers: string[] = [];
-      if (currentServer?.countryCode?.toUpperCase() === regionCode.toUpperCase()) {
+      if (regionSummary.isCurrent) {
         markers.push(ui.premiumRegionCurrentRouteLabel);
       }
-      if (regionServers.length > 0) {
-        markers.push(`${regionServers.length} server${regionServers.length === 1 ? '' : 's'}`);
+      if (regionSummary.serverCount > 0) {
+        markers.push(`${regionSummary.serverCount} server${regionSummary.serverCount === 1 ? '' : 's'}`);
       }
 
       lines.push(
-        `  ${getFlagEmoji(regionCode)} <b>${escapeHtml(regionCode)}</b> · ${escapeHtml(
-          formatPremiumRegionHealthLabel(primary?.lastStatus, ui),
+        `  ${getFlagEmoji(regionSummary.regionCode)} <b>${escapeHtml(regionSummary.regionCode)}</b> · ${escapeHtml(
+          formatPremiumRegionHealthLabel(regionSummary.status, ui),
         )}${
-          typeof primary?.lastLatencyMs === 'number'
-            ? ` · ${primary.lastLatencyMs}ms / ${primary.latencyThresholdMs}ms`
+          typeof regionSummary.latencyMs === 'number'
+            ? ` · ${regionSummary.latencyMs}ms / ${regionSummary.latencyThresholdMs}ms`
             : ''
         }`,
       );
       if (markers.length > 0) {
         lines.push(`    ${escapeHtml(markers.join(' • '))}`);
       }
-      if (primary?.server?.name) {
-        lines.push(`    ${escapeHtml(primary.server.name)}`);
+      if (regionSummary.serverName) {
+        lines.push(`    ${escapeHtml(regionSummary.serverName)}`);
       }
-      if (primary?.lastCheckedAt) {
+      if (regionSummary.lastCheckedAt) {
         lines.push(
-          `    ${escapeHtml(formatTelegramDateTime(primary.lastCheckedAt, input.locale))}`,
+          `    ${escapeHtml(formatTelegramDateTime(regionSummary.lastCheckedAt, input.locale))}`,
         );
       }
     }
@@ -965,6 +1129,233 @@ export async function handlePremiumRegionStatusCommand(input: {
   });
 
   return sent ? null : message;
+}
+
+function buildTelegramPremiumRegionAlertMessage(input: {
+  locale: SupportedLocale;
+  keyName: string;
+  analysis: PremiumRegionAnalysis;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const lines = [ui.premiumRegionAlertTitle, ''];
+
+  lines.push(`• <b>${escapeHtml(input.keyName)}</b>`);
+  lines.push(
+    `${ui.premiumRegionPreferredLabel}: ${
+      input.analysis.preferredRegions.length
+        ? escapeHtml(input.analysis.preferredRegions.join(', '))
+        : escapeHtml(ui.premiumRegionNoAttached)
+    }`,
+  );
+  lines.push(
+    `${ui.premiumRegionAlertCurrentLabel}: ${
+      input.analysis.currentSummary
+        ? escapeHtml(formatPremiumRegionSummaryLine(input.analysis.currentSummary, ui))
+        : escapeHtml(ui.premiumRegionUnknownStatus)
+    }`,
+  );
+
+  if (input.analysis.suggestedFallbacks.length > 0) {
+    lines.push(
+      `${ui.premiumRegionAlertSuggestedLabel}: ${escapeHtml(
+        input.analysis.suggestedFallbacks
+          .map((entry) => formatPremiumRegionSummaryLine(entry, ui))
+          .join(' | '),
+      )}`,
+      '',
+      ui.premiumRegionAlertHint,
+    );
+  } else {
+    lines.push('', ui.premiumRegionAlertNoFallback, ui.premiumRegionAlertHealthyHint);
+  }
+
+  return lines.join('\n');
+}
+
+export async function runTelegramPremiumRegionAlertCycle() {
+  const config = await getTelegramConfig();
+  if (!config?.botToken) {
+    return {
+      skipped: true,
+      scanned: 0,
+      alerted: 0,
+      deduped: 0,
+      skippedNoDestination: 0,
+      skippedPreferences: 0,
+      skippedHealthy: 0,
+      errors: [] as string[],
+    };
+  }
+
+  const supportLink = await getTelegramSupportLink();
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60_000);
+  const premiumKeys = await db.dynamicAccessKey.findMany({
+    where: {
+      status: 'ACTIVE',
+      OR: [{ telegramId: { not: null } }, { user: { telegramChatId: { not: null } } }],
+      accessKeys: {
+        some: {
+          serverId: { not: null },
+        },
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          telegramChatId: true,
+        },
+      },
+      accessKeys: {
+        include: {
+          server: true,
+        },
+      },
+    },
+  });
+
+  const allServerIds = Array.from(
+    new Set(
+      premiumKeys.flatMap((key) =>
+        key.accessKeys
+          .map((accessKey) => accessKey.server?.id || null)
+          .filter((serverId): serverId is string => Boolean(serverId)),
+      ),
+    ),
+  );
+  const healthChecks = allServerIds.length
+    ? await db.healthCheck.findMany({
+        where: {
+          serverId: { in: allServerIds },
+        },
+        select: {
+          serverId: true,
+          lastStatus: true,
+          lastLatencyMs: true,
+          lastCheckedAt: true,
+          latencyThresholdMs: true,
+          server: {
+            select: {
+              id: true,
+              name: true,
+              countryCode: true,
+            },
+          },
+        },
+      })
+    : [];
+  const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+
+  const result = {
+    skipped: false,
+    scanned: premiumKeys.length,
+    alerted: 0,
+    deduped: 0,
+    skippedNoDestination: 0,
+    skippedPreferences: 0,
+    skippedHealthy: 0,
+    errors: [] as string[],
+  };
+
+  for (const key of premiumKeys) {
+    try {
+      const destinationChatId = resolveTelegramChatIdForDynamicKey(key);
+      if (!destinationChatId) {
+        result.skippedNoDestination += 1;
+        continue;
+      }
+
+      const preferences = await getTelegramNotificationPreferences({
+        telegramUserId: key.telegramId || String(destinationChatId),
+        telegramChatId: String(destinationChatId),
+      });
+      if (!preferences.maintenance && !preferences.support) {
+        result.skippedPreferences += 1;
+        continue;
+      }
+
+      const analysis = summarizeTelegramPremiumRegions(key, healthByServerId);
+      if (!shouldAlertForPremiumRegionDegradation(analysis)) {
+        result.skippedHealthy += 1;
+        continue;
+      }
+
+      const existing = await db.dynamicRoutingEvent.findFirst({
+        where: {
+          dynamicAccessKeyId: key.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+          createdAt: { gte: sixHoursAgo },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        result.deduped += 1;
+        continue;
+      }
+
+      const locale = await resolveTelegramLocaleForRecipient({
+        telegramUserId: key.telegramId || String(destinationChatId),
+        telegramChatId: String(destinationChatId),
+        fallbackLocale: 'en',
+      });
+      const alertText = buildTelegramPremiumRegionAlertMessage({
+        locale,
+        keyName: key.name,
+        analysis,
+      });
+      const alertKeyboard =
+        analysis.suggestedFallbacks.length > 0 || analysis.preferredRegions.length > 0
+          ? buildTelegramDynamicPremiumRegionKeyboard({
+              dynamicAccessKeyId: key.id,
+              locale,
+              regionCodes:
+                (analysis.suggestedFallbacks.length > 0
+                  ? analysis.suggestedFallbacks.map((entry) => entry.regionCode)
+                  : analysis.preferredRegions
+                ).slice(0, 6),
+              supportLink,
+            })
+          : supportLink
+            ? { inline_keyboard: [[{ text: getTelegramUi(locale).getSupport, url: supportLink }]] }
+            : undefined;
+
+      const sent = await sendTelegramMessage(config.botToken, destinationChatId, alertText, {
+        replyMarkup: alertKeyboard,
+        disableWebPagePreview: true,
+      });
+      if (!sent) {
+        result.errors.push(`Failed to send premium region alert for ${key.id}`);
+        continue;
+      }
+
+      await recordDynamicRoutingEvent({
+        dynamicAccessKeyId: key.id,
+        eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+        severity: analysis.currentSummary?.status === 'DOWN' ? 'CRITICAL' : 'WARNING',
+        reason: analysis.currentSummary
+          ? `Preferred/current premium region degraded: ${formatPremiumRegionSummaryLine(analysis.currentSummary, getTelegramUi(locale))}`
+          : 'Preferred premium routing region degraded.',
+        metadata: {
+          destinationChatId: String(destinationChatId),
+          currentRegionCode: analysis.currentSummary?.regionCode || null,
+          currentStatus: analysis.currentSummary?.status || null,
+          currentLatencyMs: analysis.currentSummary?.latencyMs ?? null,
+          preferredRegions: analysis.preferredRegions,
+          suggestedFallbackRegions: analysis.suggestedFallbacks.map((entry) => entry.regionCode),
+          alertedViaTelegram: true,
+        },
+      });
+      await db.dynamicAccessKey.update({
+        where: { id: key.id },
+        data: { lastRoutingAlertAt: new Date() },
+      });
+      result.alerted += 1;
+    } catch (error) {
+      result.errors.push(error instanceof Error ? error.message : 'Unknown premium region alert error');
+    }
+  }
+
+  return result;
 }
 
 export async function handlePremiumSupportFollowUpText(input: {

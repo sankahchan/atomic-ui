@@ -9,6 +9,7 @@ export const DYNAMIC_ROUTING_EVENT_TYPES = {
   HEALTH_ALERT: 'HEALTH_ALERT',
   QUOTA_ALERT: 'QUOTA_ALERT',
   FLAPPING_ALERT: 'FLAPPING_ALERT',
+  PREFERRED_REGION_DEGRADED: 'PREFERRED_REGION_DEGRADED',
   TEST_RUN: 'TEST_RUN',
   FAILOVER_SIMULATION: 'FAILOVER_SIMULATION',
   PIN_APPLIED: 'PIN_APPLIED',
@@ -438,7 +439,8 @@ export async function getDynamicRoutingAlerts(input: {
 
   const degradedEvent = recentEvents.find((event) =>
     event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.HEALTH_ALERT ||
-    event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH,
+    event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.NO_MATCH ||
+    event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
   );
 
   if (degradedEvent) {

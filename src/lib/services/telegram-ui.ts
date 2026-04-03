@@ -212,6 +212,18 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumRegionStatusFootnote: isMyanmar
       ? 'Region အခြေအနေကို နောက်ဆုံး health check အချက်အလက်အပေါ် အခြေခံပြီး ပြထားပါသည်။'
       : 'Region status is based on the latest server health checks.',
+    premiumRegionAlertTitle: isMyanmar ? '⚠️ <b>Premium region alert</b>' : '⚠️ <b>Premium region alert</b>',
+    premiumRegionAlertCurrentLabel: isMyanmar ? 'Impacted route' : 'Impacted route',
+    premiumRegionAlertSuggestedLabel: isMyanmar ? 'Suggested fallback regions' : 'Suggested fallback regions',
+    premiumRegionAlertNoFallback: isMyanmar
+      ? 'ယခုအချိန်တွင် ပိုကောင်းသော fallback region မတွေ့သေးပါ။ Admin/support ကို ဆက်သွယ်ပါ။'
+      : 'There is no better fallback region yet. Please contact admin/support.',
+    premiumRegionAlertHint: isMyanmar
+      ? 'အောက်ပါ region ခလုတ်များထဲမှ တစ်ခုကို နှိပ်ပြီး preferred region ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
+      : 'Choose one of the regions below to request a preferred-region change.',
+    premiumRegionAlertHealthyHint: isMyanmar
+      ? 'Route မတည်ငြိမ်ပါက /premiumregion ဖြင့် status ကို စစ်ပြီး admin ကို ဆက်သွယ်နိုင်ပါသည်။'
+      : 'If routing still feels unstable, use /premiumregion to check status and contact admin.',
     premiumStatusHint: isMyanmar
       ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new premium support request.',

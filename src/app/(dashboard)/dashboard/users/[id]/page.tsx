@@ -447,6 +447,32 @@ export default function UserLedgerPage() {
       });
     }
 
+    for (const alert of ledgerQuery.data.premiumRoutingAlerts) {
+      const metadata = (alert.metadata || {}) as Record<string, unknown>;
+      const currentRegionCode =
+        typeof metadata.currentRegionCode === 'string' ? metadata.currentRegionCode : null;
+      const currentStatus =
+        typeof metadata.currentStatus === 'string' ? metadata.currentStatus : null;
+      const fallbackRegions = Array.isArray(metadata.suggestedFallbackRegions)
+        ? metadata.suggestedFallbackRegions.filter((value): value is string => typeof value === 'string')
+        : [];
+
+      events.push({
+        id: `premium-routing:${alert.id}`,
+        at: new Date(alert.createdAt),
+        title: 'Premium region alert',
+        detail: [
+          alert.dynamicAccessKeyName,
+          currentRegionCode ? `${currentRegionCode}${currentStatus ? ` • ${currentStatus}` : ''}` : null,
+          fallbackRegions.length > 0 ? `fallback ${fallbackRegions.join(', ')}` : null,
+        ]
+          .filter(Boolean)
+          .join(' • '),
+        tone: alert.severity === 'CRITICAL' ? 'danger' : 'warning',
+        href: withBasePath(`/dashboard/dynamic-keys/${alert.dynamicAccessKeyId}`),
+      });
+    }
+
     for (const delivery of ledgerQuery.data.customerNotifications.announcements) {
       events.push({
         id: `announcement:${delivery.id}`,
@@ -517,7 +543,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, customerNotifications, supportNotes, financePermissions, crmPermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -532,6 +558,7 @@ export default function UserLedgerPage() {
   type KeyNoticeItem = (typeof customerNotifications.keyNotices)[number];
   type ServerChangeRequestItem = (typeof serverChangeRequests)[number];
   type PremiumSupportRequestItem = (typeof premiumSupportRequests)[number];
+  type PremiumRoutingAlertItem = (typeof premiumRoutingAlerts)[number];
   type AccessKeyItem = (typeof accessKeys)[number];
   type DynamicKeyItem = (typeof dynamicKeys)[number];
 
@@ -1470,6 +1497,57 @@ export default function UserLedgerPage() {
                         ) : null}
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">Premium routing alerts</p>
+                {premiumRoutingAlerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No premium routing alerts recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {premiumRoutingAlerts.map((alert: PremiumRoutingAlertItem) => {
+                      const metadata = (alert.metadata || {}) as Record<string, unknown>;
+                      const fallbackRegions = Array.isArray(metadata.suggestedFallbackRegions)
+                        ? metadata.suggestedFallbackRegions.filter((value): value is string => typeof value === 'string')
+                        : [];
+
+                      return (
+                        <div key={alert.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-medium">{alert.dynamicAccessKeyName}</p>
+                            <Badge
+                              variant="outline"
+                              className={
+                                alert.severity === 'CRITICAL'
+                                  ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                                  : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                              }
+                            >
+                              {alert.severity}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatRelativeTime(alert.createdAt)}</p>
+                          <p className="mt-2 text-sm text-muted-foreground">{alert.reason}</p>
+                          {fallbackRegions.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {fallbackRegions.map((regionCode) => (
+                                <Badge key={`${alert.id}:${regionCode}`} variant="secondary">
+                                  Fallback: {regionCode}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                          <Button asChild size="sm" variant="outline" className="mt-3">
+                            <Link href={withBasePath(`/dashboard/dynamic-keys/${alert.dynamicAccessKeyId}`)}>
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Open premium key
+                            </Link>
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
