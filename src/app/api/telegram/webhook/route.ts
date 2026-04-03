@@ -22,7 +22,22 @@ import { getPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links'
 export async function POST(request: NextRequest) {
   try {
     const config = await getTelegramConfig();
-    const update: TelegramUpdate = await request.json();
+    let update: TelegramUpdate;
+    try {
+      update = await request.json();
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid Telegram update payload' },
+        { status: 400 },
+      );
+    }
+
+    if (!update || typeof update !== 'object') {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid Telegram update payload' },
+        { status: 400 },
+      );
+    }
 
     // Process the update and get a response
     // If config is missing, handleTelegramUpdate will return null or help msg regarding config if we modify it, 

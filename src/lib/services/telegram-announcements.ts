@@ -181,12 +181,11 @@ async function buildTelegramAnnouncementCustomerStateMap() {
     db.telegramOrder.findMany({
       where: {
         status: 'FULFILLED',
-        priceAmount: {
-          gt: 0,
-        },
       },
       select: {
         telegramChatId: true,
+        kind: true,
+        deliveryType: true,
         priceAmount: true,
       },
     }),
@@ -283,8 +282,18 @@ async function buildTelegramAnnouncementCustomerStateMap() {
       continue;
     }
 
-    state.fulfilledPaidOrders += 1;
-    state.totalPaidRevenue += order.priceAmount || 0;
+    if (order.kind === 'TRIAL') {
+      state.hasTrial = true;
+    } else if (order.deliveryType === 'DYNAMIC_KEY') {
+      state.hasPremium = true;
+    } else {
+      state.hasStandard = true;
+    }
+
+    if ((order.priceAmount || 0) > 0) {
+      state.fulfilledPaidOrders += 1;
+      state.totalPaidRevenue += order.priceAmount || 0;
+    }
   }
 
   return stateByChatId;
@@ -394,12 +403,19 @@ export function computeNextTelegramAnnouncementRun(input: {
     return null;
   }
 
-  const anchor = input.scheduledFor ? new Date(input.scheduledFor) : new Date(input.now || new Date());
-  if (recurrenceType === 'DAILY') {
-    return new Date(anchor.getTime() + 24 * 60 * 60 * 1000);
+  const now = input.now ? new Date(input.now) : new Date();
+  const anchor = input.scheduledFor ? new Date(input.scheduledFor) : new Date(now);
+  const intervalMs =
+    recurrenceType === 'DAILY'
+      ? 24 * 60 * 60 * 1000
+      : 7 * 24 * 60 * 60 * 1000;
+
+  let nextRun = new Date(anchor.getTime() + intervalMs);
+  while (nextRun.getTime() <= now.getTime()) {
+    nextRun = new Date(nextRun.getTime() + intervalMs);
   }
 
-  return new Date(anchor.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return nextRun;
 }
 
 export async function getTelegramAnnouncementAudienceMap(filters?: TelegramAnnouncementFilters) {

@@ -735,6 +735,7 @@ export const usersRouter = router({
         select: {
           id: true,
           orderCode: true,
+          kind: true,
           status: true,
           locale: true,
           telegramChatId: true,
@@ -806,7 +807,7 @@ export const usersRouter = router({
         locale: coerceSupportedLocale(order.locale) || 'en',
         order,
         deliveredKeyName,
-        isTrial: order.priceAmount === 0,
+        isTrial: order.kind === 'TRIAL',
       });
 
       if (!sent) {
