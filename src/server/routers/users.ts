@@ -38,6 +38,10 @@ import {
   sendServerIssueNoticeToTelegram,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
+import {
+  getTelegramSalesSettings,
+  type TelegramSalesSettings,
+} from '@/lib/services/telegram-sales';
 import { adminProcedure, router } from '../trpc';
 
 function parseJsonRecord(value: string | null) {
@@ -101,6 +105,218 @@ async function resolveCustomerTelegramDestination(userId: string) {
     user,
     destinationChatId,
   };
+}
+
+const CRM_PROMO_SUPPORT_NOTE_KINDS = new Set(['INTERNAL', 'DIRECT_MESSAGE', 'OUTAGE_UPDATE']);
+
+type CustomerCouponEligibility = {
+  campaignType: 'TRIAL_TO_PAID' | 'RENEWAL_SOON' | 'PREMIUM_UPSELL' | 'WINBACK';
+  label: string;
+  enabled: boolean;
+  paused: boolean;
+  remainingUses: number;
+  activeCoupons: number;
+  redeemedCoupons: number;
+  expiredCoupons: number;
+  revokedCoupons: number;
+  maxUsesPerUser: number;
+  cooldownUntil: Date | null;
+  blockedReason:
+    | 'DISABLED'
+    | 'PAUSED'
+    | 'ACTIVE_COUPON'
+    | 'CONVERTED'
+    | 'LIMIT_REACHED'
+    | 'COOLDOWN'
+    | 'RECENT_REFUND'
+    | 'SUPPORT_HEAVY'
+    | null;
+  eligibleNow: boolean;
+};
+
+function buildCustomerCouponEligibility(input: {
+  settings: TelegramSalesSettings;
+  now: Date;
+  accessKeyIds: string[];
+  dynamicKeyIds: string[];
+  couponRedemptions: Array<{
+    campaignType: string;
+    status: string;
+    maxUsesPerUser: number;
+    issuedAt: Date;
+    expiresAt: Date | null;
+  }>;
+  telegramOrders: Array<{
+    status: string;
+    kind: string;
+    deliveryType: string;
+    priceAmount: number | null;
+    targetAccessKeyId: string | null;
+    targetDynamicKeyId: string | null;
+    financeStatus: string;
+    financeUpdatedAt: Date | null;
+    refundRequestStatus: string | null;
+    refundRequestedAt: Date | null;
+    refundRequestReviewedAt: Date | null;
+    fulfilledAt: Date | null;
+    createdAt: Date;
+  }>;
+  supportNotes: Array<{
+    kind: string;
+    createdAt: Date;
+  }>;
+}) {
+  const refundCutoff = new Date(
+    input.now.getTime() -
+      Math.max(1, input.settings.promoExcludeRecentRefundDays) * 24 * 60 * 60 * 1000,
+  );
+  const supportCutoff = new Date(
+    input.now.getTime() -
+      Math.max(1, input.settings.promoSupportHeavyLookbackDays) * 24 * 60 * 60 * 1000,
+  );
+  const cooldownHours = Math.max(0, input.settings.promoCampaignCooldownHours || 0);
+  const cooldownMs = cooldownHours * 60 * 60 * 1000;
+  const recentRefundBlocked =
+    input.settings.promoExcludeRecentRefundUsers &&
+    input.telegramOrders.some((order) => {
+      if (order.financeStatus === 'REFUNDED' && order.financeUpdatedAt) {
+        return order.financeUpdatedAt >= refundCutoff;
+      }
+      if (!order.refundRequestStatus || !['APPROVED', 'PENDING'].includes(order.refundRequestStatus)) {
+        return false;
+      }
+      const baseline = order.refundRequestReviewedAt || order.refundRequestedAt;
+      return Boolean(baseline && baseline >= refundCutoff);
+    });
+  const recentSupportCount = input.supportNotes.filter(
+    (note) =>
+      CRM_PROMO_SUPPORT_NOTE_KINDS.has(note.kind) &&
+      note.createdAt >= supportCutoff,
+  ).length;
+  const supportHeavyBlocked =
+    input.settings.promoExcludeSupportHeavyUsers &&
+    recentSupportCount >= Math.max(1, input.settings.promoSupportHeavyThreshold);
+  const latestPaidFulfillment = input.telegramOrders
+    .filter((order) => order.status === 'FULFILLED' && (order.priceAmount || 0) > 0)
+    .map((order) => order.fulfilledAt || order.createdAt)
+    .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+
+  const campaigns: Array<{
+    campaignType: CustomerCouponEligibility['campaignType'];
+    label: string;
+    enabled: boolean;
+    paused: boolean;
+    converted: boolean;
+  }> = [
+    {
+      campaignType: 'TRIAL_TO_PAID',
+      label: 'Trial to paid',
+      enabled: input.settings.trialCouponEnabled,
+      paused: input.settings.trialCouponPaused,
+      converted: input.telegramOrders.some(
+        (order) => order.status === 'FULFILLED' && (order.priceAmount || 0) > 0,
+      ),
+    },
+    {
+      campaignType: 'RENEWAL_SOON',
+      label: 'Renewal coupon',
+      enabled: input.settings.renewalCouponEnabled,
+      paused: input.settings.renewalCouponPaused,
+      converted: input.telegramOrders.some(
+        (order) =>
+          order.status === 'FULFILLED' &&
+          order.kind === 'RENEW' &&
+          ((order.targetAccessKeyId && input.accessKeyIds.includes(order.targetAccessKeyId)) ||
+            (order.targetDynamicKeyId && input.dynamicKeyIds.includes(order.targetDynamicKeyId))),
+      ),
+    },
+    {
+      campaignType: 'PREMIUM_UPSELL',
+      label: 'Premium upsell',
+      enabled: input.settings.premiumUpsellCouponEnabled,
+      paused: input.settings.premiumUpsellCouponPaused,
+      converted: input.telegramOrders.some(
+        (order) =>
+          order.status === 'FULFILLED' &&
+          order.deliveryType === 'DYNAMIC_KEY' &&
+          (order.priceAmount || 0) > 0,
+      ),
+    },
+    {
+      campaignType: 'WINBACK',
+      label: 'Win-back',
+      enabled: input.settings.winbackCouponEnabled,
+      paused: input.settings.winbackCouponPaused,
+      converted: Boolean(
+        latestPaidFulfillment &&
+          input.now.getTime() - latestPaidFulfillment.getTime() < 30 * 24 * 60 * 60 * 1000,
+      ),
+    },
+  ];
+
+  return campaigns.map((campaign) => {
+    const relatedCoupons = input.couponRedemptions.filter(
+      (coupon) => coupon.campaignType === campaign.campaignType,
+    );
+    const activeCoupons = relatedCoupons.filter(
+      (coupon) =>
+        coupon.status === 'ISSUED' &&
+        (!coupon.expiresAt || coupon.expiresAt.getTime() > input.now.getTime()),
+    );
+    const redeemedCoupons = relatedCoupons.filter((coupon) => coupon.status === 'REDEEMED');
+    const expiredCoupons = relatedCoupons.filter((coupon) => coupon.status === 'EXPIRED');
+    const revokedCoupons = relatedCoupons.filter((coupon) => coupon.status === 'CANCELLED');
+    const maxUsesPerUser = Math.max(
+      1,
+      ...relatedCoupons.map((coupon) => coupon.maxUsesPerUser || 1),
+    );
+    const remainingUses = Math.max(0, maxUsesPerUser - redeemedCoupons.length);
+    const latestIssuedAt = relatedCoupons
+      .map((coupon) => coupon.issuedAt)
+      .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+    const cooldownUntil =
+      latestIssuedAt && cooldownMs > 0
+        ? new Date(latestIssuedAt.getTime() + cooldownMs)
+        : null;
+    const cooldownBlocked = Boolean(
+      cooldownUntil && cooldownUntil.getTime() > input.now.getTime(),
+    );
+
+    let blockedReason: CustomerCouponEligibility['blockedReason'] = null;
+    if (!campaign.enabled) {
+      blockedReason = 'DISABLED';
+    } else if (campaign.paused) {
+      blockedReason = 'PAUSED';
+    } else if (activeCoupons.length > 0) {
+      blockedReason = 'ACTIVE_COUPON';
+    } else if (campaign.converted) {
+      blockedReason = 'CONVERTED';
+    } else if (remainingUses <= 0) {
+      blockedReason = 'LIMIT_REACHED';
+    } else if (cooldownBlocked) {
+      blockedReason = 'COOLDOWN';
+    } else if (recentRefundBlocked) {
+      blockedReason = 'RECENT_REFUND';
+    } else if (supportHeavyBlocked) {
+      blockedReason = 'SUPPORT_HEAVY';
+    }
+
+    return {
+      campaignType: campaign.campaignType,
+      label: campaign.label,
+      enabled: campaign.enabled,
+      paused: campaign.paused,
+      remainingUses,
+      activeCoupons: activeCoupons.length,
+      redeemedCoupons: redeemedCoupons.length,
+      expiredCoupons: expiredCoupons.length,
+      revokedCoupons: revokedCoupons.length,
+      maxUsesPerUser,
+      cooldownUntil: cooldownBlocked ? cooldownUntil : null,
+      blockedReason,
+      eligibleNow: blockedReason === null,
+    } satisfies CustomerCouponEligibility;
+  });
 }
 
 export const usersRouter = router({
@@ -180,7 +396,10 @@ export const usersRouter = router({
         });
       }
 
-      const financeControls = await getFinanceControls();
+      const [financeControls, telegramSalesSettings] = await Promise.all([
+        getFinanceControls(),
+        getTelegramSalesSettings(),
+      ]);
 
       const accessKeyIds = user.accessKeys.map((key) => key.id);
       const dynamicKeyIds = user.dynamicAccessKeys.map((key) => key.id);
@@ -480,6 +699,38 @@ export const usersRouter = router({
           statusUpdatedByUserId: coupon.statusUpdatedByUserId,
           statusUpdatedReason: coupon.statusUpdatedReason,
         })),
+        couponEligibility: buildCustomerCouponEligibility({
+          settings: telegramSalesSettings,
+          now: new Date(),
+          accessKeyIds,
+          dynamicKeyIds,
+          couponRedemptions: couponRedemptions.map((coupon) => ({
+            campaignType: coupon.campaignType as CustomerCouponEligibility['campaignType'],
+            status: coupon.status,
+            maxUsesPerUser: coupon.maxUsesPerUser,
+            issuedAt: coupon.issuedAt,
+            expiresAt: coupon.expiresAt,
+          })),
+          telegramOrders: telegramOrders.map((order) => ({
+            status: order.status,
+            kind: order.kind,
+            deliveryType: order.deliveryType,
+            priceAmount: order.priceAmount ?? null,
+            targetAccessKeyId: order.targetAccessKeyId,
+            targetDynamicKeyId: order.targetDynamicKeyId,
+            financeStatus: order.financeStatus,
+            financeUpdatedAt: order.financeUpdatedAt,
+            refundRequestStatus: order.refundRequestStatus,
+            refundRequestedAt: order.refundRequestedAt,
+            refundRequestReviewedAt: order.refundRequestReviewedAt,
+            fulfilledAt: order.fulfilledAt,
+            createdAt: order.createdAt,
+          })),
+          supportNotes: supportNotes.map((note) => ({
+            kind: note.kind,
+            createdAt: note.createdAt,
+          })),
+        }),
         serverChangeRequests,
         premiumSupportRequests,
         premiumRoutingAlerts: premiumRoutingAlerts.map((event) => ({

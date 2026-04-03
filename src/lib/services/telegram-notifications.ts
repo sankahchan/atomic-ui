@@ -1,0 +1,223 @@
+import type { SupportedLocale } from '@/lib/i18n/config';
+import { db } from '@/lib/db';
+import { buildTelegramNotificationPreferenceCallbackData } from '@/lib/services/telegram-callbacks';
+import {
+  getTelegramNotificationPreferenceLabel,
+  getTelegramNotificationPreferences,
+  sendTelegramMessage,
+} from '@/lib/services/telegram-runtime';
+import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
+
+export function buildTelegramNotificationPreferencesKeyboard(
+  locale: SupportedLocale,
+  preferences: Awaited<ReturnType<typeof getTelegramNotificationPreferences>>,
+) {
+  const renderToggle = (key: 'promo' | 'maintenance' | 'receipt' | 'support') => {
+    const enabled = preferences[key];
+    const label = getTelegramNotificationPreferenceLabel(key, locale);
+    return {
+      text: `${enabled ? '✅' : '⚪️'} ${label}`,
+      callback_data: buildTelegramNotificationPreferenceCallbackData(key, !enabled),
+    };
+  };
+
+  return {
+    inline_keyboard: [
+      [renderToggle('promo')],
+      [renderToggle('maintenance')],
+      [renderToggle('receipt')],
+      [renderToggle('support')],
+    ],
+  };
+}
+
+export function buildTelegramNotificationPreferencesMessage(
+  locale: SupportedLocale,
+  preferences: Awaited<ReturnType<typeof getTelegramNotificationPreferences>>,
+  includeHint = true,
+) {
+  const lines = [
+    locale === 'my'
+      ? '🔔 <b>Notification preferences</b>'
+      : '🔔 <b>Notification preferences</b>',
+    '',
+    `• ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
+    `• ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
+  ];
+
+  if (includeHint) {
+    lines.push(
+      '',
+      locale === 'my'
+        ? 'အောက်ပါ button များဖြင့် ON/OFF ပြောင်းနိုင်ပါသည်။'
+        : 'Use the buttons below to turn each type on or off.',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+export async function handleNotificationPreferencesCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+}) {
+  const preferences = await getTelegramNotificationPreferences({
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+  });
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramNotificationPreferencesMessage(input.locale, preferences),
+    {
+      replyMarkup: buildTelegramNotificationPreferencesKeyboard(input.locale, preferences),
+    },
+  );
+
+  return null;
+}
+
+export async function handleInboxCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  argsText: string;
+  locale: SupportedLocale;
+}): Promise<string> {
+  const chatIdValue = String(input.chatId);
+  const telegramUserIdValue = String(input.telegramUserId);
+  const mode = (() => {
+    const normalized = input.argsText.trim().toLowerCase();
+    if (normalized === 'unread') {
+      return 'UNREAD' as const;
+    }
+    if (normalized === 'pinned' || normalized === 'important') {
+      return 'PINNED' as const;
+    }
+    return 'ALL' as const;
+  })();
+  const [announcements, accessKeys] = await Promise.all([
+    db.telegramAnnouncementDelivery.findMany({
+      where: {
+        chatId: chatIdValue,
+        status: 'SENT',
+        ...(mode === 'UNREAD'
+          ? { readAt: null }
+          : mode === 'PINNED'
+            ? { isPinned: true }
+            : {}),
+      },
+      include: {
+        announcement: true,
+      },
+      orderBy: [{ isPinned: 'desc' }, { readAt: 'asc' }, { sentAt: 'desc' }, { createdAt: 'desc' }],
+      take: 8,
+    }),
+    db.accessKey.findMany({
+      where: {
+        OR: [
+          { telegramId: chatIdValue },
+          { telegramId: telegramUserIdValue },
+          { user: { telegramChatId: chatIdValue } },
+        ],
+      },
+      select: {
+        id: true,
+      },
+      take: 12,
+    }),
+  ]);
+
+  const keyLogs = accessKeys.length
+    ? await db.notificationLog.findMany({
+        where: {
+          accessKeyId: {
+            in: accessKeys.map((key) => key.id),
+          },
+        },
+        include: {
+          accessKey: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: [{ sentAt: 'desc' }],
+        take: 5,
+      })
+    : [];
+
+  const unreadAnnouncementIds = announcements
+    .filter((delivery) => delivery.readAt == null)
+    .map((delivery) => delivery.id);
+  if (unreadAnnouncementIds.length > 0) {
+    await db.telegramAnnouncementDelivery.updateMany({
+      where: {
+        id: {
+          in: unreadAnnouncementIds,
+        },
+      },
+      data: {
+        readAt: new Date(),
+      },
+    });
+  }
+
+  if (!announcements.length && !keyLogs.length) {
+    return input.locale === 'my'
+      ? '📭 မကြာသေးမီက notice သို့မဟုတ် announcement မရှိသေးပါ။'
+      : '📭 No recent notices or announcements yet.';
+  }
+
+  const lines = [
+    input.locale === 'my' ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>',
+    '',
+  ];
+
+  if (announcements.length) {
+    lines.push(
+      mode === 'PINNED'
+        ? input.locale === 'my'
+          ? '<b>Pin လုပ်ထားသော announcement များ</b>'
+          : '<b>Pinned announcements</b>'
+        : mode === 'UNREAD'
+          ? input.locale === 'my'
+            ? '<b>မဖတ်ရသေးသော announcement များ</b>'
+            : '<b>Unread announcements</b>'
+          : input.locale === 'my'
+            ? '<b>Announcement များ</b>'
+            : '<b>Announcements</b>',
+    );
+    for (const delivery of announcements) {
+      lines.push(
+        `• ${delivery.isPinned ? '📌 ' : ''}<b>${escapeHtml(delivery.announcement.title)}</b>`,
+        `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale)}`,
+        `  ${delivery.readAt ? (input.locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (input.locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
+      );
+    }
+    lines.push('');
+  }
+
+  if (keyLogs.length && mode === 'ALL') {
+    lines.push(input.locale === 'my' ? '<b>Key Notice များ</b>' : '<b>Key notices</b>');
+    for (const log of keyLogs) {
+      lines.push(
+        `• <b>${escapeHtml(log.event)}</b>`,
+        `  ${escapeHtml(log.accessKey?.name || 'Key')} • ${formatTelegramDateTime(log.sentAt, input.locale)}`,
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    input.locale === 'my'
+      ? 'Tip: /inbox unread သို့မဟုတ် /inbox pinned ကို အသုံးပြုနိုင်သည်။'
+      : 'Tip: use /inbox unread or /inbox pinned.',
+  );
+
+  return lines.join('\n');
+}

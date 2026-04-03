@@ -56,6 +56,61 @@ function FinanceStatusBadge({ status }: { status: string }) {
   );
 }
 
+function CouponLifecycleBadge({
+  status,
+}: {
+  status:
+    | 'ISSUED'
+    | 'REDEEMED'
+    | 'EXPIRED'
+    | 'CANCELLED'
+    | 'ELIGIBLE'
+    | 'ACTIVE_COUPON'
+    | 'PAUSED'
+    | 'COOLDOWN'
+    | 'RECENT_REFUND'
+    | 'SUPPORT_HEAVY'
+    | 'CONVERTED'
+    | 'DISABLED'
+    | 'LIMIT_REACHED';
+}) {
+  const labelMap: Record<string, string> = {
+    ISSUED: 'Active',
+    REDEEMED: 'Redeemed',
+    EXPIRED: 'Expired',
+    CANCELLED: 'Revoked',
+    ELIGIBLE: 'Eligible',
+    ACTIVE_COUPON: 'Active coupon',
+    PAUSED: 'Paused',
+    COOLDOWN: 'Cooling down',
+    RECENT_REFUND: 'Recent refund',
+    SUPPORT_HEAVY: 'Support-heavy',
+    CONVERTED: 'Converted',
+    DISABLED: 'Disabled',
+    LIMIT_REACHED: 'Limit reached',
+  };
+  const className =
+    status === 'ISSUED' || status === 'ACTIVE_COUPON' || status === 'ELIGIBLE'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+      : status === 'REDEEMED' || status === 'CONVERTED'
+        ? 'border-sky-500/30 bg-sky-500/10 text-sky-200'
+        : status === 'PAUSED' || status === 'COOLDOWN'
+          ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+          : status === 'RECENT_REFUND' || status === 'SUPPORT_HEAVY'
+            ? 'border-orange-500/30 bg-orange-500/10 text-orange-100'
+            : status === 'EXPIRED' || status === 'LIMIT_REACHED'
+              ? 'border-zinc-500/30 bg-zinc-500/10 text-zinc-200'
+              : status === 'DISABLED'
+                ? 'border-border/60 bg-background/50 text-muted-foreground'
+                : 'border-red-500/30 bg-red-500/10 text-red-200';
+
+  return (
+    <Badge variant="outline" className={className}>
+      {labelMap[status] || status}
+    </Badge>
+  );
+}
+
 type FinanceTimelineEvent = {
   id: string;
   at: Date;
@@ -753,7 +808,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, couponHistory, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, couponHistory, couponEligibility, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -772,6 +827,7 @@ export default function UserLedgerPage() {
   type AccessKeyItem = (typeof accessKeys)[number];
   type DynamicKeyItem = (typeof dynamicKeys)[number];
   type CouponHistoryItem = (typeof couponHistory)[number];
+  type CouponEligibilityItem = (typeof couponEligibility)[number];
 
   return (
     <div className="space-y-6">
@@ -1144,6 +1200,84 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
+                <p className="mb-2 text-sm font-medium">Campaign eligibility</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {couponEligibility.map((campaign: CouponEligibilityItem) => (
+                    <div
+                      key={campaign.campaignType}
+                      className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{campaign.label}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Remaining eligibility {campaign.remainingUses}/{campaign.maxUsesPerUser}
+                            {campaign.cooldownUntil
+                              ? ` • cooldown until ${formatDateTime(campaign.cooldownUntil)}`
+                              : ''}
+                          </p>
+                        </div>
+                        <CouponLifecycleBadge
+                          status={
+                            campaign.blockedReason
+                              ? campaign.blockedReason
+                              : campaign.eligibleNow
+                                ? 'ELIGIBLE'
+                                : 'LIMIT_REACHED'
+                          }
+                        />
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                        <div className="rounded-xl border border-border/50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Active
+                          </p>
+                          <p className="mt-2 text-lg font-semibold">{campaign.activeCoupons}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Redeemed
+                          </p>
+                          <p className="mt-2 text-lg font-semibold">{campaign.redeemedCoupons}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Expired
+                          </p>
+                          <p className="mt-2 text-lg font-semibold">{campaign.expiredCoupons}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Revoked
+                          </p>
+                          <p className="mt-2 text-lg font-semibold">{campaign.revokedCoupons}</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {!campaign.enabled
+                          ? 'This campaign is disabled in Telegram sales settings.'
+                          : campaign.paused
+                            ? 'This campaign is paused and will not issue new coupons.'
+                            : campaign.blockedReason === 'ACTIVE_COUPON'
+                              ? 'This customer already has an active coupon for this campaign.'
+                              : campaign.blockedReason === 'CONVERTED'
+                                ? 'This customer already converted, so this campaign stops automatically.'
+                                : campaign.blockedReason === 'COOLDOWN'
+                                  ? 'This customer is inside the promo cool-down window.'
+                                  : campaign.blockedReason === 'RECENT_REFUND'
+                                    ? 'Recent refund activity blocks new promos for this customer.'
+                                    : campaign.blockedReason === 'SUPPORT_HEAVY'
+                                      ? 'Recent support volume blocks new promos for this customer.'
+                                      : campaign.blockedReason === 'LIMIT_REACHED'
+                                        ? 'This customer already used the maximum number of coupons for this campaign.'
+                                        : 'This customer can receive this promo if they enter the matching campaign segment.'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <p className="mb-2 text-sm font-medium">Coupon history</p>
                 {couponHistory.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No coupon history for this customer yet.</p>
@@ -1156,7 +1290,7 @@ export default function UserLedgerPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-medium">{coupon.couponCode}</p>
                               <Badge variant="outline">{coupon.campaignType}</Badge>
-                              <Badge variant="secondary">{coupon.status}</Badge>
+                              <CouponLifecycleBadge status={coupon.status as 'ISSUED' | 'REDEEMED' | 'EXPIRED' | 'CANCELLED'} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {coupon.couponDiscountLabel || formatMoney(coupon.couponDiscountAmount, coupon.currency)} • per-user limit {coupon.maxUsesPerUser} • stop after conversion {coupon.stopAfterConversion ? 'yes' : 'no'}

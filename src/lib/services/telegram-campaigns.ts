@@ -1,6 +1,9 @@
 import { db } from '@/lib/db';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
-import { issueTelegramCampaignCoupon } from '@/lib/services/telegram-coupons';
+import {
+  issueTelegramCampaignCoupon,
+  type TelegramCampaignCouponType,
+} from '@/lib/services/telegram-coupons';
 import {
   getTelegramDefaultLocale,
   loadAccessKeyForMessaging,
@@ -13,8 +16,231 @@ import {
   sendAccessKeyTrialExpiryReminder,
   sendTelegramWinbackCouponCampaign,
 } from '@/lib/services/telegram-reminders';
-import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
+import {
+  getTelegramSalesSettings,
+  type TelegramSalesSettings,
+} from '@/lib/services/telegram-sales';
 import { tagMatchesFilter } from '@/lib/tags';
+
+const PROMO_SUPPORT_NOTE_KINDS = ['INTERNAL', 'DIRECT_MESSAGE', 'OUTAGE_UPDATE'] as const;
+
+type PromoGuardrailInput = {
+  telegramChatId: string;
+  telegramUserId: string;
+  linkedUserId?: string | null;
+};
+
+type PromoGuardrailCaches = {
+  linkedUserIds: Map<string, string | null>;
+  recentRefunds: Map<string, boolean>;
+  supportHeavy: Map<string, boolean>;
+  cooldown: Map<string, boolean>;
+};
+
+function resolveCampaignControl(
+  settings: TelegramSalesSettings,
+  campaignType: TelegramCampaignCouponType,
+) {
+  switch (campaignType) {
+    case 'TRIAL_TO_PAID':
+      return {
+        enabled: settings.trialCouponEnabled,
+        paused: settings.trialCouponPaused,
+        maxRecipientsPerRun: settings.trialCouponMaxRecipientsPerRun,
+      };
+    case 'RENEWAL_SOON':
+      return {
+        enabled: settings.renewalCouponEnabled,
+        paused: settings.renewalCouponPaused,
+        maxRecipientsPerRun: settings.renewalCouponMaxRecipientsPerRun,
+      };
+    case 'PREMIUM_UPSELL':
+      return {
+        enabled: settings.premiumUpsellCouponEnabled,
+        paused: settings.premiumUpsellCouponPaused,
+        maxRecipientsPerRun: settings.premiumUpsellCouponMaxRecipientsPerRun,
+      };
+    case 'WINBACK':
+      return {
+        enabled: settings.winbackCouponEnabled,
+        paused: settings.winbackCouponPaused,
+        maxRecipientsPerRun: settings.winbackCouponMaxRecipientsPerRun,
+      };
+  }
+}
+
+function hasReachedCampaignCap(sentCount: number, maxRecipientsPerRun: number) {
+  return maxRecipientsPerRun > 0 && sentCount >= maxRecipientsPerRun;
+}
+
+async function resolveLinkedUserIdForPromo(
+  input: PromoGuardrailInput,
+  caches: PromoGuardrailCaches,
+) {
+  if (input.linkedUserId) {
+    return input.linkedUserId;
+  }
+
+  const cacheKey = `${input.telegramChatId}:${input.telegramUserId}`;
+  if (caches.linkedUserIds.has(cacheKey)) {
+    return caches.linkedUserIds.get(cacheKey) || null;
+  }
+
+  const matchedUser = await db.user.findFirst({
+    where: {
+      OR: [
+        { telegramChatId: input.telegramChatId },
+        { accessKeys: { some: { telegramId: input.telegramChatId } } },
+        { accessKeys: { some: { telegramId: input.telegramUserId } } },
+        { dynamicAccessKeys: { some: { telegramId: input.telegramChatId } } },
+        { dynamicAccessKeys: { some: { telegramId: input.telegramUserId } } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  const userId = matchedUser?.id || null;
+  caches.linkedUserIds.set(cacheKey, userId);
+  return userId;
+}
+
+async function hasRecentRefundBlock(
+  input: PromoGuardrailInput,
+  settings: TelegramSalesSettings,
+  now: Date,
+  caches: PromoGuardrailCaches,
+) {
+  if (!settings.promoExcludeRecentRefundUsers) {
+    return false;
+  }
+
+  const cacheKey = input.telegramUserId;
+  if (caches.recentRefunds.has(cacheKey)) {
+    return caches.recentRefunds.get(cacheKey) || false;
+  }
+
+  const cutoff = new Date(
+    now.getTime() - Math.max(1, settings.promoExcludeRecentRefundDays) * 24 * 60 * 60 * 1000,
+  );
+
+  const matches = await db.telegramOrder.count({
+    where: {
+      telegramUserId: input.telegramUserId,
+      OR: [
+        {
+          financeStatus: 'REFUNDED',
+          financeUpdatedAt: { gte: cutoff },
+        },
+        {
+          refundRequestStatus: { in: ['APPROVED', 'PENDING'] },
+          OR: [
+            { refundRequestReviewedAt: { gte: cutoff } },
+            { refundRequestedAt: { gte: cutoff } },
+          ],
+        },
+      ],
+    },
+  });
+
+  const blocked = matches > 0;
+  caches.recentRefunds.set(cacheKey, blocked);
+  return blocked;
+}
+
+async function hasSupportHeavyBlock(
+  input: PromoGuardrailInput,
+  settings: TelegramSalesSettings,
+  now: Date,
+  caches: PromoGuardrailCaches,
+) {
+  if (!settings.promoExcludeSupportHeavyUsers) {
+    return false;
+  }
+
+  const linkedUserId = await resolveLinkedUserIdForPromo(input, caches);
+  if (!linkedUserId) {
+    return false;
+  }
+
+  if (caches.supportHeavy.has(linkedUserId)) {
+    return caches.supportHeavy.get(linkedUserId) || false;
+  }
+
+  const cutoff = new Date(
+    now.getTime() - Math.max(1, settings.promoSupportHeavyLookbackDays) * 24 * 60 * 60 * 1000,
+  );
+
+  const noteCount = await db.customerSupportNote.count({
+    where: {
+      userId: linkedUserId,
+      kind: {
+        in: [...PROMO_SUPPORT_NOTE_KINDS],
+      },
+      createdAt: {
+        gte: cutoff,
+      },
+    },
+  });
+
+  const blocked = noteCount >= Math.max(1, settings.promoSupportHeavyThreshold);
+  caches.supportHeavy.set(linkedUserId, blocked);
+  return blocked;
+}
+
+async function hasCooldownBlock(
+  input: PromoGuardrailInput,
+  settings: TelegramSalesSettings,
+  now: Date,
+  caches: PromoGuardrailCaches,
+) {
+  if ((settings.promoCampaignCooldownHours || 0) <= 0) {
+    return false;
+  }
+
+  const cacheKey = `${input.telegramChatId}:${input.telegramUserId}`;
+  if (caches.cooldown.has(cacheKey)) {
+    return caches.cooldown.get(cacheKey) || false;
+  }
+
+  const cutoff = new Date(
+    now.getTime() - Math.max(0, settings.promoCampaignCooldownHours) * 60 * 60 * 1000,
+  );
+
+  const issuedRecently = await db.telegramCouponRedemption.count({
+    where: {
+      telegramChatId: input.telegramChatId,
+      telegramUserId: input.telegramUserId,
+      createdAt: {
+        gte: cutoff,
+      },
+    },
+  });
+
+  const blocked = issuedRecently > 0;
+  caches.cooldown.set(cacheKey, blocked);
+  return blocked;
+}
+
+async function isPromoSendBlocked(
+  input: PromoGuardrailInput,
+  settings: TelegramSalesSettings,
+  now: Date,
+  caches: PromoGuardrailCaches,
+) {
+  if (await hasRecentRefundBlock(input, settings, now, caches)) {
+    return true;
+  }
+
+  if (await hasSupportHeavyBlock(input, settings, now, caches)) {
+    return true;
+  }
+
+  if (await hasCooldownBlock(input, settings, now, caches)) {
+    return true;
+  }
+
+  return false;
+}
 
 export async function runTelegramCouponCampaignCycle(input: {
   now?: Date;
@@ -23,6 +249,12 @@ export async function runTelegramCouponCampaignCycle(input: {
   const settings = await getTelegramSalesSettings();
   const trialReminderLeadMs = 6 * 60 * 60 * 1000;
   const trialCouponLeadMs = Math.max(1, settings.trialCouponLeadHours || 12) * 60 * 60 * 1000;
+  const guardrailCaches: PromoGuardrailCaches = {
+    linkedUserIds: new Map(),
+    recentRefunds: new Map(),
+    supportHeavy: new Map(),
+    cooldown: new Map(),
+  };
 
   let trialCouponReminded = 0;
   let renewalCouponReminded = 0;
@@ -55,7 +287,12 @@ export async function runTelegramCouponCampaignCycle(input: {
     tagMatchesFilter(candidate.tags || '', 'trial'),
   );
 
-  if (settings.trialCouponEnabled && eligibleTrialCandidates.length > 0) {
+  const trialCampaignControl = resolveCampaignControl(settings, 'TRIAL_TO_PAID');
+  if (
+    trialCampaignControl.enabled &&
+    !trialCampaignControl.paused &&
+    eligibleTrialCandidates.length > 0
+  ) {
     const couponCandidates = eligibleTrialCandidates.filter(
       (candidate) =>
         Boolean(candidate.expiresAt) &&
@@ -63,6 +300,14 @@ export async function runTelegramCouponCampaignCycle(input: {
     );
 
     for (const key of couponCandidates) {
+      if (
+        hasReachedCampaignCap(
+          trialCouponReminded,
+          trialCampaignControl.maxRecipientsPerRun,
+        )
+      ) {
+        break;
+      }
       if (!key.expiresAt) {
         continue;
       }
@@ -79,6 +324,20 @@ export async function runTelegramCouponCampaignCycle(input: {
         }
         const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
         if (!destinationChatId) {
+          continue;
+        }
+        if (
+          await isPromoSendBlocked(
+            {
+              telegramChatId: destinationChatId,
+              telegramUserId: messagingKey.telegramId || destinationChatId,
+              linkedUserId: messagingKey.user?.id || null,
+            },
+            settings,
+            now,
+            guardrailCaches,
+          )
+        ) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -156,7 +415,8 @@ export async function runTelegramCouponCampaignCycle(input: {
     }
   }
 
-  if (settings.renewalCouponEnabled) {
+  const renewalCampaignControl = resolveCampaignControl(settings, 'RENEWAL_SOON');
+  if (renewalCampaignControl.enabled && !renewalCampaignControl.paused) {
     const renewalLeadDays = Math.max(1, settings.renewalCouponLeadDays || 5);
     const renewalCandidates = await db.accessKey.findMany({
       where: {
@@ -176,6 +436,14 @@ export async function runTelegramCouponCampaignCycle(input: {
     });
 
     for (const key of renewalCandidates) {
+      if (
+        hasReachedCampaignCap(
+          renewalCouponReminded,
+          renewalCampaignControl.maxRecipientsPerRun,
+        )
+      ) {
+        break;
+      }
       if (!key.expiresAt || tagMatchesFilter(key.tags || '', 'trial')) {
         continue;
       }
@@ -187,6 +455,20 @@ export async function runTelegramCouponCampaignCycle(input: {
         }
         const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
         if (!destinationChatId) {
+          continue;
+        }
+        if (
+          await isPromoSendBlocked(
+            {
+              telegramChatId: destinationChatId,
+              telegramUserId: messagingKey.telegramId || destinationChatId,
+              linkedUserId: messagingKey.user?.id || null,
+            },
+            settings,
+            now,
+            guardrailCaches,
+          )
+        ) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -224,7 +506,8 @@ export async function runTelegramCouponCampaignCycle(input: {
     }
   }
 
-  if (settings.premiumUpsellCouponEnabled) {
+  const premiumUpsellCampaignControl = resolveCampaignControl(settings, 'PREMIUM_UPSELL');
+  if (premiumUpsellCampaignControl.enabled && !premiumUpsellCampaignControl.paused) {
     const threshold = Math.max(10, Math.min(100, settings.premiumUpsellUsageThresholdPercent || 80));
     const upsellCandidates = await db.accessKey.findMany({
       where: {
@@ -243,6 +526,14 @@ export async function runTelegramCouponCampaignCycle(input: {
     });
 
     for (const key of upsellCandidates) {
+      if (
+        hasReachedCampaignCap(
+          premiumUpsellReminded,
+          premiumUpsellCampaignControl.maxRecipientsPerRun,
+        )
+      ) {
+        break;
+      }
       if (!key.dataLimitBytes || tagMatchesFilter(key.tags || '', 'trial')) {
         continue;
       }
@@ -258,6 +549,20 @@ export async function runTelegramCouponCampaignCycle(input: {
         }
         const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
         if (!destinationChatId) {
+          continue;
+        }
+        if (
+          await isPromoSendBlocked(
+            {
+              telegramChatId: destinationChatId,
+              telegramUserId: messagingKey.telegramId || destinationChatId,
+              linkedUserId: messagingKey.user?.id || null,
+            },
+            settings,
+            now,
+            guardrailCaches,
+          )
+        ) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -291,7 +596,8 @@ export async function runTelegramCouponCampaignCycle(input: {
     }
   }
 
-  if (settings.winbackCouponEnabled) {
+  const winbackCampaignControl = resolveCampaignControl(settings, 'WINBACK');
+  if (winbackCampaignControl.enabled && !winbackCampaignControl.paused) {
     const inactivityDays = Math.max(7, settings.winbackCouponInactivityDays || 30);
     const inactivityCutoff = new Date(now.getTime() - inactivityDays * 24 * 60 * 60 * 1000);
     const winbackOrders = await db.telegramOrder.findMany({
@@ -319,12 +625,33 @@ export async function runTelegramCouponCampaignCycle(input: {
     }
 
     for (const order of Array.from(latestByUser.values())) {
+      if (
+        hasReachedCampaignCap(
+          winbackCouponReminded,
+          winbackCampaignControl.maxRecipientsPerRun,
+        )
+      ) {
+        break;
+      }
       const baseline = order.fulfilledAt || order.createdAt;
       if (baseline > inactivityCutoff) {
         continue;
       }
 
       try {
+        if (
+          await isPromoSendBlocked(
+            {
+              telegramChatId: order.telegramChatId,
+              telegramUserId: order.telegramUserId,
+            },
+            settings,
+            now,
+            guardrailCaches,
+          )
+        ) {
+          continue;
+        }
         const issued = await issueTelegramCampaignCoupon({
           campaignType: 'WINBACK',
           couponCode: settings.winbackCouponCode,

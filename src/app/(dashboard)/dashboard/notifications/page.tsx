@@ -545,25 +545,39 @@ type TelegramSalesSettingsForm = {
   dailySalesDigestHour: number;
   dailySalesDigestMinute: number;
   trialCouponEnabled: boolean;
+  trialCouponPaused: boolean;
   trialCouponLeadHours: string;
+  trialCouponMaxRecipientsPerRun: string;
   trialCouponCode: string;
   trialCouponDiscountLabel: string;
   trialCouponDiscountAmount: string;
   renewalCouponEnabled: boolean;
+  renewalCouponPaused: boolean;
   renewalCouponLeadDays: string;
+  renewalCouponMaxRecipientsPerRun: string;
   renewalCouponCode: string;
   renewalCouponDiscountLabel: string;
   renewalCouponDiscountAmount: string;
   premiumUpsellCouponEnabled: boolean;
+  premiumUpsellCouponPaused: boolean;
   premiumUpsellUsageThresholdPercent: string;
+  premiumUpsellCouponMaxRecipientsPerRun: string;
   premiumUpsellCouponCode: string;
   premiumUpsellCouponDiscountLabel: string;
   premiumUpsellCouponDiscountAmount: string;
   winbackCouponEnabled: boolean;
+  winbackCouponPaused: boolean;
   winbackCouponInactivityDays: string;
+  winbackCouponMaxRecipientsPerRun: string;
   winbackCouponCode: string;
   winbackCouponDiscountLabel: string;
   winbackCouponDiscountAmount: string;
+  promoCampaignCooldownHours: string;
+  promoExcludeRecentRefundUsers: boolean;
+  promoExcludeRecentRefundDays: string;
+  promoExcludeSupportHeavyUsers: boolean;
+  promoSupportHeavyLookbackDays: string;
+  promoSupportHeavyThreshold: string;
   paymentReminderHours: string;
   pendingReviewReminderHours: string;
   rejectedOrderReminderHours: string;
@@ -992,25 +1006,39 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   dailySalesDigestHour: 20,
   dailySalesDigestMinute: 0,
   trialCouponEnabled: true,
+  trialCouponPaused: false,
   trialCouponLeadHours: '12',
+  trialCouponMaxRecipientsPerRun: '25',
   trialCouponCode: 'TRIAL500',
   trialCouponDiscountLabel: '500 Kyat off your first paid order',
   trialCouponDiscountAmount: '500',
   renewalCouponEnabled: true,
+  renewalCouponPaused: false,
   renewalCouponLeadDays: '5',
+  renewalCouponMaxRecipientsPerRun: '20',
   renewalCouponCode: 'RENEW500',
   renewalCouponDiscountLabel: '500 Kyat off your renewal',
   renewalCouponDiscountAmount: '500',
   premiumUpsellCouponEnabled: true,
+  premiumUpsellCouponPaused: false,
   premiumUpsellUsageThresholdPercent: '80',
+  premiumUpsellCouponMaxRecipientsPerRun: '15',
   premiumUpsellCouponCode: 'PREMIUM1000',
   premiumUpsellCouponDiscountLabel: '1,000 Kyat off your premium upgrade',
   premiumUpsellCouponDiscountAmount: '1000',
   winbackCouponEnabled: true,
+  winbackCouponPaused: false,
   winbackCouponInactivityDays: '30',
+  winbackCouponMaxRecipientsPerRun: '20',
   winbackCouponCode: 'WELCOME700',
   winbackCouponDiscountLabel: '700 Kyat off your comeback order',
   winbackCouponDiscountAmount: '700',
+  promoCampaignCooldownHours: '72',
+  promoExcludeRecentRefundUsers: true,
+  promoExcludeRecentRefundDays: '30',
+  promoExcludeSupportHeavyUsers: true,
+  promoSupportHeavyLookbackDays: '14',
+  promoSupportHeavyThreshold: '3',
   paymentReminderHours: '3',
   pendingReviewReminderHours: '6',
   rejectedOrderReminderHours: '12',
@@ -3169,6 +3197,66 @@ function TelegramBotSetupCard() {
                     </div>
 
                     <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">Template comparison</p>
+                        <Badge variant="outline">
+                          {announcementAnalytics.byTemplate.length >= 2 ? 'Side by side' : 'Need 2 templates'}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        {announcementAnalytics.byTemplate.length >= 2 ? (
+                          announcementAnalytics.byTemplate.slice(0, 2).map((entry) => (
+                            <div
+                              key={`compare:${entry.templateId || entry.templateName}`}
+                              className="rounded-xl border border-border/50 p-3"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium">{entry.templateName}</p>
+                                <Badge variant="outline">
+                                  {Math.round(entry.conversionRate * 100)}% conv.
+                                </Badge>
+                              </div>
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <div className="rounded-lg border border-border/50 px-3 py-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Delivery</p>
+                                  <p className="mt-2 text-sm font-medium">{entry.sentCount}/{entry.totalRecipients}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">{Math.round(entry.deliverySuccessRate * 100)}% success</p>
+                                </div>
+                                <div className="rounded-lg border border-border/50 px-3 py-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Engagement</p>
+                                  <p className="mt-2 text-sm font-medium">{entry.openCount} opens • {entry.clickCount} clicks</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-border/50 px-3 py-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Orders</p>
+                                  <p className="mt-2 text-sm font-medium">{entry.attributedOrders}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">Attributed conversions</p>
+                                </div>
+                                <div className="rounded-lg border border-border/50 px-3 py-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
+                                  <p className="mt-2 text-sm font-medium">
+                                    {entry.attributedRevenue.length > 0
+                                      ? entry.attributedRevenue
+                                          .map((value) => formatAnnouncementMoney(value.amount, value.currency))
+                                          .join(' • ')
+                                      : '0'}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">Attributed promo revenue</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Send at least two announcement templates to compare them side by side.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
                       <p className="text-sm font-medium">Best send time hints</p>
                       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                         {announcementAnalytics.bestSendTimes.length === 0 ? (
@@ -4604,8 +4692,14 @@ function TelegramSalesWorkflowCard() {
         settingsQuery.data.dailySalesDigestMinute ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestMinute,
       trialCouponEnabled:
         settingsQuery.data.trialCouponEnabled ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponEnabled,
+      trialCouponPaused:
+        settingsQuery.data.trialCouponPaused ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponPaused,
       trialCouponLeadHours: String(
         settingsQuery.data.trialCouponLeadHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponLeadHours,
+      ),
+      trialCouponMaxRecipientsPerRun: String(
+        settingsQuery.data.trialCouponMaxRecipientsPerRun ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponMaxRecipientsPerRun,
       ),
       trialCouponCode:
         settingsQuery.data.trialCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponCode,
@@ -4619,9 +4713,15 @@ function TelegramSalesWorkflowCard() {
       renewalCouponEnabled:
         settingsQuery.data.renewalCouponEnabled ??
         DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponEnabled,
+      renewalCouponPaused:
+        settingsQuery.data.renewalCouponPaused ?? DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponPaused,
       renewalCouponLeadDays: String(
         settingsQuery.data.renewalCouponLeadDays ??
           DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponLeadDays,
+      ),
+      renewalCouponMaxRecipientsPerRun: String(
+        settingsQuery.data.renewalCouponMaxRecipientsPerRun ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponMaxRecipientsPerRun,
       ),
       renewalCouponCode:
         settingsQuery.data.renewalCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponCode,
@@ -4635,9 +4735,16 @@ function TelegramSalesWorkflowCard() {
       premiumUpsellCouponEnabled:
         settingsQuery.data.premiumUpsellCouponEnabled ??
         DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponEnabled,
+      premiumUpsellCouponPaused:
+        settingsQuery.data.premiumUpsellCouponPaused ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponPaused,
       premiumUpsellUsageThresholdPercent: String(
         settingsQuery.data.premiumUpsellUsageThresholdPercent ??
           DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellUsageThresholdPercent,
+      ),
+      premiumUpsellCouponMaxRecipientsPerRun: String(
+        settingsQuery.data.premiumUpsellCouponMaxRecipientsPerRun ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponMaxRecipientsPerRun,
       ),
       premiumUpsellCouponCode:
         settingsQuery.data.premiumUpsellCouponCode ??
@@ -4651,9 +4758,15 @@ function TelegramSalesWorkflowCard() {
       ),
       winbackCouponEnabled:
         settingsQuery.data.winbackCouponEnabled ?? DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponEnabled,
+      winbackCouponPaused:
+        settingsQuery.data.winbackCouponPaused ?? DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponPaused,
       winbackCouponInactivityDays: String(
         settingsQuery.data.winbackCouponInactivityDays ??
           DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponInactivityDays,
+      ),
+      winbackCouponMaxRecipientsPerRun: String(
+        settingsQuery.data.winbackCouponMaxRecipientsPerRun ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponMaxRecipientsPerRun,
       ),
       winbackCouponCode:
         settingsQuery.data.winbackCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponCode,
@@ -4663,6 +4776,28 @@ function TelegramSalesWorkflowCard() {
       winbackCouponDiscountAmount: String(
         settingsQuery.data.winbackCouponDiscountAmount ??
           DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponDiscountAmount,
+      ),
+      promoCampaignCooldownHours: String(
+        settingsQuery.data.promoCampaignCooldownHours ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.promoCampaignCooldownHours,
+      ),
+      promoExcludeRecentRefundUsers:
+        settingsQuery.data.promoExcludeRecentRefundUsers ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.promoExcludeRecentRefundUsers,
+      promoExcludeRecentRefundDays: String(
+        settingsQuery.data.promoExcludeRecentRefundDays ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.promoExcludeRecentRefundDays,
+      ),
+      promoExcludeSupportHeavyUsers:
+        settingsQuery.data.promoExcludeSupportHeavyUsers ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.promoExcludeSupportHeavyUsers,
+      promoSupportHeavyLookbackDays: String(
+        settingsQuery.data.promoSupportHeavyLookbackDays ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.promoSupportHeavyLookbackDays,
+      ),
+      promoSupportHeavyThreshold: String(
+        settingsQuery.data.promoSupportHeavyThreshold ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.promoSupportHeavyThreshold,
       ),
       paymentReminderHours: String(
         settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
@@ -5072,9 +5207,14 @@ function TelegramSalesWorkflowCard() {
       dailySalesDigestHour: form.dailySalesDigestHour,
       dailySalesDigestMinute: form.dailySalesDigestMinute,
       trialCouponEnabled: form.trialCouponEnabled,
+      trialCouponPaused: form.trialCouponPaused,
       trialCouponLeadHours: (() => {
         const parsed = Number.parseInt(form.trialCouponLeadHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+      })(),
+      trialCouponMaxRecipientsPerRun: (() => {
+        const parsed = Number.parseInt(form.trialCouponMaxRecipientsPerRun.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 25;
       })(),
       trialCouponCode: form.trialCouponCode.trim() || 'TRIAL500',
       trialCouponDiscountLabel:
@@ -5084,9 +5224,14 @@ function TelegramSalesWorkflowCard() {
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 500;
       })(),
       renewalCouponEnabled: form.renewalCouponEnabled,
+      renewalCouponPaused: form.renewalCouponPaused,
       renewalCouponLeadDays: (() => {
         const parsed = Number.parseInt(form.renewalCouponLeadDays.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+      })(),
+      renewalCouponMaxRecipientsPerRun: (() => {
+        const parsed = Number.parseInt(form.renewalCouponMaxRecipientsPerRun.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 20;
       })(),
       renewalCouponCode: form.renewalCouponCode.trim() || 'RENEW500',
       renewalCouponDiscountLabel:
@@ -5096,9 +5241,14 @@ function TelegramSalesWorkflowCard() {
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 500;
       })(),
       premiumUpsellCouponEnabled: form.premiumUpsellCouponEnabled,
+      premiumUpsellCouponPaused: form.premiumUpsellCouponPaused,
       premiumUpsellUsageThresholdPercent: (() => {
         const parsed = Number.parseInt(form.premiumUpsellUsageThresholdPercent.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? Math.min(Math.max(parsed, 10), 100) : 80;
+      })(),
+      premiumUpsellCouponMaxRecipientsPerRun: (() => {
+        const parsed = Number.parseInt(form.premiumUpsellCouponMaxRecipientsPerRun.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 15;
       })(),
       premiumUpsellCouponCode: form.premiumUpsellCouponCode.trim() || 'PREMIUM1000',
       premiumUpsellCouponDiscountLabel:
@@ -5108,9 +5258,14 @@ function TelegramSalesWorkflowCard() {
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1000;
       })(),
       winbackCouponEnabled: form.winbackCouponEnabled,
+      winbackCouponPaused: form.winbackCouponPaused,
       winbackCouponInactivityDays: (() => {
         const parsed = Number.parseInt(form.winbackCouponInactivityDays.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+      })(),
+      winbackCouponMaxRecipientsPerRun: (() => {
+        const parsed = Number.parseInt(form.winbackCouponMaxRecipientsPerRun.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 20;
       })(),
       winbackCouponCode: form.winbackCouponCode.trim() || 'WELCOME700',
       winbackCouponDiscountLabel:
@@ -5118,6 +5273,24 @@ function TelegramSalesWorkflowCard() {
       winbackCouponDiscountAmount: (() => {
         const parsed = Number.parseInt(form.winbackCouponDiscountAmount.trim(), 10);
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 700;
+      })(),
+      promoCampaignCooldownHours: (() => {
+        const parsed = Number.parseInt(form.promoCampaignCooldownHours.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 72;
+      })(),
+      promoExcludeRecentRefundUsers: form.promoExcludeRecentRefundUsers,
+      promoExcludeRecentRefundDays: (() => {
+        const parsed = Number.parseInt(form.promoExcludeRecentRefundDays.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+      })(),
+      promoExcludeSupportHeavyUsers: form.promoExcludeSupportHeavyUsers,
+      promoSupportHeavyLookbackDays: (() => {
+        const parsed = Number.parseInt(form.promoSupportHeavyLookbackDays.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 14;
+      })(),
+      promoSupportHeavyThreshold: (() => {
+        const parsed = Number.parseInt(form.promoSupportHeavyThreshold.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
       })(),
       paymentReminderHours: (() => {
         const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
@@ -5663,6 +5836,25 @@ function TelegramSalesWorkflowCard() {
                 }
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={form.trialCouponEnabled ? 'default' : 'secondary'}>
+                {form.trialCouponEnabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+              <Badge variant={form.trialCouponPaused ? 'outline' : 'secondary'}>
+                {form.trialCouponPaused ? 'Paused' : 'Running'}
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setForm((prev) => ({ ...prev, trialCouponPaused: !prev.trialCouponPaused }))
+                }
+                disabled={!form.trialCouponEnabled}
+              >
+                {form.trialCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+              </Button>
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>{isMyanmar ? 'Send before expiry (hours)' : 'Send before expiry (hours)'}</Label>
@@ -5718,6 +5910,20 @@ function TelegramSalesWorkflowCard() {
                   placeholder="500"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.trialCouponMaxRecipientsPerRun}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      trialCouponMaxRecipientsPerRun: event.target.value,
+                    }))
+                  }
+                  placeholder="25"
+                />
+              </div>
             </div>
           </div>
 
@@ -5739,6 +5945,25 @@ function TelegramSalesWorkflowCard() {
                   setForm((prev) => ({ ...prev, renewalCouponEnabled: checked }))
                 }
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={form.renewalCouponEnabled ? 'default' : 'secondary'}>
+                {form.renewalCouponEnabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+              <Badge variant={form.renewalCouponPaused ? 'outline' : 'secondary'}>
+                {form.renewalCouponPaused ? 'Paused' : 'Running'}
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setForm((prev) => ({ ...prev, renewalCouponPaused: !prev.renewalCouponPaused }))
+                }
+                disabled={!form.renewalCouponEnabled}
+              >
+                {form.renewalCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+              </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
@@ -5795,6 +6020,20 @@ function TelegramSalesWorkflowCard() {
                   placeholder="500"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.renewalCouponMaxRecipientsPerRun}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalCouponMaxRecipientsPerRun: event.target.value,
+                    }))
+                  }
+                  placeholder="20"
+                />
+              </div>
             </div>
           </div>
 
@@ -5816,6 +6055,28 @@ function TelegramSalesWorkflowCard() {
                   setForm((prev) => ({ ...prev, premiumUpsellCouponEnabled: checked }))
                 }
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={form.premiumUpsellCouponEnabled ? 'default' : 'secondary'}>
+                {form.premiumUpsellCouponEnabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+              <Badge variant={form.premiumUpsellCouponPaused ? 'outline' : 'secondary'}>
+                {form.premiumUpsellCouponPaused ? 'Paused' : 'Running'}
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    premiumUpsellCouponPaused: !prev.premiumUpsellCouponPaused,
+                  }))
+                }
+                disabled={!form.premiumUpsellCouponEnabled}
+              >
+                {form.premiumUpsellCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+              </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
@@ -5872,6 +6133,20 @@ function TelegramSalesWorkflowCard() {
                   placeholder="1000"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.premiumUpsellCouponMaxRecipientsPerRun}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      premiumUpsellCouponMaxRecipientsPerRun: event.target.value,
+                    }))
+                  }
+                  placeholder="15"
+                />
+              </div>
             </div>
           </div>
 
@@ -5893,6 +6168,25 @@ function TelegramSalesWorkflowCard() {
                   setForm((prev) => ({ ...prev, winbackCouponEnabled: checked }))
                 }
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={form.winbackCouponEnabled ? 'default' : 'secondary'}>
+                {form.winbackCouponEnabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+              <Badge variant={form.winbackCouponPaused ? 'outline' : 'secondary'}>
+                {form.winbackCouponPaused ? 'Paused' : 'Running'}
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setForm((prev) => ({ ...prev, winbackCouponPaused: !prev.winbackCouponPaused }))
+                }
+                disabled={!form.winbackCouponEnabled}
+              >
+                {form.winbackCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+              </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
@@ -5947,6 +6241,120 @@ function TelegramSalesWorkflowCard() {
                     }))
                   }
                   placeholder="700"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.winbackCouponMaxRecipientsPerRun}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      winbackCouponMaxRecipientsPerRun: event.target.value,
+                    }))
+                  }
+                  placeholder="20"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {isMyanmar ? 'Campaign guardrails' : 'Campaign guardrails'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isMyanmar
+                  ? 'Promo များကို အရမ်းများများမပို့မိစေရန် cool-down, refund, support volume rules များကို သတ်မှတ်ပါ။'
+                  : 'Set cool-down, refund, and support-volume rules so the same customer does not receive too many promos.'}
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Promo cool-down (hours)' : 'Promo cool-down (hours)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.promoCampaignCooldownHours}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      promoCampaignCooldownHours: event.target.value,
+                    }))
+                  }
+                  placeholder="72"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Recent refund lookback (days)' : 'Recent refund lookback (days)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.promoExcludeRecentRefundDays}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      promoExcludeRecentRefundDays: event.target.value,
+                    }))
+                  }
+                  placeholder="30"
+                  disabled={!form.promoExcludeRecentRefundUsers}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Support lookback (days)' : 'Support lookback (days)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.promoSupportHeavyLookbackDays}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      promoSupportHeavyLookbackDays: event.target.value,
+                    }))
+                  }
+                  placeholder="14"
+                  disabled={!form.promoExcludeSupportHeavyUsers}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Support-heavy threshold' : 'Support-heavy threshold'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.promoSupportHeavyThreshold}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      promoSupportHeavyThreshold: event.target.value,
+                    }))
+                  }
+                  placeholder="3"
+                  disabled={!form.promoExcludeSupportHeavyUsers}
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Exclude recent refund users</p>
+                  <p className="text-xs text-muted-foreground">Skip promo sends after recent refund activity.</p>
+                </div>
+                <Switch
+                  checked={form.promoExcludeRecentRefundUsers}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, promoExcludeRecentRefundUsers: checked }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Exclude support-heavy users</p>
+                  <p className="text-xs text-muted-foreground">Skip promo sends for customers with recent support volume.</p>
+                </div>
+                <Switch
+                  checked={form.promoExcludeSupportHeavyUsers}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, promoExcludeSupportHeavyUsers: checked }))
+                  }
                 />
               </div>
             </div>

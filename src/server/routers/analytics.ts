@@ -1284,6 +1284,28 @@ export const analyticsRouter = router({
       let couponAttributedOrders = 0;
       let couponAttributedFulfilled = 0;
       const couponDiscountValueByCurrency = new Map<string, number>();
+      const couponVsNoCoupon = {
+        withCoupon: {
+          orders: 0,
+          fulfilled: 0,
+          revenueByCurrency: new Map<string, number>(),
+        },
+        withoutCoupon: {
+          orders: 0,
+          fulfilled: 0,
+          revenueByCurrency: new Map<string, number>(),
+        },
+      };
+      const lifecycleRevenue = new Map<
+        string,
+        {
+          bucket: string;
+          label: string;
+          orders: number;
+          fulfilled: number;
+          revenueByCurrency: Map<string, number>;
+        }
+      >();
 
       for (const trialOrder of fulfilledTrials) {
         const baseline = trialOrder.fulfilledAt || trialOrder.createdAt;
@@ -1371,6 +1393,75 @@ export const analyticsRouter = router({
 
         if (order.planCode === 'trial_1d_3gb' && order.status === 'FULFILLED') {
           trialFulfilledInRange += 1;
+        }
+
+        if (typeof order.priceAmount === 'number' && order.planCode !== 'trial_1d_3gb') {
+          const couponComparisonBucket = order.couponCode
+            ? couponVsNoCoupon.withCoupon
+            : couponVsNoCoupon.withoutCoupon;
+          couponComparisonBucket.orders += 1;
+          if (order.status === 'FULFILLED') {
+            couponComparisonBucket.fulfilled += 1;
+            if (order.priceAmount > 0) {
+              const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+              couponComparisonBucket.revenueByCurrency.set(
+                currency,
+                (couponComparisonBucket.revenueByCurrency.get(currency) || 0) + order.priceAmount,
+              );
+            }
+          }
+        }
+
+        const lifecycleBucket = (() => {
+          if (
+            order.couponCampaignType === 'TRIAL_TO_PAID' ||
+            ['trial_expiry', 'trial_coupon', 'trial_expired'].includes(order.retentionSource || '')
+          ) {
+            return { bucket: 'TRIAL', label: 'Trial to paid' };
+          }
+          if (
+            order.couponCampaignType === 'RENEWAL_SOON' ||
+            ['renewal_7d', 'renewal_3d', 'renewal_manual', 'renewal_coupon', 'premium_renewal_7d', 'premium_renewal_3d'].includes(
+              order.retentionSource || '',
+            )
+          ) {
+            return { bucket: 'RENEWAL', label: 'Renewal' };
+          }
+          if (
+            order.couponCampaignType === 'WINBACK' ||
+            order.retentionSource === 'winback_coupon'
+          ) {
+            return { bucket: 'WINBACK', label: 'Win-back' };
+          }
+          if (
+            order.couponCampaignType === 'PREMIUM_UPSELL' ||
+            order.retentionSource === 'premium_upsell_coupon'
+          ) {
+            return { bucket: 'PREMIUM_UPSELL', label: 'Premium upsell' };
+          }
+          return null;
+        })();
+
+        if (lifecycleBucket && typeof order.priceAmount === 'number') {
+          const currentBucket = lifecycleRevenue.get(lifecycleBucket.bucket) || {
+            bucket: lifecycleBucket.bucket,
+            label: lifecycleBucket.label,
+            orders: 0,
+            fulfilled: 0,
+            revenueByCurrency: new Map<string, number>(),
+          };
+          currentBucket.orders += 1;
+          if (order.status === 'FULFILLED') {
+            currentBucket.fulfilled += 1;
+            if (order.priceAmount > 0) {
+              const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+              currentBucket.revenueByCurrency.set(
+                currency,
+                (currentBucket.revenueByCurrency.get(currency) || 0) + order.priceAmount,
+              );
+            }
+          }
+          lifecycleRevenue.set(lifecycleBucket.bucket, currentBucket);
         }
 
         if (order.couponCode) {
@@ -1842,6 +1933,49 @@ export const analyticsRouter = router({
               return right.issued - left.issued;
             })
             .slice(0, input.limit),
+          couponVsNonCoupon: {
+            withCoupon: {
+              orders: couponVsNoCoupon.withCoupon.orders,
+              fulfilled: couponVsNoCoupon.withCoupon.fulfilled,
+              conversionRate:
+                couponVsNoCoupon.withCoupon.orders > 0
+                  ? (couponVsNoCoupon.withCoupon.fulfilled / couponVsNoCoupon.withCoupon.orders) * 100
+                  : null,
+              revenueByCurrency: Array.from(couponVsNoCoupon.withCoupon.revenueByCurrency.entries())
+                .map(([currency, amount]) => ({ currency, amount }))
+                .sort((left, right) => right.amount - left.amount),
+            },
+            withoutCoupon: {
+              orders: couponVsNoCoupon.withoutCoupon.orders,
+              fulfilled: couponVsNoCoupon.withoutCoupon.fulfilled,
+              conversionRate:
+                couponVsNoCoupon.withoutCoupon.orders > 0
+                  ? (couponVsNoCoupon.withoutCoupon.fulfilled / couponVsNoCoupon.withoutCoupon.orders) * 100
+                  : null,
+              revenueByCurrency: Array.from(couponVsNoCoupon.withoutCoupon.revenueByCurrency.entries())
+                .map(([currency, amount]) => ({ currency, amount }))
+                .sort((left, right) => right.amount - left.amount),
+            },
+          },
+          revenueByLifecycle: Array.from(lifecycleRevenue.values())
+            .map((bucket) => ({
+              bucket: bucket.bucket,
+              label: bucket.label,
+              orders: bucket.orders,
+              fulfilled: bucket.fulfilled,
+              conversionRate: bucket.orders > 0 ? (bucket.fulfilled / bucket.orders) * 100 : null,
+              revenueByCurrency: Array.from(bucket.revenueByCurrency.entries())
+                .map(([currency, amount]) => ({ currency, amount }))
+                .sort((left, right) => right.amount - left.amount),
+            }))
+            .sort((left, right) => {
+              const rightRevenue = right.revenueByCurrency.reduce((sum, item) => sum + item.amount, 0);
+              const leftRevenue = left.revenueByCurrency.reduce((sum, item) => sum + item.amount, 0);
+              if (rightRevenue !== leftRevenue) {
+                return rightRevenue - leftRevenue;
+              }
+              return right.fulfilled - left.fulfilled;
+            }),
         },
         premium: {
           summary: {

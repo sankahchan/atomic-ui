@@ -2,14 +2,16 @@ import { type SupportedLocale } from '@/lib/i18n/config';
 import {
   buildTelegramLocaleSelectorKeyboard,
   buildTelegramLocaleSelectorMessage,
-  buildTelegramNotificationPreferenceCallbackData,
   getCommandKeyboard,
   parseTelegramLocaleCallbackData,
   parseTelegramNotificationPreferenceCallbackData,
 } from '@/lib/services/telegram-callbacks';
 import {
+  buildTelegramNotificationPreferencesKeyboard,
+  buildTelegramNotificationPreferencesMessage,
+} from '@/lib/services/telegram-notifications';
+import {
   answerTelegramCallbackQuery,
-  getTelegramNotificationPreferenceLabel,
   getTelegramNotificationPreferences,
   sendTelegramMessage,
   setTelegramUserLocale,
@@ -17,62 +19,6 @@ import {
   type TelegramConfig,
 } from '@/lib/services/telegram-runtime';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
-
-export function buildTelegramNotificationPreferencesKeyboard(
-  locale: SupportedLocale,
-  preferences: Awaited<ReturnType<typeof getTelegramNotificationPreferences>>,
-) {
-  const renderToggle = (key: 'promo' | 'maintenance' | 'receipt' | 'support') => {
-    const enabled = preferences[key];
-    const label = getTelegramNotificationPreferenceLabel(key, locale);
-    return {
-      text: `${enabled ? '✅' : '⚪️'} ${label}`,
-      callback_data: buildTelegramNotificationPreferenceCallbackData(key, !enabled),
-    };
-  };
-
-  return {
-    inline_keyboard: [
-      [renderToggle('promo')],
-      [renderToggle('maintenance')],
-      [renderToggle('receipt')],
-      [renderToggle('support')],
-    ],
-  };
-}
-
-export async function handleNotificationPreferencesCommand(input: {
-  chatId: number;
-  telegramUserId: number;
-  locale: SupportedLocale;
-  botToken: string;
-}) {
-  const preferences = await getTelegramNotificationPreferences({
-    telegramUserId: String(input.telegramUserId),
-    telegramChatId: String(input.chatId),
-  });
-
-  const lines = [
-    input.locale === 'my'
-      ? '🔔 <b>Notification preferences</b>'
-      : '🔔 <b>Notification preferences</b>',
-    '',
-    `• ${getTelegramNotificationPreferenceLabel('promo', input.locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('maintenance', input.locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('receipt', input.locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('support', input.locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
-    '',
-    input.locale === 'my'
-      ? 'အောက်ပါ button များဖြင့် ON/OFF ပြောင်းနိုင်ပါသည်။'
-      : 'Use the buttons below to turn each type on or off.',
-  ];
-
-  await sendTelegramMessage(input.botToken, input.chatId, lines.join('\n'), {
-    replyMarkup: buildTelegramNotificationPreferencesKeyboard(input.locale, preferences),
-  });
-
-  return null;
-}
 
 export async function handleTelegramLocaleOrPreferenceCallback(input: {
   callbackQuery: any;
@@ -143,16 +89,7 @@ export async function handleTelegramLocaleOrPreferenceCallback(input: {
     await sendTelegramMessage(
       input.config.botToken,
       chatId,
-      [
-        locale === 'my'
-          ? '🔔 <b>Notification preferences</b>'
-          : '🔔 <b>Notification preferences</b>',
-        '',
-        `• ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
-        `• ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
-        `• ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
-        `• ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
-      ].join('\n'),
+      buildTelegramNotificationPreferencesMessage(locale, preferences, false),
       {
         replyMarkup: buildTelegramNotificationPreferencesKeyboard(locale, preferences),
       },

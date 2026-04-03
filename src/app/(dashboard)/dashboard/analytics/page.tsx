@@ -1738,6 +1738,96 @@ export default function AnalyticsPage() {
                         </div>
                       </div>
                     </div>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                      <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Coupon vs no-coupon conversion
+                        </p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {[
+                            {
+                              label: 'With coupon',
+                              data: telegramSalesDashboard?.coupons.couponVsNonCoupon.withCoupon,
+                            },
+                            {
+                              label: 'Without coupon',
+                              data: telegramSalesDashboard?.coupons.couponVsNonCoupon.withoutCoupon,
+                            },
+                          ].map((entry) => (
+                            <div
+                              key={entry.label}
+                              className="rounded-[1rem] border border-border/50 p-3"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium">{entry.label}</p>
+                                <Badge variant="outline">
+                                  {loadingTelegramSalesDashboard
+                                    ? '…'
+                                    : entry.data?.conversionRate !== null &&
+                                        entry.data?.conversionRate !== undefined
+                                      ? `${Math.round(entry.data.conversionRate)}%`
+                                      : '0%'}
+                                </Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {loadingTelegramSalesDashboard
+                                  ? '…'
+                                  : `${entry.data?.fulfilled || 0}/${entry.data?.orders || 0} fulfilled`}
+                              </p>
+                              <div className="mt-3 space-y-1">
+                                {(entry.data?.revenueByCurrency || []).length > 0 ? (
+                                  entry.data?.revenueByCurrency.map((revenue) => (
+                                    <p key={`${entry.label}-${revenue.currency}`} className="text-xs text-muted-foreground">
+                                      {formatRevenueLabel(revenue.currency, revenue.amount)}
+                                    </p>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">No fulfilled revenue yet.</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Recovery revenue by campaign
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {loadingTelegramSalesDashboard ? (
+                            [...Array(4)].map((_, i) => (
+                              <div key={i} className="h-16 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                            ))
+                          ) : telegramSalesDashboard && telegramSalesDashboard.coupons.revenueByLifecycle.length > 0 ? (
+                            telegramSalesDashboard.coupons.revenueByLifecycle.map((bucket) => (
+                              <div key={bucket.bucket} className="rounded-[1rem] border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{bucket.label}</p>
+                                  <Badge variant="outline">
+                                    {bucket.conversionRate !== null && bucket.conversionRate !== undefined
+                                      ? `${Math.round(bucket.conversionRate)}% conv.`
+                                      : '0% conv.'}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {bucket.fulfilled}/{bucket.orders} fulfilled
+                                </p>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {bucket.revenueByCurrency.length > 0
+                                    ? bucket.revenueByCurrency
+                                        .map((revenue) => formatRevenueLabel(revenue.currency, revenue.amount))
+                                        .join(' • ')
+                                    : 'No fulfilled revenue yet'}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No recovery revenue yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
