@@ -40,9 +40,12 @@ import {
 } from '@/lib/services/telegram-bot';
 import { buildTelegramPromoDeliveryCandidates, resolveTelegramPromoAttribution } from '@/lib/services/telegram-attribution';
 import { dispatchTelegramAnnouncement } from '@/lib/services/telegram-announcements';
+import { buildTelegramAnnouncementMessage } from '@/lib/services/telegram-announcements';
 import {
   getTelegramConfig,
   getTelegramSupportLink,
+  sendTelegramDocument,
+  sendTelegramPhotoUrl,
   sendServerIssueNoticeToTelegram,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
@@ -819,6 +822,10 @@ export const usersRouter = router({
           id: note.id,
           kind: note.kind,
           note: note.note,
+          telegramMessageTitle: note.telegramMessageTitle,
+          telegramCardStyle: note.telegramCardStyle,
+          telegramMediaKind: note.telegramMediaKind,
+          telegramMediaUrl: note.telegramMediaUrl,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
           createdBy: note.createdBy,
@@ -1071,8 +1078,12 @@ export const usersRouter = router({
     .input(
       z.object({
         userId: z.string(),
-        message: z.string().trim().min(3).max(2000),
+        title: z.string().trim().max(120).optional().nullable(),
+        message: z.string().trim().min(1).max(2000),
         includeSupportButton: z.boolean().default(true),
+        cardStyle: z.enum(['DEFAULT', 'PROMO', 'PREMIUM', 'OPERATIONS']).default('DEFAULT'),
+        mediaKind: z.enum(['NONE', 'IMAGE', 'FILE']).default('NONE'),
+        mediaUrl: z.string().trim().url().max(1000).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1100,18 +1111,67 @@ export const usersRouter = router({
       }
 
       const supportLink = input.includeSupportButton ? await getTelegramSupportLink() : null;
-      const sent = await sendTelegramMessage(
-        config.botToken,
-        destinationChatId,
-        [`💬 <b>Message from admin</b>`, '', input.message.trim()].join('\n'),
-        supportLink
-          ? {
-              replyMarkup: {
-                inline_keyboard: [[{ text: 'Support', url: supportLink }]],
-              },
-            }
-          : undefined,
-      );
+      const replyMarkup = supportLink
+        ? {
+            inline_keyboard: [[{ text: 'Support', url: supportLink }]],
+          }
+        : undefined;
+      const messageTitle = input.title?.trim() || 'Message from admin';
+      const formattedMessage = buildTelegramAnnouncementMessage({
+        type: 'ANNOUNCEMENT',
+        title: messageTitle,
+        message: input.message.trim(),
+        cardStyle: input.cardStyle,
+      });
+
+      let sent = false;
+      const trimmedMediaUrl = input.mediaUrl?.trim() || null;
+
+      if (input.mediaKind === 'IMAGE' && trimmedMediaUrl) {
+        sent = await sendTelegramPhotoUrl(
+          config.botToken,
+          destinationChatId,
+          trimmedMediaUrl,
+          formattedMessage,
+          replyMarkup ? { replyMarkup } : undefined,
+        );
+      } else if (input.mediaKind === 'FILE' && trimmedMediaUrl) {
+        let response: Response;
+        try {
+          response = await fetch(trimmedMediaUrl);
+        } catch {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'The file URL could not be fetched.',
+          });
+        }
+
+        if (!response.ok) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'The file URL returned an invalid response.',
+          });
+        }
+
+        const fileBytes = Buffer.from(await response.arrayBuffer());
+        const filename =
+          trimmedMediaUrl.split('/').pop()?.split('?')[0]?.trim() || 'attachment.bin';
+        sent = await sendTelegramDocument(
+          config.botToken,
+          destinationChatId,
+          fileBytes,
+          filename,
+          formattedMessage,
+          replyMarkup ? { replyMarkup } : undefined,
+        );
+      } else {
+        sent = await sendTelegramMessage(
+          config.botToken,
+          destinationChatId,
+          formattedMessage,
+          replyMarkup ? { replyMarkup } : undefined,
+        );
+      }
 
       if (!sent) {
         throw new TRPCError({
@@ -1126,6 +1186,10 @@ export const usersRouter = router({
           createdByUserId: ctx.user.id,
           kind: 'DIRECT_MESSAGE',
           note: input.message.trim(),
+          telegramMessageTitle: messageTitle,
+          telegramCardStyle: input.cardStyle,
+          telegramMediaKind: input.mediaKind === 'NONE' ? null : input.mediaKind,
+          telegramMediaUrl: trimmedMediaUrl,
         },
       });
 
@@ -1138,6 +1202,9 @@ export const usersRouter = router({
         details: {
           destinationChatId,
           includeSupportButton: input.includeSupportButton,
+          cardStyle: input.cardStyle,
+          mediaKind: input.mediaKind,
+          mediaUrl: trimmedMediaUrl,
         },
       });
 

@@ -206,8 +206,12 @@ export default function UserLedgerPage() {
   } | null>(null);
   const [financeAmount, setFinanceAmount] = useState('');
   const [financeNote, setFinanceNote] = useState('');
+  const [crmDirectMessageTitle, setCrmDirectMessageTitle] = useState('');
   const [crmDirectMessage, setCrmDirectMessage] = useState('');
   const [crmIncludeSupportButton, setCrmIncludeSupportButton] = useState(true);
+  const [crmDirectMessageCardStyle, setCrmDirectMessageCardStyle] = useState<'DEFAULT' | 'PROMO' | 'PREMIUM' | 'OPERATIONS'>('DEFAULT');
+  const [crmDirectMessageMediaKind, setCrmDirectMessageMediaKind] = useState<'NONE' | 'IMAGE' | 'FILE'>('NONE');
+  const [crmDirectMessageMediaUrl, setCrmDirectMessageMediaUrl] = useState('');
   const [crmSupportNote, setCrmSupportNote] = useState('');
   const [crmOutageServerName, setCrmOutageServerName] = useState('');
   const [crmOutageMessage, setCrmOutageMessage] = useState('');
@@ -286,7 +290,11 @@ export default function UserLedgerPage() {
         title: 'Telegram message sent',
         description: 'The direct customer message was delivered.',
       });
+      setCrmDirectMessageTitle('');
       setCrmDirectMessage('');
+      setCrmDirectMessageCardStyle('DEFAULT');
+      setCrmDirectMessageMediaKind('NONE');
+      setCrmDirectMessageMediaUrl('');
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
@@ -821,7 +829,15 @@ export default function UserLedgerPage() {
                     ? 'announcement'
                     : 'message',
         customerFacing: note.kind !== 'INTERNAL',
-        meta: note.createdBy?.email ? `By ${note.createdBy.email}` : undefined,
+        href: note.telegramMediaUrl || undefined,
+        meta: [
+          note.createdBy?.email ? `By ${note.createdBy.email}` : null,
+          note.telegramMessageTitle ? `Title ${note.telegramMessageTitle}` : null,
+          note.telegramCardStyle ? `${note.telegramCardStyle.toLowerCase()} card` : null,
+          note.telegramMediaKind ? `Media ${note.telegramMediaKind.toLowerCase()}` : null,
+        ]
+          .filter(Boolean)
+          .join(' • ') || undefined,
       });
     }
 
@@ -1652,12 +1668,21 @@ export default function UserLedgerPage() {
                           <div className="flex flex-col items-start gap-2 sm:items-end">
                             <p className="text-xs text-muted-foreground">{formatDateTime(event.at)}</p>
                             {event.href ? (
-                              <Button asChild size="sm" variant="outline">
-                                <Link href={event.href}>
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open
-                                </Link>
-                              </Button>
+                              event.href.startsWith('http') ? (
+                                <Button asChild size="sm" variant="outline">
+                                  <a href={event.href} target="_blank" rel="noreferrer">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Open
+                                  </a>
+                                </Button>
+                              ) : (
+                                <Button asChild size="sm" variant="outline">
+                                  <Link href={event.href}>
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Open
+                                  </Link>
+                                </Button>
+                              )
                             ) : null}
                           </div>
                         </div>
@@ -1862,6 +1887,72 @@ export default function UserLedgerPage() {
                   placeholder="Write a direct Telegram message for this customer…"
                   disabled={!crmPermissions.canMessageCustomer}
                 />
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Message title</Label>
+                    <Input
+                      value={crmDirectMessageTitle}
+                      onChange={(event) => setCrmDirectMessageTitle(event.target.value)}
+                      placeholder="Optional headline"
+                      disabled={!crmPermissions.canMessageCustomer}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Card style</Label>
+                    <Select
+                      value={crmDirectMessageCardStyle}
+                      onValueChange={(value) =>
+                        setCrmDirectMessageCardStyle(value as 'DEFAULT' | 'PROMO' | 'PREMIUM' | 'OPERATIONS')
+                      }
+                    >
+                      <SelectTrigger disabled={!crmPermissions.canMessageCustomer}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DEFAULT">Default card</SelectItem>
+                        <SelectItem value="PROMO">Promo card</SelectItem>
+                        <SelectItem value="PREMIUM">Premium card</SelectItem>
+                        <SelectItem value="OPERATIONS">Operations card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <Label>Media support</Label>
+                    <Select
+                      value={crmDirectMessageMediaKind}
+                      onValueChange={(value) =>
+                        setCrmDirectMessageMediaKind(value as 'NONE' | 'IMAGE' | 'FILE')
+                      }
+                    >
+                      <SelectTrigger disabled={!crmPermissions.canMessageCustomer}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Text only</SelectItem>
+                        <SelectItem value="IMAGE">Image / banner</SelectItem>
+                        <SelectItem value="FILE">File attachment</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{crmDirectMessageMediaKind === 'FILE' ? 'File URL' : 'Image URL'}</Label>
+                    <Input
+                      value={crmDirectMessageMediaUrl}
+                      onChange={(event) => setCrmDirectMessageMediaUrl(event.target.value)}
+                      placeholder={
+                        crmDirectMessageMediaKind === 'FILE'
+                          ? 'https://example.com/receipt.pdf'
+                          : 'https://example.com/banner.jpg'
+                      }
+                      disabled={!crmPermissions.canMessageCustomer || crmDirectMessageMediaKind === 'NONE'}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Reuses the Telegram announcement card styling for one-user messages.
+                    </p>
+                  </div>
+                </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="space-y-2">
                     <Label>Template apply mode</Label>
@@ -1907,13 +1998,21 @@ export default function UserLedgerPage() {
                   disabled={
                     !crmPermissions.canMessageCustomer ||
                     sendDirectTelegramMessageMutation.isPending ||
-                    crmDirectMessage.trim().length < 3
+                    crmDirectMessage.trim().length < 3 ||
+                    (crmDirectMessageMediaKind !== 'NONE' && crmDirectMessageMediaUrl.trim().length < 8)
                   }
                   onClick={() =>
                     sendDirectTelegramMessageMutation.mutate({
                       userId,
+                      title: crmDirectMessageTitle.trim() || undefined,
                       message: crmDirectMessage.trim(),
                       includeSupportButton: crmIncludeSupportButton,
+                      cardStyle: crmDirectMessageCardStyle,
+                      mediaKind: crmDirectMessageMediaKind,
+                      mediaUrl:
+                        crmDirectMessageMediaKind === 'NONE'
+                          ? undefined
+                          : crmDirectMessageMediaUrl.trim() || undefined,
                     })
                   }
                 >
@@ -2127,6 +2226,30 @@ export default function UserLedgerPage() {
                           <span>{formatRelativeTime(note.createdAt)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap">{note.note}</p>
+                        {(note.telegramMessageTitle || note.telegramMediaKind || note.telegramMediaUrl) ? (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {[
+                              note.telegramMessageTitle ? `Title ${note.telegramMessageTitle}` : null,
+                              note.telegramCardStyle ? `${note.telegramCardStyle.toLowerCase()} card` : null,
+                              note.telegramMediaKind ? `Media ${note.telegramMediaKind.toLowerCase()}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' • ')}
+                            {note.telegramMediaUrl ? (
+                              <>
+                                {' • '}
+                                <a
+                                  href={note.telegramMediaUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="underline underline-offset-4"
+                                >
+                                  Open media
+                                </a>
+                              </>
+                            ) : null}
+                          </p>
+                        ) : null}
                         {note.createdBy?.email ? (
                           <p className="mt-1 text-[11px] text-muted-foreground">By {note.createdBy.email}</p>
                         ) : null}

@@ -612,6 +612,10 @@ model CustomerSupportNote {
   createdBy       User?    @relation("CreatedCustomerSupportNotes", fields: [createdByUserId], references: [id], onDelete: SetNull)
   kind            String   @default("INTERNAL")
   note            String
+  telegramMessageTitle String?
+  telegramCardStyle    String?
+  telegramMediaKind    String?
+  telegramMediaUrl     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

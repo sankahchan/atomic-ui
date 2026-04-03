@@ -2079,12 +2079,20 @@ export const telegramBotRouter = router({
       z
         .object({
           limit: z.number().int().min(1).max(50).default(10),
+          includeArchived: z.boolean().default(false),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
       const announcements = await db.telegramAnnouncement.findMany({
+        where: input?.includeArchived
+          ? undefined
+          : {
+              status: {
+                not: 'ARCHIVED',
+              },
+            },
         orderBy: [{ createdAt: 'desc' }],
         take: input?.limit ?? 10,
         include: {
@@ -2640,6 +2648,144 @@ export const telegramBotRouter = router({
       });
 
       return result;
+    }),
+
+  resendAnnouncementFailedBatch: adminProcedure
+    .input(
+      z.object({
+        announcementIds: z.array(z.string().cuid()).min(1).max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+      const announcements = await db.telegramAnnouncement.findMany({
+        where: {
+          id: {
+            in: input.announcementIds,
+          },
+          status: {
+            not: 'ARCHIVED',
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+        },
+      });
+
+      if (announcements.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No active announcements were selected for resend.',
+        });
+      }
+
+      let processed = 0;
+      let resent = 0;
+      let failed = 0;
+
+      for (const announcement of announcements) {
+        const failedDeliveryCount = await db.telegramAnnouncementDelivery.count({
+          where: {
+            announcementId: announcement.id,
+            status: 'FAILED',
+          },
+        });
+
+        if (failedDeliveryCount === 0) {
+          continue;
+        }
+
+        const result = await dispatchTelegramAnnouncement({
+          announcementId: announcement.id,
+          resendFailedOnly: true,
+        });
+
+        processed += 1;
+        if (!result.skipped) {
+          resent += result.sentDelta;
+          failed += result.failedDelta;
+        }
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_RESEND_FAILED_BATCH',
+        entity: 'TELEGRAM',
+        details: {
+          announcementIds: announcements.map((announcement) => announcement.id),
+          processed,
+          resent,
+          failed,
+        },
+      });
+
+      return {
+        processed,
+        resent,
+        failed,
+      };
+    }),
+
+  archiveAnnouncements: adminProcedure
+    .input(
+      z.object({
+        announcementIds: z.array(z.string().cuid()).min(1).max(100),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+      const archivableAnnouncements = await db.telegramAnnouncement.findMany({
+        where: {
+          id: {
+            in: input.announcementIds,
+          },
+          status: {
+            notIn: ['PROCESSING', 'SCHEDULED', 'ARCHIVED'],
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+        },
+      });
+
+      if (archivableAnnouncements.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No completed announcements were selected for archive.',
+        });
+      }
+
+      const updated = await db.telegramAnnouncement.updateMany({
+        where: {
+          id: {
+            in: archivableAnnouncements.map((announcement) => announcement.id),
+          },
+        },
+        data: {
+          status: 'ARCHIVED',
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_ARCHIVE_BATCH',
+        entity: 'TELEGRAM',
+        details: {
+          announcementIds: archivableAnnouncements.map((announcement) => announcement.id),
+          archivedCount: updated.count,
+        },
+      });
+
+      return {
+        archivedCount: updated.count,
+      };
     }),
 
   listAnnouncementTemplates: adminProcedure.query(async ({ ctx }) => {

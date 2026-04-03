@@ -693,6 +693,9 @@ export async function sendTelegramDocument(
   document: Buffer,
   filename: string,
   caption?: string,
+  options?: {
+    replyMarkup?: Record<string, unknown>;
+  },
 ) {
   const preparedCaption =
     caption && caption.trim()
@@ -715,6 +718,9 @@ export async function sendTelegramDocument(
       formData.append('caption', preparedCaption.text);
       formData.append('parse_mode', 'HTML');
     }
+    if (options?.replyMarkup) {
+      formData.append('reply_markup', JSON.stringify(options.replyMarkup));
+    }
 
     const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendDocument`, {
       method: 'POST',
@@ -724,9 +730,12 @@ export async function sendTelegramDocument(
     if (!response.ok) {
       const data = await response.json();
       console.error(`Failed to send Telegram document to ${chatId}:`, data.description);
+      return false;
     }
+    return true;
   } catch (error) {
     console.error(`Error sending Telegram document to ${chatId}:`, error);
+    return false;
   }
 }
 

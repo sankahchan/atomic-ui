@@ -10,7 +10,7 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1405,9 +1405,12 @@ function buildEventCooldownPayload(eventCooldowns: EventCooldownInputs) {
   return next;
 }
 
-function TelegramBotSetupCard() {
+function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const { t, locale } = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isMyanmar = locale === 'my';
   const telegramUi = {
     enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
@@ -1540,7 +1543,16 @@ function TelegramBotSetupCard() {
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
-  const [activeBotTab, setActiveBotTab] = useState<TelegramBotSubtabId>('setup');
+  const botTabParam = searchParams.get('botTab');
+  const announcementIdParam = searchParams.get('announcementId')?.trim() || '';
+  const [activeBotTab, setActiveBotTab] = useState<TelegramBotSubtabId>(
+    botTabParam === 'broadcasts' ||
+      botTabParam === 'templates' ||
+      botTabParam === 'analytics' ||
+      botTabParam === 'history'
+      ? (botTabParam as TelegramBotSubtabId)
+      : 'setup',
+  );
   const [botAdvancedOpen, setBotAdvancedOpen] = useState(false);
   const [savedBotSnapshot, setSavedBotSnapshot] = useState<{
     form: TelegramSettings;
@@ -1565,6 +1577,10 @@ function TelegramBotSetupCard() {
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
   const [announcementAnalyticsRange, setAnnouncementAnalyticsRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const isBroadcastsTabActive = isActive && activeBotTab === 'broadcasts';
+  const isTemplatesTabActive = isActive && activeBotTab === 'templates';
+  const isAnalyticsTabActive = isActive && activeBotTab === 'analytics';
+  const isHistoryTabActive = isActive && activeBotTab === 'history';
   const botSettingsDirty = useMemo(() => {
     if (!savedBotSnapshot) {
       return false;
@@ -1606,6 +1622,30 @@ function TelegramBotSetupCard() {
       adminChatIdsInput: nextAdminChatIdsInput,
     });
   }, [settingsQuery.data, t]);
+
+  useEffect(() => {
+    if (
+      botTabParam === 'setup' ||
+      botTabParam === 'broadcasts' ||
+      botTabParam === 'templates' ||
+      botTabParam === 'analytics' ||
+      botTabParam === 'history'
+    ) {
+      setActiveBotTab(botTabParam);
+    }
+  }, [botTabParam]);
+
+  const updateTelegramUrlState = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const saveSettingsMutation = trpc.telegramBot.updateSettings.useMutation({
     onSuccess: async () => {
@@ -1693,24 +1733,43 @@ function TelegramBotSetupCard() {
       });
     },
   });
-  const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery({
-    filters: {
-      tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
-      segment:
-        announcementTargetSegment === 'ALL'
-          ? null
-          : (announcementTargetSegment as TelegramAnnouncementSegment),
-      serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
-      countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+  const announcementAudienceCountsQuery = trpc.telegramBot.getAnnouncementAudienceCounts.useQuery(
+    {
+      filters: {
+        tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
+        segment:
+          announcementTargetSegment === 'ALL'
+            ? null
+            : (announcementTargetSegment as TelegramAnnouncementSegment),
+        serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
+        countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
+      },
+      type: announcementType,
     },
-    type: announcementType,
+    {
+      enabled: isBroadcastsTabActive,
+    },
+  );
+  const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery(undefined, {
+    enabled: isBroadcastsTabActive || isTemplatesTabActive,
   });
-  const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery();
-  const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery();
-  const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery({ limit: 12 });
-  const announcementAnalyticsQuery = trpc.telegramBot.getAnnouncementAnalytics.useQuery({
-    range: announcementAnalyticsRange,
+  const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery(undefined, {
+    enabled: isBroadcastsTabActive || isTemplatesTabActive,
   });
+  const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery(
+    { limit: 12, includeArchived: false },
+    {
+      enabled: isHistoryTabActive,
+    },
+  );
+  const announcementAnalyticsQuery = trpc.telegramBot.getAnnouncementAnalytics.useQuery(
+    {
+      range: announcementAnalyticsRange,
+    },
+    {
+      enabled: isAnalyticsTabActive,
+    },
+  );
   const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
     onSuccess: async (result) => {
@@ -1809,6 +1868,50 @@ function TelegramBotSetupCard() {
       });
     },
   });
+  const resendAnnouncementFailedBatchMutation =
+    trpc.telegramBot.resendAnnouncementFailedBatch.useMutation({
+      onSuccess: async (result) => {
+        await Promise.all([
+          utils.telegramBot.listAnnouncementHistory.invalidate(),
+          utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+        ]);
+        toast({
+          title: telegramUi.announcementSent,
+          description: `${result.processed} announcement${result.processed === 1 ? '' : 's'} processed.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: telegramUi.announcementFailed,
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
+    });
+  const archiveAnnouncementsMutation = trpc.telegramBot.archiveAnnouncements.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.telegramBot.listAnnouncementHistory.invalidate(),
+        utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+      ]);
+      toast({
+        title: isMyanmar ? 'Announcement များကို archive လုပ်ပြီးပါပြီ' : 'Announcements archived',
+        description: isMyanmar
+          ? `${result.archivedCount} ခုကို history မှ archive လုပ်ပြီးပါပြီ။`
+          : `${result.archivedCount} announcement${result.archivedCount === 1 ? '' : 's'} archived.`,
+      });
+      if (announcementIdParam) {
+        updateTelegramUrlState({ announcementId: null });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.announcementFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
   const dispatchScheduledAnnouncementMutation = trpc.telegramBot.dispatchScheduledAnnouncement.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -1840,9 +1943,42 @@ function TelegramBotSetupCard() {
     countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
   };
   const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
-  const announcementTemplates = (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[];
-  const announcementHistory = (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[];
-  const announcementAnalytics = (announcementAnalyticsQuery.data ?? null) as TelegramAnnouncementAnalytics | null;
+  const announcementTemplates = useMemo(
+    () => (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[],
+    [announcementTemplatesQuery.data],
+  );
+  const announcementHistory = useMemo(
+    () => (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[],
+    [announcementHistoryQuery.data],
+  );
+  const announcementAnalytics = useMemo(
+    () => (announcementAnalyticsQuery.data ?? null) as TelegramAnnouncementAnalytics | null,
+    [announcementAnalyticsQuery.data],
+  );
+  const failedAnnouncementIds = useMemo(
+    () =>
+      announcementHistory
+        .filter((announcement) => announcement.failedCount > 0)
+        .map((announcement) => announcement.id),
+    [announcementHistory],
+  );
+  const archivableAnnouncementIds = useMemo(
+    () =>
+      announcementHistory
+        .filter((announcement) => {
+          if (
+            announcement.status === 'PROCESSING' ||
+            announcement.status === 'SCHEDULED' ||
+            announcement.status === 'ARCHIVED'
+          ) {
+            return false;
+          }
+          const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          return new Date(announcement.createdAt).getTime() <= sevenDaysAgo;
+        })
+        .map((announcement) => announcement.id),
+    [announcementHistory],
+  );
   const announcementTargetOptions = (announcementTargetOptionsQuery.data ?? {
     tags: [],
     segments: [],
@@ -1892,6 +2028,17 @@ function TelegramBotSetupCard() {
   const copyAnnouncementCommand = async (command: string) => {
     await copyToClipboard(command, telegramUi.announcementCommandCopied, telegramUi.announcementCommandPreview);
   };
+
+  useEffect(() => {
+    if (!isHistoryTabActive || !announcementIdParam) {
+      return;
+    }
+
+    const announcementCard = document.getElementById(`announcement-history-${announcementIdParam}`);
+    if (announcementCard) {
+      announcementCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [announcementHistory, announcementIdParam, isHistoryTabActive]);
 
   const handleSave = () => {
     const adminChatIds = adminChatIdsInput
@@ -1972,7 +2119,19 @@ function TelegramBotSetupCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Tabs value={activeBotTab} onValueChange={(value) => setActiveBotTab(value as TelegramBotSubtabId)} className="space-y-5">
+        <Tabs
+          value={activeBotTab}
+          onValueChange={(value) => {
+            const nextTab = value as TelegramBotSubtabId;
+            setActiveBotTab(nextTab);
+            updateTelegramUrlState({
+              workspace: 'telegram',
+              botTab: nextTab,
+              announcementId: nextTab === 'history' ? announcementIdParam || null : null,
+            });
+          }}
+          className="space-y-5"
+        >
           <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
             <TabsTrigger value="setup">Bot setup</TabsTrigger>
             <TabsTrigger value="broadcasts">Broadcasts</TabsTrigger>
@@ -2720,6 +2879,11 @@ function TelegramBotSetupCard() {
                             setAnnouncementSourceTemplateId(template.id);
                             setAnnouncementSourceTemplateName(template.name);
                             setActiveBotTab('broadcasts');
+                            updateTelegramUrlState({
+                              workspace: 'telegram',
+                              botTab: 'broadcasts',
+                              announcementId: null,
+                            });
                           }}
                         >
                           {telegramUi.announcementApplyTemplate}
@@ -2843,6 +3007,23 @@ function TelegramBotSetupCard() {
                           <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.orderCode}</p><Badge variant="outline">{entry.minutesFromSend} min</Badge></div>
                           <p className="mt-1 text-xs text-muted-foreground">{entry.announcementTitle}{entry.templateName ? ` • ${entry.templateName}` : ''}{entry.targetSegment ? ` • ${entry.targetSegment}` : ''}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{entry.audience} • {formatAnnouncementMoney(entry.priceAmount, entry.priceCurrency)}{entry.couponCode ? ` • coupon ${entry.couponCode}` : ''}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setActiveBotTab('history');
+                                updateTelegramUrlState({
+                                  workspace: 'telegram',
+                                  botTab: 'history',
+                                  announcementId: entry.announcementId,
+                                });
+                              }}
+                            >
+                              Jump to history item
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2854,13 +3035,62 @@ function TelegramBotSetupCard() {
 
           <TabsContent value="history" className="space-y-4">
             <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      resendAnnouncementFailedBatchMutation.mutate({
+                        announcementIds: failedAnnouncementIds,
+                      })
+                    }
+                    disabled={
+                      resendAnnouncementFailedBatchMutation.isPending || failedAnnouncementIds.length === 0
+                    }
+                  >
+                    {resendAnnouncementFailedBatchMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                    )}
+                    Bulk resend failed
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      archiveAnnouncementsMutation.mutate({
+                        announcementIds: archivableAnnouncementIds,
+                      })
+                    }
+                    disabled={archiveAnnouncementsMutation.isPending || archivableAnnouncementIds.length === 0}
+                  >
+                    {archiveAnnouncementsMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Bulk archive old
+                  </Button>
+                </div>
               </div>
               <div className="mt-3 space-y-3">
                 {announcementHistory.length ? announcementHistory.map((announcement) => (
-                  <div key={announcement.id} className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                  <div
+                    key={announcement.id}
+                    id={`announcement-history-${announcement.id}`}
+                    className={cn(
+                      'rounded-2xl border border-border/60 bg-background/70 p-3',
+                      announcement.id === announcementIdParam && 'border-primary/50 bg-primary/5 shadow-sm',
+                    )}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{announcement.title}</p>
@@ -2904,6 +3134,17 @@ function TelegramBotSetupCard() {
                       {announcement.failedCount > 0 ? (
                         <Button type="button" size="sm" variant="outline" onClick={() => resendAnnouncementFailedMutation.mutate({ announcementId: announcement.id })} disabled={resendAnnouncementFailedMutation.isPending}>
                           {telegramUi.announcementResendFailed}
+                        </Button>
+                      ) : null}
+                      {['SENT', 'FAILED', 'COMPLETED'].includes(announcement.status) ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => archiveAnnouncementsMutation.mutate({ announcementIds: [announcement.id] })}
+                          disabled={archiveAnnouncementsMutation.isPending}
+                        >
+                          Archive
                         </Button>
                       ) : null}
                     </div>
@@ -3501,9 +3742,11 @@ function ChannelCard({
   );
 }
 
-function TelegramSalesWorkflowCard() {
+function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const { locale } = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
@@ -3533,12 +3776,53 @@ function TelegramSalesWorkflowCard() {
   const [priorityFilter, setPriorityFilter] = useState<
     'ALL' | 'UNCLAIMED' | 'HIGH_RISK' | 'PREMIUM' | 'MY_QUEUE' | 'OLDEST'
   >('ALL');
-  const [activeWorkflowTab, setActiveWorkflowTab] = useState<WorkflowSubtabId>('settings');
+  const workflowTabParam = searchParams.get('workflowTab');
+  const [activeWorkflowTab, setActiveWorkflowTab] = useState<WorkflowSubtabId>(
+    workflowTabParam && ['settings', 'coupons', 'guardrails', 'review', 'premium'].includes(workflowTabParam)
+      ? (workflowTabParam as WorkflowSubtabId)
+      : 'settings',
+  );
   const [workflowAdvancedOpen, setWorkflowAdvancedOpen] = useState(false);
   const [savedWorkflowSnapshot, setSavedWorkflowSnapshot] =
     useState<TelegramSalesSettingsForm | null>(null);
   const deferredOrderSearch = useDeferredValue(orderSearch.trim());
   const orderCodeParam = searchParams.get('orderCode')?.trim() || '';
+  const updateWorkflowUrlState = (updates: {
+    workspace?: NotificationWorkspaceId;
+    workflowTab?: WorkflowSubtabId | null;
+    orderCode?: string | null;
+  }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const currentWorkspace = searchParams.get('workspace');
+    const nextWorkspace =
+      updates.workspace ??
+      (currentWorkspace && ['overview', 'telegram', 'workflow', 'channels'].includes(currentWorkspace)
+        ? (currentWorkspace as NotificationWorkspaceId)
+        : 'workflow');
+    params.set('workspace', nextWorkspace);
+    if (updates.workflowTab) {
+      params.set('workflowTab', updates.workflowTab);
+    } else if (updates.workflowTab === null) {
+      params.delete('workflowTab');
+    }
+    if (updates.orderCode) {
+      params.set('orderCode', updates.orderCode);
+    } else if (updates.orderCode === null) {
+      params.delete('orderCode');
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    if (
+      workflowTabParam &&
+      ['settings', 'coupons', 'guardrails', 'review', 'premium'].includes(workflowTabParam) &&
+      workflowTabParam !== activeWorkflowTab
+    ) {
+      setActiveWorkflowTab(workflowTabParam as WorkflowSubtabId);
+    }
+  }, [activeWorkflowTab, workflowTabParam]);
+
   const ordersQuery = trpc.telegramBot.listOrders.useQuery(
     {
       limit: 50,
@@ -3548,6 +3832,7 @@ function TelegramSalesWorkflowCard() {
     },
     {
       placeholderData: keepPreviousData,
+      enabled: isActive && activeWorkflowTab === 'review',
     },
   );
   const serverChangeRequestsQuery = trpc.telegramBot.listServerChangeRequests.useQuery(
@@ -3557,6 +3842,7 @@ function TelegramSalesWorkflowCard() {
     },
     {
       placeholderData: keepPreviousData,
+      enabled: isActive && activeWorkflowTab === 'review',
     },
   );
   const [premiumRequestSearch, setPremiumRequestSearch] = useState('');
@@ -3582,6 +3868,7 @@ function TelegramSalesWorkflowCard() {
     },
     {
       placeholderData: keepPreviousData,
+      enabled: isActive && activeWorkflowTab === 'premium',
     },
   );
   const [premiumReviewTarget, setPremiumReviewTarget] = useState<{
@@ -5104,7 +5391,15 @@ function TelegramSalesWorkflowCard() {
         <CardContent className="space-y-6">
           <Tabs
             value={activeWorkflowTab}
-            onValueChange={(value) => setActiveWorkflowTab(value as WorkflowSubtabId)}
+            onValueChange={(value) => {
+              const nextTab = value as WorkflowSubtabId;
+              setActiveWorkflowTab(nextTab);
+              updateWorkflowUrlState({
+                workspace: 'workflow',
+                workflowTab: nextTab,
+                orderCode: nextTab === 'review' ? orderCodeParam || null : null,
+              });
+            }}
             className="space-y-6"
           >
             <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
@@ -5351,6 +5646,82 @@ function TelegramSalesWorkflowCard() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className={cn('grid gap-3 md:grid-cols-2 xl:grid-cols-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
+            {[
+              {
+                key: 'trial',
+                title: 'Trial-to-paid',
+                enabled: form.trialCouponEnabled,
+                paused: form.trialCouponPaused,
+                onToggle: () =>
+                  setForm((prev) => ({
+                    ...prev,
+                    trialCouponPaused: !prev.trialCouponPaused,
+                  })),
+              },
+              {
+                key: 'renewal',
+                title: 'Renewal',
+                enabled: form.renewalCouponEnabled,
+                paused: form.renewalCouponPaused,
+                onToggle: () =>
+                  setForm((prev) => ({
+                    ...prev,
+                    renewalCouponPaused: !prev.renewalCouponPaused,
+                  })),
+              },
+              {
+                key: 'premium',
+                title: 'Premium upsell',
+                enabled: form.premiumUpsellCouponEnabled,
+                paused: form.premiumUpsellCouponPaused,
+                onToggle: () =>
+                  setForm((prev) => ({
+                    ...prev,
+                    premiumUpsellCouponPaused: !prev.premiumUpsellCouponPaused,
+                  })),
+              },
+              {
+                key: 'winback',
+                title: 'Win-back',
+                enabled: form.winbackCouponEnabled,
+                paused: form.winbackCouponPaused,
+                onToggle: () =>
+                  setForm((prev) => ({
+                    ...prev,
+                    winbackCouponPaused: !prev.winbackCouponPaused,
+                  })),
+              },
+            ].map((campaign) => (
+              <div
+                key={campaign.key}
+                className="rounded-2xl border border-border/60 bg-background/55 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{campaign.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {campaign.enabled ? (campaign.paused ? 'Enabled but paused' : 'Enabled and running') : 'Disabled'}
+                    </p>
+                  </div>
+                  <Badge variant={campaign.enabled ? 'default' : 'secondary'}>
+                    {campaign.enabled ? (campaign.paused ? 'Paused' : 'Running') : 'Disabled'}
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={campaign.onToggle}
+                  disabled={!campaign.enabled}
+                >
+                  {campaign.paused ? 'Resume campaign' : 'Pause campaign'}
+                </Button>
+              </div>
+            ))}
           </div>
 
           <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
@@ -9226,9 +9597,33 @@ export default function NotificationsPage() {
   const { t, locale } = useLocale();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editChannel, setEditChannel] = useState<Channel | null>(null);
-  const [activeWorkspace, setActiveWorkspace] = useState<NotificationWorkspaceId>('overview');
+  const workspaceParam = searchParams.get('workspace');
+  const [activeWorkspace, setActiveWorkspace] = useState<NotificationWorkspaceId>(
+    workspaceParam && ['overview', 'telegram', 'workflow', 'channels'].includes(workspaceParam)
+      ? (workspaceParam as NotificationWorkspaceId)
+      : 'overview',
+  );
+
+  useEffect(() => {
+    if (
+      workspaceParam &&
+      ['overview', 'telegram', 'workflow', 'channels'].includes(workspaceParam) &&
+      workspaceParam !== activeWorkspace
+    ) {
+      setActiveWorkspace(workspaceParam as NotificationWorkspaceId);
+    }
+  }, [activeWorkspace, workspaceParam]);
+
+  const updateWorkspaceUrlState = (workspace: NotificationWorkspaceId) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('workspace', workspace);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const { data: channels = [], isLoading: isChannelsLoading } = trpc.notifications.listChannels.useQuery(
     undefined,
@@ -9408,7 +9803,14 @@ export default function NotificationsPage() {
         </div>
       </section>
 
-      <Tabs value={activeWorkspace} onValueChange={(value) => setActiveWorkspace(value as NotificationWorkspaceId)}>
+      <Tabs
+        value={activeWorkspace}
+        onValueChange={(value) => {
+          const workspace = value as NotificationWorkspaceId;
+          setActiveWorkspace(workspace);
+          updateWorkspaceUrlState(workspace);
+        }}
+      >
         <TabsList className="grid h-auto w-full grid-cols-1 gap-2 rounded-[1.8rem] border border-border/60 bg-background/55 p-2 md:grid-cols-2 2xl:grid-cols-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.9),rgba(5,12,24,0.76))] dark:shadow-[0_16px_38px_rgba(1,6,20,0.34)]">
           {workspaces.map((workspace) => {
             const Icon = workspace.icon;
@@ -9472,7 +9874,10 @@ export default function NotificationsPage() {
                         <button
                           key={`jump:${workspace.id}`}
                           type="button"
-                          onClick={() => setActiveWorkspace(workspace.id)}
+                          onClick={() => {
+                            setActiveWorkspace(workspace.id);
+                            updateWorkspaceUrlState(workspace.id);
+                          }}
                           className="rounded-2xl border border-border/60 bg-background/70 p-4 text-left transition-colors hover:border-primary/30 hover:bg-background"
                         >
                           <div className="flex items-center gap-2 text-sm font-semibold">
@@ -9512,7 +9917,7 @@ export default function NotificationsPage() {
               </CardContent>
             </Card>
 
-            <TelegramBotSetupCard />
+            <TelegramBotSetupCard isActive={activeWorkspace === 'telegram'} />
           </div>
         </TabsContent>
 
@@ -9536,7 +9941,7 @@ export default function NotificationsPage() {
               </CardContent>
             </Card>
 
-            <TelegramSalesWorkflowCard />
+            <TelegramSalesWorkflowCard isActive={activeWorkspace === 'workflow'} />
           </div>
         </TabsContent>
 

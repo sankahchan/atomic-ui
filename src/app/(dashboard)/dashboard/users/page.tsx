@@ -31,10 +31,11 @@ import { MobileCardView } from '@/components/mobile-card-view';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Key, Loader2, Plus, Search, Send, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
+import { ExternalLink, Key, Loader2, Plus, RefreshCw, Search, Send, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
 type RefundQueueFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -102,6 +103,11 @@ export default function UsersPage() {
     orderCode: string;
     action: RefundReviewAction;
   } | null>(null);
+  const [quickActionsUser, setQuickActionsUser] = useState<{ id: string; email: string } | null>(null);
+  const [quickActionMessage, setQuickActionMessage] = useState('');
+  const [quickActionIncludeSupportButton, setQuickActionIncludeSupportButton] = useState(true);
+  const [quickActionReceiptOrderId, setQuickActionReceiptOrderId] = useState('');
+  const [quickActionShareTarget, setQuickActionShareTarget] = useState('');
   const [refundReasonPresetCode, setRefundReasonPresetCode] = useState('');
   const [refundReviewNote, setRefundReviewNote] = useState('');
   const [refundReviewCustomerMessage, setRefundReviewCustomerMessage] = useState('');
@@ -117,6 +123,12 @@ export default function UsersPage() {
     limit: 24,
   });
   const userList = useMemo(() => users ?? [], [users]);
+  const quickActionLedgerQuery = trpc.users.getLedger.useQuery(
+    { id: quickActionsUser?.id || '' },
+    {
+      enabled: Boolean(quickActionsUser?.id),
+    },
+  );
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -161,6 +173,12 @@ export default function UsersPage() {
       ].filter((preset): preset is NonNullable<ReturnType<typeof getRefundReasonPreset>> => Boolean(preset)),
     [],
   );
+  const quickActionLedger = quickActionLedgerQuery.data;
+  const quickActionAccessKeys = quickActionLedger?.accessKeys || [];
+  const quickActionDynamicKeys = quickActionLedger?.dynamicKeys || [];
+  const quickActionTelegramOrders = quickActionLedger?.telegramOrders || [];
+  const quickActionCouponEligibility = quickActionLedger?.couponEligibility || [];
+  const quickActionCouponHistory = quickActionLedger?.couponHistory || [];
 
   const createMutation = trpc.users.createClient.useMutation({
     onSuccess: () => {
@@ -282,6 +300,87 @@ export default function UsersPage() {
     onError: (error) => {
       toast({
         title: 'Refund reassignment failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const sendDirectTelegramMessageMutation = trpc.users.sendDirectTelegramMessage.useMutation({
+    onSuccess: async () => {
+      await quickActionLedgerQuery.refetch();
+      toast({
+        title: 'Telegram message sent',
+        description: 'The direct customer message was delivered.',
+      });
+      setQuickActionMessage('');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Telegram message failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const resendTelegramOrderReceiptMutation = trpc.users.resendTelegramOrderReceipt.useMutation({
+    onSuccess: async () => {
+      await quickActionLedgerQuery.refetch();
+      toast({
+        title: 'Receipt resent',
+        description: 'The Telegram receipt was sent again.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Receipt resend failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const resendCustomerSharePageMutation = trpc.users.resendCustomerSharePage.useMutation({
+    onSuccess: async () => {
+      await quickActionLedgerQuery.refetch();
+      toast({
+        title: 'Share page resent',
+        description: 'The customer received the share page again in Telegram.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Share resend failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const updatePromoEligibilityOverrideMutation = trpc.users.updatePromoEligibilityOverride.useMutation({
+    onSuccess: async () => {
+      await quickActionLedgerQuery.refetch();
+      toast({
+        title: 'Promo override saved',
+        description: 'Customer promo eligibility was updated.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Promo override failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const updateCouponStatusMutation = trpc.users.updateCouponStatus.useMutation({
+    onSuccess: async (result) => {
+      await quickActionLedgerQuery.refetch();
+      toast({
+        title: result.status === 'CANCELLED' ? 'Coupon revoked' : 'Coupon expired',
+        description: `${result.couponCode} is no longer available to this customer.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Coupon update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -1127,6 +1226,19 @@ export default function UsersPage() {
                                 </Link>
                               </Button>
                               <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  setQuickActionsUser({
+                                    id: user.id,
+                                    email: user.email || 'Unknown',
+                                  })
+                                }
+                              >
+                                <Send className="mr-2 h-4 w-4" />
+                                Quick actions
+                              </Button>
+                              <Button
                                 variant="ghost"
                                 size="icon"
                                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -1231,18 +1343,378 @@ export default function UsersPage() {
                     </div>
                   ) : null}
 
-                  <Button asChild variant="outline" className="w-full rounded-full">
-                    <Link href={`/dashboard/users/${user.id}`}>
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open CRM
-                    </Link>
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button asChild variant="outline" className="w-full rounded-full">
+                      <Link href={`/dashboard/users/${user.id}`}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open CRM
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="w-full rounded-full"
+                      onClick={() =>
+                        setQuickActionsUser({
+                          id: user.id,
+                          email: user.email || 'Unknown',
+                        })
+                      }
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      Quick actions
+                    </Button>
+                  </div>
                 </div>
               );
             }}
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(quickActionsUser)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQuickActionsUser(null);
+            setQuickActionMessage('');
+            setQuickActionReceiptOrderId('');
+            setQuickActionShareTarget('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Customer quick actions</DialogTitle>
+            <DialogDescription>
+              {quickActionsUser?.email || 'Selected customer'} without leaving the user list.
+            </DialogDescription>
+          </DialogHeader>
+          {quickActionLedgerQuery.isLoading ? (
+            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading customer shortcuts…
+            </div>
+          ) : quickActionLedger ? (
+            <div className="space-y-5">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-border/60 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {quickActionLedger.telegramProfile?.telegramChatId || quickActionLedger.user.telegramChatId || 'Not linked'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {quickActionLedger.telegramProfile?.username ? `@${quickActionLedger.telegramProfile.username}` : 'No username'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/60 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled orders</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {quickActionTelegramOrders.filter((order) => order.status === 'FULFILLED').length}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Ready for receipt resend</p>
+                </div>
+                <div className="rounded-xl border border-border/60 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active keys</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {quickActionAccessKeys.length + quickActionDynamicKeys.length}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Share page resend available</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-border/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Direct Telegram message</p>
+                      <p className="text-xs text-muted-foreground">Send a short customer update from the directory.</p>
+                    </div>
+                    <Switch
+                      checked={quickActionIncludeSupportButton}
+                      onCheckedChange={setQuickActionIncludeSupportButton}
+                    />
+                  </div>
+                  <Textarea
+                    className="mt-3 min-h-[120px]"
+                    value={quickActionMessage}
+                    onChange={(event) => setQuickActionMessage(event.target.value)}
+                    placeholder="Write a direct Telegram message…"
+                    disabled={!quickActionLedger.crmPermissions.canMessageCustomer}
+                  />
+                  <Button
+                    className="mt-3 w-full"
+                    disabled={
+                      !quickActionLedger.crmPermissions.canMessageCustomer ||
+                      sendDirectTelegramMessageMutation.isPending ||
+                      quickActionMessage.trim().length < 3
+                    }
+                    onClick={() =>
+                      sendDirectTelegramMessageMutation.mutate({
+                        userId: quickActionLedger.user.id,
+                        message: quickActionMessage.trim(),
+                        includeSupportButton: quickActionIncludeSupportButton,
+                      })
+                    }
+                  >
+                    {sendDirectTelegramMessageMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Send message
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border/60 p-4">
+                  <p className="text-sm font-medium">Delivery shortcuts</p>
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-2">
+                      <Label>Resend receipt</Label>
+                      <Select value={quickActionReceiptOrderId} onValueChange={setQuickActionReceiptOrderId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a fulfilled order" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {quickActionTelegramOrders
+                            .filter((order) => order.status === 'FULFILLED')
+                            .map((order) => (
+                              <SelectItem key={order.id} value={order.id}>
+                                {order.orderCode} • {order.planName || order.planCode || 'Order'}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={
+                          !quickActionLedger.crmPermissions.canMessageCustomer ||
+                          resendTelegramOrderReceiptMutation.isPending ||
+                          !quickActionReceiptOrderId
+                        }
+                        onClick={() =>
+                          resendTelegramOrderReceiptMutation.mutate({
+                            orderId: quickActionReceiptOrderId,
+                          })
+                        }
+                      >
+                        {resendTelegramOrderReceiptMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                        )}
+                        Resend receipt
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Resend share page</Label>
+                      <Select value={quickActionShareTarget} onValueChange={setQuickActionShareTarget}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a key" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {quickActionAccessKeys.map((key) => (
+                            <SelectItem key={`ACCESS_KEY:${key.id}`} value={`ACCESS_KEY:${key.id}`}>
+                              Standard • {key.name}
+                            </SelectItem>
+                          ))}
+                          {quickActionDynamicKeys.map((key) => (
+                            <SelectItem key={`DYNAMIC_KEY:${key.id}`} value={`DYNAMIC_KEY:${key.id}`}>
+                              Premium • {key.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={
+                          !quickActionLedger.crmPermissions.canMessageCustomer ||
+                          resendCustomerSharePageMutation.isPending ||
+                          !quickActionShareTarget
+                        }
+                        onClick={() => {
+                          const [keyType, keyId] = quickActionShareTarget.split(':');
+                          if (!keyType || !keyId) return;
+                          resendCustomerSharePageMutation.mutate({
+                            keyType: keyType as 'ACCESS_KEY' | 'DYNAMIC_KEY',
+                            keyId,
+                          });
+                        }}
+                      >
+                        {resendCustomerSharePageMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                        )}
+                        Resend share page
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Promo overrides</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {quickActionCouponEligibility.map((campaign) => (
+                    <div key={campaign.campaignType} className="rounded-xl border border-border/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{campaign.label}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Remaining {campaign.remainingUses}/{campaign.maxUsesPerUser}
+                          </p>
+                        </div>
+                        <Badge variant="outline">
+                          {campaign.overrideMode === 'FORCE_ALLOW'
+                            ? 'Force allow'
+                            : campaign.overrideMode === 'FORCE_BLOCK'
+                              ? 'Suppressed'
+                              : campaign.eligibleNow
+                                ? 'Eligible'
+                                : campaign.blockedReason || 'Blocked'}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={campaign.overrideMode === 'FORCE_ALLOW' ? 'default' : 'outline'}
+                          disabled={
+                            !quickActionLedger.crmPermissions.canManagePromoOverrides ||
+                            updatePromoEligibilityOverrideMutation.isPending
+                          }
+                          onClick={() =>
+                            updatePromoEligibilityOverrideMutation.mutate({
+                              userId: quickActionLedger.user.id,
+                              campaignType: campaign.campaignType,
+                              mode: 'FORCE_ALLOW',
+                            })
+                          }
+                        >
+                          Force allow
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={campaign.overrideMode === 'FORCE_BLOCK' ? 'destructive' : 'outline'}
+                          disabled={
+                            !quickActionLedger.crmPermissions.canManagePromoOverrides ||
+                            updatePromoEligibilityOverrideMutation.isPending
+                          }
+                          onClick={() =>
+                            updatePromoEligibilityOverrideMutation.mutate({
+                              userId: quickActionLedger.user.id,
+                              campaignType: campaign.campaignType,
+                              mode: 'FORCE_BLOCK',
+                            })
+                          }
+                        >
+                          Suppress
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={
+                            !quickActionLedger.crmPermissions.canManagePromoOverrides ||
+                            updatePromoEligibilityOverrideMutation.isPending ||
+                            !campaign.overrideMode
+                          }
+                          onClick={() =>
+                            updatePromoEligibilityOverrideMutation.mutate({
+                              userId: quickActionLedger.user.id,
+                              campaignType: campaign.campaignType,
+                              mode: 'DEFAULT',
+                            })
+                          }
+                        >
+                          Use rules
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {quickActionCouponHistory.some((coupon) => coupon.status === 'ISSUED') ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Coupon actions</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {quickActionCouponHistory
+                      .filter((coupon) => coupon.status === 'ISSUED')
+                      .slice(0, 4)
+                      .map((coupon) => (
+                        <div key={coupon.id} className="rounded-xl border border-border/60 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{coupon.couponCode}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {coupon.campaignType} • {coupon.couponDiscountLabel || formatMoney(coupon.couponDiscountAmount, coupon.currency)}
+                              </p>
+                            </div>
+                            <Badge variant="outline">{coupon.status}</Badge>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                !quickActionLedger.crmPermissions.canManageCoupons ||
+                                updateCouponStatusMutation.isPending
+                              }
+                              onClick={() =>
+                                updateCouponStatusMutation.mutate({
+                                  couponId: coupon.id,
+                                  action: 'EXPIRE',
+                                  reason: 'Expired from user list quick actions',
+                                })
+                              }
+                            >
+                              Expire
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={
+                                !quickActionLedger.crmPermissions.canManageCoupons ||
+                                updateCouponStatusMutation.isPending
+                              }
+                              onClick={() =>
+                                updateCouponStatusMutation.mutate({
+                                  couponId: coupon.id,
+                                  action: 'REVOKE',
+                                  reason: 'Revoked from user list quick actions',
+                                })
+                              }
+                            >
+                              Revoke
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+              Customer quick actions are not available for this account yet.
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickActionsUser(null)}>
+              Close
+            </Button>
+            {quickActionsUser ? (
+              <Button asChild>
+                <Link href={`/dashboard/users/${quickActionsUser.id}`}>
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open CRM
+                </Link>
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmationDialog
         open={!!userToDelete}
