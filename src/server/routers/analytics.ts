@@ -1009,7 +1009,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials] = await Promise.all([
+      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -1033,6 +1033,9 @@ export const analyticsRouter = router({
             paymentMethodLabel: true,
             retryOfOrderId: true,
             retentionSource: true,
+            couponCampaignType: true,
+            couponCode: true,
+            couponDiscountAmount: true,
             paymentReminderSentAt: true,
             reviewReminderSentAt: true,
             rejectedFollowUpSentAt: true,
@@ -1069,6 +1072,9 @@ export const analyticsRouter = router({
             paymentMethodLabel: true,
             retryOfOrderId: true,
             retentionSource: true,
+            couponCampaignType: true,
+            couponCode: true,
+            couponDiscountAmount: true,
             paymentProofRevision: true,
             rejectionReasonCode: true,
             createdAt: true,
@@ -1109,6 +1115,25 @@ export const analyticsRouter = router({
             createdAt: true,
           },
         }),
+        db.telegramCouponRedemption.findMany({
+          where: {
+            OR: [
+              { createdAt: { gte: cutoff } },
+              { redeemedAt: { gte: cutoff } },
+            ],
+          },
+          select: {
+            id: true,
+            campaignType: true,
+            couponCode: true,
+            couponDiscountAmount: true,
+            currency: true,
+            status: true,
+            redeemedOrderId: true,
+            createdAt: true,
+            redeemedAt: true,
+          },
+        }),
       ]);
 
       const summary = {
@@ -1147,10 +1172,37 @@ export const analyticsRouter = router({
         expiredRecoveryFulfilled: 0,
         renewalReminderOrders: 0,
         renewalReminderFulfilled: 0,
+        renewalCouponOrders: 0,
+        renewalCouponFulfilled: 0,
+        premiumUpsellOrders: 0,
+        premiumUpsellFulfilled: 0,
+        winbackOrders: 0,
+        winbackFulfilled: 0,
         premiumRenewalOrders: 0,
         premiumRenewalFulfilled: 0,
       };
       const rejectionReasons = new Map<string, number>();
+      const couponCampaigns = new Map<
+        string,
+        {
+          campaignType: string;
+          issued: number;
+          redeemed: number;
+          attributedOrders: number;
+          fulfilledOrders: number;
+          discountByCurrency: Map<string, number>;
+          revenueByCurrency: Map<string, number>;
+        }
+      >();
+      const couponCodes = new Map<
+        string,
+        {
+          couponCode: string;
+          campaignType: string;
+          issued: number;
+          redeemed: number;
+        }
+      >();
 
       const revenueByCurrency = new Map<string, number>();
       const topPlans = new Map<
@@ -1189,6 +1241,11 @@ export const analyticsRouter = router({
       let premiumOpenOlderThan6Hours = 0;
       let premiumOpenOlderThan24Hours = 0;
       let premiumOldestOpenMinutes: number | null = null;
+      let couponIssued = 0;
+      let couponRedeemed = 0;
+      let couponAttributedOrders = 0;
+      let couponAttributedFulfilled = 0;
+      const couponDiscountValueByCurrency = new Map<string, number>();
 
       for (const trialOrder of fulfilledTrials) {
         const baseline = trialOrder.fulfilledAt || trialOrder.createdAt;
@@ -1245,6 +1302,24 @@ export const analyticsRouter = router({
               retention.renewalReminderFulfilled += 1;
             }
             break;
+          case 'renewal_coupon':
+            retention.renewalCouponOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.renewalCouponFulfilled += 1;
+            }
+            break;
+          case 'premium_upsell_coupon':
+            retention.premiumUpsellOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.premiumUpsellFulfilled += 1;
+            }
+            break;
+          case 'winback_coupon':
+            retention.winbackOrders += 1;
+            if (order.status === 'FULFILLED') {
+              retention.winbackFulfilled += 1;
+            }
+            break;
           case 'premium_renewal_7d':
           case 'premium_renewal_3d':
             retention.premiumRenewalOrders += 1;
@@ -1258,6 +1333,40 @@ export const analyticsRouter = router({
 
         if (order.planCode === 'trial_1d_3gb' && order.status === 'FULFILLED') {
           trialFulfilledInRange += 1;
+        }
+
+        if (order.couponCode) {
+          couponAttributedOrders += 1;
+          const campaignType = order.couponCampaignType || 'UNKNOWN';
+          const currentCampaign = couponCampaigns.get(campaignType) || {
+            campaignType,
+            issued: 0,
+            redeemed: 0,
+            attributedOrders: 0,
+            fulfilledOrders: 0,
+            discountByCurrency: new Map<string, number>(),
+            revenueByCurrency: new Map<string, number>(),
+          };
+          currentCampaign.attributedOrders += 1;
+          if (order.status === 'FULFILLED') {
+            couponAttributedFulfilled += 1;
+            currentCampaign.fulfilledOrders += 1;
+          }
+          if (typeof order.couponDiscountAmount === 'number' && order.couponDiscountAmount > 0) {
+            const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+            currentCampaign.discountByCurrency.set(
+              currency,
+              (currentCampaign.discountByCurrency.get(currency) || 0) + order.couponDiscountAmount,
+            );
+          }
+          if (order.status === 'FULFILLED' && typeof order.priceAmount === 'number' && order.priceAmount > 0) {
+            const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+            currentCampaign.revenueByCurrency.set(
+              currency,
+              (currentCampaign.revenueByCurrency.get(currency) || 0) + order.priceAmount,
+            );
+          }
+          couponCampaigns.set(campaignType, currentCampaign);
         }
 
         if (order.paymentMethodCode || order.paymentMethodLabel) {
@@ -1466,6 +1575,50 @@ export const analyticsRouter = router({
         premiumRouteIssuesByServer.set(serverKey, current);
       }
 
+      for (const coupon of couponRedemptions) {
+        const campaignType = coupon.campaignType || 'UNKNOWN';
+        const currentCampaign = couponCampaigns.get(campaignType) || {
+          campaignType,
+          issued: 0,
+          redeemed: 0,
+          attributedOrders: 0,
+          fulfilledOrders: 0,
+          discountByCurrency: new Map<string, number>(),
+          revenueByCurrency: new Map<string, number>(),
+        };
+        currentCampaign.issued += 1;
+        couponIssued += 1;
+        if (coupon.status === 'REDEEMED' || coupon.redeemedOrderId) {
+          currentCampaign.redeemed += 1;
+          couponRedeemed += 1;
+          if (coupon.couponDiscountAmount > 0) {
+            const currency = (coupon.currency || 'MMK').trim().toUpperCase();
+            currentCampaign.discountByCurrency.set(
+              currency,
+              (currentCampaign.discountByCurrency.get(currency) || 0) + coupon.couponDiscountAmount,
+            );
+            couponDiscountValueByCurrency.set(
+              currency,
+              (couponDiscountValueByCurrency.get(currency) || 0) + coupon.couponDiscountAmount,
+            );
+          }
+        }
+        couponCampaigns.set(campaignType, currentCampaign);
+
+        const normalizedCode = coupon.couponCode?.trim().toUpperCase() || 'UNKNOWN';
+        const codeEntry = couponCodes.get(normalizedCode) || {
+          couponCode: normalizedCode,
+          campaignType,
+          issued: 0,
+          redeemed: 0,
+        };
+        codeEntry.issued += 1;
+        if (coupon.status === 'REDEEMED' || coupon.redeemedOrderId) {
+          codeEntry.redeemed += 1;
+        }
+        couponCodes.set(normalizedCode, codeEntry);
+      }
+
       return {
         range: input.range,
         summary,
@@ -1540,6 +1693,62 @@ export const analyticsRouter = router({
               : null,
         },
         retention,
+        coupons: {
+          summary: {
+            issued: couponIssued,
+            redeemed: couponRedeemed,
+            redemptionRate: couponIssued > 0 ? (couponRedeemed / couponIssued) * 100 : null,
+            attributedOrders: couponAttributedOrders,
+            attributedFulfilled: couponAttributedFulfilled,
+            attributedConversionRate:
+              couponAttributedOrders > 0
+                ? (couponAttributedFulfilled / couponAttributedOrders) * 100
+                : null,
+            discountValueByCurrency: Array.from(couponDiscountValueByCurrency.entries())
+              .map(([currency, amount]) => ({ currency, amount }))
+              .sort((left, right) => right.amount - left.amount),
+          },
+          byCampaign: Array.from(couponCampaigns.values())
+            .map((campaign) => ({
+              campaignType: campaign.campaignType,
+              issued: campaign.issued,
+              redeemed: campaign.redeemed,
+              redemptionRate: campaign.issued > 0 ? (campaign.redeemed / campaign.issued) * 100 : null,
+              attributedOrders: campaign.attributedOrders,
+              fulfilledOrders: campaign.fulfilledOrders,
+              conversionRate:
+                campaign.attributedOrders > 0
+                  ? (campaign.fulfilledOrders / campaign.attributedOrders) * 100
+                  : null,
+              discountByCurrency: Array.from(campaign.discountByCurrency.entries())
+                .map(([currency, amount]) => ({ currency, amount }))
+                .sort((left, right) => right.amount - left.amount),
+              revenueByCurrency: Array.from(campaign.revenueByCurrency.entries())
+                .map(([currency, amount]) => ({ currency, amount }))
+                .sort((left, right) => right.amount - left.amount),
+            }))
+            .sort((left, right) => {
+              if (right.issued !== left.issued) {
+                return right.issued - left.issued;
+              }
+              return right.redeemed - left.redeemed;
+            }),
+          byCode: Array.from(couponCodes.values())
+            .map((code) => ({
+              couponCode: code.couponCode,
+              campaignType: code.campaignType,
+              issued: code.issued,
+              redeemed: code.redeemed,
+              redemptionRate: code.issued > 0 ? (code.redeemed / code.issued) * 100 : null,
+            }))
+            .sort((left, right) => {
+              if (right.redeemed !== left.redeemed) {
+                return right.redeemed - left.redeemed;
+              }
+              return right.issued - left.issued;
+            })
+            .slice(0, input.limit),
+        },
         premium: {
           summary: {
             premiumOrders: orders.filter((order) => order.deliveryType === 'DYNAMIC_KEY').length,

@@ -379,6 +379,7 @@ export async function handleBuyCommand(input: {
   username: string;
   locale: SupportedLocale;
   botToken: string;
+  argsText?: string;
   retentionSource?: string | null;
   deps: any;
 }): Promise<string | null> {
@@ -406,6 +407,22 @@ export async function handleBuyCommand(input: {
     retentionSource: input.retentionSource ?? null,
   });
 
+  const coupon = input.deps.resolveTelegramCouponForOrderStart
+    ? await input.deps.resolveTelegramCouponForOrderStart({
+        chatId: input.chatId,
+        telegramUserId: input.telegramUserId,
+        source: input.retentionSource ?? null,
+        couponCode: input.argsText?.trim() || null,
+      })
+    : null;
+  const preparedOrder =
+    coupon && input.deps.attachTelegramCouponToOrder
+      ? await input.deps.attachTelegramCouponToOrder({
+          orderId: order.id,
+          coupon,
+        })
+      : order;
+
   const enabledPlans = await input.deps.listAvailableTelegramPlansForOrder({
     kind: 'NEW',
     chatId: input.chatId,
@@ -427,9 +444,18 @@ export async function handleBuyCommand(input: {
       return price ? `• ${label} - ${price}` : `• ${label}`;
     });
   const lines = [
-    ui.orderPlanPrompt(order.orderCode),
+    ui.orderPlanPrompt(preparedOrder.orderCode),
     '',
     ui.buyPlanChooseHint,
+    ...(input.deps.buildTelegramCouponReadyLines
+      ? input.deps.buildTelegramCouponReadyLines({
+          locale: input.locale,
+          couponCode: preparedOrder.couponCode,
+          couponDiscountAmount: preparedOrder.couponDiscountAmount,
+          couponDiscountLabel: preparedOrder.couponDiscountLabel,
+          priceCurrency: preparedOrder.priceCurrency,
+        })
+      : []),
     '',
     ui.buyStandardSummary,
     ...(standardPlanLines.length ? ['', `${ui.buyStandardPlansTitle}:`, ...standardPlanLines] : []),
@@ -447,7 +473,7 @@ export async function handleBuyCommand(input: {
   const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: input.deps.buildTelegramPlanSelectionKeyboard({
-      orderId: order.id,
+      orderId: preparedOrder.id,
       plans: enabledPlans,
       locale: input.locale,
     }),
@@ -619,7 +645,12 @@ export async function handleTelegramOrderTextMessage(input: {
         return ui.freeTrialUnavailable;
       }
       if (plan.unlimitedQuota && !plan.fixedDurationMonths) {
-        const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(plan, locale);
+        const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(plan, locale, {
+          couponCampaignType: activeOrder.couponCampaignType,
+          couponCode: activeOrder.couponCode,
+          couponDiscountAmount: activeOrder.couponDiscountAmount,
+          couponDiscountLabel: activeOrder.couponDiscountLabel,
+        });
         await db.telegramOrder.update({
           where: { id: activeOrder.id },
           data: {
@@ -630,7 +661,12 @@ export async function handleTelegramOrderTextMessage(input: {
         return ui.orderMonthsPrompt;
       }
 
-      const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(plan, locale);
+      const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(plan, locale, {
+        couponCampaignType: activeOrder.couponCampaignType,
+        couponCode: activeOrder.couponCode,
+        couponDiscountAmount: activeOrder.couponDiscountAmount,
+        couponDiscountLabel: activeOrder.couponDiscountLabel,
+      });
       const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(salesSettings);
       const nextStatus =
         activeOrder.kind === 'NEW'
@@ -764,6 +800,10 @@ export async function handleTelegramOrderTextMessage(input: {
           ...input.deps.buildTelegramOrderPlanSnapshot(plan, locale, {
             durationMonths: months,
             durationDays: null,
+            couponCampaignType: activeOrder.couponCampaignType,
+            couponCode: activeOrder.couponCode,
+            couponDiscountAmount: activeOrder.couponDiscountAmount,
+            couponDiscountLabel: activeOrder.couponDiscountLabel,
           }),
           planName: planSummary,
           status: nextStatus,

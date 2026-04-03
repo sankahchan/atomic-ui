@@ -97,6 +97,16 @@ import {
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
 import {
+  buildTelegramCouponAdjustedPlanSnapshot,
+  expireTelegramCoupons,
+  findTelegramApplicableCoupon,
+  formatTelegramSalesMoneyAmount,
+  getTelegramCampaignCouponTypeFromSource,
+  issueTelegramCampaignCoupon,
+  redeemTelegramCouponForOrder,
+  type TelegramCampaignCouponType,
+} from '@/lib/services/telegram-coupons';
+import {
   buildTelegramFinanceDocumentUrl,
   evaluateTelegramOrderRefundEligibility,
   getFinanceControls,
@@ -221,12 +231,15 @@ import {
 } from '@/lib/services/telegram-links';
 import {
   runTelegramSalesDigestCycle,
+  sendAccessKeyPremiumUpsellCouponCampaign,
   sendAccessKeyLifecycleTelegramNotification as sendAccessKeyLifecycleTelegramReminder,
   sendAccessKeyTrialCouponCampaign,
+  sendAccessKeyRenewalCouponCampaign,
   sendAccessKeyRenewalReminder,
   sendAccessKeyTrialExpiryReminder,
   sendDynamicKeyExpiryTelegramNotification,
   sendDynamicKeyRenewalReminder,
+  sendTelegramWinbackCouponCampaign,
 } from '@/lib/services/telegram-reminders';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import {
@@ -352,6 +365,11 @@ function buildTelegramSalesPaymentPrompt(input: {
   requestedName?: string | null;
   renewalTargetName?: string | null;
   supportLink?: string | null;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
+  couponDiscountLabel?: string | null;
+  originalPriceAmount?: number | null;
+  priceCurrency?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
   const lines = [
@@ -369,6 +387,21 @@ function buildTelegramSalesPaymentPrompt(input: {
 
   if (input.selectedServerName) {
     lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(input.selectedServerName)}</b>`);
+  }
+
+  if (input.couponCode) {
+    lines.push(`${ui.couponCodeLabel}: <b>${escapeHtml(input.couponCode)}</b>`);
+    if (typeof input.originalPriceAmount === 'number' && input.originalPriceAmount > 0) {
+      lines.push(
+        `${ui.originalPriceLabel}: <b>${escapeHtml(formatTelegramSalesMoneyAmount(input.originalPriceAmount, input.priceCurrency || 'MMK', input.locale))}</b>`,
+      );
+    }
+    const discountText =
+      input.couponDiscountLabel?.trim()
+      || formatTelegramSalesMoneyAmount(input.couponDiscountAmount ?? null, input.priceCurrency || 'MMK', input.locale);
+    if (discountText) {
+      lines.push(`${ui.discountLabel}: <b>${escapeHtml(discountText)}</b>`);
+    }
   }
 
   lines.push(
@@ -439,6 +472,11 @@ async function sendTelegramOrderPaymentPromptCard(input: {
     id: string;
     status: string;
     paymentMethodCode?: string | null;
+    couponCode?: string | null;
+    couponDiscountAmount?: number | null;
+    couponDiscountLabel?: string | null;
+    originalPriceAmount?: number | null;
+    priceCurrency?: string | null;
   };
   orderCode: string;
   planSummary: string;
@@ -466,6 +504,11 @@ async function sendTelegramOrderPaymentPromptCard(input: {
       requestedName: input.requestedName,
       renewalTargetName: input.renewalTargetName,
       supportLink: input.supportLink,
+      couponCode: input.order.couponCode,
+      couponDiscountAmount: input.order.couponDiscountAmount,
+      couponDiscountLabel: input.order.couponDiscountLabel,
+      originalPriceAmount: input.order.originalPriceAmount,
+      priceCurrency: input.order.priceCurrency,
     }),
     {
       replyMarkup: buildTelegramOrderActionKeyboard({
@@ -555,9 +598,14 @@ async function retryTelegramOrderForUser(input: {
       requestedEmail: sourceOrder.requestedEmail?.trim() || null,
       planCode: sourceOrder.planCode || null,
       planName: sourceOrder.planName || null,
+      originalPriceAmount: sourceOrder.originalPriceAmount ?? null,
       priceAmount: sourceOrder.priceAmount ?? null,
       priceCurrency: sourceOrder.priceCurrency || null,
       priceLabel: sourceOrder.priceLabel || null,
+      couponCampaignType: sourceOrder.couponCampaignType || null,
+      couponCode: sourceOrder.couponCode || null,
+      couponDiscountAmount: sourceOrder.couponDiscountAmount ?? null,
+      couponDiscountLabel: sourceOrder.couponDiscountLabel || null,
       durationMonths: sourceOrder.durationMonths ?? null,
       durationDays: sourceOrder.durationDays ?? null,
       dataLimitBytes: sourceOrder.dataLimitBytes ?? null,
@@ -934,6 +982,11 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
   requestedName?: string | null;
   renewalTargetName?: string | null;
   selectedServerName?: string | null;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
+  couponDiscountLabel?: string | null;
+  originalPriceAmount?: number | null;
+  priceCurrency?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
   const lines = [
@@ -951,6 +1004,21 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
 
   if (input.selectedServerName) {
     lines.push(`${ui.preferredServerLabel}: <b>${escapeHtml(input.selectedServerName)}</b>`);
+  }
+
+  if (input.couponCode) {
+    lines.push(`${ui.couponCodeLabel}: <b>${escapeHtml(input.couponCode)}</b>`);
+    if (typeof input.originalPriceAmount === 'number' && input.originalPriceAmount > 0) {
+      lines.push(
+        `${ui.originalPriceLabel}: <b>${escapeHtml(formatTelegramSalesMoneyAmount(input.originalPriceAmount, input.priceCurrency || 'MMK', input.locale))}</b>`,
+      );
+    }
+    const discountText =
+      input.couponDiscountLabel?.trim()
+      || formatTelegramSalesMoneyAmount(input.couponDiscountAmount ?? null, input.priceCurrency || 'MMK', input.locale);
+    if (discountText) {
+      lines.push(`${ui.discountLabel}: <b>${escapeHtml(discountText)}</b>`);
+    }
   }
 
   lines.push(
@@ -1324,6 +1392,10 @@ async function createTelegramOrderRecord(input: {
   selectedServerCountryCode?: string | null;
   retryOfOrderId?: string | null;
   retentionSource?: TelegramRetentionSource | null;
+  couponCampaignType?: string | null;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
+  couponDiscountLabel?: string | null;
 }) {
   const orderCode = await generateTelegramOrderCode();
   return db.telegramOrder.create({
@@ -1354,6 +1426,13 @@ async function createTelegramOrderRecord(input: {
       selectedServerCountryCode: input.selectedServerCountryCode ?? null,
       retryOfOrderId: input.retryOfOrderId ?? null,
       retentionSource: input.retentionSource ?? null,
+      couponCampaignType: input.couponCampaignType ?? null,
+      couponCode: input.couponCode?.trim().toUpperCase() || null,
+      couponDiscountAmount:
+        typeof input.couponDiscountAmount === 'number' && Number.isFinite(input.couponDiscountAmount)
+          ? Math.max(0, Math.floor(input.couponDiscountAmount))
+          : null,
+      couponDiscountLabel: input.couponDiscountLabel?.trim() || null,
     },
   });
 }
@@ -1395,6 +1474,53 @@ async function createTelegramServerChangeRequestRecord(input: {
       requestedServerCountryCode: input.requestedServer.countryCode || null,
     },
   });
+}
+
+async function resolveTelegramCouponForOrderStart(input: {
+  chatId: number;
+  telegramUserId: number;
+  source?: string | null;
+  couponCode?: string | null;
+  accessKeyId?: string | null;
+  dynamicAccessKeyId?: string | null;
+}) {
+  return findTelegramApplicableCoupon({
+    telegramChatId: String(input.chatId),
+    telegramUserId: String(input.telegramUserId),
+    source: input.source ?? null,
+    couponCode: input.couponCode ?? null,
+    accessKeyId: input.accessKeyId ?? null,
+    dynamicAccessKeyId: input.dynamicAccessKeyId ?? null,
+  });
+}
+
+function buildTelegramCouponReadyLines(input: {
+  locale: SupportedLocale;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
+  priceCurrency?: string | null;
+  couponDiscountLabel?: string | null;
+}) {
+  if (!input.couponCode) {
+    return [];
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const discountLabel = input.couponDiscountLabel?.trim()
+    || formatTelegramSalesMoneyAmount(
+      input.couponDiscountAmount ?? null,
+      input.priceCurrency || 'MMK',
+      input.locale,
+    );
+
+  return [
+    '',
+    `${ui.couponCodeLabel}: <b>${escapeHtml(input.couponCode)}</b>`,
+    discountLabel
+      ? `${ui.discountLabel}: <b>${escapeHtml(discountLabel)}</b>`
+      : '',
+    ui.couponReadyHint,
+  ].filter(Boolean);
 }
 
 async function findTelegramServerChangeRequestByIdForUser(input: {
@@ -1746,6 +1872,7 @@ async function handleBuyCommand(
   locale: SupportedLocale,
   botToken: string,
   retentionSource?: TelegramRetentionSource | null,
+  argsText?: string,
 ): Promise<string | null> {
   return handleTelegramBuyCommand({
     chatId,
@@ -1753,9 +1880,30 @@ async function handleBuyCommand(
     username,
     locale,
     botToken,
+    argsText,
     retentionSource: retentionSource ?? null,
     deps: {
       createTelegramOrderRecord,
+      resolveTelegramCouponForOrderStart,
+      attachTelegramCouponToOrder: async (input: {
+        orderId: string;
+        coupon: {
+          campaignType: string;
+          couponCode: string;
+          couponDiscountAmount: number;
+          couponDiscountLabel?: string | null;
+        };
+      }) =>
+        db.telegramOrder.update({
+          where: { id: input.orderId },
+          data: {
+            couponCampaignType: input.coupon.campaignType,
+            couponCode: input.coupon.couponCode,
+            couponDiscountAmount: input.coupon.couponDiscountAmount,
+            couponDiscountLabel: input.coupon.couponDiscountLabel?.trim() || null,
+          },
+        }),
+      buildTelegramCouponReadyLines,
       listAvailableTelegramPlansForOrder,
       buildTelegramSalesPlanPromptText,
       buildTelegramPlanSelectionKeyboard,
@@ -2117,6 +2265,10 @@ export async function runTelegramSalesOrderCycle() {
       rejectedFollowUpReminded: 0,
       retryReminded: 0,
       trialCouponReminded: 0,
+      renewalCouponReminded: 0,
+      premiumUpsellReminded: 0,
+      winbackCouponReminded: 0,
+      expiredCoupons: 0,
       trialReminded: 0,
       premiumRenewalReminded: 0,
       premiumExpired: 0,
@@ -2128,6 +2280,7 @@ export async function runTelegramSalesOrderCycle() {
   }
 
   const now = new Date();
+  const expiredCoupons = await expireTelegramCoupons(now);
   const reminderMs = Math.max(1, settings.paymentReminderHours) * 60 * 60 * 1000;
   const expiryMs = Math.max(settings.unpaidOrderExpiryHours, settings.paymentReminderHours) * 60 * 60 * 1000;
   const trialReminderLeadMs = 6 * 60 * 60 * 1000;
@@ -2150,6 +2303,13 @@ export async function runTelegramSalesOrderCycle() {
       locale: true,
       planCode: true,
       planName: true,
+      priceAmount: true,
+      priceCurrency: true,
+      originalPriceAmount: true,
+      couponCampaignType: true,
+      couponCode: true,
+      couponDiscountAmount: true,
+      couponDiscountLabel: true,
       durationMonths: true,
       paymentMethodCode: true,
       paymentMethodLabel: true,
@@ -2221,6 +2381,9 @@ export async function runTelegramSalesOrderCycle() {
   let rejectedFollowUpReminded = 0;
   let retryReminded = 0;
   let trialCouponReminded = 0;
+  let renewalCouponReminded = 0;
+  let premiumUpsellReminded = 0;
+  let winbackCouponReminded = 0;
   let trialReminded = 0;
   let premiumRenewalReminded = 0;
   let premiumExpired = 0;
@@ -2571,25 +2734,8 @@ export async function runTelegramSalesOrderCycle() {
     );
 
     if (couponCandidates.length > 0) {
-      const existingCouponLogs = await db.notificationLog.findMany({
-        where: {
-          accessKeyId: { in: couponCandidates.map((candidate) => candidate.id) },
-          event: 'TELEGRAM_TRIAL_COUPON',
-          status: 'SUCCESS',
-        },
-        select: {
-          accessKeyId: true,
-        },
-      });
-
-      const couponSentAccessKeyIds = new Set(
-        existingCouponLogs
-          .map((entry) => entry.accessKeyId)
-          .filter((entry): entry is string => Boolean(entry)),
-      );
-
       for (const key of couponCandidates) {
-        if (!key.expiresAt || couponSentAccessKeyIds.has(key.id)) {
+        if (!key.expiresAt) {
           continue;
         }
 
@@ -2597,10 +2743,32 @@ export async function runTelegramSalesOrderCycle() {
         const hoursLeft = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)));
 
         try {
+          const messagingKey = await loadAccessKeyForMessaging(key.id);
+          if (!messagingKey) {
+            continue;
+          }
+          const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
+          if (!destinationChatId) {
+            continue;
+          }
+          const issued = await issueTelegramCampaignCoupon({
+            campaignType: 'TRIAL_TO_PAID',
+            couponCode: settings.trialCouponCode,
+            couponDiscountAmount: settings.trialCouponDiscountAmount,
+            couponDiscountLabel: settings.trialCouponDiscountLabel,
+            currency: 'MMK',
+            telegramChatId: destinationChatId,
+            telegramUserId: messagingKey.telegramId || destinationChatId,
+            accessKeyId: key.id,
+            expiresAt: key.expiresAt,
+          });
+          if (!issued || !issued.created) {
+            continue;
+          }
           const sent = await sendAccessKeyTrialCouponCampaign({
             accessKeyId: key.id,
             hoursLeft,
-            couponCode: settings.trialCouponCode,
+            couponCode: issued.coupon.couponCode,
             discountLabel: settings.trialCouponDiscountLabel,
             source: 'trial_coupon',
           });
@@ -2653,6 +2821,202 @@ export async function runTelegramSalesOrderCycle() {
         }
       } catch (error) {
         errors.push(`trial:${key.id}:${(error as Error).message}`);
+      }
+    }
+  }
+
+  if (settings.renewalCouponEnabled) {
+    const renewalLeadDays = Math.max(1, settings.renewalCouponLeadDays || 5);
+    const renewalCandidates = await db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+        telegramDeliveryEnabled: true,
+        expiresAt: {
+          not: null,
+          gt: now,
+          lte: new Date(now.getTime() + renewalLeadDays * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        id: true,
+        expiresAt: true,
+        tags: true,
+      },
+    });
+
+    for (const key of renewalCandidates) {
+      if (!key.expiresAt || tagMatchesFilter(key.tags || '', 'trial')) {
+        continue;
+      }
+
+      try {
+        const messagingKey = await loadAccessKeyForMessaging(key.id);
+        if (!messagingKey) {
+          continue;
+        }
+        const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
+        if (!destinationChatId) {
+          continue;
+        }
+        const issued = await issueTelegramCampaignCoupon({
+          campaignType: 'RENEWAL_SOON',
+          couponCode: settings.renewalCouponCode,
+          couponDiscountAmount: settings.renewalCouponDiscountAmount,
+          couponDiscountLabel: settings.renewalCouponDiscountLabel,
+          currency: 'MMK',
+          telegramChatId: destinationChatId,
+          telegramUserId: messagingKey.telegramId || destinationChatId,
+          accessKeyId: key.id,
+          expiresAt: key.expiresAt,
+        });
+        if (!issued || !issued.created) {
+          continue;
+        }
+        const daysLeft = Math.max(
+          1,
+          Math.ceil((key.expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+        );
+        const sent = await sendAccessKeyRenewalCouponCampaign({
+          accessKeyId: key.id,
+          daysLeft,
+          couponCode: issued.coupon.couponCode,
+          discountLabel: settings.renewalCouponDiscountLabel,
+        });
+        if (sent) {
+          renewalCouponReminded += 1;
+        }
+      } catch (error) {
+        errors.push(`renewal-coupon:${key.id}:${(error as Error).message}`);
+      }
+    }
+  }
+
+  if (settings.premiumUpsellCouponEnabled) {
+    const threshold = Math.max(10, Math.min(100, settings.premiumUpsellUsageThresholdPercent || 80));
+    const upsellCandidates = await db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+        telegramDeliveryEnabled: true,
+        dataLimitBytes: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        usedBytes: true,
+        dataLimitBytes: true,
+        tags: true,
+      },
+    });
+
+    for (const key of upsellCandidates) {
+      if (!key.dataLimitBytes || tagMatchesFilter(key.tags || '', 'trial')) {
+        continue;
+      }
+      const usagePercent = Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes);
+      if (usagePercent < threshold) {
+        continue;
+      }
+
+      try {
+        const messagingKey = await loadAccessKeyForMessaging(key.id);
+        if (!messagingKey) {
+          continue;
+        }
+        const destinationChatId = resolveTelegramChatIdForKey(messagingKey);
+        if (!destinationChatId) {
+          continue;
+        }
+        const issued = await issueTelegramCampaignCoupon({
+          campaignType: 'PREMIUM_UPSELL',
+          couponCode: settings.premiumUpsellCouponCode,
+          couponDiscountAmount: settings.premiumUpsellCouponDiscountAmount,
+          couponDiscountLabel: settings.premiumUpsellCouponDiscountLabel,
+          currency: 'MMK',
+          telegramChatId: destinationChatId,
+          telegramUserId: messagingKey.telegramId || destinationChatId,
+          accessKeyId: key.id,
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        });
+        if (!issued || !issued.created) {
+          continue;
+        }
+        const sent = await sendAccessKeyPremiumUpsellCouponCampaign({
+          accessKeyId: key.id,
+          usagePercent,
+          couponCode: issued.coupon.couponCode,
+          discountLabel: settings.premiumUpsellCouponDiscountLabel,
+        });
+        if (sent) {
+          premiumUpsellReminded += 1;
+        }
+      } catch (error) {
+        errors.push(`premium-upsell:${key.id}:${(error as Error).message}`);
+      }
+    }
+  }
+
+  if (settings.winbackCouponEnabled) {
+    const inactivityDays = Math.max(7, settings.winbackCouponInactivityDays || 30);
+    const inactivityCutoff = new Date(now.getTime() - inactivityDays * 24 * 60 * 60 * 1000);
+    const winbackOrders = await db.telegramOrder.findMany({
+      where: {
+        status: 'FULFILLED',
+        priceAmount: {
+          gt: 0,
+        },
+      },
+      orderBy: [{ fulfilledAt: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        telegramChatId: true,
+        telegramUserId: true,
+        locale: true,
+        fulfilledAt: true,
+        createdAt: true,
+      },
+    });
+
+    const latestByUser = new Map<string, (typeof winbackOrders)[number]>();
+    for (const order of winbackOrders) {
+      if (!latestByUser.has(order.telegramUserId)) {
+        latestByUser.set(order.telegramUserId, order);
+      }
+    }
+
+    for (const order of Array.from(latestByUser.values())) {
+      const baseline = order.fulfilledAt || order.createdAt;
+      if (baseline > inactivityCutoff) {
+        continue;
+      }
+
+      try {
+        const issued = await issueTelegramCampaignCoupon({
+          campaignType: 'WINBACK',
+          couponCode: settings.winbackCouponCode,
+          couponDiscountAmount: settings.winbackCouponDiscountAmount,
+          couponDiscountLabel: settings.winbackCouponDiscountLabel,
+          currency: 'MMK',
+          telegramChatId: order.telegramChatId,
+          telegramUserId: order.telegramUserId,
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        });
+        if (!issued || !issued.created) {
+          continue;
+        }
+        const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
+        const sent = await sendTelegramWinbackCouponCampaign({
+          telegramChatId: order.telegramChatId,
+          telegramUserId: order.telegramUserId,
+          locale,
+          inactiveDays: inactivityDays,
+          couponCode: issued.coupon.couponCode,
+          discountLabel: settings.winbackCouponDiscountLabel,
+        });
+        if (sent) {
+          winbackCouponReminded += 1;
+        }
+      } catch (error) {
+        errors.push(`winback-coupon:${order.telegramUserId}:${(error as Error).message}`);
       }
     }
   }
@@ -2750,6 +3114,10 @@ export async function runTelegramSalesOrderCycle() {
     rejectedFollowUpReminded,
     retryReminded,
     trialCouponReminded,
+    renewalCouponReminded,
+    premiumUpsellReminded,
+    winbackCouponReminded,
+    expiredCoupons,
     trialReminded,
     premiumRenewalReminded,
     premiumExpired,
@@ -2965,34 +3333,27 @@ function buildTelegramOrderPlanSnapshot(
   overrides?: {
     durationMonths?: number | null;
     durationDays?: number | null;
+    couponCampaignType?: string | null;
+    couponCode?: string | null;
+    couponDiscountAmount?: number | null;
+    couponDiscountLabel?: string | null;
   },
 ) {
-  const durationMonths =
-    overrides?.durationMonths ??
-    plan.fixedDurationMonths ??
-    plan.minDurationMonths ??
-    null;
-  const durationDays = overrides?.durationDays ?? plan.fixedDurationDays ?? null;
+  const snapshot = buildTelegramCouponAdjustedPlanSnapshot({
+    plan,
+    locale,
+    durationMonths: overrides?.durationMonths,
+    durationDays: overrides?.durationDays,
+    couponCampaignType: overrides?.couponCampaignType,
+    couponCode: overrides?.couponCode,
+    couponDiscountAmount: overrides?.couponDiscountAmount,
+    couponDiscountLabel: overrides?.couponDiscountLabel,
+  });
   const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
-  const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
 
   return {
-    planCode: plan.code,
-    planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
-    priceAmount: plan.priceAmount ?? null,
-    priceCurrency: plan.priceCurrency || null,
-    priceLabel: priceLabel || null,
-    deliveryType: plan.deliveryType,
-    templateId: plan.deliveryType === 'ACCESS_KEY' ? plan.templateId || null : null,
-    dynamicTemplateId: plan.deliveryType === 'DYNAMIC_KEY' ? plan.dynamicTemplateId || null : null,
-    durationMonths,
-    durationDays,
-    dataLimitBytes: plan.unlimitedQuota
-      ? null
-      : plan.dataLimitGB
-        ? BigInt(plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
-        : null,
-    unlimitedQuota: plan.unlimitedQuota,
+    ...snapshot,
+    planName: snapshot.priceLabel ? `${planLabel} (${snapshot.priceLabel})` : planLabel,
   };
 }
 
@@ -3770,6 +4131,13 @@ export async function approveTelegramOrder(input: {
         customerMessage: null,
         rejectionReasonCode: null,
       },
+    });
+    await redeemTelegramCouponForOrder({
+      telegramOrderId: finalOrder.id,
+      telegramUserId: finalOrder.telegramUserId,
+      telegramChatId: finalOrder.telegramChatId,
+      couponCode: finalOrder.couponCode,
+      orderCode: finalOrder.orderCode,
     });
 
     let deliveryError: string | null = null;
@@ -4801,18 +5169,19 @@ export async function updateTelegramOrderDraft(input: {
     }
   }
 
-  const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
-  const priceLabel = resolveTelegramSalesPriceLabel(plan, locale);
   const planSnapshot = buildTelegramOrderPlanSnapshot(plan, locale, {
     durationMonths,
     durationDays,
+    couponCampaignType: order.couponCampaignType,
+    couponCode: order.couponCode,
+    couponDiscountAmount: order.couponDiscountAmount,
+    couponDiscountLabel: order.couponDiscountLabel,
   });
 
   const updatedOrder = await db.telegramOrder.update({
     where: { id: order.id },
     data: {
       ...planSnapshot,
-      planName: priceLabel ? `${planLabel} (${priceLabel})` : planLabel,
       targetAccessKeyId: deliveryType === 'ACCESS_KEY' ? order.targetAccessKeyId : null,
       targetDynamicKeyId: deliveryType === 'DYNAMIC_KEY' ? order.targetDynamicKeyId : null,
       selectedServerId,
@@ -6517,6 +6886,17 @@ async function handleTelegramCallbackQuery(
             const retentionSource = resolveTelegramRetentionSourceFromRenewAction(
               userOrderAction.secondary,
             );
+            const coupon = await resolveTelegramCouponForOrderStart({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              source: retentionSource,
+              accessKeyId: isDynamicRenewalActionSecondary(userOrderAction.secondary)
+                ? null
+                : userOrderAction.primary,
+              dynamicAccessKeyId: isDynamicRenewalActionSecondary(userOrderAction.secondary)
+                ? userOrderAction.primary
+                : null,
+            });
             const matchedKey =
               isDynamicRenewalActionSecondary(userOrderAction.secondary)
                 ? (await findLinkedDynamicAccessKeys(chatId, callbackQuery.from.id, true)).find(
@@ -6543,6 +6923,10 @@ async function handleTelegramCallbackQuery(
               locale,
               initialStatus: 'AWAITING_KEY_SELECTION',
               retentionSource,
+              couponCampaignType: coupon?.campaignType || null,
+              couponCode: coupon?.couponCode || null,
+              couponDiscountAmount: coupon?.couponDiscountAmount ?? null,
+              couponDiscountLabel: coupon?.couponDiscountLabel || null,
             });
             await sendTelegramRenewalPlanSelection({
               orderId: order.id,
@@ -6626,7 +7010,12 @@ async function handleTelegramCallbackQuery(
             const planLabel = resolveTelegramSalesPlanLabel(plan, locale);
 
             if (plan.unlimitedQuota && !plan.fixedDurationMonths) {
-              const planSnapshot = buildTelegramOrderPlanSnapshot(plan, locale);
+              const planSnapshot = buildTelegramOrderPlanSnapshot(plan, locale, {
+                couponCampaignType: order.couponCampaignType,
+                couponCode: order.couponCode,
+                couponDiscountAmount: order.couponDiscountAmount,
+                couponDiscountLabel: order.couponDiscountLabel,
+              });
               await db.telegramOrder.update({
                 where: { id: order.id },
                 data: {
@@ -6652,7 +7041,12 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            const planSnapshot = buildTelegramOrderPlanSnapshot(plan, locale);
+            const planSnapshot = buildTelegramOrderPlanSnapshot(plan, locale, {
+              couponCampaignType: order.couponCampaignType,
+              couponCode: order.couponCode,
+              couponDiscountAmount: order.couponDiscountAmount,
+              couponDiscountLabel: order.couponDiscountLabel,
+            });
             const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(settings);
             const nextStatus =
               order.kind === 'NEW'
@@ -7083,6 +7477,7 @@ async function handleTelegramCallbackQuery(
               locale,
               config.botToken,
               resolveTelegramRetentionSourceFromBuyAction(userOrderAction.secondary),
+              '',
             );
           }
           case 'rt': {
@@ -7611,7 +8006,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'language':
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
-      return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken);
+      return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
     case 'trial':
       return handleTrialCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'orders':

@@ -266,6 +266,11 @@ model TelegramOrder {
   priceAmount          Int?
   priceCurrency        String?
   priceLabel           String?
+  originalPriceAmount  Int?
+  couponCampaignType   String?
+  couponCode           String?
+  couponDiscountAmount Int?
+  couponDiscountLabel  String?
   durationMonths       Int?
   durationDays         Int?
   dataLimitBytes       BigInt?
@@ -346,6 +351,37 @@ model TelegramOrder {
   @@index([retryOfOrderId, createdAt])
   @@index([retentionSource, createdAt])
   @@index([paymentProofUniqueId, createdAt])
+  @@index([couponCampaignType, createdAt])
+  @@index([couponCode, createdAt])
+}
+
+model TelegramCouponRedemption {
+  id                 String   @id @default(cuid())
+  campaignType       String
+  couponCode         String
+  couponDiscountAmount Int
+  couponDiscountLabel  String?
+  currency           String   @default("MMK")
+  telegramChatId     String
+  telegramUserId     String
+  accessKeyId        String?
+  dynamicAccessKeyId String?
+  status             String   @default("ISSUED") // ISSUED, REDEEMED, EXPIRED, CANCELLED
+  redeemedOrderId    String?
+  redeemedOrderCode  String?
+  issuedAt           DateTime @default(now())
+  expiresAt          DateTime?
+  redeemedAt         DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([campaignType, status, createdAt])
+  @@index([couponCode, status, createdAt])
+  @@index([telegramUserId, status, createdAt])
+  @@index([telegramChatId, status, createdAt])
+  @@index([accessKeyId, status, createdAt])
+  @@index([dynamicAccessKeyId, status, createdAt])
 }
 
 model TelegramOrderFinanceAction {

@@ -518,6 +518,22 @@ type TelegramSalesSettingsForm = {
   trialCouponLeadHours: string;
   trialCouponCode: string;
   trialCouponDiscountLabel: string;
+  trialCouponDiscountAmount: string;
+  renewalCouponEnabled: boolean;
+  renewalCouponLeadDays: string;
+  renewalCouponCode: string;
+  renewalCouponDiscountLabel: string;
+  renewalCouponDiscountAmount: string;
+  premiumUpsellCouponEnabled: boolean;
+  premiumUpsellUsageThresholdPercent: string;
+  premiumUpsellCouponCode: string;
+  premiumUpsellCouponDiscountLabel: string;
+  premiumUpsellCouponDiscountAmount: string;
+  winbackCouponEnabled: boolean;
+  winbackCouponInactivityDays: string;
+  winbackCouponCode: string;
+  winbackCouponDiscountLabel: string;
+  winbackCouponDiscountAmount: string;
   paymentReminderHours: string;
   pendingReviewReminderHours: string;
   rejectedOrderReminderHours: string;
@@ -949,6 +965,22 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   trialCouponLeadHours: '12',
   trialCouponCode: 'TRIAL500',
   trialCouponDiscountLabel: '500 Kyat off your first paid order',
+  trialCouponDiscountAmount: '500',
+  renewalCouponEnabled: true,
+  renewalCouponLeadDays: '5',
+  renewalCouponCode: 'RENEW500',
+  renewalCouponDiscountLabel: '500 Kyat off your renewal',
+  renewalCouponDiscountAmount: '500',
+  premiumUpsellCouponEnabled: true,
+  premiumUpsellUsageThresholdPercent: '80',
+  premiumUpsellCouponCode: 'PREMIUM1000',
+  premiumUpsellCouponDiscountLabel: '1,000 Kyat off your premium upgrade',
+  premiumUpsellCouponDiscountAmount: '1000',
+  winbackCouponEnabled: true,
+  winbackCouponInactivityDays: '30',
+  winbackCouponCode: 'WELCOME700',
+  winbackCouponDiscountLabel: '700 Kyat off your comeback order',
+  winbackCouponDiscountAmount: '700',
   paymentReminderHours: '3',
   pendingReviewReminderHours: '6',
   rejectedOrderReminderHours: '12',
@@ -4465,6 +4497,58 @@ function TelegramSalesWorkflowCard() {
       trialCouponDiscountLabel:
         settingsQuery.data.trialCouponDiscountLabel ??
         DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponDiscountLabel,
+      trialCouponDiscountAmount: String(
+        settingsQuery.data.trialCouponDiscountAmount ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponDiscountAmount,
+      ),
+      renewalCouponEnabled:
+        settingsQuery.data.renewalCouponEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponEnabled,
+      renewalCouponLeadDays: String(
+        settingsQuery.data.renewalCouponLeadDays ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponLeadDays,
+      ),
+      renewalCouponCode:
+        settingsQuery.data.renewalCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponCode,
+      renewalCouponDiscountLabel:
+        settingsQuery.data.renewalCouponDiscountLabel ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponDiscountLabel,
+      renewalCouponDiscountAmount: String(
+        settingsQuery.data.renewalCouponDiscountAmount ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.renewalCouponDiscountAmount,
+      ),
+      premiumUpsellCouponEnabled:
+        settingsQuery.data.premiumUpsellCouponEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponEnabled,
+      premiumUpsellUsageThresholdPercent: String(
+        settingsQuery.data.premiumUpsellUsageThresholdPercent ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellUsageThresholdPercent,
+      ),
+      premiumUpsellCouponCode:
+        settingsQuery.data.premiumUpsellCouponCode ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponCode,
+      premiumUpsellCouponDiscountLabel:
+        settingsQuery.data.premiumUpsellCouponDiscountLabel ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponDiscountLabel,
+      premiumUpsellCouponDiscountAmount: String(
+        settingsQuery.data.premiumUpsellCouponDiscountAmount ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.premiumUpsellCouponDiscountAmount,
+      ),
+      winbackCouponEnabled:
+        settingsQuery.data.winbackCouponEnabled ?? DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponEnabled,
+      winbackCouponInactivityDays: String(
+        settingsQuery.data.winbackCouponInactivityDays ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponInactivityDays,
+      ),
+      winbackCouponCode:
+        settingsQuery.data.winbackCouponCode ?? DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponCode,
+      winbackCouponDiscountLabel:
+        settingsQuery.data.winbackCouponDiscountLabel ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponDiscountLabel,
+      winbackCouponDiscountAmount: String(
+        settingsQuery.data.winbackCouponDiscountAmount ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.winbackCouponDiscountAmount,
+      ),
       paymentReminderHours: String(
         settingsQuery.data.paymentReminderHours ?? DEFAULT_TELEGRAM_SALES_SETTINGS.paymentReminderHours,
       ),
@@ -4880,6 +4964,46 @@ function TelegramSalesWorkflowCard() {
       trialCouponCode: form.trialCouponCode.trim() || 'TRIAL500',
       trialCouponDiscountLabel:
         form.trialCouponDiscountLabel.trim() || '500 Kyat off your first paid order',
+      trialCouponDiscountAmount: (() => {
+        const parsed = Number.parseInt(form.trialCouponDiscountAmount.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 500;
+      })(),
+      renewalCouponEnabled: form.renewalCouponEnabled,
+      renewalCouponLeadDays: (() => {
+        const parsed = Number.parseInt(form.renewalCouponLeadDays.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+      })(),
+      renewalCouponCode: form.renewalCouponCode.trim() || 'RENEW500',
+      renewalCouponDiscountLabel:
+        form.renewalCouponDiscountLabel.trim() || '500 Kyat off your renewal',
+      renewalCouponDiscountAmount: (() => {
+        const parsed = Number.parseInt(form.renewalCouponDiscountAmount.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 500;
+      })(),
+      premiumUpsellCouponEnabled: form.premiumUpsellCouponEnabled,
+      premiumUpsellUsageThresholdPercent: (() => {
+        const parsed = Number.parseInt(form.premiumUpsellUsageThresholdPercent.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? Math.min(Math.max(parsed, 10), 100) : 80;
+      })(),
+      premiumUpsellCouponCode: form.premiumUpsellCouponCode.trim() || 'PREMIUM1000',
+      premiumUpsellCouponDiscountLabel:
+        form.premiumUpsellCouponDiscountLabel.trim() || '1,000 Kyat off your premium upgrade',
+      premiumUpsellCouponDiscountAmount: (() => {
+        const parsed = Number.parseInt(form.premiumUpsellCouponDiscountAmount.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1000;
+      })(),
+      winbackCouponEnabled: form.winbackCouponEnabled,
+      winbackCouponInactivityDays: (() => {
+        const parsed = Number.parseInt(form.winbackCouponInactivityDays.trim(), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+      })(),
+      winbackCouponCode: form.winbackCouponCode.trim() || 'WELCOME700',
+      winbackCouponDiscountLabel:
+        form.winbackCouponDiscountLabel.trim() || '700 Kyat off your comeback order',
+      winbackCouponDiscountAmount: (() => {
+        const parsed = Number.parseInt(form.winbackCouponDiscountAmount.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 700;
+      })(),
       paymentReminderHours: (() => {
         const parsed = Number.parseInt(form.paymentReminderHours.trim(), 10);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
@@ -5463,6 +5587,251 @@ function TelegramSalesWorkflowCard() {
                     }))
                   }
                   placeholder="500 Kyat off your first paid order"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.trialCouponDiscountAmount}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      trialCouponDiscountAmount: event.target.value,
+                    }))
+                  }
+                  placeholder="500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {isMyanmar ? 'Renewal coupon campaign' : 'Renewal coupon campaign'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar
+                    ? 'သက်တမ်းကုန်ရန်နီးသော user များထံ renewal coupon ကို automatic ပို့မည်။'
+                    : 'Automatically send renewal coupons to users whose keys are close to expiry.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.renewalCouponEnabled}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, renewalCouponEnabled: checked }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Lead time (days)' : 'Lead time (days)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.renewalCouponLeadDays}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalCouponLeadDays: event.target.value,
+                    }))
+                  }
+                  placeholder="5"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Input
+                  value={form.renewalCouponCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalCouponCode: event.target.value,
+                    }))
+                  }
+                  placeholder="RENEW500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Input
+                  value={form.renewalCouponDiscountLabel}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalCouponDiscountLabel: event.target.value,
+                    }))
+                  }
+                  placeholder="500 Kyat off your renewal"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.renewalCouponDiscountAmount}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalCouponDiscountAmount: event.target.value,
+                    }))
+                  }
+                  placeholder="500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {isMyanmar ? 'Premium upsell coupon campaign' : 'Premium upsell coupon campaign'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar
+                    ? 'Usage မြင့်လာသော standard user များထံ premium upgrade coupon ကို automatic ပို့မည်။'
+                    : 'Automatically send premium upgrade coupons to standard users with high usage.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.premiumUpsellCouponEnabled}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, premiumUpsellCouponEnabled: checked }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Usage threshold (%)' : 'Usage threshold (%)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.premiumUpsellUsageThresholdPercent}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      premiumUpsellUsageThresholdPercent: event.target.value,
+                    }))
+                  }
+                  placeholder="80"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Input
+                  value={form.premiumUpsellCouponCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      premiumUpsellCouponCode: event.target.value,
+                    }))
+                  }
+                  placeholder="PREMIUM1000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Input
+                  value={form.premiumUpsellCouponDiscountLabel}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      premiumUpsellCouponDiscountLabel: event.target.value,
+                    }))
+                  }
+                  placeholder="1,000 Kyat off your premium upgrade"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.premiumUpsellCouponDiscountAmount}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      premiumUpsellCouponDiscountAmount: event.target.value,
+                    }))
+                  }
+                  placeholder="1000"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {isMyanmar ? 'Win-back coupon campaign' : 'Win-back coupon campaign'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar
+                    ? 'အချိန်တစ်ခုကြာ inactive ဖြစ်နေသော user များထံ comeback coupon ကို automatic ပို့မည်။'
+                    : 'Automatically send comeback coupons to inactive past buyers.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.winbackCouponEnabled}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, winbackCouponEnabled: checked }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Inactive after (days)' : 'Inactive after (days)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.winbackCouponInactivityDays}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      winbackCouponInactivityDays: event.target.value,
+                    }))
+                  }
+                  placeholder="30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Input
+                  value={form.winbackCouponCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      winbackCouponCode: event.target.value,
+                    }))
+                  }
+                  placeholder="WELCOME700"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Input
+                  value={form.winbackCouponDiscountLabel}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      winbackCouponDiscountLabel: event.target.value,
+                    }))
+                  }
+                  placeholder="700 Kyat off your comeback order"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.winbackCouponDiscountAmount}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      winbackCouponDiscountAmount: event.target.value,
+                    }))
+                  }
+                  placeholder="700"
                 />
               </div>
             </div>

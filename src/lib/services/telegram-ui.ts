@@ -523,8 +523,32 @@ export function getTelegramUi(locale: SupportedLocale) {
         ? `Coupon: <b>${code}</b>\nOffer: ${label}`
         : `Coupon: <b>${code}</b>\nOffer: ${label}`,
     trialCouponHint: isMyanmar
-      ? 'Paid plan ကို စတင်ရန် Buy new key ကို နှိပ်နိုင်ပါသည်။ Coupon ကို payment screenshot နှင့်အတူ mention လုပ်ပေးပါ။'
-      : 'Tap Buy new key to start a paid order. Mention the coupon code when you send your payment screenshot.',
+      ? 'Buy new key ကို နှိပ်ပါ သို့မဟုတ် /buy COUPON-CODE ကို သုံးပါ။ အကျိုးခံစားခွင့်ကို checkout ထဲတွင် အလိုအလျောက် တွက်ပေးပါမည်။'
+      : 'Tap Buy new key or use /buy COUPON-CODE. The discount will be applied automatically during checkout.',
+    renewalCouponTitle: isMyanmar
+      ? '🔁 <b>Renewal coupon ready</b>'
+      : '🔁 <b>Renewal coupon ready</b>',
+    renewalCouponBody: (daysLeft: number) =>
+      isMyanmar
+        ? `သင့် key သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့်သာ ကျန်ရှိသေးသည်။ Renewal လုပ်ရန် coupon offer ပို့ပေးထားပါသည်။`
+        : `Your key has about ${daysLeft} day(s) left. A renewal coupon is ready for you.`,
+    premiumUpsellCouponTitle: isMyanmar
+      ? '💎 <b>Premium upgrade offer</b>'
+      : '💎 <b>Premium upgrade offer</b>',
+    premiumUpsellCouponBody: (usagePercent: number) =>
+      isMyanmar
+        ? `လက်ရှိ standard key အသုံးပြုမှုသည် ${usagePercent}% သို့ ရောက်နေပါပြီ။ ပိုမိုတည်ငြိမ်သော premium plan သို့ ပြောင်းရန် coupon offer ပို့ပေးထားပါသည်။`
+        : `Your standard key is already at ${usagePercent}% usage. Here is a coupon offer to upgrade to a more stable premium plan.`,
+    winbackCouponTitle: isMyanmar
+      ? '🎉 <b>Welcome back offer</b>'
+      : '🎉 <b>Welcome back offer</b>',
+    winbackCouponBody: (inactiveDays: number) =>
+      isMyanmar
+        ? `${inactiveDays} ရက်ခန့် အော်ဒါအသစ် မလုပ်သေးသောကြောင့် ပြန်လည်အသုံးပြုရန် coupon offer ပို့ပေးထားပါသည်။`
+        : `It has been about ${inactiveDays} day(s) since your last paid order, so here is a welcome-back coupon.`,
+    couponReadyHint: isMyanmar
+      ? 'အောက်ပါ button ကို နှိပ်ပါ သို့မဟုတ် coupon code ကို အသုံးပြု၍ order စတင်နိုင်ပါသည်။'
+      : 'Use the button below or start an order with the coupon code.',
     orderRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
@@ -667,6 +691,9 @@ export function getTelegramUi(locale: SupportedLocale) {
     paymentMethodLabel: isMyanmar ? 'ရွေးထားသော ငွေပေးချေမှုနည်းလမ်း' : 'Payment method',
     planLabel: isMyanmar ? 'Plan' : 'Plan',
     priceLabel: isMyanmar ? 'စျေးနှုန်း' : 'Price',
+    originalPriceLabel: isMyanmar ? 'မူရင်းစျေး' : 'Original price',
+    discountLabel: isMyanmar ? 'လျှော့စျေး' : 'Discount',
+    couponCodeLabel: isMyanmar ? 'Coupon' : 'Coupon',
     orderCodeLabel: isMyanmar ? 'Order' : 'Order',
     orderTypeLabel: isMyanmar ? 'Order အမျိုးအစား' : 'Order type',
     orderStatusTitle: isMyanmar ? '🧾 <b>Order အခြေအနေ</b>' : '🧾 <b>Order status</b>',

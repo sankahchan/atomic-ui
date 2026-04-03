@@ -235,6 +235,10 @@ export function initScheduler() {
                     result.rejectedFollowUpReminded > 0 ||
                     result.retryReminded > 0 ||
                     result.trialCouponReminded > 0 ||
+                    result.renewalCouponReminded > 0 ||
+                    result.premiumUpsellReminded > 0 ||
+                    result.winbackCouponReminded > 0 ||
+                    result.expiredCoupons > 0 ||
                     result.trialReminded > 0 ||
                     result.premiumRenewalReminded > 0 ||
                     result.premiumExpired > 0 ||
@@ -244,7 +248,7 @@ export function initScheduler() {
                 )
             ) {
                 logger.info(
-                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.salesDigestSent ? `${result.salesDigestAdminChats} sales digest chat(s)` : '0 sales digest chat(s)'}, ${result.errors.length} errors`,
+                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.renewalCouponReminded} renewal coupon reminded, ${result.premiumUpsellReminded} premium upsell reminded, ${result.winbackCouponReminded} winback coupon reminded, ${result.expiredCoupons} coupons expired, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.salesDigestSent ? `${result.salesDigestAdminChats} sales digest chat(s)` : '0 sales digest chat(s)'}, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {
@@ -327,6 +331,10 @@ export function initScheduler() {
                     result.rejectedFollowUpReminded > 0 ||
                     result.retryReminded > 0 ||
                     result.trialCouponReminded > 0 ||
+                    result.renewalCouponReminded > 0 ||
+                    result.premiumUpsellReminded > 0 ||
+                    result.winbackCouponReminded > 0 ||
+                    result.expiredCoupons > 0 ||
                     result.trialReminded > 0 ||
                     result.premiumRenewalReminded > 0 ||
                     result.premiumExpired > 0 ||
@@ -335,7 +343,7 @@ export function initScheduler() {
                 )
             ) {
                 logger.info(
-                    `Initial Telegram sales order cycle: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.errors.length} errors`,
+                    `Initial Telegram sales order cycle: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.renewalCouponReminded} renewal coupon reminded, ${result.premiumUpsellReminded} premium upsell reminded, ${result.winbackCouponReminded} winback coupon reminded, ${result.expiredCoupons} coupons expired, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {

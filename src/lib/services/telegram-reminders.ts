@@ -861,6 +861,170 @@ export async function sendAccessKeyTrialCouponCampaign(input: {
   };
 }
 
+export async function sendAccessKeyRenewalCouponCampaign(input: {
+  accessKeyId: string;
+  daysLeft: number;
+  couponCode: string;
+  discountLabel: string;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key || !key.telegramDeliveryEnabled) {
+    return null;
+  }
+
+  const destinationChatId = resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    return null;
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  const lines = [
+    ui.renewalCouponTitle,
+    '',
+    `🔑 ${escapeHtml(key.name)}`,
+    ui.renewalCouponBody(Math.max(1, input.daysLeft)),
+    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
+    ui.couponReadyHint,
+  ];
+
+  if (supportLink) {
+    lines.push('', `${ui.supportLabel}: ${supportLink}`);
+  }
+
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: ui.orderActionRenewKey,
+            callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'renewal_coupon'),
+          },
+        ],
+        ...(supportLink ? [[{ text: ui.getSupport, url: supportLink }]] : []),
+      ],
+    },
+  });
+
+  return sent ? { destinationChatId } : null;
+}
+
+export async function sendAccessKeyPremiumUpsellCouponCampaign(input: {
+  accessKeyId: string;
+  usagePercent: number;
+  couponCode: string;
+  discountLabel: string;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const key = await loadAccessKeyForMessaging(input.accessKeyId);
+  if (!key || !key.telegramDeliveryEnabled) {
+    return null;
+  }
+
+  const destinationChatId = resolveTelegramChatIdForKey(key);
+  if (!destinationChatId) {
+    return null;
+  }
+
+  const defaults = await getSubscriptionDefaults();
+  const locale = await resolveTelegramLocaleForRecipient({
+    telegramUserId: key.telegramId || null,
+    telegramChatId: destinationChatId,
+    fallbackLocale: defaults.defaultLanguage,
+  });
+  const ui = getTelegramUi(locale);
+  const supportLink = await getTelegramSupportLink();
+
+  const lines = [
+    ui.premiumUpsellCouponTitle,
+    '',
+    `🔑 ${escapeHtml(key.name)}`,
+    ui.premiumUpsellCouponBody(Math.max(1, input.usagePercent)),
+    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
+    ui.couponReadyHint,
+  ];
+
+  if (supportLink) {
+    lines.push('', `${ui.supportLabel}: ${supportLink}`);
+  }
+
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: ui.orderActionBuyNewKey,
+            callback_data: buildTelegramOrderActionCallbackData('by', key.id, 'premium_upsell_coupon'),
+          },
+        ],
+        ...(supportLink ? [[{ text: ui.getSupport, url: supportLink }]] : []),
+      ],
+    },
+  });
+
+  return sent ? { destinationChatId } : null;
+}
+
+export async function sendTelegramWinbackCouponCampaign(input: {
+  telegramChatId: string;
+  telegramUserId: string;
+  locale: 'en' | 'my';
+  inactiveDays: number;
+  couponCode: string;
+  discountLabel: string;
+}) {
+  const config = await getTelegramConfig();
+  if (!config) {
+    return null;
+  }
+
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await getTelegramSupportLink();
+  const lines = [
+    ui.winbackCouponTitle,
+    '',
+    ui.winbackCouponBody(Math.max(1, input.inactiveDays)),
+    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
+    ui.couponReadyHint,
+  ];
+
+  if (supportLink) {
+    lines.push('', `${ui.supportLabel}: ${supportLink}`);
+  }
+
+  const sent = await sendTelegramMessage(config.botToken, input.telegramChatId, lines.join('\n'), {
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: ui.orderActionBuyNewKey,
+            callback_data: buildTelegramOrderActionCallbackData('by', 'winback', 'winback_coupon'),
+          },
+        ],
+        ...(supportLink ? [[{ text: ui.getSupport, url: supportLink }]] : []),
+      ],
+    },
+  });
+
+  return sent ? { destinationChatId: input.telegramChatId } : null;
+}
+
 export async function sendTelegramDigestToAdmins(input?: {
   now?: Date;
 }) {

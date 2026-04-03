@@ -70,6 +70,22 @@ export const telegramSalesSettingsSchema = z.object({
   trialCouponLeadHours: z.number().int().min(1).max(168).default(12),
   trialCouponCode: z.string().trim().max(40).optional().default('TRIAL500'),
   trialCouponDiscountLabel: z.string().trim().max(120).optional().default('500 Kyat off your first paid order'),
+  trialCouponDiscountAmount: z.number().int().min(0).max(1000000).default(500),
+  renewalCouponEnabled: z.boolean().default(false),
+  renewalCouponLeadDays: z.number().int().min(1).max(30).default(5),
+  renewalCouponCode: z.string().trim().max(40).optional().default('RENEW500'),
+  renewalCouponDiscountLabel: z.string().trim().max(120).optional().default('500 Kyat off your renewal'),
+  renewalCouponDiscountAmount: z.number().int().min(0).max(1000000).default(500),
+  premiumUpsellCouponEnabled: z.boolean().default(false),
+  premiumUpsellUsageThresholdPercent: z.number().int().min(10).max(100).default(80),
+  premiumUpsellCouponCode: z.string().trim().max(40).optional().default('PREMIUM1000'),
+  premiumUpsellCouponDiscountLabel: z.string().trim().max(120).optional().default('1000 Kyat off a premium upgrade'),
+  premiumUpsellCouponDiscountAmount: z.number().int().min(0).max(1000000).default(1000),
+  winbackCouponEnabled: z.boolean().default(false),
+  winbackCouponInactivityDays: z.number().int().min(7).max(180).default(30),
+  winbackCouponCode: z.string().trim().max(40).optional().default('WELCOME700'),
+  winbackCouponDiscountLabel: z.string().trim().max(120).optional().default('700 Kyat off your next paid order'),
+  winbackCouponDiscountAmount: z.number().int().min(0).max(1000000).default(700),
   paymentReminderHours: z.number().int().min(1).max(168).default(3),
   pendingReviewReminderHours: z.number().int().min(1).max(168).default(6),
   rejectedOrderReminderHours: z.number().int().min(1).max(336).default(12),
@@ -434,6 +450,22 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     trialCouponLeadHours: 12,
     trialCouponCode: 'TRIAL500',
     trialCouponDiscountLabel: '500 Kyat off your first paid order',
+    trialCouponDiscountAmount: 500,
+    renewalCouponEnabled: false,
+    renewalCouponLeadDays: 5,
+    renewalCouponCode: 'RENEW500',
+    renewalCouponDiscountLabel: '500 Kyat off your renewal',
+    renewalCouponDiscountAmount: 500,
+    premiumUpsellCouponEnabled: false,
+    premiumUpsellUsageThresholdPercent: 80,
+    premiumUpsellCouponCode: 'PREMIUM1000',
+    premiumUpsellCouponDiscountLabel: '1000 Kyat off a premium upgrade',
+    premiumUpsellCouponDiscountAmount: 1000,
+    winbackCouponEnabled: false,
+    winbackCouponInactivityDays: 30,
+    winbackCouponCode: 'WELCOME700',
+    winbackCouponDiscountLabel: '700 Kyat off your next paid order',
+    winbackCouponDiscountAmount: 700,
     paymentReminderHours: 3,
     pendingReviewReminderHours: 6,
     rejectedOrderReminderHours: 12,
@@ -504,6 +536,49 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
     trialCouponCode: next.trialCouponCode?.trim() || defaults.trialCouponCode,
     trialCouponDiscountLabel:
       next.trialCouponDiscountLabel?.trim() || defaults.trialCouponDiscountLabel,
+    trialCouponDiscountAmount:
+      typeof next.trialCouponDiscountAmount === 'number' && Number.isFinite(next.trialCouponDiscountAmount)
+        ? Math.max(0, Math.floor(next.trialCouponDiscountAmount))
+        : defaults.trialCouponDiscountAmount,
+    renewalCouponEnabled: Boolean(next.renewalCouponEnabled),
+    renewalCouponLeadDays:
+      typeof next.renewalCouponLeadDays === 'number' && Number.isFinite(next.renewalCouponLeadDays)
+        ? Math.min(30, Math.max(1, next.renewalCouponLeadDays))
+        : defaults.renewalCouponLeadDays,
+    renewalCouponCode: next.renewalCouponCode?.trim() || defaults.renewalCouponCode,
+    renewalCouponDiscountLabel:
+      next.renewalCouponDiscountLabel?.trim() || defaults.renewalCouponDiscountLabel,
+    renewalCouponDiscountAmount:
+      typeof next.renewalCouponDiscountAmount === 'number' && Number.isFinite(next.renewalCouponDiscountAmount)
+        ? Math.max(0, Math.floor(next.renewalCouponDiscountAmount))
+        : defaults.renewalCouponDiscountAmount,
+    premiumUpsellCouponEnabled: Boolean(next.premiumUpsellCouponEnabled),
+    premiumUpsellUsageThresholdPercent:
+      typeof next.premiumUpsellUsageThresholdPercent === 'number' &&
+      Number.isFinite(next.premiumUpsellUsageThresholdPercent)
+        ? Math.min(100, Math.max(10, next.premiumUpsellUsageThresholdPercent))
+        : defaults.premiumUpsellUsageThresholdPercent,
+    premiumUpsellCouponCode:
+      next.premiumUpsellCouponCode?.trim() || defaults.premiumUpsellCouponCode,
+    premiumUpsellCouponDiscountLabel:
+      next.premiumUpsellCouponDiscountLabel?.trim() || defaults.premiumUpsellCouponDiscountLabel,
+    premiumUpsellCouponDiscountAmount:
+      typeof next.premiumUpsellCouponDiscountAmount === 'number' &&
+      Number.isFinite(next.premiumUpsellCouponDiscountAmount)
+        ? Math.max(0, Math.floor(next.premiumUpsellCouponDiscountAmount))
+        : defaults.premiumUpsellCouponDiscountAmount,
+    winbackCouponEnabled: Boolean(next.winbackCouponEnabled),
+    winbackCouponInactivityDays:
+      typeof next.winbackCouponInactivityDays === 'number' && Number.isFinite(next.winbackCouponInactivityDays)
+        ? Math.min(180, Math.max(7, next.winbackCouponInactivityDays))
+        : defaults.winbackCouponInactivityDays,
+    winbackCouponCode: next.winbackCouponCode?.trim() || defaults.winbackCouponCode,
+    winbackCouponDiscountLabel:
+      next.winbackCouponDiscountLabel?.trim() || defaults.winbackCouponDiscountLabel,
+    winbackCouponDiscountAmount:
+      typeof next.winbackCouponDiscountAmount === 'number' && Number.isFinite(next.winbackCouponDiscountAmount)
+        ? Math.max(0, Math.floor(next.winbackCouponDiscountAmount))
+        : defaults.winbackCouponDiscountAmount,
     paymentReminderHours,
     pendingReviewReminderHours,
     rejectedOrderReminderHours,

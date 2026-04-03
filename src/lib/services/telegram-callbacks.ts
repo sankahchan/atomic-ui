@@ -26,11 +26,14 @@ export type TelegramRetentionSource =
   | 'trial_expiry'
   | 'trial_coupon'
   | 'trial_expired'
+  | 'renewal_coupon'
   | 'renewal_7d'
   | 'renewal_3d'
   | 'renewal_manual'
+  | 'premium_upsell_coupon'
   | 'premium_renewal_7d'
   | 'premium_renewal_3d'
+  | 'winback_coupon'
   | 'expired_recovery'
   | 'order_retry';
 
@@ -193,11 +196,14 @@ export function normalizeTelegramRetentionSource(
     case 'trial_expiry':
     case 'trial_coupon':
     case 'trial_expired':
+    case 'renewal_coupon':
     case 'renewal_7d':
     case 'renewal_3d':
     case 'renewal_manual':
+    case 'premium_upsell_coupon':
     case 'premium_renewal_7d':
     case 'premium_renewal_3d':
+    case 'winback_coupon':
     case 'expired_recovery':
     case 'order_retry':
       return value;
@@ -223,12 +229,15 @@ export function resolveTelegramRetentionSourceFromRenewAction(
     case 'renewal_7d':
     case 'renewal_3d':
     case 'renewal_manual':
+    case 'renewal_coupon':
     case 'expired_recovery':
       return secondary;
     case 'dynamic_renewal_7d':
       return 'premium_renewal_7d';
     case 'dynamic_renewal_3d':
       return 'premium_renewal_3d';
+    case 'dynamic_premium_upsell_coupon':
+      return 'premium_upsell_coupon';
     default:
       return null;
   }

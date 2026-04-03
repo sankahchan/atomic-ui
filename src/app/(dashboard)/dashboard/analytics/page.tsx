@@ -1482,6 +1482,167 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon performance</p>
+                    <h3 className="mt-2 text-lg font-semibold">Promo conversion</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupons issued</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.issued || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Campaign coupons sent in this range.</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupons redeemed</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.redeemed || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : telegramSalesDashboard?.coupons.summary.redemptionRate !== null &&
+                                telegramSalesDashboard?.coupons.summary.redemptionRate !== undefined
+                              ? `${Math.round(telegramSalesDashboard.coupons.summary.redemptionRate)}% redemption rate`
+                              : 'No redemptions yet'}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon-backed orders</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.attributedOrders || 0}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${telegramSalesDashboard?.coupons.summary.attributedFulfilled || 0} fulfilled with coupon pricing`}
+                        </p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon conversion</p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : telegramSalesDashboard?.coupons.summary.attributedConversionRate !== null &&
+                                telegramSalesDashboard?.coupons.summary.attributedConversionRate !== undefined
+                              ? `${Math.round(telegramSalesDashboard.coupons.summary.attributedConversionRate)}%`
+                              : '0%'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">From coupon-attributed checkout starts.</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_0.85fr]">
+                      <div className="space-y-3">
+                        {loadingTelegramSalesDashboard ? (
+                          [...Array(3)].map((_, i) => (
+                            <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-muted/40 dark:bg-white/[0.04]" />
+                          ))
+                        ) : telegramSalesDashboard && telegramSalesDashboard.coupons.byCampaign.length > 0 ? (
+                          telegramSalesDashboard.coupons.byCampaign.map((campaign) => {
+                            const labelMap: Record<string, string> = {
+                              TRIAL_TO_PAID: 'Trial to paid',
+                              RENEWAL_SOON: 'Renewal coupon',
+                              PREMIUM_UPSELL: 'Premium upsell',
+                              WINBACK: 'Win-back',
+                            };
+                            return (
+                              <div
+                                key={campaign.campaignType}
+                                className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">
+                                      {labelMap[campaign.campaignType] || campaign.campaignType}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {campaign.issued} issued • {campaign.redeemed} redeemed • {campaign.attributedOrders} orders
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {campaign.redemptionRate !== null && campaign.redemptionRate !== undefined
+                                        ? `${Math.round(campaign.redemptionRate)}% redemption`
+                                        : 'No redemption yet'}
+                                      {' • '}
+                                      {campaign.conversionRate !== null && campaign.conversionRate !== undefined
+                                        ? `${Math.round(campaign.conversionRate)}% checkout conversion`
+                                        : 'No checkout conversion yet'}
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline">{campaign.fulfilledOrders} fulfilled</Badge>
+                                </div>
+                                {campaign.revenueByCurrency.length > 0 ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {campaign.revenueByCurrency.map((revenue) => (
+                                      <Badge key={revenue.currency} variant="secondary">
+                                        {formatRevenueLabel(revenue.currency, revenue.amount)}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="ops-chart-empty">
+                            <div className="space-y-2 text-center">
+                              <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                              <p className="font-medium text-foreground">No coupon campaigns yet</p>
+                              <p className="text-sm text-muted-foreground">
+                                Enable trial, renewal, upsell, or win-back coupons to see promo performance here.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-3">
+                        <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Discount value</p>
+                          <div className="mt-3 space-y-2">
+                            {loadingTelegramSalesDashboard ? (
+                              <div className="h-24 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                            ) : telegramSalesDashboard && telegramSalesDashboard.coupons.summary.discountValueByCurrency.length > 0 ? (
+                              telegramSalesDashboard.coupons.summary.discountValueByCurrency.map((entry) => (
+                                <div key={entry.currency} className="ops-mini-tile">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                    {entry.currency}
+                                  </p>
+                                  <p className="mt-2 text-xl font-semibold">
+                                    {formatRevenueLabel(entry.currency, entry.amount)}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">Redeemed discount value.</p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No redeemed discounts in this range.</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Top coupon codes</p>
+                          <div className="mt-3 space-y-2">
+                            {loadingTelegramSalesDashboard ? (
+                              <div className="h-24 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                            ) : telegramSalesDashboard && telegramSalesDashboard.coupons.byCode.length > 0 ? (
+                              telegramSalesDashboard.coupons.byCode.map((code) => (
+                                <div key={code.couponCode} className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/50 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">{code.couponCode}</p>
+                                    <p className="text-xs text-muted-foreground">{code.campaignType}</p>
+                                  </div>
+                                  <Badge variant="outline">
+                                    {code.redeemed}/{code.issued}
+                                  </Badge>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No coupon codes issued yet.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial conversion</p>
                     <h3 className="mt-2 text-lg font-semibold">Free trial to paid</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
