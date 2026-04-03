@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
@@ -137,6 +138,8 @@ type Channel = {
   config: Record<string, string>;
   events: NotificationEventId[];
 };
+
+type NotificationWorkspaceId = 'overview' | 'telegram' | 'workflow' | 'channels';
 
 type DeliveryStatusFilter = 'ALL' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
 type EventCooldownInputs = Partial<Record<NotificationEventId, string>>;
@@ -1935,7 +1938,7 @@ function TelegramBotSetupCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+        <div className="grid gap-6">
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
@@ -9552,10 +9555,12 @@ function DeliveryHistoryCard({ channels }: { channels: Channel[] }) {
  */
 export default function NotificationsPage() {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editChannel, setEditChannel] = useState<Channel | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<NotificationWorkspaceId>('overview');
 
   const { data: channels = [], isLoading: isChannelsLoading } = trpc.notifications.listChannels.useQuery(
     undefined,
@@ -9625,6 +9630,50 @@ export default function NotificationsPage() {
 
   const activeChannels = channels.filter((channel) => channel.isActive).length;
   const subscribedEventCount = new Set(channels.flatMap((channel) => channel.events)).size;
+  const workspaces: Array<{
+    id: NotificationWorkspaceId;
+    title: string;
+    description: string;
+    meta: string;
+    icon: typeof Bell;
+  }> = [
+    {
+      id: 'overview',
+      title: isMyanmar ? 'Overview' : 'Overview',
+      description: isMyanmar
+        ? 'Alert များ၊ queue နှင့် delivery health ကို အမြန်ကြည့်ရန်'
+        : 'Alerts, queue health, and the most important notification signals.',
+      meta: `${channels.length} ${isMyanmar ? 'channels' : 'channels'} • ${subscribedEventCount} ${isMyanmar ? 'events' : 'events'}`,
+      icon: Bell,
+    },
+    {
+      id: 'telegram',
+      title: isMyanmar ? 'Telegram bot' : 'Telegram bot',
+      description: isMyanmar
+        ? 'Bot setup, webhook, welcome flows နှင့် broadcasts'
+        : 'Bot setup, webhook controls, localized flows, and broadcasts.',
+      meta: isMyanmar ? 'Bot + broadcasts' : 'Bot + broadcasts',
+      icon: MessageSquare,
+    },
+    {
+      id: 'workflow',
+      title: isMyanmar ? 'Order workflow' : 'Order workflow',
+      description: isMyanmar
+        ? 'Sales automation, coupon campaigns, review queue'
+        : 'Sales automation, coupon campaigns, and review operations.',
+      meta: isMyanmar ? 'Sales + review' : 'Sales + review',
+      icon: Send,
+    },
+    {
+      id: 'channels',
+      title: isMyanmar ? 'Channels & history' : 'Channels & history',
+      description: isMyanmar
+        ? 'Channel setup နှင့် delivery history ကို စီမံရန်'
+        : 'Channel setup, testing, and delivery history in one place.',
+      meta: `${activeChannels} ${isMyanmar ? 'active' : 'active'} • ${Math.max(0, channels.length - activeChannels)} ${isMyanmar ? 'inactive' : 'inactive'}`,
+      icon: History,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -9691,74 +9740,239 @@ export default function NotificationsPage() {
         </div>
       </section>
 
-      {/* Key Alerts Card - Primary feature */}
-      <KeyAlertsCard />
+      <Tabs value={activeWorkspace} onValueChange={(value) => setActiveWorkspace(value as NotificationWorkspaceId)}>
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 rounded-[1.8rem] border border-border/60 bg-background/55 p-2 md:grid-cols-2 2xl:grid-cols-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.9),rgba(5,12,24,0.76))] dark:shadow-[0_16px_38px_rgba(1,6,20,0.34)]">
+          {workspaces.map((workspace) => {
+            const Icon = workspace.icon;
+            return (
+              <TabsTrigger
+                key={workspace.id}
+                value={workspace.id}
+                className="min-h-[94px] w-full flex-col items-start justify-start gap-2 rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:shadow-[0_0_28px_rgba(34,211,238,0.18)]"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Icon className="h-4 w-4" />
+                  {workspace.title}
+                </span>
+                <span className="workspace-caption text-xs leading-5 text-muted-foreground">
+                  {workspace.description}
+                </span>
+                <span className="workspace-meta text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  {workspace.meta}
+                </span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-      <QueueStatusCard />
+        <TabsContent value="overview" forceMount className="mt-6 space-y-6">
+          <div className={cn('space-y-6', activeWorkspace !== 'overview' && 'hidden')}>
+            <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
+              <div className="space-y-6">
+                <KeyAlertsCard />
+              </div>
+              <div className="space-y-6">
+                <QueueStatusCard />
 
-      {/* Info card */}
-      <Card className="border-dashed bg-background/55 dark:bg-white/[0.02]">
-        <CardContent className="p-5">
-          <div className="flex gap-3">
-            <Bell className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">{t('notifications.info.title')}</p>
-              <p className="text-sm text-muted-foreground">
-                {t('notifications.info.desc')}
-              </p>
+                <Card className="border-dashed bg-background/55 dark:bg-white/[0.02]">
+                  <CardContent className="p-5">
+                    <div className="flex gap-3">
+                      <Bell className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">{t('notifications.info.title')}</p>
+                        <p className="text-sm text-muted-foreground">{t('notifications.info.desc')}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
+                  <CardHeader className="space-y-1">
+                    <CardTitle className="text-lg">
+                      {isMyanmar ? 'Focused workspaces' : 'Focused workspaces'}
+                    </CardTitle>
+                    <CardDescription>
+                      {isMyanmar
+                        ? 'Notifications ကို အလုပ်အမျိုးအစားအလိုက် ခွဲထားပြီး scroll များမဖြစ်စေရန် တစ်ခန်းချင်း စီမံနိုင်ပါသည်။'
+                        : 'Open only the part of Notifications you need instead of working through one long page.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-3">
+                    {workspaces.slice(1).map((workspace) => {
+                      const Icon = workspace.icon;
+                      return (
+                        <button
+                          key={`jump:${workspace.id}`}
+                          type="button"
+                          onClick={() => setActiveWorkspace(workspace.id)}
+                          className="rounded-2xl border border-border/60 bg-background/70 p-4 text-left transition-colors hover:border-primary/30 hover:bg-background"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-semibold">
+                            <Icon className="h-4 w-4 text-primary" />
+                            {workspace.title}
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            {workspace.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      <TelegramBotSetupCard />
-      <TelegramSalesWorkflowCard />
-
-      {/* Channels grid */}
-      {isChannelsLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((item) => (
-            <Card key={item}>
-              <CardContent className="p-5">
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-5 w-32 rounded bg-muted" />
-                  <div className="h-4 w-24 rounded bg-muted" />
-                  <div className="h-16 rounded bg-muted" />
-                  <div className="h-9 rounded bg-muted" />
+        <TabsContent value="telegram" forceMount className="mt-6 space-y-6">
+          <div className={cn('space-y-6', activeWorkspace !== 'telegram' && 'hidden')}>
+            <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
+              <CardContent className="flex flex-col gap-3 p-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {isMyanmar ? 'Bot setup and broadcasts' : 'Bot setup and broadcasts'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {isMyanmar
+                      ? 'Bot identity, webhook, localized messages, announcements, templates, analytics နှင့် history ကို တစ်နေရာတည်းတွင် စီမံနိုင်ပါသည်။'
+                      : 'Manage bot identity, webhook, localized messages, broadcasts, templates, analytics, and history without mixing them with the rest of the page.'}
+                  </p>
                 </div>
+                <Badge variant="outline" className="w-fit">
+                  {isMyanmar ? 'Cleaner full-width workspace' : 'Cleaner full-width workspace'}
+                </Badge>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : channels.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {channels.map((channel) => (
-            <ChannelCard
-              key={channel.id}
-              channel={channel}
-              onEdit={() => handleEdit(channel)}
-              onDelete={() => handleDelete(channel)}
-              onTest={() => handleTest(channel)}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Bell className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">{t('notifications.empty.title')}</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              {t('notifications.empty.desc')}
-            </p>
-            <Button onClick={handleOpenCreate}>
-              <Plus className="w-4 h-4 mr-2" />
-              {t('notifications.empty.btn')}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
-      <DeliveryHistoryCard channels={channels} />
+            <TelegramBotSetupCard />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="workflow" forceMount className="mt-6 space-y-6">
+          <div className={cn('space-y-6', activeWorkspace !== 'workflow' && 'hidden')}>
+            <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
+              <CardContent className="flex flex-col gap-3 p-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {isMyanmar ? 'Sales automation and review operations' : 'Sales automation and review operations'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {isMyanmar
+                      ? 'Order flow, coupons, automation guardrails, reviewer queue နှင့် premium support ကို သီးခြား workspace အဖြစ်ထားပေးထားသည်။'
+                      : 'Keep order flow, coupons, automation guardrails, reviewer queues, and premium support in a dedicated operations workspace.'}
+                  </p>
+                </div>
+                <Badge variant="outline" className="w-fit">
+                  {isMyanmar ? 'Sales + review' : 'Sales + review'}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            <TelegramSalesWorkflowCard />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="channels" forceMount className="mt-6 space-y-6">
+          <div className={cn('space-y-6', activeWorkspace !== 'channels' && 'hidden')}>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-lg">
+                    {isMyanmar ? 'Delivery channels' : 'Delivery channels'}
+                  </CardTitle>
+                  <CardDescription>
+                    {isMyanmar
+                      ? 'Telegram, email နှင့် webhook channel များကို ပြုပြင်၊ test လုပ်ပြီး delivery history ကို စစ်ဆေးနိုင်သည်။'
+                      : 'Manage Telegram, email, and webhook delivery channels, then review what the worker actually sent.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {t('notifications.summary.channels')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {t('notifications.summary.active_channels')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {t('notifications.summary.coverage')}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold">{subscribedEventCount}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-lg">{t('notifications.add_channel')}</CardTitle>
+                  <CardDescription>
+                    {isMyanmar
+                      ? 'Delivery endpoint အသစ် ထည့်ပြီး event coverage ကို တိုးချဲ့နိုင်သည်။'
+                      : 'Create a new delivery endpoint and expand your event coverage.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={handleOpenCreate} className="h-11 w-full rounded-full">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('notifications.add_channel')}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {isChannelsLoading ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                  <Card key={item}>
+                    <CardContent className="p-5">
+                      <div className="animate-pulse space-y-3">
+                        <div className="h-5 w-32 rounded bg-muted" />
+                        <div className="h-4 w-24 rounded bg-muted" />
+                        <div className="h-16 rounded bg-muted" />
+                        <div className="h-9 rounded bg-muted" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : channels.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {channels.map((channel) => (
+                  <ChannelCard
+                    key={channel.id}
+                    channel={channel}
+                    onEdit={() => handleEdit(channel)}
+                    onDelete={() => handleDelete(channel)}
+                    onTest={() => handleTest(channel)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Bell className="mb-4 h-16 w-16 text-muted-foreground/50" />
+                  <h3 className="mb-2 text-lg font-semibold">{t('notifications.empty.title')}</h3>
+                  <p className="mb-6 max-w-md text-center text-muted-foreground">
+                    {t('notifications.empty.desc')}
+                  </p>
+                  <Button onClick={handleOpenCreate}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('notifications.empty.btn')}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <DeliveryHistoryCard channels={channels} />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Channel dialog */}
       <ChannelDialog
