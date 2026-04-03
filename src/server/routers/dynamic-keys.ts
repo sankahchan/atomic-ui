@@ -49,6 +49,11 @@ import {
   recordDynamicRoutingEvent,
 } from '@/lib/services/dynamic-routing-events';
 import {
+  getPremiumHealthyPreferredRegions,
+  selectPremiumFallbackTarget,
+  summarizePremiumRegions,
+} from '@/lib/services/premium-region-routing';
+import {
   createDynamicKeyTelegramConnectLink,
   sendDynamicKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
@@ -1101,7 +1106,15 @@ export const dynamicKeysRouter = router({
         drainGraceMinutes: dak.drainGraceMinutes,
       });
 
-      const [sessions, analytics, preferredServers, candidateServers, routingTimeline, routingAlerts] = await Promise.all([
+      const attachedServerIds = Array.from(
+        new Set(
+          activeKeys
+            .map((key) => key.server?.id || null)
+            .filter((serverId): serverId is string => Boolean(serverId)),
+        ),
+      );
+
+      const [sessions, analytics, preferredServers, candidateServers, routingTimeline, routingAlerts, premiumRegionHealthChecks] = await Promise.all([
         accessKeyIds.length > 0
           ? db.connectionSession.findMany({
               where: {
@@ -1167,6 +1180,27 @@ export const dynamicKeysRouter = router({
           usedBytes: dak.usedBytes,
           dataLimitBytes: dak.dataLimitBytes,
         }),
+        attachedServerIds.length > 0
+          ? db.healthCheck.findMany({
+              where: {
+                serverId: { in: attachedServerIds },
+              },
+              select: {
+                serverId: true,
+                lastStatus: true,
+                lastLatencyMs: true,
+                lastCheckedAt: true,
+                latencyThresholdMs: true,
+                server: {
+                  select: {
+                    id: true,
+                    name: true,
+                    countryCode: true,
+                  },
+                },
+              },
+            })
+          : Promise.resolve([]),
       ]);
       const orderedPreferredServers = routingPreferences.preferredServerIds
         .map((serverId) => preferredServers.find((server) => server.id === serverId))
@@ -1475,6 +1509,100 @@ export const dynamicKeysRouter = router({
         }
       }
 
+      const premiumRegionHealthByServerId = new Map(
+        premiumRegionHealthChecks.map((entry) => [entry.serverId, entry] as const),
+      );
+      const premiumRegionAnalysis = summarizePremiumRegions(
+        {
+          type: dak.type,
+          preferredCountryCodesJson: dak.preferredCountryCodesJson,
+          lastResolvedServerId: dak.lastResolvedServerId,
+          accessKeys: activeKeys.map((key) => ({
+            id: key.id,
+            name: key.name,
+            server: key.server
+              ? {
+                  id: key.server.id,
+                  name: key.server.name,
+                  countryCode: key.server.countryCode,
+                }
+              : null,
+          })),
+        },
+        premiumRegionHealthByServerId,
+      );
+      const latestPremiumDegraded = routingTimeline.find(
+        (event) => event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+      ) ?? null;
+      const latestPremiumFallback = routingTimeline.find(
+        (event) => event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED,
+      ) ?? null;
+      const latestPremiumRecovered = routingTimeline.find(
+        (event) => event.eventType === DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED,
+      ) ?? null;
+      const suggestedFallback = selectPremiumFallbackTarget(
+        {
+          type: dak.type,
+          preferredCountryCodesJson: dak.preferredCountryCodesJson,
+          lastResolvedServerId: dak.lastResolvedServerId,
+          accessKeys: activeKeys.map((key) => ({
+            id: key.id,
+            name: key.name,
+            server: key.server
+              ? {
+                  id: key.server.id,
+                  name: key.server.name,
+                  countryCode: key.server.countryCode,
+                }
+              : null,
+          })),
+        },
+        premiumRegionHealthByServerId,
+        premiumRegionAnalysis,
+      );
+      const healthyPreferredRegions = getPremiumHealthyPreferredRegions(premiumRegionAnalysis);
+      const fallbackMetadata = latestPremiumFallback?.metadata as Record<string, unknown> | null;
+      const recoveredMetadata = latestPremiumRecovered?.metadata as Record<string, unknown> | null;
+      const activeAutoFallback =
+        latestPremiumFallback &&
+        (!latestPremiumRecovered || latestPremiumRecovered.createdAt < latestPremiumFallback.createdAt) &&
+        (
+          (typeof fallbackMetadata?.pinnedServerId === 'string' &&
+            fallbackMetadata.pinnedServerId === pinState.pinnedServerId) ||
+          (typeof fallbackMetadata?.pinnedAccessKeyId === 'string' &&
+            fallbackMetadata.pinnedAccessKeyId === pinState.pinnedAccessKeyId)
+        )
+          ? {
+              eventId: latestPremiumFallback.id,
+              appliedAt: latestPremiumFallback.createdAt.toISOString(),
+              pinExpiresAt:
+                typeof fallbackMetadata?.pinExpiresAt === 'string'
+                  ? fallbackMetadata.pinExpiresAt
+                  : pinState.pinExpiresAt?.toISOString() ?? null,
+              fallbackRegionCode:
+                typeof fallbackMetadata?.fallbackRegionCode === 'string'
+                  ? fallbackMetadata.fallbackRegionCode
+                  : null,
+              pinnedServerId:
+                typeof fallbackMetadata?.pinnedServerId === 'string'
+                  ? fallbackMetadata.pinnedServerId
+                  : pinState.pinnedServerId ?? null,
+              pinnedServerName:
+                typeof fallbackMetadata?.toServerName === 'string'
+                  ? fallbackMetadata.toServerName
+                  : (pinnedBackend?.serverName ?? null),
+            }
+          : null;
+      const premiumLifecycleState: 'HEALTHY' | 'DEGRADED' | 'FALLBACK' | 'RECOVERED' =
+        activeAutoFallback
+          ? 'FALLBACK'
+          : latestPremiumRecovered &&
+              (!latestPremiumDegraded || latestPremiumRecovered.createdAt >= latestPremiumDegraded.createdAt)
+            ? 'RECOVERED'
+            : latestPremiumDegraded
+              ? 'DEGRADED'
+              : 'HEALTHY';
+
       return {
         algorithm,
         algorithmLabel: getDynamicRoutingAlgorithmLabel(algorithm),
@@ -1520,6 +1648,34 @@ export const dynamicKeysRouter = router({
         lastSharePageCopyAt: analytics.lastCopiedAt?.toISOString() ?? null,
         lastSharePageOpenAppAt:
           analytics.recentEvents.find((event) => event.eventType === 'OPEN_APP')?.createdAt.toISOString() ?? null,
+        premiumRegionAutomation: {
+          lifecycleState: premiumLifecycleState,
+          preferredRegions: premiumRegionAnalysis.preferredRegions,
+          currentRegionCode: premiumRegionAnalysis.currentSummary?.regionCode ?? null,
+          currentRegionStatus: premiumRegionAnalysis.currentSummary?.status ?? null,
+          healthyPreferredRegions,
+          suggestedFallback: suggestedFallback
+            ? {
+                mode: suggestedFallback.mode,
+                accessKeyId: suggestedFallback.accessKeyId,
+                accessKeyName: suggestedFallback.accessKeyName,
+                serverId: suggestedFallback.serverId,
+                serverName: suggestedFallback.serverName,
+                serverCountryCode: suggestedFallback.serverCountryCode,
+                regionCode: suggestedFallback.regionCode,
+                status: suggestedFallback.status,
+                latencyMs: suggestedFallback.latencyMs,
+              }
+            : null,
+          activeAutoFallback,
+          latestDegradedAt: latestPremiumDegraded?.createdAt.toISOString() ?? null,
+          latestFallbackAt: latestPremiumFallback?.createdAt.toISOString() ?? null,
+          latestRecoveredAt: latestPremiumRecovered?.createdAt.toISOString() ?? null,
+          latestRecoveryMinutes:
+            typeof recoveredMetadata?.recoveryMinutes === 'number'
+              ? recoveredMetadata.recoveryMinutes
+              : null,
+        },
       };
     }),
 

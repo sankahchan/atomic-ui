@@ -456,19 +456,39 @@ export default function UserLedgerPage() {
       const fallbackRegions = Array.isArray(metadata.suggestedFallbackRegions)
         ? metadata.suggestedFallbackRegions.filter((value): value is string => typeof value === 'string')
         : [];
+      const fallbackRegionCode =
+        typeof metadata.fallbackRegionCode === 'string' ? metadata.fallbackRegionCode : null;
+      const healthyPreferredRegions = Array.isArray(metadata.healthyPreferredRegions)
+        ? metadata.healthyPreferredRegions.filter((value): value is string => typeof value === 'string')
+        : [];
+      const recoveryMinutes =
+        typeof metadata.recoveryMinutes === 'number' ? metadata.recoveryMinutes : null;
 
       events.push({
         id: `premium-routing:${alert.id}`,
         at: new Date(alert.createdAt),
-        title: 'Premium region alert',
+        title:
+          alert.eventType === 'AUTO_FALLBACK_PIN_APPLIED'
+            ? 'Premium fallback pinned'
+            : alert.eventType === 'PREFERRED_REGION_RECOVERED'
+              ? 'Premium region recovered'
+              : 'Premium region degraded',
         detail: [
           alert.dynamicAccessKeyName,
           currentRegionCode ? `${currentRegionCode}${currentStatus ? ` • ${currentStatus}` : ''}` : null,
+          fallbackRegionCode ? `fallback ${fallbackRegionCode}` : null,
           fallbackRegions.length > 0 ? `fallback ${fallbackRegions.join(', ')}` : null,
+          healthyPreferredRegions.length > 0 ? `recovered ${healthyPreferredRegions.join(', ')}` : null,
+          recoveryMinutes ? `${Math.round(recoveryMinutes)} min` : null,
         ]
           .filter(Boolean)
           .join(' • '),
-        tone: alert.severity === 'CRITICAL' ? 'danger' : 'warning',
+        tone:
+          alert.eventType === 'PREFERRED_REGION_RECOVERED'
+            ? 'positive'
+            : alert.severity === 'CRITICAL'
+              ? 'danger'
+              : 'warning',
         href: withBasePath(`/dashboard/dynamic-keys/${alert.dynamicAccessKeyId}`),
       });
     }
@@ -1502,9 +1522,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Premium routing alerts</p>
+                <p className="mb-2 text-sm font-medium">Premium routing lifecycle</p>
                 {premiumRoutingAlerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No premium routing alerts recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">No premium routing events recorded yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {premiumRoutingAlerts.map((alert: PremiumRoutingAlertItem) => {
@@ -1512,15 +1532,31 @@ export default function UserLedgerPage() {
                       const fallbackRegions = Array.isArray(metadata.suggestedFallbackRegions)
                         ? metadata.suggestedFallbackRegions.filter((value): value is string => typeof value === 'string')
                         : [];
+                      const fallbackRegionCode =
+                        typeof metadata.fallbackRegionCode === 'string' ? metadata.fallbackRegionCode : null;
+                      const healthyPreferredRegions = Array.isArray(metadata.healthyPreferredRegions)
+                        ? metadata.healthyPreferredRegions.filter((value): value is string => typeof value === 'string')
+                        : [];
 
                       return (
                         <div key={alert.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="font-medium">{alert.dynamicAccessKeyName}</p>
+                            <p className="font-medium">
+                              {alert.dynamicAccessKeyName}
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {alert.eventType === 'AUTO_FALLBACK_PIN_APPLIED'
+                                  ? 'Fallback'
+                                  : alert.eventType === 'PREFERRED_REGION_RECOVERED'
+                                    ? 'Recovered'
+                                    : 'Degraded'}
+                              </span>
+                            </p>
                             <Badge
                               variant="outline"
                               className={
-                                alert.severity === 'CRITICAL'
+                                alert.eventType === 'PREFERRED_REGION_RECOVERED'
+                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                  : alert.severity === 'CRITICAL'
                                   ? 'border-red-500/30 bg-red-500/10 text-red-300'
                                   : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                               }
@@ -1535,6 +1571,20 @@ export default function UserLedgerPage() {
                               {fallbackRegions.map((regionCode) => (
                                 <Badge key={`${alert.id}:${regionCode}`} variant="secondary">
                                   Fallback: {regionCode}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                          {fallbackRegionCode ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge variant="secondary">Pinned fallback: {fallbackRegionCode}</Badge>
+                            </div>
+                          ) : null}
+                          {healthyPreferredRegions.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {healthyPreferredRegions.map((regionCode) => (
+                                <Badge key={`${alert.id}:recovered:${regionCode}`} variant="secondary">
+                                  Recovered: {regionCode}
                                 </Badge>
                               ))}
                             </div>

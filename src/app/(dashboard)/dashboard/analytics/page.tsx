@@ -1230,6 +1230,104 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Most degraded region</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.mostDegradedRegions.length > 0 ? (
+                        telegramSalesDashboard.premium.mostDegradedRegions.map((region) => (
+                          <div key={region.region} className="ops-mini-tile">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{region.region}</p>
+                              <Badge variant="outline">{region.count}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No degraded premium regions yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Most requested fallback</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.mostRequestedFallbackRegions.length > 0 ? (
+                        telegramSalesDashboard.premium.mostRequestedFallbackRegions.map((region) => (
+                          <div key={region.region} className="ops-mini-tile">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{region.region}</p>
+                              <Badge variant="outline">{region.count}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No fallback activity yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery time by region</p>
+                    <div className="mt-3 space-y-3">
+                      {loadingTelegramSalesDashboard ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                        ))
+                      ) : telegramSalesDashboard && telegramSalesDashboard.premium.recoveryTimeByRegion.length > 0 ? (
+                        telegramSalesDashboard.premium.recoveryTimeByRegion.map((region) => (
+                          <div key={region.region} className="ops-mini-tile">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{region.region}</p>
+                              <Badge variant="outline">{region.recoveries}</Badge>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {region.avgMinutes !== null ? `${Math.round(region.avgMinutes)} min avg` : 'No recovery time yet'}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No recovered premium incidents yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Affected premium users by incident</p>
+                  <div className="mt-3 space-y-3">
+                    {loadingTelegramSalesDashboard ? (
+                      [...Array(3)].map((_, i) => (
+                        <div key={i} className="h-16 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
+                      ))
+                    ) : telegramSalesDashboard && telegramSalesDashboard.premium.affectedUsersByIncident.length > 0 ? (
+                      telegramSalesDashboard.premium.affectedUsersByIncident.map((incident) => (
+                        <div key={incident.incidentKey} className="ops-mini-tile">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">{incident.region}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Started {formatRelativeTime(new Date(incident.startedAt))}
+                              </p>
+                            </div>
+                            <Badge variant="outline">{incident.affectedUsers} users</Badge>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No premium incidents recorded yet.</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

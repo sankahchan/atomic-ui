@@ -224,6 +224,19 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumRegionAlertHealthyHint: isMyanmar
       ? 'Route မတည်ငြိမ်ပါက /premiumregion ဖြင့် status ကို စစ်ပြီး admin ကို ဆက်သွယ်နိုင်ပါသည်။'
       : 'If routing still feels unstable, use /premiumregion to check status and contact admin.',
+    premiumRegionFallbackTitle: isMyanmar ? '🔁 <b>Premium fallback activated</b>' : '🔁 <b>Premium fallback activated</b>',
+    premiumRegionFallbackAppliedLabel: isMyanmar ? 'Temporary fallback' : 'Temporary fallback',
+    premiumRegionFallbackUntilLabel: isMyanmar ? 'Fallback pin expires' : 'Fallback pin expires',
+    premiumRegionFallbackHint: isMyanmar
+      ? 'Preferred region ပြန်ကောင်းလာပါက ထပ်မံအသိပေးပို့ပေးမည်။ လက်ရှိ fallback ကို ပြောင်းလိုပါက support ကို အသုံးပြုနိုင်ပါသည်။'
+      : 'We will notify you again when the preferred region is healthy. If you want to change this fallback, use support.',
+    premiumRegionRecoveredTitle: isMyanmar ? '✅ <b>Preferred region recovered</b>' : '✅ <b>Preferred region recovered</b>',
+    premiumRegionRecoveredLabel: isMyanmar ? 'Recovered region' : 'Recovered region',
+    premiumRegionCurrentFallbackLabel: isMyanmar ? 'Current fallback' : 'Current fallback',
+    premiumRegionRecoveryTimeLabel: isMyanmar ? 'Recovery time' : 'Recovery time',
+    premiumRegionRecoveredHint: isMyanmar
+      ? 'လိုအပ်ပါက အောက်ပါ region ခလုတ်ကို နှိပ်ပြီး preferred region သို့ ပြန်ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
+      : 'If you want to move back to the preferred region, tap one of the region buttons below.',
     premiumStatusHint: isMyanmar
       ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new premium support request.',

@@ -1741,6 +1741,36 @@ type DynamicRoutingDiagnostics = {
   autoFallbackToPrefer: boolean;
   autoSkipUnhealthy: boolean;
   routingAlertRules: string | null;
+  premiumRegionAutomation: {
+    lifecycleState: 'HEALTHY' | 'DEGRADED' | 'FALLBACK' | 'RECOVERED';
+    preferredRegions: string[];
+    currentRegionCode: string | null;
+    currentRegionStatus: string | null;
+    healthyPreferredRegions: string[];
+    suggestedFallback: {
+      mode: 'ATTACHED_KEY' | 'SELF_MANAGED_SERVER';
+      accessKeyId: string | null;
+      accessKeyName: string | null;
+      serverId: string;
+      serverName: string;
+      serverCountryCode: string | null;
+      regionCode: string;
+      status: string | null;
+      latencyMs: number | null;
+    } | null;
+    activeAutoFallback: {
+      eventId: string;
+      appliedAt: string;
+      pinExpiresAt: string | null;
+      fallbackRegionCode: string | null;
+      pinnedServerId: string | null;
+      pinnedServerName: string | null;
+    } | null;
+    latestDegradedAt: string | null;
+    latestFallbackAt: string | null;
+    latestRecoveredAt: string | null;
+    latestRecoveryMinutes: number | null;
+  };
   appliedTemplate: {
     id: string;
     name: string;
@@ -1800,6 +1830,12 @@ function formatRoutingEventLabel(eventType: string, t: (key: string) => string) 
       return t('dynamic_keys.routing.event.pin_applied');
     case 'PIN_CLEARED':
       return t('dynamic_keys.routing.event.pin_cleared');
+    case 'AUTO_FALLBACK_PIN_APPLIED':
+      return 'Auto fallback pin applied';
+    case 'PREFERRED_REGION_DEGRADED':
+      return 'Preferred region degraded';
+    case 'PREFERRED_REGION_RECOVERED':
+      return 'Preferred region recovered';
     default:
       return eventType.replaceAll('_', ' ');
   }
@@ -1828,15 +1864,17 @@ function matchesRoutingTimelineFilter(eventType: string, filter: RoutingTimeline
       'NO_MATCH',
       'HEALTH_ALERT',
       'FLAPPING_ALERT',
+      'AUTO_FALLBACK_PIN_APPLIED',
+      'PREFERRED_REGION_RECOVERED',
     ].includes(eventType);
   }
 
   if (filter === 'ALERTS') {
-    return ['NO_MATCH', 'HEALTH_ALERT', 'QUOTA_ALERT', 'FLAPPING_ALERT'].includes(eventType);
+    return ['NO_MATCH', 'HEALTH_ALERT', 'QUOTA_ALERT', 'FLAPPING_ALERT', 'PREFERRED_REGION_DEGRADED'].includes(eventType);
   }
 
   if (filter === 'PINS') {
-    return ['PIN_APPLIED', 'PIN_CLEARED'].includes(eventType);
+    return ['PIN_APPLIED', 'PIN_CLEARED', 'AUTO_FALLBACK_PIN_APPLIED'].includes(eventType);
   }
 
   if (filter === 'ROTATION') {
@@ -1856,6 +1894,7 @@ function DynamicRoutingDiagnosticsCard({
   onRefresh,
   isRefreshing,
   onPinCurrent,
+  onPinSuggestedFallback,
   onClearPin,
   onSimulateFailover,
   onTestCandidates,
@@ -1875,6 +1914,7 @@ function DynamicRoutingDiagnosticsCard({
   isRefreshing: boolean;
   isPinning: boolean;
   onPinCurrent: (expiresInMinutes: number | null, operatorNote?: string) => void;
+  onPinSuggestedFallback?: () => void;
   onClearPin: () => void;
   onSimulateFailover: () => void;
   onTestCandidates: () => void;
@@ -2018,6 +2058,134 @@ function DynamicRoutingDiagnosticsCard({
                 </div>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {data?.premiumRegionAutomation ? (
+          <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Premium region lifecycle
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Shows the degraded, fallback, and recovered state for premium routing, plus the current operator override path.
+                </p>
+              </div>
+              <Badge
+                variant="outline"
+                className={cn(
+                  data.premiumRegionAutomation.lifecycleState === 'FALLBACK' && 'border-amber-500/40 text-amber-500',
+                  data.premiumRegionAutomation.lifecycleState === 'DEGRADED' && 'border-red-500/40 text-red-500',
+                  data.premiumRegionAutomation.lifecycleState === 'RECOVERED' && 'border-emerald-500/40 text-emerald-500',
+                )}
+              >
+                {data.premiumRegionAutomation.lifecycleState}
+              </Badge>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <div className="ops-inline-stat">
+                <p className="text-xs text-muted-foreground">Preferred regions</p>
+                <p className="font-medium">
+                  {data.premiumRegionAutomation.preferredRegions.length
+                    ? data.premiumRegionAutomation.preferredRegions.join(', ')
+                    : 'Auto'}
+                </p>
+              </div>
+              <div className="ops-inline-stat">
+                <p className="text-xs text-muted-foreground">Current region</p>
+                <p className="font-medium">
+                  {data.premiumRegionAutomation.currentRegionCode
+                    ? `${data.premiumRegionAutomation.currentRegionCode}${data.premiumRegionAutomation.currentRegionStatus ? ` • ${data.premiumRegionAutomation.currentRegionStatus}` : ''}`
+                    : 'Unknown'}
+                </p>
+              </div>
+              <div className="ops-inline-stat">
+                <p className="text-xs text-muted-foreground">Healthy preferred</p>
+                <p className="font-medium">
+                  {data.premiumRegionAutomation.healthyPreferredRegions.length
+                    ? data.premiumRegionAutomation.healthyPreferredRegions.join(', ')
+                    : 'None yet'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
+                <p className="text-xs font-medium">Degraded</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {data.premiumRegionAutomation.latestDegradedAt
+                    ? formatRelativeTime(new Date(data.premiumRegionAutomation.latestDegradedAt))
+                    : 'No recent degradation'}
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
+                <p className="text-xs font-medium">Fallback</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {data.premiumRegionAutomation.activeAutoFallback
+                    ? `${data.premiumRegionAutomation.activeAutoFallback.fallbackRegionCode || 'Fallback'} • ${data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'Pinned'}`
+                    : data.premiumRegionAutomation.latestFallbackAt
+                      ? `Last applied ${formatRelativeTime(new Date(data.premiumRegionAutomation.latestFallbackAt))}`
+                      : 'No fallback pin'}
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
+                <p className="text-xs font-medium">Recovered</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {data.premiumRegionAutomation.latestRecoveredAt
+                    ? `${formatRelativeTime(new Date(data.premiumRegionAutomation.latestRecoveredAt))}${data.premiumRegionAutomation.latestRecoveryMinutes ? ` • ${Math.round(data.premiumRegionAutomation.latestRecoveryMinutes)} min` : ''}`
+                    : 'No recovery yet'}
+                </p>
+              </div>
+            </div>
+
+            {(data.premiumRegionAutomation.suggestedFallback || data.premiumRegionAutomation.activeAutoFallback) ? (
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+                <div className="rounded-[1rem] border border-dashed border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
+                  {data.premiumRegionAutomation.activeAutoFallback ? (
+                    <>
+                      <p className="text-sm font-medium">
+                        Temporary fallback is active on {data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'the pinned backend'}.
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt
+                          ? `Auto fallback pin expires ${formatRelativeTime(new Date(data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt))}.`
+                          : 'This premium key is currently pinned to a temporary fallback backend.'}
+                      </p>
+                    </>
+                  ) : data.premiumRegionAutomation.suggestedFallback ? (
+                    <>
+                      <p className="text-sm font-medium">
+                        Suggested fallback: {getCountryFlag(data.premiumRegionAutomation.suggestedFallback.serverCountryCode || '')} {data.premiumRegionAutomation.suggestedFallback.serverName}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {data.premiumRegionAutomation.suggestedFallback.regionCode}
+                        {data.premiumRegionAutomation.suggestedFallback.status ? ` • ${data.premiumRegionAutomation.suggestedFallback.status}` : ''}
+                        {typeof data.premiumRegionAutomation.suggestedFallback.latencyMs === 'number'
+                          ? ` • ${data.premiumRegionAutomation.suggestedFallback.latencyMs}ms`
+                          : ''}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {data.premiumRegionAutomation.suggestedFallback && !data.premiumRegionAutomation.activeAutoFallback && onPinSuggestedFallback ? (
+                    <Button variant="outline" onClick={onPinSuggestedFallback} disabled={isPinning}>
+                      {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pin className="mr-2 h-4 w-4" />}
+                      Approve fallback
+                    </Button>
+                  ) : null}
+                  {data.premiumRegionAutomation.activeAutoFallback ? (
+                    <Button variant="outline" onClick={onClearPin} disabled={isClearingPin}>
+                      {isClearingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PinOff className="mr-2 h-4 w-4" />}
+                      Override / clear fallback
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -3208,6 +3376,26 @@ export default function DynamicKeyDetailPage() {
     });
   };
 
+  const handlePinSuggestedFallback = () => {
+    if (!dak || !routingDiagnosticsQuery.data?.premiumRegionAutomation?.suggestedFallback) {
+      toast({
+        title: 'Fallback unavailable',
+        description: 'No suggested premium fallback is available right now.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const fallback = routingDiagnosticsQuery.data.premiumRegionAutomation.suggestedFallback;
+    pinBackendMutation.mutate({
+      id: dak.id,
+      accessKeyId: fallback.accessKeyId ?? undefined,
+      serverId: fallback.serverId,
+      expiresInMinutes: 8 * 60,
+      operatorNote: `Premium fallback approved from panel for ${fallback.regionCode}.`,
+    });
+  };
+
   const exportDiagnosticsMutation = trpc.dynamicKeys.exportDiagnostics.useMutation({
     onSuccess: (data: any) => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -3790,6 +3978,7 @@ export default function DynamicKeyDetailPage() {
             }}
             isRefreshing={routingDiagnosticsQuery.isFetching}
             onPinCurrent={handlePinCurrentBackend}
+            onPinSuggestedFallback={handlePinSuggestedFallback}
             onClearPin={handleClearPinnedBackend}
             onSimulateFailover={handleSimulateFailover}
             onTestCandidates={handleTestCandidates}

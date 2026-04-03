@@ -260,7 +260,13 @@ export const usersRouter = router({
             ? db.dynamicRoutingEvent.findMany({
                 where: {
                   dynamicAccessKeyId: { in: dynamicKeyIds },
-                  eventType: 'PREFERRED_REGION_DEGRADED',
+                  eventType: {
+                    in: [
+                      'PREFERRED_REGION_DEGRADED',
+                      'AUTO_FALLBACK_PIN_APPLIED',
+                      'PREFERRED_REGION_RECOVERED',
+                    ],
+                  },
                 },
                 include: {
                   dynamicAccessKey: {

@@ -6,8 +6,23 @@ import {
   recordDynamicRoutingEvent,
 } from '@/lib/services/dynamic-routing-events';
 import {
+  resolveDynamicPinState,
+} from '@/lib/services/dynamic-subscription-routing';
+import {
   buildTelegramDynamicSupportActionCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  buildPremiumIncidentKey,
+  getPremiumHealthyPreferredRegions,
+  getPremiumIncidentRegionCode,
+  type PremiumFallbackTarget,
+  type PremiumRegionAnalysis,
+  type PremiumRegionHealthCheck,
+  type PremiumRegionSummary,
+  selectPremiumFallbackTarget,
+  shouldAlertForPremiumRegionDegradation,
+  summarizePremiumRegions,
+} from '@/lib/services/premium-region-routing';
 import {
   getTelegramConfig,
   getTelegramNotificationPreferences,
@@ -191,53 +206,15 @@ type PremiumMessagingKey = {
   preferredServerIdsJson?: string | null;
   preferredCountryCodesJson?: string | null;
   lastResolvedServerId?: string | null;
-  accessKeys: Array<{ server?: { id?: string; name: string; countryCode?: string | null } | null }>;
-};
-
-type PremiumRegionHealthCheck = {
-  serverId: string;
-  lastStatus: string | null;
-  lastLatencyMs: number | null;
-  lastCheckedAt: Date | null;
-  latencyThresholdMs: number | null;
-  server: {
+  pinnedAccessKeyId?: string | null;
+  pinnedServerId?: string | null;
+  pinnedAt?: Date | null;
+  pinExpiresAt?: Date | null;
+  accessKeys: Array<{
     id: string;
     name: string;
-    countryCode: string | null;
-  } | null;
-};
-
-type PremiumRegionSummary = {
-  regionCode: string;
-  status: string | null;
-  latencyMs: number | null;
-  latencyThresholdMs: number | null;
-  lastCheckedAt: Date | null;
-  serverCount: number;
-  serverName: string | null;
-  isCurrent: boolean;
-};
-
-type PremiumRegionAnalysis = {
-  preferredRegions: string[];
-  attachedServers: Array<{ id?: string; name: string; countryCode?: string | null }>;
-  currentServer: { id?: string; name: string; countryCode?: string | null } | null;
-  currentSummary: PremiumRegionSummary | null;
-  regionSummaries: PremiumRegionSummary[];
-  suggestedFallbacks: PremiumRegionSummary[];
-};
-
-function getPremiumRegionHealthRank(status?: string | null) {
-  switch (status) {
-    case 'UP':
-      return 0;
-    case 'SLOW':
-      return 1;
-    case 'DOWN':
-      return 2;
-    default:
-      return 3;
-  }
+    server?: { id?: string; name: string; countryCode?: string | null } | null;
+  }>;
 }
 
 function formatPremiumRegionHealthLabel(status: string | null | undefined, ui: ReturnType<typeof getTelegramUi>) {
@@ -251,104 +228,6 @@ function formatPremiumRegionHealthLabel(status: string | null | undefined, ui: R
     default:
       return ui.premiumRegionUnknownStatus;
   }
-}
-
-function summarizeTelegramPremiumRegions(
-  key: PremiumMessagingKey,
-  healthByServerId: Map<string, PremiumRegionHealthCheck>,
-): PremiumRegionAnalysis {
-  const preferredRegions = getDynamicKeyRegionChoices(key).map((code) => code.toUpperCase());
-  const preferredRegionSet = new Set(preferredRegions);
-  const attachedServers = key.accessKeys
-    .map((accessKey) => accessKey.server)
-    .filter((server): server is NonNullable<typeof server> => Boolean(server));
-  const currentServer = attachedServers.find((server) => server.id === key.lastResolvedServerId) || null;
-  const regionCodes = Array.from(
-    new Set(
-      [
-        ...preferredRegions,
-        ...attachedServers
-          .map((server) => server.countryCode?.toUpperCase() || null)
-          .filter((value): value is string => Boolean(value)),
-      ],
-    ),
-  );
-
-  const regionSummaries = regionCodes
-    .map((regionCode) => {
-      const regionServers = attachedServers.filter(
-        (server) => server.countryCode?.toUpperCase() === regionCode,
-      );
-      const regionChecks = regionServers
-        .map((server) => (server.id ? healthByServerId.get(server.id) : null))
-        .filter((entry): entry is PremiumRegionHealthCheck => Boolean(entry))
-        .sort((left, right) => {
-          const rankDelta = getPremiumRegionHealthRank(left.lastStatus) - getPremiumRegionHealthRank(right.lastStatus);
-          if (rankDelta !== 0) {
-            return rankDelta;
-          }
-          return (left.lastLatencyMs ?? Number.MAX_SAFE_INTEGER) - (right.lastLatencyMs ?? Number.MAX_SAFE_INTEGER);
-        });
-      const primary = regionChecks[0] || null;
-
-      return {
-        regionCode,
-        status: primary?.lastStatus || null,
-        latencyMs: primary?.lastLatencyMs ?? null,
-        latencyThresholdMs: primary?.latencyThresholdMs ?? null,
-        lastCheckedAt: primary?.lastCheckedAt ?? null,
-        serverCount: regionServers.length,
-        serverName: primary?.server?.name || regionServers[0]?.name || null,
-        isCurrent: currentServer?.countryCode?.toUpperCase() === regionCode,
-      };
-    })
-    .sort((left, right) => {
-      const preferredDelta = Number(preferredRegionSet.has(left.regionCode)) - Number(preferredRegionSet.has(right.regionCode));
-      if (preferredDelta !== 0) {
-        return preferredDelta * -1;
-      }
-      const currentDelta = Number(right.isCurrent) - Number(left.isCurrent);
-      if (currentDelta !== 0) {
-        return currentDelta;
-      }
-      const rankDelta = getPremiumRegionHealthRank(left.status) - getPremiumRegionHealthRank(right.status);
-      if (rankDelta !== 0) {
-        return rankDelta;
-      }
-      return (left.latencyMs ?? Number.MAX_SAFE_INTEGER) - (right.latencyMs ?? Number.MAX_SAFE_INTEGER);
-    });
-
-  const currentSummary =
-    regionSummaries.find((entry) => entry.isCurrent) ||
-    (currentServer?.countryCode
-      ? regionSummaries.find((entry) => entry.regionCode === currentServer.countryCode?.toUpperCase()) || null
-      : null);
-
-  const suggestedFallbacks = regionSummaries
-    .filter((entry) => !entry.isCurrent)
-    .filter((entry) => entry.status !== 'DOWN')
-    .sort((left, right) => {
-      const leftPreferred = preferredRegionSet.has(left.regionCode) ? 0 : 1;
-      const rightPreferred = preferredRegionSet.has(right.regionCode) ? 0 : 1;
-      if (leftPreferred !== rightPreferred) {
-        return leftPreferred - rightPreferred;
-      }
-      const rankDelta = getPremiumRegionHealthRank(left.status) - getPremiumRegionHealthRank(right.status);
-      if (rankDelta !== 0) {
-        return rankDelta;
-      }
-      return (left.latencyMs ?? Number.MAX_SAFE_INTEGER) - (right.latencyMs ?? Number.MAX_SAFE_INTEGER);
-    })
-    .slice(0, 3);
-
-  return {
-    preferredRegions,
-    attachedServers,
-    currentServer,
-    currentSummary,
-    regionSummaries,
-    suggestedFallbacks,
-  };
 }
 
 function formatPremiumRegionSummaryLine(
@@ -369,22 +248,6 @@ function formatPremiumRegionSummaryLine(
   }
 
   return parts.join(' • ');
-}
-
-function shouldAlertForPremiumRegionDegradation(analysis: PremiumRegionAnalysis) {
-  if (analysis.currentSummary && ['SLOW', 'DOWN'].includes(analysis.currentSummary.status || '')) {
-    return true;
-  }
-
-  const preferredSummaries = analysis.regionSummaries.filter((entry) =>
-    analysis.preferredRegions.includes(entry.regionCode),
-  );
-
-  return (
-    preferredSummaries.length > 0 &&
-    preferredSummaries.some((entry) => ['SLOW', 'DOWN'].includes(entry.status || '')) &&
-    preferredSummaries.every((entry) => entry.status !== 'UP')
-  );
 }
 
 export async function createTelegramPremiumSupportRequestRecord(input: {
@@ -1058,7 +921,7 @@ export async function handlePremiumRegionStatusCommand(input: {
   const lines = [ui.premiumRegionStatusTitle, '', ui.premiumRegionStatusHint, ''];
 
   for (const key of dynamicKeys.slice(0, 4)) {
-    const analysis = summarizeTelegramPremiumRegions(key, healthByServerId);
+    const analysis = summarizePremiumRegions(key, healthByServerId);
 
     lines.push(`• <b>${escapeHtml(key.name)}</b>`);
     lines.push(
@@ -1131,6 +994,121 @@ export async function handlePremiumRegionStatusCommand(input: {
   return sent ? null : message;
 }
 
+const PREMIUM_REGION_LOOKBACK_MS = 48 * 60 * 60_000;
+const PREMIUM_REGION_DEGRADE_CONFIRM_MS = 30 * 60_000;
+const PREMIUM_REGION_AUTO_FALLBACK_MINUTES = 8 * 60;
+
+type PremiumRegionCycleEvent = {
+  id: string;
+  dynamicAccessKeyId: string;
+  eventType: string;
+  createdAt: Date;
+  reason: string;
+  metadata: Record<string, unknown> | null;
+};
+
+function parsePremiumRegionEventMetadata(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function getPremiumCycleEventsForKey(
+  eventsByKeyId: Map<string, PremiumRegionCycleEvent[]>,
+  dynamicAccessKeyId: string,
+) {
+  return eventsByKeyId.get(dynamicAccessKeyId) ?? [];
+}
+
+function getLatestPremiumCycleEvent(
+  events: PremiumRegionCycleEvent[],
+  eventType: string,
+) {
+  return events.find((event) => event.eventType === eventType) ?? null;
+}
+
+function getActiveAutoFallbackEvent(input: {
+  events: PremiumRegionCycleEvent[];
+  pinnedAccessKeyId: string | null;
+  pinnedServerId: string | null;
+}) {
+  return input.events.find((event) => {
+    if (event.eventType !== DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED) {
+      return false;
+    }
+    const metadata = event.metadata || {};
+    const metadataServerId =
+      typeof metadata.pinnedServerId === 'string' ? metadata.pinnedServerId : null;
+    const metadataAccessKeyId =
+      typeof metadata.pinnedAccessKeyId === 'string' ? metadata.pinnedAccessKeyId : null;
+
+    return (
+      (!!input.pinnedServerId && metadataServerId === input.pinnedServerId) ||
+      (!!input.pinnedAccessKeyId && metadataAccessKeyId === input.pinnedAccessKeyId)
+    );
+  }) ?? null;
+}
+
+async function applyTelegramPremiumFallbackPin(input: {
+  key: PremiumMessagingKey;
+  target: PremiumFallbackTarget;
+  analysis: PremiumRegionAnalysis;
+  incidentKey: string;
+  locale: SupportedLocale;
+}) {
+  const pinnedAt = new Date();
+  const pinExpiresAt = new Date(pinnedAt.getTime() + PREMIUM_REGION_AUTO_FALLBACK_MINUTES * 60_000);
+  await db.dynamicAccessKey.update({
+    where: { id: input.key.id },
+    data: {
+      pinnedAccessKeyId: input.target.accessKeyId,
+      pinnedServerId: input.target.serverId,
+      pinnedAt,
+      pinExpiresAt,
+    },
+  });
+
+  await recordDynamicRoutingEvent({
+    dynamicAccessKeyId: input.key.id,
+    eventType: DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED,
+    severity: input.analysis.currentSummary?.status === 'DOWN' ? 'CRITICAL' : 'WARNING',
+    reason: `Pinned premium routing to fallback ${input.target.serverName} (${input.target.regionCode}) while ${input.analysis.currentSummary?.regionCode || 'preferred'} routing remains degraded.`,
+    fromServerId: input.analysis.currentServer?.id || null,
+    fromServerName: input.analysis.currentServer?.name || null,
+    toKeyId: input.target.accessKeyId,
+    toKeyName: input.target.accessKeyName,
+    toServerId: input.target.serverId,
+    toServerName: input.target.serverName,
+    metadata: {
+      incidentKey: input.incidentKey,
+      preferredRegions: input.analysis.preferredRegions,
+      impactedRegionCode: getPremiumIncidentRegionCode(input.analysis),
+      fallbackRegionCode: input.target.regionCode,
+      pinnedServerId: input.target.serverId,
+      pinnedAccessKeyId: input.target.accessKeyId,
+      serverName: input.target.serverName,
+      accessKeyName: input.target.accessKeyName,
+      pinExpiresAt: pinExpiresAt.toISOString(),
+      automatic: true,
+      locale: input.locale,
+    },
+  });
+
+  return {
+    pinnedAt,
+    pinExpiresAt,
+  };
+}
+
 function buildTelegramPremiumRegionAlertMessage(input: {
   locale: SupportedLocale;
   keyName: string;
@@ -1172,6 +1150,82 @@ function buildTelegramPremiumRegionAlertMessage(input: {
   return lines.join('\n');
 }
 
+function buildTelegramPremiumFallbackMessage(input: {
+  locale: SupportedLocale;
+  keyName: string;
+  analysis: PremiumRegionAnalysis;
+  target: PremiumFallbackTarget;
+  pinExpiresAt: Date;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const preferredLabel = input.analysis.preferredRegions.length
+    ? input.analysis.preferredRegions.join(', ')
+    : (input.analysis.currentSummary?.regionCode || ui.premiumRegionUnknownStatus);
+
+  return [
+    ui.premiumRegionFallbackTitle,
+    '',
+    `• <b>${escapeHtml(input.keyName)}</b>`,
+    `${ui.premiumRegionPreferredLabel}: ${escapeHtml(preferredLabel)}`,
+    `${ui.premiumRegionAlertCurrentLabel}: ${
+      input.analysis.currentSummary
+        ? escapeHtml(formatPremiumRegionSummaryLine(input.analysis.currentSummary, ui))
+        : escapeHtml(ui.premiumRegionUnknownStatus)
+    }`,
+    `${ui.premiumRegionFallbackAppliedLabel}: <b>${escapeHtml(
+      `${getFlagEmoji(input.target.regionCode)} ${input.target.regionCode} • ${input.target.serverName}`,
+    )}</b>`,
+    `${ui.premiumRegionFallbackUntilLabel}: ${escapeHtml(
+      formatTelegramDateTime(input.pinExpiresAt, input.locale),
+    )}`,
+    '',
+    ui.premiumRegionFallbackHint,
+  ].join('\n');
+}
+
+function buildTelegramPremiumRecoveryMessage(input: {
+  locale: SupportedLocale;
+  keyName: string;
+  analysis: PremiumRegionAnalysis;
+  currentPinnedRegionCode?: string | null;
+  currentPinnedServerName?: string | null;
+  recoveryMinutes?: number | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const healthyPreferred = getPremiumHealthyPreferredRegions(input.analysis);
+  const preferredLabel = healthyPreferred.length > 0
+    ? healthyPreferred.join(', ')
+    : (input.analysis.preferredRegions.join(', ') || ui.premiumRegionUnknownStatus);
+
+  const lines = [
+    ui.premiumRegionRecoveredTitle,
+    '',
+    `• <b>${escapeHtml(input.keyName)}</b>`,
+    `${ui.premiumRegionRecoveredLabel}: <b>${escapeHtml(preferredLabel)}</b>`,
+  ];
+
+  if (input.currentPinnedRegionCode || input.currentPinnedServerName) {
+    lines.push(
+      `${ui.premiumRegionCurrentFallbackLabel}: <b>${escapeHtml(
+        [
+          input.currentPinnedRegionCode ? `${getFlagEmoji(input.currentPinnedRegionCode)} ${input.currentPinnedRegionCode}` : null,
+          input.currentPinnedServerName || null,
+        ]
+          .filter(Boolean)
+          .join(' • '),
+      )}</b>`,
+    );
+  }
+
+  if (typeof input.recoveryMinutes === 'number' && Number.isFinite(input.recoveryMinutes)) {
+    lines.push(`${ui.premiumRegionRecoveryTimeLabel}: ${escapeHtml(`${Math.max(1, Math.round(input.recoveryMinutes))} min`)}`);
+  }
+
+  lines.push('', ui.premiumRegionRecoveredHint);
+
+  return lines.join('\n');
+}
+
 export async function runTelegramPremiumRegionAlertCycle() {
   const config = await getTelegramConfig();
   if (!config?.botToken) {
@@ -1180,6 +1234,8 @@ export async function runTelegramPremiumRegionAlertCycle() {
       scanned: 0,
       alerted: 0,
       deduped: 0,
+      fallbackPinned: 0,
+      recovered: 0,
       skippedNoDestination: 0,
       skippedPreferences: 0,
       skippedHealthy: 0,
@@ -1188,7 +1244,9 @@ export async function runTelegramPremiumRegionAlertCycle() {
   }
 
   const supportLink = await getTelegramSupportLink();
-  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60_000);
+  const now = new Date();
+  const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60_000);
+  const lookbackCutoff = new Date(now.getTime() - PREMIUM_REGION_LOOKBACK_MS);
   const premiumKeys = await db.dynamicAccessKey.findMany({
     where: {
       status: 'ACTIVE',
@@ -1211,6 +1269,7 @@ export async function runTelegramPremiumRegionAlertCycle() {
       },
     },
   });
+  const premiumKeyIds = premiumKeys.map((key) => key.id);
 
   const allServerIds = Array.from(
     new Set(
@@ -1243,12 +1302,56 @@ export async function runTelegramPremiumRegionAlertCycle() {
       })
     : [];
   const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+  const recentEvents = premiumKeyIds.length
+    ? await db.dynamicRoutingEvent.findMany({
+        where: {
+          dynamicAccessKeyId: { in: premiumKeyIds },
+          eventType: {
+            in: [
+              DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+              DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED,
+              DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED,
+              DYNAMIC_ROUTING_EVENT_TYPES.PIN_CLEARED,
+            ],
+          },
+          createdAt: { gte: lookbackCutoff },
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          dynamicAccessKeyId: true,
+          eventType: true,
+          createdAt: true,
+          reason: true,
+          metadata: true,
+        },
+      })
+    : [];
+  const eventsByKeyId = new Map<string, PremiumRegionCycleEvent[]>();
+  for (const event of recentEvents) {
+    const mapped: PremiumRegionCycleEvent = {
+      id: event.id,
+      dynamicAccessKeyId: event.dynamicAccessKeyId,
+      eventType: event.eventType,
+      createdAt: event.createdAt,
+      reason: event.reason,
+      metadata: parsePremiumRegionEventMetadata(event.metadata),
+    };
+    const list = eventsByKeyId.get(event.dynamicAccessKeyId);
+    if (list) {
+      list.push(mapped);
+    } else {
+      eventsByKeyId.set(event.dynamicAccessKeyId, [mapped]);
+    }
+  }
 
   const result = {
     skipped: false,
     scanned: premiumKeys.length,
     alerted: 0,
     deduped: 0,
+    fallbackPinned: 0,
+    recovered: 0,
     skippedNoDestination: 0,
     skippedPreferences: 0,
     skippedHealthy: 0,
@@ -1263,91 +1366,242 @@ export async function runTelegramPremiumRegionAlertCycle() {
         continue;
       }
 
-      const preferences = await getTelegramNotificationPreferences({
-        telegramUserId: key.telegramId || String(destinationChatId),
-        telegramChatId: String(destinationChatId),
-      });
-      if (!preferences.maintenance && !preferences.support) {
-        result.skippedPreferences += 1;
-        continue;
-      }
-
-      const analysis = summarizeTelegramPremiumRegions(key, healthByServerId);
-      if (!shouldAlertForPremiumRegionDegradation(analysis)) {
-        result.skippedHealthy += 1;
-        continue;
-      }
-
-      const existing = await db.dynamicRoutingEvent.findFirst({
-        where: {
-          dynamicAccessKeyId: key.id,
-          eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
-          createdAt: { gte: sixHoursAgo },
-        },
-        select: { id: true },
-      });
-      if (existing) {
-        result.deduped += 1;
-        continue;
-      }
-
       const locale = await resolveTelegramLocaleForRecipient({
         telegramUserId: key.telegramId || String(destinationChatId),
         telegramChatId: String(destinationChatId),
         fallbackLocale: 'en',
       });
-      const alertText = buildTelegramPremiumRegionAlertMessage({
-        locale,
-        keyName: key.name,
-        analysis,
+      const ui = getTelegramUi(locale);
+      const preferences = await getTelegramNotificationPreferences({
+        telegramUserId: key.telegramId || String(destinationChatId),
+        telegramChatId: String(destinationChatId),
       });
-      const alertKeyboard =
-        analysis.suggestedFallbacks.length > 0 || analysis.preferredRegions.length > 0
-          ? buildTelegramDynamicPremiumRegionKeyboard({
-              dynamicAccessKeyId: key.id,
-              locale,
-              regionCodes:
-                (analysis.suggestedFallbacks.length > 0
-                  ? analysis.suggestedFallbacks.map((entry) => entry.regionCode)
-                  : analysis.preferredRegions
-                ).slice(0, 6),
-              supportLink,
-            })
-          : supportLink
-            ? { inline_keyboard: [[{ text: getTelegramUi(locale).getSupport, url: supportLink }]] }
-            : undefined;
+      const canSendOperationalNotice = preferences.maintenance || preferences.support;
+      if (!canSendOperationalNotice) {
+        result.skippedPreferences += 1;
+      }
 
-      const sent = await sendTelegramMessage(config.botToken, destinationChatId, alertText, {
-        replyMarkup: alertKeyboard,
-        disableWebPagePreview: true,
+      const analysis = summarizePremiumRegions(key, healthByServerId);
+      const pinState = await resolveDynamicPinState({
+        dynamicAccessKeyId: key.id,
+        pinnedAccessKeyId: key.pinnedAccessKeyId,
+        pinnedServerId: key.pinnedServerId,
+        pinnedAt: key.pinnedAt,
+        pinExpiresAt: key.pinExpiresAt,
       });
-      if (!sent) {
-        result.errors.push(`Failed to send premium region alert for ${key.id}`);
+      const keyEvents = getPremiumCycleEventsForKey(eventsByKeyId, key.id);
+      const latestDegraded = getLatestPremiumCycleEvent(
+        keyEvents,
+        DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+      );
+      const latestRecovered = getLatestPremiumCycleEvent(
+        keyEvents,
+        DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED,
+      );
+      const activeAutoFallback = getActiveAutoFallbackEvent({
+        events: keyEvents,
+        pinnedAccessKeyId: pinState.pinnedAccessKeyId,
+        pinnedServerId: pinState.pinnedServerId,
+      });
+
+      if (!shouldAlertForPremiumRegionDegradation(analysis)) {
+        const healthyPreferredRegions = getPremiumHealthyPreferredRegions(analysis);
+        const degradationStillOpen =
+          latestDegraded &&
+          (!latestRecovered || latestRecovered.createdAt < latestDegraded.createdAt);
+
+        if (!degradationStillOpen || healthyPreferredRegions.length === 0) {
+          result.skippedHealthy += 1;
+          continue;
+        }
+
+        const preferredRegionCode = healthyPreferredRegions[0];
+        const recoveryMinutes = Math.max(
+          1,
+          Math.round((now.getTime() - latestDegraded.createdAt.getTime()) / 60_000),
+        );
+        const autoFallbackMetadata = activeAutoFallback?.metadata || {};
+        const currentPinnedRegionCode =
+          typeof autoFallbackMetadata.fallbackRegionCode === 'string'
+            ? autoFallbackMetadata.fallbackRegionCode
+            : null;
+        const currentPinnedServerName =
+          typeof autoFallbackMetadata.toServerName === 'string'
+            ? autoFallbackMetadata.toServerName
+            : (typeof autoFallbackMetadata.serverName === 'string' ? autoFallbackMetadata.serverName : null);
+
+        const incidentKey =
+          typeof latestDegraded.metadata?.incidentKey === 'string'
+            ? latestDegraded.metadata.incidentKey
+            : buildPremiumIncidentKey(preferredRegionCode, latestDegraded.createdAt);
+        let alertedViaTelegram = false;
+        if (canSendOperationalNotice) {
+          const recoveryMessage = buildTelegramPremiumRecoveryMessage({
+            locale,
+            keyName: key.name,
+            analysis,
+            currentPinnedRegionCode,
+            currentPinnedServerName,
+            recoveryMinutes,
+          });
+          const recoveryKeyboard =
+            healthyPreferredRegions.length > 0 || supportLink
+              ? buildTelegramDynamicPremiumRegionKeyboard({
+                  dynamicAccessKeyId: key.id,
+                  locale,
+                  regionCodes: healthyPreferredRegions.length > 0 ? healthyPreferredRegions : analysis.preferredRegions,
+                  supportLink,
+                })
+              : undefined;
+          const sent = await sendTelegramMessage(config.botToken, destinationChatId, recoveryMessage, {
+            replyMarkup: recoveryKeyboard,
+            disableWebPagePreview: true,
+          });
+          if (!sent) {
+            result.errors.push(`Failed to send premium recovery notice for ${key.id}`);
+          } else {
+            alertedViaTelegram = true;
+          }
+        }
+
+        await recordDynamicRoutingEvent({
+          dynamicAccessKeyId: key.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED,
+          severity: 'INFO',
+          reason: `Preferred premium region ${preferredRegionCode} is healthy again after ${recoveryMinutes} minutes.`,
+          fromServerId: pinState.pinnedServerId,
+          toServerId: pinState.pinnedServerId,
+          toServerName: currentPinnedServerName,
+          metadata: {
+            incidentKey,
+            preferredRegionCode,
+            healthyPreferredRegions,
+            currentPinnedRegionCode,
+            currentPinnedServerName,
+            recoveryMinutes,
+            suggestedMoveBackRegions: healthyPreferredRegions,
+            alertedViaTelegram,
+          },
+        });
+        result.recovered += 1;
         continue;
       }
 
-      await recordDynamicRoutingEvent({
-        dynamicAccessKeyId: key.id,
-        eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
-        severity: analysis.currentSummary?.status === 'DOWN' ? 'CRITICAL' : 'WARNING',
-        reason: analysis.currentSummary
-          ? `Preferred/current premium region degraded: ${formatPremiumRegionSummaryLine(analysis.currentSummary, getTelegramUi(locale))}`
-          : 'Preferred premium routing region degraded.',
-        metadata: {
-          destinationChatId: String(destinationChatId),
-          currentRegionCode: analysis.currentSummary?.regionCode || null,
-          currentStatus: analysis.currentSummary?.status || null,
-          currentLatencyMs: analysis.currentSummary?.latencyMs ?? null,
-          preferredRegions: analysis.preferredRegions,
-          suggestedFallbackRegions: analysis.suggestedFallbacks.map((entry) => entry.regionCode),
-          alertedViaTelegram: true,
-        },
+      if (!latestDegraded || latestDegraded.createdAt < sixHoursAgo) {
+        const incidentKey = buildPremiumIncidentKey(getPremiumIncidentRegionCode(analysis), now);
+        let alertedViaTelegram = false;
+        if (canSendOperationalNotice) {
+          const alertText = buildTelegramPremiumRegionAlertMessage({
+            locale,
+            keyName: key.name,
+            analysis,
+          });
+          const alertKeyboard =
+            analysis.suggestedFallbacks.length > 0 || analysis.preferredRegions.length > 0
+              ? buildTelegramDynamicPremiumRegionKeyboard({
+                  dynamicAccessKeyId: key.id,
+                  locale,
+                  regionCodes:
+                    (analysis.suggestedFallbacks.length > 0
+                      ? analysis.suggestedFallbacks.map((entry) => entry.regionCode)
+                      : analysis.preferredRegions
+                    ).slice(0, 6),
+                  supportLink,
+                })
+              : supportLink
+                ? { inline_keyboard: [[{ text: ui.getSupport, url: supportLink }]] }
+                : undefined;
+
+          const sent = await sendTelegramMessage(config.botToken, destinationChatId, alertText, {
+            replyMarkup: alertKeyboard,
+            disableWebPagePreview: true,
+          });
+          if (!sent) {
+            result.errors.push(`Failed to send premium region alert for ${key.id}`);
+          } else {
+            alertedViaTelegram = true;
+            result.alerted += 1;
+          }
+        }
+
+        await recordDynamicRoutingEvent({
+          dynamicAccessKeyId: key.id,
+          eventType: DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED,
+          severity: analysis.currentSummary?.status === 'DOWN' ? 'CRITICAL' : 'WARNING',
+          reason: analysis.currentSummary
+            ? `Preferred/current premium region degraded: ${formatPremiumRegionSummaryLine(analysis.currentSummary, ui)}`
+            : 'Preferred premium routing region degraded.',
+          metadata: {
+            incidentKey,
+            destinationChatId: String(destinationChatId),
+            currentRegionCode: analysis.currentSummary?.regionCode || null,
+            currentStatus: analysis.currentSummary?.status || null,
+            currentLatencyMs: analysis.currentSummary?.latencyMs ?? null,
+            preferredRegions: analysis.preferredRegions,
+            suggestedFallbackRegions: analysis.suggestedFallbacks.map((entry) => entry.regionCode),
+            alertedViaTelegram,
+          },
+        });
+        await db.dynamicAccessKey.update({
+          where: { id: key.id },
+          data: { lastRoutingAlertAt: now },
+        });
+        continue;
+      }
+
+      result.deduped += 1;
+      const degradationStillOpen =
+        !latestRecovered || latestRecovered.createdAt < latestDegraded.createdAt;
+      const degradedLongEnough =
+        degradationStillOpen &&
+        now.getTime() - latestDegraded.createdAt.getTime() >= PREMIUM_REGION_DEGRADE_CONFIRM_MS;
+      const hasPinnedBackend = Boolean(pinState.pinnedAccessKeyId || pinState.pinnedServerId);
+      const hasManualPin = hasPinnedBackend && !activeAutoFallback;
+      const fallbackTarget = selectPremiumFallbackTarget(key, healthByServerId, analysis);
+
+      if (!degradedLongEnough || !fallbackTarget || hasManualPin || activeAutoFallback) {
+        continue;
+      }
+
+      const incidentKey =
+        typeof latestDegraded.metadata?.incidentKey === 'string'
+          ? latestDegraded.metadata.incidentKey
+          : buildPremiumIncidentKey(getPremiumIncidentRegionCode(analysis), latestDegraded.createdAt);
+      const { pinExpiresAt } = await applyTelegramPremiumFallbackPin({
+        key,
+        target: fallbackTarget,
+        analysis,
+        incidentKey,
+        locale,
       });
+
+      if (canSendOperationalNotice) {
+        const fallbackMessage = buildTelegramPremiumFallbackMessage({
+          locale,
+          keyName: key.name,
+          analysis,
+          target: fallbackTarget,
+          pinExpiresAt,
+        });
+        const fallbackKeyboard = buildTelegramDynamicPremiumSupportKeyboard(
+          key.id,
+          locale,
+          supportLink,
+        );
+        const sent = await sendTelegramMessage(config.botToken, destinationChatId, fallbackMessage, {
+          replyMarkup: fallbackKeyboard,
+          disableWebPagePreview: true,
+        });
+        if (!sent) {
+          result.errors.push(`Failed to send premium fallback notice for ${key.id}`);
+        }
+      }
+
       await db.dynamicAccessKey.update({
         where: { id: key.id },
-        data: { lastRoutingAlertAt: new Date() },
+        data: { lastRoutingAlertAt: now },
       });
-      result.alerted += 1;
+      result.fallbackPinned += 1;
     } catch (error) {
       result.errors.push(error instanceof Error ? error.message : 'Unknown premium region alert error');
     }

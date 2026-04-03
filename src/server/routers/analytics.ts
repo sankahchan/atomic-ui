@@ -84,6 +84,21 @@ function buildCsv(rows: Array<Record<string, unknown>>) {
   return lines.join('\n');
 }
 
+function parseJsonRecord(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export const analyticsRouter = router({
   /**
    * Get traffic statistics for a specific key (legacy endpoint).
@@ -1009,7 +1024,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions] = await Promise.all([
+      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions, premiumRoutingEvents] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -1134,6 +1149,25 @@ export const analyticsRouter = router({
             redeemedAt: true,
           },
         }),
+        db.dynamicRoutingEvent.findMany({
+          where: {
+            createdAt: { gte: cutoff },
+            eventType: {
+              in: [
+                'PREFERRED_REGION_DEGRADED',
+                'AUTO_FALLBACK_PIN_APPLIED',
+                'PREFERRED_REGION_RECOVERED',
+              ],
+            },
+          },
+          select: {
+            id: true,
+            dynamicAccessKeyId: true,
+            eventType: true,
+            metadata: true,
+            createdAt: true,
+          },
+        }),
       ]);
 
       const summary = {
@@ -1232,6 +1266,10 @@ export const analyticsRouter = router({
       const premiumRevenueByCurrency = new Map<string, number>();
       const premiumRegionDemand = new Map<string, number>();
       const premiumRouteIssuesByServer = new Map<string, { label: string; count: number }>();
+      const premiumDegradedRegions = new Map<string, number>();
+      const premiumFallbackRegions = new Map<string, number>();
+      const premiumRecoveryTimesByRegion = new Map<string, { totalMinutes: number; count: number }>();
+      const premiumIncidentImpact = new Map<string, { incidentKey: string; regionCode: string; startedAt: Date; affectedKeys: Set<string> }>();
       const premiumActiveUsers = new Set<string>();
       const premiumActiveDynamicKeys = new Set<string>();
       let premiumFirstResponseMinutesTotal = 0;
@@ -1575,6 +1613,62 @@ export const analyticsRouter = router({
         premiumRouteIssuesByServer.set(serverKey, current);
       }
 
+      for (const event of premiumRoutingEvents) {
+        const metadata = parseJsonRecord(event.metadata);
+        const currentRegionCode =
+          typeof metadata?.currentRegionCode === 'string'
+            ? metadata.currentRegionCode.trim().toUpperCase()
+            : null;
+        const fallbackRegionCode =
+          typeof metadata?.fallbackRegionCode === 'string'
+            ? metadata.fallbackRegionCode.trim().toUpperCase()
+            : null;
+        const preferredRegionCode =
+          typeof metadata?.preferredRegionCode === 'string'
+            ? metadata.preferredRegionCode.trim().toUpperCase()
+            : null;
+        const recoveryMinutes =
+          typeof metadata?.recoveryMinutes === 'number' ? metadata.recoveryMinutes : null;
+        const incidentKey =
+          typeof metadata?.incidentKey === 'string'
+            ? metadata.incidentKey
+            : `${currentRegionCode || preferredRegionCode || 'AUTO'}:${Math.floor(event.createdAt.getTime() / (6 * 60 * 60_000))}`;
+
+        if (event.eventType === 'PREFERRED_REGION_DEGRADED') {
+          const regionKey = currentRegionCode || preferredRegionCode || 'AUTO';
+          premiumDegradedRegions.set(regionKey, (premiumDegradedRegions.get(regionKey) || 0) + 1);
+          const currentIncident = premiumIncidentImpact.get(incidentKey) || {
+            incidentKey,
+            regionCode: regionKey,
+            startedAt: event.createdAt,
+            affectedKeys: new Set<string>(),
+          };
+          currentIncident.affectedKeys.add(event.dynamicAccessKeyId);
+          if (event.createdAt.getTime() < currentIncident.startedAt.getTime()) {
+            currentIncident.startedAt = event.createdAt;
+          }
+          premiumIncidentImpact.set(incidentKey, currentIncident);
+        }
+
+        if (event.eventType === 'AUTO_FALLBACK_PIN_APPLIED' && fallbackRegionCode) {
+          premiumFallbackRegions.set(
+            fallbackRegionCode,
+            (premiumFallbackRegions.get(fallbackRegionCode) || 0) + 1,
+          );
+        }
+
+        if (event.eventType === 'PREFERRED_REGION_RECOVERED' && recoveryMinutes !== null) {
+          const regionKey = preferredRegionCode || currentRegionCode || 'AUTO';
+          const currentRecovery = premiumRecoveryTimesByRegion.get(regionKey) || {
+            totalMinutes: 0,
+            count: 0,
+          };
+          currentRecovery.totalMinutes += recoveryMinutes;
+          currentRecovery.count += 1;
+          premiumRecoveryTimesByRegion.set(regionKey, currentRecovery);
+        }
+      }
+
       for (const coupon of couponRedemptions) {
         const campaignType = coupon.campaignType || 'UNKNOWN';
         const currentCampaign = couponCampaigns.get(campaignType) || {
@@ -1781,6 +1875,40 @@ export const analyticsRouter = router({
           routeIssuesByServer: Array.from(premiumRouteIssuesByServer.values()).sort(
             (left, right) => right.count - left.count,
           ),
+          mostDegradedRegions: Array.from(premiumDegradedRegions.entries())
+            .map(([region, count]) => ({ region, count }))
+            .sort((left, right) => right.count - left.count)
+            .slice(0, input.limit),
+          mostRequestedFallbackRegions: Array.from(premiumFallbackRegions.entries())
+            .map(([region, count]) => ({ region, count }))
+            .sort((left, right) => right.count - left.count)
+            .slice(0, input.limit),
+          recoveryTimeByRegion: Array.from(premiumRecoveryTimesByRegion.entries())
+            .map(([region, entry]) => ({
+              region,
+              avgMinutes: entry.count > 0 ? entry.totalMinutes / entry.count : null,
+              recoveries: entry.count,
+            }))
+            .sort((left, right) => (right.recoveries !== left.recoveries ? right.recoveries - left.recoveries : (left.avgMinutes ?? 0) - (right.avgMinutes ?? 0)))
+            .slice(0, input.limit),
+          affectedUsersByIncident: Array.from(premiumIncidentImpact.values())
+            .map((incident) => ({
+              incidentKey: incident.incidentKey,
+              region: incident.regionCode,
+              startedAt: incident.startedAt,
+              affectedUsers: incident.affectedKeys.size,
+            }))
+            .sort((left, right) => {
+              if (right.affectedUsers !== left.affectedUsers) {
+                return right.affectedUsers - left.affectedUsers;
+              }
+              return right.startedAt.getTime() - left.startedAt.getTime();
+            })
+            .slice(0, input.limit)
+            .map((incident) => ({
+              ...incident,
+              startedAt: incident.startedAt.toISOString(),
+            })),
         },
       };
     }),

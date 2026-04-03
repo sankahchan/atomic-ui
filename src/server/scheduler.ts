@@ -299,9 +299,9 @@ export function initScheduler() {
     cron.schedule('*/15 * * * *', async () => {
         try {
             const result = await runTelegramPremiumRegionAlertCycle();
-            if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
+            if (!result.skipped && (result.alerted > 0 || result.fallbackPinned > 0 || result.recovered > 0 || result.errors.length > 0)) {
                 logger.info(
-                    `Premium region alerts: ${result.alerted} alerted, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
+                    `Premium region alerts: ${result.alerted} alerted, ${result.fallbackPinned} fallback-pinned, ${result.recovered} recovered, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {
@@ -385,9 +385,9 @@ export function initScheduler() {
 
         try {
             const result = await runTelegramPremiumRegionAlertCycle();
-            if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
+            if (!result.skipped && (result.alerted > 0 || result.fallbackPinned > 0 || result.recovered > 0 || result.errors.length > 0)) {
                 logger.info(
-                    `Initial premium region alert cycle: ${result.alerted} alerted, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
+                    `Initial premium region alert cycle: ${result.alerted} alerted, ${result.fallbackPinned} fallback-pinned, ${result.recovered} recovered, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
                 );
             }
         } catch (error) {
