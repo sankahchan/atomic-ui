@@ -70,6 +70,8 @@ function CouponLifecycleBadge({
     | 'COOLDOWN'
     | 'RECENT_REFUND'
     | 'SUPPORT_HEAVY'
+    | 'MANUAL_BLOCK'
+    | 'MANUAL_ALLOW'
     | 'CONVERTED'
     | 'DISABLED'
     | 'LIMIT_REACHED';
@@ -81,6 +83,8 @@ function CouponLifecycleBadge({
     CANCELLED: 'Revoked',
     ELIGIBLE: 'Eligible',
     ACTIVE_COUPON: 'Active coupon',
+    MANUAL_BLOCK: 'Suppressed',
+    MANUAL_ALLOW: 'Force allow',
     PAUSED: 'Paused',
     COOLDOWN: 'Cooling down',
     RECENT_REFUND: 'Recent refund',
@@ -98,9 +102,11 @@ function CouponLifecycleBadge({
           ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
           : status === 'RECENT_REFUND' || status === 'SUPPORT_HEAVY'
             ? 'border-orange-500/30 bg-orange-500/10 text-orange-100'
-            : status === 'EXPIRED' || status === 'LIMIT_REACHED'
-              ? 'border-zinc-500/30 bg-zinc-500/10 text-zinc-200'
-              : status === 'DISABLED'
+            : status === 'MANUAL_ALLOW'
+              ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100'
+              : status === 'EXPIRED' || status === 'LIMIT_REACHED'
+                ? 'border-zinc-500/30 bg-zinc-500/10 text-zinc-200'
+                : status === 'DISABLED'
                 ? 'border-border/60 bg-background/50 text-muted-foreground'
                 : 'border-red-500/30 bg-red-500/10 text-red-200';
 
@@ -272,6 +278,23 @@ export default function UserLedgerPage() {
     onError: (error) => {
       toast({
         title: 'Customer tags failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updatePromoEligibilityOverrideMutation = trpc.users.updatePromoEligibilityOverride.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Promo override saved',
+        description: 'Customer promo eligibility was updated.',
+      });
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Promo override failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -1219,7 +1242,9 @@ export default function UserLedgerPage() {
                         </div>
                         <CouponLifecycleBadge
                           status={
-                            campaign.blockedReason
+                            campaign.overrideMode === 'FORCE_ALLOW'
+                              ? 'MANUAL_ALLOW'
+                              : campaign.blockedReason
                               ? campaign.blockedReason
                               : campaign.eligibleNow
                                 ? 'ELIGIBLE'
@@ -1258,8 +1283,12 @@ export default function UserLedgerPage() {
                           ? 'This campaign is disabled in Telegram sales settings.'
                           : campaign.paused
                             ? 'This campaign is paused and will not issue new coupons.'
+                            : campaign.blockedReason === 'MANUAL_BLOCK'
+                              ? 'This campaign is manually suppressed for this customer.'
                             : campaign.blockedReason === 'ACTIVE_COUPON'
                               ? 'This customer already has an active coupon for this campaign.'
+                              : campaign.overrideMode === 'FORCE_ALLOW'
+                                ? 'This customer is manually allowed to receive this campaign even when automatic promo rules would normally block it.'
                               : campaign.blockedReason === 'CONVERTED'
                                 ? 'This customer already converted, so this campaign stops automatically.'
                                 : campaign.blockedReason === 'COOLDOWN'
@@ -1272,6 +1301,63 @@ export default function UserLedgerPage() {
                                         ? 'This customer already used the maximum number of coupons for this campaign.'
                                         : 'This customer can receive this promo if they enter the matching campaign segment.'}
                       </p>
+                      {campaign.overrideMode ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Manual override: {campaign.overrideMode === 'FORCE_ALLOW' ? 'Force allow' : 'Suppress'}
+                          {campaign.overrideUpdatedByEmail ? ` by ${campaign.overrideUpdatedByEmail}` : ''}
+                          {campaign.overrideUpdatedAt ? ` • ${formatRelativeTime(campaign.overrideUpdatedAt)}` : ''}
+                          {campaign.overrideNote ? ` • ${campaign.overrideNote}` : ''}
+                        </p>
+                      ) : null}
+                      {crmPermissions.canManagePromoOverrides ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={campaign.overrideMode === 'FORCE_ALLOW' ? 'default' : 'outline'}
+                            disabled={updatePromoEligibilityOverrideMutation.isPending}
+                            onClick={() =>
+                              updatePromoEligibilityOverrideMutation.mutate({
+                                userId,
+                                campaignType: campaign.campaignType,
+                                mode: 'FORCE_ALLOW',
+                              })
+                            }
+                          >
+                            Force allow
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={campaign.overrideMode === 'FORCE_BLOCK' ? 'destructive' : 'outline'}
+                            disabled={updatePromoEligibilityOverrideMutation.isPending}
+                            onClick={() =>
+                              updatePromoEligibilityOverrideMutation.mutate({
+                                userId,
+                                campaignType: campaign.campaignType,
+                                mode: 'FORCE_BLOCK',
+                              })
+                            }
+                          >
+                            Suppress
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={updatePromoEligibilityOverrideMutation.isPending || !campaign.overrideMode}
+                            onClick={() =>
+                              updatePromoEligibilityOverrideMutation.mutate({
+                                userId,
+                                campaignType: campaign.campaignType,
+                                mode: 'DEFAULT',
+                              })
+                            }
+                          >
+                            Use rules
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>

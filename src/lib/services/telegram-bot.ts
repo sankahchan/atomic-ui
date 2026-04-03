@@ -103,6 +103,7 @@ import {
   getTelegramCampaignCouponTypeFromSource,
   issueTelegramCampaignCoupon,
   redeemTelegramCouponForOrder,
+  type TelegramCouponAvailabilityReason,
   type TelegramCampaignCouponType,
 } from '@/lib/services/telegram-coupons';
 import {
@@ -1499,12 +1500,37 @@ function buildTelegramCouponReadyLines(input: {
   couponDiscountAmount?: number | null;
   priceCurrency?: string | null;
   couponDiscountLabel?: string | null;
+  unavailableReason?: TelegramCouponAvailabilityReason | null;
+  requestedCouponCode?: string | null;
 }) {
+  const ui = getTelegramUi(input.locale);
+
   if (!input.couponCode) {
-    return [];
+    if (!input.unavailableReason) {
+      return [];
+    }
+
+    const requestedCode = input.requestedCouponCode?.trim()
+      ? escapeHtml(input.requestedCouponCode.trim())
+      : null;
+    const unavailableLine =
+      input.unavailableReason === 'EXPIRED'
+        ? ui.couponUnavailableExpired(requestedCode)
+        : input.unavailableReason === 'REVOKED'
+          ? ui.couponUnavailableRevoked(requestedCode)
+          : input.unavailableReason === 'CONSUMED'
+            ? ui.couponUnavailableConsumed(requestedCode)
+            : input.unavailableReason === 'MANUAL_BLOCK'
+              ? ui.couponUnavailableBlocked(requestedCode)
+              : ui.couponUnavailableNotFound(requestedCode);
+
+    return [
+      '',
+      unavailableLine,
+      ui.couponUnavailableContinueHint,
+    ].filter(Boolean);
   }
 
-  const ui = getTelegramUi(input.locale);
   const discountLabel = input.couponDiscountLabel?.trim()
     || formatTelegramSalesMoneyAmount(
       input.couponDiscountAmount ?? null,
@@ -1811,12 +1837,30 @@ async function sendTelegramRenewalPlanSelection(input: {
     deliveryType: input.targetKey.kind === 'dynamic' ? 'DYNAMIC_KEY' : 'ACCESS_KEY',
   });
 
+  const existingOrder = await db.telegramOrder.findUnique({
+    where: { id: input.orderId },
+    select: {
+      retentionSource: true,
+    },
+  });
+  const resolvedCoupon = await resolveTelegramCouponForOrderStart({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    source: existingOrder?.retentionSource ?? null,
+    accessKeyId: input.targetKey.kind === 'access' ? input.targetKey.id : null,
+    dynamicAccessKeyId: input.targetKey.kind === 'dynamic' ? input.targetKey.id : null,
+  });
+
   await db.telegramOrder.update({
     where: { id: input.orderId },
     data: {
       targetAccessKeyId: input.targetKey.kind === 'access' ? input.targetKey.id : null,
       targetDynamicKeyId: input.targetKey.kind === 'dynamic' ? input.targetKey.id : null,
       status: 'AWAITING_PLAN',
+      couponCampaignType: resolvedCoupon?.coupon?.campaignType || null,
+      couponCode: resolvedCoupon?.coupon?.couponCode || null,
+      couponDiscountAmount: resolvedCoupon?.coupon?.couponDiscountAmount ?? null,
+      couponDiscountLabel: resolvedCoupon?.coupon?.couponDiscountLabel || null,
     },
   });
 
@@ -1824,6 +1868,15 @@ async function sendTelegramRenewalPlanSelection(input: {
     ui.orderPlanPrompt(input.orderCode),
     `${ui.renewalTargetLabel}: <b>${escapeHtml(input.targetKey.name)}</b>`,
     '',
+    ...buildTelegramCouponReadyLines({
+      locale: input.locale,
+      couponCode: resolvedCoupon?.coupon?.couponCode || null,
+      couponDiscountAmount: resolvedCoupon?.coupon?.couponDiscountAmount ?? null,
+      couponDiscountLabel: resolvedCoupon?.coupon?.couponDiscountLabel || null,
+      unavailableReason: resolvedCoupon?.unavailableReason || null,
+      requestedCouponCode: resolvedCoupon?.requestedCouponCode || null,
+    }),
+    ...(resolvedCoupon?.coupon || resolvedCoupon?.unavailableReason ? [''] : []),
     input.targetKey.kind === 'dynamic' ? ui.renewalBenefitsPremium : ui.renewalBenefitsStandard,
     '',
     ...enabledPlans.map((plan, index) => {
@@ -6469,10 +6522,10 @@ async function handleTelegramCallbackQuery(
               locale,
               initialStatus: 'AWAITING_KEY_SELECTION',
               retentionSource,
-              couponCampaignType: coupon?.campaignType || null,
-              couponCode: coupon?.couponCode || null,
-              couponDiscountAmount: coupon?.couponDiscountAmount ?? null,
-              couponDiscountLabel: coupon?.couponDiscountLabel || null,
+              couponCampaignType: coupon?.coupon?.campaignType || null,
+              couponCode: coupon?.coupon?.couponCode || null,
+              couponDiscountAmount: coupon?.coupon?.couponDiscountAmount ?? null,
+              couponDiscountLabel: coupon?.coupon?.couponDiscountLabel || null,
             });
             await sendTelegramRenewalPlanSelection({
               orderId: order.id,

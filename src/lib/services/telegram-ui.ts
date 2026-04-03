@@ -574,6 +574,29 @@ export function getTelegramUi(locale: SupportedLocale) {
     couponReadyHint: isMyanmar
       ? 'အောက်ပါ button ကို နှိပ်ပါ သို့မဟုတ် coupon code ကို အသုံးပြု၍ order စတင်နိုင်ပါသည်။'
       : 'Use the button below or start an order with the coupon code.',
+    couponUnavailableExpired: (code?: string | null) =>
+      isMyanmar
+        ? `⌛ ${code ? `Coupon <b>${code}</b>` : 'ဤ coupon'} သည် သက်တမ်းကုန်သွားပါပြီ။`
+        : `⌛ ${code ? `Coupon <b>${code}</b>` : 'This coupon'} has expired.`,
+    couponUnavailableRevoked: (code?: string | null) =>
+      isMyanmar
+        ? `🚫 ${code ? `Coupon <b>${code}</b>` : 'ဤ coupon'} ကို မရရှိနိုင်တော့ပါ။`
+        : `🚫 ${code ? `Coupon <b>${code}</b>` : 'This coupon'} is no longer available.`,
+    couponUnavailableConsumed: (code?: string | null) =>
+      isMyanmar
+        ? `✅ ${code ? `Coupon <b>${code}</b>` : 'ဤ coupon'} ကို အသုံးပြုပြီးဖြစ်သောကြောင့် ထပ်မံအသုံးမပြုနိုင်တော့ပါ။`
+        : `✅ ${code ? `Coupon <b>${code}</b>` : 'This coupon'} was already used and cannot be applied again.`,
+    couponUnavailableBlocked: (code?: string | null) =>
+      isMyanmar
+        ? `${code ? `Coupon <b>${code}</b>` : 'ဤ promo'} ကို ဤ account အတွက် admin မှ လောလောဆယ် ပိတ်ထားပါသည်။`
+        : `${code ? `Coupon <b>${code}</b>` : 'This promo'} is currently blocked for this account by the admin.`,
+    couponUnavailableNotFound: (code?: string | null) =>
+      isMyanmar
+        ? `${code ? `Coupon <b>${code}</b>` : 'ဤ coupon'} ကို မတွေ့ပါ။`
+        : `${code ? `Coupon <b>${code}</b>` : 'This coupon'} was not found.`,
+    couponUnavailableContinueHint: isMyanmar
+      ? 'Discount မရှိဘဲ ဆက်လက်ရွေးချယ်နိုင်ပါသည်။ အကူအညီလိုပါက /support ကို အသုံးပြုပါ။'
+      : 'You can continue without the discount, or use /support if you need help.',
     orderRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`

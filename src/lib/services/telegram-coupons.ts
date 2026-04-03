@@ -1,6 +1,11 @@
 import { db } from '@/lib/db';
 import type { SupportedLocale } from '@/lib/i18n/config';
 import {
+  getPromoEligibilityOverride,
+  parsePromoEligibilityOverrides,
+  type PromoEligibilityOverrideMode,
+} from '@/lib/promo-overrides';
+import {
   resolveTelegramSalesPlanLabel,
   resolveTelegramSalesPriceLabel,
   type TelegramSalesPlan,
@@ -17,6 +22,21 @@ export type TelegramCampaignCouponSource =
   | 'renewal_coupon'
   | 'premium_upsell_coupon'
   | 'winback_coupon';
+
+export type TelegramCouponAvailabilityReason =
+  | 'EXPIRED'
+  | 'REVOKED'
+  | 'CONSUMED'
+  | 'NOT_FOUND'
+  | 'MANUAL_BLOCK';
+
+export type TelegramCouponResolution = {
+  coupon: Awaited<ReturnType<typeof db.telegramCouponRedemption.findFirst>>;
+  unavailableReason: TelegramCouponAvailabilityReason | null;
+  requestedCouponCode: string | null;
+  campaignType: TelegramCampaignCouponType | null;
+  overrideMode: PromoEligibilityOverrideMode | null;
+};
 
 export type TelegramCampaignCouponConfig = {
   campaignType: TelegramCampaignCouponType;
@@ -234,6 +254,7 @@ export async function issueTelegramCampaignCoupon(input: {
   expiresAt?: Date | null;
   maxUsesPerUser?: number | null;
   stopAfterConversion?: boolean | null;
+  forceAllow?: boolean | null;
 }) {
   const normalizedCode = input.couponCode.trim().toUpperCase();
   if (!normalizedCode) {
@@ -271,11 +292,12 @@ export async function issueTelegramCampaignCoupon(input: {
     },
   });
 
-  if (alreadyRedeemedForUser >= maxUsesPerUser) {
+  if (!input.forceAllow && alreadyRedeemedForUser >= maxUsesPerUser) {
     return null;
   }
 
   if (
+    !input.forceAllow &&
     stopAfterConversion &&
     (await shouldStopTelegramCouponCampaignAfterConversion({
       campaignType: input.campaignType,
@@ -308,6 +330,32 @@ export async function issueTelegramCampaignCoupon(input: {
   return { coupon, created: true as const };
 }
 
+async function resolveTelegramPromoOverrideMode(input: {
+  telegramChatId: string;
+  telegramUserId: string;
+  campaignType: TelegramCampaignCouponType;
+}) {
+  const linkedUser = await db.user.findFirst({
+    where: {
+      OR: [
+        { telegramChatId: input.telegramChatId },
+        { accessKeys: { some: { telegramId: input.telegramChatId } } },
+        { accessKeys: { some: { telegramId: input.telegramUserId } } },
+        { dynamicAccessKeys: { some: { telegramId: input.telegramChatId } } },
+        { dynamicAccessKeys: { some: { telegramId: input.telegramUserId } } },
+      ],
+    },
+    select: {
+      promoEligibilityOverrides: true,
+    },
+  });
+
+  return getPromoEligibilityOverride(
+    parsePromoEligibilityOverrides(linkedUser?.promoEligibilityOverrides),
+    input.campaignType,
+  )?.mode || null;
+}
+
 export async function findTelegramApplicableCoupon(input: {
   telegramChatId: string;
   telegramUserId: string;
@@ -315,7 +363,7 @@ export async function findTelegramApplicableCoupon(input: {
   couponCode?: string | null;
   accessKeyId?: string | null;
   dynamicAccessKeyId?: string | null;
-}) {
+}): Promise<TelegramCouponResolution> {
   const now = new Date();
   const sourceCampaignType = getTelegramCampaignCouponTypeFromSource(input.source);
   const normalizedCouponCode = input.couponCode?.trim().toUpperCase() || null;
@@ -332,7 +380,7 @@ export async function findTelegramApplicableCoupon(input: {
     take: 20,
   });
 
-  return (
+  const activeCoupon =
     candidates.find((coupon) => {
       if (input.accessKeyId && coupon.accessKeyId && coupon.accessKeyId !== input.accessKeyId) {
         return false;
@@ -345,8 +393,103 @@ export async function findTelegramApplicableCoupon(input: {
         return false;
       }
       return true;
-    }) || null
-  );
+    }) || null;
+
+  const resolvedCampaignType = activeCoupon?.campaignType
+    ? (activeCoupon.campaignType as TelegramCampaignCouponType)
+    : sourceCampaignType;
+
+  const overrideMode = resolvedCampaignType
+    ? await resolveTelegramPromoOverrideMode({
+        telegramChatId: input.telegramChatId,
+        telegramUserId: input.telegramUserId,
+        campaignType: resolvedCampaignType,
+      })
+    : null;
+
+  if (overrideMode === 'FORCE_BLOCK') {
+    return {
+      coupon: null,
+      unavailableReason: 'MANUAL_BLOCK',
+      requestedCouponCode: normalizedCouponCode || activeCoupon?.couponCode || null,
+      campaignType: resolvedCampaignType || null,
+      overrideMode,
+    };
+  }
+
+  if (activeCoupon) {
+    return {
+      coupon: activeCoupon,
+      unavailableReason: null,
+      requestedCouponCode: normalizedCouponCode || activeCoupon.couponCode || null,
+      campaignType: resolvedCampaignType || null,
+      overrideMode,
+    };
+  }
+
+  if (!normalizedCouponCode && !sourceCampaignType) {
+    return {
+      coupon: null,
+      unavailableReason: null,
+      requestedCouponCode: null,
+      campaignType: null,
+      overrideMode,
+    };
+  }
+
+  const historicalCoupons = await db.telegramCouponRedemption.findMany({
+    where: {
+      telegramChatId: input.telegramChatId,
+      telegramUserId: input.telegramUserId,
+      ...(normalizedCouponCode ? { couponCode: normalizedCouponCode } : {}),
+      ...(sourceCampaignType ? { campaignType: sourceCampaignType } : {}),
+    },
+    orderBy: [{ updatedAt: 'desc' }, { issuedAt: 'desc' }],
+    take: 20,
+  });
+
+  const matchingHistoricalCoupon =
+    historicalCoupons.find((coupon) => {
+      if (input.accessKeyId && coupon.accessKeyId && coupon.accessKeyId !== input.accessKeyId) {
+        return false;
+      }
+      if (
+        input.dynamicAccessKeyId &&
+        coupon.dynamicAccessKeyId &&
+        coupon.dynamicAccessKeyId !== input.dynamicAccessKeyId
+      ) {
+        return false;
+      }
+      return true;
+    }) || null;
+
+  let unavailableReason: TelegramCouponAvailabilityReason = 'NOT_FOUND';
+  if (matchingHistoricalCoupon) {
+    if (
+      matchingHistoricalCoupon.status === 'EXPIRED' ||
+      (matchingHistoricalCoupon.status === 'ISSUED' &&
+        matchingHistoricalCoupon.expiresAt &&
+        matchingHistoricalCoupon.expiresAt.getTime() <= now.getTime())
+    ) {
+      unavailableReason = 'EXPIRED';
+    } else if (matchingHistoricalCoupon.status === 'CANCELLED') {
+      unavailableReason = 'REVOKED';
+    } else if (matchingHistoricalCoupon.status === 'REDEEMED') {
+      unavailableReason = 'CONSUMED';
+    }
+  }
+
+  return {
+    coupon: null,
+    unavailableReason,
+    requestedCouponCode:
+      normalizedCouponCode || matchingHistoricalCoupon?.couponCode || null,
+    campaignType:
+      (matchingHistoricalCoupon?.campaignType as TelegramCampaignCouponType | undefined) ||
+      sourceCampaignType ||
+      null,
+    overrideMode,
+  };
 }
 
 export async function expireTelegramCoupons(now = new Date()) {

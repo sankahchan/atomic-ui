@@ -1,6 +1,11 @@
 import { db } from '@/lib/db';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
 import {
+  getPromoEligibilityOverride,
+  parsePromoEligibilityOverrides,
+  type PromoEligibilityOverrideMode,
+} from '@/lib/promo-overrides';
+import {
   issueTelegramCampaignCoupon,
   type TelegramCampaignCouponType,
 } from '@/lib/services/telegram-coupons';
@@ -32,6 +37,7 @@ type PromoGuardrailInput = {
 
 type PromoGuardrailCaches = {
   linkedUserIds: Map<string, string | null>;
+  promoOverrides: Map<string, ReturnType<typeof parsePromoEligibilityOverrides>>;
   recentRefunds: Map<string, boolean>;
   supportHeavy: Map<string, boolean>;
   cooldown: Map<string, boolean>;
@@ -147,6 +153,35 @@ async function hasRecentRefundBlock(
   return blocked;
 }
 
+async function resolvePromoEligibilityOverrideMode(
+  input: PromoGuardrailInput & { campaignType: TelegramCampaignCouponType },
+  caches: PromoGuardrailCaches,
+): Promise<PromoEligibilityOverrideMode | null> {
+  const linkedUserId = await resolveLinkedUserIdForPromo(input, caches);
+  if (!linkedUserId) {
+    return null;
+  }
+
+  if (!caches.promoOverrides.has(linkedUserId)) {
+    const linkedUser = await db.user.findUnique({
+      where: { id: linkedUserId },
+      select: {
+        promoEligibilityOverrides: true,
+      },
+    });
+
+    caches.promoOverrides.set(
+      linkedUserId,
+      parsePromoEligibilityOverrides(linkedUser?.promoEligibilityOverrides),
+    );
+  }
+
+  return getPromoEligibilityOverride(
+    caches.promoOverrides.get(linkedUserId),
+    input.campaignType,
+  )?.mode || null;
+}
+
 async function hasSupportHeavyBlock(
   input: PromoGuardrailInput,
   settings: TelegramSalesSettings,
@@ -221,25 +256,54 @@ async function hasCooldownBlock(
   return blocked;
 }
 
-async function isPromoSendBlocked(
-  input: PromoGuardrailInput,
+async function resolvePromoSendDecision(
+  input: PromoGuardrailInput & {
+    campaignType: TelegramCampaignCouponType;
+  },
   settings: TelegramSalesSettings,
   now: Date,
   caches: PromoGuardrailCaches,
 ) {
+  const overrideMode = await resolvePromoEligibilityOverrideMode(input, caches);
+  if (overrideMode === 'FORCE_ALLOW') {
+    return {
+      blocked: false,
+      forceAllow: true,
+    };
+  }
+
+  if (overrideMode === 'FORCE_BLOCK') {
+    return {
+      blocked: true,
+      forceAllow: false,
+    };
+  }
+
   if (await hasRecentRefundBlock(input, settings, now, caches)) {
-    return true;
+    return {
+      blocked: true,
+      forceAllow: false,
+    };
   }
 
   if (await hasSupportHeavyBlock(input, settings, now, caches)) {
-    return true;
+    return {
+      blocked: true,
+      forceAllow: false,
+    };
   }
 
   if (await hasCooldownBlock(input, settings, now, caches)) {
-    return true;
+    return {
+      blocked: true,
+      forceAllow: false,
+    };
   }
 
-  return false;
+  return {
+    blocked: false,
+    forceAllow: false,
+  };
 }
 
 export async function runTelegramCouponCampaignCycle(input: {
@@ -251,6 +315,7 @@ export async function runTelegramCouponCampaignCycle(input: {
   const trialCouponLeadMs = Math.max(1, settings.trialCouponLeadHours || 12) * 60 * 60 * 1000;
   const guardrailCaches: PromoGuardrailCaches = {
     linkedUserIds: new Map(),
+    promoOverrides: new Map(),
     recentRefunds: new Map(),
     supportHeavy: new Map(),
     cooldown: new Map(),
@@ -326,18 +391,18 @@ export async function runTelegramCouponCampaignCycle(input: {
         if (!destinationChatId) {
           continue;
         }
-        if (
-          await isPromoSendBlocked(
-            {
-              telegramChatId: destinationChatId,
-              telegramUserId: messagingKey.telegramId || destinationChatId,
-              linkedUserId: messagingKey.user?.id || null,
-            },
-            settings,
-            now,
-            guardrailCaches,
-          )
-        ) {
+        const promoDecision = await resolvePromoSendDecision(
+          {
+            telegramChatId: destinationChatId,
+            telegramUserId: messagingKey.telegramId || destinationChatId,
+            linkedUserId: messagingKey.user?.id || null,
+            campaignType: 'TRIAL_TO_PAID',
+          },
+          settings,
+          now,
+          guardrailCaches,
+        );
+        if (promoDecision.blocked) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -352,6 +417,7 @@ export async function runTelegramCouponCampaignCycle(input: {
           expiresAt: key.expiresAt,
           maxUsesPerUser: 1,
           stopAfterConversion: true,
+          forceAllow: promoDecision.forceAllow,
         });
         if (!issued || !issued.created) {
           continue;
@@ -457,18 +523,18 @@ export async function runTelegramCouponCampaignCycle(input: {
         if (!destinationChatId) {
           continue;
         }
-        if (
-          await isPromoSendBlocked(
-            {
-              telegramChatId: destinationChatId,
-              telegramUserId: messagingKey.telegramId || destinationChatId,
-              linkedUserId: messagingKey.user?.id || null,
-            },
-            settings,
-            now,
-            guardrailCaches,
-          )
-        ) {
+        const promoDecision = await resolvePromoSendDecision(
+          {
+            telegramChatId: destinationChatId,
+            telegramUserId: messagingKey.telegramId || destinationChatId,
+            linkedUserId: messagingKey.user?.id || null,
+            campaignType: 'RENEWAL_SOON',
+          },
+          settings,
+          now,
+          guardrailCaches,
+        );
+        if (promoDecision.blocked) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -483,6 +549,7 @@ export async function runTelegramCouponCampaignCycle(input: {
           expiresAt: key.expiresAt,
           maxUsesPerUser: 1,
           stopAfterConversion: true,
+          forceAllow: promoDecision.forceAllow,
         });
         if (!issued || !issued.created) {
           continue;
@@ -551,18 +618,18 @@ export async function runTelegramCouponCampaignCycle(input: {
         if (!destinationChatId) {
           continue;
         }
-        if (
-          await isPromoSendBlocked(
-            {
-              telegramChatId: destinationChatId,
-              telegramUserId: messagingKey.telegramId || destinationChatId,
-              linkedUserId: messagingKey.user?.id || null,
-            },
-            settings,
-            now,
-            guardrailCaches,
-          )
-        ) {
+        const promoDecision = await resolvePromoSendDecision(
+          {
+            telegramChatId: destinationChatId,
+            telegramUserId: messagingKey.telegramId || destinationChatId,
+            linkedUserId: messagingKey.user?.id || null,
+            campaignType: 'PREMIUM_UPSELL',
+          },
+          settings,
+          now,
+          guardrailCaches,
+        );
+        if (promoDecision.blocked) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -577,6 +644,7 @@ export async function runTelegramCouponCampaignCycle(input: {
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           maxUsesPerUser: 1,
           stopAfterConversion: true,
+          forceAllow: promoDecision.forceAllow,
         });
         if (!issued || !issued.created) {
           continue;
@@ -639,17 +707,17 @@ export async function runTelegramCouponCampaignCycle(input: {
       }
 
       try {
-        if (
-          await isPromoSendBlocked(
-            {
-              telegramChatId: order.telegramChatId,
-              telegramUserId: order.telegramUserId,
-            },
-            settings,
-            now,
-            guardrailCaches,
-          )
-        ) {
+        const promoDecision = await resolvePromoSendDecision(
+          {
+            telegramChatId: order.telegramChatId,
+            telegramUserId: order.telegramUserId,
+            campaignType: 'WINBACK',
+          },
+          settings,
+          now,
+          guardrailCaches,
+        );
+        if (promoDecision.blocked) {
           continue;
         }
         const issued = await issueTelegramCampaignCoupon({
@@ -663,6 +731,7 @@ export async function runTelegramCouponCampaignCycle(input: {
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           maxUsesPerUser: 1,
           stopAfterConversion: true,
+          forceAllow: promoDecision.forceAllow,
         });
         if (!issued || !issued.created) {
           continue;

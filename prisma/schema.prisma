@@ -33,6 +33,7 @@ model User {
   adminScope     String?  // Valid for ADMIN role: OWNER, ADMIN, FINANCE, SUPPORT
   telegramChatId String? // Telegram chat ID for bot notifications
   marketingTags  String   @default("") // Comma-separated customer/promotion tags
+  promoEligibilityOverrides String @default("{}") // JSON map of manual promo allow/block overrides
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

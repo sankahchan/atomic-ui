@@ -407,7 +407,7 @@ export async function handleBuyCommand(input: {
     retentionSource: input.retentionSource ?? null,
   });
 
-  const coupon = input.deps.resolveTelegramCouponForOrderStart
+  const couponResolution = input.deps.resolveTelegramCouponForOrderStart
     ? await input.deps.resolveTelegramCouponForOrderStart({
         chatId: input.chatId,
         telegramUserId: input.telegramUserId,
@@ -416,10 +416,10 @@ export async function handleBuyCommand(input: {
       })
     : null;
   const preparedOrder =
-    coupon && input.deps.attachTelegramCouponToOrder
+    couponResolution?.coupon && input.deps.attachTelegramCouponToOrder
       ? await input.deps.attachTelegramCouponToOrder({
           orderId: order.id,
-          coupon,
+          coupon: couponResolution.coupon,
         })
       : order;
 
@@ -454,6 +454,8 @@ export async function handleBuyCommand(input: {
           couponDiscountAmount: preparedOrder.couponDiscountAmount,
           couponDiscountLabel: preparedOrder.couponDiscountLabel,
           priceCurrency: preparedOrder.priceCurrency,
+          unavailableReason: couponResolution?.unavailableReason || null,
+          requestedCouponCode: couponResolution?.requestedCouponCode || null,
         })
       : []),
     '',

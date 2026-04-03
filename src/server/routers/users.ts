@@ -15,6 +15,14 @@ import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getRefundReasonPreset } from '@/lib/finance';
 import {
+  getPromoEligibilityOverride,
+  parsePromoEligibilityOverrides,
+  serializePromoEligibilityOverrides,
+  setPromoEligibilityOverride,
+  type PromoCampaignType,
+  type PromoEligibilityOverrideMode,
+} from '@/lib/promo-overrides';
+import {
   canUserConfigureFinance,
   canUserManageFinance,
   evaluateTelegramOrderRefundEligibility,
@@ -110,7 +118,7 @@ async function resolveCustomerTelegramDestination(userId: string) {
 const CRM_PROMO_SUPPORT_NOTE_KINDS = new Set(['INTERNAL', 'DIRECT_MESSAGE', 'OUTAGE_UPDATE']);
 
 type CustomerCouponEligibility = {
-  campaignType: 'TRIAL_TO_PAID' | 'RENEWAL_SOON' | 'PREMIUM_UPSELL' | 'WINBACK';
+  campaignType: PromoCampaignType;
   label: string;
   enabled: boolean;
   paused: boolean;
@@ -130,8 +138,13 @@ type CustomerCouponEligibility = {
     | 'COOLDOWN'
     | 'RECENT_REFUND'
     | 'SUPPORT_HEAVY'
+    | 'MANUAL_BLOCK'
     | null;
   eligibleNow: boolean;
+  overrideMode: PromoEligibilityOverrideMode | null;
+  overrideNote: string | null;
+  overrideUpdatedAt: Date | null;
+  overrideUpdatedByEmail: string | null;
 };
 
 function buildCustomerCouponEligibility(input: {
@@ -165,6 +178,7 @@ function buildCustomerCouponEligibility(input: {
     kind: string;
     createdAt: Date;
   }>;
+  overrides: ReturnType<typeof parsePromoEligibilityOverrides>;
 }) {
   const refundCutoff = new Date(
     input.now.getTime() -
@@ -266,6 +280,7 @@ function buildCustomerCouponEligibility(input: {
     const redeemedCoupons = relatedCoupons.filter((coupon) => coupon.status === 'REDEEMED');
     const expiredCoupons = relatedCoupons.filter((coupon) => coupon.status === 'EXPIRED');
     const revokedCoupons = relatedCoupons.filter((coupon) => coupon.status === 'CANCELLED');
+    const manualOverride = getPromoEligibilityOverride(input.overrides, campaign.campaignType);
     const maxUsesPerUser = Math.max(
       1,
       ...relatedCoupons.map((coupon) => coupon.maxUsesPerUser || 1),
@@ -287,8 +302,12 @@ function buildCustomerCouponEligibility(input: {
       blockedReason = 'DISABLED';
     } else if (campaign.paused) {
       blockedReason = 'PAUSED';
+    } else if (manualOverride?.mode === 'FORCE_BLOCK') {
+      blockedReason = 'MANUAL_BLOCK';
     } else if (activeCoupons.length > 0) {
       blockedReason = 'ACTIVE_COUPON';
+    } else if (manualOverride?.mode === 'FORCE_ALLOW') {
+      blockedReason = null;
     } else if (campaign.converted) {
       blockedReason = 'CONVERTED';
     } else if (remainingUses <= 0) {
@@ -300,6 +319,10 @@ function buildCustomerCouponEligibility(input: {
     } else if (supportHeavyBlocked) {
       blockedReason = 'SUPPORT_HEAVY';
     }
+
+    const overrideUpdatedAt = manualOverride?.updatedAt
+      ? new Date(manualOverride.updatedAt)
+      : null;
 
     return {
       campaignType: campaign.campaignType,
@@ -315,6 +338,13 @@ function buildCustomerCouponEligibility(input: {
       cooldownUntil: cooldownBlocked ? cooldownUntil : null,
       blockedReason,
       eligibleNow: blockedReason === null,
+      overrideMode: manualOverride?.mode || null,
+      overrideNote: manualOverride?.note || null,
+      overrideUpdatedAt:
+        overrideUpdatedAt && !Number.isNaN(overrideUpdatedAt.getTime())
+          ? overrideUpdatedAt
+          : null,
+      overrideUpdatedByEmail: manualOverride?.updatedByEmail || null,
     } satisfies CustomerCouponEligibility;
   });
 }
@@ -347,6 +377,7 @@ export const usersRouter = router({
           role: true,
           adminScope: true,
           marketingTags: true,
+          promoEligibilityOverrides: true,
           telegramChatId: true,
           createdAt: true,
           accessKeys: {
@@ -400,6 +431,7 @@ export const usersRouter = router({
         getFinanceControls(),
         getTelegramSalesSettings(),
       ]);
+      const promoEligibilityOverrides = parsePromoEligibilityOverrides(user.promoEligibilityOverrides);
 
       const accessKeyIds = user.accessKeys.map((key) => key.id);
       const dynamicKeyIds = user.dynamicAccessKeys.map((key) => key.id);
@@ -730,6 +762,7 @@ export const usersRouter = router({
             kind: note.kind,
             createdAt: note.createdAt,
           })),
+          overrides: promoEligibilityOverrides,
         }),
         serverChangeRequests,
         premiumSupportRequests,
@@ -800,6 +833,7 @@ export const usersRouter = router({
           canAddSupportNote: hasTelegramReviewManageScope(ctx.user.adminScope),
           canManageCustomerTags: hasUserManageScope(ctx.user.adminScope),
           canManageCoupons: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
+          canManagePromoOverrides: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
           canResendAnnouncements: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
         },
       };
@@ -859,6 +893,76 @@ export const usersRouter = router({
 
       return {
         marketingTags: normalizedTags,
+      };
+    }),
+
+  updatePromoEligibilityOverride: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        campaignType: z.enum(['TRIAL_TO_PAID', 'RENEWAL_SOON', 'PREMIUM_UPSELL', 'WINBACK']),
+        mode: z.enum(['DEFAULT', 'FORCE_ALLOW', 'FORCE_BLOCK']),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramAnnouncementManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage promo eligibility overrides.',
+        });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: input.userId },
+        select: {
+          id: true,
+          promoEligibilityOverrides: true,
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found.',
+        });
+      }
+
+      const existingOverrides = parsePromoEligibilityOverrides(user.promoEligibilityOverrides);
+      const nextOverrides = setPromoEligibilityOverride(
+        existingOverrides,
+        input.campaignType,
+        input.mode === 'DEFAULT'
+          ? null
+          : {
+              mode: input.mode,
+              updatedAt: new Date().toISOString(),
+              updatedByUserId: ctx.user.id,
+              updatedByEmail: ctx.user.email,
+            },
+      );
+      const serializedOverrides = serializePromoEligibilityOverrides(nextOverrides);
+
+      await db.user.update({
+        where: { id: input.userId },
+        data: {
+          promoEligibilityOverrides: serializedOverrides,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_PROMO_OVERRIDE_UPDATED',
+        entity: 'USER',
+        entityId: input.userId,
+        details: {
+          campaignType: input.campaignType,
+          mode: input.mode,
+        },
+      });
+
+      return {
+        overrides: nextOverrides,
       };
     }),
 
