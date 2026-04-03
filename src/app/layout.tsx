@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
+import { getAppBuildInfo } from '@/lib/app-build';
+import { DeployGuardProvider } from '@/components/providers/deploy-guard-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { TRPCProvider } from '@/components/providers/trpc-provider';
 import { SessionProvider } from '@/components/providers/session-provider';
@@ -62,6 +64,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const buildInfo = getAppBuildInfo();
+
   return (
     <html
       lang="en"
@@ -78,13 +82,15 @@ export default function RootLayout({
         >
           {/* TRPCProvider enables type-safe API calls */}
           <TRPCProvider>
-            <SessionProvider>
-              {/* Main content area */}
-              {children}
+            <DeployGuardProvider initialBuildId={buildInfo.buildId}>
+              <SessionProvider>
+                {/* Main content area */}
+                {children}
 
-              {/* Toast notifications container */}
-              <Toaster />
-            </SessionProvider>
+                {/* Toast notifications container */}
+                <Toaster />
+              </SessionProvider>
+            </DeployGuardProvider>
           </TRPCProvider>
         </ThemeProvider>
       </body>
