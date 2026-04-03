@@ -2132,12 +2132,12 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
           }}
           className="space-y-5"
         >
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
-            <TabsTrigger value="setup">Bot setup</TabsTrigger>
-            <TabsTrigger value="broadcasts">Broadcasts</TabsTrigger>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.82),rgba(5,12,24,0.74))] lg:grid-cols-5">
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="setup">Bot setup</TabsTrigger>
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="broadcasts">Broadcasts</TabsTrigger>
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="templates">Templates</TabsTrigger>
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="history">History</TabsTrigger>
           </TabsList>
 
           <div className="sticky top-20 z-20 rounded-2xl border border-border/60 bg-background/85 px-4 py-3 shadow-sm backdrop-blur">
@@ -5402,12 +5402,12 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             }}
             className="space-y-6"
           >
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
-              <TabsTrigger value="settings">Order settings</TabsTrigger>
-              <TabsTrigger value="coupons">Coupons</TabsTrigger>
-              <TabsTrigger value="guardrails">Guardrails</TabsTrigger>
-              <TabsTrigger value="review">Review queue</TabsTrigger>
-              <TabsTrigger value="premium">Premium support</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.82),rgba(5,12,24,0.74))] lg:grid-cols-5">
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="settings">Order settings</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="coupons">Coupons</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="guardrails">Guardrails</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="review">Review queue</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="premium">Premium support</TabsTrigger>
             </TabsList>
 
             <div className="sticky top-20 z-20 rounded-2xl border border-border/60 bg-background/85 px-4 py-3 shadow-sm backdrop-blur">
@@ -9818,7 +9818,7 @@ export default function NotificationsPage() {
               <TabsTrigger
                 key={workspace.id}
                 value={workspace.id}
-                className="min-h-[94px] w-full flex-col items-start justify-start gap-2 rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:shadow-[0_0_28px_rgba(34,211,238,0.18)]"
+                className="min-h-[94px] w-full flex-col items-start justify-start gap-2 rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium text-foreground/90 dark:text-slate-200 dark:[&_.workspace-caption]:text-slate-400 dark:[&_.workspace-meta]:text-slate-500 data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:border-cyan-300/20 dark:data-[state=active]:bg-[linear-gradient(135deg,rgba(8,33,49,0.98),rgba(7,75,104,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:[&_.workspace-caption]:text-cyan-100/90 dark:data-[state=active]:[&_.workspace-meta]:text-cyan-200/85 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_34px_rgba(6,182,212,0.18)]"
               >
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <Icon className="h-4 w-4" />
