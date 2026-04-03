@@ -9739,7 +9739,7 @@ export default function NotificationsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 dark:[&_.ops-section-heading]:text-slate-300/90 dark:[&_.text-muted-foreground]:text-slate-300/82">
       <section className="ops-showcase">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
           <div className="space-y-5">
