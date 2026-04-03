@@ -38,6 +38,7 @@ const publicRoutes = [
   '/api/sub/',              // Alternative Subscription API
   '/api/health',            // Health check endpoint
   '/api/health-check',      // Background server checks (cron/manual secret)
+  '/api/app-version',       // Public build/version check for stale-tab reload guard
   '/api/finance/receipt',   // Printable public receipt/refund confirmation
   '/api/telegram/announcements/', // Public announcement open/click tracking
   '/api/telegram/webhook',  // Telegram webhook from external service
