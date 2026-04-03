@@ -366,6 +366,8 @@ model TelegramCouponRedemption {
   telegramUserId     String
   accessKeyId        String?
   dynamicAccessKeyId String?
+  maxUsesPerUser     Int      @default(1)
+  stopAfterConversion Boolean @default(true)
   status             String   @default("ISSUED") // ISSUED, REDEEMED, EXPIRED, CANCELLED
   redeemedOrderId    String?
   redeemedOrderCode  String?
@@ -373,6 +375,8 @@ model TelegramCouponRedemption {
   expiresAt          DateTime?
   redeemedAt         DateTime?
   cancelledAt        DateTime?
+  statusUpdatedByUserId String?
+  statusUpdatedReason String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -382,6 +386,7 @@ model TelegramCouponRedemption {
   @@index([telegramChatId, status, createdAt])
   @@index([accessKeyId, status, createdAt])
   @@index([dynamicAccessKeyId, status, createdAt])
+  @@index([statusUpdatedByUserId, status, createdAt])
 }
 
 model TelegramOrderFinanceAction {

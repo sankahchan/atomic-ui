@@ -75,6 +75,35 @@ type SupportTimelineEvent = {
   href?: string;
 };
 
+type CommunicationThreadEvent = {
+  id: string;
+  at: Date;
+  title: string;
+  detail: string;
+  tone: 'default' | 'warning' | 'danger' | 'positive';
+  href?: string;
+  meta?: string;
+};
+
+const CRM_DIRECT_MESSAGE_TEMPLATES = [
+  {
+    label: 'Support follow-up',
+    body: 'Hello. We received your message and we are checking the issue now. Please send your key name or order code if you have it.',
+  },
+  {
+    label: 'Need screenshot',
+    body: 'Please send a clearer screenshot of the payment, including the amount, account name, and transaction time.',
+  },
+  {
+    label: 'Server issue',
+    body: 'We understand the server is not working properly for you. We are checking it now. Please wait a little while, and we will update you again soon.',
+  },
+  {
+    label: 'Resolved',
+    body: 'Your issue should be resolved now. Please try again and let us know if the problem still continues.',
+  },
+] as const;
+
 export default function UserLedgerPage() {
   const params = useParams();
   const userId = params.id as string;
@@ -96,6 +125,7 @@ export default function UserLedgerPage() {
   const [crmOutageMessage, setCrmOutageMessage] = useState('');
   const [crmShareTarget, setCrmShareTarget] = useState('');
   const [crmReceiptOrderId, setCrmReceiptOrderId] = useState('');
+  const [crmAnnouncementId, setCrmAnnouncementId] = useState('');
   const [crmMarketingTags, setCrmMarketingTags] = useState('');
 
   const ledgerQuery = trpc.users.getLedger.useQuery(
@@ -261,6 +291,40 @@ export default function UserLedgerPage() {
     },
   });
 
+  const updateCouponStatusMutation = trpc.users.updateCouponStatus.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: result.status === 'CANCELLED' ? 'Coupon revoked' : 'Coupon expired',
+        description: `${result.couponCode} is no longer available to this customer.`,
+      });
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Coupon update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resendAnnouncementToCustomerMutation = trpc.users.resendAnnouncementToCustomer.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Announcement resent',
+        description: 'The selected announcement was sent again to this customer only.',
+      });
+      await utils.users.getLedger.invalidate({ id: userId });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Announcement resend failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const revenueSummary = useMemo(() => {
     const summary = ledgerQuery.data?.summary;
     if (!summary || summary.revenueByCurrency.length === 0) {
@@ -305,13 +369,20 @@ export default function UserLedgerPage() {
       }
     }
 
+    if (!crmAnnouncementId) {
+      const firstAnnouncement = ledgerQuery.data.customerNotifications.announcements[0];
+      if (firstAnnouncement) {
+        setCrmAnnouncementId(firstAnnouncement.announcement.id);
+      }
+    }
+
     if (!crmOutageServerName) {
       const firstServerName = ledgerQuery.data.accessKeys[0]?.server?.name;
       if (firstServerName) {
         setCrmOutageServerName(firstServerName);
       }
     }
-  }, [ledgerQuery.data, crmOutageServerName, crmReceiptOrderId, crmShareTarget]);
+  }, [ledgerQuery.data, crmAnnouncementId, crmOutageServerName, crmReceiptOrderId, crmShareTarget]);
 
   const financeTimeline = useMemo<FinanceTimelineEvent[]>(() => {
     if (!ledgerQuery.data) {
@@ -528,6 +599,125 @@ export default function UserLedgerPage() {
       .slice(0, 24);
   }, [ledgerQuery.data]);
 
+  const communicationHistory = useMemo<CommunicationThreadEvent[]>(() => {
+    if (!ledgerQuery.data) {
+      return [];
+    }
+
+    const events: CommunicationThreadEvent[] = [];
+
+    for (const delivery of ledgerQuery.data.customerNotifications.announcements) {
+      events.push({
+        id: `announcement-delivery:${delivery.id}`,
+        at: new Date(delivery.sentAt || delivery.createdAt),
+        title: delivery.announcement.title,
+        detail: delivery.announcement.message,
+        tone: delivery.isPinned ? 'warning' : 'default',
+        meta: [
+          'Announcement',
+          delivery.announcement.type,
+          delivery.readAt ? `Read ${formatRelativeTime(delivery.readAt)}` : 'Unread',
+          `${delivery.openCount || 0} opens`,
+          `${delivery.clickCount || 0} clicks`,
+        ].join(' • '),
+      });
+    }
+
+    for (const log of ledgerQuery.data.customerNotifications.keyNotices) {
+      events.push({
+        id: `key-notice:${log.id}`,
+        at: new Date(log.sentAt),
+        title: log.event,
+        detail: log.message,
+        tone: log.status === 'FAILED' ? 'danger' : 'warning',
+        meta: [log.accessKeyName || 'Unlinked key', log.status].join(' • '),
+      });
+    }
+
+    for (const order of ledgerQuery.data.telegramOrders) {
+      const orderHref = withBasePath(
+        `/dashboard/notifications?orderCode=${encodeURIComponent(order.orderCode)}`,
+      );
+      if (order.status === 'FULFILLED' && order.reviewedAt) {
+        events.push({
+          id: `order-receipt:${order.id}`,
+          at: new Date(order.reviewedAt),
+          title: order.kind === 'TRIAL' ? 'Trial delivery' : 'Receipt delivered',
+          detail: `${order.orderCode} • ${order.planName || order.planCode || 'Order fulfilled'}`,
+          tone: 'positive',
+          href: orderHref,
+          meta: order.couponCode ? `Coupon ${order.couponCode}` : undefined,
+        });
+      }
+      if (order.refundRequestReviewedAt && order.refundRequestStatus) {
+        events.push({
+          id: `refund-decision:${order.id}`,
+          at: new Date(order.refundRequestReviewedAt),
+          title:
+            order.refundRequestStatus === 'APPROVED'
+              ? 'Refund decision sent'
+              : 'Refund decline sent',
+          detail: `${order.orderCode}${order.refundRequestCustomerMessage ? ` • ${order.refundRequestCustomerMessage}` : ''}`,
+          tone: order.refundRequestStatus === 'APPROVED' ? 'positive' : 'danger',
+          href: orderHref,
+          meta: order.refundReviewReasonCode
+            ? resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode
+            : undefined,
+        });
+      }
+    }
+
+    for (const note of ledgerQuery.data.supportNotes) {
+      events.push({
+        id: `support-note-thread:${note.id}`,
+        at: new Date(note.createdAt),
+        title:
+          note.kind === 'DIRECT_MESSAGE'
+            ? 'Direct Telegram message'
+            : note.kind === 'OUTAGE_UPDATE'
+              ? 'Outage update'
+              : note.kind === 'RECEIPT_RESENT'
+                ? 'Receipt resent'
+                : note.kind === 'SHARE_PAGE_RESENT'
+                  ? 'Share page resent'
+                  : note.kind === 'ANNOUNCEMENT_RESEND'
+                    ? 'Announcement resent'
+                    : 'Internal support note',
+        detail: note.note,
+        tone:
+          note.kind === 'OUTAGE_UPDATE'
+            ? 'warning'
+            : note.kind === 'INTERNAL'
+              ? 'default'
+              : 'positive',
+        meta: note.createdBy?.email ? `By ${note.createdBy.email}` : undefined,
+      });
+    }
+
+    return events
+      .sort((left, right) => right.at.getTime() - left.at.getTime())
+      .slice(0, 40);
+  }, [ledgerQuery.data]);
+
+  const promotionAttributionSummary = useMemo(() => {
+    if (!ledgerQuery.data) {
+      return {
+        attributedOrders: 0,
+        couponOrders: 0,
+        announcementOrders: 0,
+      };
+    }
+
+    const attributedOrders = ledgerQuery.data.telegramOrders.filter(
+      (order) => Boolean(order.promotionAttribution) || Boolean(order.couponCode),
+    );
+    return {
+      attributedOrders: attributedOrders.length,
+      couponOrders: attributedOrders.filter((order) => Boolean(order.couponCode)).length,
+      announcementOrders: attributedOrders.filter((order) => Boolean(order.promotionAttribution)).length,
+    };
+  }, [ledgerQuery.data]);
+
   useEffect(() => {
     if (!ledgerQuery.data) {
       return;
@@ -563,7 +753,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, couponHistory, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -581,6 +771,7 @@ export default function UserLedgerPage() {
   type PremiumRoutingAlertItem = (typeof premiumRoutingAlerts)[number];
   type AccessKeyItem = (typeof accessKeys)[number];
   type DynamicKeyItem = (typeof dynamicKeys)[number];
+  type CouponHistoryItem = (typeof couponHistory)[number];
 
   return (
     <div className="space-y-6">
@@ -926,6 +1117,200 @@ export default function UserLedgerPage() {
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-primary" />
+                Promotions and coupons
+              </CardTitle>
+              <CardDescription>
+                Coupon history, manual coupon controls, and the latest promo attribution for this customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attributed orders</p>
+                  <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.attributedOrders}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Orders with coupon or promo-touch attribution.</p>
+                </div>
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon orders</p>
+                  <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.couponOrders}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Orders that carried an applied coupon code.</p>
+                </div>
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Promo touchpoints</p>
+                  <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.announcementOrders}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Orders matched to a recent promo announcement.</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">Coupon history</p>
+                {couponHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No coupon history for this customer yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {couponHistory.map((coupon: CouponHistoryItem) => (
+                      <div key={coupon.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{coupon.couponCode}</p>
+                              <Badge variant="outline">{coupon.campaignType}</Badge>
+                              <Badge variant="secondary">{coupon.status}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {coupon.couponDiscountLabel || formatMoney(coupon.couponDiscountAmount, coupon.currency)} • per-user limit {coupon.maxUsesPerUser} • stop after conversion {coupon.stopAfterConversion ? 'yes' : 'no'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Issued {formatRelativeTime(coupon.issuedAt)}
+                              {coupon.expiresAt ? ` • expires ${formatRelativeTime(coupon.expiresAt)}` : ''}
+                              {coupon.redeemedOrderCode ? ` • redeemed on ${coupon.redeemedOrderCode}` : ''}
+                            </p>
+                            {coupon.statusUpdatedReason ? (
+                              <p className="text-xs text-muted-foreground">Reason: {coupon.statusUpdatedReason}</p>
+                            ) : null}
+                          </div>
+                          {coupon.status === 'ISSUED' ? (
+                            <div className="flex flex-col gap-2 md:w-[180px]">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!crmPermissions.canManageCoupons || updateCouponStatusMutation.isPending}
+                                onClick={() =>
+                                  updateCouponStatusMutation.mutate({
+                                    couponId: coupon.id,
+                                    action: 'EXPIRE',
+                                    reason: 'Expired from CRM',
+                                  })
+                                }
+                              >
+                                Expire coupon
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={!crmPermissions.canManageCoupons || updateCouponStatusMutation.isPending}
+                                onClick={() =>
+                                  updateCouponStatusMutation.mutate({
+                                    couponId: coupon.id,
+                                    action: 'REVOKE',
+                                    reason: 'Revoked from CRM',
+                                  })
+                                }
+                              >
+                                Revoke coupon
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">Promotion attribution by order</p>
+                {telegramOrders.filter((order) => order.promotionAttribution || order.couponCode).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attributed orders yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {telegramOrders
+                      .filter((order) => order.promotionAttribution || order.couponCode)
+                      .slice(0, 8)
+                      .map((order) => (
+                        <div key={`promo-order:${order.id}`} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-medium">{order.orderCode}</p>
+                            <Badge variant="outline">{order.status}</Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {order.planName || order.planCode || 'Order'} • {formatMoney(order.priceAmount, order.priceCurrency)}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {order.couponCode ? <Badge variant="secondary">Coupon: {order.couponCode}</Badge> : null}
+                            {order.promotionAttribution?.templateName ? (
+                              <Badge variant="secondary">Template: {order.promotionAttribution.templateName}</Badge>
+                            ) : null}
+                            {order.promotionAttribution?.targetSegment ? (
+                              <Badge variant="secondary">Segment: {order.promotionAttribution.targetSegment}</Badge>
+                            ) : null}
+                          </div>
+                          {order.promotionAttribution ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Triggered by “{order.promotionAttribution.announcementTitle}” • {order.promotionAttribution.audience} • {order.promotionAttribution.minutesFromSend} min after send
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Coupon attribution only. No matching promo announcement was found in the recent send window.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Communication thread
+              </CardTitle>
+              <CardDescription>
+                One thread for support notes, direct messages, announcements, receipts, refund decisions, and key notices.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {communicationHistory.length === 0 ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  No customer communication has been recorded yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {communicationHistory.map((event) => {
+                    const toneClass =
+                      event.tone === 'positive'
+                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
+                        : event.tone === 'warning'
+                          ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                          : event.tone === 'danger'
+                            ? 'border-red-500/20 bg-red-500/10 text-red-100'
+                            : 'border-border/60 bg-background/40 text-muted-foreground dark:bg-white/[0.03]';
+
+                    return (
+                      <div key={event.id} className={`rounded-[1rem] border px-4 py-3 ${toneClass}`}>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">{event.title}</p>
+                            <p className="whitespace-pre-wrap text-sm">{event.detail}</p>
+                            {event.meta ? <p className="text-xs text-muted-foreground">{event.meta}</p> : null}
+                          </div>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <p className="text-xs text-muted-foreground">{formatDateTime(event.at)}</p>
+                            {event.href ? (
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={event.href}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Open
+                                </Link>
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <KeyRound className="h-5 w-5 text-primary" />
                 Key inventory
               </CardTitle>
@@ -1116,6 +1501,20 @@ export default function UserLedgerPage() {
                   placeholder="Write a direct Telegram message for this customer…"
                   disabled={!crmPermissions.canMessageCustomer}
                 />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {CRM_DIRECT_MESSAGE_TEMPLATES.map((template) => (
+                    <Button
+                      key={template.label}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!crmPermissions.canMessageCustomer}
+                      onClick={() => setCrmDirectMessage(template.body)}
+                    >
+                      {template.label}
+                    </Button>
+                  ))}
+                </div>
                 <Button
                   className="mt-3 w-full"
                   disabled={
@@ -1212,6 +1611,44 @@ export default function UserLedgerPage() {
                         <ExternalLink className="mr-2 h-4 w-4" />
                       )}
                       Resend share page
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Resend announcement to this user</Label>
+                    <Select value={crmAnnouncementId} onValueChange={setCrmAnnouncementId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a recent announcement" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {announcementDeliveries.map((delivery) => (
+                          <SelectItem key={delivery.id} value={delivery.announcement.id}>
+                            {delivery.announcement.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={
+                        !crmPermissions.canResendAnnouncements ||
+                        resendAnnouncementToCustomerMutation.isPending ||
+                        !crmAnnouncementId
+                      }
+                      onClick={() =>
+                        resendAnnouncementToCustomerMutation.mutate({
+                          userId,
+                          announcementId: crmAnnouncementId,
+                        })
+                      }
+                    >
+                      {resendAnnouncementToCustomerMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bell className="mr-2 h-4 w-4" />
+                      )}
+                      Resend announcement
                     </Button>
                   </div>
                 </div>

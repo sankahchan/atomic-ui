@@ -27,6 +27,88 @@ export type TelegramCampaignCouponConfig = {
   discountAmount: number;
 };
 
+async function shouldStopTelegramCouponCampaignAfterConversion(input: {
+  campaignType: TelegramCampaignCouponType;
+  telegramUserId: string;
+  accessKeyId?: string | null;
+  dynamicAccessKeyId?: string | null;
+}) {
+  switch (input.campaignType) {
+    case 'TRIAL_TO_PAID': {
+      const converted = await db.telegramOrder.count({
+        where: {
+          telegramUserId: input.telegramUserId,
+          status: 'FULFILLED',
+          priceAmount: {
+            gt: 0,
+          },
+        },
+      });
+      return converted > 0;
+    }
+    case 'RENEWAL_SOON': {
+      const renewalTargets: Array<
+        | { targetAccessKeyId: string }
+        | { targetDynamicKeyId: string }
+      > = [];
+      if (input.accessKeyId) {
+        renewalTargets.push({ targetAccessKeyId: input.accessKeyId });
+      }
+      if (input.dynamicAccessKeyId) {
+        renewalTargets.push({ targetDynamicKeyId: input.dynamicAccessKeyId });
+      }
+      if (renewalTargets.length === 0) {
+        return false;
+      }
+      const renewed = await db.telegramOrder.count({
+        where: {
+          telegramUserId: input.telegramUserId,
+          status: 'FULFILLED',
+          kind: 'RENEW',
+          OR: renewalTargets,
+        },
+      });
+      return renewed > 0;
+    }
+    case 'PREMIUM_UPSELL': {
+      const premiumConverted = await db.telegramOrder.count({
+        where: {
+          telegramUserId: input.telegramUserId,
+          status: 'FULFILLED',
+          deliveryType: 'DYNAMIC_KEY',
+          priceAmount: {
+            gt: 0,
+          },
+        },
+      });
+      return premiumConverted > 0;
+    }
+    case 'WINBACK': {
+      const recentPaidOrder = await db.telegramOrder.findFirst({
+        where: {
+          telegramUserId: input.telegramUserId,
+          status: 'FULFILLED',
+          priceAmount: {
+            gt: 0,
+          },
+        },
+        orderBy: [{ fulfilledAt: 'desc' }, { createdAt: 'desc' }],
+        select: {
+          fulfilledAt: true,
+          createdAt: true,
+        },
+      });
+      if (!recentPaidOrder) {
+        return false;
+      }
+      const baseline = recentPaidOrder.fulfilledAt || recentPaidOrder.createdAt;
+      return Date.now() - baseline.getTime() < 30 * 24 * 60 * 60 * 1000;
+    }
+    default:
+      return false;
+  }
+}
+
 export function getTelegramCampaignCouponTypeFromSource(
   source?: string | null,
 ): TelegramCampaignCouponType | null {
@@ -150,6 +232,8 @@ export async function issueTelegramCampaignCoupon(input: {
   accessKeyId?: string | null;
   dynamicAccessKeyId?: string | null;
   expiresAt?: Date | null;
+  maxUsesPerUser?: number | null;
+  stopAfterConversion?: boolean | null;
 }) {
   const normalizedCode = input.couponCode.trim().toUpperCase();
   if (!normalizedCode) {
@@ -157,10 +241,14 @@ export async function issueTelegramCampaignCoupon(input: {
   }
 
   const now = new Date();
+  const maxUsesPerUser =
+    typeof input.maxUsesPerUser === 'number' && Number.isFinite(input.maxUsesPerUser)
+      ? Math.max(1, Math.floor(input.maxUsesPerUser))
+      : 1;
+  const stopAfterConversion = input.stopAfterConversion ?? true;
   const activeExisting = await db.telegramCouponRedemption.findFirst({
     where: {
       campaignType: input.campaignType,
-      couponCode: normalizedCode,
       telegramChatId: input.telegramChatId,
       telegramUserId: input.telegramUserId,
       accessKeyId: input.accessKeyId ?? null,
@@ -175,15 +263,27 @@ export async function issueTelegramCampaignCoupon(input: {
     return { coupon: activeExisting, created: false as const };
   }
 
-  const alreadyRedeemed = await db.telegramCouponRedemption.count({
+  const alreadyRedeemedForUser = await db.telegramCouponRedemption.count({
     where: {
-      couponCode: normalizedCode,
+      campaignType: input.campaignType,
       telegramUserId: input.telegramUserId,
       status: 'REDEEMED',
     },
   });
 
-  if (alreadyRedeemed > 0) {
+  if (alreadyRedeemedForUser >= maxUsesPerUser) {
+    return null;
+  }
+
+  if (
+    stopAfterConversion &&
+    (await shouldStopTelegramCouponCampaignAfterConversion({
+      campaignType: input.campaignType,
+      telegramUserId: input.telegramUserId,
+      accessKeyId: input.accessKeyId ?? null,
+      dynamicAccessKeyId: input.dynamicAccessKeyId ?? null,
+    }))
+  ) {
     return null;
   }
 
@@ -198,6 +298,8 @@ export async function issueTelegramCampaignCoupon(input: {
       telegramUserId: input.telegramUserId,
       accessKeyId: input.accessKeyId ?? null,
       dynamicAccessKeyId: input.dynamicAccessKeyId ?? null,
+      maxUsesPerUser,
+      stopAfterConversion,
       status: 'ISSUED',
       expiresAt: input.expiresAt ?? null,
     },
@@ -290,6 +392,18 @@ export async function redeemTelegramCouponForOrder(input: {
     return null;
   }
 
+  const alreadyRedeemedForUser = await db.telegramCouponRedemption.count({
+    where: {
+      campaignType: issuedCoupon.campaignType,
+      telegramUserId: input.telegramUserId,
+      status: 'REDEEMED',
+    },
+  });
+
+  if (alreadyRedeemedForUser >= (issuedCoupon.maxUsesPerUser || 1)) {
+    return null;
+  }
+
   return db.telegramCouponRedemption.update({
     where: { id: issuedCoupon.id },
     data: {
@@ -305,6 +419,8 @@ export async function cancelTelegramCouponForOrder(input: {
   telegramUserId: string;
   telegramChatId: string;
   couponCode?: string | null;
+  statusUpdatedByUserId?: string | null;
+  statusUpdatedReason?: string | null;
 }) {
   const normalizedCouponCode = input.couponCode?.trim().toUpperCase();
   if (!normalizedCouponCode) {
@@ -321,6 +437,8 @@ export async function cancelTelegramCouponForOrder(input: {
     data: {
       status: 'CANCELLED',
       cancelledAt: new Date(),
+      statusUpdatedByUserId: input.statusUpdatedByUserId ?? null,
+      statusUpdatedReason: input.statusUpdatedReason?.trim() || null,
     },
   });
 

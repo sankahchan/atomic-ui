@@ -322,6 +322,36 @@ type TelegramAnnouncementAnalytics = {
     openRate: number;
     clickRate: number;
   }>;
+  bySegment: Array<{
+    segment: string;
+    announcements: number;
+    sentCount: number;
+    attributedOrders: number;
+    attributedRevenue: Array<{ currency: string; amount: number }>;
+    conversionRate: number;
+  }>;
+  bySendHour: Array<{
+    hour: number;
+    sentCount: number;
+    attributedOrders: number;
+    attributedRevenue: Array<{ currency: string; amount: number }>;
+    conversionRate: number;
+  }>;
+  recentAttribution: Array<{
+    orderId: string;
+    orderCode: string;
+    createdAt: string | Date;
+    couponCode: string | null;
+    announcementId: string;
+    announcementTitle: string;
+    templateName: string | null;
+    audience: string;
+    targetSegment: string | null;
+    sentAt: string | Date;
+    minutesFromSend: number;
+    priceAmount: number | null;
+    priceCurrency: string | null;
+  }>;
 };
 
 function formatAnnouncementMoney(amount: number | null | undefined, currency: string | null | undefined) {
@@ -3154,6 +3184,91 @@ function TelegramBotSetupCard() {
                               </p>
                               <p className="mt-2 text-xs text-muted-foreground">
                                 {Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-sm font-medium">Segment conversion</p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.bySegment.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.bySegment.map((entry) => (
+                              <div key={entry.segment} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{entry.segment}</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.conversionRate * 100)}% conv.
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedOrders} attributed orders • {entry.sentCount} sends • {entry.announcements} announcements
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedRevenue.length > 0
+                                    ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ')
+                                    : '0 revenue'}
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                        <p className="text-sm font-medium">Send-time conversion</p>
+                        <div className="mt-3 space-y-2">
+                          {announcementAnalytics.bySendHour.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                          ) : (
+                            announcementAnalytics.bySendHour.slice(0, 6).map((entry) => (
+                              <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{String(entry.hour).padStart(2, '0')}:00</p>
+                                  <Badge variant="outline">
+                                    {Math.round(entry.conversionRate * 100)}% conv.
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedOrders} attributed orders • {entry.sentCount} sends
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {entry.attributedRevenue.length > 0
+                                    ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ')
+                                    : '0 revenue'}
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <p className="text-sm font-medium">Recent promo attribution</p>
+                      <div className="mt-3 space-y-2">
+                        {announcementAnalytics.recentAttribution.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
+                        ) : (
+                          announcementAnalytics.recentAttribution.map((entry) => (
+                            <div key={`${entry.orderId}:${entry.announcementId}`} className="rounded-xl border border-border/50 p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium">{entry.orderCode}</p>
+                                <Badge variant="outline">{entry.minutesFromSend} min</Badge>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {entry.announcementTitle}
+                                {entry.templateName ? ` • ${entry.templateName}` : ''}
+                                {entry.targetSegment ? ` • ${entry.targetSegment}` : ''}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {entry.audience} • {formatAnnouncementMoney(entry.priceAmount, entry.priceCurrency)}
+                                {entry.couponCode ? ` • coupon ${entry.couponCode}` : ''}
                               </p>
                             </div>
                           ))

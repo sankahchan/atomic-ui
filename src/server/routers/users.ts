@@ -5,6 +5,7 @@ import { coerceSupportedLocale } from '@/lib/i18n/config';
 import {
   ADMIN_SCOPE_VALUES,
   hasOutageManageScope,
+  hasTelegramAnnouncementManageScope,
   hasTelegramReviewManageScope,
   hasUserManageScope,
   isOwnerLikeAdmin,
@@ -29,6 +30,8 @@ import {
   sendDynamicKeySharePageToTelegram,
   sendTelegramOrderReceiptConfirmation,
 } from '@/lib/services/telegram-bot';
+import { buildTelegramPromoDeliveryCandidates, resolveTelegramPromoAttribution } from '@/lib/services/telegram-attribution';
+import { dispatchTelegramAnnouncement } from '@/lib/services/telegram-announcements';
 import {
   getTelegramConfig,
   getTelegramSupportLink,
@@ -332,6 +335,35 @@ export const usersRouter = router({
             take: 24,
           }),
         ]);
+      const telegramIdentifiers = Array.from(
+        new Set(
+          [
+            ...customerChatIds,
+            telegramProfile?.telegramChatId,
+            telegramProfile?.telegramUserId,
+          ].filter((value): value is string => Boolean(value && value.trim())),
+        ),
+      );
+      const couponRedemptions =
+        telegramIdentifiers.length > 0 || accessKeyIds.length > 0 || dynamicKeyIds.length > 0
+          ? await db.telegramCouponRedemption.findMany({
+              where: {
+                OR: [
+                  telegramIdentifiers.length > 0
+                    ? { telegramChatId: { in: telegramIdentifiers } }
+                    : undefined,
+                  telegramIdentifiers.length > 0
+                    ? { telegramUserId: { in: telegramIdentifiers } }
+                    : undefined,
+                  accessKeyIds.length > 0 ? { accessKeyId: { in: accessKeyIds } } : undefined,
+                  dynamicKeyIds.length > 0
+                    ? { dynamicAccessKeyId: { in: dynamicKeyIds } }
+                    : undefined,
+                ].filter(Boolean) as any,
+              },
+              orderBy: [{ issuedAt: 'desc' }],
+            })
+          : [];
       type AnnouncementDeliveryItem = (typeof announcementDeliveries)[number];
       type KeyNotificationLogItem = (typeof keyNotificationLog)[number];
       type SupportNoteItem = (typeof supportNotes)[number];
@@ -340,8 +372,27 @@ export const usersRouter = router({
       const refundedByCurrency = new Map<string, number>();
       let refundEligibleCount = 0;
 
+      const promoDeliveryCandidates = buildTelegramPromoDeliveryCandidates(
+        announcementDeliveries.map((delivery) => ({
+          ...delivery.announcement,
+          deliveries: [
+            {
+              id: delivery.id,
+              chatId: delivery.chatId,
+              status: delivery.status,
+              sentAt: delivery.sentAt,
+            },
+          ],
+        })),
+      );
+
       const orders = await Promise.all(telegramOrders.map(async (order) => {
         const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
+        const promotionAttribution = resolveTelegramPromoAttribution({
+          chatId: order.telegramChatId || order.telegramUserId,
+          createdAt: order.createdAt,
+          deliveries: promoDeliveryCandidates,
+        });
 
         if (refundEligibility.eligible) {
           refundEligibleCount += 1;
@@ -361,6 +412,7 @@ export const usersRouter = router({
           fulfilledPaidPurchaseCount: refundEligibility.fulfilledPaidPurchaseCount,
           refundEligible: refundEligibility.eligible,
           refundBlockedReason: refundEligibility.reason,
+          promotionAttribution,
         };
       }));
 
@@ -409,6 +461,25 @@ export const usersRouter = router({
         dynamicKeys: user.dynamicAccessKeys,
         marketingTags: user.marketingTags || '',
         telegramOrders: orders,
+        couponHistory: couponRedemptions.map((coupon) => ({
+          id: coupon.id,
+          campaignType: coupon.campaignType,
+          couponCode: coupon.couponCode,
+          couponDiscountAmount: coupon.couponDiscountAmount,
+          couponDiscountLabel: coupon.couponDiscountLabel,
+          currency: coupon.currency,
+          status: coupon.status,
+          maxUsesPerUser: coupon.maxUsesPerUser,
+          stopAfterConversion: coupon.stopAfterConversion,
+          redeemedOrderId: coupon.redeemedOrderId,
+          redeemedOrderCode: coupon.redeemedOrderCode,
+          issuedAt: coupon.issuedAt,
+          expiresAt: coupon.expiresAt,
+          redeemedAt: coupon.redeemedAt,
+          cancelledAt: coupon.cancelledAt,
+          statusUpdatedByUserId: coupon.statusUpdatedByUserId,
+          statusUpdatedReason: coupon.statusUpdatedReason,
+        })),
         serverChangeRequests,
         premiumSupportRequests,
         premiumRoutingAlerts: premiumRoutingAlerts.map((event) => ({
@@ -477,6 +548,8 @@ export const usersRouter = router({
           canSendOutageUpdate: hasOutageManageScope(ctx.user.adminScope),
           canAddSupportNote: hasTelegramReviewManageScope(ctx.user.adminScope),
           canManageCustomerTags: hasUserManageScope(ctx.user.adminScope),
+          canManageCoupons: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
+          canResendAnnouncements: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
         },
       };
     }),
@@ -740,6 +813,7 @@ export const usersRouter = router({
           locale: true,
           telegramChatId: true,
           telegramUserId: true,
+          requestedEmail: true,
           planName: true,
           planCode: true,
           priceLabel: true,
@@ -752,6 +826,8 @@ export const usersRouter = router({
           selectedServerName: true,
           selectedServerCountryCode: true,
           deliveryType: true,
+          targetAccessKeyId: true,
+          targetDynamicKeyId: true,
           approvedAccessKeyId: true,
           approvedDynamicKeyId: true,
         },
@@ -817,6 +893,34 @@ export const usersRouter = router({
         });
       }
 
+      const receiptUserFilters = [
+        order.requestedEmail ? { email: order.requestedEmail } : undefined,
+        order.approvedAccessKeyId ? { accessKeys: { some: { id: order.approvedAccessKeyId } } } : undefined,
+        order.targetAccessKeyId ? { accessKeys: { some: { id: order.targetAccessKeyId } } } : undefined,
+        order.approvedDynamicKeyId ? { dynamicAccessKeys: { some: { id: order.approvedDynamicKeyId } } } : undefined,
+        order.targetDynamicKeyId ? { dynamicAccessKeys: { some: { id: order.targetDynamicKeyId } } } : undefined,
+      ].filter(Boolean) as any;
+
+      const receiptUser = receiptUserFilters.length
+        ? await db.user.findFirst({
+            where: {
+              OR: receiptUserFilters,
+            },
+            select: { id: true },
+          })
+        : null;
+
+      if (receiptUser) {
+        await db.customerSupportNote.create({
+          data: {
+            userId: receiptUser.id,
+            createdByUserId: ctx.user.id,
+            kind: 'RECEIPT_RESENT',
+            note: `${order.orderCode} • ${order.planName || order.planCode || 'Receipt'}`,
+          },
+        });
+      }
+
       await writeAuditLog({
         userId: ctx.user.id,
         ip: ctx.clientIp,
@@ -858,6 +962,25 @@ export const usersRouter = router({
           dynamicAccessKeyId: input.keyId,
           reason: 'RESENT',
           source: 'crm_action_center',
+        });
+      }
+
+      const shareUser = await db.user.findFirst({
+        where:
+          input.keyType === 'ACCESS_KEY'
+            ? { accessKeys: { some: { id: input.keyId } } }
+            : { dynamicAccessKeys: { some: { id: input.keyId } } },
+        select: { id: true },
+      });
+
+      if (shareUser) {
+        await db.customerSupportNote.create({
+          data: {
+            userId: shareUser.id,
+            createdByUserId: ctx.user.id,
+            kind: 'SHARE_PAGE_RESENT',
+            note: `${input.keyType === 'ACCESS_KEY' ? 'Standard key' : 'Premium key'} • ${input.keyId}`,
+          },
         });
       }
 
@@ -983,6 +1106,194 @@ export const usersRouter = router({
       });
 
       return note;
+    }),
+
+  updateCouponStatus: adminProcedure
+    .input(
+      z.object({
+        couponId: z.string(),
+        action: z.enum(['REVOKE', 'EXPIRE']),
+        reason: z.string().trim().max(300).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramAnnouncementManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage customer coupons.',
+        });
+      }
+
+      const coupon = await db.telegramCouponRedemption.findUnique({
+        where: { id: input.couponId },
+        select: {
+          id: true,
+          status: true,
+          couponCode: true,
+          campaignType: true,
+        },
+      });
+
+      if (!coupon) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Coupon not found.',
+        });
+      }
+
+      if (coupon.status !== 'ISSUED') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Only active issued coupons can be revoked or expired from CRM.',
+        });
+      }
+
+      const status = input.action === 'REVOKE' ? 'CANCELLED' : 'EXPIRED';
+      const now = new Date();
+      const updated = await db.telegramCouponRedemption.update({
+        where: { id: coupon.id },
+        data: {
+          status,
+          cancelledAt: input.action === 'REVOKE' ? now : null,
+          expiresAt: input.action === 'EXPIRE' ? now : undefined,
+          statusUpdatedByUserId: ctx.user.id,
+          statusUpdatedReason: input.reason?.trim() || null,
+        },
+        select: {
+          id: true,
+          status: true,
+          couponCode: true,
+          campaignType: true,
+          statusUpdatedReason: true,
+          expiresAt: true,
+          cancelledAt: true,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action:
+          input.action === 'REVOKE'
+            ? 'TELEGRAM_COUPON_REVOKED'
+            : 'TELEGRAM_COUPON_EXPIRED',
+        entity: 'TELEGRAM_COUPON',
+        entityId: coupon.id,
+        details: {
+          couponCode: coupon.couponCode,
+          campaignType: coupon.campaignType,
+          reason: input.reason?.trim() || null,
+        },
+      });
+
+      return updated;
+    }),
+
+  resendAnnouncementToCustomer: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        announcementId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramAnnouncementManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to resend customer announcements.',
+        });
+      }
+
+      const { user, destinationChatId } = await resolveCustomerTelegramDestination(input.userId);
+      if (!destinationChatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This customer does not have a linked Telegram chat yet.',
+        });
+      }
+
+      const source = await db.telegramAnnouncement.findUnique({
+        where: { id: input.announcementId },
+        select: {
+          id: true,
+          type: true,
+          templateId: true,
+          templateName: true,
+          title: true,
+          message: true,
+          heroImageUrl: true,
+          cardStyle: true,
+          includeSupportButton: true,
+          pinToInbox: true,
+        },
+      });
+
+      if (!source) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Announcement not found.',
+        });
+      }
+
+      const resend = await db.telegramAnnouncement.create({
+        data: {
+          audience: 'DIRECT_USER',
+          type: source.type,
+          templateId: source.templateId,
+          templateName: source.templateName,
+          targetDirectChatId: destinationChatId,
+          targetDirectUserLabel: user.email,
+          title: source.title,
+          message: source.message,
+          heroImageUrl: source.heroImageUrl,
+          cardStyle: source.cardStyle,
+          includeSupportButton: source.includeSupportButton,
+          pinToInbox: source.pinToInbox,
+          status: 'SCHEDULED',
+          scheduledFor: new Date(),
+          createdByUserId: ctx.user.id,
+          createdByEmail: ctx.user.email || null,
+        },
+      });
+
+      const result = await dispatchTelegramAnnouncement({
+        announcementId: resend.id,
+        now: new Date(),
+      });
+
+      if (result.skipped) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Announcement resend could not be delivered to this customer.',
+        });
+      }
+
+      await db.customerSupportNote.create({
+        data: {
+          userId: user.id,
+          createdByUserId: ctx.user.id,
+          kind: 'ANNOUNCEMENT_RESEND',
+          note: `${source.title}${source.templateName ? ` • ${source.templateName}` : ''}`,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'CUSTOMER_ANNOUNCEMENT_RESENT',
+        entity: 'USER',
+        entityId: user.id,
+        details: {
+          sourceAnnouncementId: source.id,
+          resendAnnouncementId: resend.id,
+          destinationChatId,
+        },
+      });
+
+      return {
+        success: true,
+        announcementId: resend.id,
+      };
     }),
 
   updateAdminScope: adminProcedure
