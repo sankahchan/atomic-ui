@@ -1194,9 +1194,7 @@ export async function runTelegramPremiumRegionAlertCycle() {
       status: 'ACTIVE',
       OR: [{ telegramId: { not: null } }, { user: { telegramChatId: { not: null } } }],
       accessKeys: {
-        some: {
-          serverId: { not: null },
-        },
+        some: {},
       },
     },
     include: {
