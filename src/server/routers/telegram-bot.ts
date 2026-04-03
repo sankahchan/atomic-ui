@@ -45,6 +45,7 @@ import {
   buildTelegramPromoDeliveryCandidates,
   resolveTelegramPromoAttribution,
 } from '@/lib/services/telegram-attribution';
+import { simulateTelegramCouponCampaignAudience } from '@/lib/services/telegram-campaigns';
 import {
   approveTelegramOrder,
   approveTelegramPremiumSupportRequest,
@@ -404,6 +405,15 @@ export const telegramBotRouter = router({
       });
 
       return normalized;
+    }),
+
+  simulateCampaignAudience: adminProcedure
+    .input(telegramSalesSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+      return simulateTelegramCouponCampaignAudience({
+        settings: normalizeTelegramSalesSettings(input),
+      });
     }),
 
   listOrders: adminProcedure

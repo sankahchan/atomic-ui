@@ -23,6 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import {
@@ -140,6 +141,8 @@ type Channel = {
 };
 
 type NotificationWorkspaceId = 'overview' | 'telegram' | 'workflow' | 'channels';
+type TelegramBotSubtabId = 'setup' | 'broadcasts' | 'templates' | 'analytics' | 'history';
+type WorkflowSubtabId = 'settings' | 'coupons' | 'guardrails' | 'review' | 'premium';
 
 type DeliveryStatusFilter = 'ALL' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
 type EventCooldownInputs = Partial<Record<NotificationEventId, string>>;
@@ -1537,6 +1540,12 @@ function TelegramBotSetupCard() {
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
+  const [activeBotTab, setActiveBotTab] = useState<TelegramBotSubtabId>('setup');
+  const [botAdvancedOpen, setBotAdvancedOpen] = useState(false);
+  const [savedBotSnapshot, setSavedBotSnapshot] = useState<{
+    form: TelegramSettings;
+    adminChatIdsInput: string;
+  } | null>(null);
   const [announcementAudience, setAnnouncementAudience] = useState<TelegramAnnouncementPanelAudience>('ACTIVE_USERS');
   const [announcementType, setAnnouncementType] = useState<TelegramAnnouncementType>('ANNOUNCEMENT');
   const [announcementCardStyle, setAnnouncementCardStyle] = useState<TelegramAnnouncementCardStyle>('DEFAULT');
@@ -1556,13 +1565,23 @@ function TelegramBotSetupCard() {
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
   const [announcementAnalyticsRange, setAnnouncementAnalyticsRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const botSettingsDirty = useMemo(() => {
+    if (!savedBotSnapshot) {
+      return false;
+    }
+
+    return (
+      JSON.stringify({ form, adminChatIdsInput }) !==
+      JSON.stringify(savedBotSnapshot)
+    );
+  }, [form, adminChatIdsInput, savedBotSnapshot]);
 
   useEffect(() => {
     if (!settingsQuery.data) {
       return;
     }
 
-    setForm({
+    const nextForm: TelegramSettings = {
       botToken: settingsQuery.data.botToken || '',
       botUsername: settingsQuery.data.botUsername || '',
       welcomeMessage: settingsQuery.data.welcomeMessage || t('settings.telegram.welcome_placeholder'),
@@ -1578,8 +1597,14 @@ function TelegramBotSetupCard() {
       digestLookbackHours: settingsQuery.data.digestLookbackHours ?? 24,
       defaultLanguage: settingsQuery.data.defaultLanguage === 'my' ? 'my' : 'en',
       showLanguageSelectorOnStart: settingsQuery.data.showLanguageSelectorOnStart ?? true,
+    };
+    const nextAdminChatIdsInput = (settingsQuery.data.adminChatIds || []).join(', ');
+    setForm(nextForm);
+    setAdminChatIdsInput(nextAdminChatIdsInput);
+    setSavedBotSnapshot({
+      form: JSON.parse(JSON.stringify(nextForm)) as TelegramSettings,
+      adminChatIdsInput: nextAdminChatIdsInput,
     });
-    setAdminChatIdsInput((settingsQuery.data.adminChatIds || []).join(', '));
   }, [settingsQuery.data, t]);
 
   const saveSettingsMutation = trpc.telegramBot.updateSettings.useMutation({
@@ -1900,6 +1925,15 @@ function TelegramBotSetupCard() {
     });
   };
 
+  const handleResetBotSettings = () => {
+    if (!savedBotSnapshot) {
+      return;
+    }
+
+    setForm(JSON.parse(JSON.stringify(savedBotSnapshot.form)) as TelegramSettings);
+    setAdminChatIdsInput(savedBotSnapshot.adminChatIdsInput);
+  };
+
   const updateLocalizedTelegramText = (
     key: 'localizedWelcomeMessages' | 'localizedKeyNotFoundMessages',
     localeCode: 'en' | 'my',
@@ -1938,8 +1972,45 @@ function TelegramBotSetupCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-6">
-          <div className="space-y-4">
+        <Tabs value={activeBotTab} onValueChange={(value) => setActiveBotTab(value as TelegramBotSubtabId)} className="space-y-5">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
+            <TabsTrigger value="setup">Bot setup</TabsTrigger>
+            <TabsTrigger value="broadcasts">Broadcasts</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+
+          <div className="sticky top-20 z-20 rounded-2xl border border-border/60 bg-background/85 px-4 py-3 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  {botSettingsDirty ? 'Unsaved Telegram bot changes' : 'Telegram bot settings are in sync'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {botSettingsDirty
+                    ? 'Save or reset before leaving this workspace.'
+                    : 'Your bot identity, language, and digest settings match the latest saved version.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!botSettingsDirty || isSaving}
+                  onClick={handleResetBotSettings}
+                >
+                  Reset
+                </Button>
+                <Button type="button" onClick={handleSave} disabled={isSaving || !botSettingsDirty}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {t('settings.telegram.save')}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <TabsContent value="setup" className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="telegram-bot-token">{t('settings.telegram.token')}</Label>
@@ -1958,22 +2029,13 @@ function TelegramBotSetupCard() {
                     onClick={() => testConnectionMutation.mutate({ botToken: form.botToken.trim() })}
                     disabled={!hasToken || testConnectionMutation.isPending}
                   >
-                    {testConnectionMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <TestTube className="mr-2 h-4 w-4" />
-                    )}
+                    {testConnectionMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
                     {t('settings.telegram.test')}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {t('settings.telegram.help')}{' '}
-                  <Link
-                    href="https://t.me/BotFather"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-primary underline-offset-4 hover:underline"
-                  >
+                  <Link href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">
                     @BotFather
                   </Link>
                 </p>
@@ -2003,9 +2065,7 @@ function TelegramBotSetupCard() {
                 <Label>{telegramUi.defaultLanguage}</Label>
                 <Select
                   value={form.defaultLanguage}
-                  onValueChange={(value: 'en' | 'my') =>
-                    setForm((prev) => ({ ...prev, defaultLanguage: value }))
-                  }
+                  onValueChange={(value: 'en' | 'my') => setForm((prev) => ({ ...prev, defaultLanguage: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -2022,15 +2082,11 @@ function TelegramBotSetupCard() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">{telegramUi.languageSelectorOnStart}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {telegramUi.languageSelectorOnStartDesc}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{telegramUi.languageSelectorOnStartDesc}</p>
                   </div>
                   <Switch
                     checked={form.showLanguageSelectorOnStart}
-                    onCheckedChange={(checked) =>
-                      setForm((prev) => ({ ...prev, showLanguageSelectorOnStart: checked }))
-                    }
+                    onCheckedChange={(checked) => setForm((prev) => ({ ...prev, showLanguageSelectorOnStart: checked }))}
                   />
                 </div>
               </div>
@@ -2056,9 +2112,7 @@ function TelegramBotSetupCard() {
                     <Textarea
                       id="telegram-welcome-message-en"
                       value={form.localizedWelcomeMessages?.en || ''}
-                      onChange={(event) =>
-                        updateLocalizedTelegramText('localizedWelcomeMessages', 'en', event.target.value)
-                      }
+                      onChange={(event) => updateLocalizedTelegramText('localizedWelcomeMessages', 'en', event.target.value)}
                       rows={3}
                     />
                   </div>
@@ -2067,9 +2121,7 @@ function TelegramBotSetupCard() {
                     <Textarea
                       id="telegram-welcome-message-my"
                       value={form.localizedWelcomeMessages?.my || ''}
-                      onChange={(event) =>
-                        updateLocalizedTelegramText('localizedWelcomeMessages', 'my', event.target.value)
-                      }
+                      onChange={(event) => updateLocalizedTelegramText('localizedWelcomeMessages', 'my', event.target.value)}
                       rows={3}
                     />
                   </div>
@@ -2081,9 +2133,7 @@ function TelegramBotSetupCard() {
                 <Textarea
                   id="telegram-not-found-message"
                   value={form.keyNotFoundMessage || ''}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, keyNotFoundMessage: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, keyNotFoundMessage: event.target.value }))}
                   rows={3}
                 />
               </div>
@@ -2099,9 +2149,7 @@ function TelegramBotSetupCard() {
                     <Textarea
                       id="telegram-not-found-message-en"
                       value={form.localizedKeyNotFoundMessages?.en || ''}
-                      onChange={(event) =>
-                        updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'en', event.target.value)
-                      }
+                      onChange={(event) => updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'en', event.target.value)}
                       rows={3}
                     />
                   </div>
@@ -2110,9 +2158,7 @@ function TelegramBotSetupCard() {
                     <Textarea
                       id="telegram-not-found-message-my"
                       value={form.localizedKeyNotFoundMessages?.my || ''}
-                      onChange={(event) =>
-                        updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'my', event.target.value)
-                      }
+                      onChange={(event) => updateLocalizedTelegramText('localizedKeyNotFoundMessages', 'my', event.target.value)}
                       rows={3}
                     />
                   </div>
@@ -2124,9 +2170,7 @@ function TelegramBotSetupCard() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">{telegramUi.enableBot}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {telegramUi.enableBotDesc}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.enableBotDesc}</p>
                 </div>
                 <Switch
                   checked={form.isEnabled}
@@ -2137,15 +2181,11 @@ function TelegramBotSetupCard() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">{telegramUi.dailyDigest}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {telegramUi.dailyDigestDesc}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.dailyDigestDesc}</p>
                 </div>
                 <Switch
                   checked={form.dailyDigestEnabled}
-                  onCheckedChange={(checked) =>
-                    setForm((prev) => ({ ...prev, dailyDigestEnabled: checked }))
-                  }
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, dailyDigestEnabled: checked }))}
                 />
               </div>
 
@@ -2158,12 +2198,7 @@ function TelegramBotSetupCard() {
                     min={0}
                     max={23}
                     value={String(form.dailyDigestHour)}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        dailyDigestHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)),
-                      }))
-                    }
+                    onChange={(event) => setForm((prev) => ({ ...prev, dailyDigestHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)) }))}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2174,12 +2209,7 @@ function TelegramBotSetupCard() {
                     min={0}
                     max={59}
                     value={String(form.dailyDigestMinute)}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        dailyDigestMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)),
-                      }))
-                    }
+                    onChange={(event) => setForm((prev) => ({ ...prev, dailyDigestMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)) }))}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2190,123 +2220,75 @@ function TelegramBotSetupCard() {
                     min={1}
                     max={168}
                     value={String(form.digestLookbackHours)}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        digestLookbackHours: Math.min(168, Math.max(1, Number(event.target.value) || 1)),
-                      }))
-                    }
+                    onChange={(event) => setForm((prev) => ({ ...prev, digestLookbackHours: Math.min(168, Math.max(1, Number(event.target.value) || 1)) }))}
                   />
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
-              <div className="flex items-start justify-between gap-3">
+            <Collapsible open={botAdvancedOpen} onOpenChange={setBotAdvancedOpen} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">{t('settings.telegram.webhook_status')}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {telegramUi.webhookDesc}
-                  </p>
+                  <p className="text-sm font-medium">Advanced bot controls</p>
+                  <p className="text-xs text-muted-foreground">Webhook lifecycle, bot commands, and manual digest actions.</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => webhookInfoQuery.refetch()}
-                  disabled={webhookInfoQuery.isFetching}
-                >
-                  <RefreshCw className={cn('h-4 w-4', webhookInfoQuery.isFetching && 'animate-spin')} />
-                </Button>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    {botAdvancedOpen ? 'Hide advanced' : 'Show advanced'}
+                    <ChevronRight className={cn('ml-2 h-4 w-4 transition-transform', botAdvancedOpen && 'rotate-90')} />
+                  </Button>
+                </CollapsibleTrigger>
               </div>
+              <CollapsibleContent className="mt-4 space-y-4">
+                <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{t('settings.telegram.webhook_status')}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{telegramUi.webhookDesc}</p>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => webhookInfoQuery.refetch()} disabled={webhookInfoQuery.isFetching}>
+                      <RefreshCw className={cn('h-4 w-4', webhookInfoQuery.isFetching && 'animate-spin')} />
+                    </Button>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs break-all">
+                    {webhookUrl || telegramUi.webhookUnavailable}
+                  </div>
+                  <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
+                    <p>{telegramUi.pendingUpdates}: <span className="font-medium text-foreground">{webhookInfoQuery.data?.pendingUpdateCount ?? 0}</span></p>
+                    {webhookInfoQuery.data?.lastErrorMessage ? <p className="text-destructive">{telegramUi.lastError}: {webhookInfoQuery.data.lastErrorMessage}</p> : null}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" className="rounded-full" onClick={() => setWebhookMutation.mutate({ webhookUrl })} disabled={!hasToken || !webhookUrl || setWebhookMutation.isPending}>
+                      {setWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                      {t('settings.telegram.set_webhook')}
+                    </Button>
+                    <Button type="button" variant="outline" className="rounded-full" onClick={() => deleteWebhookMutation.mutate()} disabled={!hasToken || deleteWebhookMutation.isPending}>
+                      {deleteWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                      {t('settings.telegram.remove_webhook')}
+                    </Button>
+                  </div>
+                </div>
 
-              <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs break-all">
-                {webhookUrl || telegramUi.webhookUnavailable}
-              </div>
-
-              <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
-                <p>
-                  {telegramUi.pendingUpdates}:{' '}
-                  <span className="font-medium text-foreground">
-                    {webhookInfoQuery.data?.pendingUpdateCount ?? 0}
-                  </span>
-                </p>
-                {webhookInfoQuery.data?.lastErrorMessage ? (
-                  <p className="text-destructive">
-                    {telegramUi.lastError}: {webhookInfoQuery.data.lastErrorMessage}
+                <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
+                  <p className="text-sm font-medium">{telegramUi.commandSurface}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {telegramUi.userCommands}: <code>/start</code>, <code>/buy</code>, <code>/renew</code>, <code>/orders</code>, <code>/order</code>, <code>/mykeys</code>, <code>/sub</code>, <code>/usage</code>, <code>/inbox</code>, <code>/notifications</code>, <code>/premium</code>, <code>/premiumregion</code>, <code>/supportstatus</code>, <code>/server</code>, <code>/support</code>, <code>/language</code>
                   </p>
-                ) : null}
-              </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>, <code>/enable</code>, <code>/resend</code>, <code>/announce</code>, <code>/announcements</code>, <code>/announcehistory</code>, <code>/scheduleannouncement</code>, <code>/finance</code>, <code>/sendfinance</code>, <code>/refunds</code>, <code>/claimrefund</code>, <code>/reassignrefund</code>, <code>/serverdown</code>, <code>/maintenance</code>, <code>/serverupdate</code>, <code>/serverrecovered</code>, <code>/status</code>, <code>/sysinfo</code>, <code>/backup</code>
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" className="rounded-full" onClick={() => runDigestMutation.mutate()} disabled={runDigestMutation.isPending || !hasToken}>
+                      {runDigestMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                      {telegramUi.sendDigestNow}
+                    </Button>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </TabsContent>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  className="rounded-full"
-                  onClick={() => setWebhookMutation.mutate({ webhookUrl })}
-                  disabled={!hasToken || !webhookUrl || setWebhookMutation.isPending}
-                >
-                  {setWebhookMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                  )}
-                  {t('settings.telegram.set_webhook')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => deleteWebhookMutation.mutate()}
-                  disabled={!hasToken || deleteWebhookMutation.isPending}
-                >
-                  {deleteWebhookMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                  )}
-                  {t('settings.telegram.remove_webhook')}
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
-              <p className="text-sm font-medium">{telegramUi.commandSurface}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {telegramUi.userCommands}: <code>/start</code>, <code>/buy</code>, <code>/renew</code>,{' '}
-                <code>/orders</code>, <code>/order</code>, <code>/mykeys</code>, <code>/sub</code>,{' '}
-                <code>/usage</code>, <code>/inbox</code>, <code>/notifications</code>, <code>/premium</code>,{' '}
-                <code>/premiumregion</code>, <code>/supportstatus</code>, <code>/server</code>, <code>/support</code>,{' '}
-                <code>/language</code>
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {telegramUi.adminCommands}: <code>/expiring</code>, <code>/find</code>, <code>/disable</code>,{' '}
-                <code>/enable</code>, <code>/resend</code>, <code>/announce</code>,{' '}
-                <code>/announcements</code>, <code>/announcehistory</code>, <code>/scheduleannouncement</code>,{' '}
-                <code>/finance</code>, <code>/sendfinance</code>, <code>/refunds</code>,{' '}
-                <code>/claimrefund</code>, <code>/reassignrefund</code>, <code>/serverdown</code>,{' '}
-                <code>/maintenance</code>, <code>/serverupdate</code>, <code>/serverrecovered</code>,{' '}
-                <code>/status</code>, <code>/sysinfo</code>, <code>/backup</code>
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => runDigestMutation.mutate()}
-                  disabled={runDigestMutation.isPending || !hasToken}
-                >
-                  {runDigestMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  {telegramUi.sendDigestNow}
-                </Button>
-              </div>
-            </div>
-
+          <TabsContent value="broadcasts" className="space-y-4">
             <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
               <div className="space-y-1">
                 <p className="text-sm font-medium">{telegramUi.announcementTitle}</p>
@@ -2316,42 +2298,21 @@ function TelegramBotSetupCard() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{telegramUi.announcementAudience}</Label>
-                  <Select
-                    value={announcementAudience}
-                    onValueChange={(value: TelegramAnnouncementPanelAudience) => setAnnouncementAudience(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={announcementAudience} onValueChange={(value: TelegramAnnouncementPanelAudience) => setAnnouncementAudience(value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ACTIVE_USERS">
-                        {isMyanmar ? 'Active Telegram users' : 'Active Telegram users'}
-                      </SelectItem>
-                      <SelectItem value="STANDARD_USERS">
-                        {isMyanmar ? 'Standard key users' : 'Standard key users'}
-                      </SelectItem>
-                      <SelectItem value="PREMIUM_USERS">
-                        {isMyanmar ? 'Premium users' : 'Premium users'}
-                      </SelectItem>
-                      <SelectItem value="TRIAL_USERS">
-                        {isMyanmar ? 'Trial users' : 'Trial users'}
-                      </SelectItem>
+                      <SelectItem value="ACTIVE_USERS">{isMyanmar ? 'Active Telegram users' : 'Active Telegram users'}</SelectItem>
+                      <SelectItem value="STANDARD_USERS">{isMyanmar ? 'Standard key users' : 'Standard key users'}</SelectItem>
+                      <SelectItem value="PREMIUM_USERS">{isMyanmar ? 'Premium users' : 'Premium users'}</SelectItem>
+                      <SelectItem value="TRIAL_USERS">{isMyanmar ? 'Trial users' : 'Trial users'}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {telegramUi.recipientsLabel}: {announcementAudienceCountsQuery.isLoading ? '…' : announcementAudienceCount}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.recipientsLabel}: {announcementAudienceCountsQuery.isLoading ? '…' : announcementAudienceCount}</p>
                 </div>
-
                 <div className="space-y-2">
                   <Label>{telegramUi.announcementType}</Label>
-                  <Select
-                    value={announcementType}
-                    onValueChange={(value: TelegramAnnouncementType) => setAnnouncementType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={announcementType} onValueChange={(value: TelegramAnnouncementType) => setAnnouncementType(value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="INFO">{isMyanmar ? 'Information' : 'Information'}</SelectItem>
                       <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'Announcement' : 'Announcement'}</SelectItem>
@@ -2363,230 +2324,150 @@ function TelegramBotSetupCard() {
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementCardStyle}</Label>
-                  <Select
-                    value={announcementCardStyle}
-                    onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementCardStyle(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DEFAULT">
-                        {getAnnouncementCardStyleLabel('DEFAULT', isMyanmar)}
-                      </SelectItem>
-                      <SelectItem value="PROMO">
-                        {getAnnouncementCardStyleLabel('PROMO', isMyanmar)}
-                      </SelectItem>
-                      <SelectItem value="PREMIUM">
-                        {getAnnouncementCardStyleLabel('PREMIUM', isMyanmar)}
-                      </SelectItem>
-                      <SelectItem value="OPERATIONS">
-                        {getAnnouncementCardStyleLabel('OPERATIONS', isMyanmar)}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementRecurrence}</Label>
-                  <Select
-                    value={announcementRecurrenceType}
-                    onValueChange={(value: TelegramAnnouncementRecurrenceType) => setAnnouncementRecurrenceType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">{telegramUi.announcementOneTime}</SelectItem>
-                      <SelectItem value="DAILY">{telegramUi.announcementDaily}</SelectItem>
-                      <SelectItem value="WEEKLY">{telegramUi.announcementWeekly}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementTargetTag}</Label>
-                  <Select value={announcementTargetTag} onValueChange={setAnnouncementTargetTag}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                      {announcementTargetOptions.tags.map((tag) => (
-                        <SelectItem key={tag.value} value={tag.value}>
-                          {tag.value} ({tag.count})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{isMyanmar ? 'Customer segment' : 'Customer segment'}</Label>
-                  <Select value={announcementTargetSegment} onValueChange={setAnnouncementTargetSegment}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                      {announcementTargetOptions.segments.map((segment) => (
-                        <SelectItem key={segment.value} value={segment.value}>
-                          {getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementTargetServer}</Label>
-                  <Select value={announcementTargetServerId} onValueChange={setAnnouncementTargetServerId}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                      {announcementTargetOptions.servers.map((server) => (
-                        <SelectItem key={server.value} value={server.value}>
-                          {server.label}{server.countryCode ? ` (${server.countryCode})` : ''} ({server.count})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementTargetRegion}</Label>
-                  <Select value={announcementTargetCountryCode} onValueChange={setAnnouncementTargetCountryCode}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                      {announcementTargetOptions.regions.map((region) => (
-                        <SelectItem key={region.value} value={region.value}>
-                          {region.value} ({region.count})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
               <div className="mt-3 space-y-2">
                 <Label htmlFor="telegram-announcement-title">{telegramUi.announcementSubject}</Label>
-                <Input
-                  id="telegram-announcement-title"
-                  value={announcementTitle}
-                  onChange={(event) => setAnnouncementTitle(event.target.value)}
-                  placeholder={isMyanmar ? 'ဥပမာ - New SG server is ready' : 'Example: New SG server is ready'}
-                />
+                <Input id="telegram-announcement-title" value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} placeholder={isMyanmar ? 'ဥပမာ - New SG server is ready' : 'Example: New SG server is ready'} />
               </div>
-
               <div className="mt-3 space-y-2">
                 <Label htmlFor="telegram-announcement-message">{telegramUi.announcementBody}</Label>
-                <Textarea
-                  id="telegram-announcement-message"
-                  rows={5}
-                  value={announcementMessage}
-                  onChange={(event) => setAnnouncementMessage(event.target.value)}
-                  placeholder={
-                    isMyanmar
-                      ? 'အသုံးပြုသူများထံ ပို့လိုသော မက်ဆေ့ချ်ကို ဒီနေရာမှာ ရိုက်ပါ။'
-                      : 'Write the manual message you want to send to users here.'
-                  }
-                />
+                <Textarea id="telegram-announcement-message" rows={5} value={announcementMessage} onChange={(event) => setAnnouncementMessage(event.target.value)} placeholder={isMyanmar ? 'အသုံးပြုသူများထံ ပို့လိုသော မက်ဆေ့ချ်ကို ဒီနေရာမှာ ရိုက်ပါ။' : 'Write the manual message you want to send to users here.'} />
               </div>
 
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="telegram-announcement-hero-image">{telegramUi.announcementHeroImage}</Label>
-                <Input
-                  id="telegram-announcement-hero-image"
-                  value={announcementHeroImageUrl}
-                  onChange={(event) => setAnnouncementHeroImageUrl(event.target.value)}
-                  placeholder="https://example.com/promo-banner.jpg"
-                />
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementHeroImageHint}</p>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="telegram-announcement-scheduled-for">{telegramUi.announcementScheduleAt}</Label>
-                <Input
-                  id="telegram-announcement-scheduled-for"
-                  type="datetime-local"
-                  value={announcementScheduledFor}
-                  onChange={(event) => setAnnouncementScheduledFor(event.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementScheduleHint}</p>
-              </div>
+              <Collapsible className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Advanced targeting and presentation</p>
+                    <p className="text-xs text-muted-foreground">Card style, targeting, scheduling, inbox pinning, and image presentation.</p>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button type="button" variant="outline" size="sm">
+                      Show options
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent className="mt-4 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>{telegramUi.announcementCardStyle}</Label>
+                      <Select value={announcementCardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementCardStyle(value)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DEFAULT">{getAnnouncementCardStyleLabel('DEFAULT', isMyanmar)}</SelectItem>
+                          <SelectItem value="PROMO">{getAnnouncementCardStyleLabel('PROMO', isMyanmar)}</SelectItem>
+                          <SelectItem value="PREMIUM">{getAnnouncementCardStyleLabel('PREMIUM', isMyanmar)}</SelectItem>
+                          <SelectItem value="OPERATIONS">{getAnnouncementCardStyleLabel('OPERATIONS', isMyanmar)}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{telegramUi.announcementRecurrence}</Label>
+                      <Select value={announcementRecurrenceType} onValueChange={(value: TelegramAnnouncementRecurrenceType) => setAnnouncementRecurrenceType(value)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">{telegramUi.announcementOneTime}</SelectItem>
+                          <SelectItem value="DAILY">{telegramUi.announcementDaily}</SelectItem>
+                          <SelectItem value="WEEKLY">{telegramUi.announcementWeekly}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label>{telegramUi.announcementTargetTag}</Label>
+                      <Select value={announcementTargetTag} onValueChange={setAnnouncementTargetTag}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                          {announcementTargetOptions.tags.map((tag) => <SelectItem key={tag.value} value={tag.value}>{tag.value} ({tag.count})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{isMyanmar ? 'Customer segment' : 'Customer segment'}</Label>
+                      <Select value={announcementTargetSegment} onValueChange={setAnnouncementTargetSegment}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                          {announcementTargetOptions.segments.map((segment) => <SelectItem key={segment.value} value={segment.value}>{getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{telegramUi.announcementTargetServer}</Label>
+                      <Select value={announcementTargetServerId} onValueChange={setAnnouncementTargetServerId}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                          {announcementTargetOptions.servers.map((server) => <SelectItem key={server.value} value={server.value}>{server.label}{server.countryCode ? ` (${server.countryCode})` : ''} ({server.count})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{telegramUi.announcementTargetRegion}</Label>
+                      <Select value={announcementTargetCountryCode} onValueChange={setAnnouncementTargetCountryCode}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                          {announcementTargetOptions.regions.map((region) => <SelectItem key={region.value} value={region.value}>{region.value} ({region.count})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="telegram-announcement-hero-image">{telegramUi.announcementHeroImage}</Label>
+                      <Input id="telegram-announcement-hero-image" value={announcementHeroImageUrl} onChange={(event) => setAnnouncementHeroImageUrl(event.target.value)} placeholder="https://example.com/promo-banner.jpg" />
+                      <p className="text-xs text-muted-foreground">{telegramUi.announcementHeroImageHint}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="telegram-announcement-scheduled-for">{telegramUi.announcementScheduleAt}</Label>
+                      <Input id="telegram-announcement-scheduled-for" type="datetime-local" value={announcementScheduledFor} onChange={(event) => setAnnouncementScheduledFor(event.target.value)} />
+                      <p className="text-xs text-muted-foreground">{telegramUi.announcementScheduleHint}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-3">
+                      <div>
+                        <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
+                        <p className="text-xs text-muted-foreground">Adds the configured support link as an inline button when available.</p>
+                      </div>
+                      <Switch checked={announcementIncludeSupportButton} onCheckedChange={setAnnouncementIncludeSupportButton} />
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-3">
+                      <div>
+                        <p className="text-sm font-medium">{telegramUi.announcementPinToInbox}</p>
+                        <p className="text-xs text-muted-foreground">{telegramUi.announcementPinToInboxHint}</p>
+                      </div>
+                      <Switch checked={announcementPinToInbox} onCheckedChange={setAnnouncementPinToInbox} />
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{telegramUi.announcementCardPreview}</p>
                   <p className="text-xs text-muted-foreground">{telegramUi.announcementCardPreviewDesc}</p>
                 </div>
-                <div
-                  className={cn(
-                    'mt-3 overflow-hidden rounded-2xl border p-4',
-                    getAnnouncementCardPreviewClass(announcementCardStyle),
-                  )}
-                >
+                <div className={cn('mt-3 overflow-hidden rounded-2xl border p-4', getAnnouncementCardPreviewClass(announcementCardStyle))}>
                   {announcementHeroImageUrl.trim() ? (
                     <div className="mb-3 overflow-hidden rounded-xl border border-white/10">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={announcementHeroImageUrl.trim()}
-                        alt={announcementTitle.trim() || 'Announcement preview'}
-                        className="h-36 w-full object-cover"
-                      />
+                      <img src={announcementHeroImageUrl.trim()} alt={announcementTitle.trim() || 'Announcement preview'} className="h-36 w-full object-cover" />
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{getAnnouncementCardStyleLabel(announcementCardStyle, isMyanmar)}</Badge>
                     <Badge variant="outline">{announcementType}</Badge>
-                    <Badge variant="outline">
-                      {getAnnouncementRecurrenceLabel(announcementRecurrenceType, isMyanmar)}
-                    </Badge>
+                    <Badge variant="outline">{getAnnouncementRecurrenceLabel(announcementRecurrenceType, isMyanmar)}</Badge>
                     {announcementPinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                   </div>
-                  <p className="mt-3 text-lg font-semibold">
-                    {announcementTitle.trim() || (isMyanmar ? 'Announcement title preview' : 'Announcement title preview')}
-                  </p>
+                  <p className="mt-3 text-lg font-semibold">{announcementTitle.trim() || (isMyanmar ? 'Announcement title preview' : 'Announcement title preview')}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
-                    {announcementMessage.trim() ||
-                      (isMyanmar
-                        ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message preview ကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။'
-                        : 'This is where the branded Telegram announcement preview appears.')}
+                    {announcementMessage.trim() || (isMyanmar ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message preview ကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။' : 'This is where the branded Telegram announcement preview appears.')}
                   </p>
                 </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
-                <div>
-                  <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {isMyanmar
-                      ? 'Support link သတ်မှတ်ထားပါက အောက်ခြေ button အဖြစ် ထည့်ပေးမည်။'
-                      : 'Adds the configured support link as an inline button when available.'}
-                  </p>
-                </div>
-                <Switch
-                  checked={announcementIncludeSupportButton}
-                  onCheckedChange={setAnnouncementIncludeSupportButton}
-                />
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-3">
-                <div>
-                  <p className="text-sm font-medium">{telegramUi.announcementPinToInbox}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementPinToInboxHint}</p>
-                </div>
-                <Switch
-                  checked={announcementPinToInbox}
-                  onCheckedChange={setAnnouncementPinToInbox}
-                />
               </div>
 
               {!canManageAnnouncements ? (
@@ -2600,914 +2481,438 @@ function TelegramBotSetupCard() {
                   type="button"
                   variant="secondary"
                   className="rounded-full"
-                  onClick={() =>
-                    previewAnnouncementToSelfMutation.mutate({
-                      type: announcementType,
-                      title: announcementTitle.trim(),
-                      message: announcementMessage.trim(),
-                      cardStyle: announcementCardStyle,
-                      heroImageUrl: announcementHeroImageUrl.trim() || null,
-                      includeSupportButton: announcementIncludeSupportButton,
-                      pinToInbox: announcementPinToInbox,
-                    })
-                  }
-                  disabled={
-                    !hasToken ||
-                    !canManageAnnouncements ||
-                    previewAnnouncementToSelfMutation.isPending ||
-                    announcementTitle.trim().length < 3 ||
-                    announcementMessage.trim().length < 10
-                  }
+                  onClick={() => previewAnnouncementToSelfMutation.mutate({
+                    type: announcementType,
+                    title: announcementTitle.trim(),
+                    message: announcementMessage.trim(),
+                    cardStyle: announcementCardStyle,
+                    heroImageUrl: announcementHeroImageUrl.trim() || null,
+                    includeSupportButton: announcementIncludeSupportButton,
+                    pinToInbox: announcementPinToInbox,
+                  })}
+                  disabled={!hasToken || !canManageAnnouncements || previewAnnouncementToSelfMutation.isPending || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10}
                 >
-                  {previewAnnouncementToSelfMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <TestTube className="mr-2 h-4 w-4" />
-                  )}
+                  {previewAnnouncementToSelfMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
                   {telegramUi.announcementPreviewSelf}
                 </Button>
                 <Button
                   type="button"
                   className="rounded-full"
-                  onClick={() =>
-                    sendAnnouncementMutation.mutate({
-                      audience: announcementAudience,
-                      type: announcementType,
-                      filters: announcementFilters,
-                      title: announcementTitle.trim(),
-                      message: announcementMessage.trim(),
-                      cardStyle: announcementCardStyle,
-                      templateId: announcementSourceTemplateId,
-                      templateName: announcementSourceTemplateName,
-                      heroImageUrl: announcementHeroImageUrl.trim() || null,
-                      includeSupportButton: announcementIncludeSupportButton,
-                      pinToInbox: announcementPinToInbox,
-                      scheduledFor: null,
-                      recurrenceType: announcementRecurrenceType,
-                    })
-                  }
-                  disabled={
-                    !hasToken ||
-                    !canManageAnnouncements ||
-                    sendAnnouncementMutation.isPending ||
-                    announcementTitle.trim().length < 3 ||
-                    announcementMessage.trim().length < 10 ||
-                    announcementAudienceCount === 0
-                  }
+                  onClick={() => sendAnnouncementMutation.mutate({
+                    audience: announcementAudience,
+                    type: announcementType,
+                    filters: announcementFilters,
+                    title: announcementTitle.trim(),
+                    message: announcementMessage.trim(),
+                    cardStyle: announcementCardStyle,
+                    templateId: announcementSourceTemplateId,
+                    templateName: announcementSourceTemplateName,
+                    heroImageUrl: announcementHeroImageUrl.trim() || null,
+                    includeSupportButton: announcementIncludeSupportButton,
+                    pinToInbox: announcementPinToInbox,
+                    scheduledFor: null,
+                    recurrenceType: announcementRecurrenceType,
+                  })}
+                  disabled={!hasToken || !canManageAnnouncements || sendAnnouncementMutation.isPending || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10 || announcementAudienceCount === 0}
                 >
-                  {sendAnnouncementMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bell className="mr-2 h-4 w-4" />
-                  )}
+                  {sendAnnouncementMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bell className="mr-2 h-4 w-4" />}
                   {telegramUi.sendAnnouncementNow}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   className="rounded-full"
-                  onClick={() =>
-                    sendAnnouncementMutation.mutate({
-                      audience: announcementAudience,
-                      type: announcementType,
-                      filters: announcementFilters,
-                      title: announcementTitle.trim(),
-                      message: announcementMessage.trim(),
-                      cardStyle: announcementCardStyle,
-                      templateId: announcementSourceTemplateId,
-                      templateName: announcementSourceTemplateName,
-                      heroImageUrl: announcementHeroImageUrl.trim() || null,
-                      includeSupportButton: announcementIncludeSupportButton,
-                      pinToInbox: announcementPinToInbox,
-                      scheduledFor: announcementScheduledFor
-                        ? new Date(announcementScheduledFor).toISOString()
-                        : null,
-                      recurrenceType: announcementRecurrenceType,
-                    })
-                  }
-                  disabled={
-                    !hasToken ||
-                    !canManageAnnouncements ||
-                    sendAnnouncementMutation.isPending ||
-                    !announcementScheduledFor ||
-                    Number.isNaN(new Date(announcementScheduledFor).getTime()) ||
-                    announcementTitle.trim().length < 3 ||
-                    announcementMessage.trim().length < 10 ||
-                    announcementAudienceCount === 0
-                  }
+                  onClick={() => sendAnnouncementMutation.mutate({
+                    audience: announcementAudience,
+                    type: announcementType,
+                    filters: announcementFilters,
+                    title: announcementTitle.trim(),
+                    message: announcementMessage.trim(),
+                    cardStyle: announcementCardStyle,
+                    templateId: announcementSourceTemplateId,
+                    templateName: announcementSourceTemplateName,
+                    heroImageUrl: announcementHeroImageUrl.trim() || null,
+                    includeSupportButton: announcementIncludeSupportButton,
+                    pinToInbox: announcementPinToInbox,
+                    scheduledFor: announcementScheduledFor ? new Date(announcementScheduledFor).toISOString() : null,
+                    recurrenceType: announcementRecurrenceType,
+                  })}
+                  disabled={!hasToken || !canManageAnnouncements || sendAnnouncementMutation.isPending || !announcementScheduledFor || Number.isNaN(new Date(announcementScheduledFor).getTime()) || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10 || announcementAudienceCount === 0}
                 >
-                  {sendAnnouncementMutation.isPending && announcementScheduledFor ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Clock className="mr-2 h-4 w-4" />
-                  )}
+                  {sendAnnouncementMutation.isPending && announcementScheduledFor ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />}
                   {telegramUi.announcementScheduleNow}
                 </Button>
               </div>
+            </div>
+          </TabsContent>
 
-              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{telegramUi.announcementPresetTemplatesTitle}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementPresetTemplatesDesc}</p>
-                </div>
+          <TabsContent value="templates" className="space-y-4">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{telegramUi.announcementPresetTemplatesTitle}</p>
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementPresetTemplatesDesc}</p>
+              </div>
+              <div className="mt-3 space-y-2">
+                {announcementPresetTemplates.map((preset) => (
+                  <div key={preset.code} className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{preset.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{preset.title}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{preset.type}</Badge>
+                        <Badge variant="outline">{preset.audience}</Badge>
+                        <Badge variant="outline">{getAnnouncementCardStyleLabel(preset.cardStyle, isMyanmar)}</Badge>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{preset.message}</p>
+                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{telegramUi.announcementCommandPreview}</p>
+                      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{preset.command}</pre>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setAnnouncementAudience(preset.audience);
+                          setAnnouncementType(preset.type);
+                          setAnnouncementTargetTag(preset.targetTag || 'ALL');
+                          setAnnouncementTargetSegment(preset.targetSegment || 'ALL');
+                          setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
+                          setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
+                          setAnnouncementTitle(preset.title);
+                          setAnnouncementMessage(preset.message);
+                          setAnnouncementCardStyle(preset.cardStyle);
+                          setAnnouncementHeroImageUrl('');
+                          setAnnouncementIncludeSupportButton(preset.includeSupportButton);
+                          setAnnouncementPinToInbox(false);
+                          setAnnouncementScheduledFor('');
+                          setAnnouncementRecurrenceType(preset.recurrenceType);
+                          setAnnouncementSourceTemplateId(null);
+                          setAnnouncementSourceTemplateName(preset.name);
+                          setActiveBotTab('broadcasts');
+                        }}
+                      >
+                        {telegramUi.announcementApplyTemplate}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => void copyAnnouncementCommand(preset.command)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        {telegramUi.announcementCopyCommand}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => saveAnnouncementTemplateMutation.mutate({
+                          name: preset.name,
+                          audience: preset.audience,
+                          type: preset.type,
+                          filters: {
+                            tag: preset.targetTag,
+                            segment: (preset.targetSegment as TelegramAnnouncementSegment | null) || null,
+                            serverId: preset.targetServerId,
+                            countryCode: preset.targetCountryCode,
+                          },
+                          title: preset.title,
+                          message: preset.message,
+                          cardStyle: preset.cardStyle,
+                          includeSupportButton: preset.includeSupportButton,
+                          pinToInbox: false,
+                          recurrenceType: preset.recurrenceType,
+                        })}
+                        disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending}
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {telegramUi.announcementSavePreset}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="mt-3 space-y-2">
-                  {announcementPresetTemplates.map((preset) => (
-                    <div
-                      key={preset.code}
-                      className="rounded-2xl border border-border/60 bg-background/70 p-3"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{telegramUi.announcementTemplatesTitle}</p>
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementTemplatesDesc}</p>
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Input value={announcementTemplateName} onChange={(event) => setAnnouncementTemplateName(event.target.value)} placeholder={telegramUi.announcementTemplateName} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => saveAnnouncementTemplateMutation.mutate({
+                    name: announcementTemplateName.trim(),
+                    audience: announcementAudience,
+                    type: announcementType,
+                    filters: announcementFilters,
+                    title: announcementTitle.trim(),
+                    message: announcementMessage.trim(),
+                    cardStyle: announcementCardStyle,
+                    heroImageUrl: announcementHeroImageUrl.trim() || null,
+                    includeSupportButton: announcementIncludeSupportButton,
+                    pinToInbox: announcementPinToInbox,
+                    recurrenceType: announcementRecurrenceType,
+                  })}
+                  disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending || announcementTemplateName.trim().length < 2 || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10}
+                >
+                  {saveAnnouncementTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {telegramUi.announcementSaveTemplate}
+                </Button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {announcementTemplates.length ? (
+                  announcementTemplates.map((template) => (
+                    <div key={template.id} className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium">{preset.name}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{preset.title}</p>
+                          <p className="text-sm font-medium">{template.name}</p>
+                          <p className="text-xs text-muted-foreground">{template.title}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">{preset.type}</Badge>
-                          <Badge variant="outline">{preset.audience}</Badge>
-                          <Badge variant="outline">
-                            {getAnnouncementCardStyleLabel(preset.cardStyle, isMyanmar)}
-                          </Badge>
-                          {preset.recurrenceType && preset.recurrenceType !== 'NONE' ? (
-                            <Badge variant="secondary">
-                              {getAnnouncementRecurrenceLabel(preset.recurrenceType, isMyanmar)}
-                            </Badge>
-                          ) : null}
-                          {preset.targetTag ? <Badge variant="secondary">Tag: {preset.targetTag}</Badge> : null}
-                          {preset.targetSegment ? (
-                            <Badge variant="secondary">
-                              Segment: {getAnnouncementSegmentLabel(preset.targetSegment, isMyanmar)}
-                            </Badge>
-                          ) : null}
-                          {preset.targetCountryCode ? <Badge variant="secondary">Region: {preset.targetCountryCode}</Badge> : null}
+                          <Badge variant="outline">{template.type}</Badge>
+                          <Badge variant="outline">{getAnnouncementCardStyleLabel(template.cardStyle, isMyanmar)}</Badge>
+                          {template.recurrenceType && template.recurrenceType !== 'NONE' ? <Badge variant="secondary">{getAnnouncementRecurrenceLabel(template.recurrenceType, isMyanmar)}</Badge> : null}
+                          {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
                         </div>
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">{preset.message}</p>
-                      <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          {telegramUi.announcementCommandPreview}
-                        </p>
+                      <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{telegramUi.announcementCommandPreview}</p>
                         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                          {preset.command}
+                          {buildTelegramAnnouncementTemplateCommand({
+                            audience: template.audience,
+                            type: template.type,
+                            title: template.title,
+                            message: template.message,
+                            cardStyle: template.cardStyle,
+                            includeSupportButton: template.includeSupportButton,
+                            targetTag: template.targetTag,
+                            targetSegment: template.targetSegment,
+                            targetServerId: template.targetServerId,
+                            targetCountryCode: template.targetCountryCode,
+                          })}
                         </pre>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setAnnouncementAudience(preset.audience);
-                            setAnnouncementType(preset.type);
-                            setAnnouncementTargetTag(preset.targetTag || 'ALL');
-                            setAnnouncementTargetSegment(preset.targetSegment || 'ALL');
-                            setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
-                            setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
-                            setAnnouncementTitle(preset.title);
-                            setAnnouncementMessage(preset.message);
-                            setAnnouncementCardStyle(preset.cardStyle);
-                            setAnnouncementHeroImageUrl('');
-                            setAnnouncementIncludeSupportButton(preset.includeSupportButton);
-                            setAnnouncementPinToInbox(false);
+                            setAnnouncementAudience(template.audience);
+                            setAnnouncementType(template.type);
+                            setAnnouncementTargetTag(template.targetTag || 'ALL');
+                            setAnnouncementTargetSegment(template.targetSegment || 'ALL');
+                            setAnnouncementTargetServerId(template.targetServerId || 'ALL');
+                            setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
+                            setAnnouncementTitle(template.title);
+                            setAnnouncementMessage(template.message);
+                            setAnnouncementCardStyle(template.cardStyle);
+                            setAnnouncementHeroImageUrl(template.heroImageUrl || '');
+                            setAnnouncementIncludeSupportButton(template.includeSupportButton);
+                            setAnnouncementPinToInbox(template.pinToInbox);
                             setAnnouncementScheduledFor('');
-                            setAnnouncementRecurrenceType(preset.recurrenceType);
-                            setAnnouncementSourceTemplateId(null);
-                            setAnnouncementSourceTemplateName(preset.name);
+                            setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
+                            setAnnouncementSourceTemplateId(template.id);
+                            setAnnouncementSourceTemplateName(template.name);
+                            setActiveBotTab('broadcasts');
                           }}
                         >
                           {telegramUi.announcementApplyTemplate}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void copyAnnouncementCommand(preset.command)}
-                        >
+                        <Button type="button" size="sm" variant="outline" onClick={() => void copyAnnouncementCommand(buildTelegramAnnouncementTemplateCommand({
+                          audience: template.audience,
+                          type: template.type,
+                          title: template.title,
+                          message: template.message,
+                          cardStyle: template.cardStyle,
+                          includeSupportButton: template.includeSupportButton,
+                          targetTag: template.targetTag,
+                          targetSegment: template.targetSegment,
+                          targetServerId: template.targetServerId,
+                          targetCountryCode: template.targetCountryCode,
+                        }))}>
                           <Copy className="mr-2 h-4 w-4" />
                           {telegramUi.announcementCopyCommand}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            saveAnnouncementTemplateMutation.mutate({
-                              name: preset.name,
-                              audience: preset.audience,
-                              type: preset.type,
-                              filters: {
-                                tag: preset.targetTag,
-                                segment: (preset.targetSegment as TelegramAnnouncementSegment | null) || null,
-                                serverId: preset.targetServerId,
-                                countryCode: preset.targetCountryCode,
-                              },
-                              title: preset.title,
-                              message: preset.message,
-                              cardStyle: preset.cardStyle,
-                              includeSupportButton: preset.includeSupportButton,
-                              pinToInbox: false,
-                              recurrenceType: preset.recurrenceType,
-                            })
-                          }
-                          disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending}
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          {telegramUi.announcementSavePreset}
+                        <Button type="button" size="sm" variant="ghost" onClick={() => deleteAnnouncementTemplateMutation.mutate({ templateId: template.id })} disabled={deleteAnnouncementTemplateMutation.isPending}>
+                          {telegramUi.announcementDeleteTemplate}
                         </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementNoTemplates}</p>
+                )}
               </div>
+            </div>
+          </TabsContent>
 
-              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">{telegramUi.announcementTemplatesTitle}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementTemplatesDesc}</p>
+                  <p className="text-sm font-medium">{telegramUi.announcementAnalyticsTitle}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.announcementAnalyticsDesc}</p>
                 </div>
-
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    value={announcementTemplateName}
-                    onChange={(event) => setAnnouncementTemplateName(event.target.value)}
-                    placeholder={telegramUi.announcementTemplateName}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      saveAnnouncementTemplateMutation.mutate({
-                        name: announcementTemplateName.trim(),
-                        audience: announcementAudience,
-                        type: announcementType,
-                        filters: announcementFilters,
-                        title: announcementTitle.trim(),
-                        message: announcementMessage.trim(),
-                        cardStyle: announcementCardStyle,
-                        heroImageUrl: announcementHeroImageUrl.trim() || null,
-                        includeSupportButton: announcementIncludeSupportButton,
-                        pinToInbox: announcementPinToInbox,
-                        recurrenceType: announcementRecurrenceType,
-                      })
-                    }
-                    disabled={
-                      !canManageAnnouncements ||
-                      saveAnnouncementTemplateMutation.isPending ||
-                      announcementTemplateName.trim().length < 2 ||
-                      announcementTitle.trim().length < 3 ||
-                      announcementMessage.trim().length < 10
-                    }
-                  >
-                    {saveAnnouncementTemplateMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-4 w-4" />
-                    )}
-                    {telegramUi.announcementSaveTemplate}
-                  </Button>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  {announcementTemplates.length ? (
-                    announcementTemplates.map((template) => (
-                      <div
-                        key={template.id}
-                        className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{template.name}</p>
-                            <p className="text-xs text-muted-foreground">{template.title}</p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="outline">{template.type}</Badge>
-                            <Badge variant="outline">
-                              {getAnnouncementCardStyleLabel(template.cardStyle, isMyanmar)}
-                            </Badge>
-                            {template.recurrenceType && template.recurrenceType !== 'NONE' ? (
-                              <Badge variant="secondary">
-                                {getAnnouncementRecurrenceLabel(template.recurrenceType, isMyanmar)}
-                              </Badge>
-                            ) : null}
-                            {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
-                          </div>
-                        </div>
-                        {(template.targetTag || template.targetSegment || template.targetServerName || template.targetCountryCode) ? (
-                          <div className="flex flex-wrap gap-2">
-                            {template.targetTag ? (
-                              <Badge variant="secondary">Tag: {template.targetTag}</Badge>
-                            ) : null}
-                            {template.targetSegment ? (
-                              <Badge variant="secondary">
-                                Segment: {getAnnouncementSegmentLabel(template.targetSegment, isMyanmar)}
-                              </Badge>
-                            ) : null}
-                            {template.targetServerName ? (
-                              <Badge variant="secondary">Server: {template.targetServerName}</Badge>
-                            ) : null}
-                            {template.targetCountryCode ? (
-                              <Badge variant="secondary">Region: {template.targetCountryCode}</Badge>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {telegramUi.announcementCommandPreview}
-                          </p>
-                          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                            {buildTelegramAnnouncementTemplateCommand({
-                              audience: template.audience,
-                              type: template.type,
-                              title: template.title,
-                              message: template.message,
-                              cardStyle: template.cardStyle,
-                              includeSupportButton: template.includeSupportButton,
-                              targetTag: template.targetTag,
-                              targetSegment: template.targetSegment,
-                              targetServerId: template.targetServerId,
-                              targetCountryCode: template.targetCountryCode,
-                            })}
-                          </pre>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setAnnouncementAudience(template.audience);
-                              setAnnouncementType(template.type);
-                              setAnnouncementTargetTag(template.targetTag || 'ALL');
-                              setAnnouncementTargetSegment(template.targetSegment || 'ALL');
-                              setAnnouncementTargetServerId(template.targetServerId || 'ALL');
-                              setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
-                              setAnnouncementTitle(template.title);
-                              setAnnouncementMessage(template.message);
-                              setAnnouncementCardStyle(template.cardStyle);
-                              setAnnouncementHeroImageUrl(template.heroImageUrl || '');
-                              setAnnouncementIncludeSupportButton(template.includeSupportButton);
-                              setAnnouncementPinToInbox(template.pinToInbox);
-                              setAnnouncementScheduledFor('');
-                              setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
-                              setAnnouncementSourceTemplateId(template.id);
-                              setAnnouncementSourceTemplateName(template.name);
-                            }}
-                          >
-                            {telegramUi.announcementApplyTemplate}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              void copyAnnouncementCommand(
-                                buildTelegramAnnouncementTemplateCommand({
-                                  audience: template.audience,
-                                  type: template.type,
-                                  title: template.title,
-                                  message: template.message,
-                                  cardStyle: template.cardStyle,
-                                  includeSupportButton: template.includeSupportButton,
-                                  targetTag: template.targetTag,
-                                  targetSegment: template.targetSegment,
-                                  targetServerId: template.targetServerId,
-                                  targetCountryCode: template.targetCountryCode,
-                                }),
-                              )
-                            }
-                          >
-                            <Copy className="mr-2 h-4 w-4" />
-                            {telegramUi.announcementCopyCommand}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              deleteAnnouncementTemplateMutation.mutate({
-                                templateId: template.id,
-                              })
-                            }
-                            disabled={deleteAnnouncementTemplateMutation.isPending}
-                          >
-                            {telegramUi.announcementDeleteTemplate}
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground">{telegramUi.announcementNoTemplates}</p>
-                  )}
+                <div className="w-full sm:w-40">
+                  <Label className="mb-2 block">{telegramUi.announcementAnalyticsRange}</Label>
+                  <Select value={announcementAnalyticsRange} onValueChange={(value: '7d' | '30d' | '90d') => setAnnouncementAnalyticsRange(value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                      <SelectItem value="90d">Last 90 days</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-
-              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{telegramUi.announcementAnalyticsTitle}</p>
-                    <p className="text-xs text-muted-foreground">{telegramUi.announcementAnalyticsDesc}</p>
+              {announcementAnalyticsQuery.isLoading ? (
+                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading analytics…</div>
+              ) : announcementAnalytics ? (
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementSuccessRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.deliverySuccessRate * 100)}%</p><Progress value={announcementAnalytics.totals.deliverySuccessRate * 100} className="mt-3 h-2" /></div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementOpenRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.openRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.openCount} {telegramUi.announcementOpens.toLowerCase()}</p></div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementClickRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.clickRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.clickCount} {telegramUi.announcementClicks.toLowerCase()}</p></div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementResendRecovery}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.resendRecoveryRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.resendRecovered}/{announcementAnalytics.totals.resendAttempts || 0}</p></div>
                   </div>
-                  <div className="w-full sm:w-40">
-                    <Label className="mb-2 block">{telegramUi.announcementAnalyticsRange}</Label>
-                    <Select
-                      value={announcementAnalyticsRange}
-                      onValueChange={(value: '7d' | '30d' | '90d') => setAnnouncementAnalyticsRange(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7d">Last 7 days</SelectItem>
-                        <SelectItem value="30d">Last 30 days</SelectItem>
-                        <SelectItem value="90d">Last 90 days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {announcementAnalyticsQuery.isLoading ? (
-                  <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading analytics…
-                  </div>
-                ) : announcementAnalytics ? (
-                  <div className="mt-4 space-y-4">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {telegramUi.announcementSuccessRate}
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold">
-                          {Math.round(announcementAnalytics.totals.deliverySuccessRate * 100)}%
-                        </p>
-                        <Progress value={announcementAnalytics.totals.deliverySuccessRate * 100} className="mt-3 h-2" />
-                      </div>
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {telegramUi.announcementOpenRate}
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold">
-                          {Math.round(announcementAnalytics.totals.openRate * 100)}%
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {announcementAnalytics.totals.openCount} {telegramUi.announcementOpens.toLowerCase()}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {telegramUi.announcementClickRate}
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold">
-                          {Math.round(announcementAnalytics.totals.clickRate * 100)}%
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {announcementAnalytics.totals.clickCount} {telegramUi.announcementClicks.toLowerCase()}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {telegramUi.announcementResendRecovery}
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold">
-                          {Math.round(announcementAnalytics.totals.resendRecoveryRate * 100)}%
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {announcementAnalytics.totals.resendRecovered}/{announcementAnalytics.totals.resendAttempts || 0}
-                        </p>
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <p className="text-sm font-medium">{telegramUi.announcementByType}</p>
+                      <div className="mt-3 space-y-2">
+                        {announcementAnalytics.byType.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.byType.map((entry) => (
+                          <div key={entry.type} className="rounded-xl border border-border/50 p-3">
+                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.type}</p><Badge variant="outline">{Math.round(entry.deliverySuccessRate * 100)}%</Badge></div>
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="grid gap-4 xl:grid-cols-2">
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-sm font-medium">{telegramUi.announcementByType}</p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.byType.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.byType.map((entry) => (
-                              <div key={entry.type} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{entry.type}</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.deliverySuccessRate * 100)}%
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-sm font-medium">{telegramUi.announcementByAudience}</p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.byAudience.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.byAudience.map((entry) => (
-                              <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{entry.audience}</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.deliverySuccessRate * 100)}%
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.failedCount} failed
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                      <p className="text-sm font-medium">{telegramUi.announcementByAudience}</p>
+                      <div className="mt-3 space-y-2">
+                        {announcementAnalytics.byAudience.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.byAudience.map((entry) => (
+                          <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
+                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.audience}</p><Badge variant="outline">{Math.round(entry.conversionRate * 100)}% conv.</Badge></div>
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.failedCount} failed</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.attributedOrders} attributed orders • {entry.attributedRevenue.length > 0 ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ') : '0 revenue'}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="grid gap-4 xl:grid-cols-2">
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">Template performance</p>
-                          <Badge variant="outline">
-                            {announcementAnalytics.totals.promoAttributedOrders} attributed orders
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Promo attribution revenue:{' '}
-                          {announcementAnalytics.totals.promoAttributedRevenue.length > 0
-                            ? announcementAnalytics.totals.promoAttributedRevenue
-                                .map((entry) => formatAnnouncementMoney(entry.amount, entry.currency))
-                                .join(' • ')
-                            : '0'}
-                        </p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.byTemplate.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.byTemplate.map((entry) => (
-                              <div key={entry.templateId || entry.templateName} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{entry.templateName}</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.conversionRate * 100)}% conv.
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedOrders} orders •{' '}
-                                  {entry.attributedRevenue.length > 0
-                                    ? entry.attributedRevenue
-                                        .map((value) => formatAnnouncementMoney(value.amount, value.currency))
-                                        .join(' • ')
-                                    : '0 revenue'}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-sm font-medium">Audience conversion</p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.byAudience.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.byAudience.map((entry) => (
-                              <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{entry.audience}</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.conversionRate * 100)}% conv.
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedOrders} attributed orders •{' '}
-                                  {entry.attributedRevenue.length > 0
-                                    ? entry.attributedRevenue
-                                        .map((value) => formatAnnouncementMoney(value.amount, value.currency))
-                                        .join(' • ')
-                                    : '0 revenue'}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
+                  </div>
+                  <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
                     <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium">Template comparison</p>
-                        <Badge variant="outline">
-                          {announcementAnalytics.byTemplate.length >= 2 ? 'Side by side' : 'Need 2 templates'}
-                        </Badge>
+                        <Badge variant="outline">{announcementAnalytics.byTemplate.length >= 2 ? 'Side by side' : 'Need 2 templates'}</Badge>
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {announcementAnalytics.byTemplate.length >= 2 ? (
-                          announcementAnalytics.byTemplate.slice(0, 2).map((entry) => (
-                            <div
-                              key={`compare:${entry.templateId || entry.templateName}`}
-                              className="rounded-xl border border-border/50 p-3"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-medium">{entry.templateName}</p>
-                                <Badge variant="outline">
-                                  {Math.round(entry.conversionRate * 100)}% conv.
-                                </Badge>
-                              </div>
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                <div className="rounded-lg border border-border/50 px-3 py-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Delivery</p>
-                                  <p className="mt-2 text-sm font-medium">{entry.sentCount}/{entry.totalRecipients}</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">{Math.round(entry.deliverySuccessRate * 100)}% success</p>
-                                </div>
-                                <div className="rounded-lg border border-border/50 px-3 py-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Engagement</p>
-                                  <p className="mt-2 text-sm font-medium">{entry.openCount} opens • {entry.clickCount} clicks</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-border/50 px-3 py-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Orders</p>
-                                  <p className="mt-2 text-sm font-medium">{entry.attributedOrders}</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">Attributed conversions</p>
-                                </div>
-                                <div className="rounded-lg border border-border/50 px-3 py-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
-                                  <p className="mt-2 text-sm font-medium">
-                                    {entry.attributedRevenue.length > 0
-                                      ? entry.attributedRevenue
-                                          .map((value) => formatAnnouncementMoney(value.amount, value.currency))
-                                          .join(' • ')
-                                      : '0'}
-                                  </p>
-                                  <p className="mt-1 text-xs text-muted-foreground">Attributed promo revenue</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            Send at least two announcement templates to compare them side by side.
-                          </p>
-                        )}
+                        {announcementAnalytics.byTemplate.length >= 2 ? announcementAnalytics.byTemplate.slice(0, 2).map((entry) => (
+                          <div key={`compare:${entry.templateId || entry.templateName}`} className="rounded-xl border border-border/50 p-3">
+                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.templateName}</p><Badge variant="outline">{Math.round(entry.conversionRate * 100)}% conv.</Badge></div>
+                            <p className="mt-3 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.attributedOrders} orders • {entry.attributedRevenue.length > 0 ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ') : '0 revenue'}</p>
+                          </div>
+                        )) : <p className="text-xs text-muted-foreground">Send at least two announcement templates to compare them side by side.</p>}
                       </div>
                     </div>
-
                     <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
                       <p className="text-sm font-medium">Best send time hints</p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                        {announcementAnalytics.bestSendTimes.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                        ) : (
-                          announcementAnalytics.bestSendTimes.map((entry) => (
-                            <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
-                              <p className="text-sm font-medium">
-                                {String(entry.hour).padStart(2, '0')}:00
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {entry.sentCount} sent
-                              </p>
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                {Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 xl:grid-cols-2">
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-sm font-medium">Segment conversion</p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.bySegment.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.bySegment.map((entry) => (
-                              <div key={entry.segment} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{entry.segment}</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.conversionRate * 100)}% conv.
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedOrders} attributed orders • {entry.sentCount} sends • {entry.announcements} announcements
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedRevenue.length > 0
-                                    ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ')
-                                    : '0 revenue'}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-sm font-medium">Send-time conversion</p>
-                        <div className="mt-3 space-y-2">
-                          {announcementAnalytics.bySendHour.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                          ) : (
-                            announcementAnalytics.bySendHour.slice(0, 6).map((entry) => (
-                              <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-medium">{String(entry.hour).padStart(2, '0')}:00</p>
-                                  <Badge variant="outline">
-                                    {Math.round(entry.conversionRate * 100)}% conv.
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedOrders} attributed orders • {entry.sentCount} sends
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {entry.attributedRevenue.length > 0
-                                    ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ')
-                                    : '0 revenue'}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <p className="text-sm font-medium">Recent promo attribution</p>
-                      <div className="mt-3 space-y-2">
-                        {announcementAnalytics.recentAttribution.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                        ) : (
-                          announcementAnalytics.recentAttribution.map((entry) => (
-                            <div key={`${entry.orderId}:${entry.announcementId}`} className="rounded-xl border border-border/50 p-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-medium">{entry.orderCode}</p>
-                                <Badge variant="outline">{entry.minutesFromSend} min</Badge>
-                              </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {entry.announcementTitle}
-                                {entry.templateName ? ` • ${entry.templateName}` : ''}
-                                {entry.targetSegment ? ` • ${entry.targetSegment}` : ''}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {entry.audience} • {formatAnnouncementMoney(entry.priceAmount, entry.priceCurrency)}
-                                {entry.couponCode ? ` • coupon ${entry.couponCode}` : ''}
-                              </p>
-                            </div>
-                          ))
-                        )}
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        {announcementAnalytics.bestSendTimes.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.bestSendTimes.map((entry) => (
+                          <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
+                            <p className="text-sm font-medium">{String(entry.hour).padStart(2, '0')}:00</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount} sent</p>
+                            <p className="mt-2 text-xs text-muted-foreground">{Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                ) : null}
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
+                  <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                    <p className="text-sm font-medium">Recent promo attribution</p>
+                    <div className="mt-3 space-y-2">
+                      {announcementAnalytics.recentAttribution.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.recentAttribution.map((entry) => (
+                        <div key={`${entry.orderId}:${entry.announcementId}`} className="rounded-xl border border-border/50 p-3">
+                          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.orderCode}</p><Badge variant="outline">{entry.minutesFromSend} min</Badge></div>
+                          <p className="mt-1 text-xs text-muted-foreground">{entry.announcementTitle}{entry.templateName ? ` • ${entry.templateName}` : ''}{entry.targetSegment ? ` • ${entry.targetSegment}` : ''}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{entry.audience} • {formatAnnouncementMoney(entry.priceAmount, entry.priceCurrency)}{entry.couponCode ? ` • coupon ${entry.couponCode}` : ''}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+              ) : null}
+            </div>
+          </TabsContent>
 
-                <div className="mt-3 space-y-3">
-                  {announcementHistory.length ? (
-                    announcementHistory.map((announcement) => (
-                      <div
-                        key={announcement.id}
-                        className="rounded-2xl border border-border/60 bg-background/70 p-3"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{announcement.title}</p>
-                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{announcement.message}</p>
-                            {announcement.heroImageUrl ? (
-                              <p className="mt-2 text-[11px] text-muted-foreground break-all">
-                                Image: {announcement.heroImageUrl}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="outline">{announcement.type}</Badge>
-                            <Badge variant="outline">
-                              {getAnnouncementCardStyleLabel(announcement.cardStyle, isMyanmar)}
-                            </Badge>
-                            <Badge variant="outline">{announcement.status}</Badge>
-                            {announcement.recurrenceType && announcement.recurrenceType !== 'NONE' ? (
-                              <Badge variant="secondary">
-                                {getAnnouncementRecurrenceLabel(announcement.recurrenceType, isMyanmar)}
-                              </Badge>
-                            ) : null}
-                            {announcement.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
-                          </div>
-                        </div>
-                        {(announcement.targetTag ||
-                          announcement.targetSegment ||
-                          announcement.targetServerName ||
-                          announcement.targetCountryCode ||
-                          announcement.targetDirectUserLabel) ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {announcement.targetTag ? (
-                              <Badge variant="secondary">Tag: {announcement.targetTag}</Badge>
-                            ) : null}
-                            {announcement.targetSegment ? (
-                              <Badge variant="secondary">
-                                Segment: {getAnnouncementSegmentLabel(announcement.targetSegment, isMyanmar)}
-                              </Badge>
-                            ) : null}
-                            {announcement.targetServerName ? (
-                              <Badge variant="secondary">Server: {announcement.targetServerName}</Badge>
-                            ) : null}
-                            {announcement.targetCountryCode ? (
-                              <Badge variant="secondary">Region: {announcement.targetCountryCode}</Badge>
-                            ) : null}
-                            {announcement.targetDirectUserLabel ? (
-                              <Badge variant="secondary">User: {announcement.targetDirectUserLabel}</Badge>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                          <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
-                          <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
-                          <p>Resend attempts: {announcement.resendAttemptCount || 0}</p>
-                          <p>Recovered: {announcement.resendRecoveredCount || 0}</p>
-                          <p>Created: {formatDateTime(announcement.createdAt)}</p>
-                          <p>
-                            {announcement.scheduledFor
-                              ? `Scheduled: ${formatDateTime(announcement.scheduledFor)}`
-                              : announcement.sentAt
-                                ? `Sent: ${formatDateTime(announcement.sentAt)}`
-                                : `Updated: ${formatDateTime(announcement.updatedAt)}`}
-                          </p>
-                        </div>
-                        {announcement.deliveries.length > 0 ? (
-                          <div className="mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
-                            <p className="text-xs font-medium text-foreground">Recent failures</p>
-                            <div className="mt-2 space-y-2">
-                              {announcement.deliveries.map((delivery) => (
-                                <div key={delivery.id} className="rounded-xl border border-border/50 px-3 py-2 text-xs text-muted-foreground">
-                                  <p>Chat: {delivery.chatId}</p>
-                                  <p>Error: {delivery.error || 'send-failed'}</p>
-                                </div>
-                              ))}
+          <TabsContent value="history" className="space-y-4">
+            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
+                <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
+              </div>
+              <div className="mt-3 space-y-3">
+                {announcementHistory.length ? announcementHistory.map((announcement) => (
+                  <div key={announcement.id} className="rounded-2xl border border-border/60 bg-background/70 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{announcement.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{announcement.message}</p>
+                        {announcement.heroImageUrl ? <p className="mt-2 text-[11px] text-muted-foreground break-all">Image: {announcement.heroImageUrl}</p> : null}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{announcement.type}</Badge>
+                        <Badge variant="outline">{getAnnouncementCardStyleLabel(announcement.cardStyle, isMyanmar)}</Badge>
+                        <Badge variant="outline">{announcement.status}</Badge>
+                        {announcement.recurrenceType && announcement.recurrenceType !== 'NONE' ? <Badge variant="secondary">{getAnnouncementRecurrenceLabel(announcement.recurrenceType, isMyanmar)}</Badge> : null}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                      <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
+                      <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
+                      <p>Resend attempts: {announcement.resendAttemptCount || 0}</p>
+                      <p>Recovered: {announcement.resendRecoveredCount || 0}</p>
+                      <p>Created: {formatDateTime(announcement.createdAt)}</p>
+                      <p>{announcement.scheduledFor ? `Scheduled: ${formatDateTime(announcement.scheduledFor)}` : announcement.sentAt ? `Sent: ${formatDateTime(announcement.sentAt)}` : `Updated: ${formatDateTime(announcement.updatedAt)}`}</p>
+                    </div>
+                    {announcement.deliveries.length > 0 ? (
+                      <div className="mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
+                        <p className="text-xs font-medium text-foreground">Recent failures</p>
+                        <div className="mt-2 space-y-2">
+                          {announcement.deliveries.map((delivery) => (
+                            <div key={delivery.id} className="rounded-xl border border-border/50 px-3 py-2 text-xs text-muted-foreground">
+                              <p>Chat: {delivery.chatId}</p>
+                              <p>Error: {delivery.error || 'send-failed'}</p>
                             </div>
-                          </div>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {announcement.status === 'SCHEDULED' ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                dispatchScheduledAnnouncementMutation.mutate({
-                                  announcementId: announcement.id,
-                                })
-                              }
-                              disabled={dispatchScheduledAnnouncementMutation.isPending}
-                            >
-                              {telegramUi.announcementSendScheduledNow}
-                            </Button>
-                          ) : null}
-                          {announcement.failedCount > 0 ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                resendAnnouncementFailedMutation.mutate({
-                                  announcementId: announcement.id,
-                                })
-                              }
-                              disabled={resendAnnouncementFailedMutation.isPending}
-                            >
-                              {telegramUi.announcementResendFailed}
-                            </Button>
-                          ) : null}
+                          ))}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>
-                  )}
-                </div>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {announcement.status === 'SCHEDULED' ? (
+                        <Button type="button" size="sm" variant="outline" onClick={() => dispatchScheduledAnnouncementMutation.mutate({ announcementId: announcement.id })} disabled={dispatchScheduledAnnouncementMutation.isPending}>
+                          {telegramUi.announcementSendScheduledNow}
+                        </Button>
+                      ) : null}
+                      {announcement.failedCount > 0 ? (
+                        <Button type="button" size="sm" variant="outline" onClick={() => resendAnnouncementFailedMutation.mutate({ announcementId: announcement.id })} disabled={resendAnnouncementFailedMutation.isPending}>
+                          {telegramUi.announcementResendFailed}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                )) : <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>}
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {t('settings.telegram.save')}
-          </Button>
-        </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -4128,6 +3533,10 @@ function TelegramSalesWorkflowCard() {
   const [priorityFilter, setPriorityFilter] = useState<
     'ALL' | 'UNCLAIMED' | 'HIGH_RISK' | 'PREMIUM' | 'MY_QUEUE' | 'OLDEST'
   >('ALL');
+  const [activeWorkflowTab, setActiveWorkflowTab] = useState<WorkflowSubtabId>('settings');
+  const [workflowAdvancedOpen, setWorkflowAdvancedOpen] = useState(false);
+  const [savedWorkflowSnapshot, setSavedWorkflowSnapshot] =
+    useState<TelegramSalesSettingsForm | null>(null);
   const deferredOrderSearch = useDeferredValue(orderSearch.trim());
   const orderCodeParam = searchParams.get('orderCode')?.trim() || '';
   const ordersQuery = trpc.telegramBot.listOrders.useQuery(
@@ -4197,6 +3606,13 @@ function TelegramSalesWorkflowCard() {
     () => new Map((dynamicTemplatesQuery.data || []).map((template) => [template.id, template])),
     [dynamicTemplatesQuery.data],
   );
+  const workflowConfigDirty = useMemo(() => {
+    if (!savedWorkflowSnapshot) {
+      return false;
+    }
+
+    return JSON.stringify(form) !== JSON.stringify(savedWorkflowSnapshot);
+  }, [form, savedWorkflowSnapshot]);
 
   const salesUi = {
     title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
@@ -4682,7 +4098,7 @@ function TelegramSalesWorkflowCard() {
       return;
     }
 
-    setForm({
+    const nextForm: TelegramSalesSettingsForm = {
       enabled: settingsQuery.data.enabled ?? false,
       allowRenewals: settingsQuery.data.allowRenewals ?? true,
       supportLink: settingsQuery.data.supportLink || DEFAULT_TELEGRAM_SALES_SETTINGS.supportLink,
@@ -4879,7 +4295,9 @@ function TelegramSalesWorkflowCard() {
           unlimitedQuota: override?.unlimitedQuota ?? fallbackPlan.unlimitedQuota,
         };
       }),
-    });
+    };
+    setForm(nextForm);
+    setSavedWorkflowSnapshot(JSON.parse(JSON.stringify(nextForm)) as TelegramSalesSettingsForm);
   }, [settingsQuery.data]);
 
   const saveConfigMutation = trpc.telegramBot.updateSalesConfig.useMutation({
@@ -4896,6 +4314,15 @@ function TelegramSalesWorkflowCard() {
     onError: (error) => {
       toast({
         title: 'Telegram sales settings failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const simulateCampaignAudienceMutation = trpc.telegramBot.simulateCampaignAudience.useMutation({
+    onError: (error) => {
+      toast({
+        title: 'Campaign simulation failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -5201,8 +4628,8 @@ function TelegramSalesWorkflowCard() {
     return `${new Intl.NumberFormat('en-US').format(parsedAmount)} ${currency}`;
   };
 
-  const handleSaveConfig = () => {
-    saveConfigMutation.mutate({
+  const buildSalesConfigPayload = () => {
+    return {
       enabled: form.enabled,
       allowRenewals: form.allowRenewals,
       supportLink: form.supportLink.trim(),
@@ -5370,7 +4797,19 @@ function TelegramSalesWorkflowCard() {
         dataLimitGB: plan.dataLimitGB ?? null,
         unlimitedQuota: plan.unlimitedQuota,
       })),
-    });
+    };
+  };
+
+  const handleSaveConfig = () => {
+    saveConfigMutation.mutate(buildSalesConfigPayload());
+  };
+
+  const handleResetWorkflowConfig = () => {
+    if (!savedWorkflowSnapshot) {
+      return;
+    }
+
+    setForm(JSON.parse(JSON.stringify(savedWorkflowSnapshot)) as TelegramSalesSettingsForm);
   };
 
   const currentReviewerId = currentUserQuery.data?.id ?? null;
@@ -5628,6 +5067,30 @@ function TelegramSalesWorkflowCard() {
     reviewTarget?.mode,
   ]);
 
+  const workflowConfigWorkspace =
+    activeWorkflowTab === 'settings' ||
+    activeWorkflowTab === 'coupons' ||
+    activeWorkflowTab === 'guardrails';
+  const campaignSimulation = simulateCampaignAudienceMutation.data;
+  const campaignTypeLabels: Record<string, string> = {
+    TRIAL_TO_PAID: isMyanmar ? 'Trial to paid' : 'Trial to paid',
+    RENEWAL_SOON: isMyanmar ? 'Renewal' : 'Renewal',
+    PREMIUM_UPSELL: isMyanmar ? 'Premium upsell' : 'Premium upsell',
+    WINBACK: isMyanmar ? 'Win-back' : 'Win-back',
+  };
+  const campaignReasonLabels: Record<string, string> = {
+    DISABLED: isMyanmar ? 'Campaign disabled' : 'Campaign disabled',
+    PAUSED: isMyanmar ? 'Campaign paused' : 'Campaign paused',
+    NO_TELEGRAM: isMyanmar ? 'No Telegram link' : 'No Telegram link',
+    MANUAL_BLOCK: isMyanmar ? 'Manually suppressed' : 'Manually suppressed',
+    RECENT_REFUND: isMyanmar ? 'Recent refund' : 'Recent refund',
+    SUPPORT_HEAVY: isMyanmar ? 'Support-heavy' : 'Support-heavy',
+    COOLDOWN: isMyanmar ? 'Cooling down' : 'Cooling down',
+    ACTIVE_COUPON: isMyanmar ? 'Already has active coupon' : 'Already has active coupon',
+    LIMIT_REACHED: isMyanmar ? 'Per-user limit reached' : 'Per-user limit reached',
+    CONVERTED: isMyanmar ? 'Already converted' : 'Already converted',
+  };
+
   return (
     <>
       <Card className="border-violet-500/20 bg-violet-500/[0.04] dark:bg-violet-500/[0.06]">
@@ -5639,7 +5102,77 @@ function TelegramSalesWorkflowCard() {
           <CardDescription>{salesUi.desc}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <Tabs
+            value={activeWorkflowTab}
+            onValueChange={(value) => setActiveWorkflowTab(value as WorkflowSubtabId)}
+            className="space-y-6"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 lg:grid-cols-5">
+              <TabsTrigger value="settings">Order settings</TabsTrigger>
+              <TabsTrigger value="coupons">Coupons</TabsTrigger>
+              <TabsTrigger value="guardrails">Guardrails</TabsTrigger>
+              <TabsTrigger value="review">Review queue</TabsTrigger>
+              <TabsTrigger value="premium">Premium support</TabsTrigger>
+            </TabsList>
+
+            <div className="sticky top-20 z-20 rounded-2xl border border-border/60 bg-background/85 px-4 py-3 shadow-sm backdrop-blur">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    {workflowConfigWorkspace
+                      ? workflowConfigDirty
+                        ? 'Unsaved Telegram workflow changes'
+                        : 'Workflow settings are in sync'
+                      : activeWorkflowTab === 'review'
+                        ? 'Review workspace'
+                        : 'Premium support workspace'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {workflowConfigWorkspace
+                      ? workflowConfigDirty
+                        ? 'Save or reset before leaving this workspace.'
+                        : 'Coupons, payment rules, and order settings match the latest saved configuration.'
+                      : activeWorkflowTab === 'review'
+                        ? 'Queue, reviewer actions, and server-change requests are isolated below.'
+                        : 'Premium support requests and follow-up actions are isolated below.'}
+                  </p>
+                </div>
+                {workflowConfigWorkspace ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!workflowConfigDirty || saveConfigMutation.isPending}
+                      onClick={handleResetWorkflowConfig}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleSaveConfig}
+                      disabled={!canManageSalesSettings || saveConfigMutation.isPending || !workflowConfigDirty}
+                    >
+                      {saveConfigMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      {salesUi.saveConfig}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {!workflowConfigWorkspace ? (
+              <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                {activeWorkflowTab === 'review'
+                  ? 'Use the review workspace below for Telegram payment review, quick macros, and server-change approvals.'
+                  : 'Use the premium workspace below for premium support requests, replies, and routing actions.'}
+              </div>
+            ) : null}
+
+          <div className={cn('grid gap-4 md:grid-cols-2', activeWorkflowTab !== 'settings' && 'hidden')}>
             <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/60 p-4">
               <div className="space-y-1">
                 <p className="text-sm font-medium">{salesUi.enableOrders}</p>
@@ -5679,7 +5212,7 @@ function TelegramSalesWorkflowCard() {
             <p className="text-xs text-muted-foreground">{salesUi.supportLinkDesc}</p>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'settings' && 'hidden')}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">{salesUi.salesDigest}</p>
@@ -5741,7 +5274,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'settings' && 'hidden')}>
             <div className="space-y-1">
               <p className="text-sm font-medium">{salesUi.paymentAutomation}</p>
               <p className="text-xs text-muted-foreground">{salesUi.paymentAutomationDesc}</p>
@@ -5820,7 +5353,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
@@ -5930,7 +5463,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
@@ -6040,7 +5573,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
@@ -6153,7 +5686,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'coupons' && 'hidden')}>
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
@@ -6263,7 +5796,7 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'guardrails' && 'hidden')}>
             <div className="space-y-1">
               <p className="text-sm font-medium">
                 {isMyanmar ? 'Campaign guardrails' : 'Campaign guardrails'}
@@ -6363,6 +5896,131 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
+          <div
+            className={cn(
+              'space-y-4 rounded-2xl border border-border/60 bg-background/55 p-4',
+              activeWorkflowTab !== 'guardrails' && 'hidden',
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Campaign audience simulation</p>
+                <p className="text-xs text-muted-foreground">
+                  Preview who would receive each coupon campaign right now, then inspect why others are blocked.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => simulateCampaignAudienceMutation.mutate(buildSalesConfigPayload())}
+                disabled={!canManageSalesSettings || simulateCampaignAudienceMutation.isPending}
+              >
+                {simulateCampaignAudienceMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                Run simulation
+              </Button>
+            </div>
+
+            {campaignSimulation ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {campaignSimulation.campaigns.map((campaign) => (
+                  <div
+                    key={campaign.campaignType}
+                    className="rounded-2xl border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {campaignTypeLabels[campaign.campaignType] || campaign.campaignType}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {campaign.enabled
+                            ? campaign.paused
+                              ? 'Enabled but paused'
+                              : 'Enabled and ready'
+                            : 'Disabled'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={campaign.enabled ? 'default' : 'secondary'}>
+                          {campaign.enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                        <Badge variant={campaign.paused ? 'outline' : 'secondary'}>
+                          {campaign.paused ? 'Paused' : 'Running'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-border/50 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Candidates</p>
+                        <p className="mt-2 text-xl font-semibold">{campaign.totalCandidates}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/50 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Eligible</p>
+                        <p className="mt-2 text-xl font-semibold">{campaign.eligibleCount}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/50 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Would send</p>
+                        <p className="mt-2 text-xl font-semibold">{campaign.wouldSendCount}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Cap {campaign.maxRecipientsPerRun > 0 ? campaign.maxRecipientsPerRun : 'No cap'}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border/50 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Blocked</p>
+                        <p className="mt-2 text-xl font-semibold">{campaign.blockedCount}</p>
+                      </div>
+                    </div>
+
+                    {campaign.blockedReasons.length > 0 ? (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Blocked by reason</p>
+                        <div className="flex flex-wrap gap-2">
+                          {campaign.blockedReasons.map((reason) => (
+                            <Badge key={`${campaign.campaignType}-${reason.reason}`} variant="outline">
+                              {campaignReasonLabels[reason.reason] || reason.reason} · {reason.count}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                Run the simulation to preview caps, cooldowns, refund blocks, and support-heavy exclusions before the next promo cycle.
+              </div>
+            )}
+          </div>
+
+          <Collapsible
+            open={workflowAdvancedOpen}
+            onOpenChange={setWorkflowAdvancedOpen}
+            className={cn('space-y-4', activeWorkflowTab !== 'settings' && 'hidden')}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-4">
+              <div>
+                <p className="text-sm font-medium">Advanced order configuration</p>
+                <p className="text-xs text-muted-foreground">
+                  Payment instructions, payment methods, and plan/template mapping live here so the base workflow stays lighter.
+                </p>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="outline" size="sm">
+                  {workflowAdvancedOpen ? 'Hide advanced' : 'Show advanced'}
+                  <ChevronRight
+                    className={cn('ml-2 h-4 w-4 transition-transform', workflowAdvancedOpen && 'rotate-90')}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+
+            <CollapsibleContent className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
               <Label>{salesUi.englishInstructions}</Label>
@@ -6757,7 +6415,10 @@ function TelegramSalesWorkflowCard() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className={cn('flex justify-end', !workflowConfigWorkspace && 'hidden')}>
             <Button onClick={handleSaveConfig} disabled={!canManageSalesSettings || saveConfigMutation.isPending}>
               {saveConfigMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -6767,9 +6428,11 @@ function TelegramSalesWorkflowCard() {
               {salesUi.saveConfig}
             </Button>
           </div>
+          </Tabs>
         </CardContent>
       </Card>
 
+      {activeWorkflowTab === 'review' ? (
       <Card className="border-amber-500/20 bg-amber-500/[0.03] dark:bg-amber-500/[0.05]">
         <CardHeader className="space-y-2">
           <CardTitle className="flex items-center gap-2">
@@ -7336,7 +6999,9 @@ function TelegramSalesWorkflowCard() {
           )}
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeWorkflowTab === 'review' ? (
       <Card className="border border-border/60 bg-background/80 shadow-[0_22px_50px_-24px_rgba(15,23,42,0.35)] dark:bg-[#050816]/90">
         <CardHeader>
           <CardTitle>{salesUi.serverChangeRequestsTitle}</CardTitle>
@@ -7480,7 +7145,9 @@ function TelegramSalesWorkflowCard() {
           )}
         </CardContent>
       </Card>
+      ) : null}
 
+      {activeWorkflowTab === 'premium' ? (
       <Card className="border border-border/60 bg-background/80 shadow-[0_22px_50px_-24px_rgba(15,23,42,0.35)] dark:bg-[#050816]/90">
         <CardHeader>
           <CardTitle>{salesUi.premiumSupportRequestsTitle}</CardTitle>
@@ -7790,6 +7457,7 @@ function TelegramSalesWorkflowCard() {
           )}
         </CardContent>
       </Card>
+      ) : null}
 
       <Dialog
         open={Boolean(reviewTarget)}

@@ -47,7 +47,7 @@ export type TelegramCampaignCouponConfig = {
   discountAmount: number;
 };
 
-async function shouldStopTelegramCouponCampaignAfterConversion(input: {
+export async function shouldStopTelegramCouponCampaignAfterConversion(input: {
   campaignType: TelegramCampaignCouponType;
   telegramUserId: string;
   accessKeyId?: string | null;

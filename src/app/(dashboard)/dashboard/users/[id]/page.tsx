@@ -142,26 +142,53 @@ type CommunicationThreadEvent = {
   title: string;
   detail: string;
   tone: 'default' | 'warning' | 'danger' | 'positive';
+  category:
+    | 'announcement'
+    | 'message'
+    | 'support_note'
+    | 'receipt'
+    | 'refund'
+    | 'key_notice';
+  customerFacing: boolean;
   href?: string;
   meta?: string;
 };
 
 const CRM_DIRECT_MESSAGE_TEMPLATES = [
   {
+    category: 'Support',
     label: 'Support follow-up',
     body: 'Hello. We received your message and we are checking the issue now. Please send your key name or order code if you have it.',
   },
   {
+    category: 'Payments',
     label: 'Need screenshot',
     body: 'Please send a clearer screenshot of the payment, including the amount, account name, and transaction time.',
   },
   {
+    category: 'Outage',
     label: 'Server issue',
     body: 'We understand the server is not working properly for you. We are checking it now. Please wait a little while, and we will update you again soon.',
   },
   {
+    category: 'Support',
     label: 'Resolved',
     body: 'Your issue should be resolved now. Please try again and let us know if the problem still continues.',
+  },
+  {
+    category: 'Billing',
+    label: 'Receipt follow-up',
+    body: 'We sent your receipt again. If you still cannot find it in Telegram, please let us know and we will resend it manually.',
+  },
+  {
+    category: 'Retention',
+    label: 'Renewal reminder',
+    body: 'Your key is getting close to expiry. Please renew early to avoid interruption. You can use /renew or contact admin for help.',
+  },
+  {
+    category: 'Promo',
+    label: 'Promo follow-up',
+    body: 'A new offer is available for your account. If you want help choosing the right plan, reply here and we will guide you.',
   },
 ] as const;
 
@@ -188,6 +215,11 @@ export default function UserLedgerPage() {
   const [crmReceiptOrderId, setCrmReceiptOrderId] = useState('');
   const [crmAnnouncementId, setCrmAnnouncementId] = useState('');
   const [crmMarketingTags, setCrmMarketingTags] = useState('');
+  const [crmTemplateMode, setCrmTemplateMode] = useState<'replace' | 'append'>('replace');
+  const [communicationFilter, setCommunicationFilter] = useState<
+    'ALL' | 'CUSTOMER' | 'INTERNAL' | CommunicationThreadEvent['category']
+  >('ALL');
+  const [communicationSearch, setCommunicationSearch] = useState('');
 
   const ledgerQuery = trpc.users.getLedger.useQuery(
     { id: userId },
@@ -691,6 +723,8 @@ export default function UserLedgerPage() {
         title: delivery.announcement.title,
         detail: delivery.announcement.message,
         tone: delivery.isPinned ? 'warning' : 'default',
+        category: 'announcement',
+        customerFacing: true,
         meta: [
           'Announcement',
           delivery.announcement.type,
@@ -708,6 +742,8 @@ export default function UserLedgerPage() {
         title: log.event,
         detail: log.message,
         tone: log.status === 'FAILED' ? 'danger' : 'warning',
+        category: 'key_notice',
+        customerFacing: true,
         meta: [log.accessKeyName || 'Unlinked key', log.status].join(' • '),
       });
     }
@@ -723,6 +759,8 @@ export default function UserLedgerPage() {
           title: order.kind === 'TRIAL' ? 'Trial delivery' : 'Receipt delivered',
           detail: `${order.orderCode} • ${order.planName || order.planCode || 'Order fulfilled'}`,
           tone: 'positive',
+          category: 'receipt',
+          customerFacing: true,
           href: orderHref,
           meta: order.couponCode ? `Coupon ${order.couponCode}` : undefined,
         });
@@ -737,6 +775,8 @@ export default function UserLedgerPage() {
               : 'Refund decline sent',
           detail: `${order.orderCode}${order.refundRequestCustomerMessage ? ` • ${order.refundRequestCustomerMessage}` : ''}`,
           tone: order.refundRequestStatus === 'APPROVED' ? 'positive' : 'danger',
+          category: 'refund',
+          customerFacing: true,
           href: orderHref,
           meta: order.refundReviewReasonCode
             ? resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode
@@ -768,6 +808,19 @@ export default function UserLedgerPage() {
             : note.kind === 'INTERNAL'
               ? 'default'
               : 'positive',
+        category:
+          note.kind === 'DIRECT_MESSAGE'
+            ? 'message'
+            : note.kind === 'INTERNAL'
+              ? 'support_note'
+              : note.kind === 'RECEIPT_RESENT'
+                ? 'receipt'
+                : note.kind === 'SHARE_PAGE_RESENT'
+                  ? 'key_notice'
+                  : note.kind === 'ANNOUNCEMENT_RESEND'
+                    ? 'announcement'
+                    : 'message',
+        customerFacing: note.kind !== 'INTERNAL',
         meta: note.createdBy?.email ? `By ${note.createdBy.email}` : undefined,
       });
     }
@@ -795,6 +848,31 @@ export default function UserLedgerPage() {
       announcementOrders: attributedOrders.filter((order) => Boolean(order.promotionAttribution)).length,
     };
   }, [ledgerQuery.data]);
+
+  const filteredCommunicationHistory = useMemo(() => {
+    const search = communicationSearch.trim().toLowerCase();
+    return communicationHistory.filter((event) => {
+      const filterMatch =
+        communicationFilter === 'ALL'
+          ? true
+          : communicationFilter === 'CUSTOMER'
+            ? event.customerFacing
+            : communicationFilter === 'INTERNAL'
+              ? !event.customerFacing
+              : event.category === communicationFilter;
+      if (!filterMatch) {
+        return false;
+      }
+
+      if (!search) {
+        return true;
+      }
+
+      return [event.title, event.detail, event.meta, event.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+  }, [communicationFilter, communicationHistory, communicationSearch]);
 
   useEffect(() => {
     if (!ledgerQuery.data) {
@@ -1483,14 +1561,59 @@ export default function UserLedgerPage() {
                 One thread for support notes, direct messages, announcements, receipts, refund decisions, and key notices.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {communicationHistory.length === 0 ? (
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px]">
+                <Input
+                  value={communicationSearch}
+                  onChange={(event) => setCommunicationSearch(event.target.value)}
+                  placeholder="Search messages, announcements, receipts, notes, or meta…"
+                />
+                <Select
+                  value={communicationFilter}
+                  onValueChange={(value) =>
+                    setCommunicationFilter(
+                      value as 'ALL' | 'CUSTOMER' | 'INTERNAL' | CommunicationThreadEvent['category'],
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All activity</SelectItem>
+                    <SelectItem value="CUSTOMER">Customer-facing</SelectItem>
+                    <SelectItem value="INTERNAL">Internal only</SelectItem>
+                    <SelectItem value="announcement">Announcements</SelectItem>
+                    <SelectItem value="message">Direct messages</SelectItem>
+                    <SelectItem value="receipt">Receipts</SelectItem>
+                    <SelectItem value="refund">Refund decisions</SelectItem>
+                    <SelectItem value="key_notice">Key notices</SelectItem>
+                    <SelectItem value="support_note">Support notes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Showing {filteredCommunicationHistory.length}</Badge>
+                <Badge variant="secondary">
+                  {communicationFilter === 'ALL'
+                    ? 'All categories'
+                    : communicationFilter === 'CUSTOMER'
+                      ? 'Customer-facing'
+                      : communicationFilter === 'INTERNAL'
+                        ? 'Internal only'
+                        : communicationFilter.replace('_', ' ')}
+                </Badge>
+                {communicationSearch.trim() ? <Badge variant="outline">Search: {communicationSearch.trim()}</Badge> : null}
+              </div>
+
+              {filteredCommunicationHistory.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No customer communication has been recorded yet.
+                  No customer communication matches the current filters.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {communicationHistory.map((event) => {
+                  {filteredCommunicationHistory.map((event) => {
                     const toneClass =
                       event.tone === 'positive'
                         ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
@@ -1504,7 +1627,25 @@ export default function UserLedgerPage() {
                       <div key={event.id} className={`rounded-[1rem] border px-4 py-3 ${toneClass}`}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="space-y-1">
-                            <p className="font-medium text-foreground">{event.title}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-foreground">{event.title}</p>
+                              <Badge variant="outline">
+                                {event.category === 'announcement'
+                                  ? 'Announcement'
+                                  : event.category === 'message'
+                                    ? 'Direct message'
+                                    : event.category === 'receipt'
+                                      ? 'Receipt'
+                                      : event.category === 'refund'
+                                        ? 'Refund'
+                                        : event.category === 'key_notice'
+                                          ? 'Key notice'
+                                          : 'Support note'}
+                              </Badge>
+                              <Badge variant={event.customerFacing ? 'secondary' : 'outline'}>
+                                {event.customerFacing ? 'Customer-facing' : 'Internal'}
+                              </Badge>
+                            </div>
                             <p className="whitespace-pre-wrap text-sm">{event.detail}</p>
                             {event.meta ? <p className="text-xs text-muted-foreground">{event.meta}</p> : null}
                           </div>
@@ -1721,19 +1862,45 @@ export default function UserLedgerPage() {
                   placeholder="Write a direct Telegram message for this customer…"
                   disabled={!crmPermissions.canMessageCustomer}
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <Label>Template apply mode</Label>
+                    <Select
+                      value={crmTemplateMode}
+                      onValueChange={(value) => setCrmTemplateMode(value as 'replace' | 'append')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="replace">Replace message</SelectItem>
+                        <SelectItem value="append">Append to message</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="rounded-xl border border-border/50 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Direct-send templates</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
                   {CRM_DIRECT_MESSAGE_TEMPLATES.map((template) => (
                     <Button
-                      key={template.label}
+                      key={`${template.category}-${template.label}`}
                       type="button"
                       size="sm"
                       variant="outline"
                       disabled={!crmPermissions.canMessageCustomer}
-                      onClick={() => setCrmDirectMessage(template.body)}
+                      onClick={() =>
+                        setCrmDirectMessage((prev) =>
+                          crmTemplateMode === 'append' && prev.trim().length > 0
+                            ? `${prev.trim()}\n\n${template.body}`
+                            : template.body,
+                        )
+                      }
                     >
-                      {template.label}
+                      {template.category} · {template.label}
                     </Button>
                   ))}
+                    </div>
+                  </div>
                 </div>
                 <Button
                   className="mt-3 w-full"

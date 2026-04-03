@@ -7,6 +7,7 @@ import {
 } from '@/lib/promo-overrides';
 import {
   issueTelegramCampaignCoupon,
+  shouldStopTelegramCouponCampaignAfterConversion,
   type TelegramCampaignCouponType,
 } from '@/lib/services/telegram-coupons';
 import {
@@ -33,6 +34,8 @@ type PromoGuardrailInput = {
   telegramChatId: string;
   telegramUserId: string;
   linkedUserId?: string | null;
+  accessKeyId?: string | null;
+  dynamicAccessKeyId?: string | null;
 };
 
 type PromoGuardrailCaches = {
@@ -41,6 +44,33 @@ type PromoGuardrailCaches = {
   recentRefunds: Map<string, boolean>;
   supportHeavy: Map<string, boolean>;
   cooldown: Map<string, boolean>;
+};
+
+export type TelegramCampaignSimulationBlockReason =
+  | 'DISABLED'
+  | 'PAUSED'
+  | 'NO_TELEGRAM'
+  | 'MANUAL_BLOCK'
+  | 'RECENT_REFUND'
+  | 'SUPPORT_HEAVY'
+  | 'COOLDOWN'
+  | 'ACTIVE_COUPON'
+  | 'LIMIT_REACHED'
+  | 'CONVERTED';
+
+export type TelegramCampaignAudienceSimulation = {
+  campaignType: TelegramCampaignCouponType;
+  enabled: boolean;
+  paused: boolean;
+  maxRecipientsPerRun: number;
+  totalCandidates: number;
+  eligibleCount: number;
+  wouldSendCount: number;
+  blockedCount: number;
+  blockedReasons: Array<{
+    reason: TelegramCampaignSimulationBlockReason;
+    count: number;
+  }>;
 };
 
 function resolveCampaignControl(
@@ -269,6 +299,7 @@ async function resolvePromoSendDecision(
     return {
       blocked: false,
       forceAllow: true,
+      reason: null as TelegramCampaignSimulationBlockReason | null,
     };
   }
 
@@ -276,6 +307,7 @@ async function resolvePromoSendDecision(
     return {
       blocked: true,
       forceAllow: false,
+      reason: 'MANUAL_BLOCK' as TelegramCampaignSimulationBlockReason,
     };
   }
 
@@ -283,6 +315,7 @@ async function resolvePromoSendDecision(
     return {
       blocked: true,
       forceAllow: false,
+      reason: 'RECENT_REFUND' as TelegramCampaignSimulationBlockReason,
     };
   }
 
@@ -290,6 +323,7 @@ async function resolvePromoSendDecision(
     return {
       blocked: true,
       forceAllow: false,
+      reason: 'SUPPORT_HEAVY' as TelegramCampaignSimulationBlockReason,
     };
   }
 
@@ -297,12 +331,338 @@ async function resolvePromoSendDecision(
     return {
       blocked: true,
       forceAllow: false,
+      reason: 'COOLDOWN' as TelegramCampaignSimulationBlockReason,
     };
   }
 
   return {
     blocked: false,
     forceAllow: false,
+    reason: null as TelegramCampaignSimulationBlockReason | null,
+  };
+}
+
+async function resolveCouponCampaignAvailability(input: {
+  campaignType: TelegramCampaignCouponType;
+  telegramChatId: string;
+  telegramUserId: string;
+  accessKeyId?: string | null;
+  dynamicAccessKeyId?: string | null;
+  forceAllow?: boolean;
+}) {
+  const now = new Date();
+  const activeExisting = await db.telegramCouponRedemption.findFirst({
+    where: {
+      campaignType: input.campaignType,
+      telegramChatId: input.telegramChatId,
+      telegramUserId: input.telegramUserId,
+      accessKeyId: input.accessKeyId ?? null,
+      dynamicAccessKeyId: input.dynamicAccessKeyId ?? null,
+      status: 'ISSUED',
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { id: true },
+  });
+
+  if (activeExisting) {
+    return {
+      available: false,
+      reason: 'ACTIVE_COUPON' as TelegramCampaignSimulationBlockReason,
+    };
+  }
+
+  const alreadyRedeemedForUser = await db.telegramCouponRedemption.count({
+    where: {
+      campaignType: input.campaignType,
+      telegramUserId: input.telegramUserId,
+      status: 'REDEEMED',
+    },
+  });
+
+  if (!input.forceAllow && alreadyRedeemedForUser >= 1) {
+    return {
+      available: false,
+      reason: 'LIMIT_REACHED' as TelegramCampaignSimulationBlockReason,
+    };
+  }
+
+  if (
+    !input.forceAllow &&
+    (await shouldStopTelegramCouponCampaignAfterConversion({
+      campaignType: input.campaignType,
+      telegramUserId: input.telegramUserId,
+      accessKeyId: input.accessKeyId ?? null,
+      dynamicAccessKeyId: input.dynamicAccessKeyId ?? null,
+    }))
+  ) {
+    return {
+      available: false,
+      reason: 'CONVERTED' as TelegramCampaignSimulationBlockReason,
+    };
+  }
+
+  return {
+    available: true,
+    reason: null as TelegramCampaignSimulationBlockReason | null,
+  };
+}
+
+function incrementSimulationReason(
+  reasons: Map<TelegramCampaignSimulationBlockReason, number>,
+  reason: TelegramCampaignSimulationBlockReason,
+) {
+  reasons.set(reason, (reasons.get(reason) || 0) + 1);
+}
+
+export async function simulateTelegramCouponCampaignAudience(input: {
+  settings?: TelegramSalesSettings;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const settings = input.settings ?? (await getTelegramSalesSettings());
+  const guardrailCaches: PromoGuardrailCaches = {
+    linkedUserIds: new Map(),
+    promoOverrides: new Map(),
+    recentRefunds: new Map(),
+    supportHeavy: new Map(),
+    cooldown: new Map(),
+  };
+
+  const buildResult = async (
+    campaignType: TelegramCampaignCouponType,
+    evaluateCandidates: () => Promise<Array<{
+      telegramChatId: string | null;
+      telegramUserId: string | null;
+      linkedUserId?: string | null;
+      accessKeyId?: string | null;
+      dynamicAccessKeyId?: string | null;
+    }>>,
+  ): Promise<TelegramCampaignAudienceSimulation> => {
+    const control = resolveCampaignControl(settings, campaignType);
+    const candidates = await evaluateCandidates();
+    const blockedReasons = new Map<TelegramCampaignSimulationBlockReason, number>();
+    let eligibleCount = 0;
+
+    for (const candidate of candidates) {
+      if (!control.enabled) {
+        incrementSimulationReason(blockedReasons, 'DISABLED');
+        continue;
+      }
+
+      if (control.paused) {
+        incrementSimulationReason(blockedReasons, 'PAUSED');
+        continue;
+      }
+
+      if (!candidate.telegramChatId || !candidate.telegramUserId) {
+        incrementSimulationReason(blockedReasons, 'NO_TELEGRAM');
+        continue;
+      }
+
+      const promoDecision = await resolvePromoSendDecision(
+        {
+          telegramChatId: candidate.telegramChatId,
+          telegramUserId: candidate.telegramUserId,
+          linkedUserId: candidate.linkedUserId ?? null,
+          accessKeyId: candidate.accessKeyId ?? null,
+          dynamicAccessKeyId: candidate.dynamicAccessKeyId ?? null,
+          campaignType,
+        },
+        settings,
+        now,
+        guardrailCaches,
+      );
+
+      if (promoDecision.blocked) {
+        incrementSimulationReason(
+          blockedReasons,
+          promoDecision.reason || 'MANUAL_BLOCK',
+        );
+        continue;
+      }
+
+      const couponAvailability = await resolveCouponCampaignAvailability({
+        campaignType,
+        telegramChatId: candidate.telegramChatId,
+        telegramUserId: candidate.telegramUserId,
+        accessKeyId: candidate.accessKeyId ?? null,
+        dynamicAccessKeyId: candidate.dynamicAccessKeyId ?? null,
+        forceAllow: promoDecision.forceAllow,
+      });
+
+      if (!couponAvailability.available) {
+        incrementSimulationReason(
+          blockedReasons,
+          couponAvailability.reason || 'CONVERTED',
+        );
+        continue;
+      }
+
+      eligibleCount += 1;
+    }
+
+    const maxRecipientsPerRun = control.maxRecipientsPerRun;
+    const wouldSendCount =
+      maxRecipientsPerRun > 0 ? Math.min(eligibleCount, maxRecipientsPerRun) : eligibleCount;
+    const blockedCount = candidates.length - eligibleCount;
+
+    return {
+      campaignType,
+      enabled: control.enabled,
+      paused: control.paused,
+      maxRecipientsPerRun,
+      totalCandidates: candidates.length,
+      eligibleCount,
+      wouldSendCount,
+      blockedCount,
+      blockedReasons: Array.from(blockedReasons.entries())
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((left, right) => right.count - left.count),
+    };
+  };
+
+  const trialReminderLeadMs = 6 * 60 * 60 * 1000;
+  const trialCouponLeadMs = Math.max(1, settings.trialCouponLeadHours || 12) * 60 * 60 * 1000;
+  const renewalLeadDays = Math.max(1, settings.renewalCouponLeadDays || 5);
+  const premiumThreshold = Math.max(10, Math.min(100, settings.premiumUpsellUsageThresholdPercent || 80));
+  const winbackInactivityDays = Math.max(7, settings.winbackCouponInactivityDays || 30);
+  const winbackCutoff = new Date(now.getTime() - winbackInactivityDays * 24 * 60 * 60 * 1000);
+
+  const [
+    trialCandidates,
+    renewalCandidates,
+    premiumCandidates,
+    winbackCandidates,
+  ] = await Promise.all([
+    db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+        telegramDeliveryEnabled: true,
+        expiresAt: {
+          not: null,
+          gt: now,
+          lte: new Date(now.getTime() + trialReminderLeadMs),
+        },
+        tags: { contains: ',trial,' },
+      },
+      select: {
+        id: true,
+        telegramId: true,
+        expiresAt: true,
+        tags: true,
+        user: { select: { id: true, telegramChatId: true } },
+      },
+    }),
+    db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+        telegramDeliveryEnabled: true,
+        expiresAt: {
+          not: null,
+          gt: now,
+          lte: new Date(now.getTime() + renewalLeadDays * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        id: true,
+        telegramId: true,
+        expiresAt: true,
+        tags: true,
+        user: { select: { id: true, telegramChatId: true } },
+      },
+    }),
+    db.accessKey.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PENDING'] },
+        telegramDeliveryEnabled: true,
+        dataLimitBytes: { not: null },
+      },
+      select: {
+        id: true,
+        telegramId: true,
+        usedBytes: true,
+        dataLimitBytes: true,
+        tags: true,
+        user: { select: { id: true, telegramChatId: true } },
+      },
+    }),
+    db.telegramOrder.findMany({
+      where: {
+        status: 'FULFILLED',
+        priceAmount: { gt: 0 },
+      },
+      orderBy: [{ fulfilledAt: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        telegramChatId: true,
+        telegramUserId: true,
+        fulfilledAt: true,
+        createdAt: true,
+      },
+    }),
+  ]);
+
+  const latestWinbackByUser = new Map<string, (typeof winbackCandidates)[number]>();
+  for (const order of winbackCandidates) {
+    if (!latestWinbackByUser.has(order.telegramUserId)) {
+      latestWinbackByUser.set(order.telegramUserId, order);
+    }
+  }
+
+  const campaigns = await Promise.all([
+    buildResult('TRIAL_TO_PAID', async () =>
+      trialCandidates
+        .filter(
+          (candidate) =>
+            Boolean(candidate.expiresAt) &&
+            tagMatchesFilter(candidate.tags || '', 'trial') &&
+            candidate.expiresAt!.getTime() - now.getTime() <= trialCouponLeadMs,
+        )
+        .map((candidate) => ({
+          telegramChatId: candidate.user?.telegramChatId || candidate.telegramId || null,
+          telegramUserId: candidate.telegramId || candidate.user?.telegramChatId || null,
+          linkedUserId: candidate.user?.id || null,
+          accessKeyId: candidate.id,
+        })),
+    ),
+    buildResult('RENEWAL_SOON', async () =>
+      renewalCandidates
+        .filter((candidate) => !tagMatchesFilter(candidate.tags || '', 'trial'))
+        .map((candidate) => ({
+          telegramChatId: candidate.user?.telegramChatId || candidate.telegramId || null,
+          telegramUserId: candidate.telegramId || candidate.user?.telegramChatId || null,
+          linkedUserId: candidate.user?.id || null,
+          accessKeyId: candidate.id,
+        })),
+    ),
+    buildResult('PREMIUM_UPSELL', async () =>
+      premiumCandidates
+        .filter((candidate) => {
+          if (!candidate.dataLimitBytes || tagMatchesFilter(candidate.tags || '', 'trial')) {
+            return false;
+          }
+          const usagePercent = Number((candidate.usedBytes * BigInt(100)) / candidate.dataLimitBytes);
+          return usagePercent >= premiumThreshold;
+        })
+        .map((candidate) => ({
+          telegramChatId: candidate.user?.telegramChatId || candidate.telegramId || null,
+          telegramUserId: candidate.telegramId || candidate.user?.telegramChatId || null,
+          linkedUserId: candidate.user?.id || null,
+          accessKeyId: candidate.id,
+        })),
+    ),
+    buildResult('WINBACK', async () =>
+      Array.from(latestWinbackByUser.values())
+        .filter((candidate) => (candidate.fulfilledAt || candidate.createdAt) <= winbackCutoff)
+        .map((candidate) => ({
+          telegramChatId: candidate.telegramChatId || null,
+          telegramUserId: candidate.telegramUserId || null,
+        })),
+    ),
+  ]);
+
+  return {
+    generatedAt: now,
+    campaigns,
   };
 }
 
