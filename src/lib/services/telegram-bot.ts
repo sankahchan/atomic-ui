@@ -1213,15 +1213,38 @@ function buildTelegramOrderActionKeyboard(input: {
   }
 
   if (input.order.status === 'REJECTED' || input.order.status === 'CANCELLED') {
-    rows.push(
-      [
-        {
-          text: ui.orderActionRetryOrder,
-          callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
-        },
-        ...(supportButton ? [supportButton] : []),
-      ],
-    );
+    rows.push([
+      {
+        text: ui.orderActionRetryOrder,
+        callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
+      },
+      {
+        text: ui.orderActionBuyNewKey,
+        callback_data: buildTelegramOrderActionCallbackData('by', input.order.id, 'order_retry'),
+      },
+    ]);
+    if (supportButton) {
+      rows.push([supportButton]);
+    }
+  }
+
+  if (
+    input.order.status === 'AWAITING_PAYMENT_METHOD'
+    || input.order.status === 'AWAITING_PAYMENT_PROOF'
+    || input.order.status === 'PENDING_REVIEW'
+  ) {
+    rows.push([
+      {
+        text: input.locale === 'my' ? '🧾 Orders' : '🧾 Orders',
+        callback_data: buildTelegramMenuCallbackData('orders', 'action'),
+      },
+      ...(input.order.status !== 'PENDING_REVIEW'
+        ? [{
+            text: ui.orderActionBuyNewKey,
+            callback_data: buildTelegramOrderActionCallbackData('by', input.order.id, 'order_retry'),
+          }]
+        : []),
+    ]);
   }
 
   rows.push([
@@ -1412,6 +1435,16 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
       {
         text: input.locale === 'my' ? '🧾 Resend receipt' : '🧾 Resend receipt',
         callback_data: buildTelegramOrderActionCallbackData('rc', input.order.id),
+      },
+    ]);
+    rows.push([
+      {
+        text: input.locale === 'my' ? '🧾 Orders' : '🧾 Orders',
+        callback_data: buildTelegramMenuCallbackData('orders', 'completed'),
+      },
+      {
+        text: input.locale === 'my' ? '🎟 Offers' : '🎟 Offers',
+        callback_data: buildTelegramMenuCallbackData('offers', 'active'),
       },
     ]);
   }
@@ -1780,6 +1813,16 @@ function buildTelegramReviewQueueSummaryKeyboard(input: {
           text: isMyanmar ? '🛟 Support queue' : '🛟 Support queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
+        {
+          text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+          callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          callback_data: buildTelegramMenuCallbackData('admin', 'home'),
+        },
       ],
     ],
   };
@@ -1919,6 +1962,16 @@ function buildTelegramSupportQueueSummaryKeyboard(input: {
         option('all', isMyanmar ? 'All' : 'All'),
         option('admin', isMyanmar ? 'Need admin' : 'Need admin'),
         option('user', isMyanmar ? 'Need user' : 'Need user'),
+      ],
+      [
+        {
+          text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
+          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
+        },
+        {
+          text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+          callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
+        },
       ],
       [
         {
@@ -6925,6 +6978,20 @@ async function handleTelegramCallbackQuery(
         return null;
       }
 
+      if (menuAction.section === 'orders') {
+        await handleOrdersCommand({
+          chatId,
+          telegramUserId: callbackQuery.from.id,
+          locale,
+          botToken: config.botToken,
+          argsText: menuAction.action,
+          sendTelegramMessage,
+          sendTelegramOrderStatusCard,
+        });
+        await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
+        return null;
+      }
+
       if (menuAction.section === 'support') {
         switch (menuAction.action) {
           case 'orders':
@@ -9045,6 +9112,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         telegramUserId,
         locale,
         botToken: config.botToken,
+        argsText,
         sendTelegramMessage,
         sendTelegramOrderStatusCard,
       });

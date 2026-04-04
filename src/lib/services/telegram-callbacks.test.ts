@@ -72,7 +72,7 @@ test('telegram order review callbacks support quick reject presets', () => {
   );
 });
 
-test('telegram menu callbacks support admin and inbox/offers filters', () => {
+test('telegram menu callbacks support admin and user filters', () => {
   assert.deepEqual(
     parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('admin', 'supportqueue_user')),
     {
@@ -92,6 +92,13 @@ test('telegram menu callbacks support admin and inbox/offers filters', () => {
     {
       section: 'offers',
       action: 'unavailable',
+    },
+  );
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('orders', 'review')),
+    {
+      section: 'orders',
+      action: 'review',
     },
   );
   assert.deepEqual(

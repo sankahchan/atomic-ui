@@ -7,6 +7,7 @@ import {
   buildSubscriptionClientUrl,
 } from '@/lib/subscription-links';
 import { evaluateTelegramOrderRefundEligibility } from '@/lib/services/telegram-finance';
+import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramOrderNextStepText,
   buildTelegramOrderTimelineLines,
@@ -23,6 +24,48 @@ import {
   normalizeTelegramOrderLookupCodes,
 } from '@/lib/services/telegram-ui';
 import { formatBytes } from '@/lib/utils';
+
+type TelegramOrdersFilter = 'ALL' | 'ACTION' | 'REVIEW' | 'COMPLETED';
+
+function parseTelegramOrdersFilter(argsText?: string | null): TelegramOrdersFilter {
+  const normalized = argsText?.trim().toLowerCase() || '';
+  switch (normalized) {
+    case 'action':
+    case 'attention':
+    case 'pending':
+      return 'ACTION';
+    case 'review':
+    case 'reviewing':
+      return 'REVIEW';
+    case 'completed':
+    case 'done':
+    case 'fulfilled':
+      return 'COMPLETED';
+    default:
+      return 'ALL';
+  }
+}
+
+function buildTelegramOrdersKeyboard(locale: SupportedLocale, filter: TelegramOrdersFilter) {
+  const isMyanmar = locale === 'my';
+  const option = (targetFilter: TelegramOrdersFilter, label: string) => ({
+    text: filter === targetFilter ? `• ${label}` : label,
+    callback_data: buildTelegramMenuCallbackData('orders', targetFilter.toLowerCase()),
+  });
+
+  return {
+    inline_keyboard: [
+      [
+        option('ALL', isMyanmar ? 'အားလုံး' : 'All'),
+        option('ACTION', isMyanmar ? 'လုပ်ဆောင်ရန်' : 'Need action'),
+      ],
+      [
+        option('REVIEW', isMyanmar ? 'စစ်ဆေးနေ' : 'Under review'),
+        option('COMPLETED', isMyanmar ? 'ပြီးဆုံး' : 'Completed'),
+      ],
+    ],
+  };
+}
 
 export async function listTelegramOrdersForUser(
   chatId: number,
@@ -476,10 +519,16 @@ export async function handleOrdersCommand(input: {
   telegramUserId: number;
   locale: SupportedLocale;
   botToken: string;
+  argsText?: string;
   sendTelegramMessage: (
     botToken: string,
     chatId: number | string,
     text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
   ) => Promise<boolean>;
   sendTelegramOrderStatusCard: (input: {
     botToken: string;
@@ -490,6 +539,7 @@ export async function handleOrdersCommand(input: {
   }) => Promise<boolean>;
 }) {
   const ui = getTelegramUi(input.locale);
+  const filter = parseTelegramOrdersFilter(input.argsText);
   const orders = await listTelegramOrdersForUser(input.chatId, input.telegramUserId, 6);
   if (!orders.length) {
     return ui.ordersEmpty;
@@ -509,17 +559,32 @@ export async function handleOrdersCommand(input: {
   );
   const reviewOrders = orders.filter((order) => ['PENDING_REVIEW', 'APPROVED'].includes(order.status));
   const completedOrders = orders.filter((order) => order.status === 'FULFILLED');
+  const filteredOrders =
+    filter === 'ACTION'
+      ? attentionOrders
+      : filter === 'REVIEW'
+        ? reviewOrders
+        : filter === 'COMPLETED'
+          ? completedOrders
+          : orders;
   const lines = [
     ui.ordersTitle,
     '',
     `${attentionOrders.length} need action • ${reviewOrders.length} under review • ${completedOrders.length} completed`,
     '',
   ];
-  const sections = [
-    [ui.ordersAttentionTitle, attentionOrders],
-    [ui.ordersReviewTitle, reviewOrders],
-    [ui.ordersCompletedTitle, completedOrders],
-  ] as const;
+  const sections =
+    filter === 'ACTION'
+      ? ([[ui.ordersAttentionTitle, attentionOrders]] as const)
+      : filter === 'REVIEW'
+        ? ([[ui.ordersReviewTitle, reviewOrders]] as const)
+        : filter === 'COMPLETED'
+          ? ([[ui.ordersCompletedTitle, completedOrders]] as const)
+          : ([
+              [ui.ordersAttentionTitle, attentionOrders],
+              [ui.ordersReviewTitle, reviewOrders],
+              [ui.ordersCompletedTitle, completedOrders],
+            ] as const);
 
   for (const [title, sectionOrders] of sections) {
     if (sectionOrders.length === 0) {
@@ -553,11 +618,30 @@ export async function handleOrdersCommand(input: {
     lines.push('');
   }
 
+  if (filteredOrders.length === 0) {
+    lines.push(
+      filter === 'ACTION'
+        ? input.locale === 'my'
+          ? '📭 လက်ရှိလုပ်ဆောင်ရန်လိုသော order မရှိသေးပါ။'
+          : '📭 There are no orders that need action right now.'
+        : filter === 'REVIEW'
+          ? input.locale === 'my'
+            ? '📭 လက်ရှိ review စောင့်နေသော order မရှိသေးပါ။'
+            : '📭 There are no orders under review right now.'
+          : input.locale === 'my'
+            ? '📭 လတ်တလော completed order မရှိသေးပါ။'
+            : '📭 There are no completed orders yet.',
+      '',
+    );
+  }
+
   lines.push(ui.ordersHint);
   const summaryMessage = lines.join('\n');
-  const sentSummary = await input.sendTelegramMessage(input.botToken, input.chatId, summaryMessage);
+  const sentSummary = await input.sendTelegramMessage(input.botToken, input.chatId, summaryMessage, {
+    replyMarkup: buildTelegramOrdersKeyboard(input.locale, filter),
+  });
 
-  const latestOrder = attentionOrders[0] || reviewOrders[0] || orders[0];
+  const latestOrder = filteredOrders[0] || attentionOrders[0] || reviewOrders[0] || orders[0];
   if (latestOrder) {
     await input.sendTelegramOrderStatusCard({
       botToken: input.botToken,
