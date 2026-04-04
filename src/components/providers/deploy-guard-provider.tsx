@@ -21,6 +21,7 @@ const STALE_SERVER_ACTION_PATTERNS = [
   'Failed to find Server Action',
   'older or newer deployment',
   'Cannot read properties of undefined (reading \'workers\')',
+  'STALE_BUILD',
 ];
 
 function isPublicSharePath(pathname: string | null) {
@@ -154,6 +155,22 @@ export function DeployGuardProvider({
       return;
     }
 
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+
+      if (
+        !reloadTriggeredRef.current &&
+        response.headers.get('x-atomic-stale-build') === '1'
+      ) {
+        triggerReload('stale-action');
+        throw new Error('STALE_BUILD');
+      }
+
+      return response;
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         void checkForNewBuild();
@@ -191,6 +208,7 @@ export function DeployGuardProvider({
     void checkForNewBuild();
 
     return () => {
+      window.fetch = originalFetch;
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);

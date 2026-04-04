@@ -22,6 +22,9 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { getJwtSecretString } from '@/lib/session-secret';
 
+const APP_BUILD_COOKIE_NAME = 'atomic-app-build';
+const CURRENT_BUILD_ID = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || '';
+
 /**
  * Routes that don't require authentication
  * These patterns are matched against the request pathname.
@@ -157,6 +160,22 @@ function buildRedirectUrl(
   return url;
 }
 
+function applyBuildCookie(response: NextResponse) {
+  if (!CURRENT_BUILD_ID) {
+    return response;
+  }
+
+  response.cookies.set(APP_BUILD_COOKIE_NAME, CURRENT_BUILD_ID, {
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: false,
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return response;
+}
+
 /**
  * Middleware function
  * 
@@ -169,6 +188,27 @@ export async function middleware(request: NextRequest) {
   const normalizedPath = normalizePathname(request, pathname);
   const publicShareHost = getPublicShareHost();
   const requestHost = getRequestHost(request);
+  const requestBuildId = request.cookies.get(APP_BUILD_COOKIE_NAME)?.value?.trim() || '';
+  const isServerActionRequest =
+    request.headers.has('next-action') || request.headers.has('Next-Action');
+
+  if (
+    isServerActionRequest &&
+    CURRENT_BUILD_ID &&
+    requestBuildId &&
+    requestBuildId !== CURRENT_BUILD_ID
+  ) {
+    const response = NextResponse.json(
+      {
+        ok: false,
+        error: 'STALE_BUILD',
+        message: 'This tab is using an older deploy and needs to reload.',
+      },
+      { status: 409 }
+    );
+    response.headers.set('x-atomic-stale-build', '1');
+    return applyBuildCookie(response);
+  }
 
   // The public share host must never expose admin/login routes.
   if (publicShareHost && requestHost === publicShareHost) {
@@ -176,12 +216,12 @@ export async function middleware(request: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
 
-    return NextResponse.next();
+    return applyBuildCookie(NextResponse.next());
   }
 
   // Allow public routes without authentication
   if (isPublicRoute(normalizedPath)) {
-    return NextResponse.next();
+    return applyBuildCookie(NextResponse.next());
   }
 
   // Check for the session cookie
@@ -191,17 +231,17 @@ export async function middleware(request: NextRequest) {
   if (!sessionToken) {
     // For API routes, return 401 instead of redirecting
     if (normalizedPath.startsWith('/api/')) {
-      return NextResponse.json(
+      return applyBuildCookie(NextResponse.json(
         { error: 'Unauthorized', message: 'Please log in to continue.' },
         { status: 401 }
-      );
+      ));
     }
 
     // For page routes, redirect to login with return URL
     // For page routes, redirect to login with return URL
-    return NextResponse.redirect(
+    return applyBuildCookie(NextResponse.redirect(
       buildRedirectUrl(request, '/login', { from: normalizedPath })
-    );
+    ));
   }
 
   // Verify the JWT token structure
@@ -215,26 +255,26 @@ export async function middleware(request: NextRequest) {
     // Role-based Access Control (RBAC)
     // Redirect USER/CLIENT role trying to access admin dashboard
     if ((role === 'USER' || role === 'CLIENT') && normalizedPath.startsWith('/dashboard')) {
-      return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
+      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/portal')));
     }
 
     // Redirect ADMIN role trying to access user portal (optional, but keeps things clean)
     if (role === 'ADMIN' && normalizedPath.startsWith('/portal')) {
-      return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
+      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
     }
 
     // Redirect USER/CLIENT accessing root to portal
     if ((role === 'USER' || role === 'CLIENT') && normalizedPath === '/') {
-      return NextResponse.redirect(buildRedirectUrl(request, '/portal'));
+      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/portal')));
     }
 
     // Redirect ADMIN accessing root to dashboard
     if (role === 'ADMIN' && normalizedPath === '/') {
-      return NextResponse.redirect(buildRedirectUrl(request, '/dashboard'));
+      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
     }
 
     // Token is valid, allow the request to proceed
-    return NextResponse.next();
+    return applyBuildCookie(NextResponse.next());
   } catch (error) {
     // Token is invalid or expired
     console.error('Middleware: Invalid session token');
@@ -250,7 +290,7 @@ export async function middleware(request: NextRequest) {
       })();
 
     response.cookies.delete('atomic-session');
-    return response;
+    return applyBuildCookie(response);
   }
 }
 

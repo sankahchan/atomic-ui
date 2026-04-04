@@ -7,11 +7,13 @@ cd "$ROOT_DIR"
 
 NODE_HEAP_MB="${NODE_HEAP_MB:-640}"
 PUBLISH_STANDALONE="${PUBLISH_STANDALONE:-false}"
+NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-$(git rev-parse --short=12 HEAD 2>/dev/null || date +%s)}"
 
 echo "[build-low-memory] root=${ROOT_DIR}"
 echo "[build-low-memory] heap=${NODE_HEAP_MB}MB"
 
 export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB}"
+export NEXT_PUBLIC_APP_VERSION
 
 npx prisma generate --schema prisma/schema.prisma >/dev/null
 rm -rf .next/standalone

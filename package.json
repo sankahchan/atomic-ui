@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "NODE_OPTIONS='--max-old-space-size=1024' next build",
+    "build": "NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-$(git rev-parse --short=12 HEAD 2>/dev/null || echo dev)} NODE_OPTIONS='--max-old-space-size=1024' next build",
     "build:low-memory": "bash scripts/build-low-memory.sh",
     "start": "next start",
     "lint": "next lint",
