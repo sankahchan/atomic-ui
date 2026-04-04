@@ -28,6 +28,20 @@ test('canAssignKeysToServer rejects draining and maintenance servers', () => {
   assert.match(maintenance.reason ?? '', /maintenance/i);
 });
 
+test('canAssignKeysToServer allows draining when explicitly requested', () => {
+  const result = canAssignKeysToServer({
+    isActive: true,
+    lifecycleMode: 'DRAINING',
+  }, {
+    allowDraining: true,
+  });
+
+  assert.deepEqual(result, {
+    allowed: true,
+    reason: null,
+  });
+});
+
 test('canAssignKeysToServer treats unknown lifecycle modes as active', () => {
   const result = canAssignKeysToServer({
     isActive: true,

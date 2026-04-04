@@ -906,7 +906,9 @@ export const keysRouter = router({
         });
       }
 
-      const assignmentCheck = canAssignKeysToServer(server);
+      const assignmentCheck = canAssignKeysToServer(server, {
+        allowDraining: input.assignmentMode === 'MANUAL',
+      });
       if (!assignmentCheck.allowed) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -1432,7 +1434,9 @@ export const keysRouter = router({
 
       // Create keys on each server
       for (const server of servers) {
-        const assignmentCheck = canAssignKeysToServer(server);
+        const assignmentCheck = canAssignKeysToServer(server, {
+          allowDraining: true,
+        });
         if (!assignmentCheck.allowed) {
           results.failed += input.count;
           results.errors.push(`${server.name}: ${assignmentCheck.reason}`);

@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Upload, AlertTriangle, RefreshCw } from "lucide-react";
+import { Download, Upload, AlertTriangle, RefreshCw, ExternalLink, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { withBasePath } from "@/lib/base-path";
@@ -79,6 +80,26 @@ export function BackupSettings() {
 
     return (
         <div className="space-y-6">
+            <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            Primary settings workspace
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            Backup and restore also live in the main dashboard settings page. Use that workspace for the newer layout and the same safer restore handling.
+                        </p>
+                    </div>
+                    <Button asChild variant="outline" className="gap-2">
+                        <Link href="/dashboard/settings">
+                            Open Dashboard Settings
+                            <ExternalLink className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -108,6 +129,9 @@ export function BackupSettings() {
                         Restore your system from a backup file.
                         <span className="font-bold text-destructive block mt-1">
                             WARNING: This will overwrite your current database and configuration!
+                        </span>
+                        <span className="block mt-2 text-xs text-muted-foreground">
+                            Upload a valid backup <code className="rounded bg-muted px-1 py-0.5">.zip</code> file. Invalid uploads are rejected safely before restore starts.
                         </span>
                     </CardDescription>
                 </CardHeader>

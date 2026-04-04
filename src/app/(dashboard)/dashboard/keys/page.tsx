@@ -374,6 +374,11 @@ function CreateKeyDialog({
     },
   );
   const selectedCreateTags = useMemo(() => stringToTags(formData.tags), [formData.tags]);
+  const manuallySelectedServer = useMemo(
+    () => servers?.find((server) => server.id === formData.serverId) ?? null,
+    [formData.serverId, servers],
+  );
+  const selectedServerLifecycleMode = manuallySelectedServer?.lifecycleMode ?? 'ACTIVE';
 
   useEffect(() => {
     if (slugTouched) {
@@ -761,9 +766,15 @@ function CreateKeyDialog({
               <SelectContent>
                 <SelectItem value="auto">{t('keys.form.server_auto')}</SelectItem>
                 {servers?.map((server) => (
-                  <SelectItem key={server.id} value={server.id}>
+                  <SelectItem
+                    key={server.id}
+                    value={server.id}
+                    disabled={server.lifecycleMode === 'MAINTENANCE'}
+                  >
                     {server.countryCode && getCountryFlag(server.countryCode)}{' '}
                     {server.name}
+                    {server.lifecycleMode === 'DRAINING' ? ` • ${t('keys.form.server_draining_badge')}` : ''}
+                    {server.lifecycleMode === 'MAINTENANCE' ? ` • ${t('keys.form.server_maintenance_badge')}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -796,6 +807,23 @@ function CreateKeyDialog({
                 </div>
               </div>
             )}
+            {formData.serverId !== 'auto' && selectedServerLifecycleMode === 'DRAINING' && manuallySelectedServer ? (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">
+                      {t('keys.form.server_draining_help_title')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {fillTemplate(t('keys.form.server_draining_help_desc'), {
+                        server: manuallySelectedServer.name,
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Key name */}
