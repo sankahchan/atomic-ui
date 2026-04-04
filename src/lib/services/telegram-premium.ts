@@ -521,6 +521,18 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const poolSummary = formatTelegramDynamicPoolSummary(request.dynamicAccessKey, ui);
   const latestReply = request.replies?.[request.replies.length - 1] || null;
   const currentState = formatTelegramPremiumFollowUpState(request, ui);
+  const followUpIndicator =
+    currentState === ui.premiumAwaitingYourReply
+      ? input.locale === 'my'
+        ? '🟡 Reply needed'
+        : '🟡 Reply needed'
+      : currentState === ui.premiumAwaitingAdminReply
+        ? input.locale === 'my'
+          ? '🕒 Waiting for admin'
+          : '🕒 Waiting for admin'
+        : input.locale === 'my'
+          ? '✅ Up to date'
+          : '✅ Up to date';
   const lines = [
     ui.premiumStatusTitle,
     '',
@@ -535,6 +547,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
     `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b>`,
+    `${escapeHtml(followUpIndicator)}`,
     `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
     `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
   ];
@@ -970,11 +983,59 @@ export async function handlePremiumSupportStatusCommand(input: {
     return ui.premiumStatusEmpty;
   }
 
-  const lines = [ui.premiumStatusTitle, '', `${requests.length} request(s)`, ''];
+  if (requests.length === 1) {
+    const request = requests[0];
+    const message = buildTelegramPremiumSupportStatusMessage({
+      locale: input.locale,
+      request,
+    });
+    const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup:
+        request.status === 'PENDING_REVIEW'
+          ? buildTelegramDynamicPremiumPendingKeyboard({
+              dynamicAccessKeyId: request.dynamicAccessKeyId,
+              requestId: request.id,
+              locale: input.locale,
+              supportLink,
+            })
+          : buildTelegramDynamicPremiumSupportKeyboard(
+              request.dynamicAccessKeyId,
+              input.locale,
+              supportLink,
+              request.id,
+            ),
+    });
+
+    return sent ? null : message;
+  }
+
+  const waitingForAdmin = requests.filter((request) => request.followUpPending).length;
+  const replyNeeded = requests.filter((request) => {
+    const latestReply = request.replies?.[request.replies.length - 1] || null;
+    return latestReply?.senderType === 'ADMIN';
+  }).length;
+  const lines = [
+    ui.premiumStatusTitle,
+    '',
+    `${requests.length} request(s) • ${waitingForAdmin} waiting for admin • ${replyNeeded} reply needed`,
+    '',
+  ];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  const latestRequest = requests[0] || null;
 
   for (const request of requests) {
     const latestReply = request.replies?.[request.replies.length - 1] || null;
+    const replyStateLabel = latestReply?.senderType === 'ADMIN'
+      ? input.locale === 'my'
+        ? '🟡 Reply needed'
+        : '🟡 Reply needed'
+      : request.followUpPending
+        ? input.locale === 'my'
+          ? '🕒 Waiting for admin'
+          : '🕒 Waiting for admin'
+        : input.locale === 'my'
+          ? '✅ Up to date'
+          : '✅ Up to date';
     lines.push(
       `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
         formatTelegramPremiumSupportStatusLabel(request.status, ui),
@@ -985,11 +1046,7 @@ export async function handlePremiumSupportStatusCommand(input: {
       `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
         formatTelegramPremiumFollowUpState(request, ui),
       )}`,
-      latestReply?.senderType === 'ADMIN'
-        ? `  ${escapeHtml(input.locale === 'my' ? 'Reply needed' : 'Reply needed')}`
-        : request.followUpPending
-          ? `  ${escapeHtml(input.locale === 'my' ? 'Waiting for admin' : 'Waiting for admin')}`
-          : '',
+      `  ${escapeHtml(replyStateLabel)}`,
       `  ${ui.createdAtLabel}: ${escapeHtml(
         formatTelegramDateTime(request.createdAt, input.locale),
       )}`,
@@ -1022,6 +1079,33 @@ export async function handlePremiumSupportStatusCommand(input: {
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: { inline_keyboard: inlineKeyboard.slice(0, 8) },
   });
+
+  if (sent && latestRequest) {
+    await input.sendTelegramMessage(
+      input.botToken,
+      input.chatId,
+      buildTelegramPremiumSupportStatusMessage({
+        locale: input.locale,
+        request: latestRequest,
+      }),
+      {
+        replyMarkup:
+          latestRequest.status === 'PENDING_REVIEW'
+            ? buildTelegramDynamicPremiumPendingKeyboard({
+                dynamicAccessKeyId: latestRequest.dynamicAccessKeyId,
+                requestId: latestRequest.id,
+                locale: input.locale,
+                supportLink,
+              })
+            : buildTelegramDynamicPremiumSupportKeyboard(
+                latestRequest.dynamicAccessKeyId,
+                input.locale,
+                supportLink,
+                latestRequest.id,
+              ),
+      },
+    );
+  }
 
   return sent ? null : message;
 }

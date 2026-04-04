@@ -67,6 +67,40 @@ function buildTelegramOrdersKeyboard(locale: SupportedLocale, filter: TelegramOr
   };
 }
 
+function buildTelegramOrderProgressSummary(input: {
+  order: {
+    status: string;
+  };
+  locale: SupportedLocale;
+}) {
+  const status = input.order.status;
+  const isMyanmar = input.locale === 'my';
+  if (status === 'FULFILLED') {
+    return isMyanmar ? 'Step 4/4 • Delivered' : 'Step 4/4 • Delivered';
+  }
+  if (status === 'PENDING_REVIEW' || status === 'APPROVED') {
+    return isMyanmar ? 'Step 4/4 • Admin review' : 'Step 4/4 • Admin review';
+  }
+  if (status === 'AWAITING_PAYMENT_PROOF') {
+    return isMyanmar ? 'Step 3/4 • Upload screenshot' : 'Step 3/4 • Upload screenshot';
+  }
+  if (status === 'AWAITING_PAYMENT_METHOD') {
+    return isMyanmar ? 'Step 2/4 • Choose payment method' : 'Step 2/4 • Choose payment method';
+  }
+  if (
+    status === 'AWAITING_KEY_SELECTION'
+    || status === 'AWAITING_PLAN'
+    || status === 'AWAITING_MONTHS'
+    || status === 'AWAITING_SERVER_SELECTION'
+  ) {
+    return isMyanmar ? 'Step 1/4 • Setup' : 'Step 1/4 • Setup';
+  }
+  if (status === 'REJECTED' || status === 'CANCELLED') {
+    return isMyanmar ? 'Flow ended • restart available' : 'Flow ended • restart available';
+  }
+  return null;
+}
+
 export async function listTelegramOrdersForUser(
   chatId: number,
   telegramUserId: number,
@@ -212,6 +246,9 @@ export async function buildTelegramOrderStatusMessage(input: {
     `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
     stateLine ? `🧾 ${escapeHtml(stateLine)}` : '',
     nextStep ? `👉 ${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
+    buildTelegramOrderProgressSummary({ order, locale })
+      ? `⏱ ${escapeHtml(buildTelegramOrderProgressSummary({ order, locale }) || '')}`
+      : '',
     '',
     currentStateTitle,
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
@@ -370,16 +407,16 @@ export async function buildTelegramOrderStatusMessage(input: {
             : 'Choose your payment method first, then continue to the screenshot step.'
           : order.status === 'AWAITING_PAYMENT_PROOF'
             ? isMyanmar
-              ? 'ငွေပေးချေပြီး screenshot ကို ဤ chat ထဲသို့ ပို့ပါ။ မသေချာပါက /support ကို အသုံးပြုပါ။'
-              : 'Complete payment and send the screenshot in this chat. Use /support if you are unsure.'
+              ? 'ငွေပေးချေပြီး screenshot ကို ဤ chat ထဲသို့ ပို့ပါ။ Payment guide ဖြင့် account detail ကို ပြန်ကြည့်နိုင်ပြီး Payment method ပြောင်းရန် button ကိုလည်း အသုံးပြုနိုင်ပါသည်။'
+              : 'Complete payment and send the screenshot in this chat. Use Payment guide to recheck the account details, or Switch payment method if needed.'
             : order.status === 'PENDING_REVIEW'
               ? isMyanmar
                 ? 'ယခု order သည် admin review စောင့်နေပါသည်။ Screenshot ကို ထပ်မပို့ဘဲ update စောင့်ပါ။'
                 : 'This order is waiting for admin review. Wait for an update instead of sending another screenshot.'
               : order.status === 'REJECTED'
                 ? isMyanmar
-                  ? 'လိုအပ်ပါက Retry order ကို အသုံးပြုပြီး screenshot သို့မဟုတ် payment method ကို ပြန်တင်နိုင်ပါသည်။'
-                  : 'Use Retry order if you want to submit a fresh screenshot or switch the payment method.'
+                  ? 'လိုအပ်ပါက Restart same plan ကို အသုံးပြုပြီး screenshot သို့မဟုတ် payment method ကို ပြန်စနိုင်ပါသည်။'
+                  : 'Use Restart same plan if you want to restart this exact flow with a fresh screenshot or payment method.'
                 : isMyanmar
                   ? 'ဤ order ကို ပိတ်ထားပါသည်။ အသစ်စရန် /buy သို့မဟုတ် /renew ကို သုံးနိုင်ပါသည်။'
                   : 'This order is closed. Use /buy or /renew to start again.',

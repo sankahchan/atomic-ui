@@ -1128,8 +1128,8 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
 
 function getTelegramProofExampleUrls() {
   return {
-    good: withAbsoluteBasePath('/telegram/proof-example-good.svg'),
-    bad: withAbsoluteBasePath('/telegram/proof-example-bad.svg'),
+    good: withAbsoluteBasePath('/telegram/proof-example-good.png'),
+    bad: withAbsoluteBasePath('/telegram/proof-example-bad.png'),
   };
 }
 
@@ -1178,7 +1178,7 @@ function buildTelegramOrderActionKeyboard(input: {
       },
       {
         text: input.order.paymentMethodCode
-          ? ui.orderActionAlreadyPaid
+          ? ui.orderActionViewPaymentGuide
           : ui.orderActionChoosePaymentMethod,
         callback_data: buildTelegramOrderActionCallbackData(
           input.order.paymentMethodCode ? 'pay' : 'pm',
@@ -1194,9 +1194,21 @@ function buildTelegramOrderActionKeyboard(input: {
             text: ui.orderActionSwitchPaymentMethod,
             callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
           },
-          ...(supportButton ? [supportButton] : []),
+          ...(input.order.status !== 'PENDING_REVIEW'
+            ? [
+                {
+                  text: ui.orderActionRestartSamePlan,
+                  callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
+                },
+              ]
+            : supportButton
+              ? [supportButton]
+              : []),
         ],
       );
+      if (input.order.status !== 'PENDING_REVIEW' && supportButton) {
+        rows.push([supportButton]);
+      }
       rows.push([
         {
           text: input.locale === 'my' ? '✅ Good example' : '✅ Good example',
@@ -1215,7 +1227,7 @@ function buildTelegramOrderActionKeyboard(input: {
   if (input.order.status === 'REJECTED' || input.order.status === 'CANCELLED') {
     rows.push([
       {
-        text: ui.orderActionRetryOrder,
+        text: ui.orderActionRestartSamePlan,
         callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
       },
       {
@@ -1810,6 +1822,10 @@ function buildTelegramReviewQueueSummaryKeyboard(input: {
       ],
       [
         {
+          text: isMyanmar ? '⚡ Next needing action' : '⚡ Next needing action',
+          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
+        },
+        {
           text: isMyanmar ? '🛟 Support queue' : '🛟 Support queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
@@ -1964,6 +1980,10 @@ function buildTelegramSupportQueueSummaryKeyboard(input: {
         option('user', isMyanmar ? 'Need user' : 'Need user'),
       ],
       [
+        {
+          text: isMyanmar ? '⚡ Next needing action' : '⚡ Next needing action',
+          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
+        },
         {
           text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
@@ -2124,8 +2144,8 @@ function buildTelegramOrderReviewAlertMessage(input: {
     '',
     order.paymentMessageId
       ? isMyanmar
-        ? 'မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
-        : 'The original screenshot is copied just above this review summary.'
+        ? '📎 မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
+        : '📎 The original screenshot is copied just above this review summary.'
       : isMyanmar
         ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
         : 'The original screenshot could not be copied here, so review it in the panel.',
@@ -8209,14 +8229,23 @@ async function handleTelegramCallbackQuery(
                 status: 'AWAITING_PAYMENT_PROOF',
                 ...buildTelegramOrderPaymentStageFields({
                   nextStatus: 'AWAITING_PAYMENT_PROOF',
-                  currentStatus: order.status,
-                  paymentStageEnteredAt: order.paymentStageEnteredAt,
-                  paymentReminderSentAt: order.paymentReminderSentAt,
-                  retryReminderSentAt: order.retryReminderSentAt,
                 }),
+                paymentProofFileId: null,
+                paymentProofUniqueId: null,
+                paymentProofType: null,
+                paymentProofRevision: 0,
+                duplicateProofOrderId: null,
+                duplicateProofOrderCode: null,
+                duplicateProofDetectedAt: null,
+                paymentMessageId: null,
+                paymentCaption: null,
+                paymentSubmittedAt: null,
                 reviewReminderSentAt: null,
                 reviewedAt: null,
                 rejectedAt: null,
+                customerMessage: null,
+                rejectionReasonCode: null,
+                adminNote: null,
               },
             });
 
@@ -8356,6 +8385,21 @@ async function handleTelegramCallbackQuery(
             return null;
           }
           case 'by': {
+            const offer =
+              userOrderAction.primary === 'server-change'
+                ? null
+                : await db.telegramCouponRedemption.findFirst({
+                    where: {
+                      id: userOrderAction.primary,
+                      OR: [
+                        { telegramChatId: String(chatId) },
+                        { telegramUserId: String(callbackQuery.from.id) },
+                      ],
+                    },
+                    select: {
+                      couponCode: true,
+                    },
+                  });
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
@@ -8368,7 +8412,7 @@ async function handleTelegramCallbackQuery(
               locale,
               config.botToken,
               resolveTelegramRetentionSourceFromBuyAction(userOrderAction.secondary),
-              '',
+              offer?.couponCode || '',
             );
           }
           case 'rt': {
@@ -8386,7 +8430,14 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            if (!(order.status === 'REJECTED' || order.status === 'CANCELLED')) {
+            if (
+              !(
+                order.status === 'AWAITING_PAYMENT_METHOD'
+                || order.status === 'AWAITING_PAYMENT_PROOF'
+                || order.status === 'REJECTED'
+                || order.status === 'CANCELLED'
+              )
+            ) {
               await answerTelegramCallbackQuery(
                 config.botToken,
                 callbackQuery.id,

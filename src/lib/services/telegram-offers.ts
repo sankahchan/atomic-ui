@@ -72,6 +72,31 @@ function resolveTelegramOfferStatusLabel(
   return offer.status;
 }
 
+function resolveTelegramOfferUnavailableReason(
+  offer: TelegramOfferRecord,
+  locale: SupportedLocale,
+) {
+  const isMyanmar = locale === 'my';
+  if (offer.status === 'REDEEMED') {
+    return offer.redeemedOrderCode
+      ? isMyanmar
+        ? `Used on ${offer.redeemedOrderCode}`
+        : `Used on ${offer.redeemedOrderCode}`
+      : isMyanmar
+        ? 'Already used on an order'
+        : 'Already used on an order';
+  }
+  if (offer.status === 'CANCELLED') {
+    return isMyanmar ? 'Revoked by admin or campaign rules' : 'Revoked by admin or campaign rules';
+  }
+  if (offer.expiresAt && offer.expiresAt.getTime() <= Date.now()) {
+    return isMyanmar
+      ? `Expired at ${formatTelegramDateTime(offer.expiresAt, locale)}`
+      : `Expired at ${formatTelegramDateTime(offer.expiresAt, locale)}`;
+  }
+  return isMyanmar ? 'Not available for use right now' : 'Not available for use right now';
+}
+
 function resolveTelegramOfferActionLine(
   offer: TelegramOfferRecord,
   locale: SupportedLocale,
@@ -288,13 +313,26 @@ export async function handleOffersCommand(input: {
           : offer.accessKeyId
             ? accessKeyNames.get(offer.accessKeyId) || null
             : null;
+      const useNowLabel =
+        offer.campaignType === 'RENEWAL_SOON'
+          ? input.locale === 'my'
+            ? 'Tap the renew button below to use this offer.'
+            : 'Tap the renew button below to use this offer.'
+          : offer.couponCode
+            ? input.locale === 'my'
+              ? `Tap the buy button below or use /buy ${offer.couponCode}.`
+              : `Tap the buy button below or use /buy ${offer.couponCode}.`
+            : input.locale === 'my'
+              ? 'Tap the action button below to continue with this offer.'
+              : 'Tap the action button below to continue with this offer.';
       lines.push(
-        `• <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
+        `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
           resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale),
         )}`,
-        offerLabel ? `  ${escapeHtml(offerLabel)}` : '',
-        targetLabel ? `  ${escapeHtml(targetLabel)}` : '',
+        offerLabel ? `  ${input.locale === 'my' ? 'Offer' : 'Offer'}: <b>${escapeHtml(offerLabel)}</b>` : '',
+        targetLabel ? `  ${input.locale === 'my' ? 'For' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
         `  ${escapeHtml(resolveTelegramOfferActionLine(offer, input.locale, targetLabel))}`,
+        `  ${escapeHtml(useNowLabel)}`,
         offer.expiresAt
           ? `  ${input.locale === 'my' ? 'Expires' : 'Expires'}: ${escapeHtml(
               formatTelegramDateTime(offer.expiresAt, input.locale),
@@ -303,6 +341,13 @@ export async function handleOffersCommand(input: {
       );
     }
     lines.push('');
+  } else if (filter === 'ACTIVE') {
+    lines.push(
+      input.locale === 'my'
+        ? '📭 လက်ရှိ အသုံးပြုနိုင်သော offer မရှိသေးပါ။'
+        : '📭 There are no active offers right now.',
+      '',
+    );
   }
 
   if ((filter === 'ALL' || filter === 'USED') && usedOffers.length > 0) {
@@ -321,6 +366,13 @@ export async function handleOffersCommand(input: {
       );
     }
     lines.push('');
+  } else if (filter === 'USED') {
+    lines.push(
+      input.locale === 'my'
+        ? '📭 မကြာသေးမီက အသုံးပြုပြီးသော offer မရှိသေးပါ။'
+        : '📭 There are no recently used offers yet.',
+      '',
+    );
   }
 
   if ((filter === 'ALL' || filter === 'UNAVAILABLE') && inactiveOffers.length > 0) {
@@ -330,9 +382,17 @@ export async function handleOffersCommand(input: {
         `• <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
           resolveTelegramOfferStatusLabel(offer, input.locale),
         )}`,
+        `  ${escapeHtml(resolveTelegramOfferUnavailableReason(offer, input.locale))}`,
       );
     }
     lines.push('');
+  } else if (filter === 'UNAVAILABLE') {
+    lines.push(
+      input.locale === 'my'
+        ? '📭 လက်ရှိ unavailable offer မရှိသေးပါ။'
+        : '📭 There are no unavailable offers right now.',
+      '',
+    );
   }
 
   lines.push(
