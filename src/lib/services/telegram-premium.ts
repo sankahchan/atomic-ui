@@ -446,7 +446,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     `${ui.statusLineLabel}: <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
-    `${ui.premiumOpenRequestLabel}: <b>${escapeHtml(currentState)}</b>`,
+    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b>`,
     `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
     `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
   ];
@@ -619,14 +619,23 @@ export async function handlePremiumCommand(input: {
     const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
     const { sharePageUrl } = input.getDynamicKeyMessagingUrls(key, 'telegram_premium', input.locale);
     const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
+    const latestReply = latestRequest?.replies?.[latestRequest.replies.length - 1] || null;
     lines.push(
       `• <b>${escapeHtml(key.name)}</b>`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
       `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
       latestRequest
-        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+        ? `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
             `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
           )}`
+        : '',
+      latestReply
+        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(
+            `${latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou} • ${formatTelegramDateTime(latestReply.createdAt, input.locale)}`,
+          )}`
+        : '',
+      latestReply
+        ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
         : '',
       sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
       '',
@@ -798,7 +807,7 @@ export async function handlePremiumSupportStatusCommand(input: {
       `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
         formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
       )}`,
-      `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+      `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
         formatTelegramPremiumFollowUpState(request, ui),
       )}`,
       `  ${ui.createdAtLabel}: ${escapeHtml(
@@ -808,6 +817,9 @@ export async function handlePremiumSupportStatusCommand(input: {
         ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(
             `${latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou} • ${formatTelegramDateTime(latestReply.createdAt, input.locale)}`,
           )}`
+        : '',
+      latestReply
+        ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
         : '',
       '',
     );

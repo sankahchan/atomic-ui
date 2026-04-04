@@ -190,6 +190,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumHubHint: isMyanmar
       ? 'Preferred region ပြောင်းရန်၊ route issue တိုင်ကြားရန်၊ request status ကို /supportstatus ဖြင့် စစ်နိုင်သလို /premiumregion ဖြင့် region အခြေအနေကိုလည်း ကြည့်နိုင်ပါသည်။'
       : 'Use the buttons below to change preferred region, report route issues, check request progress with /supportstatus, and view live region health with /premiumregion.',
+    premiumThreadStatusLabel: isMyanmar ? 'Thread status' : 'Thread status',
     premiumStatusTitle: isMyanmar ? '🧾 <b>Premium support status</b>' : '🧾 <b>Premium support status</b>',
     premiumStatusEmpty: isMyanmar
       ? 'သင့်အတွက် premium support request မရှိသေးပါ။ Premium key အတွက် /premium သို့မဟုတ် /mykeys ကို အသုံးပြုပြီး request စတင်နိုင်ပါသည်။'
@@ -242,8 +243,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : 'Use /premium to start a new premium support request.',
     premiumOpenRequestLabel: isMyanmar ? 'Open request' : 'Open request',
     premiumLatestReplyLabel: isMyanmar ? 'Latest reply' : 'Latest reply',
-    premiumAwaitingAdminReply: isMyanmar ? 'Admin reply စောင့်နေသည်' : 'Waiting for admin reply',
-    premiumAwaitingYourReply: isMyanmar ? 'သင့် follow-up ကို စောင့်နေသည်' : 'Waiting for your follow-up',
+    premiumAwaitingAdminReply: isMyanmar ? 'Waiting for admin' : 'Waiting for admin',
+    premiumAwaitingYourReply: isMyanmar ? 'Waiting for you' : 'Waiting for you',
     premiumStatusReplyHint: isMyanmar
       ? 'လိုအပ်ပါက Reply to request ကိုနှိပ်ပြီး နောက်ဆက်တွဲ message ပို့နိုင်ပါသည်။'
       : 'Use Reply to request if you want to continue the same support thread.',
@@ -251,7 +252,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumResponseTimeLabel: isMyanmar ? 'First response' : 'First response',
     premiumResolutionTimeLabel: isMyanmar ? 'Resolved' : 'Resolved',
     premiumNoPinApplied: isMyanmar ? 'No pin applied' : 'No pin applied',
-    premiumStatusPendingReview: isMyanmar ? 'Pending review' : 'Pending review',
+    premiumStatusPendingReview: isMyanmar ? 'Pending' : 'Pending',
     premiumStatusApproved: isMyanmar ? 'Approved' : 'Approved',
     premiumStatusHandled: isMyanmar ? 'Handled' : 'Handled',
     premiumStatusDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
@@ -470,6 +471,18 @@ export function getTelegramUi(locale: SupportedLocale) {
     buyPremiumSummary: isMyanmar
       ? '💎 <b>Premium key</b>\nDynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် priority support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
       : '💎 <b>Premium key</b>\nBuilt for users who want dynamic routing, better stability, auto failover, and priority support.',
+    buyStandardBestFor: isMyanmar
+      ? 'အသုံးပြုမှု ပုံမှန်၊ စျေးနှုန်းသက်သာမှု လိုသူများအတွက် သင့်တော်ပါသည်။'
+      : 'Best for lower-cost, normal daily use.',
+    buyPremiumBestFor: isMyanmar
+      ? 'ပိုတည်ငြိမ်သော route၊ fallback, region flexibility လိုသူများအတွက် သင့်တော်ပါသည်။'
+      : 'Best for users who want stronger routing stability, fallback, and region flexibility.',
+    buyPremiumRegionExplain: isMyanmar
+      ? 'ဝယ်ပြီးနောက် preferred region request, route issue report, /premiumregion status စစ်ခြင်းတို့ကို အသုံးပြုနိုင်ပါသည်။'
+      : 'After purchase, you can request a preferred region, report route issues, and check live region health with /premiumregion.',
+    buyPlanCardChooseHint: isMyanmar
+      ? 'အောက်က button ကိုနှိပ်ပြီး plan ကို တိုက်ရိုက်ရွေးနိုင်ပါသည်။'
+      : 'Tap a button below to choose one of these plans directly.',
     buyPlanChooseHint: isMyanmar
       ? 'Order လုပ်စဉ် အဆင့်များမှာ - 1) plan ရွေးရန် 2) server / payment ရွေးရန် 3) screenshot ပို့ရန် 4) admin approval စောင့်ရန် ဖြစ်ပါသည်။'
       : 'Checkout is simple: 1) choose a plan 2) choose server/payment 3) send your screenshot 4) wait for admin approval.',

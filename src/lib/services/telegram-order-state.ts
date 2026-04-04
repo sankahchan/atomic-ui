@@ -434,14 +434,14 @@ export async function handleBuyCommand(input: {
     .map((plan: any) => {
       const label = resolveTelegramSalesPlanLabel(plan, input.locale);
       const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return price ? `• ${label} - ${price}` : `• ${label}`;
+      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
     });
   const premiumPlanLines = enabledPlans
     .filter((plan: any) => plan.deliveryType === 'DYNAMIC_KEY')
     .map((plan: any) => {
       const label = resolveTelegramSalesPlanLabel(plan, input.locale);
       const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return price ? `• ${label} - ${price}` : `• ${label}`;
+      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
     });
   const lines = [
     ui.orderPlanPrompt(preparedOrder.orderCode),
@@ -464,15 +464,19 @@ export async function handleBuyCommand(input: {
       : []),
     '',
     ui.buyStandardSummary,
+    ui.buyStandardBestFor,
     ...(standardPlanLines.length ? ['', `${ui.buyStandardPlansTitle}:`, ...standardPlanLines] : []),
     '',
     ui.buyPremiumSummary,
     ui.buyPremiumUpsell,
+    ui.buyPremiumBestFor,
+    ui.buyPremiumRegionExplain,
     ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
     '',
     input.locale === 'my'
-      ? '<b>Button ကို နှိပ်ပြီးတိုက်ရိုက် ရွေးနိုင်ပါသည်</b>'
-      : '<b>Tap a button below to choose directly</b>',
+      ? '<b>ရွေးချယ်ရန် အသင့်ဖြစ်ပါပြီ</b>'
+      : '<b>Ready to choose?</b>',
+    ui.buyPlanCardChooseHint,
     input.locale === 'my'
       ? 'Button မသုံးနိုင်ပါက အောက်ပါနံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
       : 'If the buttons do not work, reply with the matching number below.',
