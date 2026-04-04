@@ -612,7 +612,14 @@ export async function handlePremiumCommand(input: {
     input.telegramUserId,
     3,
   );
-  const lines = [ui.premiumHubTitle, '', ui.premiumHubHint, ''];
+  const lines = [
+    ui.premiumHubTitle,
+    '',
+    `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`,
+    '',
+    ui.premiumHubHint,
+    '',
+  ];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   for (const key of dynamicKeys.slice(0, 4)) {
@@ -621,7 +628,7 @@ export async function handlePremiumCommand(input: {
     const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
     const latestReply = latestRequest?.replies?.[latestRequest.replies.length - 1] || null;
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b>`,
+      `💎 <b>${escapeHtml(key.name)}</b>`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
       `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
       latestRequest
@@ -637,6 +644,11 @@ export async function handlePremiumCommand(input: {
       latestReply
         ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
         : '',
+      `  ${escapeHtml(
+        input.locale === 'my'
+          ? 'Quick actions: region • route issue • status'
+          : 'Quick actions: region • route issue • status',
+      )}`,
       sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
       '',
     );
@@ -673,7 +685,7 @@ export async function handlePremiumCommand(input: {
     lines.push(ui.premiumStatusTitle, '');
     for (const request of recentRequests) {
       lines.push(
-        `• <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
+        `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
           formatTelegramPremiumSupportStatusLabel(request.status, ui),
         )}`,
         `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
@@ -795,13 +807,13 @@ export async function handlePremiumSupportStatusCommand(input: {
     return ui.premiumStatusEmpty;
   }
 
-  const lines = [ui.premiumStatusTitle, ''];
+  const lines = [ui.premiumStatusTitle, '', `${requests.length} request(s)`, ''];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   for (const request of requests) {
     const latestReply = request.replies?.[request.replies.length - 1] || null;
     lines.push(
-      `• <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
+      `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
         formatTelegramPremiumSupportStatusLabel(request.status, ui),
       )}`,
       `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
@@ -930,12 +942,19 @@ export async function handlePremiumRegionStatusCommand(input: {
     : [];
   const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
 
-  const lines = [ui.premiumRegionStatusTitle, '', ui.premiumRegionStatusHint, ''];
+  const lines = [
+    ui.premiumRegionStatusTitle,
+    '',
+    `${dynamicKeys.length} premium key(s)`,
+    '',
+    ui.premiumRegionStatusHint,
+    '',
+  ];
 
   for (const key of dynamicKeys.slice(0, 4)) {
     const analysis = summarizePremiumRegions(key, healthByServerId);
 
-    lines.push(`• <b>${escapeHtml(key.name)}</b>`);
+    lines.push(`• 💎 <b>${escapeHtml(key.name)}</b>`);
     lines.push(
       `  ${ui.premiumRegionPreferredLabel}: ${
         analysis.preferredRegions.length
@@ -987,6 +1006,14 @@ export async function handlePremiumRegionStatusCommand(input: {
         );
       }
     }
+
+    lines.push(
+      `  ${escapeHtml(
+        input.locale === 'my'
+          ? 'Need a change? Use /premium or the buttons there to request a new region or report a route issue.'
+          : 'Need a change? Use /premium or the buttons there to request a new region or report a route issue.',
+      )}`,
+    );
 
     lines.push('');
   }

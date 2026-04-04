@@ -230,9 +230,13 @@ export async function handleInboxCommand(input: {
           ? '📬 <b>သင်၏ Notice Inbox</b>'
           : '📬 <b>Your Notice Inbox</b>',
     '',
-    input.locale === 'my'
-      ? `Announcement ${announcements.length} ခု • Support ${premiumSupportUpdates.length} ခု • Finance ${refundUpdates.length} ခု`
-      : `${announcements.length} announcement(s) • ${premiumSupportUpdates.length} support update(s) • ${refundUpdates.length} finance update(s)`,
+    mode === 'ALL'
+      ? input.locale === 'my'
+        ? `Announcement ${announcements.length} ခု • Support ${premiumSupportUpdates.length} ခု • Finance ${refundUpdates.length} ခု`
+        : `${announcements.length} announcement(s) • ${premiumSupportUpdates.length} support update(s) • ${refundUpdates.length} finance update(s)`
+      : input.locale === 'my'
+        ? `${announcements.length} announcement(s)`
+        : `${announcements.length} announcement(s)`,
     '',
   ];
 
@@ -252,9 +256,9 @@ export async function handleInboxCommand(input: {
     );
     for (const delivery of announcements) {
       lines.push(
-        `• ${delivery.isPinned ? '📌 ' : ''}<b>${escapeHtml(delivery.announcement.title)}</b>`,
+        `• ${delivery.isPinned ? '📌 ' : '📣 '}<b>${escapeHtml(delivery.announcement.title)}</b>`,
         `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale)}`,
-        `  ${delivery.readAt ? '✅' : '🆕'} ${delivery.readAt ? (input.locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (input.locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
+        `  ${delivery.readAt ? '✅' : '🆕'} ${delivery.readAt ? (input.locale === 'my' ? 'Read' : 'Read') : (input.locale === 'my' ? 'Unread' : 'Unread')}`,
       );
     }
     lines.push('');
@@ -274,7 +278,7 @@ export async function handleInboxCommand(input: {
             : 'You'
         : null;
       lines.push(
-        `• <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
+        `• 💎 <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
         `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
         latestReply
           ? `  ${escapeHtml(latestReplyPrefix || '')}: ${escapeHtml(latestReply.message.slice(0, 80))}${latestReply.message.length > 80 ? '…' : ''}`
@@ -289,7 +293,7 @@ export async function handleInboxCommand(input: {
     lines.push(input.locale === 'my' ? '<b>Refund & finance updates</b>' : '<b>Refund & finance updates</b>');
     for (const order of refundUpdates) {
       lines.push(
-        `• <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
+        `• 💸 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
           formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui),
         )}`,
         `  ${order.planName ? escapeHtml(order.planName) : escapeHtml(order.kind)}`,
@@ -318,8 +322,8 @@ export async function handleInboxCommand(input: {
   lines.push(
     '',
     input.locale === 'my'
-      ? 'Tip: /inbox unread သို့မဟုတ် /inbox pinned ကို အသုံးပြုနိုင်သည်။'
-      : 'Tip: use /inbox unread or /inbox pinned.',
+      ? 'Tip: /inbox unread, /inbox pinned, /orders, /supportstatus ကို လိုအပ်သလို ဆက်အသုံးပြုနိုင်သည်။'
+      : 'Tip: use /inbox unread, /inbox pinned, /orders, or /supportstatus when you need a narrower view.',
   );
 
   return lines.join('\n');

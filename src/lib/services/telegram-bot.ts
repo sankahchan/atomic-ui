@@ -413,7 +413,7 @@ function buildTelegramSalesPaymentPrompt(input: {
 
   lines.push(
     '',
-    isMyanmar ? '<b>လုပ်ဆောင်ရန် အဆင့်များ</b>' : '<b>What to do now</b>',
+    isMyanmar ? '<b>What to do now</b>' : '<b>What to do now</b>',
     isMyanmar
       ? '1. အောက်ပါ payment method ထဲမှ သင်သုံးမည့်နည်းလမ်းကို ရွေးပါ။'
       : '1. Choose the payment method you will use below.',
@@ -453,16 +453,16 @@ function buildTelegramSalesPaymentPrompt(input: {
     '',
     isMyanmar ? '<b>Screenshot checklist</b>' : '<b>Screenshot checklist</b>',
     isMyanmar
-      ? '• Amount, transfer ID, payment time ကို ရှင်းလင်းစွာ မြင်ရပါမည်။'
+      ? '• Good screenshot: Amount, transfer ID, payment time ကို တစ်ပုံတည်းတွင် ရှင်းလင်းစွာ မြင်ရပါမည်။'
       : '• Make sure the amount, transfer ID, and payment time are clearly visible.',
     isMyanmar
       ? '• Photo သို့မဟုတ် document အဖြစ် ပို့နိုင်ပါသည်။'
       : '• You can send it as a photo or a document.',
     isMyanmar
-      ? '• ကောင်းသော screenshot ဥပမာ - amount, account name, transfer ID, time အားလုံး တစ်ပုံတည်းတွင် ပါဝင်ရပါမည်။'
-      : '• A good screenshot shows the amount, account name, transfer ID, and time in one image.',
+      ? '• Account name သို့မဟုတ် payment account number ပါပါက ပိုကောင်းပါသည်။'
+      : '• It is even better if the account name or account number is visible too.',
     isMyanmar
-      ? '• မရှင်းလင်းသော crop, amount မပါခြင်း, duplicate screenshot များကို မပို့ပါနှင့်။'
+      ? '• Bad screenshot: မရှင်းလင်းသော crop, amount မပါခြင်း, duplicate screenshot များကို မပို့ပါနှင့်။'
       : '• Avoid blurry crops, missing amounts, or reusing an old screenshot.',
     isMyanmar
       ? '• Screenshot ပို့ပြီးနောက် ထပ်မံမပို့ဘဲ review စောင့်ပါ။'
@@ -1078,13 +1078,13 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
   lines.push(
     '',
     isMyanmar
-      ? 'အောက်ပါနည်းလမ်းထဲမှ တစ်ခုကို နှိပ်ပါ။ Button မသုံးနိုင်ပါက နံပါတ်ဖြင့် reply လုပ်နိုင်ပါသည်။'
-      : 'Tap one of the methods below. If buttons are not available, reply with the method number.',
+      ? '<b>Choose how you will pay</b>\nအောက်ပါနည်းလမ်းထဲမှ တစ်ခုကို နှိပ်ပါ။ Button မသုံးနိုင်ပါက နံပါတ်ဖြင့် reply လုပ်နိုင်ပါသည်။'
+      : '<b>Choose how you will pay</b>\nTap one of the methods below. If buttons are not available, reply with the method number.',
     '',
     ...input.methods.flatMap((method, index) => {
       const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
       const note = resolveTelegramSalesPaymentMethodNote(method, input.locale);
-      const methodLines = [`${index + 1}. ${label}`];
+      const methodLines = [`${index + 1}. <b>${escapeHtml(label)}</b>`];
 
       if (method.accountName?.trim()) {
         methodLines.push(`   ${ui.accountNameLabel}: ${escapeHtml(method.accountName.trim())}`);
@@ -1097,6 +1097,14 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
       if (note) {
         methodLines.push(`   ${escapeHtml(note)}`);
       }
+
+      methodLines.push(
+        `   ${escapeHtml(
+          input.locale === 'my'
+            ? 'ရွေးပြီးနောက် screenshot တင်ရန် နောက်အဆင့်ကို ပြပါမည်။'
+            : 'After selection, we will show the next screenshot step.',
+        )}`,
+      );
 
       return methodLines;
     }),
@@ -1132,6 +1140,13 @@ function buildTelegramOrderActionKeyboard(input: {
   ) {
     rows.push([
       {
+        text:
+          input.order.status === 'PENDING_REVIEW'
+            ? ui.orderActionReplaceProof
+            : ui.orderActionUploadProof,
+        callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
+      },
+      {
         text: input.order.paymentMethodCode
           ? ui.orderActionAlreadyPaid
           : ui.orderActionChoosePaymentMethod,
@@ -1139,13 +1154,6 @@ function buildTelegramOrderActionKeyboard(input: {
           input.order.paymentMethodCode ? 'pay' : 'pm',
           input.order.id,
         ),
-      },
-      {
-        text:
-          input.order.status === 'PENDING_REVIEW'
-            ? ui.orderActionReplaceProof
-            : ui.orderActionUploadProof,
-        callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
     ]);
 

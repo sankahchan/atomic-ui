@@ -429,6 +429,13 @@ export async function handleBuyCommand(input: {
     telegramUserId: input.telegramUserId,
     settings,
   });
+  const trialPlanLines = enabledPlans
+    .filter((plan: any) => plan.code === 'trial_1d_3gb')
+    .map((plan: any) => {
+      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
+    });
   const standardPlanLines = enabledPlans
     .filter((plan: any) => plan.deliveryType === 'ACCESS_KEY' && plan.code !== 'trial_1d_3gb')
     .map((plan: any) => {
@@ -449,7 +456,7 @@ export async function handleBuyCommand(input: {
     ui.buyPlanChooseHint,
     '',
     input.locale === 'my'
-      ? '<b>ဝယ်ယူခြင်း အကျဉ်းချုပ်</b>\n• Plan ရွေးရန်\n• Server / payment ရွေးရန်\n• Screenshot ပို့ရန်\n• Admin approval စောင့်ရန်'
+      ? '<b>How buying works</b>\n• Plan ရွေးရန်\n• Server / payment ရွေးရန်\n• Screenshot ပို့ရန်\n• Admin approval စောင့်ရန်'
       : '<b>How buying works</b>\n• Choose a plan\n• Choose server / payment\n• Send your screenshot\n• Wait for admin approval',
     ...(input.deps.buildTelegramCouponReadyLines
       ? input.deps.buildTelegramCouponReadyLines({
@@ -463,6 +470,8 @@ export async function handleBuyCommand(input: {
         })
       : []),
     '',
+    input.locale === 'my' ? '<b>Compare your options</b>' : '<b>Compare your options</b>',
+    '',
     ui.buyStandardSummary,
     ui.buyStandardBestFor,
     ...(standardPlanLines.length ? ['', `${ui.buyStandardPlansTitle}:`, ...standardPlanLines] : []),
@@ -472,6 +481,16 @@ export async function handleBuyCommand(input: {
     ui.buyPremiumBestFor,
     ui.buyPremiumRegionExplain,
     ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
+    ...(trialPlanLines.length
+      ? [
+          '',
+          input.locale === 'my' ? '🎁 <b>Trial option</b>' : '🎁 <b>Trial option</b>',
+          input.locale === 'my'
+            ? 'အရင် စမ်းသုံးလိုသူများအတွက် free trial option ပါရှိနိုင်ပါသည်။'
+            : 'A free trial option may be available if you want to try the service first.',
+          ...trialPlanLines,
+        ]
+      : []),
     '',
     input.locale === 'my'
       ? '<b>ရွေးချယ်ရန် အသင့်ဖြစ်ပါပြီ</b>'
@@ -525,8 +544,20 @@ export async function handleRenewOrderCommand(input: {
     findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, true),
   ]);
   const renewableKeys = [
-    ...accessKeys.map((key) => ({ id: key.id, name: key.name, kind: 'access' as const, status: key.status })),
-    ...dynamicKeys.map((key) => ({ id: key.id, name: key.name, kind: 'dynamic' as const, status: key.status })),
+    ...accessKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      kind: 'access' as const,
+      status: key.status,
+      detailLine: `${ui.myKeysTypeStandard} • ${formatExpirationSummary(key, input.locale)}`,
+    })),
+    ...dynamicKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      kind: 'dynamic' as const,
+      status: key.status,
+      detailLine: `${ui.myKeysTypePremium} • ${formatExpirationSummary(key, input.locale)}`,
+    })),
   ];
 
   if (renewableKeys.length === 0) {
@@ -571,9 +602,13 @@ export async function handleRenewOrderCommand(input: {
       ? 'Renew လုပ်လိုသော key ကို ရွေးပါ။ Button ကို နှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။'
       : 'Choose the key you want to renew. You can tap a button or reply with the number.',
     '',
+    input.locale === 'my'
+      ? '<b>Renewal keeps the same key history</b>\n• share page\n• Telegram linkage\n• support history'
+      : '<b>Renewal keeps the same key history</b>\n• share page\n• Telegram linkage\n• support history',
+    '',
     ...renewableKeys.map((key, index) => {
-      const typeLabel = key.kind === 'dynamic' ? ui.myKeysTypePremium : ui.myKeysTypeStandard;
-      return `${index + 1}. ${key.name} • ${typeLabel} • ${key.status}`;
+      const icon = key.kind === 'dynamic' ? '💎' : '🔑';
+      return `${index + 1}. ${icon} ${key.name}\n   ${key.detailLine}\n   ${key.status}`;
     }),
   ];
   const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
@@ -612,8 +647,18 @@ export async function handleTelegramOrderTextMessage(input: {
         findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, true),
       ]);
       const renewableKeys = [
-        ...accessKeys.map((key) => ({ id: key.id, name: key.name, kind: 'access' as const })),
-        ...dynamicKeys.map((key) => ({ id: key.id, name: key.name, kind: 'dynamic' as const })),
+        ...accessKeys.map((key) => ({
+          id: key.id,
+          name: key.name,
+          kind: 'access' as const,
+          status: key.status,
+        })),
+        ...dynamicKeys.map((key) => ({
+          id: key.id,
+          name: key.name,
+          kind: 'dynamic' as const,
+          status: key.status,
+        })),
       ];
       if (renewableKeys.length === 0) {
         return ui.myKeysEmpty;
@@ -642,7 +687,7 @@ export async function handleTelegramOrderTextMessage(input: {
           id: matchedKey.id,
           name: matchedKey.name,
           kind: matchedKey.kind,
-          status: activeOrder.status,
+          status: matchedKey.status,
         },
       });
       return null;

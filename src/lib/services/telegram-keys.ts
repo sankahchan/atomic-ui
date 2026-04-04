@@ -301,17 +301,21 @@ export async function handleMyKeysCommand(input: {
     return ui.myKeysEmpty;
   }
 
+  const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
+  const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
   const lines = [
     ui.myKeysTitle,
     '',
     input.locale === 'my'
-      ? 'လိုအပ်သော key ကို ရွေးပြီး share page ဖွင့်ခြင်း၊ renew လုပ်ခြင်း၊ support request တင်ခြင်းတို့ကို အောက်ပါ button များဖြင့် တိုက်ရိုက် လုပ်နိုင်ပါသည်။'
-      : 'Choose the key you need below. Use the buttons to open the share page, renew, or contact support directly.',
+      ? `${standardKeys.length} standard • ${trialKeys.length} trial • ${dynamicKeys.length} premium`
+      : `${standardKeys.length} standard • ${trialKeys.length} trial • ${dynamicKeys.length} premium`,
+    '',
+    input.locale === 'my'
+      ? 'လိုအပ်သော key card ကို အောက်တွင် ကြည့်ပါ။ Button များဖြင့် share page ဖွင့်ခြင်း၊ renew လုပ်ခြင်းနှင့် support ရယူခြင်းတို့ကို တိုက်ရိုက် လုပ်နိုင်ပါသည်။'
+      : 'See each key card below. Use the buttons to open the share page, renew, or get support directly.',
     '',
   ];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
-  const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
-  const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
   const latestPremiumRequestByKey = new Map<string, (typeof premiumRequests)[number]>();
   for (const request of premiumRequests) {
     if (!latestPremiumRequestByKey.has(request.dynamicAccessKeyId)) {
@@ -329,15 +333,16 @@ export async function handleMyKeysCommand(input: {
       ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
       : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypeStandard)}`,
+      `🔑 <b>${escapeHtml(key.name)}</b>`,
+      `  ${escapeHtml(ui.myKeysTypeStandard)}`,
       `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
-      `  📊 ${formatTelegramQuotaSummary({
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  🔗 ${ui.openSharePage}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  ${input.locale === 'my' ? 'Quick actions: share • renew • support' : 'Quick actions: share • renew • support'}`,
       '',
     );
     inlineKeyboard.push([
@@ -376,15 +381,16 @@ export async function handleMyKeysCommand(input: {
       ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
       : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypeTrial)}`,
+      `🎁 <b>${escapeHtml(key.name)}</b>`,
+      `  ${escapeHtml(ui.myKeysTypeTrial)}`,
       `  ${formatTelegramKeyStatusChip(key.status)}`,
-      `  📊 ${formatTelegramQuotaSummary({
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  🔗 ${ui.openSharePage}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  ${input.locale === 'my' ? 'Quick actions: share • renew' : 'Quick actions: share • renew'}`,
       '',
     );
     inlineKeyboard.push([
@@ -409,24 +415,32 @@ export async function handleMyKeysCommand(input: {
     const latestRequest = latestPremiumRequestByKey.get(key.id);
     const preferredRegions = getDynamicKeyRegionChoices(key);
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypePremium)}`,
+      `💎 <b>${escapeHtml(key.name)}</b>`,
+      `  ${escapeHtml(ui.myKeysTypePremium)}`,
       `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
-      `  🌐 ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
-      `  📊 ${formatTelegramQuotaSummary({
+      `  ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
+      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
       preferredRegions.length > 0
-        ? `  🎯 ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
+        ? `  ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
         : '',
       latestRequest
-        ? `  🛟 ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
             `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
           )}`
         : '',
-      sharePageUrl ? `  🔗 ${ui.openSharePage}` : '',
+      latestRequest?.replies?.length
+        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(latestRequest.replies[latestRequest.replies.length - 1]?.message.slice(0, 80) || '')}${(latestRequest.replies[latestRequest.replies.length - 1]?.message.length || 0) > 80 ? '…' : ''}`
+        : '',
+      sharePageUrl
+        ? input.locale === 'my'
+          ? '  Quick actions: share • renew • premium status'
+          : '  Quick actions: share • renew • premium status'
+        : '',
       '',
     );
     inlineKeyboard.push([
@@ -542,10 +556,24 @@ export async function handleSupportCommand(locale: SupportedLocale) {
     '',
     ui.supportHubHint,
     '',
+    locale === 'my' ? '<b>Quick paths</b>' : '<b>Quick paths</b>',
     ui.supportHubOrdersHint,
     ui.supportHubInboxHint,
     ui.supportHubServerHint,
     ui.supportHubPremiumHint,
+    '',
+    locale === 'my'
+      ? '<b>When to use what</b>'
+      : '<b>When to use what</b>',
+    locale === 'my'
+      ? '• Screenshot / payment / order problem ရှိပါက /orders သို့မဟုတ် /order ကို စတင်အသုံးပြုပါ။'
+      : '• Start with /orders or /order if your issue is about payment, proof, or order review.',
+    locale === 'my'
+      ? '• Notice, refund, support reply များကို /inbox တွင် တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
+      : '• Use /inbox to review announcements, refunds, and support replies in one place.',
+    locale === 'my'
+      ? '• Premium route / preferred region အတွက် /premium သို့မဟုတ် /premiumregion ကို အသုံးပြုပါ။'
+      : '• Use /premium or /premiumregion for preferred-region and routing issues.',
   ];
 
   if (supportLink) {
