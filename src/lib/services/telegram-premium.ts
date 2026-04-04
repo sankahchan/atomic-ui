@@ -438,6 +438,8 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const lines = [
     ui.premiumStatusTitle,
     '',
+    `${request.requestCode} • ${formatTelegramPremiumSupportStatusLabel(request.status, ui)}`,
+    '',
     `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
     `${ui.keyLabel}: <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
     `${ui.premiumRequestType}: <b>${escapeHtml(
@@ -500,6 +502,28 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
       escapeHtml(latestReply.message),
     );
   }
+
+  lines.push(
+    '',
+    `<b>${input.locale === 'my' ? 'What happens next' : 'What happens next'}</b>`,
+    escapeHtml(
+      request.status === 'PENDING_REVIEW'
+        ? input.locale === 'my'
+          ? 'Admin review စောင့်ပါ။ လိုအပ်ပါက screenshot သို့မဟုတ် extra detail တောင်းနိုင်ပါသည်။'
+          : 'Wait for admin review. If needed, the admin may ask for more detail.'
+        : currentState === ui.premiumAwaitingYourReply
+          ? input.locale === 'my'
+            ? 'Admin က reply ပို့ထားပါသည်။ Reply to request ဖြင့် ဆက်ပြောနိုင်ပါသည်။'
+            : 'The admin replied. Use Reply to request if you want to continue the same thread.'
+          : currentState === ui.premiumAwaitingAdminReply
+            ? input.locale === 'my'
+              ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
+              : 'The admin is reviewing your latest message.'
+            : input.locale === 'my'
+              ? 'လက်ရှိ request ကို status နှင့် history အဖြစ် အောက်တွင် ဆက်လက်ကြည့်နိုင်ပါသည်။'
+              : 'You can continue to track the current request status and history below.',
+    ),
+  );
 
   lines.push('', `${ui.orderTimelineTitle}:`);
   lines.push(
@@ -822,6 +846,11 @@ export async function handlePremiumSupportStatusCommand(input: {
       `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
         formatTelegramPremiumFollowUpState(request, ui),
       )}`,
+      latestReply?.senderType === 'ADMIN'
+        ? `  ${escapeHtml(input.locale === 'my' ? 'Reply needed' : 'Reply needed')}`
+        : request.followUpPending
+          ? `  ${escapeHtml(input.locale === 'my' ? 'Waiting for admin' : 'Waiting for admin')}`
+          : '',
       `  ${ui.createdAtLabel}: ${escapeHtml(
         formatTelegramDateTime(request.createdAt, input.locale),
       )}`,
@@ -955,6 +984,21 @@ export async function handlePremiumRegionStatusCommand(input: {
     const analysis = summarizePremiumRegions(key, healthByServerId);
 
     lines.push(`• 💎 <b>${escapeHtml(key.name)}</b>`);
+    lines.push(
+      `  ${escapeHtml(
+        analysis.regionSummaries.some((region) => region.status === 'DOWN')
+          ? input.locale === 'my'
+            ? 'Overall: Down routes detected'
+            : 'Overall: Down routes detected'
+          : analysis.regionSummaries.some((region) => region.status === 'SLOW')
+            ? input.locale === 'my'
+              ? 'Overall: Some routes are slow'
+              : 'Overall: Some routes are slow'
+            : input.locale === 'my'
+              ? 'Overall: Healthy'
+              : 'Overall: Healthy',
+      )}`,
+    );
     lines.push(
       `  ${ui.premiumRegionPreferredLabel}: ${
         analysis.preferredRegions.length

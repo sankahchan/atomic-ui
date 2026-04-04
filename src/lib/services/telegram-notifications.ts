@@ -280,6 +280,11 @@ export async function handleInboxCommand(input: {
       lines.push(
         `• 💎 <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
         `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
+        latestReply?.senderType === 'ADMIN'
+          ? `  ${escapeHtml(input.locale === 'my' ? 'Reply needed' : 'Reply needed')}`
+          : request.followUpPending
+            ? `  ${escapeHtml(input.locale === 'my' ? 'Waiting for admin' : 'Waiting for admin')}`
+            : '',
         latestReply
           ? `  ${escapeHtml(latestReplyPrefix || '')}: ${escapeHtml(latestReply.message.slice(0, 80))}${latestReply.message.length > 80 ? '…' : ''}`
           : '',

@@ -310,6 +310,40 @@ export async function buildTelegramOrderStatusMessage(input: {
     lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundRejectedHelp));
   }
 
+  if (
+    order.status === 'AWAITING_PAYMENT_METHOD' ||
+    order.status === 'AWAITING_PAYMENT_PROOF' ||
+    order.status === 'PENDING_REVIEW' ||
+    order.status === 'REJECTED' ||
+    order.status === 'CANCELLED'
+  ) {
+    lines.push(
+      '',
+      `<b>${isMyanmar ? 'Quick help' : 'Quick help'}</b>`,
+      escapeHtml(
+        order.status === 'AWAITING_PAYMENT_METHOD'
+          ? isMyanmar
+            ? 'Payment method ကို အရင် ရွေးပြီးနောက် screenshot အဆင့်ကို ဆက်သွားပါ။'
+            : 'Choose your payment method first, then continue to the screenshot step.'
+          : order.status === 'AWAITING_PAYMENT_PROOF'
+            ? isMyanmar
+              ? 'ငွေပေးချေပြီး screenshot ကို ဤ chat ထဲသို့ ပို့ပါ။ မသေချာပါက /support ကို အသုံးပြုပါ။'
+              : 'Complete payment and send the screenshot in this chat. Use /support if you are unsure.'
+            : order.status === 'PENDING_REVIEW'
+              ? isMyanmar
+                ? 'ယခု order သည် admin review စောင့်နေပါသည်။ Screenshot ကို ထပ်မပို့ဘဲ update စောင့်ပါ။'
+                : 'This order is waiting for admin review. Wait for an update instead of sending another screenshot.'
+              : order.status === 'REJECTED'
+                ? isMyanmar
+                  ? 'လိုအပ်ပါက Retry order ကို အသုံးပြုပြီး screenshot သို့မဟုတ် payment method ကို ပြန်တင်နိုင်ပါသည်။'
+                  : 'Use Retry order if you want to submit a fresh screenshot or switch the payment method.'
+                : isMyanmar
+                  ? 'ဤ order ကို ပိတ်ထားပါသည်။ အသစ်စရန် /buy သို့မဟုတ် /renew ကို သုံးနိုင်ပါသည်။'
+                  : 'This order is closed. Use /buy or /renew to start again.',
+      ),
+    );
+  }
+
   lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
 
   const relatedAccessKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
@@ -470,7 +504,12 @@ export async function handleOrdersCommand(input: {
   );
   const reviewOrders = orders.filter((order) => ['PENDING_REVIEW', 'APPROVED'].includes(order.status));
   const completedOrders = orders.filter((order) => order.status === 'FULFILLED');
-  const lines = [ui.ordersTitle, ''];
+  const lines = [
+    ui.ordersTitle,
+    '',
+    `${attentionOrders.length} need action • ${reviewOrders.length} under review • ${completedOrders.length} completed`,
+    '',
+  ];
   const sections = [
     [ui.ordersAttentionTitle, attentionOrders],
     [ui.ordersReviewTitle, reviewOrders],
@@ -484,6 +523,7 @@ export async function handleOrdersCommand(input: {
 
     lines.push(title);
     for (const order of sectionOrders) {
+      const nextStep = buildTelegramOrderNextStepText(order, ui);
       lines.push(
         `${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(
           formatTelegramOrderStateLine({
@@ -501,6 +541,9 @@ export async function handleOrdersCommand(input: {
           formatTelegramOrderStatusLabel(order.status, ui),
         )} • ${escapeHtml(formatTelegramDateTime(order.createdAt, input.locale))}`,
       );
+      if (nextStep) {
+        lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
+      }
     }
     lines.push('');
   }
