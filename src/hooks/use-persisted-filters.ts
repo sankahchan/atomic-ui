@@ -11,6 +11,7 @@ const quickFiltersSchema = z.object({
   expiring7d: z.boolean().optional(),
   overQuota: z.boolean().optional(),
   inactive30d: z.boolean().optional(),
+  overDeviceLimit: z.boolean().optional(),
 });
 
 const filtersSchema = z.object({

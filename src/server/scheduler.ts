@@ -37,6 +37,7 @@ import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
 import { runServerOutageCycle } from '@/lib/services/server-outage';
+import { runAccessKeyDeviceLimitCycle } from '@/lib/services/device-limits';
 
 let isSchedulerRunning = false;
 
@@ -80,6 +81,19 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Bandwidth alert check failed', error);
+        }
+    });
+
+    cron.schedule('*/5 * * * *', async () => {
+        try {
+            const result = await runAccessKeyDeviceLimitCycle();
+            if (result.warned > 0 || result.disabled > 0 || result.cleared > 0 || result.errors.length > 0) {
+                logger.info(
+                    `Device limits: ${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Device limit cycle failed', error);
         }
     });
 
@@ -334,6 +348,17 @@ export function initScheduler() {
             await collectTrafficActivity();
         } catch (error) {
             logger.error('Initial traffic activity collection failed', error);
+        }
+
+        try {
+            const result = await runAccessKeyDeviceLimitCycle();
+            if (result.warned > 0 || result.disabled > 0 || result.cleared > 0 || result.errors.length > 0) {
+                logger.info(
+                    `Initial device limit cycle: ${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared, ${result.errors.length} errors`,
+                );
+            }
+        } catch (error) {
+            logger.error('Initial device limit cycle failed', error);
         }
 
         try {

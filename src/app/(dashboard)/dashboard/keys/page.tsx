@@ -187,6 +187,26 @@ type CreatedKeySummary = {
   } | null;
 };
 
+type DeviceLimitVisualState = {
+  estimatedDevices?: number | null;
+  maxDevices?: number | null;
+  deviceLimitObservedDevices?: number | null;
+  deviceLimitOverLimit?: boolean;
+  deviceLimitEnforcementStage?: string | null;
+};
+
+function getDeviceLimitVisualState(key: DeviceLimitVisualState) {
+  const deviceCount = key.deviceLimitObservedDevices ?? key.estimatedDevices ?? 0;
+  const overLimit = key.deviceLimitOverLimit ?? (key.maxDevices != null && deviceCount > key.maxDevices);
+  const stage = key.deviceLimitEnforcementStage ?? (overLimit ? 'PENDING_DISABLE' : 'OK');
+
+  return {
+    deviceCount,
+    overLimit,
+    stage,
+  };
+}
+
 function fillTemplate(template: string, values: Record<string, string | number>) {
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
@@ -300,6 +320,7 @@ function CreateKeyDialog({
     autoDisableOnExpire: boolean;
     autoArchiveAfterDays: string;
     quotaAlertThresholds: string;
+    maxDevices: string;
     autoRenewPolicy: 'NONE' | 'EXTEND_DURATION';
     autoRenewDurationDays: string;
   }>({
@@ -328,6 +349,7 @@ function CreateKeyDialog({
     autoDisableOnExpire: true,
     autoArchiveAfterDays: '0',
     quotaAlertThresholds: '80,90',
+    maxDevices: '',
     autoRenewPolicy: 'NONE',
     autoRenewDurationDays: '',
   });
@@ -524,6 +546,7 @@ function CreateKeyDialog({
       autoDisableOnExpire: true,
       autoArchiveAfterDays: '0',
       quotaAlertThresholds: '80,90',
+      maxDevices: '',
       autoRenewPolicy: 'NONE',
       autoRenewDurationDays: '',
     });
@@ -611,6 +634,7 @@ function CreateKeyDialog({
       autoDisableOnExpire: template.autoDisableOnExpire ?? true,
       autoArchiveAfterDays: String(template.autoArchiveAfterDays ?? 0),
       quotaAlertThresholds: template.quotaAlertThresholds || '80,90',
+      maxDevices: prev.maxDevices,
       autoRenewPolicy: template.autoRenewPolicy || 'NONE',
       autoRenewDurationDays: template.autoRenewDurationDays?.toString() || '',
     }));
@@ -711,6 +735,7 @@ function CreateKeyDialog({
       autoDisableOnExpire: formData.autoDisableOnExpire,
       autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
       quotaAlertThresholds: formData.quotaAlertThresholds,
+      maxDevices: formData.maxDevices ? Number.parseInt(formData.maxDevices, 10) : undefined,
       autoRenewPolicy: formData.autoRenewPolicy,
       autoRenewDurationDays:
         formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
@@ -1125,6 +1150,22 @@ function CreateKeyDialog({
               </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="maxDevices">Max devices (estimated)</Label>
+            <Input
+              id="maxDevices"
+              type="number"
+              min="1"
+              max="20"
+              placeholder="Leave empty for no device limit"
+              value={formData.maxDevices}
+              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Uses recent IP and user-agent activity as an estimate. If the estimate stays over the limit, the key will be warned first and then disabled automatically.
+            </p>
+          </div>
 
           {/* Expiration type */}
           <div className="space-y-2">
@@ -2226,6 +2267,13 @@ function EditKeyDialog({
     durationDays: number | null;
     expiresAt: Date | null;
     expirationType: string | null;
+    maxDevices: number | null;
+    autoDisableOnLimit: boolean;
+    autoDisableOnExpire: boolean;
+    autoArchiveAfterDays: number;
+    quotaAlertThresholds: string | null;
+    autoRenewPolicy: string | null;
+    autoRenewDurationDays: number | null;
   };
   onSuccess: () => void;
 }) {
@@ -2242,6 +2290,7 @@ function EditKeyDialog({
     dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
     durationDays: keyData.durationDays?.toString() || '',
     expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
+    maxDevices: keyData.maxDevices?.toString() || '',
   });
 
   // Reset form data when keyData changes
@@ -2257,6 +2306,7 @@ function EditKeyDialog({
       dataLimitResetStrategy: (keyData.dataLimitResetStrategy as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') || 'NEVER',
       durationDays: keyData.durationDays?.toString() || '',
       expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
+      maxDevices: keyData.maxDevices?.toString() || '',
     });
   }, [keyData]);
 
@@ -2300,6 +2350,7 @@ function EditKeyDialog({
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
+      maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
     } as any);
   };
 
@@ -2356,26 +2407,42 @@ function EditKeyDialog({
           </div>
 
           {formData.dataLimitGB && (
-            <div className="space-y-2">
-              <Label>{t('keys.form.reset_strategy')}</Label>
-              <Select
-                value={formData.dataLimitResetStrategy}
-                onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
-                  setFormData({ ...formData, dataLimitResetStrategy: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
-                  <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
-                  <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
-                  <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label>{t('keys.form.reset_strategy')}</Label>
+                <Select
+                  value={formData.dataLimitResetStrategy}
+                  onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                    setFormData({ ...formData, dataLimitResetStrategy: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
+                    <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
+                    <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
+                    <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+            </>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+            <Input
+              id="editMaxDevices"
+              type="number"
+              min="1"
+              max="20"
+              placeholder="Leave empty for no device limit"
+              value={formData.maxDevices}
+              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+            />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="editDuration">{t('keys.form.duration')}</Label>
@@ -2478,6 +2545,10 @@ function KeyRow({
     isExpiringSoon?: boolean;
     isTrafficWarning?: boolean;
     estimatedDevices?: number;
+    maxDevices?: number | null;
+    deviceLimitObservedDevices?: number;
+    deviceLimitOverLimit?: boolean;
+    deviceLimitEnforcementStage?: string;
     lastUsedAt?: Date | null;
     lastTrafficAt?: Date | null;
     recentTrafficDeltaBytes?: bigint;
@@ -2506,6 +2577,7 @@ function KeyRow({
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
   const showTrafficState = accessKey.status === 'ACTIVE';
+  const { deviceCount, overLimit } = getDeviceLimitVisualState(accessKey);
 
   return (
     <tr
@@ -2604,6 +2676,19 @@ function KeyRow({
               {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
             </p>
           ) : null}
+          {accessKey.maxDevices ? (
+            <Badge
+              variant="outline"
+              className={cn(
+                'border text-[11px]',
+                overLimit
+                  ? 'border-violet-500/40 text-violet-300'
+                  : 'border-border/60 text-muted-foreground',
+              )}
+            >
+              {deviceCount}/{accessKey.maxDevices} devices
+            </Badge>
+          ) : null}
         </div>
       </td>
 
@@ -2642,9 +2727,14 @@ function KeyRow({
         <div className="flex items-center justify-center gap-1">
           <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-sm font-medium">
-            {accessKey.estimatedDevices || 0}
+            {deviceCount}
           </span>
         </div>
+        {accessKey.maxDevices ? (
+          <p className={cn('mt-1 text-[11px]', accessKey.deviceLimitOverLimit ? 'text-violet-300' : 'text-muted-foreground')}>
+            limit {accessKey.maxDevices}
+          </p>
+        ) : null}
       </td>
 
       {/* Expiration */}
@@ -2784,6 +2874,13 @@ export default function KeysPage() {
     durationDays: number | null;
     expiresAt: Date | null;
     expirationType: string | null;
+    autoDisableOnLimit: boolean;
+    autoDisableOnExpire: boolean;
+    autoArchiveAfterDays: number;
+    quotaAlertThresholds: string | null;
+    maxDevices: number | null;
+    autoRenewPolicy: string | null;
+    autoRenewDurationDays: number | null;
   } | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
   const { t } = useLocale();
@@ -2817,6 +2914,7 @@ export default function KeysPage() {
     const usedBytes = formatBytes(BigInt(key.usedBytes ?? 0));
     const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
     const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
+    const { deviceCount, overLimit } = getDeviceLimitVisualState(key);
 
     return (
       <div className="space-y-4">
@@ -2862,6 +2960,16 @@ export default function KeysPage() {
                 {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
               </Badge>
             ) : null}
+            {key.maxDevices ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  overLimit ? 'border-violet-500/40 text-violet-300' : 'border-border/60 text-muted-foreground',
+                )}
+              >
+                {deviceCount}/{key.maxDevices} devices
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -2897,8 +3005,13 @@ export default function KeysPage() {
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.devices')}</p>
             <p className="mt-1 flex items-center gap-1 text-sm font-medium">
               <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
-              {key.estimatedDevices || 0}
+              {deviceCount}
             </p>
+            {key.maxDevices ? (
+              <p className={cn('mt-1 text-[11px]', overLimit ? 'text-violet-300' : 'text-muted-foreground')}>
+                limit {key.maxDevices}
+              </p>
+            ) : null}
           </div>
           <div className="ops-row-card">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('keys.mobile.expires')}</p>
@@ -2971,6 +3084,7 @@ export default function KeysPage() {
     expiring7d: filters.quickFilters.expiring7d || undefined,
     overQuota: filters.quickFilters.overQuota || undefined,
     inactive30d: filters.quickFilters.inactive30d || undefined,
+    overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     tag: filters.tagFilter || undefined,
     owner: filters.ownerFilter || undefined,
   }, {
@@ -3437,6 +3551,7 @@ export default function KeysPage() {
     filters.quickFilters.expiring7d ||
     filters.quickFilters.overQuota ||
     filters.quickFilters.inactive30d ||
+    filters.quickFilters.overDeviceLimit ||
     filters.tagFilter ||
     filters.ownerFilter,
   );
@@ -3836,6 +3951,15 @@ export default function KeysPage() {
           <EyeOff className="w-3 h-3 mr-1" />
           {t('keys.quick_filters.inactive30d')}
         </Button>
+        <Button
+          variant={filters.quickFilters.overDeviceLimit ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.overDeviceLimit && 'bg-violet-600 hover:bg-violet-700')}
+          onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
+        >
+          <Smartphone className="w-3 h-3 mr-1" />
+          Over device limit
+        </Button>
         
         {/* Tag filter */}
         <div className="ml-1.5 flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
@@ -3859,7 +3983,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.tagFilter || filters.ownerFilter) && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.overDeviceLimit || filters.tagFilter || filters.ownerFilter) && (
           <Button
             variant="ghost"
             size="sm"
@@ -4128,6 +4252,15 @@ export default function KeysPage() {
                   <EyeOff className="w-3 h-3 mr-1" />
                   {t('keys.quick_filters.inactive30d')}
                 </Button>
+                <Button
+                  variant={filters.quickFilters.overDeviceLimit ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.overDeviceLimit && 'bg-violet-600 hover:bg-violet-700')}
+                  onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
+                >
+                  <Smartphone className="w-3 h-3 mr-1" />
+                  Over device limit
+                </Button>
               </div>
             </div>
 
@@ -4395,6 +4528,7 @@ export default function KeysPage() {
               const trafficMeta = liveMetricsById.get(key.id);
               const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
               const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
+              const { deviceCount, overLimit, stage } = getDeviceLimitVisualState(key);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -4445,6 +4579,22 @@ export default function KeysPage() {
                         </span>
                       </div>
                     ) : null}
+                    {key.maxDevices ? (
+                      <div className="flex items-center justify-between text-xs">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'border',
+                            overLimit ? 'border-violet-500/40 text-violet-300' : 'border-border/60 text-muted-foreground',
+                          )}
+                        >
+                          {deviceCount}/{key.maxDevices} devices
+                        </Badge>
+                        <span className={cn('text-[11px]', overLimit ? 'text-violet-300' : 'text-muted-foreground')}>
+                          {stage === 'PENDING_DISABLE' ? 'Disable pending' : 'Estimated'}
+                        </span>
+                      </div>
+                    ) : null}
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs mb-1">
@@ -4459,7 +4609,7 @@ export default function KeysPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <Smartphone className="w-3 h-3" />
-                        {key.estimatedDevices || 0} {t('keys.devices_count')}
+                        {deviceCount} {t('keys.devices_count')}
                       </span>
                       <span className={cn('text-muted-foreground', key.isExpiringSoon && 'text-red-500')}>
                         {key.expiresAt ? formatRelativeTime(key.expiresAt) : t('keys.never_expires')}

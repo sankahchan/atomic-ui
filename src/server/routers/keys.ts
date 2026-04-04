@@ -65,6 +65,9 @@ import {
   hashSharePagePassword,
 } from '@/lib/share-page-protection';
 import { replaceAccessKeyServer } from '@/lib/services/server-migration';
+import {
+  getAccessKeyDeviceLimitSnapshots,
+} from '@/lib/services/device-limits';
 
 /**
  * Validation schema for creating a new access key.
@@ -122,6 +125,7 @@ const createKeySchema = z.object({
   autoDisableOnExpire: z.boolean().optional(),
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
   quotaAlertThresholds: z.string().optional().nullable(),
+  maxDevices: z.number().int().min(1).max(20).optional().nullable(),
   autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
   autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
@@ -162,6 +166,7 @@ const updateKeySchema = z.object({
   autoDisableOnExpire: z.boolean().optional(),
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
   quotaAlertThresholds: z.string().optional().nullable(),
+  maxDevices: z.number().int().min(1).max(20).optional().nullable(),
   autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
   autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
@@ -198,6 +203,7 @@ const listKeysSchema = z.object({
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
+  overDeviceLimit: z.boolean().optional(),
 });
 
 const accessDistributionLinkSchema = z.object({
@@ -471,7 +477,21 @@ export const keysRouter = router({
   list: protectedProcedure
     .input(listKeysSchema)
     .query(async ({ ctx, input }) => {
-      const { serverId, status, search, page, pageSize, unattachedOnly, online, expiring7d, overQuota, inactive30d, tag, owner } = input;
+      const {
+        serverId,
+        status,
+        search,
+        page,
+        pageSize,
+        unattachedOnly,
+        online,
+        expiring7d,
+        overQuota,
+        inactive30d,
+        tag,
+        owner,
+        overDeviceLimit,
+      } = input;
 
       // Build the where clause
       const where: Prisma.AccessKeyWhereInput = {};
@@ -542,6 +562,10 @@ export const keysRouter = router({
         where.owner = { contains: owner };
       }
 
+      if (overDeviceLimit) {
+        where.deviceLimitExceededAt = { not: null };
+      }
+
       // Get total count for pagination
       const total = await db.accessKey.count({ where });
 
@@ -581,6 +605,31 @@ export const keysRouter = router({
           daysRemaining,
           isExpiringSoon: daysRemaining !== null && daysRemaining <= 3 && daysRemaining > 0,
           isTrafficWarning: usagePercent >= 80 && usagePercent < 100,
+        };
+      });
+
+      const deviceLimitSnapshots = await getAccessKeyDeviceLimitSnapshots({
+        accessKeys: keysWithStats.map((key) => ({
+          id: key.id,
+          maxDevices: key.maxDevices,
+          status: key.status,
+          deviceLimitExceededAt: key.deviceLimitExceededAt,
+          deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+        })),
+      });
+
+      keysWithStats = keysWithStats.map((key) => {
+        const snapshot = deviceLimitSnapshots.get(key.id);
+        const deviceLimitObservedDevices = snapshot?.observedDevices ?? Math.max(key.estimatedDevices ?? 0, key.deviceLimitLastObservedDevices ?? 0);
+
+        return {
+          ...key,
+          estimatedDevices: deviceLimitObservedDevices,
+          peakDevices: Math.max(key.peakDevices ?? 0, deviceLimitObservedDevices),
+          deviceLimitObservedDevices,
+          deviceLimitOverLimit: snapshot?.overLimit ?? false,
+          deviceLimitEnforcementStage: snapshot?.stage ?? 'OK',
+          deviceLimitDisableAt: snapshot?.disableAt ?? null,
         };
       });
 
@@ -667,7 +716,7 @@ export const keysRouter = router({
         });
       }
 
-      const [supportActivity, openIncidents, auditTrail, billingHistory] = await Promise.all([
+      const [supportActivity, openIncidents, auditTrail, billingHistory, deviceLimitSnapshots] = await Promise.all([
         db.auditLog.findMany({
           where: {
             entity: 'ACCESS_KEY',
@@ -760,10 +809,28 @@ export const keysRouter = router({
             },
           },
         }),
+        getAccessKeyDeviceLimitSnapshots({
+          accessKeys: [{
+            id: key.id,
+            maxDevices: key.maxDevices,
+            status: key.status,
+            deviceLimitExceededAt: key.deviceLimitExceededAt,
+            deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+          }],
+        }),
       ]);
+
+      const deviceLimitSnapshot = deviceLimitSnapshots.get(key.id);
+      const deviceLimitObservedDevices = deviceLimitSnapshot?.observedDevices ?? Math.max(key.estimatedDevices ?? 0, key.deviceLimitLastObservedDevices ?? 0);
 
       return {
         ...key,
+        estimatedDevices: deviceLimitObservedDevices,
+        peakDevices: Math.max(key.peakDevices ?? 0, deviceLimitObservedDevices),
+        deviceLimitObservedDevices,
+        deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
+        deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
+        deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
         subscriptionToken: nextToken,
         publicSlug: nextPublicSlug,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
@@ -803,6 +870,10 @@ export const keysRouter = router({
           lastUsedAt: true,
           estimatedDevices: true,
           peakDevices: true,
+          maxDevices: true,
+          deviceLimitExceededAt: true,
+          deviceLimitWarningSentAt: true,
+          deviceLimitLastObservedDevices: true,
           outlineKeyId: true,
         },
       });
@@ -821,13 +892,22 @@ export const keysRouter = router({
         });
       }
 
-      const [collectorResult, activeSessions] = await Promise.all([
+      const [collectorResult, activeSessions, deviceLimitSnapshots] = await Promise.all([
         collectTrafficActivity({ keyIds: [input.id], persist: false }),
         db.connectionSession.count({
           where: {
             accessKeyId: input.id,
             isActive: true,
           },
+        }),
+        getAccessKeyDeviceLimitSnapshots({
+          accessKeys: [{
+            id: key.id,
+            maxDevices: key.maxDevices,
+            status: key.status,
+            deviceLimitExceededAt: key.deviceLimitExceededAt,
+            deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+          }],
         }),
       ]);
 
@@ -844,8 +924,9 @@ export const keysRouter = router({
 
       const lastTrafficAt = observedKey?.lastTrafficAt ?? refreshedKey?.lastTrafficAt ?? key.lastTrafficAt;
       const lastUsedAt = refreshedKey?.lastUsedAt ?? key.lastUsedAt;
-      const estimatedDevices = refreshedKey?.estimatedDevices ?? key.estimatedDevices;
-      const peakDevices = refreshedKey?.peakDevices ?? key.peakDevices;
+      const deviceLimitSnapshot = deviceLimitSnapshots.get(key.id);
+      const estimatedDevices = deviceLimitSnapshot?.observedDevices ?? Math.max(refreshedKey?.estimatedDevices ?? key.estimatedDevices, key.deviceLimitLastObservedDevices ?? 0);
+      const peakDevices = Math.max(refreshedKey?.peakDevices ?? key.peakDevices, estimatedDevices);
 
       return {
         id: key.id,
@@ -860,6 +941,11 @@ export const keysRouter = router({
         activeSessions,
         estimatedDevices,
         peakDevices,
+        maxDevices: key.maxDevices,
+        deviceLimitObservedDevices: estimatedDevices,
+        deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
+        deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
+        deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
         activityWindowSeconds: Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000),
       };
     }),
@@ -979,6 +1065,7 @@ export const keysRouter = router({
             autoDisableOnExpire: input.autoDisableOnExpire ?? true,
             autoArchiveAfterDays: input.autoArchiveAfterDays ?? 0,
             quotaAlertThresholds: stringifyQuotaAlertThresholds(input.quotaAlertThresholds),
+            maxDevices: input.maxDevices ?? null,
             quotaAlertsSent: '[]',
             autoRenewPolicy: input.autoRenewPolicy ?? 'NONE',
             autoRenewDurationDays: input.autoRenewDurationDays ?? null,
@@ -1188,6 +1275,15 @@ export const keysRouter = router({
           updateData.quotaAlertsSent = '[]';
         }
 
+        if (data.maxDevices !== undefined) {
+          updateData.maxDevices = data.maxDevices ?? null;
+          if (!data.maxDevices) {
+            updateData.deviceLimitExceededAt = null;
+            updateData.deviceLimitWarningSentAt = null;
+            updateData.deviceLimitLastObservedDevices = null;
+          }
+        }
+
         if (data.autoRenewPolicy !== undefined) {
           updateData.autoRenewPolicy = data.autoRenewPolicy;
         }
@@ -1223,6 +1319,11 @@ export const keysRouter = router({
           updateData.bandwidthAlertAt80 = false;
           updateData.bandwidthAlertAt90 = false;
           updateData.quotaAlertsSent = '[]';
+        }
+
+        if (data.status === 'ACTIVE' && existingKey.status === 'DISABLED') {
+          updateData.deviceLimitExceededAt = null;
+          updateData.deviceLimitWarningSentAt = null;
         }
 
         // Update the database record
@@ -1973,6 +2074,8 @@ export const keysRouter = router({
               method: newOutlineKey.method,
               disabledAt: null,
               disabledOutlineKeyId: null,
+              deviceLimitExceededAt: null,
+              deviceLimitWarningSentAt: null,
               // Set negative offset to preserve the existing usedBytes during sync
               usageOffset: BigInt(preservedUsageOffset),
             },
@@ -3175,7 +3278,17 @@ export const keysRouter = router({
     .query(async ({ ctx, input }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.keyId },
-        select: { id: true, userId: true, estimatedDevices: true, peakDevices: true },
+        select: {
+          id: true,
+          userId: true,
+          estimatedDevices: true,
+          peakDevices: true,
+          maxDevices: true,
+          status: true,
+          deviceLimitExceededAt: true,
+          deviceLimitWarningSentAt: true,
+          deviceLimitLastObservedDevices: true,
+        },
       });
 
       if (!key) {
@@ -3215,53 +3328,42 @@ export const keysRouter = router({
         };
       });
 
-      const subscriptionEvents = await db.subscriptionPageEvent.findMany({
-        where: {
-          accessKeyId: input.keyId,
-          ip: { not: null },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        select: {
-          ip: true,
-          userAgent: true,
-          createdAt: true,
-          platform: true,
-        },
+      const deviceLimitSnapshots = await getAccessKeyDeviceLimitSnapshots({
+        accessKeys: [{
+          id: key.id,
+          maxDevices: key.maxDevices,
+          status: key.status,
+          deviceLimitExceededAt: key.deviceLimitExceededAt,
+          deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+        }],
+        includeEvidence: true,
       });
-
-      const uniqueDevices = new Map<
-        string,
-        {
-          ip: string | null;
-          userAgent: string | null;
-          platform: string | null;
-          lastSeenAt: Date;
-          countryCode: string | null;
-        }
-      >();
-
-      for (const event of subscriptionEvents) {
-        if (!event.ip || uniqueDevices.has(event.ip)) {
-          continue;
-        }
-
-        const geo = await getGeoIpCountry(event.ip);
-        uniqueDevices.set(event.ip, {
-          ip: geo.ip,
-          userAgent: event.userAgent,
-          platform: event.platform,
-          lastSeenAt: event.createdAt,
-          countryCode: geo.countryCode,
-        });
-      }
+      const deviceLimitSnapshot = deviceLimitSnapshots.get(key.id);
+      const subscriberDevices = await Promise.all(
+        (deviceLimitSnapshot?.evidence ?? []).map(async (device) => {
+          const geo = device.ip ? await getGeoIpCountry(device.ip) : null;
+          return {
+            ip: geo?.ip ?? device.ip,
+            userAgent: device.userAgent,
+            platform: device.platform,
+            lastSeenAt: device.lastSeenAt,
+            countryCode: geo?.countryCode ?? null,
+          };
+        }),
+      );
+      const effectiveEstimatedDevices = deviceLimitSnapshot?.observedDevices ?? Math.max(key.estimatedDevices ?? 0, key.deviceLimitLastObservedDevices ?? 0);
 
       return {
         sessions: sessionsWithDuration,
         activeCount: sessions.filter((s) => s.isActive).length,
-        estimatedDevices: key.estimatedDevices,
-        peakDevices: key.peakDevices,
-        subscriberDevices: Array.from(uniqueDevices.values()),
+        estimatedDevices: effectiveEstimatedDevices,
+        peakDevices: Math.max(key.peakDevices ?? 0, effectiveEstimatedDevices),
+        maxDevices: key.maxDevices,
+        deviceLimitObservedDevices: effectiveEstimatedDevices,
+        deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
+        deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
+        deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
+        subscriberDevices,
       };
     }),
 

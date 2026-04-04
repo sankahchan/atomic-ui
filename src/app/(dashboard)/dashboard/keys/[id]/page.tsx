@@ -167,6 +167,7 @@ function EditKeyDialog({
     autoDisableOnExpire: boolean;
     autoArchiveAfterDays: number;
     quotaAlertThresholds: string | null;
+    maxDevices: number | null;
     autoRenewPolicy: string | null;
     autoRenewDurationDays: number | null;
   };
@@ -188,6 +189,7 @@ function EditKeyDialog({
     autoDisableOnExpire: keyData.autoDisableOnExpire ?? true,
     autoArchiveAfterDays: String(keyData.autoArchiveAfterDays ?? 0),
     quotaAlertThresholds: keyData.quotaAlertThresholds || '80,90',
+    maxDevices: keyData.maxDevices?.toString() || '',
     autoRenewPolicy: (keyData.autoRenewPolicy as 'NONE' | 'EXTEND_DURATION') || 'NONE',
     autoRenewDurationDays: keyData.autoRenewDurationDays?.toString() || '',
   });
@@ -236,6 +238,7 @@ function EditKeyDialog({
       autoDisableOnExpire: formData.autoDisableOnExpire,
       autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
       quotaAlertThresholds: formData.quotaAlertThresholds,
+      maxDevices: formData.maxDevices ? Number.parseInt(formData.maxDevices, 10) : null,
       autoRenewPolicy: formData.autoRenewPolicy,
       autoRenewDurationDays:
         formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
@@ -343,8 +346,25 @@ function EditKeyDialog({
                   onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
                 />
               </div>
+
             </>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+            <Input
+              id="editMaxDevices"
+              type="number"
+              min="1"
+              max="20"
+              placeholder="Leave empty for no device limit"
+              value={formData.maxDevices}
+              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Uses recent IP and user-agent activity as an estimate. The key will warn first and only disable if the over-limit state continues.
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="editDuration">Duration (Days)</Label>
@@ -3512,6 +3532,7 @@ export default function KeyDetailPage() {
             autoDisableOnExpire: (key as any).autoDisableOnExpire ?? true,
             autoArchiveAfterDays: (key as any).autoArchiveAfterDays ?? 0,
             quotaAlertThresholds: (key as any).quotaAlertThresholds ?? '80,90',
+            maxDevices: (key as any).maxDevices ?? null,
             autoRenewPolicy: (key as any).autoRenewPolicy ?? 'NONE',
             autoRenewDurationDays: (key as any).autoRenewDurationDays ?? null,
           }}
@@ -3646,6 +3667,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
     const days = Math.floor(hours / 24);
     return `${days}d ${hours % 24}h`;
   };
+  const disableEta = data?.deviceLimitDisableAt ? formatRelativeTime(data.deviceLimitDisableAt) : null;
 
   if (isLoading) {
     return (
@@ -3693,6 +3715,49 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
             <p className="text-xs text-muted-foreground">Peak Devices</p>
           </div>
         </div>
+
+        {data?.maxDevices ? (
+          <div
+            className={cn(
+              'rounded-xl border px-4 py-3 text-sm',
+              data.deviceLimitOverLimit
+                ? 'border-violet-500/30 bg-violet-500/10'
+                : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
+            )}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Device limit</p>
+                <p className="text-xs text-muted-foreground">
+                  Estimated devices: {data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / {data.maxDevices}
+                </p>
+              </div>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'border',
+                  data.deviceLimitOverLimit ? 'border-violet-500/40 text-violet-300' : 'border-border/60 text-muted-foreground',
+                )}
+              >
+                {data.deviceLimitEnforcementStage === 'PENDING_DISABLE'
+                  ? 'Disable pending'
+                  : data.deviceLimitOverLimit
+                    ? 'Over limit'
+                    : 'Within limit'}
+              </Badge>
+            </div>
+            {data.deviceLimitOverLimit ? (
+              <p className="mt-2 text-xs text-violet-100/90">
+                This key is over the configured device limit. If the estimate stays over the limit, it will disable automatically
+                {disableEta ? ` (${disableEta}).` : '.'}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Device counts are estimated from recent traffic plus share/subscription activity.
+              </p>
+            )}
+          </div>
+        ) : null}
 
         {/* Recent Sessions */}
         {data?.sessions && data.sessions.length > 0 && (

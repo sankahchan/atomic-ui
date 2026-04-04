@@ -227,6 +227,10 @@ model AccessKey {
   // Connection/device tracking
   estimatedDevices Int @default(0)
   peakDevices      Int @default(0)
+  maxDevices       Int?
+  deviceLimitExceededAt     DateTime?
+  deviceLimitWarningSentAt  DateTime?
+  deviceLimitLastObservedDevices Int?
 
   // Ownership and tagging
   owner String? // Owner/email for this key
