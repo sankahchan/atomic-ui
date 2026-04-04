@@ -364,6 +364,26 @@ export function getTelegramUi(locale: SupportedLocale) {
     subSent: (count: number) => isMyanmar ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။` : `📎 Sent ${count} share page(s) to this chat.`,
     noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ support link မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
     supportLabel: isMyanmar ? '🛟 အကူအညီ' : '🛟 Support',
+    supportHubTitle: isMyanmar ? '🛟 <b>Support center</b>' : '🛟 <b>Support center</b>',
+    supportHubHint: isMyanmar
+      ? 'Order အခြေအနေ၊ refund update၊ server issue သို့မဟုတ် premium request တွေကို ဒီနေရာကနေ စတင်နိုင်ပါတယ်။'
+      : 'Start from here for order updates, refund follow-up, server issues, or premium requests.',
+    supportHubOrdersHint: isMyanmar
+      ? '• /orders သို့မဟုတ် /order ORDER-CODE ဖြင့် payment/order အခြေအနေကို စစ်ပါ။'
+      : '• Use /orders or /order ORDER-CODE to check payment and order progress.',
+    supportHubInboxHint: isMyanmar
+      ? '• /inbox ဖြင့် announcements, refund, support update များကို တစ်နေရာတည်းမှာ ကြည့်ပါ။'
+      : '• Use /inbox to see announcements, refund updates, and support replies in one place.',
+    supportHubPremiumHint: isMyanmar
+      ? '• Premium user များအတွက် /premium နှင့် /supportstatus ကို အသုံးပြုနိုင်ပါသည်။'
+      : '• Premium users can continue with /premium and /supportstatus.',
+    supportHubServerHint: isMyanmar
+      ? '• Normal key server ပြဿနာရှိပါက /server ဖြင့် server change request စတင်ပါ။'
+      : '• If a normal-key server has an issue, use /server to start a server-change request.',
+    supportHubDirectLink: (supportLink: string) =>
+      isMyanmar
+        ? `• Admin ကို တိုက်ရိုက်ဆက်သွယ်ရန်: ${supportLink}`
+        : `• Contact admin directly: ${supportLink}`,
     keyLabel: isMyanmar ? 'Key' : 'Key',
     serverLabel: isMyanmar ? 'Server' : 'Server',
     statusLineLabel: isMyanmar ? 'Status' : 'Status',
@@ -738,6 +758,9 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderReviewPanelLabel: isMyanmar ? 'Panel တွင် စစ်ဆေးရန်' : 'Review in panel',
     orderApproveActionLabel: isMyanmar ? 'Telegram မှ အတည်ပြုရန်' : 'Approve in Telegram',
     orderRejectActionLabel: isMyanmar ? 'Telegram မှ ပယ်ရန်' : 'Reject in Telegram',
+    orderRejectDuplicateActionLabel: isMyanmar ? 'Duplicate proof' : 'Duplicate proof',
+    orderRejectBlurryActionLabel: isMyanmar ? 'Blurry proof' : 'Blurry proof',
+    orderRejectWrongAmountActionLabel: isMyanmar ? 'Wrong amount' : 'Wrong amount',
     orderReviewActionUnauthorized: isMyanmar ? 'ဤ action ကို admin များသာ လုပ်နိုင်ပါသည်။' : 'Only admins can perform this action.',
     orderReviewActionApproved: (code: string) =>
       isMyanmar ? `Order ${code} ကို Telegram မှ အတည်ပြုပြီးပါပြီ။` : `Approved order ${code} from Telegram.`,

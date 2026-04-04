@@ -160,13 +160,15 @@ export async function buildTelegramOrderStatusMessage(input: {
   const isMyanmar = locale === 'my';
   const statusIcon = formatTelegramOrderStatusIcon(order.status);
   const nextStep = buildTelegramOrderNextStepText(order, ui);
+  const stateLine = formatTelegramOrderStateLine(order);
   const summaryTitle = isMyanmar ? '<b>Order summary</b>' : '<b>Order summary</b>';
   const currentStateTitle = isMyanmar ? '<b>Current state</b>' : '<b>Current state</b>';
   const lines = [
     ui.orderStatusTitle,
     '',
     `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
-    nextStep ? `➡️ ${escapeHtml(nextStep)}` : '',
+    stateLine ? `🧾 ${escapeHtml(stateLine)}` : '',
+    nextStep ? `${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
     '',
     currentStateTitle,
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
@@ -228,6 +230,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.paymentMethodLabel) {
+    lines.push('', `<b>${isMyanmar ? 'Payment & review' : 'Payment & review'}</b>`);
     lines.push(`${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`);
   }
 
@@ -348,7 +351,8 @@ export async function buildTelegramOrderStatusMessage(input: {
             })
         : null;
 
-      lines.push('', `${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`);
+      lines.push('', `<b>${isMyanmar ? 'Delivered access' : 'Delivered access'}</b>`);
+      lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`);
 
       if (sharePageUrl) {
         lines.push(`🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
@@ -394,7 +398,8 @@ export async function buildTelegramOrderStatusMessage(input: {
       );
       const poolSummary = formatTelegramDynamicPoolSummary(dynamicKey, ui);
 
-      lines.push('', `${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`);
+      lines.push('', `<b>${isMyanmar ? 'Delivered access' : 'Delivered access'}</b>`);
+      lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`);
       lines.push(`💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`);
       lines.push(`✨ ${ui.premiumStableLink}`);
       if (dynamicKey.type === 'SELF_MANAGED') {

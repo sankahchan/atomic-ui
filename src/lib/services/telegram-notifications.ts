@@ -1,5 +1,6 @@
 import type { SupportedLocale } from '@/lib/i18n/config';
 import { db } from '@/lib/db';
+import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import { buildTelegramNotificationPreferenceCallbackData } from '@/lib/services/telegram-callbacks';
 import {
   getTelegramNotificationPreferenceLabel,
@@ -205,14 +206,29 @@ export async function handleInboxCommand(input: {
     });
   }
 
-  if (!announcements.length && !keyLogs.length) {
+  const hasAnyUpdate =
+    announcements.length > 0 ||
+    keyLogs.length > 0 ||
+    (mode === 'ALL' && (refundUpdates.length > 0 || premiumSupportUpdates.length > 0));
+
+  if (!hasAnyUpdate) {
     return input.locale === 'my'
       ? '📭 မကြာသေးမီက notice သို့မဟုတ် announcement မရှိသေးပါ။'
       : '📭 No recent notices or announcements yet.';
   }
 
   const lines = [
-    input.locale === 'my' ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>',
+    mode === 'UNREAD'
+      ? input.locale === 'my'
+        ? '📬 <b>မဖတ်ရသေးသော Inbox</b>'
+        : '📬 <b>Your unread inbox</b>'
+      : mode === 'PINNED'
+        ? input.locale === 'my'
+          ? '📌 <b>Pin လုပ်ထားသော Inbox</b>'
+          : '📌 <b>Your pinned inbox</b>'
+        : input.locale === 'my'
+          ? '📬 <b>သင်၏ Notice Inbox</b>'
+          : '📬 <b>Your Notice Inbox</b>',
     '',
     input.locale === 'my'
       ? `Announcement ${announcements.length} ခု • Support ${premiumSupportUpdates.length} ခု • Finance ${refundUpdates.length} ခု`
@@ -247,9 +263,22 @@ export async function handleInboxCommand(input: {
   if (premiumSupportUpdates.length && mode === 'ALL') {
     lines.push(input.locale === 'my' ? '<b>Support updates</b>' : '<b>Support updates</b>');
     for (const request of premiumSupportUpdates) {
+      const latestReply = request.replies?.[request.replies.length - 1] || null;
+      const latestReplyPrefix = latestReply
+        ? latestReply.senderType === 'ADMIN'
+          ? input.locale === 'my'
+            ? 'Admin'
+            : 'Admin'
+          : input.locale === 'my'
+            ? 'You'
+            : 'You'
+        : null;
       lines.push(
         `• <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
         `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
+        latestReply
+          ? `  ${escapeHtml(latestReplyPrefix || '')}: ${escapeHtml(latestReply.message.slice(0, 80))}${latestReply.message.length > 80 ? '…' : ''}`
+          : '',
         `  ${formatTelegramDateTime(request.updatedAt || request.createdAt, input.locale)}`,
       );
     }
@@ -264,6 +293,12 @@ export async function handleInboxCommand(input: {
           formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui),
         )}`,
         `  ${order.planName ? escapeHtml(order.planName) : escapeHtml(order.kind)}`,
+        order.refundReviewReasonCode
+          ? `  ${escapeHtml(
+              resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
+                order.refundReviewReasonCode,
+            )}`
+          : '',
         `  ${formatTelegramDateTime(order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt, input.locale)}`,
       );
     }

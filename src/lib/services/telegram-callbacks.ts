@@ -1,7 +1,12 @@
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 
 export type TelegramLocaleSelectorContext = 'start' | 'switch';
-export type TelegramOrderReviewAction = 'approve' | 'reject';
+export type TelegramOrderReviewAction =
+  | 'approve'
+  | 'reject'
+  | 'reject_duplicate'
+  | 'reject_blurry'
+  | 'reject_wrong_amount';
 export type TelegramOrderUserAction =
   | 'pl'
   | 'ky'
@@ -212,7 +217,13 @@ export function parseTelegramOrderReviewCallbackData(data?: string | null) {
       ? 'approve'
       : parts[1] === 'reject'
         ? 'reject'
-        : null;
+        : parts[1] === 'reject_duplicate'
+          ? 'reject_duplicate'
+          : parts[1] === 'reject_blurry'
+            ? 'reject_blurry'
+            : parts[1] === 'reject_wrong_amount'
+              ? 'reject_wrong_amount'
+              : null;
   const orderId = parts[2]?.trim();
 
   if (!action || !orderId) {

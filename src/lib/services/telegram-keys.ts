@@ -537,11 +537,24 @@ export async function handleSupportCommand(locale: SupportedLocale) {
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
 
-  if (!supportLink) {
-    return ui.noSupportLink;
+  const lines = [
+    ui.supportHubTitle,
+    '',
+    ui.supportHubHint,
+    '',
+    ui.supportHubOrdersHint,
+    ui.supportHubInboxHint,
+    ui.supportHubServerHint,
+    ui.supportHubPremiumHint,
+  ];
+
+  if (supportLink) {
+    lines.push('', ui.supportHubDirectLink(supportLink));
+  } else {
+    lines.push('', ui.noSupportLink);
   }
 
-  return `${ui.supportLabel}: ${supportLink}`;
+  return lines.join('\n');
 }
 
 export async function handleUserServerCommand(input: {

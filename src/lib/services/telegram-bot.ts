@@ -449,11 +449,6 @@ function buildTelegramSalesPaymentPrompt(input: {
   }
 
   lines.push('', `<b>${ui.paymentInstructionsLabel}</b>`, escapeHtml(input.paymentInstructions));
-
-  if (input.supportLink) {
-    lines.push('', `${ui.supportLabel}: ${escapeHtml(input.supportLink)}`);
-  }
-
   lines.push(
     '',
     isMyanmar ? '<b>Screenshot checklist</b>' : '<b>Screenshot checklist</b>',
@@ -464,11 +459,36 @@ function buildTelegramSalesPaymentPrompt(input: {
       ? '• Photo သို့မဟုတ် document အဖြစ် ပို့နိုင်ပါသည်။'
       : '• You can send it as a photo or a document.',
     isMyanmar
+      ? '• ကောင်းသော screenshot ဥပမာ - amount, account name, transfer ID, time အားလုံး တစ်ပုံတည်းတွင် ပါဝင်ရပါမည်။'
+      : '• A good screenshot shows the amount, account name, transfer ID, and time in one image.',
+    isMyanmar
+      ? '• မရှင်းလင်းသော crop, amount မပါခြင်း, duplicate screenshot များကို မပို့ပါနှင့်။'
+      : '• Avoid blurry crops, missing amounts, or reusing an old screenshot.',
+    isMyanmar
       ? '• Screenshot ပို့ပြီးနောက် ထပ်မံမပို့ဘဲ review စောင့်ပါ။'
       : '• After uploading, wait for review instead of sending duplicates.',
     '',
+    isMyanmar ? '<b>ပို့ပြီးနောက်</b>' : '<b>After upload</b>',
+    isMyanmar
+      ? '• Order status ကို ဤ chat ထဲမှာ update ပို့ပေးပါမည်။'
+      : '• We will update the order status in this chat.',
+    isMyanmar
+      ? '• လိုအပ်ပါက admin က screenshot အသစ် သို့မဟုတ် အသေးစိတ်ထပ်တောင်းနိုင်ပါသည်။'
+      : '• If needed, the admin may ask for a clearer screenshot or more details.',
+    isMyanmar
+      ? '• အခြေအနေကို စစ်ရန် /orders သို့မဟုတ် /order ORDER-CODE ကို သုံးနိုင်ပါသည်။'
+      : '• Use /orders or /order ORDER-CODE to check progress any time.',
+    '',
     ui.paymentProofRequired,
   );
+
+  if (input.supportLink) {
+    lines.push(
+      '',
+      isMyanmar ? '<b>အကူအညီလိုပါက</b>' : '<b>Need help?</b>',
+      `${ui.supportLabel}: ${escapeHtml(input.supportLink)}`,
+    );
+  }
 
   return lines.join('\n');
 }
@@ -1637,12 +1657,14 @@ async function sendTelegramOrderReviewAlert(
         '• screenshot ရှင်းလင်းမှု',
         '• amount / method / plan ကိုက်ညီမှု',
         '• duplicate proof warning ရှိ/မရှိ',
+        '• quick reject preset သုံးရန် လို/မလို',
       ]
     : [
         '<b>Review checklist</b>',
         '• screenshot clarity',
         '• amount / method / plan match',
         '• duplicate-proof warning',
+        '• whether a quick reject preset is enough',
       ];
   const lines = [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
@@ -1686,6 +1708,22 @@ async function sendTelegramOrderReviewAlert(
             {
               text: ui.orderRejectActionLabel,
               callback_data: buildTelegramOrderReviewCallbackData('reject', order.id),
+            },
+          ],
+          [
+            {
+              text: ui.orderRejectDuplicateActionLabel,
+              callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', order.id),
+            },
+            {
+              text: ui.orderRejectBlurryActionLabel,
+              callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', order.id),
+            },
+          ],
+          [
+            {
+              text: ui.orderRejectWrongAmountActionLabel,
+              callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', order.id),
             },
           ],
           [{ text: ui.orderReviewPanelLabel, url: panelUrl }],
@@ -7519,6 +7557,22 @@ async function handleTelegramCallbackQuery(
           adminUi.orderReviewActionApproved(result.orderCode),
         );
       } else {
+        const rejectionReasonCode =
+          orderAction.action === 'reject_duplicate'
+            ? 'duplicate_payment'
+            : orderAction.action === 'reject_blurry'
+              ? 'proof_unclear'
+              : orderAction.action === 'reject_wrong_amount'
+                ? 'amount_mismatch'
+                : null;
+        const rejectionAdminNote =
+          rejectionReasonCode === 'duplicate_payment'
+            ? 'Rejected from Telegram quick action: duplicate proof'
+            : rejectionReasonCode === 'proof_unclear'
+              ? 'Rejected from Telegram quick action: blurry proof'
+              : rejectionReasonCode === 'amount_mismatch'
+                ? 'Rejected from Telegram quick action: wrong amount'
+                : null;
         const result = await rejectTelegramOrder({
           orderId: orderAction.orderId,
           reviewedByUserId: adminActor.userId,
@@ -7527,7 +7581,8 @@ async function handleTelegramCallbackQuery(
             callbackQuery.from.username ||
             callbackQuery.from.first_name ||
             null,
-          adminNote: null,
+          adminNote: rejectionAdminNote,
+          reasonCode: rejectionReasonCode,
         });
 
         await answerTelegramCallbackQuery(

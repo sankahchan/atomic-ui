@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildTelegramOrderReviewCallbackData,
   getCommandKeyboard,
   normalizeTelegramReplyKeyboardCommand,
+  parseTelegramOrderReviewCallbackData,
 } from '@/lib/services/telegram-callbacks';
 
 test('getCommandKeyboard renders localized customer labels', () => {
@@ -26,4 +28,32 @@ test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back 
 test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () => {
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', false), null);
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', true), '/announcements');
+});
+
+test('telegram order review callbacks support quick reject presets', () => {
+  const data = buildTelegramOrderReviewCallbackData('reject_duplicate', 'ord_123');
+  assert.deepEqual(parseTelegramOrderReviewCallbackData(data), {
+    action: 'reject_duplicate',
+    orderId: 'ord_123',
+  });
+
+  assert.deepEqual(
+    parseTelegramOrderReviewCallbackData(
+      buildTelegramOrderReviewCallbackData('reject_blurry', 'ord_456'),
+    ),
+    {
+      action: 'reject_blurry',
+      orderId: 'ord_456',
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramOrderReviewCallbackData(
+      buildTelegramOrderReviewCallbackData('reject_wrong_amount', 'ord_789'),
+    ),
+    {
+      action: 'reject_wrong_amount',
+      orderId: 'ord_789',
+    },
+  );
 });
