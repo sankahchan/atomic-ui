@@ -1585,11 +1585,7 @@ export const keysRouter = router({
 
       // Create keys on each server
       for (const server of servers) {
-        if (
-          server.lifecycleMode === 'DRAINING' &&
-          server.allowManualAssignmentsWhenDraining &&
-          !input.confirmDrainingServers
-        ) {
+        if (server.lifecycleMode === 'DRAINING' && !input.confirmDrainingServers) {
           results.failed += input.count;
           results.errors.push(`${server.name}: Confirm draining-server bulk creation before continuing.`);
           continue;
@@ -1736,7 +1732,9 @@ export const keysRouter = router({
           }
 
           if (input.enable) {
-            const assignmentCheck = canAssignKeysToServer(key.server);
+            const assignmentCheck = canAssignKeysToServer(key.server, {
+              allowDraining: true,
+            });
             if (!assignmentCheck.allowed) {
               throw new Error(assignmentCheck.reason);
             }
@@ -2079,7 +2077,9 @@ export const keysRouter = router({
       const isCurrentlyDisabled = key.status === 'DISABLED';
 
       if (isCurrentlyDisabled) {
-        const assignmentCheck = canAssignKeysToServer(key.server);
+        const assignmentCheck = canAssignKeysToServer(key.server, {
+          allowDraining: true,
+        });
         if (!assignmentCheck.allowed) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -3631,7 +3631,9 @@ export const keysRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Target server not found' });
       }
 
-      const assignmentCheck = canAssignKeysToServer(targetServer);
+      const assignmentCheck = canAssignKeysToServer(targetServer, {
+        allowDraining: true,
+      });
       if (!assignmentCheck.allowed) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: assignmentCheck.reason });
       }

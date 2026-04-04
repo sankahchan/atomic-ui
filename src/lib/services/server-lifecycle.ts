@@ -22,11 +22,7 @@ export function canAssignKeysToServer(server: {
   const lifecycleMode = serverLifecycleModeSchema.safeParse(server.lifecycleMode ?? 'ACTIVE');
   const mode = lifecycleMode.success ? lifecycleMode.data : 'ACTIVE';
 
-  if (
-    mode === 'DRAINING' &&
-    options.allowDraining &&
-    server.allowManualAssignmentsWhenDraining
-  ) {
+  if (mode === 'DRAINING' && options.allowDraining) {
     return {
       allowed: true as const,
       reason: null,
@@ -36,9 +32,7 @@ export function canAssignKeysToServer(server: {
   if (mode === 'DRAINING') {
     return {
       allowed: false as const,
-      reason: server.allowManualAssignmentsWhenDraining
-        ? 'Server is draining and only accepting manual admin assignments.'
-        : 'Server is draining and not accepting new assignments.',
+      reason: 'Server is draining and not accepting automatic assignments.',
     };
   }
 

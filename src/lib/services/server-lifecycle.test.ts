@@ -32,7 +32,6 @@ test('canAssignKeysToServer allows draining when explicitly requested', () => {
   const result = canAssignKeysToServer({
     isActive: true,
     lifecycleMode: 'DRAINING',
-    allowManualAssignmentsWhenDraining: true,
   }, {
     allowDraining: true,
   });
@@ -43,7 +42,7 @@ test('canAssignKeysToServer allows draining when explicitly requested', () => {
   });
 });
 
-test('canAssignKeysToServer still rejects draining servers when manual assignments are blocked', () => {
+test('canAssignKeysToServer allows draining even when the old manual flag is false', () => {
   const result = canAssignKeysToServer({
     isActive: true,
     lifecycleMode: 'DRAINING',
@@ -52,8 +51,10 @@ test('canAssignKeysToServer still rejects draining servers when manual assignmen
     allowDraining: true,
   });
 
-  assert.equal(result.allowed, false);
-  assert.match(result.reason ?? '', /draining/i);
+  assert.deepEqual(result, {
+    allowed: true,
+    reason: null,
+  });
 });
 
 test('canAssignKeysToServer treats unknown lifecycle modes as active', () => {
