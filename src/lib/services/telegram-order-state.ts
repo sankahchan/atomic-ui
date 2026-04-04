@@ -550,6 +550,9 @@ export async function handleRenewOrderCommand(input: {
       kind: 'access' as const,
       status: key.status,
       detailLine: `${ui.myKeysTypeStandard} • ${formatExpirationSummary(key, input.locale)}`,
+      extraLine: key.server
+        ? `${ui.preferredServerLabel}: ${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+        : null,
     })),
     ...dynamicKeys.map((key) => ({
       id: key.id,
@@ -557,6 +560,7 @@ export async function handleRenewOrderCommand(input: {
       kind: 'dynamic' as const,
       status: key.status,
       detailLine: `${ui.myKeysTypePremium} • ${formatExpirationSummary(key, input.locale)}`,
+      extraLine: null,
     })),
   ];
 
@@ -598,18 +602,33 @@ export async function handleRenewOrderCommand(input: {
   const lines = [
     ui.renewTargetPrompt(order.orderCode),
     '',
+    `<b>${input.locale === 'my' ? 'Choose the key to renew' : 'Choose the key to renew'}</b>`,
     input.locale === 'my'
-      ? 'Renew လုပ်လိုသော key ကို ရွေးပါ။ Button ကို နှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။'
-      : 'Choose the key you want to renew. You can tap a button or reply with the number.',
+      ? 'Button ကို နှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။'
+      : 'Tap a button or reply with the number.',
     '',
+    `<b>${input.locale === 'my' ? 'What stays the same' : 'What stays the same'}</b>`,
     input.locale === 'my'
-      ? '<b>Renewal keeps the same key history</b>\n• share page\n• Telegram linkage\n• support history'
-      : '<b>Renewal keeps the same key history</b>\n• share page\n• Telegram linkage\n• support history',
+      ? '• share page\n• Telegram linkage\n• support history'
+      : '• share page\n• Telegram linkage\n• support history',
     '',
     ...renewableKeys.map((key, index) => {
       const icon = key.kind === 'dynamic' ? '💎' : '🔑';
-      return `${index + 1}. ${icon} ${key.name}\n   ${key.detailLine}\n   ${key.status}`;
+      return [
+        `${index + 1}. ${icon} <b>${escapeHtml(key.name)}</b>`,
+        `   ${escapeHtml(key.detailLine)}`,
+        `   ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+        key.extraLine ? `   ${escapeHtml(key.extraLine)}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
     }),
+    '',
+    escapeHtml(
+      input.locale === 'my'
+        ? 'Key ကို ရွေးပြီးနောက် renewal package များကို ဒီ chat ထဲမှာ ဆက်ပြပေးပါမည်။'
+        : 'After you choose a key, the renewal packages will appear here in this chat.',
+    ),
   ];
   const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {

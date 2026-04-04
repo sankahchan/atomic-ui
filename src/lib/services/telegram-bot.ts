@@ -787,7 +787,10 @@ function buildTelegramRenewKeySelectionKeyboard(input: {
 }) {
   const rows = input.keys.slice(0, 8).map((key) => [
     {
-      text: truncateTelegramButtonLabel(`🔄 ${key.name}`, 36),
+      text: truncateTelegramButtonLabel(
+        `${key.kind === 'dynamic' ? '💎' : '🔑'} ${key.name}`,
+        36,
+      ),
       callback_data: buildTelegramOrderActionCallbackData(
         'ky',
         key.id,
@@ -1124,14 +1127,23 @@ function buildTelegramOrderActionKeyboard(input: {
 }) {
   const ui = getTelegramUi(input.locale);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  const supportButton = input.supportLink
+    ? {
+        text: ui.getSupport,
+        url: input.supportLink,
+      }
+    : null;
 
   if (input.order.status === 'AWAITING_PAYMENT_METHOD') {
-    rows.push([
-      {
-        text: ui.orderActionChoosePaymentMethod,
-        callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
-      },
-    ]);
+    rows.push(
+      [
+        {
+          text: ui.orderActionChoosePaymentMethod,
+          callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+        },
+        ...(supportButton ? [supportButton] : []),
+      ],
+    );
   }
 
   if (
@@ -1158,13 +1170,30 @@ function buildTelegramOrderActionKeyboard(input: {
     ]);
 
     if (input.order.paymentMethodCode) {
-      rows.push([
-        {
-          text: ui.orderActionSwitchPaymentMethod,
-          callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
-        },
-      ]);
+      rows.push(
+        [
+          {
+            text: ui.orderActionSwitchPaymentMethod,
+            callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+          },
+          ...(supportButton ? [supportButton] : []),
+        ],
+      );
+    } else if (supportButton) {
+      rows.push([supportButton]);
     }
+  }
+
+  if (input.order.status === 'REJECTED' || input.order.status === 'CANCELLED') {
+    rows.push(
+      [
+        {
+          text: ui.orderActionRetryOrder,
+          callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
+        },
+        ...(supportButton ? [supportButton] : []),
+      ],
+    );
   }
 
   rows.push([
@@ -1174,21 +1203,18 @@ function buildTelegramOrderActionKeyboard(input: {
     },
   ]);
 
-  if (input.order.status === 'REJECTED' || input.order.status === 'CANCELLED') {
+  if (
+    supportButton &&
+    ![
+      'AWAITING_PAYMENT_METHOD',
+      'AWAITING_PAYMENT_PROOF',
+      'PENDING_REVIEW',
+      'REJECTED',
+      'CANCELLED',
+    ].includes(input.order.status)
+  ) {
     rows.push([
-      {
-        text: ui.orderActionRetryOrder,
-        callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
-      },
-    ]);
-  }
-
-  if (input.supportLink) {
-    rows.push([
-      {
-        text: ui.getSupport,
-        url: input.supportLink,
-      },
+      supportButton,
     ]);
   }
 
@@ -1217,9 +1243,13 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
   }
 
   const supportLink = await getTelegramSupportLink();
-  const supportHandledInKeyboard = ['AWAITING_PAYMENT_PROOF', 'PENDING_REVIEW', 'REJECTED', 'CANCELLED'].includes(
-    input.order.status,
-  );
+  const supportHandledInKeyboard = [
+    'AWAITING_PAYMENT_METHOD',
+    'AWAITING_PAYMENT_PROOF',
+    'PENDING_REVIEW',
+    'REJECTED',
+    'CANCELLED',
+  ].includes(input.order.status);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     ...(
       buildTelegramOrderActionKeyboard({
@@ -1960,6 +1990,7 @@ async function sendTelegramRenewalPlanSelection(input: {
   targetKey: TelegramRenewableKeyOption;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const enabledPlans = await listAvailableTelegramPlansForOrder({
     kind: 'RENEW',
     chatId: input.chatId,
@@ -1995,9 +2026,14 @@ async function sendTelegramRenewalPlanSelection(input: {
     },
   });
 
+  const renewTargetTypeLabel =
+    input.targetKey.kind === 'dynamic' ? ui.myKeysTypePremium : ui.myKeysTypeStandard;
   const lines = [
     ui.orderPlanPrompt(input.orderCode),
+    '',
+    `<b>${isMyanmar ? 'Renewal target' : 'Renewal target'}</b>`,
     `${ui.renewalTargetLabel}: <b>${escapeHtml(input.targetKey.name)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(renewTargetTypeLabel)}</b>`,
     '',
     ...buildTelegramCouponReadyLines({
       locale: input.locale,
@@ -2008,13 +2044,51 @@ async function sendTelegramRenewalPlanSelection(input: {
       requestedCouponCode: resolvedCoupon?.requestedCouponCode || null,
     }),
     ...(resolvedCoupon?.coupon || resolvedCoupon?.unavailableReason ? [''] : []),
+    `<b>${isMyanmar ? 'What you keep' : 'What you keep'}</b>`,
     input.targetKey.kind === 'dynamic' ? ui.renewalBenefitsPremium : ui.renewalBenefitsStandard,
     '',
-    ...enabledPlans.map((plan, index) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
-    }),
+    `<b>${isMyanmar ? 'Choose renewal package' : 'Choose renewal package'}</b>`,
+    ...(enabledPlans.length
+      ? enabledPlans.map((plan, index) => {
+          const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+          const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+          const quotaLabel = plan.unlimitedQuota
+            ? 'Unlimited'
+            : typeof plan.dataLimitGB === 'number'
+              ? `${plan.dataLimitGB} GB`
+              : null;
+          const durationLabel = plan.fixedDurationMonths
+            ? isMyanmar
+              ? `${plan.fixedDurationMonths} လ`
+              : `${plan.fixedDurationMonths} month${plan.fixedDurationMonths === 1 ? '' : 's'}`
+            : plan.minDurationMonths
+              ? isMyanmar
+                ? `${plan.minDurationMonths}+ လ`
+                : `${plan.minDurationMonths}+ month option`
+              : null;
+          const detailParts = [
+            plan.deliveryType === 'DYNAMIC_KEY' ? ui.premiumLabel : ui.myKeysTypeStandard,
+            quotaLabel,
+            durationLabel,
+            plan.unlimitedQuota && !plan.fixedDurationMonths
+              ? isMyanmar
+                ? 'ရွေးချယ်ပြီးနောက် လကို ဆက်ရွေးပါ'
+                : 'Choose months after this'
+              : null,
+          ].filter(Boolean);
+          return `${index + 1}. ${plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : '🔑'} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}\n   ${escapeHtml(detailParts.join(' • '))}`;
+        })
+      : [
+          isMyanmar
+            ? 'လက်ရှိ renewal package မရှိသေးပါ။ Admin ကို ဆက်သွယ်ပါ။'
+            : 'No renewal package is available right now. Please contact admin.',
+        ]),
+    '',
+    escapeHtml(
+      isMyanmar
+        ? 'Plan ကို ရွေးပြီးနောက် payment step ကို ဒီ chat ထဲမှာ ဆက်ဖွင့်ပေးပါမည်။'
+        : 'After you choose a package, the payment step will continue here in this chat.',
+    ),
   ];
 
   await sendTelegramMessage(

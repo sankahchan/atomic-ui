@@ -250,6 +250,92 @@ function formatPremiumRegionSummaryLine(
   return parts.join(' • ');
 }
 
+function getPremiumCurrentFallbackRegion(analysis: PremiumRegionAnalysis) {
+  const currentRegion =
+    analysis.currentSummary?.regionCode ||
+    analysis.currentServer?.countryCode?.trim().toUpperCase() ||
+    null;
+
+  if (!currentRegion || analysis.preferredRegions.length === 0) {
+    return null;
+  }
+
+  return analysis.preferredRegions.includes(currentRegion) ? null : currentRegion;
+}
+
+function formatPremiumOverallStatusLine(
+  analysis: PremiumRegionAnalysis,
+  locale: SupportedLocale,
+) {
+  const preferredSummaries = analysis.regionSummaries.filter((entry) =>
+    analysis.preferredRegions.includes(entry.regionCode),
+  );
+
+  if (analysis.currentSummary?.status === 'DOWN') {
+    return locale === 'my' ? 'Overall: Current route is down' : 'Overall: Current route is down';
+  }
+
+  if (analysis.currentSummary?.status === 'SLOW') {
+    return locale === 'my'
+      ? 'Overall: Current route is slow'
+      : 'Overall: Current route is slow';
+  }
+
+  if (
+    preferredSummaries.length > 0 &&
+    preferredSummaries.some((entry) => entry.status === 'DOWN') &&
+    preferredSummaries.every((entry) => entry.status !== 'UP')
+  ) {
+    return locale === 'my'
+      ? 'Overall: Preferred region is degraded'
+      : 'Overall: Preferred region is degraded';
+  }
+
+  if (preferredSummaries.some((entry) => entry.status === 'SLOW')) {
+    return locale === 'my'
+      ? 'Overall: Some preferred routes are slow'
+      : 'Overall: Some preferred routes are slow';
+  }
+
+  if (analysis.regionSummaries.length === 0) {
+    return locale === 'my'
+      ? 'Overall: Region health is not ready yet'
+      : 'Overall: Region health is not ready yet';
+  }
+
+  return locale === 'my' ? 'Overall: Healthy' : 'Overall: Healthy';
+}
+
+function buildPremiumRecommendedNextStepText(
+  analysis: PremiumRegionAnalysis,
+  locale: SupportedLocale,
+) {
+  const suggestedFallback = analysis.suggestedFallbacks[0] || null;
+  const currentFallback = getPremiumCurrentFallbackRegion(analysis);
+
+  if (analysis.currentSummary?.status === 'DOWN' && suggestedFallback) {
+    return locale === 'my'
+      ? `${suggestedFallback.regionCode} ကို fallback အဖြစ် တောင်းဆိုပါ သို့မဟုတ် route issue report တင်ပါ။`
+      : `Request ${suggestedFallback.regionCode} as fallback or report a route issue.`;
+  }
+
+  if (analysis.currentSummary?.status === 'SLOW' && suggestedFallback) {
+    return locale === 'my'
+      ? `${suggestedFallback.regionCode} သို့ ပြောင်းရန် စဉ်းစားနိုင်ပါသည်၊ သို့မဟုတ် လက်ရှိ route issue ကို report တင်ပါ။`
+      : `Consider switching to ${suggestedFallback.regionCode}, or report the current route issue.`;
+  }
+
+  if (currentFallback && analysis.preferredRegions.length > 0) {
+    return locale === 'my'
+      ? `${analysis.preferredRegions.join(', ')} သို့ ပြန်လိုပါက region change request တင်နိုင်ပါသည်။`
+      : `Request a move back to ${analysis.preferredRegions.join(', ')} if you want to return to your preferred region.`;
+  }
+
+  return locale === 'my'
+    ? 'လက်ရှိ route ကို ဆက်အသုံးပြုနိုင်ပါသည်။ ပြောင်းလိုပါက region change request ကို အသုံးပြုပါ။'
+    : 'You can keep using the current route. Use region change only if you want a different preference.';
+}
+
 export async function createTelegramPremiumSupportRequestRecord(input: {
   chatId: number;
   telegramUserId: number;
@@ -631,6 +717,38 @@ export async function handlePremiumCommand(input: {
     return ui.premiumHubEmpty;
   }
 
+  const allServerIds = Array.from(
+    new Set(
+      dynamicKeys.flatMap((key) =>
+        key.accessKeys
+          .map((accessKey) => accessKey.server?.id || null)
+          .filter((serverId): serverId is string => Boolean(serverId)),
+      ),
+    ),
+  );
+  const healthChecks = allServerIds.length
+    ? await db.healthCheck.findMany({
+        where: {
+          serverId: { in: allServerIds },
+        },
+        select: {
+          serverId: true,
+          lastStatus: true,
+          lastLatencyMs: true,
+          lastCheckedAt: true,
+          latencyThresholdMs: true,
+          server: {
+            select: {
+              id: true,
+              name: true,
+              countryCode: true,
+            },
+          },
+        },
+      })
+    : [];
+  const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+
   const recentRequests = await listTelegramPremiumSupportRequestsForUser(
     input.chatId,
     input.telegramUserId,
@@ -651,9 +769,29 @@ export async function handlePremiumCommand(input: {
     const { sharePageUrl } = input.getDynamicKeyMessagingUrls(key, 'telegram_premium', input.locale);
     const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
     const latestReply = latestRequest?.replies?.[latestRequest.replies.length - 1] || null;
+    const analysis = summarizePremiumRegions(key, healthByServerId);
+    const currentFallback = getPremiumCurrentFallbackRegion(analysis);
+    const currentRouteLabel = analysis.currentServer
+      ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
+      : ui.premiumRegionUnknownStatus;
+    const nextStepSummary = latestRequest
+      ? latestReply?.senderType === 'ADMIN'
+        ? ui.premiumReplyToRequest
+        : latestRequest.followUpPending
+          ? (input.locale === 'my' ? 'Wait for admin reply' : 'Wait for admin reply')
+          : ui.orderActionCheckStatus
+      : buildPremiumRecommendedNextStepText(analysis, input.locale);
     lines.push(
       `💎 <b>${escapeHtml(key.name)}</b>`,
+      `  ${escapeHtml(formatPremiumOverallStatusLine(analysis, input.locale))}`,
       `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+      `  ${ui.premiumRegionPreferredLabel}: ${escapeHtml(
+        analysis.preferredRegions.length ? analysis.preferredRegions.join(', ') : ui.premiumRegionNoAttached,
+      )}`,
+      `  ${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}`,
+      currentFallback
+        ? `  ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}`
+        : '',
       `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
       latestRequest
         ? `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
@@ -668,6 +806,7 @@ export async function handlePremiumCommand(input: {
       latestReply
         ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
         : '',
+      `  ${ui.orderNextStepLabel}: ${escapeHtml(nextStepSummary)}`,
       `  ${escapeHtml(
         input.locale === 'my'
           ? 'Quick actions: region • route issue • status'
@@ -979,25 +1118,19 @@ export async function handlePremiumRegionStatusCommand(input: {
     ui.premiumRegionStatusHint,
     '',
   ];
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   for (const key of dynamicKeys.slice(0, 4)) {
     const analysis = summarizePremiumRegions(key, healthByServerId);
+    const currentFallback = getPremiumCurrentFallbackRegion(analysis);
+    const currentRouteLabel = analysis.currentServer
+      ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
+      : ui.premiumRegionUnknownStatus;
+    const suggestedFallback = analysis.suggestedFallbacks[0] || null;
 
     lines.push(`• 💎 <b>${escapeHtml(key.name)}</b>`);
     lines.push(
-      `  ${escapeHtml(
-        analysis.regionSummaries.some((region) => region.status === 'DOWN')
-          ? input.locale === 'my'
-            ? 'Overall: Down routes detected'
-            : 'Overall: Down routes detected'
-          : analysis.regionSummaries.some((region) => region.status === 'SLOW')
-            ? input.locale === 'my'
-              ? 'Overall: Some routes are slow'
-              : 'Overall: Some routes are slow'
-            : input.locale === 'my'
-              ? 'Overall: Healthy'
-              : 'Overall: Healthy',
-      )}`,
+      `  ${escapeHtml(formatPremiumOverallStatusLine(analysis, input.locale))}`,
     );
     lines.push(
       `  ${ui.premiumRegionPreferredLabel}: ${
@@ -1007,16 +1140,30 @@ export async function handlePremiumRegionStatusCommand(input: {
       }`,
     );
     lines.push(
-      `  ${ui.premiumRegionCurrentRouteLabel}: ${
-        analysis.currentServer
-          ? `${escapeHtml(analysis.currentServer.name)} ${getFlagEmoji(analysis.currentServer.countryCode || '')}`
-          : escapeHtml(ui.premiumRegionUnknownStatus)
-      }`,
+      `  ${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}`,
     );
+    if (currentFallback) {
+      lines.push(`  ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}`);
+    }
+    if (suggestedFallback) {
+      lines.push(
+        `  ${ui.premiumRegionAlertSuggestedLabel}: ${escapeHtml(
+          `${suggestedFallback.regionCode}${suggestedFallback.latencyMs ? ` • ${suggestedFallback.latencyMs}ms` : ''}`,
+        )}`,
+      );
+    }
+    lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(buildPremiumRecommendedNextStepText(analysis, input.locale))}`);
     lines.push(`  ${ui.premiumRegionAttachedLabel}: ${analysis.attachedServers.length}`);
+    lines.push(`  <b>${input.locale === 'my' ? 'Region health' : 'Region health'}</b>`);
 
     if (analysis.preferredRegions.length === 0) {
       lines.push(`  ${escapeHtml(ui.premiumRegionNoAttached)}`, '');
+      inlineKeyboard.push([
+        {
+          text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 36),
+          callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
+        },
+      ]);
       continue;
     }
 
@@ -1030,13 +1177,7 @@ export async function handlePremiumRegionStatusCommand(input: {
       }
 
       lines.push(
-        `  ${getFlagEmoji(regionSummary.regionCode)} <b>${escapeHtml(regionSummary.regionCode)}</b> · ${escapeHtml(
-          formatPremiumRegionHealthLabel(regionSummary.status, ui),
-        )}${
-          typeof regionSummary.latencyMs === 'number'
-            ? ` · ${regionSummary.latencyMs}ms / ${regionSummary.latencyThresholdMs}ms`
-            : ''
-        }`,
+        `  • ${escapeHtml(formatPremiumRegionSummaryLine(regionSummary, ui))}`,
       );
       if (markers.length > 0) {
         lines.push(`    ${escapeHtml(markers.join(' • '))}`);
@@ -1054,17 +1195,26 @@ export async function handlePremiumRegionStatusCommand(input: {
     lines.push(
       `  ${escapeHtml(
         input.locale === 'my'
-          ? 'Need a change? Use /premium or the buttons there to request a new region or report a route issue.'
-          : 'Need a change? Use /premium or the buttons there to request a new region or report a route issue.',
+          ? 'Need a change? Use the buttons below to request a region change or report a route issue.'
+          : 'Need a change? Use the buttons below to request a region change or report a route issue.',
       )}`,
     );
 
     lines.push('');
+    inlineKeyboard.push([
+      {
+        text: truncateTelegramButtonLabel(`${ui.premiumChangeRegion}: ${key.name}`, 34),
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
+      },
+      {
+        text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 34),
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
+      },
+    ]);
   }
 
   lines.push(ui.premiumRegionStatusFootnote);
 
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }

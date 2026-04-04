@@ -161,14 +161,14 @@ export async function buildTelegramOrderStatusMessage(input: {
   const statusIcon = formatTelegramOrderStatusIcon(order.status);
   const nextStep = buildTelegramOrderNextStepText(order, ui);
   const stateLine = formatTelegramOrderStateLine(order);
-  const summaryTitle = isMyanmar ? '<b>Order summary</b>' : '<b>Order summary</b>';
-  const currentStateTitle = isMyanmar ? '<b>Current state</b>' : '<b>Current state</b>';
+  const summaryTitle = isMyanmar ? '<b>📦 Order details</b>' : '<b>📦 Order details</b>';
+  const currentStateTitle = isMyanmar ? '<b>📌 Current state</b>' : '<b>📌 Current state</b>';
   const lines = [
     ui.orderStatusTitle,
     '',
     `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
     stateLine ? `🧾 ${escapeHtml(stateLine)}` : '',
-    nextStep ? `${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
+    nextStep ? `👉 ${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
     '',
     currentStateTitle,
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
@@ -230,7 +230,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.paymentMethodLabel) {
-    lines.push('', `<b>${isMyanmar ? 'Payment & review' : 'Payment & review'}</b>`);
+    lines.push('', `<b>${isMyanmar ? '💳 Payment & review' : '💳 Payment & review'}</b>`);
     lines.push(`${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`);
   }
 
@@ -295,19 +295,19 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.customerMessage?.trim()) {
-    lines.push('', `${ui.customerMessage}:`, escapeHtml(order.customerMessage.trim()));
+    lines.push('', `<b>${isMyanmar ? '📝 Customer note' : '📝 Customer note'}</b>`, escapeHtml(order.customerMessage.trim()));
   }
 
   if (order.refundRequestCustomerMessage?.trim()) {
-    lines.push('', `${ui.customerMessage}:`, escapeHtml(order.refundRequestCustomerMessage.trim()));
+    lines.push('', `<b>${isMyanmar ? '📝 Customer note' : '📝 Customer note'}</b>`, escapeHtml(order.refundRequestCustomerMessage.trim()));
   }
 
   if (order.refundRequestStatus === 'PENDING') {
-    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundPendingHelp));
+    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundPendingHelp));
   } else if (order.refundRequestStatus === 'APPROVED') {
-    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundApprovedHelp));
+    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundApprovedHelp));
   } else if (order.refundRequestStatus === 'REJECTED') {
-    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundRejectedHelp));
+    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundRejectedHelp));
   }
 
   if (
@@ -319,7 +319,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   ) {
     lines.push(
       '',
-      `<b>${isMyanmar ? 'Quick help' : 'Quick help'}</b>`,
+      `<b>${isMyanmar ? '🛟 What you can do now' : '🛟 What you can do now'}</b>`,
       escapeHtml(
         order.status === 'AWAITING_PAYMENT_METHOD'
           ? isMyanmar
@@ -340,6 +340,11 @@ export async function buildTelegramOrderStatusMessage(input: {
                 : isMyanmar
                   ? 'ဤ order ကို ပိတ်ထားပါသည်။ အသစ်စရန် /buy သို့မဟုတ် /renew ကို သုံးနိုင်ပါသည်။'
                   : 'This order is closed. Use /buy or /renew to start again.',
+      ),
+      escapeHtml(
+        isMyanmar
+          ? 'အောက်ရှိ buttons များသည် order အခြေအနေနှင့် ကိုက်ညီအောင် ပြောင်းလဲထားပါသည်။'
+          : 'The buttons below are matched to the current order state.',
       ),
     );
   }
@@ -385,7 +390,7 @@ export async function buildTelegramOrderStatusMessage(input: {
             })
         : null;
 
-      lines.push('', `<b>${isMyanmar ? 'Delivered access' : 'Delivered access'}</b>`);
+      lines.push('', `<b>${isMyanmar ? '🔗 Delivered access' : '🔗 Delivered access'}</b>`);
       lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`);
 
       if (sharePageUrl) {
@@ -432,7 +437,7 @@ export async function buildTelegramOrderStatusMessage(input: {
       );
       const poolSummary = formatTelegramDynamicPoolSummary(dynamicKey, ui);
 
-      lines.push('', `<b>${isMyanmar ? 'Delivered access' : 'Delivered access'}</b>`);
+      lines.push('', `<b>${isMyanmar ? '🔗 Delivered access' : '🔗 Delivered access'}</b>`);
       lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`);
       lines.push(`💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`);
       lines.push(`✨ ${ui.premiumStableLink}`);
@@ -458,7 +463,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   if (order.status === 'AWAITING_PAYMENT_PROOF' || order.status === 'PENDING_REVIEW') {
     lines.push(
       '',
-      `<b>${isMyanmar ? 'Need help?' : 'Need help?'}</b>`,
+      `<b>${isMyanmar ? '🛟 Need help?' : '🛟 Need help?'}</b>`,
       ui.orderSupportHint,
     );
   }
