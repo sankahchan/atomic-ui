@@ -654,7 +654,9 @@ export function getTelegramUi(locale: SupportedLocale) {
       ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
       : 'Before approval, you can cancel the current order at any time with /cancel.',
     orderActionPayNow: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Pay now',
+    orderActionAlreadyPaid: isMyanmar ? 'ငွေပေးချေပြီးပါပြီ' : 'I already paid',
     orderActionUploadProof: isMyanmar ? 'Screenshot ပို့ရန်' : 'Upload screenshot',
+    orderActionReplaceProof: isMyanmar ? 'Screenshot အသစ်နဲ့ အစားထိုးရန်' : 'Replace screenshot',
     orderActionCheckStatus: isMyanmar ? 'အခြေအနေ စစ်ရန်' : 'Check status',
     orderActionRequestRefund: isMyanmar ? 'Refund တောင်းဆိုရန်' : 'Request refund',
     orderActionCancel: isMyanmar ? 'Order ပယ်ရန်' : 'Cancel order',
@@ -761,6 +763,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderRejectDuplicateActionLabel: isMyanmar ? 'Duplicate proof' : 'Duplicate proof',
     orderRejectBlurryActionLabel: isMyanmar ? 'Blurry proof' : 'Blurry proof',
     orderRejectWrongAmountActionLabel: isMyanmar ? 'Wrong amount' : 'Wrong amount',
+    orderManualReviewActionLabel: isMyanmar ? 'Panel တွင် စစ်ရန်' : 'Need manual review',
     orderReviewActionUnauthorized: isMyanmar ? 'ဤ action ကို admin များသာ လုပ်နိုင်ပါသည်။' : 'Only admins can perform this action.',
     orderReviewActionApproved: (code: string) =>
       isMyanmar ? `Order ${code} ကို Telegram မှ အတည်ပြုပြီးပါပြီ။` : `Approved order ${code} from Telegram.`,

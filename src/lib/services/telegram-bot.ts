@@ -565,6 +565,7 @@ async function sendTelegramOrderPaymentPromptCard(input: {
       replyMarkup: buildTelegramOrderActionKeyboard({
         order: input.order,
         locale: input.locale,
+        supportLink: input.supportLink,
       }),
     },
   );
@@ -1111,9 +1112,10 @@ function buildTelegramOrderActionKeyboard(input: {
     paymentMethodCode?: string | null;
   };
   locale: SupportedLocale;
+  supportLink?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
-  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   if (input.order.status === 'AWAITING_PAYMENT_METHOD') {
     rows.push([
@@ -1130,14 +1132,19 @@ function buildTelegramOrderActionKeyboard(input: {
   ) {
     rows.push([
       {
-        text: input.order.paymentMethodCode ? ui.orderActionPayNow : ui.orderActionChoosePaymentMethod,
+        text: input.order.paymentMethodCode
+          ? ui.orderActionAlreadyPaid
+          : ui.orderActionChoosePaymentMethod,
         callback_data: buildTelegramOrderActionCallbackData(
           input.order.paymentMethodCode ? 'pay' : 'pm',
           input.order.id,
         ),
       },
       {
-        text: ui.orderActionUploadProof,
+        text:
+          input.order.status === 'PENDING_REVIEW'
+            ? ui.orderActionReplaceProof
+            : ui.orderActionUploadProof,
         callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
     ]);
@@ -1168,6 +1175,15 @@ function buildTelegramOrderActionKeyboard(input: {
     ]);
   }
 
+  if (input.supportLink) {
+    rows.push([
+      {
+        text: ui.getSupport,
+        url: input.supportLink,
+      },
+    ]);
+  }
+
   if (!isTelegramOrderTerminal(input.order.status)) {
     rows.push([
       {
@@ -1192,16 +1208,20 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
     return undefined;
   }
 
+  const supportLink = await getTelegramSupportLink();
+  const supportHandledInKeyboard = ['AWAITING_PAYMENT_PROOF', 'PENDING_REVIEW', 'REJECTED', 'CANCELLED'].includes(
+    input.order.status,
+  );
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     ...(
       buildTelegramOrderActionKeyboard({
         order: input.order,
         locale: input.locale,
+        supportLink: supportHandledInKeyboard ? supportLink : null,
       })?.inline_keyboard || []
     ),
   ];
   const ui = getTelegramUi(input.locale);
-  const supportLink = await getTelegramSupportLink();
 
   if (input.order.status === 'FULFILLED') {
     if ((input.order.priceAmount || 0) > 0) {
@@ -1313,7 +1333,7 @@ async function buildTelegramOrderStatusReplyMarkup(input: {
     }
   }
 
-  if (supportLink && input.order.status !== 'PENDING_REVIEW') {
+  if (supportLink && input.order.status !== 'PENDING_REVIEW' && !supportHandledInKeyboard) {
     rows.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
@@ -1687,9 +1707,13 @@ async function sendTelegramOrderReviewAlert(
     '',
     ...reviewFocusLines,
     '',
-    isMyanmar
-      ? 'မူရင်း screenshot ကို နောက်မက်ဆေ့ခ်ျတွင် copy လုပ်ပေးထားပါမည်။'
-      : 'The original screenshot will be copied into the next admin message.',
+    order.paymentMessageId
+      ? isMyanmar
+        ? 'မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
+        : 'The original screenshot is copied just above this review summary.'
+      : isMyanmar
+        ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
+        : 'The original screenshot could not be copied here, so review it in the panel.',
     '',
     `${ui.orderReviewPanelLabel}: ${panelUrl}`,
   ]
@@ -1697,6 +1721,15 @@ async function sendTelegramOrderReviewAlert(
     .join('\n');
 
   for (const adminChatId of config.adminChatIds) {
+    if (order.paymentMessageId) {
+      await copyTelegramMessage(
+        config.botToken,
+        order.telegramChatId,
+        order.paymentMessageId,
+        adminChatId,
+      );
+    }
+
     await sendTelegramMessage(config.botToken, adminChatId, lines, {
       replyMarkup: {
         inline_keyboard: [
@@ -1726,19 +1759,10 @@ async function sendTelegramOrderReviewAlert(
               callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', order.id),
             },
           ],
-          [{ text: ui.orderReviewPanelLabel, url: panelUrl }],
+          [{ text: ui.orderManualReviewActionLabel, url: panelUrl }],
         ],
       },
     });
-
-    if (order.paymentMessageId) {
-      await copyTelegramMessage(
-        config.botToken,
-        order.telegramChatId,
-        order.paymentMessageId,
-        adminChatId,
-      );
-    }
   }
 }
 
@@ -2577,6 +2601,7 @@ export async function runTelegramSalesOrderCycle() {
                 paymentMethodCode: order.paymentMethodCode,
               },
               locale,
+              supportLink,
             }),
           });
         }
@@ -2718,6 +2743,7 @@ export async function runTelegramSalesOrderCycle() {
             replyMarkup: buildTelegramOrderActionKeyboard({
               order,
               locale,
+              supportLink,
             }),
           },
         );
@@ -2823,6 +2849,7 @@ export async function runTelegramSalesOrderCycle() {
             replyMarkup: buildTelegramOrderActionKeyboard({
               order,
               locale,
+              supportLink,
             }),
           },
         );
@@ -4117,6 +4144,7 @@ export async function rejectTelegramOrder(input: {
           replyMarkup: buildTelegramOrderActionKeyboard({
             order: finalOrder,
             locale,
+            supportLink,
           }),
         },
       );
