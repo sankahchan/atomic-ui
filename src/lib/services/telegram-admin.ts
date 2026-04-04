@@ -544,47 +544,57 @@ export function buildTelegramHelpMessage(input: {
   let message = isMyanmar
     ? `📚 <b>အသုံးပြုနိုင်သော Command များ</b>
 
-/start - Telegram account ကို ချိတ်ဆက်မည်
-/language - ဘာသာစကား ပြောင်းမည်
-/buy - Plan ရွေးပြီး key အသစ် မှာယူမည်
-/trial - ၁ ရက် 3 GB free trial ရယူမည်
+<b>Customer actions</b>
+/buy - key အသစ် မှာယူမည်
+/trial - free trial ရယူမည်
+/renew - လက်ရှိ key ကို သက်တမ်းတိုးမည်
+/mykeys - ချိတ်ထားသော key များကို ကြည့်မည်
 /orders - မိမိ order များကို ကြည့်မည်
 /order [code] - order အခြေအနေ အသေးစိတ်ကြည့်မည်
-/refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
-/usage - အသုံးပြုမှုနှင့် QR/setup အချက်အလက်ကို ရယူမည်
-/mykeys - ချိတ်ထားသော key များနှင့် ID များကို ကြည့်မည်
-/inbox - announcement နှင့် key notice များကို ကြည့်မည်
+
+<b>Updates & support</b>
+/inbox - announcement နှင့် notice များကို ကြည့်မည်
 /notifications - notice preference များကို ပြောင်းမည်
-/premium - premium key support shortcut များကို ကြည့်မည်
+/premium - premium shortcut များကို ကြည့်မည်
 /premiumregion - premium region အခြေအနေကို ကြည့်မည်
 /supportstatus - premium support request အခြေအနေကို ကြည့်မည်
-/sub - Share page များကို လက်ခံမည်
-/support - သတ်မှတ်ထားသော support link ကို ကြည့်မည်
+/support - support link ကို ကြည့်မည်
 /server - normal key အတွက် server ပြောင်းရန် တောင်းဆိုမည်
-/renew - ရှိပြီးသော key ကို plan အလိုက် သက်တမ်းတိုးမည်
+/refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
+
+<b>Utilities</b>
+/usage - အသုံးပြုမှုနှင့် QR/setup info ရယူမည်
+/sub - Share page များကို လက်ခံမည်
+/language - ဘာသာစကား ပြောင်းမည်
 /cancel - လက်ရှိ order ကို ပယ်ဖျက်မည်
+/start - Telegram account ကို ချိတ်ဆက်မည်
 /help - ဤ help စာမျက်နှာကို ပြမည်`
     : `📚 <b>Available Commands</b>
 
-/start - Link your Telegram account
-/language - Change the bot language
+<b>Customer actions</b>
 /buy - Start a new key order
-/trial - Claim the 1-day 3 GB free trial
-/orders - Show your recent orders
-/order [code] - Show one order status
-/refund - Show refund-eligible orders
-/usage - Fetch your usage and QR/setup info
-/mykeys - List linked keys and IDs
-/inbox - Show your recent notices and announcements
-/notifications - Manage your notice preferences
-/premium - Open premium support shortcuts
-/premiumregion - View premium region health
-/supportstatus - Check your premium support request status
-/sub - Receive your share pages
-/support - Show the configured support link
-/server - Request a server change for a normal key
+/trial - Claim the free trial
 /renew - Renew one of your existing keys
+/mykeys - List your linked keys
+/orders - Show your recent orders
+/order [code] - Show one order in detail
+
+<b>Updates & support</b>
+/inbox - Show announcements and notices
+/notifications - Manage notice preferences
+/premium - Open premium shortcuts
+/premiumregion - View premium region health
+/supportstatus - Check your premium support request
+/support - Show the support link
+/server - Request a server change for a normal key
+/refund - Show refund-eligible orders
+
+<b>Utilities</b>
+/usage - Fetch usage and QR/setup info
+/sub - Receive your share pages
+/language - Change the bot language
 /cancel - Cancel the current order
+/start - Link your Telegram account
 /help - Show this help message`;
 
   if (input.isAdmin) {

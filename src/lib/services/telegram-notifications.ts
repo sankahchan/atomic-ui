@@ -6,7 +6,14 @@ import {
   getTelegramNotificationPreferences,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
-import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
+import {
+  escapeHtml,
+  formatTelegramDateTime,
+  formatTelegramPremiumFollowUpState,
+  formatTelegramPremiumSupportTypeLabel,
+  formatTelegramRefundRequestStatusLabel,
+  getTelegramUi,
+} from '@/lib/services/telegram-ui';
 
 export function buildTelegramNotificationPreferencesKeyboard(
   locale: SupportedLocale,
@@ -131,6 +138,7 @@ export async function handleInboxCommand(input: {
       take: 12,
     }),
   ]);
+  const ui = getTelegramUi(input.locale);
 
   const keyLogs = accessKeys.length
     ? await db.notificationLog.findMany({
@@ -150,6 +158,36 @@ export async function handleInboxCommand(input: {
         take: 5,
       })
     : [];
+  const [refundUpdates, premiumSupportUpdates] = mode === 'ALL'
+    ? await Promise.all([
+        db.telegramOrder.findMany({
+          where: {
+            OR: [{ telegramChatId: chatIdValue }, { telegramUserId: telegramUserIdValue }],
+            refundRequestStatus: { in: ['PENDING', 'APPROVED', 'REJECTED'] },
+          },
+          orderBy: [{ refundRequestedAt: 'desc' }, { updatedAt: 'desc' }],
+          take: 4,
+        }),
+        db.telegramPremiumSupportRequest.findMany({
+          where: {
+            OR: [{ telegramChatId: chatIdValue }, { telegramUserId: telegramUserIdValue }],
+          },
+          include: {
+            dynamicAccessKey: {
+              select: {
+                name: true,
+              },
+            },
+            replies: {
+              orderBy: { createdAt: 'asc' },
+              take: 6,
+            },
+          },
+          orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+          take: 4,
+        }),
+      ])
+    : [[], []];
 
   const unreadAnnouncementIds = announcements
     .filter((delivery) => delivery.readAt == null)
@@ -177,8 +215,8 @@ export async function handleInboxCommand(input: {
     input.locale === 'my' ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>',
     '',
     input.locale === 'my'
-      ? `Announcement ${announcements.length} ခု • Key notice ${mode === 'ALL' ? keyLogs.length : 0} ခု`
-      : `${announcements.length} announcement(s) • ${mode === 'ALL' ? keyLogs.length : 0} key notice(s)`,
+      ? `Announcement ${announcements.length} ခု • Support ${premiumSupportUpdates.length} ခု • Finance ${refundUpdates.length} ခု`
+      : `${announcements.length} announcement(s) • ${premiumSupportUpdates.length} support update(s) • ${refundUpdates.length} finance update(s)`,
     '',
   ];
 
@@ -201,6 +239,32 @@ export async function handleInboxCommand(input: {
         `• ${delivery.isPinned ? '📌 ' : ''}<b>${escapeHtml(delivery.announcement.title)}</b>`,
         `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale)}`,
         `  ${delivery.readAt ? '✅' : '🆕'} ${delivery.readAt ? (input.locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (input.locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
+      );
+    }
+    lines.push('');
+  }
+
+  if (premiumSupportUpdates.length && mode === 'ALL') {
+    lines.push(input.locale === 'my' ? '<b>Support updates</b>' : '<b>Support updates</b>');
+    for (const request of premiumSupportUpdates) {
+      lines.push(
+        `• <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
+        `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
+        `  ${formatTelegramDateTime(request.updatedAt || request.createdAt, input.locale)}`,
+      );
+    }
+    lines.push('');
+  }
+
+  if (refundUpdates.length && mode === 'ALL') {
+    lines.push(input.locale === 'my' ? '<b>Refund & finance updates</b>' : '<b>Refund & finance updates</b>');
+    for (const order of refundUpdates) {
+      lines.push(
+        `• <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
+          formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui),
+        )}`,
+        `  ${order.planName ? escapeHtml(order.planName) : escapeHtml(order.kind)}`,
+        `  ${formatTelegramDateTime(order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt, input.locale)}`,
       );
     }
     lines.push('');

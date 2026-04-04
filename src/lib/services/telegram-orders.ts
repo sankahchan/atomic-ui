@@ -157,15 +157,23 @@ export async function buildTelegramOrderStatusMessage(input: {
 
   const locale = input.locale;
   const ui = getTelegramUi(locale);
+  const isMyanmar = locale === 'my';
+  const statusIcon = formatTelegramOrderStatusIcon(order.status);
+  const nextStep = buildTelegramOrderNextStepText(order, ui);
+  const summaryTitle = isMyanmar ? '<b>Order summary</b>' : '<b>Order summary</b>';
+  const currentStateTitle = isMyanmar ? '<b>Current state</b>' : '<b>Current state</b>';
   const lines = [
     ui.orderStatusTitle,
     '',
+    `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
+    nextStep ? `➡️ ${escapeHtml(nextStep)}` : '',
+    '',
+    currentStateTitle,
     `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
-    `${ui.statusLineLabel}: <b>${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(
-      formatTelegramOrderStatusLabel(order.status, ui),
-    )}</b>`,
     `${ui.orderTypeLabel}: ${escapeHtml(formatTelegramOrderKindLabel(order.kind, ui))}`,
   ];
+
+  lines.push('', summaryTitle);
 
   if (order.planName || order.planCode) {
     lines.push(`${ui.planLabel}: <b>${escapeHtml(order.planName || order.planCode || '')}</b>`);
@@ -292,19 +300,14 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.refundRequestStatus === 'PENDING') {
-    lines.push('', escapeHtml(ui.refundPendingHelp));
+    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundPendingHelp));
   } else if (order.refundRequestStatus === 'APPROVED') {
-    lines.push('', escapeHtml(ui.refundApprovedHelp));
+    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundApprovedHelp));
   } else if (order.refundRequestStatus === 'REJECTED') {
-    lines.push('', escapeHtml(ui.refundRejectedHelp));
+    lines.push('', `<b>${isMyanmar ? 'Finance update' : 'Finance update'}</b>`, escapeHtml(ui.refundRejectedHelp));
   }
 
   lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
-
-  const nextStep = buildTelegramOrderNextStepText(order, ui);
-  if (nextStep) {
-    lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
-  }
 
   const relatedAccessKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
   if (relatedAccessKeyId) {
@@ -414,7 +417,11 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.status === 'AWAITING_PAYMENT_PROOF' || order.status === 'PENDING_REVIEW') {
-    lines.push('', ui.orderSupportHint);
+    lines.push(
+      '',
+      `<b>${isMyanmar ? 'Need help?' : 'Need help?'}</b>`,
+      ui.orderSupportHint,
+    );
   }
 
   return lines.join('\n');

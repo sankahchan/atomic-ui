@@ -55,6 +55,7 @@ import {
   buildTelegramOrderTimelineLines,
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
   getDynamicKeyRegionChoices,
   formatTelegramOrderKindLabel,
@@ -373,8 +374,13 @@ function buildTelegramSalesPaymentPrompt(input: {
   priceCurrency?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const lines = [
-    ui.orderCodeLabel + `: <b>${escapeHtml(input.orderCode)}</b>`,
+    isMyanmar
+      ? `💳 <b>ငွေပေးချေမှု အဆင့် · ${escapeHtml(input.orderCode)}</b>`
+      : `💳 <b>Payment step · ${escapeHtml(input.orderCode)}</b>`,
+    '',
+    isMyanmar ? '<b>Order summary</b>' : '<b>Order summary</b>',
     `${ui.planLabel}: <b>${escapeHtml(input.planSummary)}</b>`,
   ];
 
@@ -407,15 +413,23 @@ function buildTelegramSalesPaymentPrompt(input: {
 
   lines.push(
     '',
-    `${ui.paymentInstructionsLabel}:`,
-    escapeHtml(input.paymentInstructions),
+    isMyanmar ? '<b>လုပ်ဆောင်ရန် အဆင့်များ</b>' : '<b>What to do now</b>',
+    isMyanmar
+      ? '1. အောက်ပါ payment method ထဲမှ သင်သုံးမည့်နည်းလမ်းကို ရွေးပါ။'
+      : '1. Choose the payment method you will use below.',
+    isMyanmar
+      ? '2. ပေးချေပြီးနောက် screenshot ကို ဤ chat ထဲသို့ ပြန်ပို့ပါ။'
+      : '2. Complete the payment and send the screenshot back in this chat.',
+    isMyanmar
+      ? '3. Admin approval ပြီးသည်နှင့် access details ကို ဤနေရာတွင် ပို့ပေးပါမည်။'
+      : '3. After admin approval, your access details will be delivered here.',
   );
 
   const paymentMethods = input.paymentMethod
     ? [input.paymentMethod]
     : (input.paymentMethods || []).filter((method) => method.enabled);
   if (paymentMethods.length > 0) {
-    lines.push('', `${ui.paymentMethodsLabel}:`);
+    lines.push('', `<b>${ui.paymentMethodsLabel}</b>`);
     for (const method of paymentMethods) {
       const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
       const note = resolveTelegramSalesPaymentMethodNote(method, input.locale);
@@ -431,14 +445,30 @@ function buildTelegramSalesPaymentPrompt(input: {
       }
     }
   } else if (input.paymentMethodLabel?.trim()) {
-    lines.push('', `${ui.paymentMethodLabel}: <b>${escapeHtml(input.paymentMethodLabel.trim())}</b>`);
+    lines.push('', `<b>${ui.paymentMethodLabel}</b>: <b>${escapeHtml(input.paymentMethodLabel.trim())}</b>`);
   }
+
+  lines.push('', `<b>${ui.paymentInstructionsLabel}</b>`, escapeHtml(input.paymentInstructions));
 
   if (input.supportLink) {
     lines.push('', `${ui.supportLabel}: ${escapeHtml(input.supportLink)}`);
   }
 
-  lines.push('', ui.paymentProofRequired);
+  lines.push(
+    '',
+    isMyanmar ? '<b>Screenshot checklist</b>' : '<b>Screenshot checklist</b>',
+    isMyanmar
+      ? '• Amount, transfer ID, payment time ကို ရှင်းလင်းစွာ မြင်ရပါမည်။'
+      : '• Make sure the amount, transfer ID, and payment time are clearly visible.',
+    isMyanmar
+      ? '• Photo သို့မဟုတ် document အဖြစ် ပို့နိုင်ပါသည်။'
+      : '• You can send it as a photo or a document.',
+    isMyanmar
+      ? '• Screenshot ပို့ပြီးနောက် ထပ်မံမပို့ဘဲ review စောင့်ပါ။'
+      : '• After uploading, wait for review instead of sending duplicates.',
+    '',
+    ui.paymentProofRequired,
+  );
 
   return lines.join('\n');
 }
@@ -990,8 +1020,10 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
   priceCurrency?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const lines = [
     ui.orderPaymentMethodPrompt(input.orderCode),
+    '',
     `${ui.planLabel}: <b>${escapeHtml(input.planSummary)}</b>`,
   ];
 
@@ -1023,6 +1055,10 @@ function buildTelegramPaymentMethodSelectionPromptText(input: {
   }
 
   lines.push(
+    '',
+    isMyanmar
+      ? 'အောက်ပါနည်းလမ်းထဲမှ တစ်ခုကို နှိပ်ပါ။ Button မသုံးနိုင်ပါက နံပါတ်ဖြင့် reply လုပ်နိုင်ပါသည်။'
+      : 'Tap one of the methods below. If buttons are not available, reply with the method number.',
     '',
     ...input.methods.flatMap((method, index) => {
       const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
@@ -1593,21 +1629,45 @@ async function sendTelegramOrderReviewAlert(
 
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
+  const isMyanmar = locale === 'my';
   const panelUrl = await buildTelegramOrderPanelUrl(order.id);
+  const reviewFocusLines = isMyanmar
+    ? [
+        '<b>Review checklist</b>',
+        '• screenshot ရှင်းလင်းမှု',
+        '• amount / method / plan ကိုက်ညီမှု',
+        '• duplicate proof warning ရှိ/မရှိ',
+      ]
+    : [
+        '<b>Review checklist</b>',
+        '• screenshot clarity',
+        '• amount / method / plan match',
+        '• duplicate-proof warning',
+      ];
   const lines = [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
     '',
-    `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
+    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
+    order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
     `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
     `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
+    order.paymentSubmittedAt
+      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
+      : '',
     `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
       : '',
-    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
-    order.planName ? `${ui.planLabel}: <b>${escapeHtml(order.planName)}</b>` : '',
     order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
     order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
+    '',
+    ...reviewFocusLines,
+    '',
+    isMyanmar
+      ? 'မူရင်း screenshot ကို နောက်မက်ဆေ့ခ်ျတွင် copy လုပ်ပေးထားပါမည်။'
+      : 'The original screenshot will be copied into the next admin message.',
     '',
     `${ui.orderReviewPanelLabel}: ${panelUrl}`,
   ]
