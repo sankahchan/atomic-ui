@@ -45,6 +45,7 @@ const publicRoutes = [
   '/api/finance/receipt',   // Printable public receipt/refund confirmation
   '/api/telegram/announcements/', // Public announcement open/click tracking
   '/api/telegram/webhook',  // Telegram webhook from external service
+  '/telegram/',             // Public Telegram help/proof example media
   '/api/trpc/auth.login',   // Login API endpoint
   '/api/trpc/auth.getAdminLoginApprovalStatus',
   '/api/trpc/auth.completeAdminLoginApproval',
