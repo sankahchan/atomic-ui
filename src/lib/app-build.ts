@@ -6,6 +6,15 @@ export type AppBuildInfo = {
   builtAt: string | null;
 };
 
+function getPreferredBuildId() {
+  return (
+    process.env.NEXT_PUBLIC_APP_VERSION?.trim() ||
+    process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
+    process.env.npm_package_version?.trim() ||
+    ''
+  );
+}
+
 function resolveBuildIdCandidates() {
   const cwd = process.cwd();
   return [
@@ -16,6 +25,8 @@ function resolveBuildIdCandidates() {
 }
 
 export function getAppBuildInfo(): AppBuildInfo {
+  const preferredBuildId = getPreferredBuildId();
+
   for (const candidate of resolveBuildIdCandidates()) {
     try {
       if (!fs.existsSync(candidate)) {
@@ -25,7 +36,7 @@ export function getAppBuildInfo(): AppBuildInfo {
       const buildId = fs.readFileSync(candidate, 'utf8').trim();
       const stat = fs.statSync(candidate);
       return {
-        buildId: buildId || 'unknown',
+        buildId: preferredBuildId || buildId || 'unknown',
         builtAt: Number.isFinite(stat.mtimeMs) ? new Date(stat.mtimeMs).toISOString() : null,
       };
     } catch {
@@ -34,11 +45,7 @@ export function getAppBuildInfo(): AppBuildInfo {
   }
 
   return {
-    buildId:
-      process.env.NEXT_PUBLIC_APP_VERSION ||
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      process.env.npm_package_version ||
-      'unknown',
+    buildId: preferredBuildId || 'unknown',
     builtAt: null,
   };
 }
