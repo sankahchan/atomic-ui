@@ -2,10 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
 import si from 'systeminformation';
+import {
+  hasFinanceManageScope,
+  hasOutageManageScope,
+  hasTelegramAnnouncementManageScope,
+  hasTelegramReviewManageScope,
+} from '@/lib/admin-scope';
 import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
-import { getCommandKeyboard } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramMenuCallbackData,
+  getCommandKeyboard,
+} from '@/lib/services/telegram-callbacks';
 import { type TelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import {
   sendServerIssueNoticeToTelegram,
@@ -538,9 +547,71 @@ export async function handleServerRecoveredCommand(argsText: string, locale: Sup
     : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
 }
 
+function buildTelegramAdminHomeKeyboard(input: {
+  locale: SupportedLocale;
+  adminActor: TelegramAdminActor;
+}) {
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+  const isMyanmar = input.locale === 'my';
+
+  if (hasTelegramReviewManageScope(input.adminActor.scope)) {
+    rows.push([
+      {
+        text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
+        callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
+      },
+      {
+        text: isMyanmar ? '🛟 Support queue' : '🛟 Support queue',
+        callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
+      },
+    ]);
+  }
+
+  if (hasFinanceManageScope(input.adminActor.scope)) {
+    rows.push([
+      {
+        text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+        callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
+      },
+      {
+        text: isMyanmar ? '💼 Finance' : '💼 Finance',
+        callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
+      },
+    ]);
+  }
+
+  if (hasTelegramAnnouncementManageScope(input.adminActor.scope)) {
+    rows.push([
+      {
+        text: isMyanmar ? '📢 Broadcasts' : '📢 Broadcasts',
+        callback_data: buildTelegramMenuCallbackData('admin', 'announcements'),
+      },
+    ]);
+  }
+
+  const lastRow: Array<{ text: string; callback_data: string }> = [];
+  if (hasOutageManageScope(input.adminActor.scope)) {
+    lastRow.push({
+      text: isMyanmar ? '🚨 Server notices' : '🚨 Server notices',
+      callback_data: buildTelegramMenuCallbackData('admin', 'servernotices'),
+    });
+  }
+  lastRow.push({
+    text: isMyanmar ? '📊 Status' : '📊 Status',
+    callback_data: buildTelegramMenuCallbackData('admin', 'status'),
+  });
+  rows.push(lastRow);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
 export async function handleAdminHomeCommand(input: {
   locale: SupportedLocale;
   adminActor: TelegramAdminActor;
+  botToken?: string;
+  chatId?: string | number | null;
 }) {
   const isMyanmar = input.locale === 'my';
   const [pendingReview, unclaimedReview, pendingRefunds, myRefunds, scheduledAnnouncements, failedDeliveries] =
@@ -581,7 +652,7 @@ export async function handleAdminHomeCommand(input: {
       }),
     ]);
 
-  return [
+  const message = [
     isMyanmar ? '🧭 <b>Admin home</b>' : '🧭 <b>Admin home</b>',
     '',
     input.adminActor.email
@@ -610,6 +681,18 @@ export async function handleAdminHomeCommand(input: {
     '• /finance',
     '• /status',
   ].join('\n');
+
+  if (input.botToken && input.chatId != null) {
+    await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramAdminHomeKeyboard({
+        locale: input.locale,
+        adminActor: input.adminActor,
+      }),
+    });
+    return null;
+  }
+
+  return message;
 }
 
 export function buildTelegramHelpMessage(input: {
@@ -693,6 +776,7 @@ export function buildTelegramHelpMessage(input: {
 /announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
 /announcehistory - announcement history ကို ကြည့်မည်
 /scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
+/supportqueue [admin|user] - premium support thread queue ကို chat ထဲတွင် ဖွင့်မည်
 /finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
 /sendfinance - Finance digest ကို ယခုချက်ချင်း ပို့မည်
 /refunds - pending refund request များကို ကြည့်မည်
@@ -718,6 +802,7 @@ export function buildTelegramHelpMessage(input: {
 /announcements - Show recent announcements
 /announcehistory - Show recent announcement history
 /scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
+/supportqueue [admin|user] - Open the premium support thread queue in chat
 /finance - Show the finance summary
 /sendfinance - Send the finance digest now
 /refunds - Show pending refund requests

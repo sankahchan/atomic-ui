@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildTelegramMenuCallbackData,
   buildTelegramOrderReviewCallbackData,
+  buildTelegramSupportQueueCallbackData,
   getCommandKeyboard,
   normalizeTelegramReplyKeyboardCommand,
+  parseTelegramMenuCallbackData,
   parseTelegramOrderReviewCallbackData,
+  parseTelegramSupportQueueCallbackData,
   resolveTelegramRetentionSourceFromRenewAction,
 } from '@/lib/services/telegram-callbacks';
 
@@ -42,6 +46,7 @@ test('telegram order review callbacks support quick reject presets', () => {
   assert.deepEqual(parseTelegramOrderReviewCallbackData(data), {
     action: 'reject_duplicate',
     orderId: 'ord_123',
+    secondary: null,
   });
 
   assert.deepEqual(
@@ -51,6 +56,7 @@ test('telegram order review callbacks support quick reject presets', () => {
     {
       action: 'reject_blurry',
       orderId: 'ord_456',
+      secondary: null,
     },
   );
 
@@ -61,6 +67,44 @@ test('telegram order review callbacks support quick reject presets', () => {
     {
       action: 'reject_wrong_amount',
       orderId: 'ord_789',
+      secondary: null,
+    },
+  );
+});
+
+test('telegram menu callbacks support admin and inbox/offers filters', () => {
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('admin', 'supportqueue_user')),
+    {
+      section: 'admin',
+      action: 'supportqueue_user',
+    },
+  );
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('inbox', 'premium')),
+    {
+      section: 'inbox',
+      action: 'premium',
+    },
+  );
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('offers', 'unavailable')),
+    {
+      section: 'offers',
+      action: 'unavailable',
+    },
+  );
+});
+
+test('telegram support queue callbacks preserve queue mode secondary', () => {
+  assert.deepEqual(
+    parseTelegramSupportQueueCallbackData(
+      buildTelegramSupportQueueCallbackData('nx', 'req_123', 'user'),
+    ),
+    {
+      action: 'nx',
+      requestId: 'req_123',
+      secondary: 'user',
     },
   );
 });

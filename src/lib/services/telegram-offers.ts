@@ -4,13 +4,34 @@ import {
   formatTelegramSalesMoneyAmount,
   type TelegramCampaignCouponType,
 } from '@/lib/services/telegram-coupons';
-import { buildTelegramOrderActionCallbackData } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramMenuCallbackData,
+  buildTelegramOrderActionCallbackData,
+} from '@/lib/services/telegram-callbacks';
 import { getTelegramSupportLink, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { escapeHtml, formatTelegramDateTime, getTelegramUi } from '@/lib/services/telegram-ui';
 
 type TelegramOfferRecord = Awaited<
   ReturnType<typeof db.telegramCouponRedemption.findMany>
 >[number];
+
+type TelegramOffersFilter = 'ALL' | 'ACTIVE' | 'USED' | 'UNAVAILABLE';
+
+function parseTelegramOffersFilter(argsText?: string | null): TelegramOffersFilter {
+  const normalized = argsText?.trim().toLowerCase() || '';
+  switch (normalized) {
+    case 'active':
+      return 'ACTIVE';
+    case 'used':
+      return 'USED';
+    case 'unavailable':
+    case 'expired':
+    case 'revoked':
+      return 'UNAVAILABLE';
+    default:
+      return 'ALL';
+  }
+}
 
 function resolveTelegramOfferCampaignLabel(
   campaignType: string,
@@ -95,6 +116,7 @@ function resolveTelegramOfferCallbackSource(
 
 function buildTelegramOffersKeyboard(input: {
   locale: SupportedLocale;
+  filter: TelegramOffersFilter;
   activeOffers: Array<
     TelegramOfferRecord & {
       accessKeyName?: string | null;
@@ -105,6 +127,17 @@ function buildTelegramOffersKeyboard(input: {
 }) {
   const ui = getTelegramUi(input.locale);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  const filterChip = (filter: TelegramOffersFilter, label: string) => ({
+    text: input.filter === filter ? `• ${label}` : label,
+    callback_data: buildTelegramMenuCallbackData('offers', filter.toLowerCase()),
+  });
+
+  rows.push([
+    filterChip('ALL', 'All'),
+    filterChip('ACTIVE', 'Active'),
+    filterChip('USED', 'Used'),
+    filterChip('UNAVAILABLE', 'Unavailable'),
+  ]);
 
   for (const offer of input.activeOffers.slice(0, 4)) {
     const callbackSource = resolveTelegramOfferCallbackSource(offer.campaignType);
@@ -156,10 +189,12 @@ export async function handleOffersCommand(input: {
   telegramUserId: number;
   locale: SupportedLocale;
   botToken: string;
+  argsText?: string;
 }) {
   const chatIdValue = String(input.chatId);
   const telegramUserIdValue = String(input.telegramUserId);
   const ui = getTelegramUi(input.locale);
+  const filter = parseTelegramOffersFilter(input.argsText);
   const offers = await db.telegramCouponRedemption.findMany({
     where: {
       OR: [
@@ -170,12 +205,6 @@ export async function handleOffersCommand(input: {
     orderBy: [{ updatedAt: 'desc' }, { issuedAt: 'desc' }],
     take: 12,
   });
-
-  if (offers.length === 0) {
-    return input.locale === 'my'
-      ? '🎟 <b>Offer wallet</b>\n\nActive promo မရှိသေးပါ။ Trial, renewal, or promo announcements ရရှိသည့်အခါ ဒီနေရာမှာ တစ်နေရာတည်းမှာ ပြသပေးပါမည်။'
-      : '🎟 <b>Offer wallet</b>\n\nThere are no active offers yet. Trial, renewal, and promo coupons will appear here in one place.';
-  }
 
   const accessKeyIds = Array.from(
     new Set(offers.map((offer) => offer.accessKeyId).filter((value): value is string => Boolean(value))),
@@ -218,6 +247,21 @@ export async function handleOffersCommand(input: {
         offer.expiresAt.getTime() <= Date.now()),
   );
 
+  if (offers.length === 0) {
+    const emptyMessage = input.locale === 'my'
+      ? '🎟 <b>Offer wallet</b>\n\nActive promo မရှိသေးပါ။ Trial, renewal, or promo announcements ရရှိသည့်အခါ ဒီနေရာမှာ တစ်နေရာတည်းမှာ ပြသပေးပါမည်။'
+      : '🎟 <b>Offer wallet</b>\n\nThere are no active offers yet. Trial, renewal, and promo coupons will appear here in one place.';
+    const sent = await sendTelegramMessage(input.botToken, input.chatId, emptyMessage, {
+      replyMarkup: buildTelegramOffersKeyboard({
+        locale: input.locale,
+        filter,
+        activeOffers: [],
+        supportLink,
+      }),
+    });
+    return sent ? null : emptyMessage;
+  }
+
   const lines = [
     input.locale === 'my' ? '🎟 <b>Offer wallet</b>' : '🎟 <b>Offer wallet</b>',
     '',
@@ -227,7 +271,7 @@ export async function handleOffersCommand(input: {
     '',
   ];
 
-  if (activeOffers.length > 0) {
+  if ((filter === 'ALL' || filter === 'ACTIVE') && activeOffers.length > 0) {
     lines.push(input.locale === 'my' ? '<b>Active offers</b>' : '<b>Active offers</b>');
     for (const offer of activeOffers) {
       const offerLabel =
@@ -260,7 +304,7 @@ export async function handleOffersCommand(input: {
     lines.push('');
   }
 
-  if (usedOffers.length > 0) {
+  if ((filter === 'ALL' || filter === 'USED') && usedOffers.length > 0) {
     lines.push(input.locale === 'my' ? '<b>Used recently</b>' : '<b>Used recently</b>');
     for (const offer of usedOffers) {
       lines.push(
@@ -278,7 +322,7 @@ export async function handleOffersCommand(input: {
     lines.push('');
   }
 
-  if (inactiveOffers.length > 0) {
+  if ((filter === 'ALL' || filter === 'UNAVAILABLE') && inactiveOffers.length > 0) {
     lines.push(input.locale === 'my' ? '<b>Unavailable now</b>' : '<b>Unavailable now</b>');
     for (const offer of inactiveOffers.slice(0, 3)) {
       lines.push(
@@ -300,6 +344,7 @@ export async function handleOffersCommand(input: {
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: buildTelegramOffersKeyboard({
       locale: input.locale,
+      filter,
       activeOffers: activeOffers.map((offer) => ({
         ...offer,
         accessKeyName: offer.accessKeyId ? accessKeyNames.get(offer.accessKeyId) || null : null,

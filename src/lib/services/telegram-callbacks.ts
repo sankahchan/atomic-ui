@@ -3,6 +3,8 @@ import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 export type TelegramLocaleSelectorContext = 'start' | 'switch';
 export type TelegramOrderReviewAction =
   | 'approve'
+  | 'claim'
+  | 'next'
   | 'reject'
   | 'reject_duplicate'
   | 'reject_blurry'
@@ -18,10 +20,35 @@ export type TelegramOrderUserAction =
   | 'rf'
   | 'ca'
   | 'by'
-  | 'rt';
+  | 'rt'
+  | 'sh'
+  | 'rc';
 export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
+export type TelegramMenuSection = 'admin' | 'inbox' | 'offers';
+export type TelegramAdminMenuAction =
+  | 'home'
+  | 'reviewqueue'
+  | 'reviewqueue_mine'
+  | 'reviewqueue_unclaimed'
+  | 'refunds'
+  | 'announcements'
+  | 'finance'
+  | 'status'
+  | 'servernotices'
+  | 'supportqueue';
+export type TelegramInboxMenuAction =
+  | 'all'
+  | 'unread'
+  | 'pinned'
+  | 'orders'
+  | 'support'
+  | 'refunds'
+  | 'announcements'
+  | 'premium';
+export type TelegramOffersMenuAction = 'all' | 'active' | 'used' | 'unavailable';
+export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx';
 export type TelegramNotificationPreferenceKey =
   | 'promo'
   | 'maintenance'
@@ -49,6 +76,8 @@ const TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX = 'server-review';
 const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
+const TELEGRAM_MENU_CALLBACK_PREFIX = 'tgmenu';
+const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
 
 type TelegramCommandShortcut = {
   command: string;
@@ -207,8 +236,11 @@ export function parseTelegramLocaleCallbackData(data?: string | null) {
 export function buildTelegramOrderReviewCallbackData(
   action: TelegramOrderReviewAction,
   orderId: string,
+  secondary?: string,
 ) {
-  return `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}`;
+  return secondary
+    ? `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}:${secondary}`
+    : `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}`;
 }
 
 export function parseTelegramOrderReviewCallbackData(data?: string | null) {
@@ -217,13 +249,17 @@ export function parseTelegramOrderReviewCallbackData(data?: string | null) {
   }
 
   const parts = data.split(':');
-  if (parts.length !== 3 || parts[0] !== TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX) {
+  if (parts.length < 3 || parts.length > 4 || parts[0] !== TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX) {
     return null;
   }
 
   const action =
     parts[1] === 'approve'
       ? 'approve'
+      : parts[1] === 'claim'
+        ? 'claim'
+        : parts[1] === 'next'
+          ? 'next'
       : parts[1] === 'reject'
         ? 'reject'
         : parts[1] === 'reject_duplicate'
@@ -242,6 +278,7 @@ export function parseTelegramOrderReviewCallbackData(data?: string | null) {
   return {
     action,
     orderId,
+    secondary: parts[3]?.trim() || null,
   } as const;
 }
 
@@ -266,7 +303,7 @@ export function parseTelegramOrderActionCallbackData(data?: string | null) {
   }
 
   const action = parts[1];
-  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'rf', 'ca', 'by', 'rt'].includes(action)) {
+  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'rf', 'ca', 'by', 'rt', 'sh', 'rc'].includes(action)) {
     return null;
   }
 
@@ -457,5 +494,84 @@ export function parseTelegramNotificationPreferenceCallbackData(data?: string | 
   return {
     preference: preference as TelegramNotificationPreferenceKey,
     enabled: parts[2] === 'on',
+  } as const;
+}
+
+export function buildTelegramMenuCallbackData(
+  section: TelegramMenuSection,
+  action: string,
+) {
+  return `${TELEGRAM_MENU_CALLBACK_PREFIX}:${section}:${action}`;
+}
+
+export function parseTelegramMenuCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== TELEGRAM_MENU_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const section =
+    parts[1] === 'admin'
+      ? 'admin'
+      : parts[1] === 'inbox'
+        ? 'inbox'
+        : parts[1] === 'offers'
+          ? 'offers'
+          : null;
+
+  if (!section) {
+    return null;
+  }
+
+  return {
+    section,
+    action: parts[2]?.trim() || '',
+  } as const;
+}
+
+export function buildTelegramSupportQueueCallbackData(
+  action: TelegramSupportQueueAction,
+  requestId: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX}:${action}:${requestId}:${secondary}`
+    : `${TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX}:${action}:${requestId}`;
+}
+
+export function parseTelegramSupportQueueCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts.length > 4 || parts[0] !== TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action =
+    parts[1] === 'wk'
+      ? 'wk'
+      : parts[1] === 'nd'
+        ? 'nd'
+        : parts[1] === 'hd'
+          ? 'hd'
+          : parts[1] === 'nx'
+            ? 'nx'
+            : null;
+  const requestId = parts[2]?.trim();
+
+  if (!action || !requestId) {
+    return null;
+  }
+
+  return {
+    action,
+    requestId,
+    secondary: parts[3]?.trim() || null,
   } as const;
 }

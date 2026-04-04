@@ -1,7 +1,10 @@
 import type { SupportedLocale } from '@/lib/i18n/config';
 import { db } from '@/lib/db';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
-import { buildTelegramNotificationPreferenceCallbackData } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramMenuCallbackData,
+  buildTelegramNotificationPreferenceCallbackData,
+} from '@/lib/services/telegram-callbacks';
 import {
   getTelegramNotificationPreferenceLabel,
   getTelegramNotificationPreferences,
@@ -113,6 +116,32 @@ function buildTelegramInboxTip(mode: TelegramInboxMode, locale: SupportedLocale)
     : 'Tip: use /inbox to switch back to the combined view.';
 }
 
+function buildTelegramInboxKeyboard(locale: SupportedLocale, mode: TelegramInboxMode) {
+  const option = (targetMode: TelegramInboxMode, label: string) => ({
+    text: mode === targetMode ? `• ${label}` : label,
+    callback_data: buildTelegramMenuCallbackData('inbox', targetMode.toLowerCase()),
+  });
+
+  return {
+    inline_keyboard: [
+      [
+        option('ALL', 'All'),
+        option('ORDERS', 'Orders'),
+        option('SUPPORT', 'Support'),
+      ],
+      [
+        option('REFUNDS', 'Refunds'),
+        option('ANNOUNCEMENTS', 'Announcements'),
+        option('PREMIUM', 'Premium'),
+      ],
+      [
+        option('UNREAD', 'Unread'),
+        option('PINNED', 'Pinned'),
+      ],
+    ],
+  };
+}
+
 function formatTelegramInboxRoutingEventLabel(
   eventType: string,
   locale: SupportedLocale,
@@ -217,7 +246,8 @@ export async function handleInboxCommand(input: {
   telegramUserId: number;
   argsText: string;
   locale: SupportedLocale;
-}): Promise<string> {
+  botToken?: string;
+}): Promise<string | null> {
   const chatIdValue = String(input.chatId);
   const telegramUserIdValue = String(input.telegramUserId);
   const mode = parseTelegramInboxMode(input.argsText);
@@ -403,7 +433,14 @@ export async function handleInboxCommand(input: {
     premiumRoutingEvents.length > 0;
 
   if (!hasAnyUpdate) {
-    return buildTelegramInboxEmptyMessage(mode, input.locale);
+    const emptyMessage = buildTelegramInboxEmptyMessage(mode, input.locale);
+    if (input.botToken) {
+      await sendTelegramMessage(input.botToken, input.chatId, emptyMessage, {
+        replyMarkup: buildTelegramInboxKeyboard(input.locale, mode),
+      });
+      return null;
+    }
+    return emptyMessage;
   }
 
   const dynamicKeyNameById = new Map(dynamicKeys.map((key) => [key.id, key.name]));
@@ -581,5 +618,13 @@ export async function handleInboxCommand(input: {
     buildTelegramInboxTip(mode, input.locale),
   );
 
-  return lines.join('\n');
+  const message = lines.join('\n');
+  if (input.botToken) {
+    await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramInboxKeyboard(input.locale, mode),
+    });
+    return null;
+  }
+
+  return message;
 }
