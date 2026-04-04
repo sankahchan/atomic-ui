@@ -63,6 +63,91 @@ export async function resolveAdminKeyQuery(query: string) {
   };
 }
 
+export async function getTelegramReviewQueueSnapshot(input: {
+  reviewerUserId?: string | null;
+  mode?: 'all' | 'mine' | 'unclaimed';
+  limit?: number;
+}) {
+  const mode = input.mode || 'all';
+  const listWhere =
+    mode === 'mine'
+      ? input.reviewerUserId
+        ? {
+            status: 'PENDING_REVIEW' as const,
+            assignedReviewerUserId: input.reviewerUserId,
+          }
+        : {
+            status: 'PENDING_REVIEW' as const,
+            id: '__no_review_queue_match__',
+          }
+      : mode === 'unclaimed'
+        ? {
+            status: 'PENDING_REVIEW' as const,
+            assignedReviewerUserId: null,
+          }
+        : {
+            status: 'PENDING_REVIEW' as const,
+          };
+
+  const [summary, orders] = await Promise.all([
+    Promise.all([
+      db.telegramOrder.count({
+        where: {
+          status: 'PENDING_REVIEW',
+        },
+      }),
+      db.telegramOrder.count({
+        where: {
+          status: 'PENDING_REVIEW',
+          assignedReviewerUserId: null,
+        },
+      }),
+      input.reviewerUserId
+        ? db.telegramOrder.count({
+            where: {
+              status: 'PENDING_REVIEW',
+              assignedReviewerUserId: input.reviewerUserId,
+            },
+          })
+        : Promise.resolve(0),
+      db.telegramOrder.count({
+        where: {
+          status: 'PENDING_REVIEW',
+          duplicateProofDetectedAt: {
+            not: null,
+          },
+        },
+      }),
+    ]),
+    db.telegramOrder.findMany({
+      where: listWhere,
+      include: {
+        reviewedBy: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [
+        { duplicateProofDetectedAt: 'desc' },
+        { assignedAt: 'asc' },
+        { paymentSubmittedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      take: input.limit ?? 4,
+    }),
+  ]);
+
+  return {
+    totalPending: summary[0],
+    unclaimed: summary[1],
+    mine: summary[2],
+    duplicateWarnings: summary[3],
+    orders,
+  };
+}
+
 export async function setAccessKeyEnabledState(accessKeyId: string, enable: boolean) {
   const key = await db.accessKey.findUnique({
     where: { id: accessKeyId },

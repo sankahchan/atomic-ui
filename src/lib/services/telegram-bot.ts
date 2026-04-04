@@ -171,9 +171,10 @@ import {
   handleInboxCommand,
   handleNotificationPreferencesCommand as handleTelegramNotificationPreferencesCommand,
 } from '@/lib/services/telegram-notifications';
+import { handleOffersCommand } from '@/lib/services/telegram-offers';
 import { handleTelegramStartCommand } from '@/lib/services/telegram-onboarding';
 import {
-  buildTelegramHelpMessage,
+  handleAdminHomeCommand,
   handleAdminToggleCommand,
   handleAnnounceCommand,
   handleAnnounceUserCommand,
@@ -186,6 +187,7 @@ import {
   handleHelpCommand,
   handleMaintenanceCommand,
   handleRefundsCommand,
+  getTelegramReviewQueueSnapshot,
   handleReassignRefundCommand,
   handleResendCommand,
   handleScheduleAnnouncementCommand,
@@ -1685,6 +1687,231 @@ async function findTelegramServerChangeRequestByIdForUser(input: {
   });
 }
 
+type TelegramAdminReviewQueueOrder =
+  Awaited<ReturnType<typeof getTelegramReviewQueueSnapshot>>['orders'][number];
+
+function resolveTelegramReviewQueueMode(argsText: string) {
+  const normalized = argsText.trim().toLowerCase();
+  if (normalized === 'mine' || normalized === 'my') {
+    return 'mine' as const;
+  }
+  if (normalized === 'unclaimed') {
+    return 'unclaimed' as const;
+  }
+  return 'all' as const;
+}
+
+function buildTelegramOrderReviewAlertMessage(input: {
+  order: TelegramAdminReviewQueueOrder;
+  locale: SupportedLocale;
+  mode: 'initial' | 'reminder' | 'updated';
+  panelUrl: string;
+}) {
+  const { order, locale, mode, panelUrl } = input;
+  const ui = getTelegramUi(locale);
+  const isMyanmar = locale === 'my';
+  const reviewFocusLines = isMyanmar
+    ? [
+        '<b>Review checklist</b>',
+        '• screenshot ရှင်းလင်းမှု',
+        '• amount / method / plan ကိုက်ညီမှု',
+        '• duplicate proof warning ရှိ/မရှိ',
+        '• quick reject preset သုံးရန် လို/မလို',
+      ]
+    : [
+        '<b>Review checklist</b>',
+        '• screenshot clarity',
+        '• amount / method / plan match',
+        '• duplicate-proof warning',
+        '• whether a quick reject preset is enough',
+      ];
+
+  return [
+    mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
+    '',
+    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
+    order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
+    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
+    order.paymentSubmittedAt
+      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
+      : '',
+    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
+    order.assignedReviewerEmail
+      ? `${isMyanmar ? 'Assigned' : 'Assigned'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
+      : '',
+    order.duplicateProofOrderCode
+      ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
+      : '',
+    order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
+    order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
+    '',
+    ...reviewFocusLines,
+    '',
+    order.paymentMessageId
+      ? isMyanmar
+        ? 'မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
+        : 'The original screenshot is copied just above this review summary.'
+      : isMyanmar
+        ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
+        : 'The original screenshot could not be copied here, so review it in the panel.',
+    '',
+    `${ui.orderReviewPanelLabel}: ${panelUrl}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildTelegramOrderReviewAlertKeyboard(input: {
+  orderId: string;
+  locale: SupportedLocale;
+  panelUrl: string;
+}) {
+  const ui = getTelegramUi(input.locale);
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: ui.orderApproveActionLabel,
+          callback_data: buildTelegramOrderReviewCallbackData('approve', input.orderId),
+        },
+        {
+          text: ui.orderRejectActionLabel,
+          callback_data: buildTelegramOrderReviewCallbackData('reject', input.orderId),
+        },
+      ],
+      [
+        {
+          text: ui.orderRejectDuplicateActionLabel,
+          callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', input.orderId),
+        },
+        {
+          text: ui.orderRejectBlurryActionLabel,
+          callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', input.orderId),
+        },
+      ],
+      [
+        {
+          text: ui.orderRejectWrongAmountActionLabel,
+          callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', input.orderId),
+        },
+      ],
+      [{ text: ui.orderManualReviewActionLabel, url: input.panelUrl }],
+    ],
+  };
+}
+
+async function sendTelegramOrderReviewCardToChat(input: {
+  botToken: string;
+  adminChatId: string | number;
+  order: TelegramAdminReviewQueueOrder;
+  locale: SupportedLocale;
+  mode: 'initial' | 'reminder' | 'updated';
+}) {
+  if (input.order.paymentMessageId) {
+    await copyTelegramMessage(
+      input.botToken,
+      input.order.telegramChatId,
+      input.order.paymentMessageId,
+      input.adminChatId,
+    );
+  }
+
+  const panelUrl = await buildTelegramOrderPanelUrl(input.order.id);
+  return sendTelegramMessage(
+    input.botToken,
+    input.adminChatId,
+    buildTelegramOrderReviewAlertMessage({
+      order: input.order,
+      locale: input.locale,
+      mode: input.mode,
+      panelUrl,
+    }),
+    {
+      replyMarkup: buildTelegramOrderReviewAlertKeyboard({
+        orderId: input.order.id,
+        locale: input.locale,
+        panelUrl,
+      }),
+    },
+  );
+}
+
+async function handleTelegramReviewQueueCommand(input: {
+  chatId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  argsText: string;
+  adminActor: TelegramAdminActor;
+}) {
+  const mode = resolveTelegramReviewQueueMode(input.argsText);
+  if (mode === 'mine' && !input.adminActor.userId) {
+    return input.locale === 'my'
+      ? 'Mine filter ကို သုံးရန် Telegram admin account ကို dashboard admin user နှင့် link လုပ်ထားရန် လိုအပ်သည်။'
+      : 'The `mine` filter needs your Telegram admin chat linked to a dashboard admin user.';
+  }
+
+  const snapshot = await getTelegramReviewQueueSnapshot({
+    reviewerUserId: input.adminActor.userId,
+    mode,
+    limit: 3,
+  });
+
+  if (snapshot.orders.length === 0) {
+    return input.locale === 'my'
+      ? '📭 Pending review order မရှိသေးပါ။'
+      : '📭 There are no pending review orders right now.';
+  }
+
+  const modeLabel =
+    mode === 'mine'
+      ? input.locale === 'my'
+        ? 'Assigned to me'
+        : 'Assigned to me'
+      : mode === 'unclaimed'
+        ? input.locale === 'my'
+          ? 'Unclaimed only'
+          : 'Unclaimed only'
+        : input.locale === 'my'
+          ? 'All pending'
+          : 'All pending';
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    [
+      input.locale === 'my' ? '📋 <b>Review queue</b>' : '📋 <b>Review queue</b>',
+      '',
+      `${modeLabel}`,
+      input.locale === 'my'
+        ? `${snapshot.totalPending} pending • ${snapshot.unclaimed} unclaimed • ${snapshot.mine} mine`
+        : `${snapshot.totalPending} pending • ${snapshot.unclaimed} unclaimed • ${snapshot.mine} mine`,
+      input.locale === 'my'
+        ? `${snapshot.duplicateWarnings} duplicate-proof warning`
+        : `${snapshot.duplicateWarnings} duplicate-proof warning`,
+      '',
+      input.locale === 'my'
+        ? `Showing ${snapshot.orders.length} item(s). Use /reviewqueue mine or /reviewqueue unclaimed when needed.`
+        : `Showing ${snapshot.orders.length} item(s). Use /reviewqueue mine or /reviewqueue unclaimed when needed.`,
+    ].join('\n'),
+  );
+
+  for (const order of snapshot.orders) {
+    const locale = coerceSupportedLocale(order.locale) || input.locale;
+    await sendTelegramOrderReviewCardToChat({
+      botToken: input.botToken,
+      adminChatId: input.chatId,
+      order,
+      locale,
+      mode: 'updated',
+    });
+  }
+
+  return null;
+}
+
 async function sendTelegramOrderReviewAlert(
   orderId: string,
   mode: 'initial' | 'reminder' | 'updated' = 'initial',
@@ -1706,100 +1933,14 @@ async function sendTelegramOrderReviewAlert(
   }
 
   const locale = coerceSupportedLocale(order.locale) || (await getTelegramDefaultLocale());
-  const ui = getTelegramUi(locale);
-  const isMyanmar = locale === 'my';
-  const panelUrl = await buildTelegramOrderPanelUrl(order.id);
-  const reviewFocusLines = isMyanmar
-    ? [
-        '<b>Review checklist</b>',
-        '• screenshot ရှင်းလင်းမှု',
-        '• amount / method / plan ကိုက်ညီမှု',
-        '• duplicate proof warning ရှိ/မရှိ',
-        '• quick reject preset သုံးရန် လို/မလို',
-      ]
-    : [
-        '<b>Review checklist</b>',
-        '• screenshot clarity',
-        '• amount / method / plan match',
-        '• duplicate-proof warning',
-        '• whether a quick reject preset is enough',
-      ];
-  const lines = [
-    mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
-    '',
-    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
-    order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
-    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
-    order.paymentSubmittedAt
-      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
-      : '',
-    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
-    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
-    order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
-    order.duplicateProofOrderCode
-      ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
-      : '',
-    order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
-    order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
-    '',
-    ...reviewFocusLines,
-    '',
-    order.paymentMessageId
-      ? isMyanmar
-        ? 'မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
-        : 'The original screenshot is copied just above this review summary.'
-      : isMyanmar
-        ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
-        : 'The original screenshot could not be copied here, so review it in the panel.',
-    '',
-    `${ui.orderReviewPanelLabel}: ${panelUrl}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
 
   for (const adminChatId of config.adminChatIds) {
-    if (order.paymentMessageId) {
-      await copyTelegramMessage(
-        config.botToken,
-        order.telegramChatId,
-        order.paymentMessageId,
-        adminChatId,
-      );
-    }
-
-    await sendTelegramMessage(config.botToken, adminChatId, lines, {
-      replyMarkup: {
-        inline_keyboard: [
-          [
-            {
-              text: ui.orderApproveActionLabel,
-              callback_data: buildTelegramOrderReviewCallbackData('approve', order.id),
-            },
-            {
-              text: ui.orderRejectActionLabel,
-              callback_data: buildTelegramOrderReviewCallbackData('reject', order.id),
-            },
-          ],
-          [
-            {
-              text: ui.orderRejectDuplicateActionLabel,
-              callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', order.id),
-            },
-            {
-              text: ui.orderRejectBlurryActionLabel,
-              callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', order.id),
-            },
-          ],
-          [
-            {
-              text: ui.orderRejectWrongAmountActionLabel,
-              callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', order.id),
-            },
-          ],
-          [{ text: ui.orderManualReviewActionLabel, url: panelUrl }],
-        ],
-      },
+    await sendTelegramOrderReviewCardToChat({
+      botToken: config.botToken,
+      adminChatId,
+      order,
+      locale,
+      mode,
     });
   }
 }
@@ -7834,6 +7975,13 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
+    case 'offers':
+      return handleOffersCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+      });
     case 'trial':
       return handleTrialCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'orders':
@@ -7985,6 +8133,20 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
       return ui.orderCancelled(currentOrder.orderCode);
     }
+    case 'admin':
+      return isAdmin ? handleAdminHomeCommand({ locale, adminActor }) : ui.adminOnly;
+    case 'reviewqueue':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasTelegramReviewManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'review' });
+      }
+      return handleTelegramReviewQueueCommand({
+        chatId,
+        locale,
+        botToken: config.botToken,
+        argsText,
+        adminActor,
+      });
     case 'status':
       return isAdmin ? handleStatusCommand(locale) : ui.adminOnly;
     case 'expiring':

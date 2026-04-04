@@ -321,6 +321,47 @@ export default function AnalyticsPage() {
     return `${(minutes / (24 * 60)).toFixed(1)}d`;
   };
 
+  const telegramFunnelSteps = useMemo(() => {
+    const created = telegramSalesDashboard?.funnel.created || 0;
+    const rawSteps = [
+      {
+        key: 'created',
+        label: 'Orders created',
+        value: created,
+      },
+      {
+        key: 'method',
+        label: 'Method selected',
+        value: telegramSalesDashboard?.funnel.paymentMethodSelected || 0,
+      },
+      {
+        key: 'proof',
+        label: 'Proof uploaded',
+        value: telegramSalesDashboard?.funnel.proofUploaded || 0,
+      },
+      {
+        key: 'reviewed',
+        label: 'Reviewed',
+        value: telegramSalesDashboard?.funnel.reviewed || 0,
+      },
+      {
+        key: 'fulfilled',
+        label: 'Fulfilled',
+        value: telegramSalesDashboard?.funnel.fulfilled || 0,
+      },
+    ];
+
+    return rawSteps.map((step, index) => {
+      const previousValue = index === 0 ? created : rawSteps[index - 1]?.value || 0;
+      return {
+        ...step,
+        cumulativeRate: created > 0 ? (step.value / created) * 100 : 0,
+        stepRate: index === 0 ? 100 : previousValue > 0 ? (step.value / previousValue) * 100 : 0,
+        dropOff: index === 0 ? 0 : Math.max(previousValue - step.value, 0),
+      };
+    });
+  }, [telegramSalesDashboard]);
+
   const daysOfWeek = [
     t('days.sunday') || 'Sun',
     t('days.monday') || 'Mon',
@@ -1412,35 +1453,80 @@ export default function AnalyticsPage() {
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Conversion funnel</p>
                     <h3 className="mt-2 text-lg font-semibold">Telegram storefront flow</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Review velocity
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : formatDurationMetric(telegramSalesDashboard?.averages.reviewMinutes)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Average time from proof to review</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Fulfillment velocity
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : formatDurationMetric(telegramSalesDashboard?.averages.fulfillmentMinutes)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Average time from proof to delivery</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Final conversion
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${Math.round(telegramFunnelSteps[telegramFunnelSteps.length - 1]?.cumulativeRate || 0)}%`}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Created orders that became fulfilled</p>
+                      </div>
+                      <div className="ops-mini-tile">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Largest drop-off
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold">
+                          {loadingTelegramSalesDashboard
+                            ? '…'
+                            : `${Math.max(...telegramFunnelSteps.map((step) => step.dropOff))}`}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Users lost between one step and the next</p>
+                      </div>
+                    </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      {[
-                        {
-                          label: 'Orders created',
-                          value: telegramSalesDashboard?.funnel.created || 0,
-                        },
-                        {
-                          label: 'Method selected',
-                          value: telegramSalesDashboard?.funnel.paymentMethodSelected || 0,
-                        },
-                        {
-                          label: 'Proof uploaded',
-                          value: telegramSalesDashboard?.funnel.proofUploaded || 0,
-                        },
-                        {
-                          label: 'Reviewed',
-                          value: telegramSalesDashboard?.funnel.reviewed || 0,
-                        },
-                        {
-                          label: 'Fulfilled',
-                          value: telegramSalesDashboard?.funnel.fulfilled || 0,
-                        },
-                      ].map((step) => (
-                        <div key={step.label} className="ops-mini-tile">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {step.label}
-                          </p>
-                          <p className="mt-2 text-2xl font-semibold">
-                            {loadingTelegramSalesDashboard ? '…' : step.value}
+                      {telegramFunnelSteps.map((step) => (
+                        <div key={step.key} className="ops-mini-tile">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                {step.label}
+                              </p>
+                              <p className="mt-2 text-2xl font-semibold">
+                                {loadingTelegramSalesDashboard ? '…' : step.value}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="border-cyan-400/30 bg-cyan-500/10 text-cyan-100">
+                              {step.key === 'created'
+                                ? '100% start'
+                                : `${Math.round(step.stepRate)}% from prev`}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+                            <div
+                              className="h-full rounded-full bg-cyan-400 transition-[width]"
+                              style={{ width: `${Math.max(step.cumulativeRate, step.value > 0 ? 6 : 0)}%` }}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {step.key === 'created'
+                              ? 'Baseline for the storefront funnel'
+                              : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of created orders reached here`}
                           </p>
                         </div>
                       ))}

@@ -62,35 +62,40 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/mykeys', labelEn: '🗂 My keys', labelMy: '🗂 Key များ' },
   ],
   [
+    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offer များ' },
     { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
+  ],
+  [
     { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
-  ],
-  [
     { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+  ],
+  [
     { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
-  ],
-  [
     { command: '/trial', labelEn: '🎁 Free trial', labelMy: '🎁 Free Trial' },
+  ],
+  [
     { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
-  ],
-  [
     { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
+  ],
+  [
     { command: '/sub', labelEn: '📎 Sub links', labelMy: '📎 Sub Links' },
-  ],
-  [
     { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
+  ],
+  [
     { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
-  ],
-  [
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
-    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
   ],
   [
+    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
     { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
   ],
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
+  [
+    { command: '/admin', labelEn: '🧭 Admin home', labelMy: '🧭 Admin home' },
+    { command: '/reviewqueue', labelEn: '📋 Review queue', labelMy: '📋 Review queue' },
+  ],
   [
     { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status' },
     { command: '/expiring', labelEn: '⏰ Expiring', labelMy: '⏰ Expiring' },
@@ -98,6 +103,10 @@ const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
     { command: '/find', labelEn: '🔎 Find key', labelMy: '🔎 Key ရှာ' },
     { command: '/announcements', labelEn: '📢 Broadcasts', labelMy: '📢 Broadcasts' },
+  ],
+  [
+    { command: '/finance', labelEn: '💼 Finance', labelMy: '💼 Finance' },
+    { command: '/refunds', labelEn: '💸 Refunds', labelMy: '💸 Refunds' },
   ],
 ];
 
@@ -311,6 +320,8 @@ export function resolveTelegramRetentionSourceFromRenewAction(
     case 'renewal_coupon':
     case 'expired_recovery':
       return secondary;
+    case 'dynamic_renewal_coupon':
+      return 'renewal_coupon';
     case 'dynamic_renewal_7d':
       return 'premium_renewal_7d';
     case 'dynamic_renewal_3d':

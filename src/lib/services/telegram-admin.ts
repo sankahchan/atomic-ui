@@ -6,6 +6,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { getCommandKeyboard } from '@/lib/services/telegram-callbacks';
+import { type TelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import {
   sendServerIssueNoticeToTelegram,
   sendTelegramDocument,
@@ -39,6 +40,7 @@ export {
 export {
   handleAdminToggleCommand,
   handleFindCommand,
+  getTelegramReviewQueueSnapshot,
   handleResendCommand,
   resolveAdminKeyQuery,
   setAccessKeyEnabledState,
@@ -536,6 +538,80 @@ export async function handleServerRecoveredCommand(argsText: string, locale: Sup
     : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
 }
 
+export async function handleAdminHomeCommand(input: {
+  locale: SupportedLocale;
+  adminActor: TelegramAdminActor;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const [pendingReview, unclaimedReview, pendingRefunds, myRefunds, scheduledAnnouncements, failedDeliveries] =
+    await Promise.all([
+      db.telegramOrder.count({
+        where: {
+          status: 'PENDING_REVIEW',
+        },
+      }),
+      db.telegramOrder.count({
+        where: {
+          status: 'PENDING_REVIEW',
+          assignedReviewerUserId: null,
+        },
+      }),
+      db.telegramOrder.count({
+        where: {
+          refundRequestStatus: 'PENDING',
+        },
+      }),
+      input.adminActor.userId
+        ? db.telegramOrder.count({
+            where: {
+              refundRequestStatus: 'PENDING',
+              refundAssignedReviewerUserId: input.adminActor.userId,
+            },
+          })
+        : Promise.resolve(0),
+      db.telegramAnnouncement.count({
+        where: {
+          status: 'SCHEDULED',
+        },
+      }),
+      db.telegramAnnouncementDelivery.count({
+        where: {
+          status: 'FAILED',
+        },
+      }),
+    ]);
+
+  return [
+    isMyanmar ? '🧭 <b>Admin home</b>' : '🧭 <b>Admin home</b>',
+    '',
+    input.adminActor.email
+      ? isMyanmar
+        ? `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
+        : `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
+      : isMyanmar
+        ? 'Signed in with admin chat access'
+        : 'Signed in with admin chat access',
+    '',
+    isMyanmar ? '<b>Queues</b>' : '<b>Queues</b>',
+    isMyanmar
+      ? `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`
+      : `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`,
+    isMyanmar
+      ? `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`
+      : `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`,
+    isMyanmar
+      ? `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`
+      : `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`,
+    '',
+    isMyanmar ? '<b>Quick next actions</b>' : '<b>Quick next actions</b>',
+    '• /reviewqueue',
+    '• /refunds',
+    '• /announcements',
+    '• /finance',
+    '• /status',
+  ].join('\n');
+}
+
 export function buildTelegramHelpMessage(input: {
   isAdmin: boolean;
   locale: SupportedLocale;
@@ -546,6 +622,7 @@ export function buildTelegramHelpMessage(input: {
 
 <b>Customer actions</b>
 /buy - key အသစ် မှာယူမည်
+/offers - active coupon နှင့် promo offer များကို ကြည့်မည်
 /trial - free trial ရယူမည်
 /renew - လက်ရှိ key ကို သက်တမ်းတိုးမည်
 /mykeys - ချိတ်ထားသော key များကို ကြည့်မည်
@@ -554,6 +631,7 @@ export function buildTelegramHelpMessage(input: {
 
 <b>Updates & support</b>
 /inbox - announcement နှင့် notice များကို ကြည့်မည်
+/inbox orders|support|refunds|announcements|premium - inbox ကို category အလိုက် ကြည့်မည်
 /notifications - notice preference များကို ပြောင်းမည်
 /premium - premium shortcut များကို ကြည့်မည်
 /premiumregion - premium region အခြေအနေကို ကြည့်မည်
@@ -573,6 +651,7 @@ export function buildTelegramHelpMessage(input: {
 
 <b>Customer actions</b>
 /buy - Start a new key order
+/offers - Show active coupon and promo offers
 /trial - Claim the free trial
 /renew - Renew one of your existing keys
 /mykeys - List your linked keys
@@ -581,6 +660,7 @@ export function buildTelegramHelpMessage(input: {
 
 <b>Updates & support</b>
 /inbox - Show announcements and notices
+/inbox orders|support|refunds|announcements|premium - Filter the inbox by category
 /notifications - Manage notice preferences
 /premium - Open premium shortcuts
 /premiumregion - View premium region health
@@ -600,6 +680,8 @@ export function buildTelegramHelpMessage(input: {
   if (input.isAdmin) {
     message += isMyanmar
       ? `\n\n<b>Admin Commands</b>
+/admin - Admin summary hub
+/reviewqueue [mine|unclaimed] - pending review queue ကို chat ထဲတွင် ဖွင့်မည်
 /status - Server အခြေအနေအနှစ်ချုပ်
 /expiring [days] - မကြာမီ သက်တမ်းကုန်မည့် key များ
 /find &lt;query&gt; - Key ကို ရှာမည်
@@ -623,6 +705,8 @@ export function buildTelegramHelpMessage(input: {
 /sysinfo - System resource usage
 /backup - Backup ဖန်တီးပြီး ဒေါင်းလုဒ်ဆွဲမည်`
       : `\n\n<b>Admin Commands</b>
+/admin - Open the admin summary hub
+/reviewqueue [mine|unclaimed] - Open the pending review queue in chat
 /status - Server status summary
 /expiring [days] - Keys expiring soon
 /find &lt;query&gt; - Search for a key

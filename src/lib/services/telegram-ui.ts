@@ -1160,55 +1160,81 @@ export function buildTelegramOrderTimelineLines(input: {
   ui: TelegramUi;
 }) {
   const { order, locale, ui } = input;
-  const lines = [
-    `${ui.orderTimelineTitle}:`,
-    `• ${ui.orderTimelineCreated} · ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
+  const waitingLabel = locale === 'my' ? 'Waiting' : 'Waiting';
+  const pendingLabel = locale === 'my' ? 'Not yet' : 'Not yet';
+  const currentStage =
+    order.status === 'AWAITING_PAYMENT_METHOD'
+      ? 'payment'
+      : order.status === 'AWAITING_PAYMENT_PROOF'
+        ? 'proof'
+        : order.status === 'PENDING_REVIEW'
+          ? 'review'
+          : order.status === 'FULFILLED'
+            ? 'fulfilled'
+            : null;
+  const lines = [`${ui.orderTimelineTitle}:`];
+  const stages = [
+    {
+      key: 'created',
+      label: ui.orderTimelineCreated,
+      at: order.createdAt,
+      state: 'done' as const,
+    },
+    {
+      key: 'payment',
+      label: ui.orderTimelinePaymentStage,
+      at: order.paymentStageEnteredAt,
+      state: order.paymentStageEnteredAt ? ('done' as const) : currentStage === 'payment' ? ('current' as const) : ('pending' as const),
+    },
+    {
+      key: 'proof',
+      label: ui.orderTimelineProofSubmitted,
+      at: order.paymentSubmittedAt,
+      state: order.paymentSubmittedAt ? ('done' as const) : currentStage === 'proof' ? ('current' as const) : ('pending' as const),
+    },
+    {
+      key: 'review',
+      label: ui.orderTimelineReviewed,
+      at: order.reviewedAt,
+      state: order.reviewedAt ? ('done' as const) : currentStage === 'review' ? ('current' as const) : ('pending' as const),
+    },
   ];
 
-  if (order.paymentStageEnteredAt) {
-    lines.push(
-      `• ${ui.orderTimelinePaymentStage} · ${escapeHtml(
-        formatTelegramDateTime(order.paymentStageEnteredAt, locale),
-      )}`,
-    );
-  }
-
-  if (order.paymentSubmittedAt) {
-    lines.push(
-      `• ${ui.orderTimelineProofSubmitted} · ${escapeHtml(
-        formatTelegramDateTime(order.paymentSubmittedAt, locale),
-      )}`,
-    );
-  }
-
-  if (order.reviewedAt) {
-    lines.push(
-      `• ${ui.orderTimelineReviewed} · ${escapeHtml(
-        formatTelegramDateTime(order.reviewedAt, locale),
-      )}`,
-    );
+  for (const stage of stages) {
+    const marker =
+      stage.state === 'done' ? '✅' : stage.state === 'current' ? '🟡' : '⚪️';
+    const detail = stage.at
+      ? escapeHtml(formatTelegramDateTime(stage.at, locale))
+      : stage.state === 'current'
+        ? waitingLabel
+        : pendingLabel;
+    lines.push(`${marker} ${stage.label} · ${detail}`);
   }
 
   if (order.fulfilledAt) {
     lines.push(
-      `• ${ui.orderTimelineFulfilled} · ${escapeHtml(
+      `✅ ${ui.orderTimelineFulfilled} · ${escapeHtml(
         formatTelegramDateTime(order.fulfilledAt, locale),
       )}`,
     );
   } else if (order.rejectedAt) {
     lines.push(
-      `• ${ui.orderTimelineRejected} · ${escapeHtml(
+      `🛑 ${ui.orderTimelineRejected} · ${escapeHtml(
         formatTelegramDateTime(order.rejectedAt, locale),
       )}`,
     );
   } else if (order.status === 'CANCELLED') {
     lines.push(
-      `• ${ui.orderTimelineCancelled} · ${escapeHtml(
+      `🛑 ${ui.orderTimelineCancelled} · ${escapeHtml(
         formatTelegramDateTime(
           order.expiredAt || order.reviewedAt || order.paymentStageEnteredAt || order.createdAt,
           locale,
         ),
       )}`,
+    );
+  } else {
+    lines.push(
+      `⚪️ ${ui.orderTimelineFulfilled} · ${currentStage === 'fulfilled' ? waitingLabel : pendingLabel}`,
     );
   }
 
