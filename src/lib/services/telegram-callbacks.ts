@@ -26,7 +26,7 @@ export type TelegramOrderUserAction =
 export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
-export type TelegramMenuSection = 'admin' | 'inbox' | 'offers';
+export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support';
 export type TelegramAdminMenuAction =
   | 'home'
   | 'reviewqueue'
@@ -48,6 +48,13 @@ export type TelegramInboxMenuAction =
   | 'announcements'
   | 'premium';
 export type TelegramOffersMenuAction = 'all' | 'active' | 'used' | 'unavailable';
+export type TelegramSupportMenuAction =
+  | 'orders'
+  | 'refunds'
+  | 'inbox'
+  | 'server'
+  | 'premium'
+  | 'keys';
 export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx';
 export type TelegramNotificationPreferenceKey =
   | 'promo'
@@ -521,6 +528,8 @@ export function parseTelegramMenuCallbackData(data?: string | null) {
         ? 'inbox'
         : parts[1] === 'offers'
           ? 'offers'
+          : parts[1] === 'support'
+            ? 'support'
           : null;
 
   if (!section) {

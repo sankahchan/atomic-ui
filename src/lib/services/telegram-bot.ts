@@ -6924,6 +6924,72 @@ async function handleTelegramCallbackQuery(
         await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
         return null;
       }
+
+      if (menuAction.section === 'support') {
+        switch (menuAction.action) {
+          case 'orders':
+            await handleOrdersCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              sendTelegramMessage,
+              sendTelegramOrderStatusCard,
+            });
+            break;
+          case 'refunds':
+            await handleRefundCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              sendTelegramMessage,
+              sendTelegramOrderStatusCard,
+            });
+            break;
+          case 'inbox':
+            await handleInboxCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              argsText: 'support',
+              locale,
+              botToken: config.botToken,
+            });
+            break;
+          case 'server':
+            await handleUserServerCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+            });
+            break;
+          case 'premium':
+            await handlePremiumCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              getTelegramSupportLink,
+              findLinkedDynamicAccessKeys,
+              getDynamicKeyMessagingUrls,
+              sendTelegramMessage,
+            });
+            break;
+          case 'keys':
+            await handleMyKeysCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+            });
+            break;
+          default:
+            break;
+        }
+        await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
+        return null;
+      }
     }
 
     const supportQueueAction = parseTelegramSupportQueueCallbackData(callbackQuery.data);
@@ -9083,7 +9149,12 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         sendDynamicKeySharePageToTelegram,
       });
     case 'support':
-      return handleSupportCommand(locale);
+      return handleSupportCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+      });
     case 'server':
       return isAdmin && !argsText.trim()
         ? handleStatusCommand(locale)

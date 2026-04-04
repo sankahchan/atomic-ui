@@ -7,6 +7,7 @@ import {
 } from '@/lib/subscription-links';
 import { formatBytes } from '@/lib/utils';
 import {
+  buildTelegramMenuCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramOrderActionCallbackData,
   buildTelegramServerChangeActionCallbackData,
@@ -547,7 +548,58 @@ export async function handleSubscriptionLinksCommand(input: {
   return ui.subSent(keys.length + dynamicKeys.length);
 }
 
-export async function handleSupportCommand(locale: SupportedLocale) {
+function buildTelegramSupportHubKeyboard(input: {
+  locale: SupportedLocale;
+  supportLink?: string | null;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: isMyanmar ? '🧾 Order အကူအညီ' : '🧾 Order help',
+        callback_data: buildTelegramMenuCallbackData('support', 'orders'),
+      },
+      {
+        text: isMyanmar ? '💸 Refund' : '💸 Refunds',
+        callback_data: buildTelegramMenuCallbackData('support', 'refunds'),
+      },
+    ],
+    [
+      {
+        text: isMyanmar ? '📬 Inbox update' : '📬 Inbox updates',
+        callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
+      },
+      {
+        text: isMyanmar ? '🛠 Server ပြောင်း' : '🛠 Server change',
+        callback_data: buildTelegramMenuCallbackData('support', 'server'),
+      },
+    ],
+    [
+      {
+        text: isMyanmar ? '💎 Premium' : '💎 Premium',
+        callback_data: buildTelegramMenuCallbackData('support', 'premium'),
+      },
+      {
+        text: isMyanmar ? '🗂 My keys' : '🗂 My keys',
+        callback_data: buildTelegramMenuCallbackData('support', 'keys'),
+      },
+    ],
+  ];
+
+  if (input.supportLink) {
+    rows.push([{ text: isMyanmar ? '🛟 Admin ကို ဆက်သွယ်ရန်' : '🛟 Contact admin', url: input.supportLink }]);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+export async function handleSupportCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken?: string;
+}) {
+  const locale = input.locale;
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
 
@@ -574,6 +626,10 @@ export async function handleSupportCommand(locale: SupportedLocale) {
     locale === 'my'
       ? '• Premium route / preferred region အတွက် /premium သို့မဟုတ် /premiumregion ကို အသုံးပြုပါ။'
       : '• Use /premium or /premiumregion for preferred-region and routing issues.',
+    '',
+    locale === 'my'
+      ? 'အောက်ပါ button များထဲမှ တစ်ခုကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။'
+      : 'Use one of the buttons below to jump directly to the right place.',
   ];
 
   if (supportLink) {
@@ -582,7 +638,18 @@ export async function handleSupportCommand(locale: SupportedLocale) {
     lines.push('', ui.noSupportLink);
   }
 
-  return lines.join('\n');
+  const message = lines.join('\n');
+  if (input.botToken) {
+    const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramSupportHubKeyboard({
+        locale,
+        supportLink,
+      }),
+    });
+    return sent ? null : message;
+  }
+
+  return message;
 }
 
 export async function handleUserServerCommand(input: {

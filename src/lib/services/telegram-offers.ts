@@ -126,6 +126,7 @@ function buildTelegramOffersKeyboard(input: {
   supportLink?: string | null;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
   const filterChip = (filter: TelegramOffersFilter, label: string) => ({
     text: input.filter === filter ? `• ${label}` : label,
@@ -133,10 +134,10 @@ function buildTelegramOffersKeyboard(input: {
   });
 
   rows.push([
-    filterChip('ALL', 'All'),
-    filterChip('ACTIVE', 'Active'),
-    filterChip('USED', 'Used'),
-    filterChip('UNAVAILABLE', 'Unavailable'),
+    filterChip('ALL', isMyanmar ? 'အားလုံး' : 'All'),
+    filterChip('ACTIVE', isMyanmar ? 'အသုံးပြုရန်' : 'Active'),
+    filterChip('USED', isMyanmar ? 'သုံးပြီး' : 'Used'),
+    filterChip('UNAVAILABLE', isMyanmar ? 'မရနိုင်' : 'Unavailable'),
   ]);
 
   for (const offer of input.activeOffers.slice(0, 4)) {

@@ -550,18 +550,24 @@ export async function handleServerRecoveredCommand(argsText: string, locale: Sup
 function buildTelegramAdminHomeKeyboard(input: {
   locale: SupportedLocale;
   adminActor: TelegramAdminActor;
+  pendingReview: number;
+  supportOpen: number;
+  pendingRefunds: number;
+  scheduledAnnouncements: number;
+  failedDeliveries: number;
 }) {
   const rows: Array<Array<{ text: string; callback_data: string }>> = [];
   const isMyanmar = input.locale === 'my';
+  const withCount = (label: string, count: number) => (count > 0 ? `${label} (${count})` : label);
 
   if (hasTelegramReviewManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
+        text: withCount(isMyanmar ? '📋 Review queue' : '📋 Review queue', input.pendingReview),
         callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
       },
       {
-        text: isMyanmar ? '🛟 Support queue' : '🛟 Support queue',
+        text: withCount(isMyanmar ? '🛟 Support queue' : '🛟 Support queue', input.supportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
       },
     ]);
@@ -570,7 +576,7 @@ function buildTelegramAdminHomeKeyboard(input: {
   if (hasFinanceManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+        text: withCount(isMyanmar ? '💸 Refunds' : '💸 Refunds', input.pendingRefunds),
         callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
       },
       {
@@ -583,7 +589,12 @@ function buildTelegramAdminHomeKeyboard(input: {
   if (hasTelegramAnnouncementManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: isMyanmar ? '📢 Broadcasts' : '📢 Broadcasts',
+        text: withCount(
+          isMyanmar
+            ? `📢 Broadcasts${input.failedDeliveries > 0 ? ' • failed' : ''}`
+            : `📢 Broadcasts${input.failedDeliveries > 0 ? ' • failed' : ''}`,
+          input.scheduledAnnouncements,
+        ),
         callback_data: buildTelegramMenuCallbackData('admin', 'announcements'),
       },
     ]);
@@ -614,7 +625,7 @@ export async function handleAdminHomeCommand(input: {
   chatId?: string | number | null;
 }) {
   const isMyanmar = input.locale === 'my';
-  const [pendingReview, unclaimedReview, pendingRefunds, myRefunds, scheduledAnnouncements, failedDeliveries] =
+  const [pendingReview, unclaimedReview, supportOpen, pendingRefunds, myRefunds, scheduledAnnouncements, failedDeliveries] =
     await Promise.all([
       db.telegramOrder.count({
         where: {
@@ -625,6 +636,13 @@ export async function handleAdminHomeCommand(input: {
         where: {
           status: 'PENDING_REVIEW',
           assignedReviewerUserId: null,
+        },
+      }),
+      db.telegramPremiumSupportRequest.count({
+        where: {
+          status: {
+            not: 'DISMISSED',
+          },
         },
       }),
       db.telegramOrder.count({
@@ -668,6 +686,9 @@ export async function handleAdminHomeCommand(input: {
       ? `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`
       : `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`,
     isMyanmar
+      ? `• Support: ${supportOpen} open thread${supportOpen === 1 ? '' : 's'}`
+      : `• Support: ${supportOpen} open thread${supportOpen === 1 ? '' : 's'}`,
+    isMyanmar
       ? `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`
       : `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`,
     isMyanmar
@@ -687,6 +708,11 @@ export async function handleAdminHomeCommand(input: {
       replyMarkup: buildTelegramAdminHomeKeyboard({
         locale: input.locale,
         adminActor: input.adminActor,
+        pendingReview,
+        supportOpen,
+        pendingRefunds,
+        scheduledAnnouncements,
+        failedDeliveries,
       }),
     });
     return null;

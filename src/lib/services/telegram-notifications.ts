@@ -117,6 +117,7 @@ function buildTelegramInboxTip(mode: TelegramInboxMode, locale: SupportedLocale)
 }
 
 function buildTelegramInboxKeyboard(locale: SupportedLocale, mode: TelegramInboxMode) {
+  const isMyanmar = locale === 'my';
   const option = (targetMode: TelegramInboxMode, label: string) => ({
     text: mode === targetMode ? `• ${label}` : label,
     callback_data: buildTelegramMenuCallbackData('inbox', targetMode.toLowerCase()),
@@ -125,18 +126,18 @@ function buildTelegramInboxKeyboard(locale: SupportedLocale, mode: TelegramInbox
   return {
     inline_keyboard: [
       [
-        option('ALL', 'All'),
-        option('ORDERS', 'Orders'),
-        option('SUPPORT', 'Support'),
+        option('ALL', isMyanmar ? 'အားလုံး' : 'All'),
+        option('ORDERS', isMyanmar ? 'Order' : 'Orders'),
+        option('SUPPORT', isMyanmar ? 'Support' : 'Support'),
       ],
       [
-        option('REFUNDS', 'Refunds'),
-        option('ANNOUNCEMENTS', 'Announcements'),
-        option('PREMIUM', 'Premium'),
+        option('REFUNDS', isMyanmar ? 'Refund' : 'Refunds'),
+        option('ANNOUNCEMENTS', isMyanmar ? 'Notice' : 'Announcements'),
+        option('PREMIUM', isMyanmar ? 'Premium' : 'Premium'),
       ],
       [
-        option('UNREAD', 'Unread'),
-        option('PINNED', 'Pinned'),
+        option('UNREAD', isMyanmar ? 'မဖတ်ရသေး' : 'Unread'),
+        option('PINNED', isMyanmar ? 'Pin လုပ်ထား' : 'Pinned'),
       ],
     ],
   };

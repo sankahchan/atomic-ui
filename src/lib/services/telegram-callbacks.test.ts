@@ -94,6 +94,13 @@ test('telegram menu callbacks support admin and inbox/offers filters', () => {
       action: 'unavailable',
     },
   );
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('support', 'server')),
+    {
+      section: 'support',
+      action: 'server',
+    },
+  );
 });
 
 test('telegram support queue callbacks preserve queue mode secondary', () => {
