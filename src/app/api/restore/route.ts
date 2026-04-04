@@ -5,6 +5,7 @@ import path from 'path';
 import { getCurrentUser } from '@/lib/auth';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
+import { parseRestoreUploadFormData } from '@/lib/services/restore-upload';
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,10 +14,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const formData = await req.formData();
-        const file = formData.get('backup') as File;
+        const { formData, error } = await parseRestoreUploadFormData(req);
+        if (error) {
+            return NextResponse.json({ error: error.error }, { status: error.status });
+        }
 
-        if (!file) {
+        const file = formData?.get('backup');
+
+        if (!(file instanceof File)) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
