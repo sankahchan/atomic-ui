@@ -252,6 +252,7 @@ import {
   buildTelegramServerChangeReviewCallbackData,
   getCommandKeyboard,
   isDynamicRenewalActionSecondary,
+  normalizeTelegramReplyKeyboardCommand,
   parseTelegramDynamicSupportActionCallbackData,
   parseTelegramOrderActionCallbackData,
   parseTelegramOrderReviewCallbackData,
@@ -4123,7 +4124,7 @@ export async function approveTelegramServerChangeRequest(input: {
             replacement.targetServer.name,
           ),
           {
-            replyMarkup: getCommandKeyboard(false),
+            replyMarkup: getCommandKeyboard(false, locale),
           },
         );
       }
@@ -4231,7 +4232,7 @@ export async function rejectTelegramServerChangeRequest(input: {
           supportLink,
         ),
         {
-          replyMarkup: getCommandKeyboard(false),
+          replyMarkup: getCommandKeyboard(false, locale),
         },
       );
     }
@@ -4476,7 +4477,7 @@ export async function approveTelegramPremiumSupportRequest(input: {
         request.telegramChatId,
         finalRequest.customerMessage || ui.premiumRequestApproved(request.dynamicAccessKey.name, applied.appliedRegionCode, supportLink),
         {
-          replyMarkup: getCommandKeyboard(false),
+          replyMarkup: getCommandKeyboard(false, locale),
         },
       );
     }
@@ -4611,7 +4612,7 @@ export async function handleTelegramPremiumSupportRequest(input: {
         request.telegramChatId,
         finalRequest.customerMessage || ui.premiumIssueHandled(request.dynamicAccessKey.name, supportLink),
         {
-          replyMarkup: getCommandKeyboard(false),
+          replyMarkup: getCommandKeyboard(false, locale),
         },
       );
     }
@@ -4710,7 +4711,7 @@ export async function dismissTelegramPremiumSupportRequest(input: {
       request.telegramChatId,
       finalRequest.customerMessage || ui.premiumSupportDismissed(request.dynamicAccessKey.name, null, supportLink),
       {
-        replyMarkup: getCommandKeyboard(false),
+        replyMarkup: getCommandKeyboard(false, locale),
       },
     );
   }
@@ -7220,7 +7221,7 @@ async function handleTelegramCallbackQuery(
                   refundEligibility.reason ? escapeHtml(refundEligibility.reason) : ui.refundPolicySummary,
                 ].join('\n'),
                 {
-                  replyMarkup: getCommandKeyboard(isAdmin),
+                  replyMarkup: getCommandKeyboard(isAdmin, locale),
                 },
               );
               await answerTelegramCallbackQuery(
@@ -7315,7 +7316,7 @@ async function handleTelegramCallbackQuery(
               },
             });
             await sendTelegramMessage(config.botToken, chatId, ui.orderCancelled(order.orderCode), {
-              replyMarkup: getCommandKeyboard(isAdmin),
+              replyMarkup: getCommandKeyboard(isAdmin, locale),
             });
             await answerTelegramCallbackQuery(
               config.botToken,
@@ -7553,7 +7554,15 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     return handleEmailLink(chatId, telegramUserId, text, locale);
   }
 
-  const commandMatch = text.match(/^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/);
+  const adminActor = await resolveTelegramAdminActor({
+    telegramUserId,
+    chatId,
+    config,
+  });
+  const isAdmin = adminActor.isAdmin;
+  const normalizedShortcutCommand = normalizeTelegramReplyKeyboardCommand(text, isAdmin);
+  const commandText = normalizedShortcutCommand || text;
+  const commandMatch = commandText.match(/^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/);
   if (!commandMatch) {
     if (activeOrder) {
       return handleTelegramOrderTextMessage({
@@ -7585,12 +7594,6 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
   const command = commandMatch[1].toLowerCase();
   const argsText = commandMatch[2] || '';
-  const adminActor = await resolveTelegramAdminActor({
-    telegramUserId,
-    chatId,
-    config,
-  });
-  const isAdmin = adminActor.isAdmin;
 
   switch (command) {
     case 'start':

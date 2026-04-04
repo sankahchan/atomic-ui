@@ -127,7 +127,7 @@ export async function handleTelegramLocaleOrPreferenceCallback(input: {
         ui.languagePromptDesc,
       ].join('\n'),
       {
-        replyMarkup: getCommandKeyboard(input.isAdmin),
+        replyMarkup: getCommandKeyboard(input.isAdmin, parsed.locale),
       },
     );
     return { handled: true as const, result: null };

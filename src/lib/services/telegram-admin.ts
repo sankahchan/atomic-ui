@@ -652,7 +652,7 @@ export async function handleHelpCommand(
 ) {
   const message = buildTelegramHelpMessage({ isAdmin, locale });
   await sendTelegramMessage(botToken, chatId, message, {
-    replyMarkup: getCommandKeyboard(isAdmin),
+    replyMarkup: getCommandKeyboard(isAdmin, locale),
   });
 
   return null;

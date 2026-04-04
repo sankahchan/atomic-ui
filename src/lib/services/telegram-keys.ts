@@ -118,6 +118,23 @@ function truncateTelegramButtonLabel(value: string, maxLength = 28) {
   return `${trimmed.slice(0, maxLength - 1)}…`;
 }
 
+function formatTelegramKeyStatusChip(status: string) {
+  switch (status) {
+    case 'ACTIVE':
+      return '🟢 ACTIVE';
+    case 'PENDING':
+      return '🟡 PENDING';
+    case 'DISABLED':
+      return '🔴 DISABLED';
+    default:
+      return `⚪ ${status}`;
+  }
+}
+
+function formatTelegramKeySectionTitle(title: string, count: number) {
+  return `${title} (${count})`;
+}
+
 function buildTelegramServerChangeKeySelectionKeyboard(input: {
   locale: SupportedLocale;
   keys: Array<{
@@ -284,7 +301,14 @@ export async function handleMyKeysCommand(input: {
     return ui.myKeysEmpty;
   }
 
-  const lines = [ui.myKeysTitle, ''];
+  const lines = [
+    ui.myKeysTitle,
+    '',
+    input.locale === 'my'
+      ? 'လိုအပ်သော key ကို ရွေးပြီး share page ဖွင့်ခြင်း၊ renew လုပ်ခြင်း၊ support request တင်ခြင်းတို့ကို အောက်ပါ button များဖြင့် တိုက်ရိုက် လုပ်နိုင်ပါသည်။'
+      : 'Choose the key you need below. Use the buttons to open the share page, renew, or contact support directly.',
+    '',
+  ];
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
   const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
   const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
@@ -296,7 +320,7 @@ export async function handleMyKeysCommand(input: {
   }
 
   if (standardKeys.length > 0) {
-    lines.push(ui.myKeysSectionStandard, '');
+    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionStandard, standardKeys.length), '');
   }
 
   for (const key of standardKeys) {
@@ -305,17 +329,15 @@ export async function handleMyKeysCommand(input: {
       ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
       : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b>`,
-      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypeStandard)}`,
-      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-      `  ${ui.serverLabel}: ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypeStandard)}`,
+      `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
+      `  📊 ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  ${ui.sharePageLabel}: ${sharePageUrl}`,
+      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  🔗 ${ui.openSharePage}`,
       '',
     );
     inlineKeyboard.push([
@@ -345,7 +367,7 @@ export async function handleMyKeysCommand(input: {
   }
 
   if (trialKeys.length > 0) {
-    lines.push(ui.myKeysSectionTrial, '');
+    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionTrial, trialKeys.length), '');
   }
 
   for (const key of trialKeys) {
@@ -354,16 +376,15 @@ export async function handleMyKeysCommand(input: {
       ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
       : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b>`,
-      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypeTrial)}`,
-      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypeTrial)}`,
+      `  ${formatTelegramKeyStatusChip(key.status)}`,
+      `  📊 ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  ${ui.sharePageLabel}: ${sharePageUrl}`,
+      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  🔗 ${ui.openSharePage}`,
       '',
     );
     inlineKeyboard.push([
@@ -379,7 +400,7 @@ export async function handleMyKeysCommand(input: {
   }
 
   if (dynamicKeys.length > 0) {
-    lines.push(ui.myKeysSectionPremium, '');
+    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionPremium, dynamicKeys.length), '');
   }
 
   for (const key of dynamicKeys) {
@@ -388,26 +409,24 @@ export async function handleMyKeysCommand(input: {
     const latestRequest = latestPremiumRequestByKey.get(key.id);
     const preferredRegions = getDynamicKeyRegionChoices(key);
     lines.push(
-      `• <b>${escapeHtml(key.name)}</b>`,
-      `  ${ui.planLabel}: ${escapeHtml(ui.myKeysTypePremium)}`,
-      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-      `  ${ui.modeLabel}: ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
-      `  ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+      `• <b>${escapeHtml(key.name)}</b> • ${escapeHtml(ui.myKeysTypePremium)}`,
+      `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
+      `  🌐 ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
+      `  📊 ${formatTelegramQuotaSummary({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
         ui,
       })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
+      `  ⏳ ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
       preferredRegions.length > 0
-        ? `  ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
+        ? `  🎯 ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
         : '',
       latestRequest
-        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
+        ? `  🛟 ${ui.premiumOpenRequestLabel}: ${escapeHtml(
             `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
           )}`
         : '',
-      sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
+      sharePageUrl ? `  🔗 ${ui.openSharePage}` : '',
       '',
     );
     inlineKeyboard.push([

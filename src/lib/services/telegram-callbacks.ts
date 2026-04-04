@@ -45,31 +45,99 @@ const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 
-export function getCommandKeyboard(isAdmin: boolean) {
-  const keyboard = [
-    [{ text: '/buy' }, { text: '/trial' }],
-    [{ text: '/renew' }, { text: '/orders' }],
-    [{ text: '/refund' }, { text: '/mykeys' }],
-    [{ text: '/usage' }, { text: '/inbox' }],
-    [{ text: '/sub' }, { text: '/server' }],
-    [{ text: '/premium' }, { text: '/supportstatus' }],
-    [{ text: '/support' }, { text: '/notifications' }],
-    [{ text: '/cancel' }, { text: '/help' }],
-    [{ text: '/language' }],
-  ];
+type TelegramCommandShortcut = {
+  command: string;
+  labelEn: string;
+  labelMy: string;
+};
 
-  if (isAdmin) {
-    keyboard.push([{ text: '/status' }, { text: '/expiring' }]);
-    keyboard.push([{ text: '/find' }, { text: '/sysinfo' }]);
-    keyboard.push([{ text: '/refunds' }, { text: '/finance' }]);
-    keyboard.push([{ text: '/announcements' }]);
-  }
+const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
+  [
+    { command: '/buy', labelEn: '🛒 Buy key', labelMy: '🛒 Key ဝယ်မည်' },
+    { command: '/mykeys', labelEn: '🗂 My keys', labelMy: '🗂 Key များ' },
+  ],
+  [
+    { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
+    { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
+  ],
+  [
+    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+    { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
+  ],
+  [
+    { command: '/trial', labelEn: '🎁 Free trial', labelMy: '🎁 Free Trial' },
+    { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
+  ],
+  [
+    { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
+    { command: '/sub', labelEn: '📎 Sub links', labelMy: '📎 Sub Links' },
+  ],
+  [
+    { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
+    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
+  ],
+  [
+    { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
+    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
+  ],
+  [
+    { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
+  ],
+];
 
+const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
+  [
+    { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status' },
+    { command: '/expiring', labelEn: '⏰ Expiring', labelMy: '⏰ Expiring' },
+  ],
+  [
+    { command: '/find', labelEn: '🔎 Find key', labelMy: '🔎 Key ရှာ' },
+    { command: '/announcements', labelEn: '📢 Broadcasts', labelMy: '📢 Broadcasts' },
+  ],
+];
+
+function getTelegramShortcutLabel(shortcut: TelegramCommandShortcut, locale: SupportedLocale) {
+  return locale === 'my' ? shortcut.labelMy : shortcut.labelEn;
+}
+
+function listTelegramCommandShortcuts(isAdmin: boolean) {
+  return [...TELEGRAM_USER_COMMAND_ROWS, ...(isAdmin ? TELEGRAM_ADMIN_COMMAND_ROWS : [])];
+}
+
+export function getCommandKeyboard(isAdmin: boolean, locale: SupportedLocale = 'en') {
   return {
-    keyboard,
+    keyboard: listTelegramCommandShortcuts(isAdmin).map((row) =>
+      row.map((shortcut) => ({ text: getTelegramShortcutLabel(shortcut, locale) })),
+    ),
     resize_keyboard: true,
     one_time_keyboard: false,
   };
+}
+
+export function normalizeTelegramReplyKeyboardCommand(
+  text: string,
+  isAdmin: boolean,
+) {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  for (const row of listTelegramCommandShortcuts(isAdmin)) {
+    for (const shortcut of row) {
+      const aliases = [
+        shortcut.command,
+        shortcut.command.replace(/^\//, ''),
+        shortcut.labelEn,
+        shortcut.labelMy,
+      ];
+      if (aliases.some((alias) => alias.trim().toLowerCase() === normalized)) {
+        return shortcut.command;
+      }
+    }
+  }
+
+  return null;
 }
 
 export function buildTelegramLocaleSelectorKeyboard(

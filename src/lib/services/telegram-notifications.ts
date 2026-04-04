@@ -38,13 +38,13 @@ export function buildTelegramNotificationPreferencesMessage(
 ) {
   const lines = [
     locale === 'my'
-      ? '🔔 <b>Notification preferences</b>'
-      : '🔔 <b>Notification preferences</b>',
+      ? '🔔 <b>Notification settings</b>'
+      : '🔔 <b>Notification settings</b>',
     '',
-    `• ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
-    `• ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
+    `🏷 ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,
+    `🛠 ${getTelegramNotificationPreferenceLabel('maintenance', locale)}: <b>${preferences.maintenance ? 'ON' : 'OFF'}</b>`,
+    `🧾 ${getTelegramNotificationPreferenceLabel('receipt', locale)}: <b>${preferences.receipt ? 'ON' : 'OFF'}</b>`,
+    `🛟 ${getTelegramNotificationPreferenceLabel('support', locale)}: <b>${preferences.support ? 'ON' : 'OFF'}</b>`,
   ];
 
   if (includeHint) {
@@ -176,6 +176,10 @@ export async function handleInboxCommand(input: {
   const lines = [
     input.locale === 'my' ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>',
     '',
+    input.locale === 'my'
+      ? `Announcement ${announcements.length} ခု • Key notice ${mode === 'ALL' ? keyLogs.length : 0} ခု`
+      : `${announcements.length} announcement(s) • ${mode === 'ALL' ? keyLogs.length : 0} key notice(s)`,
+    '',
   ];
 
   if (announcements.length) {
@@ -196,7 +200,7 @@ export async function handleInboxCommand(input: {
       lines.push(
         `• ${delivery.isPinned ? '📌 ' : ''}<b>${escapeHtml(delivery.announcement.title)}</b>`,
         `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale)}`,
-        `  ${delivery.readAt ? (input.locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (input.locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
+        `  ${delivery.readAt ? '✅' : '🆕'} ${delivery.readAt ? (input.locale === 'my' ? 'ဖတ်ပြီး' : 'Read') : (input.locale === 'my' ? 'မဖတ်ရသေး' : 'Unread')}`,
       );
     }
     lines.push('');

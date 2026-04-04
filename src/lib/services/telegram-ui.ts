@@ -311,11 +311,20 @@ export function getTelegramUi(locale: SupportedLocale) {
     lifecycleExpiring3Body: (days: number) => isMyanmar ? `${days} ရက်ခန့်သာ ကျန်ပါသည်။` : `Only about ${days} day(s) remain.`,
     lifecycleExpiredTitle: isMyanmar ? '⌛ <b>သင့် access key သက်တမ်းကုန်သွားပါပြီ</b>' : '⌛ <b>Your access key has expired</b>',
     lifecycleExpiredBody: isMyanmar ? 'ဤ key ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက support ကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
-    startLinked: (username: string) => isMyanmar ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\nလိုအပ်သည့်အချိန်တွင် /usage သို့မဟုတ် /mykeys ကို အသုံးပြုနိုင်ပါသည်။` : `✅ Telegram linked for <b>${username}</b>.\n\nUse /usage or /mykeys to fetch your keys any time.`,
+    startLinked: (username: string) =>
+      isMyanmar
+        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\nအောက်ရှိ menu မှ key များကြည့်ခြင်း၊ အသစ်ဝယ်ခြင်း၊ renew လုပ်ခြင်းနှင့် support ရယူခြင်းတို့ကို လွယ်ကူစွာ အသုံးပြုနိုင်ပါသည်။`
+        : `✅ Telegram linked for <b>${username}</b>.\n\nUse the menu below to view your keys, buy a new one, renew, or get support quickly.`,
     linkExpired: isMyanmar ? '⚠️ ဤ Telegram link သက်တမ်းကုန်သွားပါပြီ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '⚠️ This Telegram link has expired. Ask the admin to generate a new one.',
     linkInvalid: isMyanmar ? '❌ ဤ Telegram link ကို မသုံးနိုင်တော့ပါ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.',
-    welcomeBack: (username: string) => isMyanmar ? `✅ ပြန်လည်ကြိုဆိုပါသည်၊ <b>${username}</b>!\n\nသင့် account သည် ချိတ်ဆက်ပြီးဖြစ်သည်။ /usage သို့မဟုတ် /mykeys ကို အချိန်မရွေး အသုံးပြုနိုင်ပါသည်။` : `✅ Welcome back, <b>${username}</b>!\n\nYour account is already linked. Use /usage or /mykeys any time.`,
-    accountLinked: (username: string) => isMyanmar ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\nကြိုဆိုပါသည်၊ <b>${username}</b>! /usage သို့မဟုတ် /mykeys ကို အသုံးပြုနိုင်ပါသည်။` : `✅ Account linked successfully!\n\nWelcome, <b>${username}</b>! Use /usage or /mykeys to fetch your keys.`,
+    welcomeBack: (username: string) =>
+      isMyanmar
+        ? `✅ ပြန်လည်ကြိုဆိုပါသည်၊ <b>${username}</b>!\n\nသင့် account သည် ချိတ်ဆက်ပြီးဖြစ်သည်။ အောက်ရှိ menu မှ /buy, /mykeys, /renew, /support တို့ကို အလွယ်တကူ အသုံးပြုနိုင်ပါသည်။`
+        : `✅ Welcome back, <b>${username}</b>!\n\nYour account is already linked. Use the menu below for /buy, /mykeys, /renew, and /support.`,
+    accountLinked: (username: string) =>
+      isMyanmar
+        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\nကြိုဆိုပါသည်၊ <b>${username}</b>! အောက်ရှိ menu မှ key များကြည့်ခြင်းနှင့် order စတင်ခြင်းတို့ကို လွယ်ကူစွာ ပြုလုပ်နိုင်ပါသည်။`
+        : `✅ Account linked successfully!\n\nWelcome, <b>${username}</b>! Use the menu below to view keys and start new orders quickly.`,
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
     languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
     languagePromptDesc: isMyanmar
@@ -330,15 +339,17 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အသုံးဝင်သော command များ</b>\n• /buy - key အသစ်မှာယူရန်\n• /trial - ၁ ရက် 3 GB free trial ရယူရန်\n• /renew - လက်ရှိ key ကို သက်တမ်းတိုးရန်\n• /orders - သင့် order များကို ကြည့်ရန်\n• /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်ရန်\n• /mykeys - ချိတ်ထားသော key များကို ကြည့်ရန်\n• /inbox - မကြာသေးမီက ပို့ထားသော notice များကို ကြည့်ရန်\n• /notifications - notice preference များကို ပြောင်းရန်\n• /premium - premium key support shortcut များကို ကြည့်ရန်\n• /premiumregion - premium region အခြေအနေကို ကြည့်ရန်\n• /supportstatus - premium support request အခြေအနေကို စစ်ရန်\n• /server - server ပြောင်းလဲရန် တောင်းဆိုရန်\n• /support - admin အကူအညီ link ကို ကြည့်ရန်\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick commands</b>\n• /buy - order a new key\n• /trial - claim the 1-day 3 GB free trial\n• /renew - renew an existing key\n• /orders - view your recent orders\n• /refund - view refund-eligible orders\n• /mykeys - view your linked keys\n• /inbox - view your recent notices\n• /notifications - manage your notice preferences\n• /premium - open premium support shortcuts\n• /premiumregion - view premium region health\n• /supportstatus - check your premium support request status\n• /server - request a server change for a normal key\n• /support - open the admin support link\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>ယခု စတင်အသုံးပြုနိုင်သော menu များ</b>\n• 🛒 Key ဝယ်မည်\n• 🗂 Key များ\n• 🔄 Renew\n• 📬 Inbox\n\n<b>အခြား အသုံးဝင်သော shortcut များ</b>\n• 🎁 Free Trial\n• 💎 Premium\n• 🛠 Server ပြောင်း\n• 🛟 Support\n\nအောက်ရှိ menu button များကိုနှိပ်ပြီး အသုံးပြုနိုင်သလို slash command များကိုလည်း အချိန်မရွေး ဆက်သုံးနိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Start here</b>\n• 🛒 Buy key\n• 🗂 My keys\n• 🔄 Renew\n• 📬 Inbox\n\n<b>More shortcuts</b>\n• 🎁 Free trial\n• 💎 Premium\n• 🛠 Server change\n• 🛟 Support\n\nTap the menu buttons below, or keep using slash commands any time.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
     keyNotFoundDefault: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES[locale],
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
-    myKeysEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိပါ။' : '❌ No linked keys found for this Telegram account.',
-    myKeysTitle: isMyanmar ? '🗂 <b>သင့်နှင့် ချိတ်ထားသော key များ</b>' : '🗂 <b>Your linked keys</b>',
+    myKeysEmpty: isMyanmar
+      ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိသေးပါ။ Key အသစ်ဝယ်ရန် /buy သို့မဟုတ် free trial ရယူရန် /trial ကို အသုံးပြုနိုင်ပါသည်။'
+      : '❌ No linked keys were found for this Telegram account yet. Use /buy for a new key or /trial for a free trial.',
+    myKeysTitle: isMyanmar ? '🗂 <b>သင့် key များ</b>' : '🗂 <b>Your key menu</b>',
     myKeysSectionStandard: isMyanmar ? '🔑 <b>Normal keys</b>' : '🔑 <b>Normal keys</b>',
     myKeysSectionTrial: isMyanmar ? '🎁 <b>Trial keys</b>' : '🎁 <b>Trial keys</b>',
     myKeysSectionPremium: isMyanmar ? '💎 <b>Premium dynamic keys</b>' : '💎 <b>Premium dynamic keys</b>',
@@ -434,14 +445,14 @@ export function getTelegramUi(locale: SupportedLocale) {
     renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
     buyDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ key အသစ် မမှာယူနိုင်သေးပါ။' : 'ℹ️ New key orders are not available through Telegram right now.',
     buyStandardSummary: isMyanmar
-      ? '🔑 <b>Standard key</b> သည် ပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်သော regular key ဖြစ်ပြီး စျေးနှုန်းသက်သာကာ server တစ်ခုအပေါ် အခြေခံပါသည်။'
-      : '🔑 <b>Standard key</b> is the lower-cost option for normal daily use and typically stays on one selected server.',
+      ? '🔑 <b>Standard key</b>\nပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်သော regular key ဖြစ်ပြီး စျေးနှုန်းသက်သာကာ ရွေးထားသော server တစ်ခုအပေါ် အခြေခံပါသည်။'
+      : '🔑 <b>Standard key</b>\nLower-cost option for normal daily use. It usually stays on the server you select.',
     buyPremiumSummary: isMyanmar
-      ? '💎 <b>Premium key</b> သည် dynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် priority support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
-      : '💎 <b>Premium key</b> gives you dynamic routing, better stability, auto failover, and priority support.',
+      ? '💎 <b>Premium key</b>\nDynamic routing၊ ပိုတည်ငြိမ်မှု၊ auto failover နှင့် priority support အကျိုးကျေးဇူးများပါဝင်ပါသည်။'
+      : '💎 <b>Premium key</b>\nBuilt for users who want dynamic routing, better stability, auto failover, and priority support.',
     buyPlanChooseHint: isMyanmar
-      ? 'မဝယ်မီ Standard နှင့် Premium အကြား ကွာခြားချက်နှင့် available package များကို အောက်တွင် ကြည့်နိုင်ပါသည်။'
-      : 'Before you buy, review the difference between Standard and Premium and the available packages below.',
+      ? 'Order လုပ်စဉ် အဆင့်များမှာ - 1) plan ရွေးရန် 2) server / payment ရွေးရန် 3) screenshot ပို့ရန် 4) admin approval စောင့်ရန် ဖြစ်ပါသည်။'
+      : 'Checkout is simple: 1) choose a plan 2) choose server/payment 3) send your screenshot 4) wait for admin approval.',
     buyStandardPlansTitle: isMyanmar ? 'Standard packages' : 'Standard packages',
     buyPremiumPlansTitle: isMyanmar ? 'Premium packages' : 'Premium packages',
     buyPremiumUpsell: isMyanmar
@@ -462,8 +473,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '🧾 After payment, send the payment screenshot here as a photo or document. Make sure the amount, transfer ID, and time are clearly visible.',
     orderPlanPrompt: (code: string) =>
       isMyanmar
-        ? `🛒 <b>Order ${code}</b>\n\nအောက်ပါစာရင်းထဲမှ လိုချင်သော plan ကို ရွေးချယ်ပါ။ Button ကိုနှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။`
-        : `🛒 <b>Order ${code}</b>\n\nChoose one of the plans below. You can tap a button or reply with the plan number.`,
+        ? `🛒 <b>Order ${code}</b>\n\nသင့်အတွက် သင့်တော်သော package ကို ရွေးချယ်ပါ။ Button ကိုနှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။`
+        : `🛒 <b>Order ${code}</b>\n\nChoose the package that fits you. You can tap a button or reply with the plan number.`,
     orderMonthsPrompt: isMyanmar
       ? '📆 Unlimited plan အတွက် လအရေအတွက်ကို ပို့ပါ။ အနည်းဆုံး 3 လ ဖြစ်ရပါမည်။'
       : '📆 Send the number of months for the unlimited plan. The minimum is 3 months.',
@@ -705,8 +716,8 @@ export function getTelegramUi(locale: SupportedLocale) {
         ? `✅ Order <b>${code}</b> အတွက် refund ကို အတည်ပြုပြီးပါပြီ။${customerMessage ? `\n\n${customerMessage}` : ''}`
         : `✅ Refund approved for order <b>${code}</b>.${customerMessage ? `\n\n${customerMessage}` : ''}`,
     myKeysRenewHint: isMyanmar
-      ? 'အောက်ပါ button များဖြင့် key ကို တိုက်ရိုက် သက်တမ်းတိုးနိုင်ပါသည်။'
-      : 'Use the buttons below to renew a specific key directly.',
+      ? 'အောက်ပါ button များဖြင့် share page ဖွင့်ခြင်း၊ renew လုပ်ခြင်း၊ server issue တင်ခြင်းနှင့် support ရယူခြင်းတို့ကို တိုက်ရိုက် ပြုလုပ်နိုင်ပါသည်။'
+      : 'Use the buttons below to open the share page, renew, report a server issue, or contact support directly.',
     renewShortcutUsed: (keyName: string) =>
       isMyanmar
         ? `🔄 <b>${keyName}</b> အတွက် renewal ကို တိုက်ရိုက် စတင်လိုက်ပါပြီ။`

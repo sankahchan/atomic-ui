@@ -102,7 +102,7 @@ export async function handleTelegramStartCommand(input: {
         input.chatId,
         ui.startLinked(escapeHtml(input.username)),
         {
-          replyMarkup: getCommandKeyboard(input.isAdmin),
+          replyMarkup: getCommandKeyboard(input.isAdmin, locale),
         },
       );
 
@@ -141,7 +141,7 @@ export async function handleTelegramStartCommand(input: {
         : ui.linkInvalid;
 
     await sendTelegramMessage(input.botToken, input.chatId, errorMessage, {
-      replyMarkup: getCommandKeyboard(input.isAdmin),
+      replyMarkup: getCommandKeyboard(input.isAdmin, locale),
     });
     return null;
   }
@@ -156,7 +156,7 @@ export async function handleTelegramStartCommand(input: {
       input.chatId,
       ui.welcomeBack(escapeHtml(input.username)),
       {
-        replyMarkup: getCommandKeyboard(input.isAdmin),
+        replyMarkup: getCommandKeyboard(input.isAdmin, locale),
       },
     );
     return null;
@@ -178,7 +178,7 @@ export async function handleTelegramStartCommand(input: {
       input.chatId,
       ui.accountLinked(escapeHtml(input.username)),
       {
-        replyMarkup: getCommandKeyboard(input.isAdmin),
+        replyMarkup: getCommandKeyboard(input.isAdmin, locale),
       },
     );
     return null;
@@ -196,7 +196,7 @@ export async function handleTelegramStartCommand(input: {
     input.chatId,
     ui.hello(escapeHtml(input.username), escapeHtml(welcomeMessage), input.telegramUserId, adminMsg),
     {
-      replyMarkup: getCommandKeyboard(input.isAdmin),
+      replyMarkup: getCommandKeyboard(input.isAdmin, locale),
     },
   );
   return null;

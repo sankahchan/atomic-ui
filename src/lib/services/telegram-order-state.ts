@@ -447,6 +447,10 @@ export async function handleBuyCommand(input: {
     ui.orderPlanPrompt(preparedOrder.orderCode),
     '',
     ui.buyPlanChooseHint,
+    '',
+    input.locale === 'my'
+      ? '<b>ဝယ်ယူခြင်း အကျဉ်းချုပ်</b>\n• Plan ရွေးရန်\n• Server / payment ရွေးရန်\n• Screenshot ပို့ရန်\n• Admin approval စောင့်ရန်'
+      : '<b>How buying works</b>\n• Choose a plan\n• Choose server / payment\n• Send your screenshot\n• Wait for admin approval',
     ...(input.deps.buildTelegramCouponReadyLines
       ? input.deps.buildTelegramCouponReadyLines({
           locale: input.locale,
@@ -465,6 +469,13 @@ export async function handleBuyCommand(input: {
     ui.buyPremiumSummary,
     ui.buyPremiumUpsell,
     ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
+    '',
+    input.locale === 'my'
+      ? '<b>Button ကို နှိပ်ပြီးတိုက်ရိုက် ရွေးနိုင်ပါသည်</b>'
+      : '<b>Tap a button below to choose directly</b>',
+    input.locale === 'my'
+      ? 'Button မသုံးနိုင်ပါက အောက်ပါနံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
+      : 'If the buttons do not work, reply with the matching number below.',
     '',
     ...enabledPlans.map((plan: any, index: number) => {
       const label = resolveTelegramSalesPlanLabel(plan, input.locale);
@@ -551,7 +562,15 @@ export async function handleRenewOrderCommand(input: {
 
   const lines = [
     ui.renewTargetPrompt(order.orderCode),
-    ...renewableKeys.map((key, index) => `${index + 1}. ${key.name} (${key.status})`),
+    '',
+    input.locale === 'my'
+      ? 'Renew လုပ်လိုသော key ကို ရွေးပါ။ Button ကို နှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။'
+      : 'Choose the key you want to renew. You can tap a button or reply with the number.',
+    '',
+    ...renewableKeys.map((key, index) => {
+      const typeLabel = key.kind === 'dynamic' ? ui.myKeysTypePremium : ui.myKeysTypeStandard;
+      return `${index + 1}. ${key.name} • ${typeLabel} • ${key.status}`;
+    }),
   ];
   const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
