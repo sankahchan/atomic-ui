@@ -231,6 +231,8 @@ model AccessKey {
   deviceLimitExceededAt     DateTime?
   deviceLimitWarningSentAt  DateTime?
   deviceLimitLastObservedDevices Int?
+  deviceLimitSuppressedUntil DateTime?
+  deviceLimitAutoDisabledAt  DateTime?
 
   // Ownership and tagging
   owner String? // Owner/email for this key

@@ -193,17 +193,30 @@ type DeviceLimitVisualState = {
   deviceLimitObservedDevices?: number | null;
   deviceLimitOverLimit?: boolean;
   deviceLimitEnforcementStage?: string | null;
+  deviceLimitSuppressedUntil?: Date | string | null;
+  deviceLimitAutoDisabledAt?: Date | string | null;
 };
 
 function getDeviceLimitVisualState(key: DeviceLimitVisualState) {
   const deviceCount = key.deviceLimitObservedDevices ?? key.estimatedDevices ?? 0;
   const overLimit = key.deviceLimitOverLimit ?? (key.maxDevices != null && deviceCount > key.maxDevices);
   const stage = key.deviceLimitEnforcementStage ?? (overLimit ? 'PENDING_DISABLE' : 'OK');
+  const stageLabel =
+    stage === 'SUPPRESSED'
+      ? 'Suppressed'
+      : stage === 'DISABLED'
+        ? 'Auto-disabled'
+        : stage === 'PENDING_DISABLE'
+          ? 'Disable pending'
+          : stage === 'WARNED'
+            ? 'Warning sent'
+            : 'Estimated';
 
   return {
     deviceCount,
     overLimit,
     stage,
+    stageLabel,
   };
 }
 
@@ -2549,6 +2562,8 @@ function KeyRow({
     deviceLimitObservedDevices?: number;
     deviceLimitOverLimit?: boolean;
     deviceLimitEnforcementStage?: string;
+    deviceLimitSuppressedUntil?: Date | null;
+    deviceLimitAutoDisabledAt?: Date | null;
     lastUsedAt?: Date | null;
     lastTrafficAt?: Date | null;
     recentTrafficDeltaBytes?: bigint;
@@ -2577,7 +2592,7 @@ function KeyRow({
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
   const showTrafficState = accessKey.status === 'ACTIVE';
-  const { deviceCount, overLimit } = getDeviceLimitVisualState(accessKey);
+  const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(accessKey);
 
   return (
     <tr
@@ -2677,17 +2692,26 @@ function KeyRow({
             </p>
           ) : null}
           {accessKey.maxDevices ? (
-            <Badge
-              variant="outline"
-              className={cn(
-                'border text-[11px]',
-                overLimit
-                  ? 'border-violet-500/40 text-violet-300'
-                  : 'border-border/60 text-muted-foreground',
-              )}
-            >
-              {deviceCount}/{accessKey.maxDevices} devices
-            </Badge>
+            <div className="space-y-1">
+              <Badge
+                variant="outline"
+                className={cn(
+                  'border text-[11px]',
+                  overLimit || stage === 'DISABLED'
+                    ? 'border-violet-500/40 text-violet-300'
+                    : stage === 'SUPPRESSED'
+                      ? 'border-sky-500/40 text-sky-300'
+                      : 'border-border/60 text-muted-foreground',
+                )}
+              >
+                {deviceCount}/{accessKey.maxDevices} devices
+              </Badge>
+              {stage !== 'OK' ? (
+                <p className={cn('text-[11px]', overLimit || stage === 'DISABLED' ? 'text-violet-300' : 'text-sky-300')}>
+                  {stageLabel}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </td>
@@ -2731,8 +2755,8 @@ function KeyRow({
           </span>
         </div>
         {accessKey.maxDevices ? (
-          <p className={cn('mt-1 text-[11px]', accessKey.deviceLimitOverLimit ? 'text-violet-300' : 'text-muted-foreground')}>
-            limit {accessKey.maxDevices}
+          <p className={cn('mt-1 text-[11px]', overLimit || stage === 'DISABLED' ? 'text-violet-300' : stage === 'SUPPRESSED' ? 'text-sky-300' : 'text-muted-foreground')}>
+            {stage !== 'OK' ? `${stageLabel} · ` : ''}limit {accessKey.maxDevices}
           </p>
         ) : null}
       </td>
@@ -2914,7 +2938,7 @@ export default function KeysPage() {
     const usedBytes = formatBytes(BigInt(key.usedBytes ?? 0));
     const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
     const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
-    const { deviceCount, overLimit } = getDeviceLimitVisualState(key);
+    const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
 
     return (
       <div className="space-y-4">
@@ -2961,14 +2985,25 @@ export default function KeysPage() {
               </Badge>
             ) : null}
             {key.maxDevices ? (
-              <Badge
-                variant="outline"
-                className={cn(
-                  overLimit ? 'border-violet-500/40 text-violet-300' : 'border-border/60 text-muted-foreground',
-                )}
-              >
-                {deviceCount}/{key.maxDevices} devices
-              </Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    overLimit || stage === 'DISABLED'
+                      ? 'border-violet-500/40 text-violet-300'
+                      : stage === 'SUPPRESSED'
+                        ? 'border-sky-500/40 text-sky-300'
+                        : 'border-border/60 text-muted-foreground',
+                  )}
+                >
+                  {deviceCount}/{key.maxDevices} devices
+                </Badge>
+                {stage !== 'OK' ? (
+                  <span className={cn('text-[11px]', overLimit || stage === 'DISABLED' ? 'text-violet-300' : 'text-sky-300')}>
+                    {stageLabel}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
@@ -3008,8 +3043,8 @@ export default function KeysPage() {
               {deviceCount}
             </p>
             {key.maxDevices ? (
-              <p className={cn('mt-1 text-[11px]', overLimit ? 'text-violet-300' : 'text-muted-foreground')}>
-                limit {key.maxDevices}
+              <p className={cn('mt-1 text-[11px]', overLimit || stage === 'DISABLED' ? 'text-violet-300' : stage === 'SUPPRESSED' ? 'text-sky-300' : 'text-muted-foreground')}>
+                {stage !== 'OK' ? `${stageLabel} · ` : ''}limit {key.maxDevices}
               </p>
             ) : null}
           </div>
@@ -3085,6 +3120,7 @@ export default function KeysPage() {
     overQuota: filters.quickFilters.overQuota || undefined,
     inactive30d: filters.quickFilters.inactive30d || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
+    deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
     owner: filters.ownerFilter || undefined,
   }, {
@@ -3552,6 +3588,7 @@ export default function KeysPage() {
     filters.quickFilters.overQuota ||
     filters.quickFilters.inactive30d ||
     filters.quickFilters.overDeviceLimit ||
+    filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
     filters.ownerFilter,
   );
@@ -3730,6 +3767,47 @@ export default function KeysPage() {
             </div>
           </div>
         )}
+
+        {stats ? (
+          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+            <div className="ops-kpi-tile p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-violet-500/20 bg-violet-500/10">
+                  <Smartphone className="h-4 w-4 text-violet-300" />
+                </div>
+                <p className="text-xs font-medium text-violet-300">Over device limit</p>
+              </div>
+              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitOverLimit ?? 0}</p>
+            </div>
+            <div className="ops-kpi-tile p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-amber-500/20 bg-amber-500/10">
+                  <AlertTriangle className="h-4 w-4 text-amber-300" />
+                </div>
+                <p className="text-xs font-medium text-amber-300">Warning sent</p>
+              </div>
+              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitWarned ?? 0}</p>
+            </div>
+            <div className="ops-kpi-tile p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-fuchsia-500/20 bg-fuchsia-500/10">
+                  <Clock className="h-4 w-4 text-fuchsia-300" />
+                </div>
+                <p className="text-xs font-medium text-fuchsia-300">Pending disable</p>
+              </div>
+              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitPendingDisable ?? 0}</p>
+            </div>
+            <div className="ops-kpi-tile p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-red-500/20 bg-red-500/10">
+                  <Power className="h-4 w-4 text-red-300" />
+                </div>
+                <p className="text-xs font-medium text-red-300">Auto-disabled</p>
+              </div>
+              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitAutoDisabled ?? 0}</p>
+            </div>
+          </div>
+        ) : null}
 
         {stats ? (
           <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-3.5 dark:bg-white/[0.02]">
@@ -3960,6 +4038,15 @@ export default function KeysPage() {
           <Smartphone className="w-3 h-3 mr-1" />
           Over device limit
         </Button>
+        <Button
+          variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.deviceLimitWarned && 'bg-amber-600 hover:bg-amber-700')}
+          onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
+        >
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Warning sent
+        </Button>
         
         {/* Tag filter */}
         <div className="ml-1.5 flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
@@ -3983,7 +4070,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.overDeviceLimit || filters.tagFilter || filters.ownerFilter) && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter) && (
           <Button
             variant="ghost"
             size="sm"
@@ -4261,6 +4348,15 @@ export default function KeysPage() {
                   <Smartphone className="w-3 h-3 mr-1" />
                   Over device limit
                 </Button>
+                <Button
+                  variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.deviceLimitWarned && 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
+                >
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Warning sent
+                </Button>
               </div>
             </div>
 
@@ -4528,7 +4624,7 @@ export default function KeysPage() {
               const trafficMeta = liveMetricsById.get(key.id);
               const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
               const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
-              const { deviceCount, overLimit, stage } = getDeviceLimitVisualState(key);
+              const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -4590,8 +4686,17 @@ export default function KeysPage() {
                         >
                           {deviceCount}/{key.maxDevices} devices
                         </Badge>
-                        <span className={cn('text-[11px]', overLimit ? 'text-violet-300' : 'text-muted-foreground')}>
-                          {stage === 'PENDING_DISABLE' ? 'Disable pending' : 'Estimated'}
+                        <span
+                          className={cn(
+                            'text-[11px]',
+                            overLimit || stage === 'DISABLED'
+                              ? 'text-violet-300'
+                              : stage === 'SUPPRESSED'
+                                ? 'text-sky-300'
+                                : 'text-muted-foreground',
+                          )}
+                        >
+                          {stageLabel}
                         </span>
                       </div>
                     ) : null}

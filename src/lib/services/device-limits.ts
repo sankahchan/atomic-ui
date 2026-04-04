@@ -23,7 +23,7 @@ export type DeviceLimitEvidence = {
   lastSeenAt: Date;
 };
 
-export type DeviceLimitStage = 'OK' | 'WARNED' | 'PENDING_DISABLE' | 'DISABLED';
+export type DeviceLimitStage = 'OK' | 'WARNED' | 'PENDING_DISABLE' | 'SUPPRESSED' | 'DISABLED';
 
 export type DeviceLimitSnapshot = {
   accessKeyId: string;
@@ -32,6 +32,8 @@ export type DeviceLimitSnapshot = {
   overLimit: boolean;
   stage: DeviceLimitStage;
   disableAt: Date | null;
+  suppressedUntil: Date | null;
+  autoDisabledAt: Date | null;
   evidence: DeviceLimitEvidence[];
 };
 
@@ -41,6 +43,8 @@ type SnapshotAccessKey = {
   status: string;
   deviceLimitExceededAt: Date | null;
   deviceLimitWarningSentAt: Date | null;
+  deviceLimitSuppressedUntil: Date | null;
+  deviceLimitAutoDisabledAt: Date | null;
 };
 
 type EnforcementAccessKey = SnapshotAccessKey & {
@@ -52,6 +56,8 @@ type EnforcementAccessKey = SnapshotAccessKey & {
   estimatedDevices: number;
   peakDevices: number;
   deviceLimitLastObservedDevices: number | null;
+  deviceLimitSuppressedUntil: Date | null;
+  deviceLimitAutoDisabledAt: Date | null;
   server: {
     id: string;
     name: string;
@@ -101,6 +107,8 @@ export function deriveDeviceLimitStage(input: {
   observedDevices: number;
   deviceLimitExceededAt: Date | null;
   deviceLimitWarningSentAt: Date | null;
+  deviceLimitSuppressedUntil: Date | null;
+  deviceLimitAutoDisabledAt: Date | null;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
@@ -111,24 +119,29 @@ export function deriveDeviceLimitStage(input: {
       input.observedDevices > input.maxDevices,
   );
 
+  const isSuppressed = Boolean(input.deviceLimitSuppressedUntil && input.deviceLimitSuppressedUntil > now);
   const disableAt =
     overLimit && input.deviceLimitExceededAt
       ? new Date(input.deviceLimitExceededAt.getTime() + DEVICE_LIMIT_DISABLE_DELAY_MS)
       : null;
 
   let stage: DeviceLimitStage = 'OK';
-  if (input.status === 'DISABLED' && input.deviceLimitExceededAt) {
+  if (input.status === 'DISABLED' && input.deviceLimitAutoDisabledAt) {
     stage = 'DISABLED';
+  } else if (isSuppressed) {
+    stage = 'SUPPRESSED';
   } else if (overLimit && input.deviceLimitWarningSentAt) {
-    stage = disableAt && disableAt <= now ? 'PENDING_DISABLE' : 'PENDING_DISABLE';
+    stage = disableAt && disableAt <= now ? 'PENDING_DISABLE' : 'WARNED';
   } else if (overLimit) {
     stage = 'WARNED';
   }
 
   return {
     overLimit,
-    disableAt,
+    disableAt: isSuppressed ? null : disableAt,
     stage,
+    suppressedUntil: input.deviceLimitSuppressedUntil,
+    autoDisabledAt: input.deviceLimitAutoDisabledAt,
   };
 }
 
@@ -181,7 +194,9 @@ export async function getAccessKeyDeviceLimitSnapshots(input: {
   const result = new Map<string, DeviceLimitSnapshot>();
 
   for (const key of input.accessKeys) {
-    const evidence = Array.from(evidenceByKey.get(key.id)?.values() ?? []);
+    const evidence = Array.from(evidenceByKey.get(key.id)?.values() ?? []).sort(
+      (left, right) => right.lastSeenAt.getTime() - left.lastSeenAt.getTime(),
+    );
     const activeSessionCount = sessionCountByKey.get(key.id) ?? 0;
     const observedDevices = Math.max(evidence.length, activeSessionCount > 0 ? 1 : 0);
     const state = deriveDeviceLimitStage({
@@ -190,6 +205,8 @@ export async function getAccessKeyDeviceLimitSnapshots(input: {
       observedDevices,
       deviceLimitExceededAt: key.deviceLimitExceededAt,
       deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+      deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+      deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
       now,
     });
 
@@ -200,6 +217,8 @@ export async function getAccessKeyDeviceLimitSnapshots(input: {
       overLimit: state.overLimit,
       stage: state.stage,
       disableAt: state.disableAt,
+      suppressedUntil: state.suppressedUntil,
+      autoDisabledAt: state.autoDisabledAt,
       evidence: input.includeEvidence ? evidence : [],
     });
   }
@@ -212,7 +231,7 @@ async function sendDeviceLimitWarningNotifications(input: {
   observedDevices: number;
 }) {
   const message = input.key.maxDevices
-    ? `Your key is active on more devices than allowed.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\n\nIf you recently switched devices, disconnect the older device first. The key will be disabled automatically if this continues.`
+    ? `We estimated that this key is active on more devices than allowed.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\nWindow: recent activity from the last 30 minutes\n\nWhat to do now:\n• disconnect older devices first\n• wait a few minutes for old activity to disappear\n• contact support if the estimate looks wrong\n\nIf the estimate stays above the limit for about 15 minutes, the key will disable automatically.`
     : '';
 
   try {
@@ -237,6 +256,7 @@ async function sendDeviceLimitWarningNotifications(input: {
         `🖥 Server: ${input.key.server.name}`,
         `📊 Estimated devices: <b>${input.observedDevices}</b>`,
         `🚦 Limit: <b>${input.key.maxDevices}</b>`,
+        '🕒 Window: <b>last 30 minutes</b>',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -253,7 +273,7 @@ async function sendDeviceLimitDisabledNotifications(input: {
   try {
     await sendAccessKeySupportMessage({
       accessKeyId: input.key.id,
-      message: `Your key has been disabled because it stayed over the allowed device count.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\n\nContact support if this looks wrong and we can review it.`,
+      message: `Your key was disabled because the recent device estimate stayed above the allowed limit.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\nWindow: recent activity from the last 30 minutes\n\nContact support if this looks wrong and we can review it.`,
       source: 'device_limit_disabled',
     });
   } catch (error) {
@@ -270,6 +290,7 @@ async function sendDeviceLimitDisabledNotifications(input: {
         `🖥 Server: ${input.key.server.name}`,
         `📊 Estimated devices: <b>${input.observedDevices}</b>`,
         `🚦 Limit: <b>${input.key.maxDevices}</b>`,
+        '🕒 Window: <b>last 30 minutes</b>',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -301,6 +322,7 @@ async function disableKeyForDeviceLimit(input: {
         disabledOutlineKeyId: input.key.outlineKeyId,
         estimatedDevices: 0,
         deviceLimitLastObservedDevices: input.observedDevices,
+        deviceLimitAutoDisabledAt: input.now,
       },
     });
 
@@ -379,6 +401,8 @@ export async function runAccessKeyDeviceLimitCycle(now = new Date()) {
       status: key.status,
       deviceLimitExceededAt: key.deviceLimitExceededAt,
       deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+      deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+      deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
     })),
     now,
   });
@@ -395,9 +419,30 @@ export async function runAccessKeyDeviceLimitCycle(now = new Date()) {
     }
 
     const nextPeakDevices = Math.max(key.peakDevices || 0, snapshot.observedDevices);
+    const isSuppressed = Boolean(key.deviceLimitSuppressedUntil && key.deviceLimitSuppressedUntil > now);
     const shouldClearState =
       !snapshot.overLimit &&
       (key.deviceLimitExceededAt || key.deviceLimitWarningSentAt || key.deviceLimitLastObservedDevices !== snapshot.observedDevices || nextPeakDevices !== (key.peakDevices || 0));
+
+    if (isSuppressed) {
+      if (
+        key.deviceLimitExceededAt ||
+        key.deviceLimitWarningSentAt ||
+        key.deviceLimitLastObservedDevices !== snapshot.observedDevices ||
+        nextPeakDevices !== (key.peakDevices || 0)
+      ) {
+        await db.accessKey.update({
+          where: { id: key.id },
+          data: {
+            deviceLimitExceededAt: null,
+            deviceLimitWarningSentAt: null,
+            deviceLimitLastObservedDevices: snapshot.observedDevices,
+            peakDevices: nextPeakDevices,
+          },
+        });
+      }
+      continue;
+    }
 
     if (shouldClearState) {
       await db.accessKey.update({

@@ -46,6 +46,26 @@ test('buildDeviceEvidenceMap deduplicates by ip and user agent', () => {
 
 test('deriveDeviceLimitStage returns pending disable after warning is sent', () => {
   const now = new Date('2026-04-04T01:00:00.000Z');
+  const exceededAt = new Date(now.getTime() - DEVICE_LIMIT_DISABLE_DELAY_MS - 60_000);
+
+  const stage = deriveDeviceLimitStage({
+    status: 'ACTIVE',
+    maxDevices: 2,
+    observedDevices: 3,
+    deviceLimitExceededAt: exceededAt,
+    deviceLimitWarningSentAt: exceededAt,
+    deviceLimitSuppressedUntil: null,
+    deviceLimitAutoDisabledAt: null,
+    now,
+  });
+
+  assert.equal(stage.overLimit, true);
+  assert.equal(stage.stage, 'PENDING_DISABLE');
+  assert.ok(stage.disableAt instanceof Date);
+});
+
+test('deriveDeviceLimitStage returns warned before auto-disable deadline', () => {
+  const now = new Date('2026-04-04T01:00:00.000Z');
   const exceededAt = new Date(now.getTime() - DEVICE_LIMIT_DISABLE_DELAY_MS + 60_000);
 
   const stage = deriveDeviceLimitStage({
@@ -54,10 +74,28 @@ test('deriveDeviceLimitStage returns pending disable after warning is sent', () 
     observedDevices: 3,
     deviceLimitExceededAt: exceededAt,
     deviceLimitWarningSentAt: exceededAt,
+    deviceLimitSuppressedUntil: null,
+    deviceLimitAutoDisabledAt: null,
     now,
   });
 
-  assert.equal(stage.overLimit, true);
-  assert.equal(stage.stage, 'PENDING_DISABLE');
-  assert.ok(stage.disableAt instanceof Date);
+  assert.equal(stage.stage, 'WARNED');
+});
+
+test('deriveDeviceLimitStage returns suppressed when enforcement is paused', () => {
+  const now = new Date('2026-04-04T01:00:00.000Z');
+
+  const stage = deriveDeviceLimitStage({
+    status: 'ACTIVE',
+    maxDevices: 2,
+    observedDevices: 3,
+    deviceLimitExceededAt: now,
+    deviceLimitWarningSentAt: now,
+    deviceLimitSuppressedUntil: new Date(now.getTime() + 60 * 60 * 1000),
+    deviceLimitAutoDisabledAt: null,
+    now,
+  });
+
+  assert.equal(stage.stage, 'SUPPRESSED');
+  assert.equal(stage.disableAt, null);
 });

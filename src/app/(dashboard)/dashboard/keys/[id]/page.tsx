@@ -3654,10 +3654,71 @@ function TrafficGraph({
  * Displays estimated device count and recent connection sessions
  */
 function ConnectionSessionsCard({ keyId }: { keyId: string }) {
+  const utils = trpc.useUtils();
+  const { toast } = useToast();
   const { data, isLoading } = trpc.keys.getConnectionSessions.useQuery(
     { keyId, limit: 10 },
     { refetchInterval: 30000 } // Refresh every 30 seconds
   );
+  const refreshDeviceLimitState = async () => {
+    await Promise.all([
+      utils.keys.getConnectionSessions.invalidate({ keyId, limit: 10 }),
+      utils.keys.getById.invalidate({ id: keyId }),
+      utils.keys.getActivitySnapshot.invalidate({ id: keyId }),
+      utils.keys.list.invalidate(),
+      utils.keys.stats.invalidate(),
+    ]);
+  };
+  const clearWarningMutation = trpc.keys.clearDeviceLimitWarning.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Warning cleared',
+        description: 'The device-limit warning was cleared for this key.',
+      });
+      await refreshDeviceLimitState();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Unable to clear warning',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const suppressMutation = trpc.keys.setDeviceLimitSuppression.useMutation({
+    onSuccess: async (_result, variables) => {
+      toast({
+        title: variables.hours ? 'Enforcement suppressed' : 'Enforcement resumed',
+        description: variables.hours
+          ? `Device-limit enforcement is paused for ${variables.hours} hour${variables.hours === 1 ? '' : 's'}.`
+          : 'Device-limit enforcement is active again.',
+      });
+      await refreshDeviceLimitState();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Unable to update suppression',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const toggleStatusMutation = trpc.keys.toggleStatus.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Key re-enabled',
+        description: 'The access key is active again and the device-limit state was reset.',
+      });
+      await refreshDeviceLimitState();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Unable to re-enable key',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const formatDuration = (minutes: number): string => {
     if (minutes < 60) return `${minutes}m`;
@@ -3668,6 +3729,12 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
     return `${days}d ${hours % 24}h`;
   };
   const disableEta = data?.deviceLimitDisableAt ? formatRelativeTime(data.deviceLimitDisableAt) : null;
+  const suppressionEta = data?.deviceLimitSuppressedUntil ? formatRelativeTime(data.deviceLimitSuppressedUntil) : null;
+  const isSuppressed = data?.deviceLimitEnforcementStage === 'SUPPRESSED';
+  const isAutoDisabled = Boolean(data?.deviceLimitAutoDisabledAt);
+  const hasWarningState = data?.deviceLimitEnforcementStage === 'WARNED' || data?.deviceLimitEnforcementStage === 'PENDING_DISABLE';
+  const deviceEvidence = data?.subscriberDevices ?? [];
+  const isMutating = clearWarningMutation.isPending || suppressMutation.isPending || toggleStatusMutation.isPending;
 
   if (isLoading) {
     return (
@@ -3720,7 +3787,9 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           <div
             className={cn(
               'rounded-xl border px-4 py-3 text-sm',
-              data.deviceLimitOverLimit
+              isAutoDisabled
+                ? 'border-red-500/30 bg-red-500/10'
+                : data.deviceLimitOverLimit
                 ? 'border-violet-500/30 bg-violet-500/10'
                 : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
             )}
@@ -3736,17 +3805,37 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
                 variant="outline"
                 className={cn(
                   'border',
-                  data.deviceLimitOverLimit ? 'border-violet-500/40 text-violet-300' : 'border-border/60 text-muted-foreground',
+                  isAutoDisabled
+                    ? 'border-red-500/40 text-red-300'
+                    : data.deviceLimitOverLimit
+                      ? 'border-violet-500/40 text-violet-300'
+                      : isSuppressed
+                        ? 'border-sky-500/40 text-sky-300'
+                        : 'border-border/60 text-muted-foreground',
                 )}
               >
-                {data.deviceLimitEnforcementStage === 'PENDING_DISABLE'
+                {isAutoDisabled
+                  ? 'Auto-disabled'
+                  : data.deviceLimitEnforcementStage === 'PENDING_DISABLE'
                   ? 'Disable pending'
+                  : isSuppressed
+                    ? 'Suppressed'
                   : data.deviceLimitOverLimit
                     ? 'Over limit'
                     : 'Within limit'}
               </Badge>
             </div>
-            {data.deviceLimitOverLimit ? (
+            {isAutoDisabled ? (
+              <p className="mt-2 text-xs text-red-100/90">
+                This key was auto-disabled after the device estimate stayed above the configured limit. Re-enable it after you review the
+                recent device evidence below.
+              </p>
+            ) : isSuppressed ? (
+              <p className="mt-2 text-xs text-sky-100/90">
+                Enforcement is paused for this key{suppressionEta ? ` (${suppressionEta})` : ''}. The estimated device count still updates,
+                but warnings and auto-disable are temporarily skipped.
+              </p>
+            ) : data.deviceLimitOverLimit ? (
               <p className="mt-2 text-xs text-violet-100/90">
                 This key is over the configured device limit. If the estimate stays over the limit, it will disable automatically
                 {disableEta ? ` (${disableEta}).` : '.'}
@@ -3756,6 +3845,61 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
                 Device counts are estimated from recent traffic plus share/subscription activity.
               </p>
             )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {hasWarningState ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={isMutating}
+                  onClick={() => clearWarningMutation.mutate({ id: keyId })}
+                >
+                  Clear warning
+                </Button>
+              ) : null}
+              {isSuppressed ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={isMutating}
+                  onClick={() => suppressMutation.mutate({ id: keyId, hours: null })}
+                >
+                  Resume enforcement
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={isMutating}
+                    onClick={() => suppressMutation.mutate({ id: keyId, hours: 4 })}
+                  >
+                    Suppress 4h
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={isMutating}
+                    onClick={() => suppressMutation.mutate({ id: keyId, hours: 24 })}
+                  >
+                    Suppress 24h
+                  </Button>
+                </>
+              )}
+              {isAutoDisabled ? (
+                <Button
+                  size="sm"
+                  className="h-8"
+                  disabled={isMutating}
+                  onClick={() => toggleStatusMutation.mutate({ id: keyId })}
+                >
+                  Re-enable key
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -3797,27 +3941,42 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           </div>
         )}
 
-        {data?.subscriberDevices && data.subscriberDevices.length > 0 && (
+        {deviceEvidence.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Recent Client Devices</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Recent Device Evidence</p>
+                <p className="text-xs text-muted-foreground">Estimated from share/subscription activity in the last 30 minutes.</p>
+              </div>
+              <Badge variant="outline" className="border-border/60 text-muted-foreground">
+                {deviceEvidence.length} seen
+              </Badge>
+            </div>
             <div className="space-y-2">
-              {data.subscriberDevices.slice(0, 5).map((device, index) => (
+              {deviceEvidence.slice(0, 8).map((device, index) => (
                 <div
                   key={`${device.ip || 'unknown'}-${index}`}
                   className="rounded-lg border border-border/60 bg-background/45 px-3 py-2 text-sm dark:bg-white/[0.03]"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-mono text-xs">{device.ip || 'Unknown IP'}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{device.ip || 'Unknown IP'}</span>
+                        <Badge variant="outline" className="border-border/60 text-[10px] text-muted-foreground">
+                          {device.countryCode ? `${getCountryFlag(device.countryCode)} ${device.countryCode}` : 'Unknown country'}
+                        </Badge>
+                      </div>
+                      {device.userAgent ? (
+                        <p className="mt-1 line-clamp-2 break-all text-[11px] text-muted-foreground">{device.userAgent}</p>
+                      ) : null}
+                    </div>
                     <span className="text-xs text-muted-foreground">
                       {device.lastSeenAt ? formatRelativeTime(device.lastSeenAt) : 'Never'}
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span>
-                      {device.countryCode ? `${getCountryFlag(device.countryCode)} ${device.countryCode}` : 'Unknown country'}
-                    </span>
-                    <span>{device.platform || 'Unknown platform'}</span>
-                    {device.userAgent ? <span className="truncate">{device.userAgent}</span> : null}
+                    <span>Platform: {device.platform || 'Unknown platform'}</span>
+                    <span>Last seen: {device.lastSeenAt ? formatDateTime(device.lastSeenAt) : 'Never'}</span>
                   </div>
                 </div>
               ))}
@@ -3825,7 +3984,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           </div>
         )}
 
-        {(!data?.sessions || data.sessions.length === 0) && (!data?.subscriberDevices || data.subscriberDevices.length === 0) && (
+        {(!data?.sessions || data.sessions.length === 0) && deviceEvidence.length === 0 && (
           <div className="text-center py-4 text-muted-foreground text-sm">
             No connection sessions recorded yet
           </div>

@@ -66,6 +66,7 @@ import {
 } from '@/lib/share-page-protection';
 import { replaceAccessKeyServer } from '@/lib/services/server-migration';
 import {
+  DEVICE_LIMIT_DISABLE_DELAY_MS,
   getAccessKeyDeviceLimitSnapshots,
 } from '@/lib/services/device-limits';
 
@@ -204,6 +205,12 @@ const listKeysSchema = z.object({
   tag: z.string().optional(),
   owner: z.string().optional(),
   overDeviceLimit: z.boolean().optional(),
+  deviceLimitWarned: z.boolean().optional(),
+});
+
+const deviceLimitSuppressionSchema = z.object({
+  id: z.string(),
+  hours: z.number().int().min(1).max(24 * 30).nullable(),
 });
 
 const accessDistributionLinkSchema = z.object({
@@ -491,10 +498,12 @@ export const keysRouter = router({
         tag,
         owner,
         overDeviceLimit,
+        deviceLimitWarned,
       } = input;
 
       // Build the where clause
       const where: Prisma.AccessKeyWhereInput = {};
+      const andConditions: Prisma.AccessKeyWhereInput[] = [];
 
       // Role-based filtering: Users see only their own keys, admins can filter by userId
       if (ctx.user.role !== 'ADMIN') {
@@ -562,8 +571,32 @@ export const keysRouter = router({
         where.owner = { contains: owner };
       }
 
+      const now = new Date();
+
       if (overDeviceLimit) {
+        where.status = 'ACTIVE';
         where.deviceLimitExceededAt = { not: null };
+        andConditions.push({
+          OR: [
+            { deviceLimitSuppressedUntil: null },
+            { deviceLimitSuppressedUntil: { lte: now } },
+          ],
+        });
+      }
+
+      if (deviceLimitWarned) {
+        where.status = 'ACTIVE';
+        where.deviceLimitWarningSentAt = { not: null };
+        andConditions.push({
+          OR: [
+            { deviceLimitSuppressedUntil: null },
+            { deviceLimitSuppressedUntil: { lte: now } },
+          ],
+        });
+      }
+
+      if (andConditions.length > 0) {
+        where.AND = andConditions;
       }
 
       // Get total count for pagination
@@ -615,6 +648,8 @@ export const keysRouter = router({
           status: key.status,
           deviceLimitExceededAt: key.deviceLimitExceededAt,
           deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+          deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+          deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
         })),
       });
 
@@ -630,6 +665,8 @@ export const keysRouter = router({
           deviceLimitOverLimit: snapshot?.overLimit ?? false,
           deviceLimitEnforcementStage: snapshot?.stage ?? 'OK',
           deviceLimitDisableAt: snapshot?.disableAt ?? null,
+          deviceLimitSuppressedUntil: snapshot?.suppressedUntil ?? key.deviceLimitSuppressedUntil ?? null,
+          deviceLimitAutoDisabledAt: snapshot?.autoDisabledAt ?? key.deviceLimitAutoDisabledAt ?? null,
         };
       });
 
@@ -816,6 +853,8 @@ export const keysRouter = router({
             status: key.status,
             deviceLimitExceededAt: key.deviceLimitExceededAt,
             deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+            deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+            deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
           }],
         }),
       ]);
@@ -831,6 +870,8 @@ export const keysRouter = router({
         deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
         deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
         deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
+        deviceLimitSuppressedUntil: deviceLimitSnapshot?.suppressedUntil ?? key.deviceLimitSuppressedUntil ?? null,
+        deviceLimitAutoDisabledAt: deviceLimitSnapshot?.autoDisabledAt ?? key.deviceLimitAutoDisabledAt ?? null,
         subscriptionToken: nextToken,
         publicSlug: nextPublicSlug,
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
@@ -874,6 +915,8 @@ export const keysRouter = router({
           deviceLimitExceededAt: true,
           deviceLimitWarningSentAt: true,
           deviceLimitLastObservedDevices: true,
+          deviceLimitSuppressedUntil: true,
+          deviceLimitAutoDisabledAt: true,
           outlineKeyId: true,
         },
       });
@@ -907,6 +950,8 @@ export const keysRouter = router({
             status: key.status,
             deviceLimitExceededAt: key.deviceLimitExceededAt,
             deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+            deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+            deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
           }],
         }),
       ]);
@@ -946,6 +991,8 @@ export const keysRouter = router({
         deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
         deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
         deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
+        deviceLimitSuppressedUntil: deviceLimitSnapshot?.suppressedUntil ?? key.deviceLimitSuppressedUntil ?? null,
+        deviceLimitAutoDisabledAt: deviceLimitSnapshot?.autoDisabledAt ?? key.deviceLimitAutoDisabledAt ?? null,
         activityWindowSeconds: Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000),
       };
     }),
@@ -1281,6 +1328,8 @@ export const keysRouter = router({
             updateData.deviceLimitExceededAt = null;
             updateData.deviceLimitWarningSentAt = null;
             updateData.deviceLimitLastObservedDevices = null;
+            updateData.deviceLimitSuppressedUntil = null;
+            updateData.deviceLimitAutoDisabledAt = null;
           }
         }
 
@@ -2076,6 +2125,8 @@ export const keysRouter = router({
               disabledOutlineKeyId: null,
               deviceLimitExceededAt: null,
               deviceLimitWarningSentAt: null,
+              deviceLimitSuppressedUntil: null,
+              deviceLimitAutoDisabledAt: null,
               // Set negative offset to preserve the existing usedBytes during sync
               usageOffset: BigInt(preservedUsageOffset),
             },
@@ -2122,6 +2173,10 @@ export const keysRouter = router({
             disabledOutlineKeyId: key.outlineKeyId,
             // Clear online tracking since key is disabled
             estimatedDevices: 0,
+            deviceLimitExceededAt: null,
+            deviceLimitWarningSentAt: null,
+            deviceLimitSuppressedUntil: null,
+            deviceLimitAutoDisabledAt: null,
           },
           include: {
             server: {
@@ -2156,6 +2211,94 @@ export const keysRouter = router({
 
         return updatedKey;
       }
+    }),
+
+  clearDeviceLimitWarning: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          maxDevices: true,
+          status: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const updatedKey = await db.accessKey.update({
+        where: { id: input.id },
+        data: {
+          deviceLimitExceededAt: null,
+          deviceLimitWarningSentAt: null,
+          ...(key.status === 'ACTIVE' ? { deviceLimitAutoDisabledAt: null } : {}),
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_DEVICE_LIMIT_WARNING_CLEARED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          maxDevices: key.maxDevices,
+        },
+      });
+
+      return updatedKey;
+    }),
+
+  setDeviceLimitSuppression: adminProcedure
+    .input(deviceLimitSuppressionSchema)
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          maxDevices: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const suppressedUntil = input.hours
+        ? new Date(Date.now() + input.hours * 60 * 60 * 1000)
+        : null;
+
+      const updatedKey = await db.accessKey.update({
+        where: { id: input.id },
+        data: {
+          deviceLimitSuppressedUntil: suppressedUntil,
+          deviceLimitExceededAt: null,
+          deviceLimitWarningSentAt: null,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: suppressedUntil ? 'ACCESS_KEY_DEVICE_LIMIT_SUPPRESSED' : 'ACCESS_KEY_DEVICE_LIMIT_SUPPRESSION_CLEARED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          maxDevices: key.maxDevices,
+          suppressedUntil: suppressedUntil?.toISOString() ?? null,
+        },
+      });
+
+      return updatedKey;
     }),
 
   /**
@@ -3064,7 +3207,10 @@ export const keysRouter = router({
    * Get statistics about access keys.
    */
   stats: protectedProcedure.query(async () => {
-    const [total, active, expired, depleted, pending, tagRows] = await Promise.all([
+    const now = new Date();
+    const pendingDisableThreshold = new Date(now.getTime() - DEVICE_LIMIT_DISABLE_DELAY_MS);
+
+    const [total, active, expired, depleted, pending, tagRows, deviceLimitWarned, deviceLimitPendingDisable, deviceLimitAutoDisabled, deviceLimitOverLimit] = await Promise.all([
       db.accessKey.count(),
       db.accessKey.count({ where: { status: 'ACTIVE' } }),
       db.accessKey.count({ where: { status: 'EXPIRED' } }),
@@ -3073,6 +3219,42 @@ export const keysRouter = router({
       db.accessKey.findMany({
         select: {
           tags: true,
+        },
+      }),
+      db.accessKey.count({
+        where: {
+          status: 'ACTIVE',
+          deviceLimitWarningSentAt: { not: null },
+          OR: [
+            { deviceLimitSuppressedUntil: null },
+            { deviceLimitSuppressedUntil: { lte: now } },
+          ],
+        },
+      }),
+      db.accessKey.count({
+        where: {
+          status: 'ACTIVE',
+          deviceLimitExceededAt: { lte: pendingDisableThreshold },
+          OR: [
+            { deviceLimitSuppressedUntil: null },
+            { deviceLimitSuppressedUntil: { lte: now } },
+          ],
+        },
+      }),
+      db.accessKey.count({
+        where: {
+          status: 'DISABLED',
+          deviceLimitAutoDisabledAt: { not: null },
+        },
+      }),
+      db.accessKey.count({
+        where: {
+          status: 'ACTIVE',
+          deviceLimitExceededAt: { not: null },
+          OR: [
+            { deviceLimitSuppressedUntil: null },
+            { deviceLimitSuppressedUntil: { lte: now } },
+          ],
         },
       }),
     ]);
@@ -3122,6 +3304,10 @@ export const keysRouter = router({
       expiringIn24h,
       totalUsedBytes,
       totalDataLimitBytes,
+      deviceLimitWarned,
+      deviceLimitPendingDisable,
+      deviceLimitAutoDisabled,
+      deviceLimitOverLimit,
       sourceCounts: tagSummary.sourceCounts,
       topTags: tagSummary.topTags,
     };
@@ -3288,6 +3474,8 @@ export const keysRouter = router({
           deviceLimitExceededAt: true,
           deviceLimitWarningSentAt: true,
           deviceLimitLastObservedDevices: true,
+          deviceLimitSuppressedUntil: true,
+          deviceLimitAutoDisabledAt: true,
         },
       });
 
@@ -3335,6 +3523,8 @@ export const keysRouter = router({
           status: key.status,
           deviceLimitExceededAt: key.deviceLimitExceededAt,
           deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+          deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+          deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
         }],
         includeEvidence: true,
       });
@@ -3355,6 +3545,7 @@ export const keysRouter = router({
 
       return {
         sessions: sessionsWithDuration,
+        status: key.status,
         activeCount: sessions.filter((s) => s.isActive).length,
         estimatedDevices: effectiveEstimatedDevices,
         peakDevices: Math.max(key.peakDevices ?? 0, effectiveEstimatedDevices),
@@ -3363,6 +3554,9 @@ export const keysRouter = router({
         deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
         deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',
         deviceLimitDisableAt: deviceLimitSnapshot?.disableAt ?? null,
+        deviceLimitSuppressedUntil: deviceLimitSnapshot?.suppressedUntil ?? key.deviceLimitSuppressedUntil ?? null,
+        deviceLimitAutoDisabledAt: deviceLimitSnapshot?.autoDisabledAt ?? key.deviceLimitAutoDisabledAt ?? null,
+        deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
         subscriberDevices,
       };
     }),
