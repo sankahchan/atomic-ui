@@ -36,12 +36,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { hasOutageManageScope } from '@/lib/admin-scope';
 import { cn, formatBytes, formatRelativeTime, getCountryFlag, COUNTRY_OPTIONS } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { ServerLifecycleBadge } from '@/components/servers/server-lifecycle-badge';
 import {
   Server,
   Key,
@@ -249,6 +251,7 @@ export default function ServerDetailPage() {
   const serverId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'health' | 'lifecycle' | 'outage' | 'history'>('health');
   const [lifecycleMode, setLifecycleMode] = useState('ACTIVE');
   const [allowManualAssignmentsWhenDraining, setAllowManualAssignmentsWhenDraining] = useState(false);
   const [lifecycleNote, setLifecycleNote] = useState('');
@@ -612,18 +615,7 @@ export default function ServerDetailPage() {
               <StatusIcon className="mr-1 h-3 w-3" />
               {t(status.labelKey)}
             </Badge>
-            {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
-              <Badge
-                variant="outline"
-                className={cn(
-                  'rounded-full px-3 py-1',
-                  server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
-                  server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
-                )}
-              >
-                {server.lifecycleMode}
-              </Badge>
-            ) : null}
+            <ServerLifecycleBadge mode={server.lifecycleMode} showActive className="rounded-full px-3 py-1" />
           </div>
 
           <div className="flex items-start gap-4">
@@ -733,18 +725,7 @@ export default function ServerDetailPage() {
                   <Server className="h-3.5 w-3.5" />
                   Server Detail
                 </span>
-                {server.lifecycleMode && server.lifecycleMode !== 'ACTIVE' ? (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'rounded-full px-3 py-1',
-                      server.lifecycleMode === 'DRAINING' && 'border-amber-500/30 text-amber-500',
-                      server.lifecycleMode === 'MAINTENANCE' && 'border-sky-500/30 text-sky-500',
-                    )}
-                  >
-                    {server.lifecycleMode}
-                  </Badge>
-                ) : null}
+                <ServerLifecycleBadge mode={server.lifecycleMode} showActive className="rounded-full px-3 py-1" />
               </div>
 
               <div className="flex items-start gap-4">
@@ -842,6 +823,29 @@ export default function ServerDetailPage() {
         </div>
       </section>
 
+      <div className="ops-panel space-y-3 p-3 sm:p-4">
+        <div className="space-y-1">
+          <p className="ops-section-heading">Server workspace</p>
+          <p className="text-sm text-muted-foreground">
+            {{
+              health: 'Health and diagnostics for current latency, uptime, and smart fallback behavior.',
+              lifecycle: 'Assignment controls, routing policy, current keys, and destructive server actions.',
+              outage: 'Replacement workflows, migration progress, and user-facing outage notifications.',
+              history: 'Past outages, follow-ups, and recovery history for this server.',
+            }[detailTab]}
+          </p>
+        </div>
+        <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'health' | 'lifecycle' | 'outage' | 'history')}>
+          <TabsList className="grid h-auto grid-cols-2 gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 sm:grid-cols-4 dark:bg-white/[0.03]">
+            <TabsTrigger value="health" className="rounded-[0.95rem] px-3 py-2 text-sm">Health</TabsTrigger>
+            <TabsTrigger value="lifecycle" className="rounded-[0.95rem] px-3 py-2 text-sm">Lifecycle</TabsTrigger>
+            <TabsTrigger value="outage" className="rounded-[0.95rem] px-3 py-2 text-sm">Outage</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">History</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {detailTab === 'health' ? (
       <div className="ops-showcase-grid">
         {/* Server Info */}
         <Card className="ops-detail-card">
@@ -1125,7 +1129,12 @@ export default function ServerDetailPage() {
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
+      ) : null}
 
+      {detailTab === 'lifecycle' ? (
+      <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>Assignment Mode</CardTitle>
@@ -1457,7 +1466,11 @@ export default function ServerDetailPage() {
               </div>
             </CardContent>
           </Card>
+      </div>
+      ) : null}
 
+      {detailTab === 'outage' ? (
+      <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1891,7 +1904,11 @@ export default function ServerDetailPage() {
               </Button>
             </CardContent>
           </Card>
+      </div>
+      ) : null}
 
+      {detailTab === 'history' ? (
+      <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle>Outage history</CardTitle>
@@ -1999,10 +2016,11 @@ export default function ServerDetailPage() {
               )}
             </CardContent>
           </Card>
-        </div>
       </div>
+      ) : null}
 
       {/* Access Keys Section */}
+      {detailTab === 'lifecycle' ? (
       <Card className="ops-detail-card">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -2072,8 +2090,10 @@ export default function ServerDetailPage() {
           )}
         </CardContent>
       </Card>
+      ) : null}
 
       {/* Danger Zone */}
+      {detailTab === 'lifecycle' ? (
       <Card className="ops-detail-card border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
@@ -2104,6 +2124,7 @@ export default function ServerDetailPage() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
       {/* Edit Dialog */}
       {server && (

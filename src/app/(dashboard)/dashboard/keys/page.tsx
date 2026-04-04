@@ -92,6 +92,7 @@ import {
 import { MobileCardView } from '@/components/mobile-card-view';
 import { TrafficSparkline } from '@/components/ui/traffic-chart';
 import { ServerGroupList } from '@/components/keys/server-group-list';
+import { ServerLifecycleBadge, getServerLifecycleMeta } from '@/components/servers/server-lifecycle-badge';
 import { copyToClipboard } from '@/lib/clipboard';
 import { QRCodeWithLogo } from '@/components/qr-code-with-logo';
 import { usePersistedFilters } from '@/hooks/use-persisted-filters';
@@ -184,6 +185,7 @@ type CreatedKeySummary = {
     id: string;
     name: string;
     countryCode: string | null;
+    lifecycleMode?: string | null;
   } | null;
 };
 
@@ -794,6 +796,34 @@ function CreateKeyDialog({
           {/* Server selection */}
           <div className="space-y-2">
             <Label>{t('keys.form.server')} *</Label>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div
+                className={cn(
+                  'rounded-2xl border px-3 py-3 text-sm',
+                  formData.serverId === 'auto'
+                    ? 'border-cyan-500/30 bg-cyan-500/10'
+                    : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
+                )}
+              >
+                <p className="font-medium text-foreground">Auto assignment</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Picks the healthiest active server automatically. Draining and maintenance servers are skipped.
+                </p>
+              </div>
+              <div
+                className={cn(
+                  'rounded-2xl border px-3 py-3 text-sm',
+                  formData.serverId !== 'auto'
+                    ? 'border-amber-500/30 bg-amber-500/10'
+                    : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
+                )}
+              >
+                <p className="font-medium text-foreground">Manual assignment</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  You choose the exact server below. Draining is allowed when you select it manually; maintenance stays blocked.
+                </p>
+              </div>
+            </div>
             <Select
               value={formData.serverId}
               onValueChange={(value) => setFormData({ ...formData, serverId: value })}
@@ -809,12 +839,12 @@ function CreateKeyDialog({
                     value={server.id}
                     disabled={server.lifecycleMode === 'MAINTENANCE'}
                   >
-                    {server.countryCode && getCountryFlag(server.countryCode)}{' '}
-                    {server.name}
-                    {server.lifecycleMode === 'DRAINING'
-                      ? ` • ${t('keys.form.server_draining_badge')}`
-                      : ''}
-                    {server.lifecycleMode === 'MAINTENANCE' ? ` • ${t('keys.form.server_maintenance_badge')}` : ''}
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                      </span>
+                      <ServerLifecycleBadge mode={server.lifecycleMode} />
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1709,15 +1739,16 @@ function CreatedKeySummaryDialog({
             </DialogHeader>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  {t('keys.dialog.created_server')}
-                </p>
-                <p className="mt-2 flex items-center gap-2 text-sm font-medium">
-                  {createdKey.server?.countryCode ? <span>{getCountryFlag(createdKey.server.countryCode)}</span> : null}
-                  <span className="truncate">{createdKey.server?.name ?? '-'}</span>
-                </p>
-              </div>
+	              <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
+	                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+	                  {t('keys.dialog.created_server')}
+	                </p>
+	                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+	                  {createdKey.server?.countryCode ? <span>{getCountryFlag(createdKey.server.countryCode)}</span> : null}
+	                  <span className="truncate">{createdKey.server?.name ?? '-'}</span>
+	                  <ServerLifecycleBadge mode={createdKey.server?.lifecycleMode} />
+	                </div>
+	              </div>
               <div className="rounded-[1.1rem] border border-border/60 bg-background/65 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {t('keys.dialog.created_encryption')}
@@ -2493,6 +2524,265 @@ function EditKeyDialog({
   );
 }
 
+function BulkCreateDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (result: { success: number; failed: number; errors: string[] }) => void;
+}) {
+  const { toast } = useToast();
+  const { data: servers } = trpc.servers.list.useQuery(undefined, {
+    enabled: open,
+  });
+  const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
+  const [count, setCount] = useState('5');
+  const [namePrefix, setNamePrefix] = useState('Batch');
+  const [dataLimitGB, setDataLimitGB] = useState('');
+  const [expirationType, setExpirationType] = useState<'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE'>('NEVER');
+  const [durationDays, setDurationDays] = useState('30');
+  const [confirmDrainingServers, setConfirmDrainingServers] = useState(false);
+
+  const bulkCreateMutation = trpc.keys.bulkCreate.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Bulk creation finished',
+        description:
+          result.failed > 0
+            ? `${result.success} keys created, ${result.failed} failed.`
+            : `${result.success} keys created successfully.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      onSuccess(result);
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Bulk creation failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedServerIds([]);
+      setCount('5');
+      setNamePrefix('Batch');
+      setDataLimitGB('');
+      setExpirationType('NEVER');
+      setDurationDays('30');
+      setConfirmDrainingServers(false);
+    }
+  }, [open]);
+
+  const selectedServers = useMemo(
+    () => (servers ?? []).filter((server) => selectedServerIds.includes(server.id)),
+    [selectedServerIds, servers],
+  );
+  const selectedDrainingServers = selectedServers.filter((server) => server.lifecycleMode === 'DRAINING');
+  const needsDrainingConfirmation = selectedDrainingServers.length > 0;
+
+  const toggleServer = (serverId: string, checked: boolean) => {
+    setSelectedServerIds((prev) =>
+      checked ? Array.from(new Set([...prev, serverId])) : prev.filter((id) => id !== serverId),
+    );
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (selectedServerIds.length === 0) {
+      toast({
+        title: 'Select at least one server',
+        description: 'Bulk create needs one or more target servers.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!namePrefix.trim()) {
+      toast({
+        title: 'Name prefix required',
+        description: 'Enter a prefix for the generated key names.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (needsDrainingConfirmation && !confirmDrainingServers) {
+      toast({
+        title: 'Confirm draining servers',
+        description: 'Bulk create is explicit admin use, but you still need to confirm draining targets before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    bulkCreateMutation.mutate({
+      serverIds: selectedServerIds,
+      count: Math.max(1, Math.min(100, Number.parseInt(count || '1', 10) || 1)),
+      namePrefix: namePrefix.trim(),
+      dataLimitGB: dataLimitGB ? Number.parseFloat(dataLimitGB) : null,
+      expirationType,
+      durationDays: expirationType === 'DURATION_FROM_CREATION' ? Math.max(1, Number.parseInt(durationDays || '1', 10) || 1) : null,
+      confirmDrainingServers: needsDrainingConfirmation ? confirmDrainingServers : undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Bulk create keys</DialogTitle>
+          <DialogDescription>
+            Create the same number of keys across one or more servers. This is always a manual admin action, so draining servers are allowed after confirmation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-name-prefix">Name prefix</Label>
+              <Input
+                id="bulk-name-prefix"
+                value={namePrefix}
+                onChange={(event) => setNamePrefix(event.target.value)}
+                placeholder="Batch"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bulk-count">Keys per server</Label>
+              <Input
+                id="bulk-count"
+                type="number"
+                min={1}
+                max={100}
+                value={count}
+                onChange={(event) => setCount(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bulk-limit">Data limit (GB)</Label>
+              <Input
+                id="bulk-limit"
+                type="number"
+                min={1}
+                value={dataLimitGB}
+                onChange={(event) => setDataLimitGB(event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-2">
+              <Label>Target servers</Label>
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-border/60 bg-background/45 p-3 dark:bg-white/[0.03]">
+                {(servers ?? []).map((server) => {
+                  const lifecycleMeta = getServerLifecycleMeta(server.lifecycleMode);
+                  const isDisabled = !server.isActive || server.lifecycleMode === 'MAINTENANCE';
+                  const isChecked = selectedServerIds.includes(server.id);
+
+                  return (
+                    <label
+                      key={server.id}
+                      className={cn(
+                        'flex items-start gap-3 rounded-xl border px-3 py-3 text-sm',
+                        isChecked ? 'border-cyan-500/30 bg-cyan-500/10' : 'border-border/50 bg-background/40 dark:bg-white/[0.02]',
+                        isDisabled && 'opacity-50',
+                      )}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        disabled={isDisabled}
+                        onCheckedChange={(checked) => toggleServer(server.id, Boolean(checked))}
+                      />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">
+                            {server.countryCode && `${getCountryFlag(server.countryCode)} `}{server.name}
+                          </span>
+                          <ServerLifecycleBadge mode={server.lifecycleMode} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {server.location || lifecycleMeta.assignmentHint}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Expiry mode</Label>
+                <Select value={expirationType} onValueChange={(value) => setExpirationType(value as 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NEVER">Never expire</SelectItem>
+                    <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
+                    <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {expirationType === 'DURATION_FROM_CREATION' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-duration">Duration (days)</Label>
+                  <Input
+                    id="bulk-duration"
+                    type="number"
+                    min={1}
+                    value={durationDays}
+                    onChange={(event) => setDurationDays(event.target.value)}
+                  />
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-border/60 bg-background/45 p-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
+                <p className="font-medium text-foreground">Assignment policy</p>
+                <p className="mt-1">Bulk create is explicit admin placement. Draining servers are allowed when selected here, but maintenance remains blocked.</p>
+              </div>
+            </div>
+          </div>
+
+          {needsDrainingConfirmation ? (
+            <label className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
+              <Checkbox
+                checked={confirmDrainingServers}
+                onCheckedChange={(checked) => setConfirmDrainingServers(Boolean(checked))}
+              />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">Confirm draining targets</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedDrainingServers.map((server) => server.name).join(', ')} {selectedDrainingServers.length === 1 ? 'is' : 'are'} draining. Auto-placement avoids them, but this bulk action will still create keys there because you selected them explicitly.
+                </p>
+              </div>
+            </label>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={bulkCreateMutation.isPending}>
+              {bulkCreateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Create keys
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * Online indicator component with blinking animation
  */
@@ -2556,6 +2846,7 @@ function KeyRow({
       id: string;
       name: string;
       countryCode: string | null;
+      lifecycleMode?: string | null;
     };
     createdAt: Date;
   };
@@ -2639,15 +2930,18 @@ function KeyRow({
       {/* Server */}
       <td className="px-4 py-3">
         {accessKey.server && (
-          <Link
-            href={`/dashboard/servers/${accessKey.server.id}`}
-            className="flex items-center gap-1.5 hover:text-primary transition-colors"
-          >
-            {accessKey.server.countryCode && (
-              <span>{getCountryFlag(accessKey.server.countryCode)}</span>
-            )}
-            <span className="text-sm">{accessKey.server.name}</span>
-          </Link>
+          <div className="space-y-1">
+            <Link
+              href={`/dashboard/servers/${accessKey.server.id}`}
+              className="flex items-center gap-1.5 hover:text-primary transition-colors"
+            >
+              {accessKey.server.countryCode && (
+                <span>{getCountryFlag(accessKey.server.countryCode)}</span>
+              )}
+              <span className="text-sm">{accessKey.server.name}</span>
+            </Link>
+            <ServerLifecycleBadge mode={accessKey.server.lifecycleMode} />
+          </div>
         )}
       </td>
 
@@ -2864,6 +3158,7 @@ export default function KeysPage() {
   const [serverFilter, setServerFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
   const [createdKey, setCreatedKey] = useState<CreatedKeySummary | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [qrDialogKey, setQrDialogKey] = useState<{ id: string; name: string } | null>(null);
@@ -2936,11 +3231,12 @@ export default function KeysPage() {
               {key.email ? (
                 <p className="truncate text-xs text-muted-foreground">{key.email}</p>
               ) : null}
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                 {key.server && (
                   <>
                     {key.server.countryCode && <span>{getCountryFlag(key.server.countryCode)}</span>}
                     <span className="truncate">{key.server.name}</span>
+                    <ServerLifecycleBadge mode={key.server.lifecycleMode} />
                   </>
                 )}
               </div>
@@ -3392,6 +3688,10 @@ export default function KeysPage() {
   // Bulk move state
   const [bulkMoveDialogOpen, setBulkMoveDialogOpen] = useState(false);
   const [bulkMoveTargetServerId, setBulkMoveTargetServerId] = useState('');
+  const selectedBulkMoveServer = useMemo(
+    () => (servers ?? []).find((server) => server.id === bulkMoveTargetServerId) ?? null,
+    [bulkMoveTargetServerId, servers],
+  );
 
   // Bulk move mutation
   const bulkMoveMutation = trpc.keys.bulkMove.useMutation({
@@ -3655,6 +3955,14 @@ export default function KeysPage() {
                   <Plus className="mr-2 h-4 w-4" />
                   {t('keys.create')}
                 </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-center rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] sm:col-span-3 xl:col-span-1"
+                  onClick={() => setBulkCreateDialogOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Bulk create
+                </Button>
                 <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
                   <Link href="/dashboard/templates">
                     <FileText className="mr-2 h-4 w-4" />
@@ -3673,10 +3981,16 @@ export default function KeysPage() {
         </div>
 
         <div className="grid gap-2 sm:hidden">
-          <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
-            {t('keys.create')}
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
+              <Plus className="w-4 h-4 mr-2" />
+              {t('keys.create')}
+            </Button>
+            <Button variant="outline" className="h-11 w-full justify-center rounded-full" onClick={() => setBulkCreateDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Bulk create
+            </Button>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" className="h-11 w-full justify-center rounded-full" asChild>
               <Link href="/dashboard/templates">
@@ -4109,18 +4423,22 @@ export default function KeysPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-10 w-[176px] rounded-[1rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
-            <SelectValue placeholder={t('keys.server_filter')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
-            {servers?.map((server) => (
-              <SelectItem key={server.id} value={server.id}>
-                {server.countryCode && getCountryFlag(server.countryCode)}{' '}
-                {server.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
+            <SelectTrigger className="h-10 w-[176px] rounded-[1rem] border-border/70 bg-background/70 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.72)]">
+              <SelectValue placeholder={t('keys.server_filter')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
+              {servers?.map((server) => (
+                <SelectItem key={server.id} value={server.id}>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                    </span>
+                    <ServerLifecycleBadge mode={server.lifecycleMode} />
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
         </Select>
 
         {hasActiveFilters && (
@@ -4276,7 +4594,12 @@ export default function KeysPage() {
                     <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
                     {servers?.map((server) => (
                       <SelectItem key={server.id} value={server.id}>
-                        {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                        <div className="flex items-center gap-2">
+                          <span>
+                            {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                          </span>
+                          <ServerLifecycleBadge mode={server.lifecycleMode} />
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -4629,9 +4952,10 @@ export default function KeysPage() {
                             {key.name}
                           </Link>
                           {key.server && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                               {key.server.countryCode && <span>{getCountryFlag(key.server.countryCode)}</span>}
                               <span className="truncate">{key.server.name}</span>
+                              <ServerLifecycleBadge mode={key.server.lifecycleMode} />
                             </div>
                           )}
                         </div>
@@ -4926,6 +5250,15 @@ export default function KeysPage() {
         }}
       />
 
+      <BulkCreateDialog
+        open={bulkCreateDialogOpen}
+        onOpenChange={setBulkCreateDialogOpen}
+        onSuccess={() => {
+          refetch();
+          refetchStats();
+        }}
+      />
+
       <CreatedKeySummaryDialog
         createdKey={createdKey}
         open={!!createdKey}
@@ -5001,13 +5334,30 @@ export default function KeysPage() {
                 <SelectValue placeholder={t('keys.bulk.move_target_placeholder')} />
               </SelectTrigger>
               <SelectContent>
-                {(servers ?? []).map((s: { id: string; name: string; location?: string | null }) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}{s.location ? ` (${s.location})` : ''}
+                {(servers ?? []).map((s: { id: string; name: string; location?: string | null; lifecycleMode?: string | null; isActive?: boolean }) => (
+                  <SelectItem key={s.id} value={s.id} disabled={s.lifecycleMode === 'MAINTENANCE' || s.isActive === false}>
+                    <div className="flex items-center gap-2">
+                      <span>{s.name}{s.location ? ` (${s.location})` : ''}</span>
+                      <ServerLifecycleBadge mode={s.lifecycleMode} />
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <div className="rounded-2xl border border-border/60 bg-background/45 px-3 py-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
+              <p className="font-medium text-foreground">Assignment policy</p>
+              <p className="mt-1">
+                Maintenance targets are blocked. Draining targets are still allowed because bulk move is an explicit admin action.
+              </p>
+            </div>
+            {selectedBulkMoveServer?.lifecycleMode === 'DRAINING' ? (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Manual draining target selected</p>
+                <p className="mt-1">
+                  {selectedBulkMoveServer.name} is draining. Auto-placement avoids it, but this explicit bulk move will still assign keys there.
+                </p>
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkMoveDialogOpen(false)}>{t('keys.cancel')}</Button>

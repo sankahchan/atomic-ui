@@ -99,6 +99,7 @@ import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { useLocale } from '@/hooks/use-locale';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
+import { ServerLifecycleBadge, getServerLifecycleMeta } from '@/components/servers/server-lifecycle-badge';
 import {
   TelegramBillingHistoryCard,
 } from '@/components/telegram/telegram-billing-history-card';
@@ -2879,7 +2880,10 @@ export default function KeyDetailPage() {
                       <span className="text-xl">{getCountryFlag(keyRecord.server.countryCode)}</span>
                     )}
                     <div>
-                      <p className="font-medium">{keyRecord.server.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{keyRecord.server.name}</p>
+                        <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
+                      </div>
                       {keyRecord.server.location && (
                         <p className="text-sm text-muted-foreground">{keyRecord.server.location}</p>
                       )}
@@ -3183,10 +3187,13 @@ export default function KeyDetailPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="ops-inline-stat">
                     <p className="text-sm text-muted-foreground">Current server</p>
-                    <p className="font-medium">
-                      {keyRecord.server?.name || 'Unassigned'}
-                      {keyRecord.server?.countryCode ? ` (${keyRecord.server.countryCode})` : ''}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="font-medium">
+                        {keyRecord.server?.name || 'Unassigned'}
+                        {keyRecord.server?.countryCode ? ` (${keyRecord.server.countryCode})` : ''}
+                      </p>
+                      <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null } | null)?.lifecycleMode} />
+                    </div>
                   </div>
                   <div className="ops-inline-stat">
                     <p className="text-sm text-muted-foreground">Changes used</p>
@@ -3212,23 +3219,39 @@ export default function KeyDetailPage() {
                     onValueChange={setReplacementServerId}
                     disabled={remainingServerChanges <= 0 || replaceServerMutation.isPending}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a target server" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Choose a target server</SelectItem>
-                      {availableReplacementServers.map((server) => (
-                        <SelectItem key={server.id} value={server.id}>
-                          {server.name}
-                          {server.countryCode ? ` (${server.countryCode})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    The key stays on the same expiry date and keeps its existing usage.
-                  </p>
-                </div>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a target server" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Choose a target server</SelectItem>
+                        {availableReplacementServers.map((server) => (
+                          <SelectItem
+                            key={server.id}
+                            value={server.id}
+                            disabled={server.lifecycleMode === 'MAINTENANCE'}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span>
+                                {server.name}
+                                {server.countryCode ? ` (${server.countryCode})` : ''}
+                              </span>
+                              <ServerLifecycleBadge mode={server.lifecycleMode} />
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      The key stays on the same expiry date and keeps its existing usage.
+                    </p>
+                    {replacementServerId !== 'none' ? (
+                      <p className="text-xs text-muted-foreground">
+                        {getServerLifecycleMeta(
+                          availableReplacementServers.find((server) => server.id === replacementServerId)?.lifecycleMode,
+                        ).assignmentHint}
+                      </p>
+                    ) : null}
+                  </div>
 
                 <div className="flex items-center justify-between rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
