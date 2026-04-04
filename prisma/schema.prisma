@@ -78,6 +78,7 @@ model Server {
   isActive           Boolean   @default(true)
   maxKeys            Int?
   lifecycleMode      String    @default("ACTIVE") // ACTIVE, DRAINING, MAINTENANCE
+  allowManualAssignmentsWhenDraining Boolean @default(false)
   lifecycleNote      String?
   lifecycleChangedAt DateTime?
   sortOrder          Int       @default(0)

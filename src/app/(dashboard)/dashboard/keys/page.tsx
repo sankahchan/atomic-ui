@@ -379,6 +379,7 @@ function CreateKeyDialog({
     [formData.serverId, servers],
   );
   const selectedServerLifecycleMode = manuallySelectedServer?.lifecycleMode ?? 'ACTIVE';
+  const selectedServerAllowsManualDraining = manuallySelectedServer?.allowManualAssignmentsWhenDraining ?? false;
 
   useEffect(() => {
     if (slugTouched) {
@@ -769,11 +770,20 @@ function CreateKeyDialog({
                   <SelectItem
                     key={server.id}
                     value={server.id}
-                    disabled={server.lifecycleMode === 'MAINTENANCE'}
+                    disabled={
+                      server.lifecycleMode === 'MAINTENANCE' ||
+                      (server.lifecycleMode === 'DRAINING' && !server.allowManualAssignmentsWhenDraining)
+                    }
                   >
                     {server.countryCode && getCountryFlag(server.countryCode)}{' '}
                     {server.name}
-                    {server.lifecycleMode === 'DRAINING' ? ` • ${t('keys.form.server_draining_badge')}` : ''}
+                    {server.lifecycleMode === 'DRAINING'
+                      ? ` • ${t(
+                          server.allowManualAssignmentsWhenDraining
+                            ? 'keys.form.server_draining_badge'
+                            : 'keys.form.server_draining_blocked_badge',
+                        )}`
+                      : ''}
                     {server.lifecycleMode === 'MAINTENANCE' ? ` • ${t('keys.form.server_maintenance_badge')}` : ''}
                   </SelectItem>
                 ))}
@@ -813,12 +823,23 @@ function CreateKeyDialog({
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
                   <div className="space-y-1">
                     <p className="font-medium text-foreground">
-                      {t('keys.form.server_draining_help_title')}
+                      {t(
+                        selectedServerAllowsManualDraining
+                          ? 'keys.form.server_draining_help_title'
+                          : 'keys.form.server_draining_blocked_title',
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {fillTemplate(t('keys.form.server_draining_help_desc'), {
-                        server: manuallySelectedServer.name,
-                      })}
+                      {fillTemplate(
+                        t(
+                          selectedServerAllowsManualDraining
+                            ? 'keys.form.server_draining_help_desc'
+                            : 'keys.form.server_draining_blocked_desc',
+                        ),
+                        {
+                          server: manuallySelectedServer.name,
+                        },
+                      )}
                     </p>
                   </div>
                 </div>

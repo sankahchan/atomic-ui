@@ -37,6 +37,7 @@ const createServerSchema = z.object({
   countryCode: z.string().length(2).optional(),
   isDefault: z.boolean().optional(),
   lifecycleMode: serverLifecycleModeSchema.optional(),
+  allowManualAssignmentsWhenDraining: z.boolean().optional(),
   lifecycleNote: z.string().max(280).optional().nullable(),
   tagIds: z.array(z.string()).optional(),
   enableHealthCheck: z.boolean().default(true),
@@ -54,6 +55,7 @@ const updateServerSchema = z.object({
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
   lifecycleMode: serverLifecycleModeSchema.optional(),
+  allowManualAssignmentsWhenDraining: z.boolean().optional(),
   lifecycleNote: z.string().max(280).optional().nullable(),
   maxKeys: z.number().int().positive().optional().nullable(),
   tagIds: z.array(z.string()).optional(),
@@ -410,6 +412,7 @@ export const serversRouter = router({
           countryCode: input.countryCode,
           isDefault: input.isDefault ?? false,
           lifecycleMode: input.lifecycleMode ?? 'ACTIVE',
+          allowManualAssignmentsWhenDraining: input.allowManualAssignmentsWhenDraining ?? false,
           lifecycleNote: input.lifecycleNote ?? null,
           lifecycleChangedAt: new Date(),
           outlineServerId: serverInfo.serverId,
@@ -462,6 +465,7 @@ export const serversRouter = router({
           countryCode: server.countryCode,
           isDefault: server.isDefault,
           lifecycleMode: server.lifecycleMode,
+          allowManualAssignmentsWhenDraining: server.allowManualAssignmentsWhenDraining,
           lifecycleNote: server.lifecycleNote,
         },
       });
@@ -548,6 +552,7 @@ export const serversRouter = router({
           isDefault: server.isDefault,
           isActive: server.isActive,
           lifecycleMode: server.lifecycleMode,
+          allowManualAssignmentsWhenDraining: server.allowManualAssignmentsWhenDraining,
           lifecycleNote: server.lifecycleNote,
         },
       });
@@ -641,6 +646,7 @@ export const serversRouter = router({
       z.object({
         id: z.string(),
         lifecycleMode: serverLifecycleModeSchema,
+        allowManualAssignmentsWhenDraining: z.boolean().optional(),
         lifecycleNote: z.string().max(280).optional().nullable(),
       }),
     )
@@ -652,6 +658,7 @@ export const serversRouter = router({
           id: true,
           name: true,
           lifecycleMode: true,
+          allowManualAssignmentsWhenDraining: true,
           lifecycleNote: true,
           isActive: true,
         },
@@ -668,6 +675,10 @@ export const serversRouter = router({
         where: { id: input.id },
         data: {
           lifecycleMode: input.lifecycleMode,
+          allowManualAssignmentsWhenDraining:
+            input.lifecycleMode === 'DRAINING'
+              ? input.allowManualAssignmentsWhenDraining ?? existing.allowManualAssignmentsWhenDraining
+              : false,
           lifecycleNote: input.lifecycleNote?.trim() || null,
           lifecycleChangedAt: new Date(),
         },
@@ -675,6 +686,7 @@ export const serversRouter = router({
           id: true,
           name: true,
           lifecycleMode: true,
+          allowManualAssignmentsWhenDraining: true,
           lifecycleNote: true,
           lifecycleChangedAt: true,
           isActive: true,
@@ -701,8 +713,10 @@ export const serversRouter = router({
         details: {
           name: server.name,
           previousMode: existing.lifecycleMode,
+          previousAllowManualAssignmentsWhenDraining: existing.allowManualAssignmentsWhenDraining,
           previousNote: existing.lifecycleNote,
           lifecycleMode: server.lifecycleMode,
+          allowManualAssignmentsWhenDraining: server.allowManualAssignmentsWhenDraining,
           lifecycleNote: server.lifecycleNote,
           isActive: server.isActive,
         },

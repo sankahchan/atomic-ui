@@ -176,6 +176,7 @@ const bulkCreateSchema = z.object({
   dataLimitGB: z.number().positive().optional().nullable(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']),
   durationDays: z.number().int().positive().optional().nullable(),
+  confirmDrainingServers: z.boolean().optional(),
 });
 
 /**
@@ -1434,6 +1435,16 @@ export const keysRouter = router({
 
       // Create keys on each server
       for (const server of servers) {
+        if (
+          server.lifecycleMode === 'DRAINING' &&
+          server.allowManualAssignmentsWhenDraining &&
+          !input.confirmDrainingServers
+        ) {
+          results.failed += input.count;
+          results.errors.push(`${server.name}: Confirm draining-server bulk creation before continuing.`);
+          continue;
+        }
+
         const assignmentCheck = canAssignKeysToServer(server, {
           allowDraining: true,
         });

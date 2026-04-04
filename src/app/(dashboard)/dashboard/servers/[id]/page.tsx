@@ -250,6 +250,7 @@ export default function ServerDetailPage() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [lifecycleMode, setLifecycleMode] = useState('ACTIVE');
+  const [allowManualAssignmentsWhenDraining, setAllowManualAssignmentsWhenDraining] = useState(false);
   const [lifecycleNote, setLifecycleNote] = useState('');
   const [outageTargetServerId, setOutageTargetServerId] = useState('none');
   const [outageGraceHours, setOutageGraceHours] = useState('3');
@@ -439,6 +440,7 @@ export default function ServerDetailPage() {
     }
 
     setLifecycleMode(server.lifecycleMode || 'ACTIVE');
+    setAllowManualAssignmentsWhenDraining(server.allowManualAssignmentsWhenDraining ?? false);
     setLifecycleNote(server.lifecycleNote || '');
     setLatencyThresholdMs(String(server.healthCheck?.latencyThresholdMs ?? 500));
     setSlowAutoDrainEnabled(server.healthCheck?.slowAutoDrainEnabled ?? true);
@@ -526,6 +528,7 @@ export default function ServerDetailPage() {
     lifecycleMutation.mutate({
       id: serverId,
       lifecycleMode: lifecycleMode as 'ACTIVE' | 'DRAINING' | 'MAINTENANCE',
+      allowManualAssignmentsWhenDraining,
       lifecycleNote: lifecycleNote.trim() || undefined,
     });
   };
@@ -1157,35 +1160,62 @@ export default function ServerDetailPage() {
 
               <div className="rounded-[1.2rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
                 <p>`Active` accepts new keys and migrations.</p>
-                <p>`Draining` keeps existing keys but blocks new assignments.</p>
-                <p>`Maintenance` blocks new assignments while the server is being worked on.</p>
+                <p>`Draining` keeps existing keys and can optionally allow manual admin key creation only.</p>
+                <p>`Maintenance` blocks all new assignments while the server is being worked on.</p>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   {
                     mode: 'ACTIVE',
                     title: 'Active',
                     desc: 'Normal placement and migrations allowed.',
+                    onSelect: () => {
+                      setLifecycleMode('ACTIVE');
+                      setAllowManualAssignmentsWhenDraining(false);
+                    },
                   },
                   {
                     mode: 'DRAINING',
-                    title: 'Drain mode',
-                    desc: 'Stops new assignments but keeps existing users connected.',
+                    title: 'Drain (manual only)',
+                    desc: 'Auto-placement stops, but admins can still create keys manually.',
+                    onSelect: () => {
+                      setLifecycleMode('DRAINING');
+                      setAllowManualAssignmentsWhenDraining(true);
+                    },
+                  },
+                  {
+                    mode: 'DRAINING_BLOCK_ALL',
+                    title: 'Drain (block all)',
+                    desc: 'Keep existing users only. No new keys, even from manual admin creation.',
+                    onSelect: () => {
+                      setLifecycleMode('DRAINING');
+                      setAllowManualAssignmentsWhenDraining(false);
+                    },
                   },
                   {
                     mode: 'MAINTENANCE',
                     title: 'Maintenance',
                     desc: 'Stops assignments and enables planned-maintenance outage handling.',
+                    onSelect: () => {
+                      setLifecycleMode('MAINTENANCE');
+                      setAllowManualAssignmentsWhenDraining(false);
+                    },
                   },
                 ].map((option) => (
                   <button
                     key={option.mode}
                     type="button"
-                    onClick={() => setLifecycleMode(option.mode)}
+                    onClick={option.onSelect}
                     className={cn(
                       'rounded-[1rem] border p-3 text-left transition-colors',
-                      lifecycleMode === option.mode
+                      (
+                        option.mode === 'DRAINING'
+                          ? lifecycleMode === 'DRAINING' && allowManualAssignmentsWhenDraining
+                          : option.mode === 'DRAINING_BLOCK_ALL'
+                            ? lifecycleMode === 'DRAINING' && !allowManualAssignmentsWhenDraining
+                            : lifecycleMode === option.mode
+                      )
                         ? 'border-cyan-500/40 bg-cyan-500/10'
                         : 'border-border/50 bg-background/30 hover:bg-background/45',
                     )}
@@ -1194,6 +1224,36 @@ export default function ServerDetailPage() {
                     <p className="mt-1 text-xs text-muted-foreground">{option.desc}</p>
                   </button>
                 ))}
+              </div>
+
+              {lifecycleMode === 'DRAINING' ? (
+                <label className="flex items-start gap-3 rounded-[1rem] border border-border/60 bg-background/35 p-3 text-sm dark:bg-white/[0.03]">
+                  <input
+                    type="checkbox"
+                    checked={allowManualAssignmentsWhenDraining}
+                    onChange={(event) => setAllowManualAssignmentsWhenDraining(event.target.checked)}
+                    className="mt-1 rounded border-gray-300"
+                  />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Allow manual admin creation while draining</p>
+                    <p className="text-muted-foreground">
+                      Automatic placement still avoids this server. This only affects explicit admin-selected key creation.
+                    </p>
+                  </div>
+                </label>
+              ) : null}
+
+              <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                <p className="font-medium text-foreground">Current new-key policy</p>
+                {lifecycleMode === 'ACTIVE' ? (
+                  <p className="mt-1">Automatic and manual key creation are allowed.</p>
+                ) : lifecycleMode === 'DRAINING' && allowManualAssignmentsWhenDraining ? (
+                  <p className="mt-1">Automatic placement is blocked. Manual admin-selected key creation is still allowed.</p>
+                ) : lifecycleMode === 'DRAINING' ? (
+                  <p className="mt-1">Both automatic and manual new-key creation are blocked while existing users stay in place.</p>
+                ) : (
+                  <p className="mt-1">All new-key creation is blocked during maintenance.</p>
+                )}
               </div>
 
               {server.lifecycleChangedAt ? (
