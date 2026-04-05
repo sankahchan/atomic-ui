@@ -122,6 +122,39 @@ function resolveTelegramOfferActionLine(
       : 'Best use: /buy';
 }
 
+function resolveTelegramOfferUseWithLabel(
+  offer: TelegramOfferRecord,
+  locale: SupportedLocale,
+) {
+  const isMyanmar = locale === 'my';
+  return offer.campaignType === 'RENEWAL_SOON'
+    ? isMyanmar
+      ? 'Use with: Renew'
+      : 'Use with: Renew'
+    : isMyanmar
+      ? 'Use with: Buy key'
+      : 'Use with: Buy key';
+}
+
+function resolveTelegramOfferBestForLabel(
+  offer: TelegramOfferRecord,
+  locale: SupportedLocale,
+) {
+  const isMyanmar = locale === 'my';
+  switch (offer.campaignType) {
+    case 'TRIAL_TO_PAID':
+      return isMyanmar ? 'Best for: your first paid order' : 'Best for: your first paid order';
+    case 'RENEWAL_SOON':
+      return isMyanmar ? 'Best for: extending your current key' : 'Best for: extending your current key';
+    case 'PREMIUM_UPSELL':
+      return isMyanmar ? 'Best for: upgrading to Premium' : 'Best for: upgrading to Premium';
+    case 'WINBACK':
+      return isMyanmar ? 'Best for: returning after inactivity' : 'Best for: returning after inactivity';
+    default:
+      return isMyanmar ? 'Best for: your next checkout' : 'Best for: your next checkout';
+  }
+}
+
 function resolveTelegramOfferCallbackSource(
   campaignType: string,
 ): string | null {
@@ -184,8 +217,8 @@ function buildTelegramOffersKeyboard(input: {
         {
           text:
             input.locale === 'my'
-              ? `🔄 ${targetLabel}`
-              : `🔄 ${targetLabel}`,
+              ? `🔄 Renew • ${targetLabel}`
+              : `🔄 Renew • ${targetLabel}`,
           callback_data: buildTelegramOrderActionCallbackData('ky', targetId, secondary),
         },
       ]);
@@ -196,8 +229,8 @@ function buildTelegramOffersKeyboard(input: {
       {
         text:
           input.locale === 'my'
-            ? `🛒 ${offer.couponCode}`
-            : `🛒 ${offer.couponCode}`,
+            ? `🛒 Buy • ${offer.couponCode}`
+            : `🛒 Buy • ${offer.couponCode}`,
         callback_data: buildTelegramOrderActionCallbackData('by', offer.id, callbackSource),
       },
     ]);
@@ -331,6 +364,8 @@ export async function handleOffersCommand(input: {
         )}`,
         offerLabel ? `  ${input.locale === 'my' ? 'Offer' : 'Offer'}: <b>${escapeHtml(offerLabel)}</b>` : '',
         targetLabel ? `  ${input.locale === 'my' ? 'For' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
+        `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
+        `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferActionLine(offer, input.locale, targetLabel))}`,
         `  ${escapeHtml(useNowLabel)}`,
         offer.expiresAt
@@ -382,6 +417,8 @@ export async function handleOffersCommand(input: {
         `• <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
           resolveTelegramOfferStatusLabel(offer, input.locale),
         )}`,
+        `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
+        `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferUnavailableReason(offer, input.locale))}`,
       );
     }

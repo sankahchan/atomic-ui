@@ -52,7 +52,9 @@ import {
   type LocalizedTemplateMap,
 } from '@/lib/localized-templates';
 import {
+  buildTelegramLatestReplyPreviewLines,
   buildTelegramOrderNextStepText,
+  buildTelegramOrderTimelineChipRow,
   buildTelegramOrderTimelineLines,
   escapeHtml,
   formatExpirationSummary,
@@ -1130,6 +1132,7 @@ function getTelegramProofExampleUrls() {
   return {
     good: withAbsoluteBasePath('/telegram/proof-example-good.png'),
     bad: withAbsoluteBasePath('/telegram/proof-example-bad.png'),
+    common: withAbsoluteBasePath('/telegram/proof-example-common-mistake.png'),
   };
 }
 
@@ -1217,6 +1220,12 @@ function buildTelegramOrderActionKeyboard(input: {
         {
           text: input.locale === 'my' ? '❌ Bad example' : '❌ Bad example',
           url: proofExamples.bad,
+        },
+      ]);
+      rows.push([
+        {
+          text: input.locale === 'my' ? '⚠️ Common mistake' : '⚠️ Common mistake',
+          url: proofExamples.common,
         },
       ]);
     } else if (supportButton) {
@@ -2028,6 +2037,17 @@ function buildTelegramSupportQueueReplyKeyboard(input: {
       ],
       [
         {
+          text: isMyanmar ? '⬅️ Queue' : '⬅️ Queue',
+          callback_data: buildTelegramMenuCallbackData(
+            'admin',
+            input.mode === 'admin'
+              ? 'supportqueue_admin'
+              : input.mode === 'user'
+                ? 'supportqueue_user'
+                : 'supportqueue',
+          ),
+        },
+        {
           text: isMyanmar ? '✅ Handled' : '✅ Handled',
           callback_data: buildTelegramSupportQueueCallbackData('hd', input.requestId, input.mode),
         },
@@ -2061,6 +2081,18 @@ async function sendTelegramSupportQueueCardToChat(input: {
     state.code === 'admin'
     && Date.now() - (input.request.updatedAt || input.request.createdAt).getTime() > 6 * 60 * 60 * 1000;
   const panelUrl = await buildTelegramSupportQueuePanelUrl(input.request.id);
+  const replyStateLabel =
+    latestReply?.senderType === 'ADMIN'
+      ? input.locale === 'my'
+        ? '🟡 Waiting for user'
+        : '🟡 Waiting for user'
+      : input.request.followUpPending
+        ? input.locale === 'my'
+          ? '🕒 Waiting for admin'
+          : '🕒 Waiting for admin'
+        : input.locale === 'my'
+          ? '✅ Up to date'
+          : '✅ Up to date';
 
   await sendTelegramMessage(
     input.botToken,
@@ -2074,10 +2106,13 @@ async function sendTelegramSupportQueueCardToChat(input: {
       `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
       `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}</b>`,
       `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'Overdue' : 'Overdue'}</b>` : ''}`,
+      `${input.locale === 'my' ? 'Reply state' : 'Reply state'}: <b>${escapeHtml(replyStateLabel)}</b>`,
       `${input.locale === 'my' ? 'Age' : 'Age'}: <b>${escapeHtml(age)}</b>`,
-      latestReply
-        ? `${latestReply.senderType === 'ADMIN' ? 'Admin' : 'User'}: ${escapeHtml(latestReply.message.slice(0, 120))}${latestReply.message.length > 120 ? '…' : ''}`
-        : '',
+      ...buildTelegramLatestReplyPreviewLines({
+        reply: latestReply,
+        locale: input.locale,
+        maxLength: 120,
+      }).map((line) => escapeHtml(line)),
       `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
     ]
       .filter(Boolean)
@@ -2117,11 +2152,29 @@ function buildTelegramOrderReviewAlertMessage(input: {
         '• duplicate-proof warning',
         '• whether a quick reject preset is enough',
       ];
+  const ownershipLabel = order.assignedReviewerEmail
+    ? `🧷 ${isMyanmar ? 'Claimed by' : 'Claimed by'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
+    : `🧷 ${isMyanmar ? 'Queue ownership' : 'Queue ownership'}: <b>${isMyanmar ? 'Unclaimed' : 'Unclaimed'}</b>`;
+  const queueHint =
+    input.mode === 'reminder'
+      ? isMyanmar
+        ? 'Reminder'
+        : 'Reminder'
+      : input.mode === 'updated'
+        ? isMyanmar
+          ? 'Live queue card'
+          : 'Live queue card'
+        : isMyanmar
+          ? 'New review item'
+          : 'New review item';
 
   return [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
     '',
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
+    `${isMyanmar ? 'Queue' : 'Queue'}: <b>${queueHint}</b>`,
+    '',
+    '<b>📎 Proof summary</b>',
     order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
     `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
     `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
@@ -2129,11 +2182,12 @@ function buildTelegramOrderReviewAlertMessage(input: {
       ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
       : '',
     `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    '',
+    '<b>🧭 Queue ownership</b>',
     order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
     order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
-    order.assignedReviewerEmail
-      ? `${isMyanmar ? 'Assigned' : 'Assigned'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
-      : '',
+    ownershipLabel,
+    buildTelegramOrderTimelineChipRow({ order }),
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
       : '',
@@ -2178,6 +2232,14 @@ function buildTelegramOrderReviewAlertKeyboard(input: {
                 : '🧷 Claim',
           callback_data: buildTelegramOrderReviewCallbackData(
             'claim',
+            input.orderId,
+            input.queueMode || 'all',
+          ),
+        },
+        {
+          text: input.locale === 'my' ? '⬅️ Prev' : '⬅️ Prev',
+          callback_data: buildTelegramOrderReviewCallbackData(
+            'prev',
             input.orderId,
             input.queueMode || 'all',
           ),
@@ -2348,20 +2410,31 @@ async function sendTelegramNextReviewQueueCard(input: {
   adminActor: TelegramAdminActor;
   mode: 'all' | 'mine' | 'unclaimed';
   excludeOrderId?: string | null;
+  direction?: 'next' | 'prev';
 }) {
   const snapshot = await getTelegramReviewQueueSnapshot({
     reviewerUserId: input.adminActor.userId,
     mode: input.mode,
-    limit: 8,
+    limit: 20,
   });
-  const nextOrder = snapshot.orders.find((order) => order.id !== (input.excludeOrderId || null)) || null;
+  const currentIndex = snapshot.orders.findIndex((order) => order.id === (input.excludeOrderId || null));
+  const nextOrder =
+    currentIndex >= 0
+      ? input.direction === 'prev'
+        ? snapshot.orders[currentIndex - 1] || null
+        : snapshot.orders[currentIndex + 1] || null
+      : snapshot.orders.find((order) => order.id !== (input.excludeOrderId || null)) || null;
   if (!nextOrder) {
     await sendTelegramMessage(
       input.botToken,
       input.chatId,
-      input.locale === 'my'
-        ? '📭 ဤ queue filter အတွက် နောက်ထပ် pending review item မရှိတော့ပါ။'
-        : '📭 There are no more pending review items in this queue filter.',
+      input.direction === 'prev'
+        ? input.locale === 'my'
+          ? '📭 ဤ queue filter အတွက် ယခင် review item မရှိတော့ပါ။'
+          : '📭 There is no previous pending review item in this queue filter.'
+        : input.locale === 'my'
+          ? '📭 ဤ queue filter အတွက် နောက်ထပ် pending review item မရှိတော့ပါ။'
+          : '📭 There are no more pending review items in this queue filter.',
       {
         replyMarkup: buildTelegramReviewQueueSummaryKeyboard({
           locale: input.locale,
@@ -8945,7 +9018,7 @@ async function handleTelegramCallbackQuery(
             ? `Claimed ${claimedOrder.orderCode}`
             : `Claimed ${claimedOrder.orderCode}`,
         );
-      } else if (orderAction.action === 'next') {
+      } else if (orderAction.action === 'next' || orderAction.action === 'prev') {
         await sendTelegramNextReviewQueueCard({
           chatId,
           locale: adminLocale,
@@ -8953,6 +9026,7 @@ async function handleTelegramCallbackQuery(
           adminActor,
           mode: resolveTelegramReviewQueueMode(orderAction.secondary || ''),
           excludeOrderId: orderAction.orderId,
+          direction: orderAction.action === 'prev' ? 'prev' : 'next',
         });
 
         await answerTelegramCallbackQuery(

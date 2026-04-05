@@ -11,11 +11,13 @@ import {
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import {
+  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramOrderStatusLabel,
   formatTelegramPremiumFollowUpState,
   formatTelegramPremiumSupportTypeLabel,
+  formatTelegramReplyStateLabel,
   formatTelegramRefundRequestStatusLabel,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
@@ -544,33 +546,20 @@ export async function handleInboxCommand(input: {
     lines.push(input.locale === 'my' ? '<b>Support updates</b>' : '<b>Support updates</b>');
     for (const request of premiumSupportUpdates) {
       const latestReply = request.replies?.[request.replies.length - 1] || null;
-      const latestReplyPrefix = latestReply
-        ? latestReply.senderType === 'ADMIN'
-          ? input.locale === 'my'
-            ? 'Admin'
-            : 'Admin'
-          : input.locale === 'my'
-            ? 'You'
-            : 'You'
-        : null;
-      const replyStateLabel = latestReply?.senderType === 'ADMIN'
-        ? input.locale === 'my'
-          ? '🟡 Reply needed'
-          : '🟡 Reply needed'
-        : request.followUpPending
-          ? input.locale === 'my'
-            ? '🕒 Waiting for admin'
-            : '🕒 Waiting for admin'
-          : input.locale === 'my'
-            ? '✅ Up to date'
-            : '✅ Up to date';
+      const replyStateLabel = formatTelegramReplyStateLabel({
+        latestReplySenderType: latestReply?.senderType || null,
+        followUpPending: request.followUpPending,
+        locale: input.locale,
+      });
       lines.push(
         `• 💎 <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
         `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
         `  ${escapeHtml(replyStateLabel)}`,
-        latestReply
-          ? `  ${escapeHtml(latestReplyPrefix || '')}: ${escapeHtml(latestReply.message.slice(0, 80))}${latestReply.message.length > 80 ? '…' : ''}`
-          : '',
+        ...buildTelegramLatestReplyPreviewLines({
+          reply: latestReply,
+          locale: input.locale,
+          maxLength: 80,
+        }).map((line) => `  ${escapeHtml(line)}`),
         `  ${formatTelegramDateTime(request.updatedAt || request.createdAt, input.locale)}`,
       );
     }

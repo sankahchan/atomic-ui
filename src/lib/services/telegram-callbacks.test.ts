@@ -70,6 +70,17 @@ test('telegram order review callbacks support quick reject presets', () => {
       secondary: null,
     },
   );
+
+  assert.deepEqual(
+    parseTelegramOrderReviewCallbackData(
+      buildTelegramOrderReviewCallbackData('prev', 'ord_prev', 'mine'),
+    ),
+    {
+      action: 'prev',
+      orderId: 'ord_prev',
+      secondary: 'mine',
+    },
+  );
 });
 
 test('telegram menu callbacks support admin and user filters', () => {

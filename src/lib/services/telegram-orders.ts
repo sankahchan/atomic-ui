@@ -9,6 +9,7 @@ import {
 import { evaluateTelegramOrderRefundEligibility } from '@/lib/services/telegram-finance';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import {
+  buildTelegramOrderTimelineChipRow,
   buildTelegramOrderNextStepText,
   buildTelegramOrderTimelineLines,
   escapeHtml,
@@ -246,6 +247,7 @@ export async function buildTelegramOrderStatusMessage(input: {
     `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
     stateLine ? `🧾 ${escapeHtml(stateLine)}` : '',
     nextStep ? `👉 ${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
+    buildTelegramOrderTimelineChipRow({ order }),
     buildTelegramOrderProgressSummary({ order, locale })
       ? `⏱ ${escapeHtml(buildTelegramOrderProgressSummary({ order, locale }) || '')}`
       : '',
@@ -648,6 +650,7 @@ export async function handleOrdersCommand(input: {
           formatTelegramOrderStatusLabel(order.status, ui),
         )} • ${escapeHtml(formatTelegramDateTime(order.createdAt, input.locale))}`,
       );
+      lines.push(`  ${buildTelegramOrderTimelineChipRow({ order })}`);
       if (nextStep) {
         lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
       }

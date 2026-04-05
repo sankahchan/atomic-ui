@@ -32,10 +32,12 @@ import {
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import {
+  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
   formatTelegramPremiumFollowUpState,
+  formatTelegramReplyStateLabel,
   formatTelegramPremiumSupportStatusLabel,
   formatTelegramPremiumSupportTypeLabel,
   getDynamicKeyRegionChoices,
@@ -521,18 +523,11 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const poolSummary = formatTelegramDynamicPoolSummary(request.dynamicAccessKey, ui);
   const latestReply = request.replies?.[request.replies.length - 1] || null;
   const currentState = formatTelegramPremiumFollowUpState(request, ui);
-  const followUpIndicator =
-    currentState === ui.premiumAwaitingYourReply
-      ? input.locale === 'my'
-        ? '🟡 Reply needed'
-        : '🟡 Reply needed'
-      : currentState === ui.premiumAwaitingAdminReply
-        ? input.locale === 'my'
-          ? '🕒 Waiting for admin'
-          : '🕒 Waiting for admin'
-        : input.locale === 'my'
-          ? '✅ Up to date'
-          : '✅ Up to date';
+  const followUpIndicator = formatTelegramReplyStateLabel({
+    latestReplySenderType: latestReply?.senderType || null,
+    followUpPending: request.followUpPending,
+    locale: input.locale,
+  });
   const lines = [
     ui.premiumStatusTitle,
     '',
@@ -591,14 +586,13 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   }
 
   if (latestReply) {
-    const senderLabel =
-      latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
+    lines.push('', '<b>💬 Latest reply</b>');
     lines.push(
-      '',
-      `${ui.premiumLatestReplyLabel}: <b>${escapeHtml(senderLabel)}</b> · ${escapeHtml(
-        formatTelegramDateTime(latestReply.createdAt, input.locale),
-      )}`,
-      escapeHtml(latestReply.message),
+      ...buildTelegramLatestReplyPreviewLines({
+        reply: latestReply,
+        locale: input.locale,
+        maxLength: 280,
+      }).map((line) => escapeHtml(line)),
     );
   }
 
@@ -1025,17 +1019,11 @@ export async function handlePremiumSupportStatusCommand(input: {
 
   for (const request of requests) {
     const latestReply = request.replies?.[request.replies.length - 1] || null;
-    const replyStateLabel = latestReply?.senderType === 'ADMIN'
-      ? input.locale === 'my'
-        ? '🟡 Reply needed'
-        : '🟡 Reply needed'
-      : request.followUpPending
-        ? input.locale === 'my'
-          ? '🕒 Waiting for admin'
-          : '🕒 Waiting for admin'
-        : input.locale === 'my'
-          ? '✅ Up to date'
-          : '✅ Up to date';
+    const replyStateLabel = formatTelegramReplyStateLabel({
+      latestReplySenderType: latestReply?.senderType || null,
+      followUpPending: request.followUpPending,
+      locale: input.locale,
+    });
     lines.push(
       `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
         formatTelegramPremiumSupportStatusLabel(request.status, ui),
@@ -1050,14 +1038,11 @@ export async function handlePremiumSupportStatusCommand(input: {
       `  ${ui.createdAtLabel}: ${escapeHtml(
         formatTelegramDateTime(request.createdAt, input.locale),
       )}`,
-      latestReply
-        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(
-            `${latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou} • ${formatTelegramDateTime(latestReply.createdAt, input.locale)}`,
-          )}`
-        : '',
-      latestReply
-        ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
-        : '',
+      ...buildTelegramLatestReplyPreviewLines({
+        reply: latestReply,
+        locale: input.locale,
+        maxLength: 100,
+      }).map((line) => `  ${escapeHtml(line)}`),
       '',
     );
     inlineKeyboard.push([

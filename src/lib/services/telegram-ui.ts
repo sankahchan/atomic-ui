@@ -1147,6 +1147,174 @@ export function formatTelegramPremiumFollowUpState(
   return formatTelegramPremiumSupportStatusLabel(request.status, ui);
 }
 
+export function formatTelegramReplyStateLabel(input: {
+  followUpPending?: boolean | null;
+  latestReplySenderType?: string | null;
+  locale: SupportedLocale;
+}) {
+  if (input.latestReplySenderType === 'ADMIN') {
+    return input.locale === 'my' ? '🟡 Waiting for you' : '🟡 Waiting for you';
+  }
+
+  if (input.followUpPending) {
+    return input.locale === 'my' ? '🕒 Waiting for admin' : '🕒 Waiting for admin';
+  }
+
+  return input.locale === 'my' ? '✅ Up to date' : '✅ Up to date';
+}
+
+export function buildTelegramLatestReplyPreviewLines(input: {
+  reply?: {
+    senderType: string;
+    createdAt: Date;
+    message: string;
+  } | null;
+  locale: SupportedLocale;
+  maxLength?: number;
+}) {
+  if (!input.reply) {
+    return [];
+  }
+
+  const senderLabel =
+    input.reply.senderType === 'ADMIN'
+      ? input.locale === 'my'
+        ? 'Admin'
+        : 'Admin'
+      : input.locale === 'my'
+        ? 'You'
+        : 'You';
+  const maxLength = input.maxLength ?? 120;
+  const preview = input.reply.message.slice(0, maxLength);
+  return [
+    `${input.locale === 'my' ? 'Latest reply' : 'Latest reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
+    `${preview}${input.reply.message.length > maxLength ? '…' : ''}`,
+  ];
+}
+
+function deriveTelegramOrderTimelineStageState(input: {
+  order: {
+    status: string;
+    createdAt: Date;
+    paymentStageEnteredAt?: Date | null;
+    paymentSubmittedAt?: Date | null;
+    reviewedAt?: Date | null;
+    fulfilledAt?: Date | null;
+    rejectedAt?: Date | null;
+    expiredAt?: Date | null;
+  };
+}) {
+  const { order } = input;
+  const currentStage =
+    order.status === 'AWAITING_PAYMENT_METHOD'
+      ? 'payment'
+      : order.status === 'AWAITING_PAYMENT_PROOF'
+        ? 'proof'
+        : order.status === 'PENDING_REVIEW' || order.status === 'APPROVED'
+          ? 'review'
+          : order.status === 'FULFILLED'
+            ? 'fulfilled'
+            : order.status === 'REJECTED' || order.status === 'CANCELLED'
+              ? 'rejected'
+              : null;
+
+  return {
+    currentStage,
+    stages: [
+      {
+        key: 'created',
+        chip: 'Created',
+        label: 'Created',
+        at: order.createdAt,
+        state: 'done' as const,
+      },
+      {
+        key: 'payment',
+        chip: 'Method selected',
+        label: 'Method selected',
+        at: order.paymentStageEnteredAt,
+        state: order.paymentStageEnteredAt
+          ? ('done' as const)
+          : currentStage === 'payment'
+            ? ('current' as const)
+            : ('pending' as const),
+      },
+      {
+        key: 'proof',
+        chip: 'Proof uploaded',
+        label: 'Proof uploaded',
+        at: order.paymentSubmittedAt,
+        state: order.paymentSubmittedAt
+          ? ('done' as const)
+          : currentStage === 'proof'
+            ? ('current' as const)
+            : ('pending' as const),
+      },
+      {
+        key: 'review',
+        chip: 'Under review',
+        label: 'Under review',
+        at: order.reviewedAt,
+        state: order.reviewedAt
+          ? ('done' as const)
+          : currentStage === 'review'
+            ? ('current' as const)
+            : ('pending' as const),
+      },
+    ],
+    outcome:
+      order.fulfilledAt
+        ? {
+            chip: 'Fulfilled',
+            label: 'Fulfilled',
+            at: order.fulfilledAt,
+            state: 'done' as const,
+          }
+        : order.rejectedAt || order.status === 'CANCELLED'
+          ? {
+              chip: order.status === 'CANCELLED' ? 'Cancelled' : 'Rejected',
+              label: order.status === 'CANCELLED' ? 'Cancelled' : 'Rejected',
+              at:
+                order.rejectedAt ||
+                order.expiredAt ||
+                order.reviewedAt ||
+                order.paymentStageEnteredAt ||
+                order.createdAt,
+              state: 'done' as const,
+            }
+          : {
+              chip: 'Fulfilled',
+              label: 'Fulfilled',
+              at: null,
+              state: currentStage === 'fulfilled' ? ('current' as const) : ('pending' as const),
+            },
+  };
+}
+
+export function buildTelegramOrderTimelineChipRow(input: {
+  order: {
+    status: string;
+    createdAt: Date;
+    paymentStageEnteredAt?: Date | null;
+    paymentSubmittedAt?: Date | null;
+    reviewedAt?: Date | null;
+    fulfilledAt?: Date | null;
+    rejectedAt?: Date | null;
+    expiredAt?: Date | null;
+  };
+}) {
+  const timeline = deriveTelegramOrderTimelineStageState({ order: input.order });
+  const chipLabel = (state: 'done' | 'current' | 'pending', label: string) => {
+    const marker = state === 'done' ? '🟢' : state === 'current' ? '🟡' : '⚪️';
+    return `${marker} <b>[${escapeHtml(label)}]</b>`;
+  };
+
+  return [
+    ...timeline.stages.map((stage) => chipLabel(stage.state, stage.chip)),
+    chipLabel(timeline.outcome.state, timeline.outcome.chip),
+  ].join(' ');
+}
+
 export function buildTelegramOrderTimelineLines(input: {
   order: {
     status: string;
@@ -1164,41 +1332,28 @@ export function buildTelegramOrderTimelineLines(input: {
   const { order, locale, ui } = input;
   const waitingLabel = locale === 'my' ? 'Waiting' : 'Waiting';
   const pendingLabel = locale === 'my' ? 'Not yet' : 'Not yet';
-  const currentStage =
-    order.status === 'AWAITING_PAYMENT_METHOD'
-      ? 'payment'
-      : order.status === 'AWAITING_PAYMENT_PROOF'
-        ? 'proof'
-        : order.status === 'PENDING_REVIEW'
-          ? 'review'
-          : order.status === 'FULFILLED'
-            ? 'fulfilled'
-            : null;
-  const lines = [`${ui.orderTimelineTitle}:`];
+  const timeline = deriveTelegramOrderTimelineStageState({ order });
+  const lines = [`${ui.orderTimelineTitle}:`, buildTelegramOrderTimelineChipRow({ order })];
   const stages = [
     {
-      key: 'created',
       label: ui.orderTimelineCreated,
       at: order.createdAt,
       state: 'done' as const,
     },
     {
-      key: 'payment',
       label: ui.orderTimelinePaymentStage,
       at: order.paymentStageEnteredAt,
-      state: order.paymentStageEnteredAt ? ('done' as const) : currentStage === 'payment' ? ('current' as const) : ('pending' as const),
+      state: timeline.stages[1]?.state ?? ('pending' as const),
     },
     {
-      key: 'proof',
       label: ui.orderTimelineProofSubmitted,
       at: order.paymentSubmittedAt,
-      state: order.paymentSubmittedAt ? ('done' as const) : currentStage === 'proof' ? ('current' as const) : ('pending' as const),
+      state: timeline.stages[2]?.state ?? ('pending' as const),
     },
     {
-      key: 'review',
       label: ui.orderTimelineReviewed,
       at: order.reviewedAt,
-      state: order.reviewedAt ? ('done' as const) : currentStage === 'review' ? ('current' as const) : ('pending' as const),
+      state: timeline.stages[3]?.state ?? ('pending' as const),
     },
   ];
 
@@ -1236,7 +1391,7 @@ export function buildTelegramOrderTimelineLines(input: {
     );
   } else {
     lines.push(
-      `⚪️ ${ui.orderTimelineFulfilled} · ${currentStage === 'fulfilled' ? waitingLabel : pendingLabel}`,
+      `⚪️ ${ui.orderTimelineFulfilled} · ${timeline.currentStage === 'fulfilled' ? waitingLabel : pendingLabel}`,
     );
   }
 
