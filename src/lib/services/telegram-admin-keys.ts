@@ -109,7 +109,14 @@ type TelegramAdminKeyDeps = {
 };
 
 type RecipientTarget = {
-  mode: 'NONE' | 'KNOWN' | 'EMAIL_ONLY' | 'USERNAME_ONLY';
+  mode:
+    | 'NONE'
+    | 'KNOWN'
+    | 'EXACT_REPLY'
+    | 'EMAIL_ONLY'
+    | 'USERNAME_ONLY'
+    | 'AMBIGUOUS_USERNAME'
+    | 'CHAT_ID_ONLY';
   label: string;
   chatId: string | null;
   telegramId: string | null;
@@ -194,6 +201,8 @@ type PendingAdminFlow =
   | DynamicManageDraft
   | SupportReplyDraft
   | DirectMessageDraft;
+
+const TELEGRAM_REPLY_RECIPIENT_PREFIX = 'reply-user:';
 
 function calculateExpiration(
   expirationType: AccessCreateDraft['expirationType'] | DynamicCreateDraft['expirationType'],
@@ -536,14 +545,16 @@ function formatRecipientSummary(recipient: RecipientTarget | null, locale: Suppo
   }
 
   const parts = [`<b>${escapeHtml(recipient.label)}</b>`];
-  if (recipient.mode === 'KNOWN' && recipient.chatId) {
+  if ((recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY') && recipient.chatId) {
     parts.push(locale === 'my' ? 'linked chat • direct send ready' : 'linked chat • direct send ready');
+  } else if (recipient.mode === 'AMBIGUOUS_USERNAME') {
+    parts.push(locale === 'my' ? 'username ambiguous • create only' : 'username ambiguous • create only');
   } else if (recipient.mode === 'EMAIL_ONLY') {
     parts.push(locale === 'my' ? 'email only • connect link fallback' : 'email only • connect link fallback');
   } else if (recipient.mode === 'USERNAME_ONLY') {
     parts.push(locale === 'my' ? 'username hint only • create only' : 'username hint only • create only');
-  } else if (recipient.chatId) {
-    parts.push(locale === 'my' ? 'manual chat id • send attempt' : 'manual chat id • send attempt');
+  } else if (recipient.mode === 'CHAT_ID_ONLY' && recipient.chatId) {
+    parts.push(locale === 'my' ? 'manual chat id • create only' : 'manual chat id • create only');
   } else {
     parts.push(locale === 'my' ? 'create only' : 'create only');
   }
@@ -559,11 +570,19 @@ function buildRecipientGuidanceLines(recipient: RecipientTarget | null, locale: 
     ];
   }
 
-  if (recipient.mode === 'KNOWN' && recipient.chatId) {
+  if ((recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY') && recipient.chatId) {
     return [
       locale === 'my'
         ? 'This recipient has a linked Telegram chat. Create & send can deliver directly.'
         : 'This recipient has a linked Telegram chat. Create & send can deliver directly.',
+    ];
+  }
+
+  if (recipient.mode === 'AMBIGUOUS_USERNAME') {
+    return [
+      locale === 'my'
+        ? 'This @username matches more than one Telegram profile. Use email, a linked chat, or reply to the user message for direct delivery.'
+        : 'This @username matches more than one Telegram profile. Use email, a linked chat, or reply to the user message for direct delivery.',
     ];
   }
 
@@ -585,9 +604,36 @@ function buildRecipientGuidanceLines(recipient: RecipientTarget | null, locale: 
 
   return [
     locale === 'my'
-      ? 'A manual Telegram chat ID was provided. Direct delivery will be attempted, but it may fail if the user has not started the bot.'
-      : 'A manual Telegram chat ID was provided. Direct delivery will be attempted, but it may fail if the user has not started the bot.',
+      ? 'A manual Telegram chat ID was provided, but it is not treated as verified delivery identity. Create only will return a connect link.'
+      : 'A manual Telegram chat ID was provided, but it is not treated as verified delivery identity. Create only will return a connect link.',
   ];
+}
+
+function parseReplyRecipientSeed(query: string) {
+  const match = query.trim().match(/^reply-user:(\d+)$/i);
+  return match?.[1] || null;
+}
+
+function canDirectSendToRecipient(
+  recipient: RecipientTarget | null,
+): recipient is RecipientTarget & { chatId: string } {
+  return Boolean(
+    recipient
+    && recipient.chatId
+    && (recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY'),
+  );
+}
+
+function getPersistedRecipientTelegramId(recipient: RecipientTarget | null) {
+  if (!recipient) {
+    return null;
+  }
+
+  if (recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY') {
+    return recipient.telegramId || recipient.chatId;
+  }
+
+  return null;
 }
 
 function formatRegionModeLabel(mode: string | null | undefined, locale: SupportedLocale) {
@@ -935,25 +981,32 @@ async function resolveRecipientTarget(query: string): Promise<RecipientTarget | 
     return null;
   }
 
+  const replyRecipientTelegramId = parseReplyRecipientSeed(trimmed);
   const normalizedUsername = trimmed.replace(/^@/, '').trim().toLowerCase();
+  const usernameQuery = trimmed.startsWith('@') ? normalizedUsername : null;
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
-  const directNumeric = /^\d+$/.test(trimmed) ? trimmed : null;
+  const directNumeric = replyRecipientTelegramId || (/^\d+$/.test(trimmed) ? trimmed : null);
 
-  const [profile, user, accessKey, dynamicKey] = await Promise.all([
-    db.telegramUserProfile.findFirst({
-      where: {
-        OR: [
-          directNumeric ? { telegramChatId: directNumeric } : undefined,
-          directNumeric ? { telegramUserId: directNumeric } : undefined,
-          normalizedUsername ? { username: normalizedUsername } : undefined,
-        ].filter(Boolean) as any,
-      },
-      select: {
-        telegramChatId: true,
-        telegramUserId: true,
-        username: true,
-      },
-    }),
+  const profileWhere = [
+    directNumeric ? { telegramChatId: directNumeric } : undefined,
+    directNumeric ? { telegramUserId: directNumeric } : undefined,
+    usernameQuery ? { username: usernameQuery } : undefined,
+  ].filter(Boolean);
+
+  const [profiles, user, accessKey, dynamicKey] = await Promise.all([
+    profileWhere.length > 0
+      ? db.telegramUserProfile.findMany({
+          where: {
+            OR: profileWhere as any,
+          },
+          select: {
+            telegramChatId: true,
+            telegramUserId: true,
+            username: true,
+          },
+          take: 3,
+        })
+      : Promise.resolve([]),
     db.user.findFirst({
       where: {
         OR: [
@@ -995,44 +1048,112 @@ async function resolveRecipientTarget(query: string): Promise<RecipientTarget | 
     }),
   ]);
 
+  const directProfile = directNumeric
+    ? profiles.find(
+        (profile) => profile.telegramChatId === directNumeric || profile.telegramUserId === directNumeric,
+      ) || null
+    : null;
+  const usernameProfiles = usernameQuery
+    ? profiles.filter((profile) => (profile.username || '').toLowerCase() === usernameQuery)
+    : [];
+  const uniqueUsernameProfile = usernameProfiles.length === 1 ? usernameProfiles[0] : null;
+  const profile = directProfile || uniqueUsernameProfile || null;
   const chatId =
     profile?.telegramChatId ||
     user?.telegramChatId ||
     accessKey?.telegramId ||
     dynamicKey?.telegramId ||
-    directNumeric ||
     null;
   const telegramId =
     profile?.telegramUserId ||
     accessKey?.telegramId ||
     dynamicKey?.telegramId ||
-    directNumeric ||
     null;
   const userId = user?.id || accessKey?.userId || dynamicKey?.userId || null;
   const email = user?.email || accessKey?.email || dynamicKey?.email || (isEmail ? trimmed.toLowerCase() : null);
-  const username = profile?.username || (trimmed.startsWith('@') ? normalizedUsername : null);
+  const username = profile?.username || (usernameQuery ? usernameQuery : null);
 
-  if (chatId || userId || email) {
+  if (replyRecipientTelegramId) {
     return {
-      mode: chatId ? 'KNOWN' : isEmail ? 'EMAIL_ONLY' : username ? 'USERNAME_ONLY' : 'KNOWN',
-      label: username ? `@${username}` : email || chatId || trimmed,
-      chatId,
-      telegramId,
+      mode: 'EXACT_REPLY',
+      label: username ? `@${username}` : email || replyRecipientTelegramId,
+      chatId: chatId || replyRecipientTelegramId,
+      telegramId: telegramId || replyRecipientTelegramId,
       userId,
       email,
       username,
     };
   }
 
-  if (trimmed.startsWith('@') && username) {
+  if (directNumeric && (profile || user || accessKey || dynamicKey)) {
     return {
-      mode: 'USERNAME_ONLY',
-      label: `@${username}`,
+      mode: 'KNOWN',
+      label: username ? `@${username}` : email || chatId || directNumeric,
+      chatId: chatId || directNumeric,
+      telegramId: telegramId || directNumeric,
+      userId,
+      email,
+      username,
+    };
+  }
+
+  if (usernameQuery && usernameProfiles.length > 1) {
+    return {
+      mode: 'AMBIGUOUS_USERNAME',
+      label: `@${usernameQuery}`,
       chatId: null,
       telegramId: null,
       userId: null,
       email: null,
+      username: usernameQuery,
+    };
+  }
+
+  if (usernameQuery && uniqueUsernameProfile) {
+    return {
+      mode: uniqueUsernameProfile.telegramChatId ? 'KNOWN' : 'USERNAME_ONLY',
+      label: `@${usernameQuery}`,
+      chatId: uniqueUsernameProfile.telegramChatId || null,
+      telegramId: uniqueUsernameProfile.telegramUserId || null,
+      userId,
+      email,
+      username: usernameQuery,
+    };
+  }
+
+  if (email) {
+    return {
+      mode: 'EMAIL_ONLY',
+      label: email,
+      chatId: null,
+      telegramId: null,
+      userId,
+      email,
       username,
+    };
+  }
+
+  if (usernameQuery) {
+    return {
+      mode: 'USERNAME_ONLY',
+      label: `@${usernameQuery}`,
+      chatId: null,
+      telegramId: null,
+      userId: null,
+      email: null,
+      username: usernameQuery,
+    };
+  }
+
+  if (directNumeric) {
+    return {
+      mode: 'CHAT_ID_ONLY',
+      label: directNumeric,
+      chatId: directNumeric,
+      telegramId: null,
+      userId: null,
+      email: null,
+      username: null,
     };
   }
 
@@ -1316,7 +1437,10 @@ async function promptAccessCreateConfirm(input: {
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
     ].join('\n'),
     {
-      replyMarkup: buildCreateConfirmKeyboard(input.locale, Boolean(input.draft.recipient?.chatId)),
+      replyMarkup: buildCreateConfirmKeyboard(
+        input.locale,
+        canDirectSendToRecipient(input.draft.recipient),
+      ),
     },
   );
 }
@@ -1356,7 +1480,10 @@ async function promptDynamicCreateConfirm(input: {
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
     ].join('\n'),
     {
-      replyMarkup: buildCreateConfirmKeyboard(input.locale, Boolean(input.draft.recipient?.chatId)),
+      replyMarkup: buildCreateConfirmKeyboard(
+        input.locale,
+        canDirectSendToRecipient(input.draft.recipient),
+      ),
     },
   );
 }
@@ -2178,7 +2305,7 @@ async function createAccessKeyFromDraft(input: {
   );
   const recipient = input.draft.recipient;
   const noteParts = [
-    recipient?.mode === 'USERNAME_ONLY' && recipient.username
+    (recipient?.mode === 'USERNAME_ONLY' || recipient?.mode === 'AMBIGUOUS_USERNAME') && recipient.username
       ? `Telegram username hint: @${recipient.username}`
       : null,
   ].filter(Boolean);
@@ -2188,7 +2315,7 @@ async function createAccessKeyFromDraft(input: {
       outlineKeyId: outlineKey.id,
       name: input.draft.name || 'Telegram Key',
       email: recipient?.email || null,
-      telegramId: recipient?.telegramId || recipient?.chatId || null,
+      telegramId: getPersistedRecipientTelegramId(recipient),
       userId: recipient?.userId || null,
       notes: noteParts.join('\n') || null,
       serverId: targetServerId,
@@ -2254,7 +2381,7 @@ async function createDynamicKeyFromDraft(input: {
   const routingPreferences = normalizeDynamicRoutingPreferences({});
   const recipient = input.draft.recipient;
   const noteParts = [
-    recipient?.mode === 'USERNAME_ONLY' && recipient.username
+    (recipient?.mode === 'USERNAME_ONLY' || recipient?.mode === 'AMBIGUOUS_USERNAME') && recipient.username
       ? `Telegram username hint: @${recipient.username}`
       : null,
   ].filter(Boolean);
@@ -2264,7 +2391,7 @@ async function createDynamicKeyFromDraft(input: {
       name: input.draft.name || 'Telegram Dynamic Key',
       type: input.draft.keyType,
       email: recipient?.email || null,
-      telegramId: recipient?.telegramId || recipient?.chatId || null,
+      telegramId: getPersistedRecipientTelegramId(recipient),
       userId: recipient?.userId || null,
       notes: noteParts.join('\n') || null,
       dynamicUrl: generateRandomString(32),
@@ -2336,7 +2463,7 @@ async function finalizeAccessCreate(input: {
     ? 'Created without direct Telegram delivery.'
     : 'Created without direct Telegram delivery.';
 
-  if (input.sendDirect && input.draft.recipient?.chatId) {
+  if (input.sendDirect && canDirectSendToRecipient(input.draft.recipient)) {
     try {
       await input.deps.sendAccessKeySharePageToTelegram({
         accessKeyId: created.id,
@@ -2411,7 +2538,7 @@ async function finalizeDynamicCreate(input: {
     ? 'Created without direct Telegram delivery.'
     : 'Created without direct Telegram delivery.';
 
-  if (input.sendDirect && input.draft.recipient?.chatId) {
+  if (input.sendDirect && canDirectSendToRecipient(input.draft.recipient)) {
     try {
       await input.deps.sendDynamicKeySharePageToTelegram({
         dynamicAccessKeyId: created.id,

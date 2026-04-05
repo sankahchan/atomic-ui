@@ -428,11 +428,7 @@ function getTelegramAdminReplyRecipientSeed(message?: TelegramUpdate['message'])
     return '';
   }
 
-  if (replyFrom.username?.trim()) {
-    return `@${replyFrom.username.trim()}`;
-  }
-
-  return String(replyFrom.id);
+  return `reply-user:${replyFrom.id}`;
 }
 
 function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines: string[]) {
