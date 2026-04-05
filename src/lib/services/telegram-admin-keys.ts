@@ -5,7 +5,10 @@ import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { selectLeastLoadedServer } from '@/lib/services/load-balancer';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
-import { normalizeDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
+import {
+  normalizeDynamicRoutingPreferences,
+  parseDynamicRoutingPreferences,
+} from '@/lib/services/dynamic-subscription-routing';
 import {
   buildTelegramAdminKeyCallbackData,
 } from '@/lib/services/telegram-callbacks';
@@ -21,7 +24,9 @@ import {
 import {
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramDynamicPoolSummary,
   getFlagEmoji,
+  getDynamicKeyRegionChoices,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
 import { mergeTagsForStorage } from '@/lib/tags';
@@ -130,13 +135,27 @@ type DynamicCreateDraft = {
 
 type AccessManageDraft = {
   kind: 'manage_access';
-  step: 'query' | 'actions' | 'quota_custom' | 'add_quota_custom' | 'expiry_date';
+  step:
+    | 'query'
+    | 'actions'
+    | 'quota_custom'
+    | 'add_quota_custom'
+    | 'expiry_date'
+    | 'confirm_resetusage'
+    | 'confirm_toggle';
   keyId: string | null;
 };
 
 type DynamicManageDraft = {
   kind: 'manage_dynamic';
-  step: 'query' | 'actions' | 'quota_custom' | 'add_quota_custom' | 'expiry_date';
+  step:
+    | 'query'
+    | 'actions'
+    | 'quota_custom'
+    | 'add_quota_custom'
+    | 'expiry_date'
+    | 'region_pick'
+    | 'confirm_resetusage';
   dynamicKeyId: string | null;
 };
 
@@ -487,12 +506,136 @@ function formatRecipientSummary(recipient: RecipientTarget | null, locale: Suppo
   }
 
   const parts = [`<b>${escapeHtml(recipient.label)}</b>`];
-  if (recipient.chatId) {
-    parts.push(locale === 'my' ? 'direct send ready' : 'direct send ready');
+  if (recipient.mode === 'KNOWN' && recipient.chatId) {
+    parts.push(locale === 'my' ? 'linked chat • direct send ready' : 'linked chat • direct send ready');
+  } else if (recipient.mode === 'EMAIL_ONLY') {
+    parts.push(locale === 'my' ? 'email only • connect link fallback' : 'email only • connect link fallback');
+  } else if (recipient.mode === 'USERNAME_ONLY') {
+    parts.push(locale === 'my' ? 'username hint only • create only' : 'username hint only • create only');
+  } else if (recipient.chatId) {
+    parts.push(locale === 'my' ? 'manual chat id • send attempt' : 'manual chat id • send attempt');
   } else {
     parts.push(locale === 'my' ? 'create only' : 'create only');
   }
   return parts.join(' • ');
+}
+
+function buildRecipientGuidanceLines(recipient: RecipientTarget | null, locale: SupportedLocale) {
+  if (!recipient || recipient.mode === 'NONE') {
+    return [
+      locale === 'my'
+        ? 'No recipient linked yet. Create only will return a connect link.'
+        : 'No recipient linked yet. Create only will return a connect link.',
+    ];
+  }
+
+  if (recipient.mode === 'KNOWN' && recipient.chatId) {
+    return [
+      locale === 'my'
+        ? 'This recipient has a linked Telegram chat. Create & send can deliver directly.'
+        : 'This recipient has a linked Telegram chat. Create & send can deliver directly.',
+    ];
+  }
+
+  if (recipient.mode === 'EMAIL_ONLY') {
+    return [
+      locale === 'my'
+        ? 'Only email ownership is known. Create only will return a connect link.'
+        : 'Only email ownership is known. Create only will return a connect link.',
+    ];
+  }
+
+  if (recipient.mode === 'USERNAME_ONLY') {
+    return [
+      locale === 'my'
+        ? 'Telegram username is stored as a hint only. The bot still needs a linked chat before direct delivery works.'
+        : 'Telegram username is stored as a hint only. The bot still needs a linked chat before direct delivery works.',
+    ];
+  }
+
+  return [
+    locale === 'my'
+      ? 'A manual Telegram chat ID was provided. Direct delivery will be attempted, but it may fail if the user has not started the bot.'
+      : 'A manual Telegram chat ID was provided. Direct delivery will be attempted, but it may fail if the user has not started the bot.',
+  ];
+}
+
+function formatRegionModeLabel(mode: string | null | undefined, locale: SupportedLocale) {
+  if ((mode || '').toUpperCase() === 'ONLY') {
+    return locale === 'my' ? 'Only preferred regions' : 'Only preferred regions';
+  }
+  return locale === 'my' ? 'Prefer preferred regions' : 'Prefer preferred regions';
+}
+
+function formatPinnedRoutingLabel(input: {
+  pinnedServerId?: string | null;
+  pinExpiresAt?: Date | null;
+  locale: SupportedLocale;
+}) {
+  if (!input.pinnedServerId) {
+    return null;
+  }
+  const base = input.locale === 'my'
+    ? 'Temporary fallback pin active'
+    : 'Temporary fallback pin active';
+  if (!input.pinExpiresAt) {
+    return base;
+  }
+  return `${base} • ${formatDateTime(input.pinExpiresAt)}`;
+}
+
+function buildDynamicRoutingManageLines(input: {
+  preferredCountryCodesJson?: string | null;
+  preferredServerIdsJson?: string | null;
+  preferredRegionMode?: string | null;
+  pinnedServerId?: string | null;
+  pinExpiresAt?: Date | null;
+  accessKeys: Array<{
+    server?: {
+      countryCode?: string | null;
+    } | null;
+  }>;
+  locale: SupportedLocale;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const routingSummary = formatTelegramDynamicPoolSummary(input, ui);
+  const regionChoices = getDynamicKeyRegionChoices(input);
+  const pinnedLabel = formatPinnedRoutingLabel({
+    pinnedServerId: input.pinnedServerId,
+    pinExpiresAt: input.pinExpiresAt,
+    locale: input.locale,
+  });
+
+  return [
+    `🌍 ${routingSummary}`,
+    `${input.locale === 'my' ? '🧭 Region mode' : '🧭 Region mode'}: ${formatRegionModeLabel(
+      input.preferredRegionMode,
+      input.locale,
+    )}`,
+    regionChoices.length > 0
+      ? `${input.locale === 'my' ? '📍 Region choices' : '📍 Region choices'}: ${regionChoices.join(', ')}`
+      : null,
+    pinnedLabel ? `📌 ${pinnedLabel}` : null,
+  ].filter((value): value is string => Boolean(value));
+}
+
+async function writeTelegramAdminKeyAudit(input: {
+  adminActor: TelegramAdminActor;
+  action: string;
+  entity: 'ACCESS_KEY' | 'DYNAMIC_ACCESS_KEY';
+  entityId: string;
+  details?: Record<string, unknown>;
+}) {
+  await writeAuditLog({
+    userId: input.adminActor.userId,
+    action: input.action,
+    entity: input.entity,
+    entityId: input.entityId,
+    details: {
+      via: 'telegram_bot',
+      ...(input.details ?? {}),
+    },
+  });
 }
 
 function parseGbInput(text: string) {
@@ -538,6 +681,38 @@ function buildCreateConfirmKeyboard(locale: SupportedLocale, canSendDirect: bool
   };
 }
 
+function buildDangerConfirmKeyboard(input: {
+  locale: SupportedLocale;
+  action: 'resetusage' | 'toggle_off';
+}) {
+  const isMyanmar = input.locale === 'my';
+  const actionLabel =
+    input.action === 'resetusage'
+      ? isMyanmar
+        ? '🔄 Reset usage'
+        : '🔄 Reset usage'
+      : isMyanmar
+        ? '⛔ Disable key'
+        : '⛔ Disable key';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: isMyanmar ? `✅ Confirm ${actionLabel}` : `✅ Confirm ${actionLabel}`,
+          callback_data: buildTelegramAdminKeyCallbackData('danger', input.action, 'confirm'),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '↩️ Back' : '↩️ Back',
+          callback_data: buildTelegramAdminKeyCallbackData('danger', input.action, 'back'),
+        },
+      ],
+      buildCancelKeyboard(input.locale).inline_keyboard[0],
+    ],
+  };
+}
+
 function buildAccessManageKeyboard(input: {
   locale: SupportedLocale;
   enabled: boolean;
@@ -545,6 +720,26 @@ function buildAccessManageKeyboard(input: {
   const isMyanmar = input.locale === 'my';
   return {
     inline_keyboard: [
+      [
+        {
+          text: '+10 GB',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'topup10'),
+        },
+        {
+          text: '+30 GB',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'topup30'),
+        },
+      ],
+      [
+        {
+          text: '+7d',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'extend7'),
+        },
+        {
+          text: '+30d',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'extend30'),
+        },
+      ],
       [
         {
           text: isMyanmar ? '📦 Set quota' : '📦 Set quota',
@@ -588,6 +783,26 @@ function buildDynamicManageKeyboard(locale: SupportedLocale) {
     inline_keyboard: [
       [
         {
+          text: '+10 GB',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'topup10'),
+        },
+        {
+          text: '+30 GB',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'topup30'),
+        },
+      ],
+      [
+        {
+          text: '+7d',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'extend7'),
+        },
+        {
+          text: '+30d',
+          callback_data: buildTelegramAdminKeyCallbackData('shortcut', 'extend30'),
+        },
+      ],
+      [
+        {
           text: isMyanmar ? '📦 Set quota' : '📦 Set quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'quota'),
         },
@@ -608,12 +823,49 @@ function buildDynamicManageKeyboard(locale: SupportedLocale) {
       ],
       [
         {
+          text: isMyanmar ? '🌍 Preferred region' : '🌍 Preferred region',
+          callback_data: buildTelegramAdminKeyCallbackData('manage', 'region'),
+        },
+        {
+          text: isMyanmar ? '🧭 Region mode' : '🧭 Region mode',
+          callback_data: buildTelegramAdminKeyCallbackData('manage', 'mode'),
+        },
+      ],
+      [
+        {
           text: isMyanmar ? '📨 Resend access' : '📨 Resend access',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resend'),
+        },
+        {
+          text: isMyanmar ? '💎 Routing view' : '💎 Routing view',
+          callback_data: buildTelegramAdminKeyCallbackData('manage', 'routing'),
         },
       ],
       buildCancelKeyboard(locale).inline_keyboard[0],
     ],
+  };
+}
+
+function buildDynamicRegionKeyboard(input: {
+  locale: SupportedLocale;
+  regionCodes: string[];
+}) {
+  const isMyanmar = input.locale === 'my';
+  const rows = input.regionCodes.slice(0, 8).map((regionCode) => [
+    {
+      text: `${getFlagEmoji(regionCode)} ${regionCode}`,
+      callback_data: buildTelegramAdminKeyCallbackData('setregion', regionCode),
+    },
+  ]);
+  rows.unshift([
+    {
+      text: isMyanmar ? '⚡ Auto / clear preference' : '⚡ Auto / clear preference',
+      callback_data: buildTelegramAdminKeyCallbackData('setregion', 'auto'),
+    },
+  ]);
+  rows.push(buildCancelKeyboard(input.locale).inline_keyboard[0]);
+  return {
+    inline_keyboard: rows,
   };
 }
 
@@ -758,6 +1010,7 @@ async function promptAccessCreateName(input: {
       isMyanmar ? '➕ <b>Create normal key</b>' : '➕ <b>Create normal key</b>',
       '',
       `${isMyanmar ? 'Recipient' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
+      ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
         ? 'ယခု key name ကို စာသားဖြင့် ပို့ပေးပါ။'
@@ -784,6 +1037,7 @@ async function promptDynamicCreateName(input: {
       isMyanmar ? '💎 <b>Create dynamic key</b>' : '💎 <b>Create dynamic key</b>',
       '',
       `${isMyanmar ? 'Recipient' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
+      ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
         ? 'ယခု dynamic key name ကို စာသားဖြင့် ပို့ပေးပါ။'
@@ -999,13 +1253,7 @@ async function promptAccessCreateConfirm(input: {
         ),
       )}`,
       '',
-      input.draft.recipient?.chatId
-        ? input.locale === 'my'
-          ? 'Create & send ဖြင့် user ထံ တိုက်ရိုက်ပို့နိုင်ပါသည်။'
-          : 'Create & send will deliver directly to the linked Telegram chat.'
-        : input.locale === 'my'
-          ? 'Direct Telegram delivery မရှိသေးပါ။ Create only လုပ်ပြီး connect link ကို ပေးပါမည်။'
-          : 'Direct Telegram delivery is not available yet. Create only will include a connect link instead.',
+      ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
     ].join('\n'),
     {
       replyMarkup: buildCreateConfirmKeyboard(input.locale, Boolean(input.draft.recipient?.chatId)),
@@ -1045,13 +1293,7 @@ async function promptDynamicCreateConfirm(input: {
         ),
       )}`,
       '',
-      input.draft.recipient?.chatId
-        ? input.locale === 'my'
-          ? 'Create & send ဖြင့် user ထံ တိုက်ရိုက်ပို့နိုင်ပါသည်။'
-          : 'Create & send will deliver directly to the linked Telegram chat.'
-        : input.locale === 'my'
-          ? 'Direct Telegram delivery မရှိသေးပါ။ Create only လုပ်ပြီး connect link ကို ပေးပါမည်။'
-          : 'Direct Telegram delivery is not available yet. Create only will include a connect link instead.',
+      ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
     ].join('\n'),
     {
       replyMarkup: buildCreateConfirmKeyboard(input.locale, Boolean(input.draft.recipient?.chatId)),
@@ -1113,6 +1355,11 @@ async function resolveDynamicKeyQuery(query: string) {
       accessKeys: {
         select: {
           id: true,
+          server: {
+            select: {
+              countryCode: true,
+            },
+          },
         },
       },
     },
@@ -1136,6 +1383,11 @@ async function resolveDynamicKeyQuery(query: string) {
       accessKeys: {
         select: {
           id: true,
+          server: {
+            select: {
+              countryCode: true,
+            },
+          },
         },
       },
     },
@@ -1211,7 +1463,17 @@ function formatDynamicManageSummary(key: {
   durationDays: number | null;
   telegramId?: string | null;
   email?: string | null;
-  accessKeys: Array<{ id: string }>;
+  preferredCountryCodesJson?: string | null;
+  preferredServerIdsJson?: string | null;
+  preferredRegionMode?: string | null;
+  pinnedServerId?: string | null;
+  pinExpiresAt?: Date | null;
+  accessKeys: Array<{
+    id: string;
+    server?: {
+      countryCode?: string | null;
+    } | null;
+  }>;
 }, locale: SupportedLocale) {
   return [
     locale === 'my' ? '🧭 <b>Manage dynamic key</b>' : '🧭 <b>Manage dynamic key</b>',
@@ -1238,6 +1500,15 @@ function formatDynamicManageSummary(key: {
     )}`,
     key.email ? `✉️ ${escapeHtml(key.email)}` : '',
     key.telegramId ? `📨 <code>${escapeHtml(key.telegramId)}</code>` : '',
+    ...buildDynamicRoutingManageLines({
+      preferredCountryCodesJson: key.preferredCountryCodesJson,
+      preferredServerIdsJson: key.preferredServerIdsJson,
+      preferredRegionMode: key.preferredRegionMode,
+      pinnedServerId: key.pinnedServerId,
+      pinExpiresAt: key.pinExpiresAt,
+      accessKeys: key.accessKeys,
+      locale,
+    }),
   ]
     .filter(Boolean)
     .join('\n');
@@ -1297,6 +1568,11 @@ async function showDynamicManageActions(input: {
       accessKeys: {
         select: {
           id: true,
+          server: {
+            select: {
+              countryCode: true,
+            },
+          },
         },
       },
     },
@@ -1325,13 +1601,13 @@ async function promptManageMatches(input: {
   botToken: string;
   locale: SupportedLocale;
   type: 'access' | 'dynamic';
-  matches: Array<{ id: string; name: string; status: string }>;
+  matches: Array<{ id: string; name: string; status: string; details: string[] }>;
   deps: TelegramAdminKeyDeps;
 }) {
   const isMyanmar = input.locale === 'my';
-  const rows = input.matches.map((match) => ([
+  const rows = input.matches.map((match, index) => ([
     {
-      text: `${match.name} • ${match.status}`,
+      text: `${index + 1}. ${match.name} • ${match.status}`.slice(0, 60),
       callback_data: buildTelegramAdminKeyCallbackData('pick', match.id),
     },
   ]));
@@ -1345,6 +1621,11 @@ async function promptManageMatches(input: {
         ? (isMyanmar ? '🔎 <b>Matching access keys</b>' : '🔎 <b>Matching access keys</b>')
         : (isMyanmar ? '🔎 <b>Matching dynamic keys</b>' : '🔎 <b>Matching dynamic keys</b>'),
       '',
+      ...input.matches.flatMap((match, index) => [
+        `${index + 1}. <b>${escapeHtml(match.name)}</b> • ${escapeHtml(match.status)}`,
+        ...match.details.map((detail) => `   ${escapeHtml(detail)}`),
+        '',
+      ]),
       isMyanmar ? 'တစ်ခုကို ရွေးပါ။' : 'Choose one match.',
     ].join('\n'),
     {
@@ -1689,6 +1970,85 @@ async function updateDynamicExpiry(input: {
   });
 }
 
+async function updateDynamicPreferredRegions(input: {
+  dynamicKeyId: string;
+  preferredCountryCodes: string[];
+}) {
+  const dynamicKey = await db.dynamicAccessKey.findUnique({
+    where: { id: input.dynamicKeyId },
+    select: {
+      id: true,
+      preferredServerIdsJson: true,
+      preferredCountryCodesJson: true,
+      preferredServerWeightsJson: true,
+      preferredCountryWeightsJson: true,
+      preferredRegionMode: true,
+      sessionStickinessMode: true,
+      drainGraceMinutes: true,
+    },
+  });
+  if (!dynamicKey) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const routing = normalizeDynamicRoutingPreferences(
+    parseDynamicRoutingPreferences({
+      preferredServerIdsJson: dynamicKey.preferredServerIdsJson,
+      preferredCountryCodesJson: dynamicKey.preferredCountryCodesJson,
+      preferredServerWeightsJson: dynamicKey.preferredServerWeightsJson,
+      preferredCountryWeightsJson: dynamicKey.preferredCountryWeightsJson,
+      preferredRegionMode: dynamicKey.preferredRegionMode,
+      sessionStickinessMode: dynamicKey.sessionStickinessMode,
+      drainGraceMinutes: dynamicKey.drainGraceMinutes,
+    }),
+  );
+
+  routing.preferredCountryCodes = input.preferredCountryCodes;
+  if (input.preferredCountryCodes.length > 0) {
+    routing.preferredServerIds = [];
+    routing.preferredServerWeights = {};
+  }
+
+  return db.dynamicAccessKey.update({
+    where: { id: dynamicKey.id },
+    data: {
+      preferredServerIdsJson: JSON.stringify(routing.preferredServerIds),
+      preferredCountryCodesJson: JSON.stringify(routing.preferredCountryCodes),
+      preferredServerWeightsJson: JSON.stringify(routing.preferredServerWeights),
+      preferredCountryWeightsJson: JSON.stringify(routing.preferredCountryWeights),
+      preferredRegionMode: routing.preferredRegionMode,
+      sessionStickinessMode: routing.sessionStickinessMode,
+      drainGraceMinutes: routing.drainGraceMinutes,
+      pinExpiresAt: input.preferredCountryCodes.length === 0 ? null : undefined,
+    },
+  });
+}
+
+async function toggleDynamicPreferredRegionMode(dynamicKeyId: string) {
+  const dynamicKey = await db.dynamicAccessKey.findUnique({
+    where: { id: dynamicKeyId },
+    select: {
+      id: true,
+      preferredRegionMode: true,
+    },
+  });
+  if (!dynamicKey) {
+    throw new Error('Dynamic key not found.');
+  }
+
+  const nextMode = dynamicKey.preferredRegionMode === 'ONLY' ? 'PREFER' : 'ONLY';
+  return db.dynamicAccessKey.update({
+    where: { id: dynamicKey.id },
+    data: {
+      preferredRegionMode: nextMode,
+    },
+    select: {
+      id: true,
+      preferredRegionMode: true,
+    },
+  });
+}
+
 async function createAccessKeyFromDraft(input: {
   draft: AccessCreateDraft;
   adminActor: TelegramAdminActor;
@@ -1891,26 +2251,34 @@ async function finalizeAccessCreate(input: {
     adminActor: input.adminActor,
   });
 
+  let directDelivered = false;
   let deliveryLine = input.locale === 'my'
     ? 'Created without direct Telegram delivery.'
     : 'Created without direct Telegram delivery.';
 
   if (input.sendDirect && input.draft.recipient?.chatId) {
-    await input.deps.sendAccessKeySharePageToTelegram({
-      accessKeyId: created.id,
-      chatId: input.draft.recipient.chatId,
-      reason: 'CREATED',
-      source: 'telegram_admin_create',
-      includeQr: true,
-      locale: input.locale,
-    });
-    deliveryLine = input.locale === 'my'
-      ? `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`
-      : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
+    try {
+      await input.deps.sendAccessKeySharePageToTelegram({
+        accessKeyId: created.id,
+        chatId: input.draft.recipient.chatId,
+        reason: 'CREATED',
+        source: 'telegram_admin_create',
+        includeQr: true,
+        locale: input.locale,
+      });
+      directDelivered = true;
+      deliveryLine = input.locale === 'my'
+        ? `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`
+        : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
+    } catch {
+      deliveryLine = input.locale === 'my'
+        ? 'Direct delivery မအောင်မြင်ပါ။ Connect link ကို ပြန်ပေးပါမည်။'
+        : 'Direct delivery was not available. A connect link is included below.';
+    }
   }
 
   let connectLine = '';
-  if (!input.draft.recipient?.chatId) {
+  if (!directDelivered) {
     const connectLink = await input.deps.createAccessKeyTelegramConnectLink({
       accessKeyId: created.id,
       createdByUserId: input.adminActor.userId,
@@ -1956,26 +2324,34 @@ async function finalizeDynamicCreate(input: {
     adminActor: input.adminActor,
   });
 
+  let directDelivered = false;
   let deliveryLine = input.locale === 'my'
     ? 'Created without direct Telegram delivery.'
     : 'Created without direct Telegram delivery.';
 
   if (input.sendDirect && input.draft.recipient?.chatId) {
-    await input.deps.sendDynamicKeySharePageToTelegram({
-      dynamicAccessKeyId: created.id,
-      chatId: input.draft.recipient.chatId,
-      reason: 'CREATED',
-      source: 'telegram_admin_create',
-      includeQr: true,
-      locale: input.locale,
-    });
-    deliveryLine = input.locale === 'my'
-      ? `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`
-      : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
+    try {
+      await input.deps.sendDynamicKeySharePageToTelegram({
+        dynamicAccessKeyId: created.id,
+        chatId: input.draft.recipient.chatId,
+        reason: 'CREATED',
+        source: 'telegram_admin_create',
+        includeQr: true,
+        locale: input.locale,
+      });
+      directDelivered = true;
+      deliveryLine = input.locale === 'my'
+        ? `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`
+        : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
+    } catch {
+      deliveryLine = input.locale === 'my'
+        ? 'Direct delivery မအောင်မြင်ပါ။ Connect link ကို ပြန်ပေးပါမည်။'
+        : 'Direct delivery was not available. A connect link is included below.';
+    }
   }
 
   let connectLine = '';
-  if (!input.draft.recipient?.chatId) {
+  if (!directDelivered) {
     const connectLink = await input.deps.createDynamicKeyTelegramConnectLink({
       dynamicAccessKeyId: created.id,
       createdByUserId: input.adminActor.userId,
@@ -2071,6 +2447,9 @@ export async function handleAdminCreateAccessKeyCommand(input: {
       input.locale === 'my'
         ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'
         : 'Send the recipient as an email, @username, Telegram user ID, or chat ID. Press Skip if you want to create without linking a recipient.',
+      input.locale === 'my'
+        ? 'Tip: user message ကို reply လုပ်ပြီး /createkey လို့ပို့လျှင် recipient ကို အလိုအလျောက်ယူပါမည်။'
+        : 'Tip: reply to a user message with /createkey to seed the recipient automatically.',
     ].join('\n'),
     {
       replyMarkup: buildRecipientKeyboard(input.locale),
@@ -2132,6 +2511,9 @@ export async function handleAdminCreateDynamicKeyCommand(input: {
       input.locale === 'my'
         ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'
         : 'Send the recipient as an email, @username, Telegram user ID, or chat ID. Press Skip if you want to create without linking a recipient.',
+      input.locale === 'my'
+        ? 'Tip: user message ကို reply လုပ်ပြီး /createdynamic လို့ပို့လျှင် recipient ကို အလိုအလျောက်ယူပါမည်။'
+        : 'Tip: reply to a user message with /createdynamic to seed the recipient automatically.',
     ].join('\n'),
     {
       replyMarkup: buildRecipientKeyboard(input.locale),
@@ -2194,6 +2576,18 @@ export async function handleAdminManageAccessKeyCommand(input: {
         id: key.id,
         name: key.name,
         status: key.status,
+        details: [
+          `${key.server?.name || 'Unknown server'}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
+          formatExpirationSummary(
+            {
+              expiresAt: key.expiresAt,
+              expirationType: key.expirationType,
+              durationDays: key.durationDays,
+            },
+            input.locale,
+          ),
+          key.email || key.telegramId || 'No recipient',
+        ],
       })),
       deps: input.deps,
     });
@@ -2265,6 +2659,19 @@ export async function handleAdminManageDynamicKeyCommand(input: {
         id: key.id,
         name: key.name,
         status: key.status,
+        details: [
+          `${key.type}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
+          formatExpirationSummary(
+            {
+              expiresAt: key.expiresAt,
+              expirationType: key.expirationType,
+              durationDays: key.durationDays,
+            },
+            input.locale,
+          ),
+          formatTelegramDynamicPoolSummary(key, getTelegramUi(input.locale)),
+          key.email || key.telegramId || 'No recipient',
+        ],
       })),
       deps: input.deps,
     });
@@ -2538,6 +2945,17 @@ export async function handleTelegramAdminKeyTextInput(input: {
       return true;
     }
 
+    if (flow.step === 'confirm_resetusage' || flow.step === 'confirm_toggle') {
+      await input.deps.sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        input.locale === 'my'
+          ? 'အောက်ပါ confirm button ကို သုံးပါ၊ သို့မဟုတ် Back ကိုနှိပ်ပါ။'
+          : 'Use the confirm button below, or press Back.',
+      );
+      return true;
+    }
+
     if (flow.step === 'quota_custom') {
       const gb = parseGbInput(text);
       if (!gb) {
@@ -2554,6 +2972,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
       await applyAccessKeyQuota({
         keyId: flow.keyId,
         dataLimitGB: gb,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_QUOTA_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId,
+        details: {
+          dataLimitGb: gb,
+          source: 'text_input',
+        },
       });
       const nextFlow: AccessManageDraft = {
         ...flow,
@@ -2597,6 +3025,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
         keyId: flow.keyId,
         dataLimitGB: currentGb + gb,
       });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_QUOTA_ADDED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId,
+        details: {
+          addGb: gb,
+          source: 'text_input',
+        },
+      });
       const nextFlow: AccessManageDraft = {
         ...flow,
         step: 'actions',
@@ -2629,6 +3067,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
         keyId: flow.keyId,
         action: 'fixed',
         fixedDate: date,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_EXPIRY_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId,
+        details: {
+          action: 'fixed',
+          fixedDate: date.toISOString(),
+        },
       });
       const nextFlow: AccessManageDraft = {
         ...flow,
@@ -2664,6 +3112,17 @@ export async function handleTelegramAdminKeyTextInput(input: {
       return true;
     }
 
+    if (flow.step === 'confirm_resetusage' || flow.step === 'region_pick') {
+      await input.deps.sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        input.locale === 'my'
+          ? 'အောက်ပါ button များထဲမှ တစ်ခုကို ရွေးပါ၊ သို့မဟုတ် Back ကိုနှိပ်ပါ။'
+          : 'Choose one of the buttons below, or press Back.',
+      );
+      return true;
+    }
+
     if (flow.step === 'quota_custom') {
       const gb = parseGbInput(text);
       if (!gb) {
@@ -2680,6 +3139,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
       await applyDynamicQuota({
         dynamicKeyId: flow.dynamicKeyId,
         dataLimitGB: gb,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_QUOTA_UPDATED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId,
+        details: {
+          dataLimitGb: gb,
+          source: 'text_input',
+        },
       });
       const nextFlow: DynamicManageDraft = {
         ...flow,
@@ -2725,6 +3194,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
         dynamicKeyId: flow.dynamicKeyId,
         dataLimitGB: currentGb + gb,
       });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_QUOTA_ADDED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId,
+        details: {
+          addGb: gb,
+          source: 'text_input',
+        },
+      });
       const nextFlow: DynamicManageDraft = {
         ...flow,
         step: 'actions',
@@ -2757,6 +3236,16 @@ export async function handleTelegramAdminKeyTextInput(input: {
         dynamicKeyId: flow.dynamicKeyId,
         action: 'fixed',
         fixedDate: date,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_EXPIRY_UPDATED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId,
+        details: {
+          action: 'fixed',
+          fixedDate: date.toISOString(),
+        },
       });
       const nextFlow: DynamicManageDraft = {
         ...flow,
@@ -3110,6 +3599,157 @@ export async function handleTelegramAdminKeyCallback(input: {
       return { handled: true, callbackText: input.locale === 'my' ? 'Selected.' : 'Selected.' };
     }
 
+    if (flow.step === 'confirm_resetusage' && flow.keyId && input.action === 'danger' && input.primary === 'resetusage') {
+      if (input.secondary === 'back') {
+        const nextFlow: AccessManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+      }
+
+      if (input.secondary === 'confirm') {
+        await resetAccessKeyUsage(flow.keyId);
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_ACCESS_KEY_USAGE_RESET',
+          entity: 'ACCESS_KEY',
+          entityId: flow.keyId,
+        });
+        const nextFlow: AccessManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+      }
+    }
+
+    if (flow.step === 'confirm_toggle' && flow.keyId && input.action === 'danger' && input.primary === 'toggle_off') {
+      if (input.secondary === 'back') {
+        const nextFlow: AccessManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+      }
+
+      if (input.secondary === 'confirm') {
+        await setAccessKeyEnabledState(flow.keyId, false);
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_ACCESS_KEY_DISABLED',
+          entity: 'ACCESS_KEY',
+          entityId: flow.keyId,
+        });
+        const nextFlow: AccessManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Key disabled.' : 'Key disabled.' };
+      }
+    }
+
+    if (flow.step === 'actions' && flow.keyId && input.action === 'shortcut') {
+      if (input.primary === 'topup10' || input.primary === 'topup30') {
+        const addGb = input.primary === 'topup10' ? 10 : 30;
+        const key = await db.accessKey.findUnique({
+          where: { id: flow.keyId },
+          select: {
+            dataLimitBytes: true,
+          },
+        });
+        if (!key) {
+          throw new Error('Access key not found.');
+        }
+        const currentGb = key.dataLimitBytes ? Number(key.dataLimitBytes) / (1024 * 1024 * 1024) : 0;
+        await applyAccessKeyQuota({
+          keyId: flow.keyId,
+          dataLimitGB: currentGb + addGb,
+        });
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_ACCESS_KEY_QUOTA_ADDED',
+          entity: 'ACCESS_KEY',
+          entityId: flow.keyId,
+          details: {
+            addGb,
+            source: 'shortcut',
+          },
+        });
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? `Added ${addGb} GB.` : `Added ${addGb} GB.` };
+      }
+
+      if (input.primary === 'extend7' || input.primary === 'extend30') {
+        const extendAction = input.primary === 'extend7' ? '7' : '30';
+        await updateAccessKeyExpiry({
+          keyId: flow.keyId,
+          action: extendAction,
+        });
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_ACCESS_KEY_EXPIRY_UPDATED',
+          entity: 'ACCESS_KEY',
+          entityId: flow.keyId,
+          details: {
+            action: extendAction,
+            source: 'shortcut',
+          },
+        });
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: flow.keyId,
+          deps: input.deps,
+        });
+        return {
+          handled: true,
+          callbackText: input.locale === 'my'
+            ? `Extended ${extendAction} days.`
+            : `Extended ${extendAction} days.`,
+        };
+      }
+    }
+
     if (flow.step === 'actions' && flow.keyId && input.action === 'manage') {
       switch (input.primary) {
         case 'quota':
@@ -3130,15 +3770,24 @@ export async function handleTelegramAdminKeyCallback(input: {
           });
           return { handled: true, callbackText: input.locale === 'my' ? 'Choose top-up.' : 'Choose top-up.' };
         case 'resetusage':
-          await resetAccessKeyUsage(flow.keyId);
-          await showAccessManageActions({
-            chatId: input.chatId,
-            botToken: input.botToken,
-            locale: input.locale,
-            keyId: flow.keyId,
-            deps: input.deps,
+          await savePendingAdminFlow(input.telegramUserId, input.chatId, {
+            ...flow,
+            step: 'confirm_resetusage',
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+          await input.deps.sendTelegramMessage(
+            input.botToken,
+            input.chatId,
+            input.locale === 'my'
+              ? '🔄 Usage ကို reset လုပ်မည်။ Confirm နှိပ်ပါ။'
+              : '🔄 This will reset usage. Press Confirm to continue.',
+            {
+              replyMarkup: buildDangerConfirmKeyboard({
+                locale: input.locale,
+                action: 'resetusage',
+              }),
+            },
+          );
+          return { handled: true, callbackText: input.locale === 'my' ? 'Confirm reset.' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -3156,7 +3805,34 @@ export async function handleTelegramAdminKeyCallback(input: {
             throw new Error('Access key not found.');
           }
           const enable = currentKey.status === 'DISABLED';
-          await setAccessKeyEnabledState(flow.keyId, enable);
+          if (!enable) {
+            await savePendingAdminFlow(input.telegramUserId, input.chatId, {
+              ...flow,
+              step: 'confirm_toggle',
+            });
+            await input.deps.sendTelegramMessage(
+              input.botToken,
+              input.chatId,
+              input.locale === 'my'
+                ? '⛔ Key ကို disable လုပ်မည်။ Confirm နှိပ်ပါ။'
+                : '⛔ This will disable the key. Press Confirm to continue.',
+              {
+                replyMarkup: buildDangerConfirmKeyboard({
+                  locale: input.locale,
+                  action: 'toggle_off',
+                }),
+              },
+            );
+            return { handled: true, callbackText: input.locale === 'my' ? 'Confirm disable.' : 'Confirm disable.' };
+          }
+
+          await setAccessKeyEnabledState(flow.keyId, true);
+          await writeTelegramAdminKeyAudit({
+            adminActor: input.adminActor,
+            action: 'TELEGRAM_ADMIN_ACCESS_KEY_ENABLED',
+            entity: 'ACCESS_KEY',
+            entityId: flow.keyId,
+          });
           await showAccessManageActions({
             chatId: input.chatId,
             botToken: input.botToken,
@@ -3164,17 +3840,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             keyId: flow.keyId,
             deps: input.deps,
           });
-          return {
-            handled: true,
-            callbackText:
-              input.locale === 'my'
-                ? enable
-                  ? 'Key enabled.'
-                  : 'Key disabled.'
-                : enable
-                  ? 'Key enabled.'
-                  : 'Key disabled.',
-          };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Key enabled.' : 'Key enabled.' };
         }
         case 'resend': {
           try {
@@ -3185,19 +3851,38 @@ export async function handleTelegramAdminKeyCallback(input: {
               includeQr: true,
               locale: input.locale,
             });
+            await writeTelegramAdminKeyAudit({
+              adminActor: input.adminActor,
+              action: 'TELEGRAM_ADMIN_ACCESS_KEY_RESEND',
+              entity: 'ACCESS_KEY',
+              entityId: flow.keyId,
+              details: {
+                directDelivery: true,
+              },
+            });
             return { handled: true, callbackText: input.locale === 'my' ? 'Access sent.' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createAccessKeyTelegramConnectLink({
               accessKeyId: flow.keyId,
               createdByUserId: input.adminActor.userId,
             });
+            await writeTelegramAdminKeyAudit({
+              adminActor: input.adminActor,
+              action: 'TELEGRAM_ADMIN_ACCESS_KEY_RESEND',
+              entity: 'ACCESS_KEY',
+              entityId: flow.keyId,
+              details: {
+                directDelivery: false,
+                fallback: 'connect_link',
+              },
+            });
             await input.deps.sendTelegramMessage(
               input.botToken,
               input.chatId,
               [
                 input.locale === 'my'
-                  ? 'Linked Telegram chat မတွေ့သောကြောင့် connect link ကို သုံးပါ။'
-                  : 'No linked Telegram chat was found, so use this connect link instead.',
+                  ? 'Direct delivery မအောင်မြင်ပါ။ Linked Telegram chat မရှိနိုင်သောကြောင့် connect link ကို သုံးပါ။'
+                  : 'Direct delivery was not available. Use this connect link instead.',
                 '',
                 connectLink.url,
                 `Expires: ${formatDateTime(connectLink.expiresAt)}`,
@@ -3233,6 +3918,15 @@ export async function handleTelegramAdminKeyCallback(input: {
       await applyAccessKeyQuota({
         keyId: flow.keyId || '',
         dataLimitGB: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_QUOTA_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId || '',
+        details: {
+          dataLimitGb: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
+        },
       });
       await showAccessManageActions({
         chatId: input.chatId,
@@ -3278,6 +3972,15 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         dataLimitGB: currentGb + (addGb || 0),
       });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_QUOTA_ADDED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId || '',
+        details: {
+          addGb: addGb || 0,
+        },
+      });
       await showAccessManageActions({
         chatId: input.chatId,
         botToken: input.botToken,
@@ -3311,6 +4014,15 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         action: (input.primary as 'never' | '7' | '30' | '90') || '30',
       });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_ACCESS_KEY_EXPIRY_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: flow.keyId || '',
+        details: {
+          action: (input.primary as 'never' | '7' | '30' | '90') || '30',
+        },
+      });
       await showAccessManageActions({
         chatId: input.chatId,
         botToken: input.botToken,
@@ -3340,6 +4052,157 @@ export async function handleTelegramAdminKeyCallback(input: {
       return { handled: true, callbackText: input.locale === 'my' ? 'Selected.' : 'Selected.' };
     }
 
+    if (flow.step === 'confirm_resetusage' && flow.dynamicKeyId && input.action === 'danger' && input.primary === 'resetusage') {
+      if (input.secondary === 'back') {
+        const nextFlow: DynamicManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showDynamicManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          dynamicKeyId: flow.dynamicKeyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+      }
+
+      if (input.secondary === 'confirm') {
+        await resetDynamicUsage(flow.dynamicKeyId);
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_USAGE_RESET',
+          entity: 'DYNAMIC_ACCESS_KEY',
+          entityId: flow.dynamicKeyId,
+        });
+        const nextFlow: DynamicManageDraft = {
+          ...flow,
+          step: 'actions',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showDynamicManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          dynamicKeyId: flow.dynamicKeyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+      }
+    }
+
+    if (flow.step === 'region_pick' && flow.dynamicKeyId && input.action === 'setregion') {
+      const preferredCountryCodes =
+        !input.primary || input.primary === 'auto'
+          ? []
+          : [input.primary.toUpperCase()];
+      await updateDynamicPreferredRegions({
+        dynamicKeyId: flow.dynamicKeyId,
+        preferredCountryCodes,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_REGION_UPDATED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId,
+        details: {
+          preferredCountryCodes,
+        },
+      });
+      const nextFlow: DynamicManageDraft = {
+        ...flow,
+        step: 'actions',
+      };
+      await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+      await showDynamicManageActions({
+        chatId: input.chatId,
+        botToken: input.botToken,
+        locale: input.locale,
+        dynamicKeyId: flow.dynamicKeyId,
+        deps: input.deps,
+      });
+      return {
+        handled: true,
+        callbackText:
+          preferredCountryCodes.length > 0
+            ? `Region set to ${preferredCountryCodes[0]}.`
+            : (input.locale === 'my' ? 'Region preference cleared.' : 'Region preference cleared.'),
+      };
+    }
+
+    if (flow.step === 'actions' && flow.dynamicKeyId && input.action === 'shortcut') {
+      if (input.primary === 'topup10' || input.primary === 'topup30') {
+        const addGb = input.primary === 'topup10' ? 10 : 30;
+        const dynamicKey = await db.dynamicAccessKey.findUnique({
+          where: { id: flow.dynamicKeyId },
+          select: {
+            dataLimitBytes: true,
+          },
+        });
+        if (!dynamicKey) {
+          throw new Error('Dynamic key not found.');
+        }
+        const currentGb = dynamicKey.dataLimitBytes
+          ? Number(dynamicKey.dataLimitBytes) / (1024 * 1024 * 1024)
+          : 0;
+        await applyDynamicQuota({
+          dynamicKeyId: flow.dynamicKeyId,
+          dataLimitGB: currentGb + addGb,
+        });
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_QUOTA_ADDED',
+          entity: 'DYNAMIC_ACCESS_KEY',
+          entityId: flow.dynamicKeyId,
+          details: {
+            addGb,
+            source: 'shortcut',
+          },
+        });
+        await showDynamicManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          dynamicKeyId: flow.dynamicKeyId,
+          deps: input.deps,
+        });
+        return { handled: true, callbackText: input.locale === 'my' ? `Added ${addGb} GB.` : `Added ${addGb} GB.` };
+      }
+
+      if (input.primary === 'extend7' || input.primary === 'extend30') {
+        const extendAction = input.primary === 'extend7' ? '7' : '30';
+        await updateDynamicExpiry({
+          dynamicKeyId: flow.dynamicKeyId,
+          action: extendAction,
+        });
+        await writeTelegramAdminKeyAudit({
+          adminActor: input.adminActor,
+          action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_EXPIRY_UPDATED',
+          entity: 'DYNAMIC_ACCESS_KEY',
+          entityId: flow.dynamicKeyId,
+          details: {
+            action: extendAction,
+            source: 'shortcut',
+          },
+        });
+        await showDynamicManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          dynamicKeyId: flow.dynamicKeyId,
+          deps: input.deps,
+        });
+        return {
+          handled: true,
+          callbackText: input.locale === 'my'
+            ? `Extended ${extendAction} days.`
+            : `Extended ${extendAction} days.`,
+        };
+      }
+    }
+
     if (flow.step === 'actions' && flow.dynamicKeyId && input.action === 'manage') {
       switch (input.primary) {
         case 'quota':
@@ -3360,15 +4223,24 @@ export async function handleTelegramAdminKeyCallback(input: {
           });
           return { handled: true, callbackText: input.locale === 'my' ? 'Choose top-up.' : 'Choose top-up.' };
         case 'resetusage':
-          await resetDynamicUsage(flow.dynamicKeyId);
-          await showDynamicManageActions({
-            chatId: input.chatId,
-            botToken: input.botToken,
-            locale: input.locale,
-            dynamicKeyId: flow.dynamicKeyId,
-            deps: input.deps,
+          await savePendingAdminFlow(input.telegramUserId, input.chatId, {
+            ...flow,
+            step: 'confirm_resetusage',
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+          await input.deps.sendTelegramMessage(
+            input.botToken,
+            input.chatId,
+            input.locale === 'my'
+              ? '🔄 Dynamic usage ကို reset လုပ်မည်။ Confirm နှိပ်ပါ။'
+              : '🔄 This will reset dynamic-key usage. Press Confirm to continue.',
+            {
+              replyMarkup: buildDangerConfirmKeyboard({
+                locale: input.locale,
+                action: 'resetusage',
+              }),
+            },
+          );
+          return { handled: true, callbackText: input.locale === 'my' ? 'Confirm reset.' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -3377,6 +4249,118 @@ export async function handleTelegramAdminKeyCallback(input: {
             deps: input.deps,
           });
           return { handled: true, callbackText: input.locale === 'my' ? 'Choose expiry.' : 'Choose expiry.' };
+        case 'region': {
+          const key = await db.dynamicAccessKey.findUnique({
+            where: { id: flow.dynamicKeyId },
+            select: {
+              preferredCountryCodesJson: true,
+              accessKeys: {
+                select: {
+                  server: {
+                    select: {
+                      countryCode: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+          if (!key) {
+            throw new Error('Dynamic key not found.');
+          }
+          const nextFlow: DynamicManageDraft = {
+            ...flow,
+            step: 'region_pick',
+          };
+          await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+          await input.deps.sendTelegramMessage(
+            input.botToken,
+            input.chatId,
+            [
+              input.locale === 'my'
+                ? '🌍 <b>Choose preferred region</b>'
+                : '🌍 <b>Choose preferred region</b>',
+              '',
+              input.locale === 'my'
+                ? 'Auto သည် region preference ကို clear လုပ်ပါမည်။'
+                : 'Auto clears the region preference.',
+            ].join('\n'),
+            {
+              replyMarkup: buildDynamicRegionKeyboard({
+                locale: input.locale,
+                regionCodes: getDynamicKeyRegionChoices(key),
+              }),
+            },
+          );
+          return { handled: true, callbackText: input.locale === 'my' ? 'Choose region.' : 'Choose region.' };
+        }
+        case 'mode': {
+          const updated = await toggleDynamicPreferredRegionMode(flow.dynamicKeyId);
+          await writeTelegramAdminKeyAudit({
+            adminActor: input.adminActor,
+            action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_REGION_MODE_UPDATED',
+            entity: 'DYNAMIC_ACCESS_KEY',
+            entityId: flow.dynamicKeyId,
+            details: {
+              preferredRegionMode: updated.preferredRegionMode,
+            },
+          });
+          await showDynamicManageActions({
+            chatId: input.chatId,
+            botToken: input.botToken,
+            locale: input.locale,
+            dynamicKeyId: flow.dynamicKeyId,
+            deps: input.deps,
+          });
+          return {
+            handled: true,
+            callbackText: formatRegionModeLabel(updated.preferredRegionMode, input.locale),
+          };
+        }
+        case 'routing': {
+          const key = await db.dynamicAccessKey.findUnique({
+            where: { id: flow.dynamicKeyId },
+            select: {
+              preferredCountryCodesJson: true,
+              preferredServerIdsJson: true,
+              preferredRegionMode: true,
+              pinnedServerId: true,
+              pinExpiresAt: true,
+              accessKeys: {
+                select: {
+                  server: {
+                    select: {
+                      countryCode: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+          if (!key) {
+            throw new Error('Dynamic key not found.');
+          }
+          await input.deps.sendTelegramMessage(
+            input.botToken,
+            input.chatId,
+            [
+              input.locale === 'my'
+                ? '💎 <b>Dynamic routing view</b>'
+                : '💎 <b>Dynamic routing view</b>',
+              '',
+              ...buildDynamicRoutingManageLines({
+                preferredCountryCodesJson: key.preferredCountryCodesJson,
+                preferredServerIdsJson: key.preferredServerIdsJson,
+                preferredRegionMode: key.preferredRegionMode,
+                pinnedServerId: key.pinnedServerId,
+                pinExpiresAt: key.pinExpiresAt,
+                accessKeys: key.accessKeys,
+                locale: input.locale,
+              }),
+            ].join('\n'),
+          );
+          return { handled: true, callbackText: input.locale === 'my' ? 'Routing view.' : 'Routing view.' };
+        }
         case 'resend': {
           try {
             await input.deps.sendDynamicKeySharePageToTelegram({
@@ -3386,19 +4370,38 @@ export async function handleTelegramAdminKeyCallback(input: {
               includeQr: true,
               locale: input.locale,
             });
+            await writeTelegramAdminKeyAudit({
+              adminActor: input.adminActor,
+              action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_RESEND',
+              entity: 'DYNAMIC_ACCESS_KEY',
+              entityId: flow.dynamicKeyId,
+              details: {
+                directDelivery: true,
+              },
+            });
             return { handled: true, callbackText: input.locale === 'my' ? 'Access sent.' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createDynamicKeyTelegramConnectLink({
               dynamicAccessKeyId: flow.dynamicKeyId,
               createdByUserId: input.adminActor.userId,
             });
+            await writeTelegramAdminKeyAudit({
+              adminActor: input.adminActor,
+              action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_RESEND',
+              entity: 'DYNAMIC_ACCESS_KEY',
+              entityId: flow.dynamicKeyId,
+              details: {
+                directDelivery: false,
+                fallback: 'connect_link',
+              },
+            });
             await input.deps.sendTelegramMessage(
               input.botToken,
               input.chatId,
               [
                 input.locale === 'my'
-                  ? 'Linked Telegram chat မတွေ့သောကြောင့် connect link ကို သုံးပါ။'
-                  : 'No linked Telegram chat was found, so use this connect link instead.',
+                  ? 'Direct delivery မအောင်မြင်ပါ။ Linked Telegram chat မရှိနိုင်သောကြောင့် connect link ကို သုံးပါ။'
+                  : 'Direct delivery was not available. Use this connect link instead.',
                 '',
                 connectLink.url,
                 `Expires: ${formatDateTime(connectLink.expiresAt)}`,
@@ -3434,6 +4437,15 @@ export async function handleTelegramAdminKeyCallback(input: {
       await applyDynamicQuota({
         dynamicKeyId: flow.dynamicKeyId || '',
         dataLimitGB: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_QUOTA_UPDATED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId || '',
+        details: {
+          dataLimitGb: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
+        },
       });
       await showDynamicManageActions({
         chatId: input.chatId,
@@ -3481,6 +4493,15 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         dataLimitGB: currentGb + (addGb || 0),
       });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_QUOTA_ADDED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId || '',
+        details: {
+          addGb: addGb || 0,
+        },
+      });
       await showDynamicManageActions({
         chatId: input.chatId,
         botToken: input.botToken,
@@ -3513,6 +4534,15 @@ export async function handleTelegramAdminKeyCallback(input: {
       await updateDynamicExpiry({
         dynamicKeyId: flow.dynamicKeyId || '',
         action: (input.primary as 'never' | '7' | '30' | '90') || '30',
+      });
+      await writeTelegramAdminKeyAudit({
+        adminActor: input.adminActor,
+        action: 'TELEGRAM_ADMIN_DYNAMIC_KEY_EXPIRY_UPDATED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: flow.dynamicKeyId || '',
+        details: {
+          action: (input.primary as 'never' | '7' | '30' | '90') || '30',
+        },
       });
       await showDynamicManageActions({
         chatId: input.chatId,

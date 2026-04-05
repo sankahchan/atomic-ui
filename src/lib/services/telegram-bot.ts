@@ -367,6 +367,21 @@ export interface TelegramUpdate {
       mime_type?: string;
       file_size?: number;
     };
+    reply_to_message?: {
+      message_id: number;
+      from?: {
+        id: number;
+        is_bot: boolean;
+        first_name: string;
+        username?: string;
+      };
+      chat?: {
+        id: number;
+        type: string;
+      };
+      text?: string;
+      caption?: string;
+    };
   };
   callback_query?: {
     id: string;
@@ -395,6 +410,19 @@ type TelegramSavedPaymentMethodSummary = {
   lastUsedAt: Date | null;
   useCount: number;
 };
+
+function getTelegramAdminReplyRecipientSeed(message?: TelegramUpdate['message']) {
+  const replyFrom = message?.reply_to_message?.from;
+  if (!replyFrom || replyFrom.is_bot) {
+    return '';
+  }
+
+  if (replyFrom.username?.trim()) {
+    return `@${replyFrom.username.trim()}`;
+  }
+
+  return String(replyFrom.id);
+}
 
 function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines: string[]) {
   const ui = getTelegramUi(locale);
@@ -10245,6 +10273,9 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
 
   const command = commandMatch[1].toLowerCase();
   const argsText = commandMatch[2] || '';
+  const adminReplyRecipientSeed = !argsText.trim()
+    ? getTelegramAdminReplyRecipientSeed(message)
+    : '';
 
   switch (command) {
     case 'start':
@@ -10473,7 +10504,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         locale,
         botToken: config.botToken,
         adminActor,
-        argsText,
+        argsText: argsText || adminReplyRecipientSeed,
         deps: {
           sendTelegramMessage,
           sendAccessKeySharePageToTelegram,
@@ -10493,7 +10524,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         locale,
         botToken: config.botToken,
         adminActor,
-        argsText,
+        argsText: argsText || adminReplyRecipientSeed,
         deps: {
           sendTelegramMessage,
           sendAccessKeySharePageToTelegram,
