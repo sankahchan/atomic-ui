@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { sendTelegramMessage } from '@/lib/telegram';
+import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 
 const WARNING_THRESHOLD_PERCENT = 80;
 const EXPIRY_WARNING_DAYS = 3;

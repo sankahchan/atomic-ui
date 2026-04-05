@@ -2102,7 +2102,6 @@ async function getLatestPremiumRoutingEventsByKeyIds(dynamicAccessKeyIds: string
       dynamicAccessKeyId: { in: dynamicAccessKeyIds },
     },
     orderBy: [{ createdAt: 'desc' }],
-    take: Math.max(dynamicAccessKeyIds.length * 6, 12),
     select: {
       dynamicAccessKeyId: true,
       eventType: true,

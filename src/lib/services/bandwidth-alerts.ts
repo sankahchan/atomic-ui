@@ -16,7 +16,7 @@ import {
 } from '@/lib/access-key-policies';
 import { createOutlineClient } from '@/lib/outline-api';
 import { getTelegramConfig } from '@/lib/services/telegram-bot';
-import { sendTelegramMessage } from '@/lib/telegram';
+import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { formatBytes } from '@/lib/utils';
 
 interface BandwidthAlertResult {

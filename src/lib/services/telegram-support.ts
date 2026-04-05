@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { type SupportedLocale } from '@/lib/i18n/config';
@@ -571,56 +572,72 @@ export async function listTelegramSupportThreadsForAdminQueue(input: {
   mode: 'all' | 'admin' | 'user';
   limit?: number;
 }) {
-  const threads = await db.telegramSupportThread.findMany({
-    where: {
-      status: {
-        in: ['OPEN', 'ESCALATED'],
-      },
+  const baseWhere: Prisma.TelegramSupportThreadWhereInput = {
+    status: {
+      in: ['OPEN', 'ESCALATED'],
     },
-    include: {
-      replies: {
-        orderBy: [{ createdAt: 'asc' }],
-        take: 8,
-      },
-    },
-    orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
-    take: Math.max((input.limit ?? 4) * 4, 12),
-  });
+  };
+  const listWhere: Prisma.TelegramSupportThreadWhereInput =
+    input.mode === 'admin'
+      ? {
+          status: 'OPEN',
+          NOT: {
+            waitingOn: 'USER',
+          },
+        }
+      : input.mode === 'user'
+        ? {
+            status: 'OPEN',
+            waitingOn: 'USER',
+          }
+        : baseWhere;
 
-  const filtered = threads.filter((thread) => {
-    const state = getTelegramSupportThreadState({
-      status: thread.status,
-      waitingOn: thread.waitingOn,
-      locale: 'en',
-    });
-    return input.mode === 'all' ? true : state.code === input.mode;
-  });
+  const [totalOpen, waitingAdmin, waitingUser, overdue, threads] = await Promise.all([
+    db.telegramSupportThread.count({
+      where: baseWhere,
+    }),
+    db.telegramSupportThread.count({
+      where: {
+        status: 'OPEN',
+        NOT: {
+          waitingOn: 'USER',
+        },
+      },
+    }),
+    db.telegramSupportThread.count({
+      where: {
+        status: 'OPEN',
+        waitingOn: 'USER',
+      },
+    }),
+    db.telegramSupportThread.count({
+      where: {
+        ...baseWhere,
+        firstAdminReplyAt: null,
+        firstResponseDueAt: {
+          lte: new Date(),
+        },
+      },
+    }),
+    db.telegramSupportThread.findMany({
+      where: listWhere,
+      include: {
+        replies: {
+          orderBy: [{ createdAt: 'asc' }],
+          take: 8,
+        },
+      },
+      orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
+      take: input.limit ?? 4,
+    }),
+  ]);
 
   return {
-    totalOpen: threads.length,
-    waitingAdmin: threads.filter(
-      (thread) =>
-        getTelegramSupportThreadState({
-          status: thread.status,
-          waitingOn: thread.waitingOn,
-          locale: 'en',
-        }).code === 'admin',
-    ).length,
-    waitingUser: threads.filter(
-      (thread) =>
-        getTelegramSupportThreadState({
-          status: thread.status,
-          waitingOn: thread.waitingOn,
-          locale: 'en',
-        }).code === 'user',
-    ).length,
-    overdue: threads.filter(
-      (thread) =>
-        !thread.firstAdminReplyAt
-        && Boolean(thread.firstResponseDueAt)
-        && (thread.firstResponseDueAt?.getTime() || 0) <= Date.now(),
-    ).length,
-    threads: filtered.slice(0, input.limit ?? 4),
+    totalOpen,
+    waitingAdmin,
+    waitingUser,
+    overdue,
+    threads,
   };
 }
 

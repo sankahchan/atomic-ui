@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/db';
-import { sendTelegramDocument } from '@/lib/telegram';
+import { sendTelegramDocument } from '@/lib/services/telegram-runtime';
 import { logger } from '@/lib/logger';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { writeAuditLog } from '@/lib/audit';
@@ -135,7 +135,11 @@ export const backupRouter = router({
                                 fileBuffer,
                                 backupFilename,
                                 `Backup created via Dashboard at ${new Date().toLocaleString()}`
-                            ).catch(e => logger.error(`Failed to send backup to ${chatId}:`, e))
+                            ).then((sent) => {
+                                if (!sent) {
+                                    logger.error(`Failed to send backup to ${chatId}: Telegram send returned false`);
+                                }
+                            }).catch(e => logger.error(`Failed to send backup to ${chatId}:`, e))
                         ));
                     }
                 }
