@@ -476,11 +476,13 @@ export async function sendTelegramMessage(
 ): Promise<boolean> {
   const parseMode = options.parseMode || 'HTML';
   const preparedMessage =
-    parseMode === 'HTML' ? sanitizeTelegramHtmlMessage(text) : { text, changed: false, invalidTags: [] };
+    parseMode === 'HTML'
+      ? sanitizeTelegramHtmlMessage(text)
+      : { text, changed: false, invalidTags: [], invalidCharactersRemoved: false };
 
   if (preparedMessage.changed) {
     console.warn(
-      `Sanitized Telegram HTML message for ${chatId}; escaped unsupported tags: ${preparedMessage.invalidTags.join(', ')}`,
+      `Sanitized Telegram HTML message for ${chatId}; escaped unsupported tags: ${preparedMessage.invalidTags.join(', ') || 'none'}${preparedMessage.invalidCharactersRemoved ? '; removed invalid UTF-8/control characters' : ''}`,
     );
   }
 

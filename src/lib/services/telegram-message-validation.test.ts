@@ -3,6 +3,7 @@ import test from 'node:test';
 import { buildTelegramHelpMessage } from '@/lib/services/telegram-admin';
 import {
   findUnsupportedTelegramHtmlTags,
+  normalizeTelegramUtf8Text,
   sanitizeTelegramHtmlMessage,
   validateTelegramHtmlMessage,
 } from '@/lib/services/telegram-message-validation';
@@ -30,6 +31,22 @@ test('telegram HTML sanitizer escapes unsupported placeholder tags but keeps sup
   assert.equal(sanitized.changed, true);
   assert.deepEqual(sanitized.invalidTags, ['order-code']);
   assert.equal(sanitized.text, 'Usage: <b>/order</b> &lt;order-code&gt;');
+});
+
+test('telegram UTF-8 normalizer strips lone surrogates and control bytes', () => {
+  const dirty = `Hello\u0000 world \ud800test\u0007`;
+  const normalized = normalizeTelegramUtf8Text(dirty);
+
+  assert.equal(normalized.changed, true);
+  assert.equal(normalized.text, 'Hello world test');
+});
+
+test('telegram HTML sanitizer removes invalid UTF-8/control characters', () => {
+  const sanitized = sanitizeTelegramHtmlMessage('A\u0000<b>ok</b>\ud800');
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.invalidCharactersRemoved, true);
+  assert.equal(sanitized.text, 'A<b>ok</b>');
 });
 
 test('telegram help message stays valid HTML for user and admin variants', () => {
