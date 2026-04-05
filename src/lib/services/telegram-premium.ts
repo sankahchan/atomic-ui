@@ -757,6 +757,7 @@ export async function handlePremiumCommand(input: {
       })
     : [];
   const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+  const latestRoutingEvents = await getLatestPremiumRoutingEventsByKeyIds(dynamicKeys.map((key) => key.id));
 
   const recentRequests = await listTelegramPremiumSupportRequestsForUser(
     input.chatId,
@@ -779,6 +780,7 @@ export async function handlePremiumCommand(input: {
     const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
     const latestReply = latestRequest?.replies?.[latestRequest.replies.length - 1] || null;
     const analysis = summarizePremiumRegions(key, healthByServerId);
+    const latestRoutingEvent = latestRoutingEvents.get(key.id) || null;
     const currentFallback = getPremiumCurrentFallbackRegion(analysis);
     const currentRouteLabel = analysis.currentServer
       ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
@@ -815,6 +817,9 @@ export async function handlePremiumCommand(input: {
       latestReply
         ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
         : '',
+      `  ${input.locale === 'my' ? 'Last routing event' : 'Last routing event'}: ${escapeHtml(
+        formatTelegramPremiumRoutingEventSummary(latestRoutingEvent, input.locale),
+      )}`,
       `  ${ui.orderNextStepLabel}: ${escapeHtml(nextStepSummary)}`,
       `  ${escapeHtml(
         input.locale === 'my'
@@ -1198,6 +1203,7 @@ export async function handlePremiumRegionStatusCommand(input: {
       })
     : [];
   const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+  const latestRoutingEvents = await getLatestPremiumRoutingEventsByKeyIds(dynamicKeys.map((key) => key.id));
 
   const lines = [
     ui.premiumRegionStatusTitle,
@@ -1211,6 +1217,7 @@ export async function handlePremiumRegionStatusCommand(input: {
 
   for (const key of dynamicKeys.slice(0, 4)) {
     const analysis = summarizePremiumRegions(key, healthByServerId);
+    const latestRoutingEvent = latestRoutingEvents.get(key.id) || null;
     const currentFallback = getPremiumCurrentFallbackRegion(analysis);
     const currentRouteLabel = analysis.currentServer
       ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
@@ -1241,6 +1248,11 @@ export async function handlePremiumRegionStatusCommand(input: {
         )}`,
       );
     }
+    lines.push(
+      `  ${input.locale === 'my' ? 'Last routing event' : 'Last routing event'}: ${escapeHtml(
+        formatTelegramPremiumRoutingEventSummary(latestRoutingEvent, input.locale),
+      )}`,
+    );
     lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(buildPremiumRecommendedNextStepText(analysis, input.locale))}`);
     lines.push(`  ${ui.premiumRegionAttachedLabel}: ${analysis.attachedServers.length}`);
     lines.push(`  <b>${input.locale === 'my' ? 'Region health' : 'Region health'}</b>`);
@@ -2071,4 +2083,74 @@ export async function handlePremiumSupportFollowUpText(input: {
   });
 
   return null;
+}
+
+type LatestPremiumRoutingEvent = {
+  dynamicAccessKeyId: string;
+  eventType: string;
+  reason: string;
+  createdAt: Date;
+};
+
+async function getLatestPremiumRoutingEventsByKeyIds(dynamicAccessKeyIds: string[]) {
+  if (dynamicAccessKeyIds.length === 0) {
+    return new Map<string, LatestPremiumRoutingEvent>();
+  }
+
+  const events = await db.dynamicRoutingEvent.findMany({
+    where: {
+      dynamicAccessKeyId: { in: dynamicAccessKeyIds },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+    take: Math.max(dynamicAccessKeyIds.length * 6, 12),
+    select: {
+      dynamicAccessKeyId: true,
+      eventType: true,
+      reason: true,
+      createdAt: true,
+    },
+  });
+
+  const map = new Map<string, LatestPremiumRoutingEvent>();
+  for (const event of events) {
+    if (!map.has(event.dynamicAccessKeyId)) {
+      map.set(event.dynamicAccessKeyId, event);
+    }
+  }
+
+  return map;
+}
+
+function formatTelegramPremiumRoutingEventTypeLabel(eventType: string, locale: SupportedLocale) {
+  switch (eventType) {
+    case DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED:
+      return locale === 'my' ? 'Preferred region degraded' : 'Preferred region degraded';
+    case DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED:
+      return locale === 'my' ? 'Preferred region recovered' : 'Preferred region recovered';
+    case DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED:
+      return locale === 'my' ? 'Auto fallback pinned' : 'Auto fallback pinned';
+    case DYNAMIC_ROUTING_EVENT_TYPES.PIN_APPLIED:
+      return locale === 'my' ? 'Manual pin applied' : 'Manual pin applied';
+    case DYNAMIC_ROUTING_EVENT_TYPES.PIN_CLEARED:
+      return locale === 'my' ? 'Pin cleared' : 'Pin cleared';
+    case DYNAMIC_ROUTING_EVENT_TYPES.BACKEND_SWITCH:
+      return locale === 'my' ? 'Route switched' : 'Route switched';
+    case DYNAMIC_ROUTING_EVENT_TYPES.AUTO_RECOVERY:
+      return locale === 'my' ? 'Auto recovery' : 'Auto recovery';
+    default:
+      return locale === 'my' ? 'Routing update' : 'Routing update';
+  }
+}
+
+function formatTelegramPremiumRoutingEventSummary(
+  event: LatestPremiumRoutingEvent | null | undefined,
+  locale: SupportedLocale,
+) {
+  if (!event) {
+    return locale === 'my' ? 'No recent routing event' : 'No recent routing event';
+  }
+
+  const reason = event.reason.trim();
+  const summary = reason.length > 96 ? `${reason.slice(0, 93)}...` : reason;
+  return `${formatTelegramPremiumRoutingEventTypeLabel(event.eventType, locale)} • ${formatTelegramDateTime(event.createdAt, locale)}${summary ? ` • ${summary}` : ''}`;
 }

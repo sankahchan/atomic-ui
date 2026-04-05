@@ -144,6 +144,93 @@ function formatTelegramReceiptPriceLabel(order: {
   return null;
 }
 
+function formatTelegramPlanDurationLabel(plan: {
+  fixedDurationMonths?: number | null;
+  fixedDurationDays?: number | null;
+}, locale: SupportedLocale) {
+  if (plan.fixedDurationMonths) {
+    return locale === 'my'
+      ? `${plan.fixedDurationMonths} လ`
+      : `${plan.fixedDurationMonths} month${plan.fixedDurationMonths === 1 ? '' : 's'}`;
+  }
+
+  if (plan.fixedDurationDays) {
+    return locale === 'my'
+      ? `${plan.fixedDurationDays} ရက်`
+      : `${plan.fixedDurationDays} day${plan.fixedDurationDays === 1 ? '' : 's'}`;
+  }
+
+  return null;
+}
+
+function getTelegramPremiumPlanBestFor(plan: {
+  code: string;
+  dataLimitGB?: number | null;
+  unlimitedQuota?: boolean;
+}, locale: SupportedLocale) {
+  if (plan.unlimitedQuota) {
+    return locale === 'my'
+      ? 'အသုံးပြုမှုများပြီး region flexibility အမြင့်ဆုံးလိုသူများအတွက်'
+      : 'Best for the heaviest daily use and maximum region flexibility.';
+  }
+
+  if ((plan.dataLimitGB || 0) <= 250) {
+    return locale === 'my'
+      ? 'တည်ငြိမ်သော premium route ကို စတင်စမ်းလိုသူများအတွက်'
+      : 'Best for lighter premium use with stable routing and fallback.';
+  }
+
+  return locale === 'my'
+    ? 'နေ့စဉ်အသုံးပြုမှုများပြီး streaming / multi-device premium use အတွက်'
+    : 'Best for heavier daily use, streaming, and more frequent premium routing.';
+}
+
+function getTelegramPremiumPlanHighlight(plan: {
+  code: string;
+  dataLimitGB?: number | null;
+  unlimitedQuota?: boolean;
+}, locale: SupportedLocale) {
+  if (plan.code === 'premium_1m_500gb') {
+    return locale === 'my' ? 'Most popular premium choice' : 'Most popular premium choice';
+  }
+
+  if (plan.unlimitedQuota) {
+    return locale === 'my' ? 'Maximum premium coverage' : 'Maximum premium coverage';
+  }
+
+  if ((plan.dataLimitGB || 0) <= 250) {
+    return locale === 'my' ? 'Good first premium step' : 'Good first premium step';
+  }
+
+  return locale === 'my' ? 'Balanced premium plan' : 'Balanced premium plan';
+}
+
+function buildTelegramPremiumPlanCard(input: {
+  plan: any;
+  locale: SupportedLocale;
+}) {
+  const { plan, locale } = input;
+  const label = resolveTelegramSalesPlanLabel(plan, locale);
+  const price = resolveTelegramSalesPriceLabel(plan, locale);
+  const quota = plan.unlimitedQuota
+    ? (locale === 'my' ? 'Unlimited quota' : 'Unlimited quota')
+    : typeof plan.dataLimitGB === 'number' && Number.isFinite(plan.dataLimitGB)
+      ? `${plan.dataLimitGB} GB`
+      : null;
+  const duration = formatTelegramPlanDurationLabel(plan, locale);
+  const detailLine = [quota, duration].filter(Boolean).join(' • ');
+
+  return [
+    `💎 <b>${label}</b>`,
+    price ? `   ${locale === 'my' ? 'Price' : 'Price'}: <b>${price}</b>` : '',
+    detailLine ? `   ${detailLine}` : '',
+    `   ${locale === 'my' ? 'Best for' : 'Best for'}: ${getTelegramPremiumPlanBestFor(plan, locale)}`,
+    `   ${locale === 'my' ? 'Highlight' : 'Highlight'}: ${getTelegramPremiumPlanHighlight(plan, locale)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function buildTelegramOrderReceiptMessage(input: {
   order: {
     orderCode: string;
@@ -529,11 +616,7 @@ export async function handleBuyCommand(input: {
     });
   const premiumPlanLines = enabledPlans
     .filter((plan: any) => plan.deliveryType === 'DYNAMIC_KEY')
-    .map((plan: any) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
-    });
+    .map((plan: any) => buildTelegramPremiumPlanCard({ plan, locale: input.locale }));
 
   if (premiumPlanLines.length > 0) {
     await sendTelegramPhotoUrl(
@@ -549,6 +632,19 @@ export async function handleBuyCommand(input: {
         ui.buyPremiumRegionExplain,
       ].join('\n'),
     );
+
+    const premiumPlans = enabledPlans.filter((plan: any) => plan.deliveryType === 'DYNAMIC_KEY');
+    if (premiumPlans.length > 0) {
+      await sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        [
+          input.locale === 'my' ? '<b>Premium plan cards</b>' : '<b>Premium plan cards</b>',
+          '',
+          ...premiumPlans.map((plan: any) => buildTelegramPremiumPlanCard({ plan, locale: input.locale })),
+        ].join('\n\n'),
+      );
+    }
   }
 
   const lines = [

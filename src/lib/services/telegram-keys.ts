@@ -21,14 +21,22 @@ import {
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import { listTelegramPremiumSupportRequestsForUser } from '@/lib/services/telegram-premium';
-import { buildTelegramSupportHubKeyboard } from '@/lib/services/telegram-support';
 import {
+  buildTelegramSupportHubKeyboard,
+  getTelegramSupportThreadState,
+  listTelegramSupportThreadsForUser,
+  resolveTelegramSupportIssueLabel,
+} from '@/lib/services/telegram-support';
+import {
+  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatExpirationSummary,
   formatTelegramDynamicPoolSummary,
   formatTelegramPremiumFollowUpState,
   formatTelegramQuotaSummary,
+  formatTelegramReplyStateLabel,
   formatTelegramServerChoiceLabel,
+  formatTelegramDateTime,
   getDynamicKeyRegionChoices,
   getFlagEmoji,
   getTelegramAccessKeyCategory,
@@ -557,13 +565,71 @@ export async function handleSupportCommand(input: {
   const locale = input.locale;
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
+  const [threads, premiumRequests] = await Promise.all([
+    listTelegramSupportThreadsForUser({
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+      limit: 3,
+    }),
+    listTelegramPremiumSupportRequestsForUser(input.chatId, input.telegramUserId, 2),
+  ]);
+  const openThreads = threads.filter((thread) => thread.status !== 'HANDLED');
+  const latestThread = threads[0] || null;
+  const latestPremiumRequest = premiumRequests[0] || null;
 
   const lines = [
     ui.supportHubTitle,
     '',
+    locale === 'my'
+      ? `${openThreads.length} open support thread(s) • ${premiumRequests.length} premium support item(s)`
+      : `${openThreads.length} open support thread(s) • ${premiumRequests.length} premium support item(s)`,
+    '',
     input.locale === 'my'
       ? 'Order, key, server, billing, or general help အတွက် category ကို ရွေးပြီး support thread တစ်ခုကို စတင်နိုင်ပါသည်။'
       : 'Choose a category to start a real support thread for orders, keys, servers, billing, or general help.',
+  ];
+
+  if (latestThread) {
+    const state = getTelegramSupportThreadState({
+      status: latestThread.status,
+      waitingOn: latestThread.waitingOn,
+      locale,
+    });
+    const latestReply = latestThread.replies[latestThread.replies.length - 1] || null;
+    lines.push(
+      '',
+      locale === 'my' ? '<b>Latest support thread</b>' : '<b>Latest support thread</b>',
+      `🧵 <b>${escapeHtml(latestThread.threadCode)}</b>`,
+      `${locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale))}</b>`,
+      `${locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
+      `${locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestThread.updatedAt, locale))}</b>`,
+      ...buildTelegramLatestReplyPreviewLines({
+        reply: latestReply,
+        locale,
+        maxLength: 120,
+      }).map((line) => escapeHtml(line)),
+    );
+  }
+
+  if (latestPremiumRequest) {
+    const latestPremiumReply = latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1] || null;
+    lines.push(
+      '',
+      locale === 'my' ? '<b>Latest premium thread</b>' : '<b>Latest premium thread</b>',
+      `💎 <b>${escapeHtml(latestPremiumRequest.requestCode)}</b>`,
+      `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramPremiumFollowUpState(latestPremiumRequest, ui))}</b>`,
+      `${escapeHtml(
+        formatTelegramReplyStateLabel({
+          latestReplySenderType: latestPremiumReply?.senderType || null,
+          followUpPending: latestPremiumRequest.followUpPending,
+          locale,
+        }),
+      )}`,
+      `${locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestPremiumRequest.updatedAt, locale))}</b>`,
+    );
+  }
+
+  lines.push(
     '',
     locale === 'my' ? '<b>Quick paths</b>' : '<b>Quick paths</b>',
     locale === 'my'
@@ -593,7 +659,7 @@ export async function handleSupportCommand(input: {
     locale === 'my'
       ? 'အောက်ပါ button များထဲမှ တစ်ခုကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။'
       : 'Use one of the buttons below to jump directly to the right place.',
-  ];
+  );
 
   if (supportLink) {
     lines.push('', ui.supportHubDirectLink(supportLink));
