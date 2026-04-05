@@ -1169,6 +1169,8 @@ export function buildTelegramLatestReplyPreviewLines(input: {
     senderType: string;
     createdAt: Date;
     message: string;
+    mediaKind?: string | null;
+    mediaFilename?: string | null;
   } | null;
   locale: SupportedLocale;
   maxLength?: number;
@@ -1187,10 +1189,22 @@ export function buildTelegramLatestReplyPreviewLines(input: {
         : 'You';
   const maxLength = input.maxLength ?? 120;
   const preview = input.reply.message.slice(0, maxLength);
-  return [
+  const lines = [
     `${input.locale === 'my' ? 'Latest reply' : 'Latest reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
-    `${preview}${input.reply.message.length > maxLength ? '…' : ''}`,
   ];
+
+  if (input.reply.mediaKind) {
+    lines.push(
+      input.reply.mediaKind === 'IMAGE'
+        ? input.locale === 'my'
+          ? 'Attachment: Image'
+          : 'Attachment: Image'
+        : `Attachment: ${input.reply.mediaFilename || (input.locale === 'my' ? 'File' : 'File')}`,
+    );
+  }
+
+  lines.push(`${preview}${input.reply.message.length > maxLength ? '…' : ''}`);
+  return lines;
 }
 
 function deriveTelegramOrderTimelineStageState(input: {

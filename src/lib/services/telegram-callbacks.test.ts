@@ -139,6 +139,41 @@ test('telegram support queue callbacks preserve queue mode secondary', () => {
   );
 });
 
+test('telegram support thread queue callbacks support ownership and reply actions', () => {
+  assert.deepEqual(
+    parseTelegramSupportQueueCallbackData(
+      buildTelegramSupportQueueCallbackData('cl', 'thr_thread123', 'admin'),
+    ),
+    {
+      action: 'cl',
+      requestId: 'thr_thread123',
+      secondary: 'admin',
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramSupportQueueCallbackData(
+      buildTelegramSupportQueueCallbackData('rp', 'thr_thread123', 'all'),
+    ),
+    {
+      action: 'rp',
+      requestId: 'thr_thread123',
+      secondary: 'all',
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramSupportQueueCallbackData(
+      buildTelegramSupportQueueCallbackData('es', 'thr_thread123', 'user'),
+    ),
+    {
+      action: 'es',
+      requestId: 'thr_thread123',
+      secondary: 'user',
+    },
+  );
+});
+
 test('resolveTelegramRetentionSourceFromRenewAction supports dynamic coupon renewals', () => {
   assert.equal(
     resolveTelegramRetentionSourceFromRenewAction('dynamic_renewal_coupon'),

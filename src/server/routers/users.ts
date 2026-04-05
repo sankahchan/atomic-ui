@@ -54,6 +54,17 @@ import {
   getTelegramSalesSettings,
   type TelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
+import {
+  assignTelegramSupportThreadToAdmin,
+  buildTelegramSupportMacroMessage,
+  claimTelegramSupportThreadAsAdmin,
+  escalateTelegramSupportThreadToPanel,
+  findTelegramSupportThreadByIdForAdmin,
+  handleTelegramSupportThreadAsAdmin,
+  replyTelegramSupportThreadAsAdmin,
+  resolveTelegramSupportIssueLabel,
+  unclaimTelegramSupportThreadAsAdmin,
+} from '@/lib/services/telegram-support';
 import { adminProcedure, router } from '../trpc';
 
 function parseJsonRecord(value: string | null) {
@@ -117,6 +128,30 @@ async function resolveCustomerTelegramDestination(userId: string) {
     user,
     destinationChatId,
   };
+}
+
+async function listAssignableSupportAdmins() {
+  const admins = await db.user.findMany({
+    where: {
+      role: 'ADMIN',
+    },
+    select: {
+      id: true,
+      email: true,
+      adminScope: true,
+      telegramChatId: true,
+    },
+    orderBy: [{ adminScope: 'asc' }, { email: 'asc' }],
+  });
+
+  return admins
+    .filter((admin) => hasTelegramReviewManageScope(admin.adminScope))
+    .map((admin) => ({
+      id: admin.id,
+      email: admin.email,
+      adminScope: normalizeAdminScope(admin.adminScope),
+      telegramChatId: admin.telegramChatId,
+    }));
 }
 
 const CRM_PROMO_SUPPORT_NOTE_KINDS = new Set(['INTERNAL', 'DIRECT_MESSAGE', 'OUTAGE_UPDATE']);
@@ -905,6 +940,290 @@ export const usersRouter = router({
           canResendAnnouncements: hasTelegramAnnouncementManageScope(ctx.user.adminScope),
         },
       };
+    }),
+
+  getSupportThreadDetail: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view support threads.',
+        });
+      }
+
+      const thread = await db.telegramSupportThread.findUnique({
+        where: { id: input.threadId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              telegramChatId: true,
+            },
+          },
+          replies: {
+            orderBy: [{ createdAt: 'asc' }],
+          },
+        },
+      });
+
+      if (!thread) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Support thread not found.',
+        });
+      }
+
+      const assignableAdmins = await listAssignableSupportAdmins();
+
+      return {
+        thread: {
+          id: thread.id,
+          threadCode: thread.threadCode,
+          status: thread.status,
+          waitingOn: thread.waitingOn,
+          issueCategory: thread.issueCategory,
+          issueLabel: resolveTelegramSupportIssueLabel(thread.issueCategory, coerceSupportedLocale(thread.locale) || 'en'),
+          locale: coerceSupportedLocale(thread.locale) || 'en',
+          telegramChatId: thread.telegramChatId,
+          telegramUserId: thread.telegramUserId,
+          telegramUsername: thread.telegramUsername,
+          userId: thread.userId,
+          subject: thread.subject,
+          relatedOrderCode: thread.relatedOrderCode,
+          relatedKeyName: thread.relatedKeyName,
+          relatedKeyType: thread.relatedKeyType,
+          relatedServerName: thread.relatedServerName,
+          firstResponseDueAt: thread.firstResponseDueAt,
+          firstAdminReplyAt: thread.firstAdminReplyAt,
+          lastCustomerReplyAt: thread.lastCustomerReplyAt,
+          lastAdminReplyAt: thread.lastAdminReplyAt,
+          handledAt: thread.handledAt,
+          escalatedAt: thread.escalatedAt,
+          escalatedReason: thread.escalatedReason,
+          assignedAdminUserId: thread.assignedAdminUserId,
+          assignedAdminName: thread.assignedAdminName,
+          createdAt: thread.createdAt,
+          updatedAt: thread.updatedAt,
+          isOverdue:
+            !thread.firstAdminReplyAt
+            && Boolean(thread.firstResponseDueAt)
+            && (thread.firstResponseDueAt?.getTime() || 0) <= Date.now(),
+          customer: thread.user
+            ? {
+                id: thread.user.id,
+                email: thread.user.email,
+                telegramChatId: thread.user.telegramChatId,
+              }
+            : null,
+          replies: thread.replies.map((reply) => ({
+            id: reply.id,
+            senderType: reply.senderType,
+            telegramUserId: reply.telegramUserId,
+            telegramUsername: reply.telegramUsername,
+            adminUserId: reply.adminUserId,
+            senderName: reply.senderName,
+            message: reply.message,
+            mediaKind: reply.mediaKind,
+            mediaUrl: reply.mediaUrl,
+            mediaFilename: reply.mediaFilename,
+            mediaContentType: reply.mediaContentType,
+            createdAt: reply.createdAt,
+          })),
+        },
+        assignableAdmins,
+        permissions: {
+          canManage: hasTelegramReviewManageScope(ctx.user.adminScope),
+          canAssign: hasTelegramReviewManageScope(ctx.user.adminScope),
+          canReply: hasTelegramReviewManageScope(ctx.user.adminScope),
+        },
+      };
+    }),
+
+  claimSupportThread: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to claim support threads.',
+        });
+      }
+
+      return claimTelegramSupportThreadAsAdmin({
+        threadId: input.threadId,
+        adminUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+      });
+    }),
+
+  unclaimSupportThread: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to unclaim support threads.',
+        });
+      }
+
+      return unclaimTelegramSupportThreadAsAdmin({
+        threadId: input.threadId,
+        adminUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        force: isOwnerLikeAdmin(ctx.user.adminScope),
+      });
+    }),
+
+  assignSupportThread: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        assignedAdminUserId: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to assign support threads.',
+        });
+      }
+
+      let assignedAdminName: string | null = null;
+      let assignedAdminUserId: string | null = input.assignedAdminUserId;
+
+      if (input.assignedAdminUserId) {
+        const target = await db.user.findUnique({
+          where: { id: input.assignedAdminUserId },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            adminScope: true,
+          },
+        });
+
+        if (!target || target.role !== 'ADMIN' || !hasTelegramReviewManageScope(target.adminScope)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'That admin cannot be assigned to support threads.',
+          });
+        }
+
+        assignedAdminUserId = target.id;
+        assignedAdminName = target.email;
+      }
+
+      return assignTelegramSupportThreadToAdmin({
+        threadId: input.threadId,
+        changedByUserId: ctx.user.id,
+        changedByName: ctx.user.email || null,
+        assignedAdminUserId,
+        assignedAdminName,
+      });
+    }),
+
+  replyToSupportThread: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        message: z.string().trim().min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to reply to support threads.',
+        });
+      }
+
+      return replyTelegramSupportThreadAsAdmin({
+        threadId: input.threadId,
+        adminUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: 'Panel support reply',
+        customerMessage: input.message,
+      });
+    }),
+
+  applySupportThreadMacro: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        macro: z.enum(['WORKING', 'NEED_DETAILS', 'ESCALATE', 'HANDLED']),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update support threads.',
+        });
+      }
+
+      const thread = await findTelegramSupportThreadByIdForAdmin({
+        threadId: input.threadId,
+      });
+
+      if (!thread) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Support thread not found.',
+        });
+      }
+
+      const locale = coerceSupportedLocale(thread.locale) || 'en';
+      const macroMessage = buildTelegramSupportMacroMessage({
+        action: input.macro,
+        category: thread.issueCategory,
+        locale,
+      });
+
+      if (input.macro === 'HANDLED') {
+        return handleTelegramSupportThreadAsAdmin({
+          threadId: input.threadId,
+          adminUserId: ctx.user.id,
+          reviewerName: ctx.user.email || null,
+          adminNote: 'Panel support macro: handled',
+          customerMessage: macroMessage,
+        });
+      }
+
+      if (input.macro === 'ESCALATE') {
+        return escalateTelegramSupportThreadToPanel({
+          threadId: input.threadId,
+          adminUserId: ctx.user.id,
+          reviewerName: ctx.user.email || null,
+          escalationReason: 'panel_macro',
+          customerMessage: macroMessage,
+        });
+      }
+
+      return replyTelegramSupportThreadAsAdmin({
+        threadId: input.threadId,
+        adminUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote:
+          input.macro === 'WORKING'
+            ? 'Panel support macro: working on it'
+            : 'Panel support macro: need details',
+        customerMessage: macroMessage,
+      });
     }),
 
   updateMarketingTags: adminProcedure

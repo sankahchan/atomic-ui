@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { type SupportedLocale } from '@/lib/i18n/config';
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import {
   buildTelegramMenuCallbackData,
   buildTelegramSupportThreadCallbackData,
@@ -38,8 +39,17 @@ export type TelegramAdminSupportThreadQueueRecord = Awaited<
     message: string;
     createdAt: Date;
     senderName?: string | null;
+    mediaKind?: string | null;
+    mediaUrl?: string | null;
+    mediaFilename?: string | null;
   }>;
 };
+
+export type TelegramSupportThreadMacro =
+  | 'WORKING'
+  | 'NEED_DETAILS'
+  | 'ESCALATE'
+  | 'HANDLED';
 
 export function resolveTelegramSupportIssueCategory(
   value?: string | null,
@@ -83,6 +93,15 @@ export function resolveTelegramSupportIssueLabel(
     default:
       return isMyanmar ? 'General help' : 'General help';
   }
+}
+
+function buildTelegramSupportReplyMediaUrl(input: {
+  threadId: string;
+  replyId: string;
+}) {
+  return withAbsoluteBasePath(
+    `/api/telegram/support-threads/${encodeURIComponent(input.threadId)}/replies/${encodeURIComponent(input.replyId)}/media`,
+  );
 }
 
 function resolveTelegramSupportIssuePrompt(
@@ -431,7 +450,11 @@ export async function addTelegramSupportReply(input: {
   telegramUsername?: string | null;
   adminUserId?: string | null;
   senderName?: string | null;
-  message: string;
+  message?: string | null;
+  mediaKind?: 'IMAGE' | 'FILE' | null;
+  mediaTelegramFileId?: string | null;
+  mediaFilename?: string | null;
+  mediaContentType?: string | null;
   waitingOn?: 'ADMIN' | 'USER' | 'NONE';
   markHandled?: boolean;
   escalate?: boolean;
@@ -451,9 +474,21 @@ export async function addTelegramSupportReply(input: {
       : 'OPEN';
   const nextWaitingOn =
     input.markHandled ? 'NONE' : input.waitingOn || (input.senderType === 'CUSTOMER' ? 'ADMIN' : 'USER');
+  const trimmedMessage = input.message?.trim() || '';
+  const fallbackMessage =
+    input.mediaKind === 'IMAGE'
+      ? 'Image attachment'
+      : input.mediaKind === 'FILE'
+        ? 'File attachment'
+        : '';
+  const storedMessage = trimmedMessage || fallbackMessage;
 
-  const [reply] = await db.$transaction([
-    db.telegramSupportReply.create({
+  if (!storedMessage) {
+    throw new Error('Support reply message is required.');
+  }
+
+  return db.$transaction(async (tx) => {
+    const createdReply = await tx.telegramSupportReply.create({
       data: {
         threadId: input.threadId,
         senderType: input.senderType,
@@ -461,10 +496,31 @@ export async function addTelegramSupportReply(input: {
         telegramUsername: input.telegramUsername || null,
         adminUserId: input.adminUserId || null,
         senderName: input.senderName || null,
-        message: input.message.trim(),
+        message: storedMessage,
+        mediaKind: input.mediaKind || null,
+        mediaTelegramFileId: input.mediaTelegramFileId || null,
+        mediaFilename: input.mediaFilename || null,
+        mediaContentType: input.mediaContentType || null,
       },
-    }),
-    db.telegramSupportThread.update({
+    });
+
+    const mediaUrl = input.mediaTelegramFileId
+      ? buildTelegramSupportReplyMediaUrl({
+          threadId: input.threadId,
+          replyId: createdReply.id,
+        })
+      : null;
+
+    const reply = mediaUrl
+      ? await tx.telegramSupportReply.update({
+          where: { id: createdReply.id },
+          data: {
+            mediaUrl,
+          },
+        })
+      : createdReply;
+
+    await tx.telegramSupportThread.update({
       where: { id: input.threadId },
       data: {
         status: nextStatus,
@@ -481,10 +537,10 @@ export async function addTelegramSupportReply(input: {
         assignedAdminUserId: input.senderType === 'ADMIN' ? input.adminUserId || null : undefined,
         assignedAdminName: input.senderType === 'ADMIN' ? input.senderName || null : undefined,
       },
-    }),
-  ]);
+    });
 
-  return reply;
+    return reply;
+  });
 }
 
 export async function findTelegramSupportThreadByIdForAdmin(input: {
@@ -558,12 +614,232 @@ export async function listTelegramSupportThreadsForAdminQueue(input: {
   };
 }
 
+export async function claimTelegramSupportThreadAsAdmin(input: {
+  threadId: string;
+  adminUserId?: string | null;
+  reviewerName?: string | null;
+  force?: boolean;
+}) {
+  const thread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: input.threadId,
+  });
+  if (!thread) {
+    throw new Error('Support thread not found.');
+  }
+  if (thread.status === 'HANDLED') {
+    throw new Error('This support thread is already handled.');
+  }
+  if (
+    !input.force
+    && thread.assignedAdminUserId
+    && thread.assignedAdminUserId !== (input.adminUserId ?? null)
+  ) {
+    throw new Error(`This support thread is claimed by ${thread.assignedAdminName || 'another admin'}.`);
+  }
+
+  const updated = await db.telegramSupportThread.update({
+    where: { id: thread.id },
+    data: {
+      assignedAdminUserId: input.adminUserId ?? null,
+      assignedAdminName: input.reviewerName ?? null,
+    },
+    include: {
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 12,
+      },
+    },
+  });
+
+  await writeAuditLog({
+    userId: input.adminUserId ?? null,
+    action: 'TELEGRAM_SUPPORT_THREAD_CLAIMED',
+    entity: 'TELEGRAM_SUPPORT_THREAD',
+    entityId: thread.id,
+    details: {
+      threadCode: thread.threadCode,
+      reviewerName: input.reviewerName ?? null,
+    },
+  });
+
+  return updated;
+}
+
+export async function unclaimTelegramSupportThreadAsAdmin(input: {
+  threadId: string;
+  adminUserId?: string | null;
+  reviewerName?: string | null;
+  force?: boolean;
+}) {
+  const thread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: input.threadId,
+  });
+  if (!thread) {
+    throw new Error('Support thread not found.');
+  }
+  if (thread.status === 'HANDLED') {
+    throw new Error('This support thread is already handled.');
+  }
+  if (
+    !input.force
+    && thread.assignedAdminUserId
+    && thread.assignedAdminUserId !== (input.adminUserId ?? null)
+  ) {
+    throw new Error(`Only ${thread.assignedAdminName || 'the assigned admin'} can unclaim this thread.`);
+  }
+
+  const updated = await db.telegramSupportThread.update({
+    where: { id: thread.id },
+    data: {
+      assignedAdminUserId: null,
+      assignedAdminName: null,
+    },
+    include: {
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 12,
+      },
+    },
+  });
+
+  await writeAuditLog({
+    userId: input.adminUserId ?? null,
+    action: 'TELEGRAM_SUPPORT_THREAD_UNCLAIMED',
+    entity: 'TELEGRAM_SUPPORT_THREAD',
+    entityId: thread.id,
+    details: {
+      threadCode: thread.threadCode,
+      reviewerName: input.reviewerName ?? null,
+    },
+  });
+
+  return updated;
+}
+
+export async function assignTelegramSupportThreadToAdmin(input: {
+  threadId: string;
+  changedByUserId?: string | null;
+  changedByName?: string | null;
+  assignedAdminUserId?: string | null;
+  assignedAdminName?: string | null;
+}) {
+  const thread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: input.threadId,
+  });
+  if (!thread) {
+    throw new Error('Support thread not found.');
+  }
+
+  const updated = await db.telegramSupportThread.update({
+    where: { id: thread.id },
+    data: {
+      assignedAdminUserId: input.assignedAdminUserId || null,
+      assignedAdminName: input.assignedAdminName || null,
+    },
+    include: {
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 24,
+      },
+    },
+  });
+
+  await writeAuditLog({
+    userId: input.changedByUserId ?? null,
+    action: 'TELEGRAM_SUPPORT_THREAD_ASSIGNED',
+    entity: 'TELEGRAM_SUPPORT_THREAD',
+    entityId: thread.id,
+    details: {
+      threadCode: thread.threadCode,
+      changedByName: input.changedByName ?? null,
+      assignedAdminUserId: input.assignedAdminUserId || null,
+      assignedAdminName: input.assignedAdminName || null,
+    },
+  });
+
+  return updated;
+}
+
+export function buildTelegramSupportMacroMessage(input: {
+  action: TelegramSupportThreadMacro;
+  category: string;
+  locale: SupportedLocale;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const categoryCode = resolveTelegramSupportIssueCategory(input.category) || 'GENERAL';
+
+  if (input.action === 'WORKING') {
+    switch (categoryCode) {
+      case 'ORDER':
+        return isMyanmar
+          ? 'Payment and order review ကို စစ်ဆေးနေပါသည်။ Update ကို မကြာမီ ပြန်ပို့ပါမည်။'
+          : 'We are checking the payment and order review now. We will update you again shortly.';
+      case 'KEY':
+        return isMyanmar
+          ? 'Key issue ကို စစ်ဆေးနေပါသည်။ Key name / usage / server side ကို review လုပ်နေပါသည်။'
+          : 'We are checking the key issue now, including the key, usage, and server side.';
+      case 'SERVER':
+        return isMyanmar
+          ? 'Server or route issue ကို စစ်ဆေးနေပါသည်။ Recovery or replacement လိုအပ်သလားကို ကြည့်နေပါသည်။'
+          : 'We are checking the server or route issue now, including whether recovery or replacement is needed.';
+      case 'BILLING':
+        return isMyanmar
+          ? 'Billing or refund issue ကို စစ်ဆေးနေပါသည်။ Update ကို မကြာမီ ပြန်ပို့ပါမည်။'
+          : 'We are checking the billing or refund issue now. We will update you again shortly.';
+      default:
+        return isMyanmar
+          ? 'Issue ကို စစ်ဆေးနေပါသည်။ Update ကို မကြာမီ ပြန်ပို့ပါမည်။'
+          : 'We are checking this now and will update you again shortly.';
+    }
+  }
+
+  if (input.action === 'NEED_DETAILS') {
+    switch (categoryCode) {
+      case 'ORDER':
+        return isMyanmar
+          ? 'Order code, payment amount, and a clearer screenshot ကို ထပ်ပို့ပေးပါ။'
+          : 'Please send the order code, payment amount, and a clearer screenshot so we can continue.';
+      case 'KEY':
+        return isMyanmar
+          ? 'Key name, current server, and the exact issue detail ကို ထပ်ပို့ပေးပါ။'
+          : 'Please send the key name, current server, and the exact issue detail so we can continue.';
+      case 'SERVER':
+        return isMyanmar
+          ? 'Server/region name, issue time, and a screenshot or error detail ကို ထပ်ပို့ပေးပါ။'
+          : 'Please send the server or region name, issue time, and a screenshot or error detail.';
+      case 'BILLING':
+        return isMyanmar
+          ? 'Receipt, payment screenshot, and the billing/refund detail ကို ထပ်ပို့ပေးပါ။'
+          : 'Please send the receipt, payment screenshot, and the billing or refund detail.';
+      default:
+        return isMyanmar
+          ? 'ဆက်လုပ်ရန် detail or screenshot အနည်းငယ် ထပ်ပို့ပေးပါ။'
+          : 'Please send a little more detail or a clearer screenshot so we can continue.';
+    }
+  }
+
+  if (input.action === 'ESCALATE') {
+    return isMyanmar
+      ? 'ဤ issue ကို deeper review အတွက် dashboard panel သို့ escalate လုပ်ထားပါသည်။'
+      : 'This issue has been escalated to the dashboard panel for deeper review.';
+  }
+
+  return isMyanmar
+    ? 'ဤ issue ကို ကိုင်တွယ်ပြီးပါပြီ။ လိုအပ်ပါက ဤ thread ကို reply လုပ်ပြီး ပြန်ဆက်သွယ်နိုင်ပါသည်။'
+    : 'This issue has been handled. If you still need help, reply here and we can continue in the same thread.';
+}
+
 export async function replyTelegramSupportThreadAsAdmin(input: {
   threadId: string;
   adminUserId?: string | null;
   reviewerName?: string | null;
   adminNote?: string | null;
   customerMessage: string;
+  mediaKind?: 'IMAGE' | 'FILE' | null;
+  mediaTelegramFileId?: string | null;
+  mediaFilename?: string | null;
+  mediaContentType?: string | null;
+  notifyCustomer?: boolean;
 }) {
   const thread = await findTelegramSupportThreadByIdForAdmin({
     threadId: input.threadId,
@@ -588,6 +864,10 @@ export async function replyTelegramSupportThreadAsAdmin(input: {
     adminUserId: input.adminUserId ?? null,
     senderName: input.reviewerName ?? null,
     message,
+    mediaKind: input.mediaKind || null,
+    mediaTelegramFileId: input.mediaTelegramFileId || null,
+    mediaFilename: input.mediaFilename || null,
+    mediaContentType: input.mediaContentType || null,
     waitingOn: 'USER',
   });
 
@@ -610,7 +890,7 @@ export async function replyTelegramSupportThreadAsAdmin(input: {
 
   const config = await getTelegramConfig();
   const supportLink = await getTelegramSupportLink();
-  if (config?.botToken) {
+  if (config?.botToken && input.notifyCustomer !== false) {
     await sendTelegramMessage(
       config.botToken,
       thread.telegramChatId,
@@ -830,6 +1110,9 @@ export function buildTelegramSupportThreadStatusMessage(input: {
       message: string;
       createdAt: Date;
       senderName?: string | null;
+      mediaKind?: string | null;
+      mediaUrl?: string | null;
+      mediaFilename?: string | null;
     }>;
   };
   locale: SupportedLocale;
@@ -863,6 +1146,17 @@ export function buildTelegramSupportThreadStatusMessage(input: {
       : '',
     input.thread.relatedKeyName
       ? `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.thread.relatedKeyName)}</b>`
+      : '',
+    latestReply?.mediaKind
+      ? `${input.locale === 'my' ? 'Attachment' : 'Attachment'}: <b>${escapeHtml(
+          latestReply.mediaKind === 'IMAGE'
+            ? input.locale === 'my'
+              ? 'Image'
+              : 'Image'
+            : latestReply.mediaKind === 'FILE'
+              ? latestReply.mediaFilename || (input.locale === 'my' ? 'File' : 'File')
+              : latestReply.mediaKind,
+        )}</b>`
       : '',
     ...buildTelegramLatestReplyPreviewLines({
       reply: latestReply,
@@ -1082,6 +1376,120 @@ export async function handleTelegramSupportReplyText(input: {
       issueCategory: thread.issueCategory,
       telegramChatId: thread.telegramChatId,
       telegramUserId: thread.telegramUserId,
+    },
+  });
+
+  await sendTelegramSupportThreadAlertToAdmins({
+    threadId: thread.id,
+    locale: input.locale,
+  });
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    [
+      input.locale === 'my'
+        ? `✅ <b>${escapeHtml(thread.threadCode)}</b> ကို support queue သို့ ပို့ပြီးပါပြီ။`
+        : `✅ <b>${escapeHtml(thread.threadCode)}</b> was sent to the support queue.`,
+      '',
+      input.locale === 'my'
+        ? 'Admin reply ရလာသည်နှင့် ဤ chat ထဲတွင် update ပြန်ပို့ပါမည်။'
+        : 'You will get the admin reply here in this chat as soon as it is available.',
+    ].join('\n'),
+    {
+      replyMarkup: buildTelegramSupportThreadKeyboard({
+        locale: input.locale,
+        threadId: thread.id,
+        supportLink,
+      }),
+    },
+  );
+
+  return null;
+}
+
+export async function handleTelegramSupportReplyMedia(input: {
+  chatId: number;
+  telegramUserId: number;
+  username: string;
+  locale: SupportedLocale;
+  botToken: string;
+  caption?: string | null;
+  mediaKind: 'IMAGE' | 'FILE';
+  mediaTelegramFileId: string;
+  mediaFilename?: string | null;
+  mediaContentType?: string | null;
+  getPendingSupportReply: (input: {
+    telegramUserId: string;
+    telegramChatId?: string | null;
+  }) => Promise<{ threadId: string; startedAt: Date | null } | null>;
+  setPendingSupportReply: (input: {
+    telegramUserId: string;
+    telegramChatId?: string | null;
+    threadId?: string | null;
+  }) => Promise<unknown>;
+}) {
+  const pending = await input.getPendingSupportReply({
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+  });
+  if (!pending) {
+    return null;
+  }
+
+  const supportLink = await getTelegramSupportLink();
+  const thread = await findTelegramSupportThreadByIdForUser({
+    threadId: pending.threadId,
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+
+  if (!thread || thread.status === 'HANDLED') {
+    await input.setPendingSupportReply({
+      telegramUserId: String(input.telegramUserId),
+      telegramChatId: String(input.chatId),
+      threadId: null,
+    });
+    return input.locale === 'my'
+      ? 'ဤ support thread ကို ဆက်မရေးနိုင်တော့ပါ။ /support ကို ပြန်ဖွင့်ပြီး အသစ်စတင်နိုင်ပါသည်။'
+      : 'This support thread can no longer accept replies. Use /support to start again.';
+  }
+
+  await addTelegramSupportReply({
+    threadId: thread.id,
+    senderType: 'CUSTOMER',
+    telegramUserId: String(input.telegramUserId),
+    telegramUsername: input.username || null,
+    senderName: input.username || null,
+    message:
+      input.caption?.trim()
+      || (input.mediaKind === 'IMAGE'
+        ? 'Customer sent an image attachment.'
+        : 'Customer sent a file attachment.'),
+    mediaKind: input.mediaKind,
+    mediaTelegramFileId: input.mediaTelegramFileId,
+    mediaFilename: input.mediaFilename || null,
+    mediaContentType: input.mediaContentType || null,
+    waitingOn: 'ADMIN',
+  });
+
+  await input.setPendingSupportReply({
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+    threadId: null,
+  });
+
+  await writeAuditLog({
+    action: 'TELEGRAM_SUPPORT_REPLY_SUBMITTED',
+    entity: 'TELEGRAM_SUPPORT_THREAD',
+    entityId: thread.id,
+    details: {
+      threadCode: thread.threadCode,
+      issueCategory: thread.issueCategory,
+      telegramChatId: thread.telegramChatId,
+      telegramUserId: thread.telegramUserId,
+      mediaKind: input.mediaKind,
+      mediaFilename: input.mediaFilename || null,
     },
   });
 

@@ -566,6 +566,9 @@ model TelegramSupportReply {
   message          String
   mediaKind        String?
   mediaUrl         String?
+  mediaTelegramFileId String?
+  mediaFilename    String?
+  mediaContentType String?
   createdAt        DateTime @default(now())
 
   @@index([threadId, createdAt])

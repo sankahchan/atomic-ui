@@ -744,6 +744,7 @@ export default function UserLedgerPage() {
     for (const thread of ledgerQuery.data.supportThreads) {
       const latestReply = thread.replies[thread.replies.length - 1];
       const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+      const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
 
       events.push({
         id: `support-thread:${thread.id}`,
@@ -760,6 +761,7 @@ export default function UserLedgerPage() {
           .filter(Boolean)
           .join(' • '),
         tone: getSupportThreadTone(thread.status, thread.waitingOn),
+        href: threadHref,
       });
     }
 
@@ -820,6 +822,7 @@ export default function UserLedgerPage() {
     for (const thread of ledgerQuery.data.supportThreads) {
       const latestReply = thread.replies[thread.replies.length - 1];
       const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+      const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
 
       events.push({
         id: `support-thread-thread:${thread.id}`,
@@ -829,6 +832,7 @@ export default function UserLedgerPage() {
         tone: getSupportThreadTone(thread.status, thread.waitingOn),
         category: 'support_thread',
         customerFacing: true,
+        href: threadHref,
         meta: [
           getSupportThreadCategoryLabel(thread.issueCategory),
           stateLabel,
@@ -2740,7 +2744,15 @@ export default function UserLedgerPage() {
                         <div key={thread.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                           <div className="flex items-center justify-between gap-3">
                             <p className="font-medium">{thread.threadCode}</p>
-                            <Badge variant="outline">{stateLabel}</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{stateLabel}</Badge>
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={withBasePath(`/dashboard/support/threads/${thread.id}`)}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Open
+                                </Link>
+                              </Button>
+                            </div>
                           </div>
                           <p className="mt-1 text-muted-foreground">
                             {getSupportThreadCategoryLabel(thread.issueCategory)}

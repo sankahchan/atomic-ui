@@ -44,8 +44,10 @@ export {
   cancelTelegramAdminKeyFlow,
   handleAdminCreateAccessKeyCommand,
   handleAdminCreateDynamicKeyCommand,
+  handleTelegramAdminKeyMediaInput,
   handleAdminManageAccessKeyCommand,
   handleAdminManageDynamicKeyCommand,
+  startTelegramAdminSupportReplyFlow,
   handleTelegramAdminKeyCallback,
   handleTelegramAdminKeyTextInput,
 } from '@/lib/services/telegram-admin-keys';

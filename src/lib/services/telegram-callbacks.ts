@@ -66,7 +66,7 @@ export type TelegramSupportMenuAction =
   | 'server'
   | 'premium'
   | 'keys';
-export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx';
+export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx' | 'cl' | 'uc' | 'rp' | 'es';
 export type TelegramSupportThreadAction = 'new' | 'reply' | 'status' | 'escalate';
 export type TelegramNotificationPreferenceKey =
   | 'promo'
@@ -597,7 +597,15 @@ export function parseTelegramSupportQueueCallbackData(data?: string | null) {
           ? 'hd'
           : parts[1] === 'nx'
             ? 'nx'
-            : null;
+            : parts[1] === 'cl'
+              ? 'cl'
+              : parts[1] === 'uc'
+                ? 'uc'
+                : parts[1] === 'rp'
+                  ? 'rp'
+                  : parts[1] === 'es'
+                    ? 'es'
+                    : null;
   const requestId = parts[2]?.trim();
 
   if (!action || !requestId) {
