@@ -11,6 +11,7 @@ import {
 } from '@/lib/services/telegram-copy';
 import { sanitizeTelegramHtmlMessage } from '@/lib/services/telegram-message-validation';
 import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
+import { type TelegramNotificationPreferenceKey } from '@/lib/services/telegram-domain-types';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -117,11 +118,7 @@ export async function upsertTelegramUserProfile(input: {
   });
 }
 
-export type TelegramNotificationPreferenceKey =
-  | 'promo'
-  | 'maintenance'
-  | 'receipt'
-  | 'support';
+export type { TelegramNotificationPreferenceKey };
 
 export function getTelegramNotificationPreferenceLabel(
   key: TelegramNotificationPreferenceKey,

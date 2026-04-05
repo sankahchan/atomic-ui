@@ -1,92 +1,62 @@
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
-
-export type TelegramLocaleSelectorContext = 'start' | 'switch';
-export type TelegramOrderReviewAction =
-  | 'approve'
-  | 'claim'
-  | 'next'
-  | 'prev'
-  | 'reject'
-  | 'reject_duplicate'
-  | 'reject_blurry'
-  | 'reject_wrong_amount';
-export type TelegramOrderUserAction =
-  | 'pl'
-  | 'ky'
-  | 'sv'
-  | 'pm'
-  | 'pay'
-  | 'up'
-  | 'st'
-  | 'rf'
-  | 'ca'
-  | 'by'
-  | 'rt'
-  | 'sh'
-  | 'rc';
-export type TelegramServerChangeReviewAction = 'approve' | 'reject';
-export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
-export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
-export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
-export type TelegramAdminMenuAction =
-  | 'home'
-  | 'createkey'
-  | 'createdynamic'
-  | 'managekey'
-  | 'managedynamic'
-  | 'reviewqueue'
-  | 'reviewqueue_mine'
-  | 'reviewqueue_unclaimed'
-  | 'supportpremium'
-  | 'supportthreads'
-  | 'refunds'
-  | 'announcements'
-  | 'finance'
-  | 'status'
-  | 'servernotices'
-  | 'supportqueue'
-  | 'supportqueue_admin'
-  | 'supportqueue_user';
-export type TelegramInboxMenuAction =
-  | 'all'
-  | 'unread'
-  | 'pinned'
-  | 'orders'
-  | 'support'
-  | 'refunds'
-  | 'announcements'
-  | 'premium';
-export type TelegramOffersMenuAction = 'all' | 'active' | 'used' | 'unavailable';
-export type TelegramOrdersMenuAction = 'all' | 'action' | 'review' | 'completed';
-export type TelegramSupportMenuAction =
-  | 'home'
-  | 'orders'
-  | 'refunds'
-  | 'inbox'
-  | 'server'
-  | 'premium'
-  | 'keys';
-export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx' | 'cl' | 'uc' | 'rp' | 'es';
-export type TelegramSupportThreadAction = 'new' | 'reply' | 'status' | 'escalate';
-export type TelegramNotificationPreferenceKey =
-  | 'promo'
-  | 'maintenance'
-  | 'receipt'
-  | 'support';
-export type TelegramRetentionSource =
-  | 'trial_expiry'
-  | 'trial_coupon'
-  | 'trial_expired'
-  | 'renewal_coupon'
-  | 'renewal_7d'
-  | 'renewal_3d'
-  | 'renewal_manual'
-  | 'premium_upsell_coupon'
-  | 'premium_renewal_7d'
-  | 'premium_renewal_3d'
-  | 'winback_coupon'
-  | 'expired_recovery'
-  | 'order_retry';
+import {
+  type TelegramAdminKeyCallbackPayload,
+  type TelegramAdminMenuAction,
+  type TelegramDynamicSupportActionCallbackPayload,
+  type TelegramDynamicSupportUserAction,
+  type TelegramInboxMenuAction,
+  type TelegramLocaleCallbackPayload,
+  type TelegramLocaleSelectorContext,
+  type TelegramMenuCallbackPayload,
+  type TelegramMenuSection,
+  type TelegramNotificationPreferenceCallbackPayload,
+  type TelegramNotificationPreferenceKey,
+  type TelegramOffersMenuAction,
+  type TelegramOrderActionCallbackPayload,
+  type TelegramOrderReviewAction,
+  type TelegramOrderReviewCallbackPayload,
+  type TelegramOrderUserAction,
+  type TelegramOrdersMenuAction,
+  type TelegramRetentionSource,
+  type TelegramServerChangeActionCallbackPayload,
+  type TelegramServerChangeReviewAction,
+  type TelegramServerChangeReviewCallbackPayload,
+  type TelegramServerChangeUserAction,
+  type TelegramSupportMenuAction,
+  type TelegramSupportQueueAction,
+  type TelegramSupportQueueCallbackPayload,
+  type TelegramSupportThreadAction,
+  type TelegramSupportThreadCallbackPayload,
+} from '@/lib/services/telegram-domain-types';
+export type {
+  TelegramAdminKeyCallbackPayload,
+  TelegramAdminMenuAction,
+  TelegramDynamicSupportActionCallbackPayload,
+  TelegramDynamicSupportUserAction,
+  TelegramInboxMenuAction,
+  TelegramLocaleCallbackPayload,
+  TelegramLocaleSelectorContext,
+  TelegramMenuCallbackPayload,
+  TelegramMenuSection,
+  TelegramNotificationPreferenceCallbackPayload,
+  TelegramNotificationPreferenceKey,
+  TelegramOffersMenuAction,
+  TelegramOrderActionCallbackPayload,
+  TelegramOrderReviewAction,
+  TelegramOrderReviewCallbackPayload,
+  TelegramOrderUserAction,
+  TelegramOrdersMenuAction,
+  TelegramRetentionSource,
+  TelegramServerChangeActionCallbackPayload,
+  TelegramServerChangeReviewAction,
+  TelegramServerChangeReviewCallbackPayload,
+  TelegramServerChangeUserAction,
+  TelegramSupportMenuAction,
+  TelegramSupportQueueAction,
+  TelegramSupportQueueCallbackPayload,
+  TelegramSupportThreadAction,
+  TelegramSupportThreadCallbackPayload,
+};
 
 const TELEGRAM_LOCALE_CALLBACK_PREFIX = 'locale';
 const TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX = 'order-review';
@@ -239,7 +209,7 @@ export function buildTelegramLocaleSelectorMessage(context: TelegramLocaleSelect
   ].join('\n');
 }
 
-export function parseTelegramLocaleCallbackData(data?: string | null) {
+export function parseTelegramLocaleCallbackData(data?: string | null): TelegramLocaleCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -272,7 +242,7 @@ export function buildTelegramOrderReviewCallbackData(
     : `${TELEGRAM_ORDER_REVIEW_CALLBACK_PREFIX}:${action}:${orderId}`;
 }
 
-export function parseTelegramOrderReviewCallbackData(data?: string | null) {
+export function parseTelegramOrderReviewCallbackData(data?: string | null): TelegramOrderReviewCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -323,7 +293,7 @@ export function buildTelegramOrderActionCallbackData(
     : `${TELEGRAM_ORDER_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
 }
 
-export function parseTelegramOrderActionCallbackData(data?: string | null) {
+export function parseTelegramOrderActionCallbackData(data?: string | null): TelegramOrderActionCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -408,7 +378,9 @@ export function buildTelegramServerChangeReviewCallbackData(
   return `${TELEGRAM_SERVER_CHANGE_REVIEW_CALLBACK_PREFIX}:${action}:${requestId}`;
 }
 
-export function parseTelegramServerChangeReviewCallbackData(data?: string | null) {
+export function parseTelegramServerChangeReviewCallbackData(
+  data?: string | null,
+): TelegramServerChangeReviewCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -446,7 +418,9 @@ export function buildTelegramServerChangeActionCallbackData(
     : `${TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX}:${action}:${primary}`;
 }
 
-export function parseTelegramServerChangeActionCallbackData(data?: string | null) {
+export function parseTelegramServerChangeActionCallbackData(
+  data?: string | null,
+): TelegramServerChangeActionCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -478,7 +452,9 @@ export function buildTelegramDynamicSupportActionCallbackData(
     : `${TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX}:${action}:${primary}`;
 }
 
-export function parseTelegramDynamicSupportActionCallbackData(data?: string | null) {
+export function parseTelegramDynamicSupportActionCallbackData(
+  data?: string | null,
+): TelegramDynamicSupportActionCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -507,7 +483,9 @@ export function buildTelegramNotificationPreferenceCallbackData(
   return `${TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX}:${preference}:${enabled ? 'on' : 'off'}`;
 }
 
-export function parseTelegramNotificationPreferenceCallbackData(data?: string | null) {
+export function parseTelegramNotificationPreferenceCallbackData(
+  data?: string | null,
+): TelegramNotificationPreferenceCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -535,7 +513,7 @@ export function buildTelegramMenuCallbackData(
   return `${TELEGRAM_MENU_CALLBACK_PREFIX}:${section}:${action}`;
 }
 
-export function parseTelegramMenuCallbackData(data?: string | null) {
+export function parseTelegramMenuCallbackData(data?: string | null): TelegramMenuCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -578,7 +556,9 @@ export function buildTelegramSupportQueueCallbackData(
     : `${TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX}:${action}:${requestId}`;
 }
 
-export function parseTelegramSupportQueueCallbackData(data?: string | null) {
+export function parseTelegramSupportQueueCallbackData(
+  data?: string | null,
+): TelegramSupportQueueCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -629,7 +609,9 @@ export function buildTelegramSupportThreadCallbackData(
     : `${TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX}:${action}:${primary}`;
 }
 
-export function parseTelegramSupportThreadCallbackData(data?: string | null) {
+export function parseTelegramSupportThreadCallbackData(
+  data?: string | null,
+): TelegramSupportThreadCallbackPayload | null {
   if (!data) {
     return null;
   }
@@ -676,7 +658,9 @@ export function buildTelegramAdminKeyCallbackData(
     .join(':');
 }
 
-export function parseTelegramAdminKeyCallbackData(data?: string | null) {
+export function parseTelegramAdminKeyCallbackData(
+  data?: string | null,
+): TelegramAdminKeyCallbackPayload | null {
   if (!data) {
     return null;
   }

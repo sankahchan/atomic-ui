@@ -5,6 +5,10 @@ import {
   buildTelegramMenuCallbackData,
   buildTelegramSupportQueueCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  type TelegramSupportQueueMode,
+  type TelegramSupportThreadQueueSnapshot,
+} from '@/lib/services/telegram-domain-types';
 import { listTelegramSupportThreadsForAdminQueue } from '@/lib/services/telegram-support-admin';
 import {
   getTelegramSupportThreadState,
@@ -17,13 +21,13 @@ import {
   formatTelegramDateTime,
 } from '@/lib/services/telegram-ui';
 
-export type TelegramSupportQueueMode = 'all' | 'admin' | 'user';
-
 type PremiumSupportSnapshot = {
   totalOpen: number;
   waitingAdmin: number;
   waitingUser: number;
 };
+
+export type { TelegramSupportQueueMode };
 
 export function resolveTelegramSupportQueueMode(argsText: string) {
   const normalized = argsText.trim().toLowerCase();
@@ -40,6 +44,10 @@ export function resolveTelegramSupportQueueMode(argsText: string) {
   }
   return 'all' as const;
 }
+
+type TelegramSupportThreadQueueRecord = Awaited<
+  ReturnType<typeof listTelegramSupportThreadsForAdminQueue>
+>['threads'][number];
 
 export function formatTelegramRelativeAge(date: Date, locale: SupportedLocale) {
   const diffMs = Date.now() - date.getTime();
@@ -181,7 +189,7 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
   botToken: string;
   chatId: string | number;
   locale: SupportedLocale;
-  thread: Awaited<ReturnType<typeof listTelegramSupportThreadsForAdminQueue>>['threads'][number];
+  thread: TelegramSupportThreadQueueRecord;
   mode: TelegramSupportQueueMode;
   adminActor: TelegramAdminActor;
 }) {
@@ -342,10 +350,11 @@ export async function sendTelegramNextSupportThreadQueueCard(input: {
   excludeThreadId?: string | null;
   adminActor: TelegramAdminActor;
 }) {
-  const snapshot = await listTelegramSupportThreadsForAdminQueue({
-    mode: input.mode,
-    limit: 8,
-  });
+  const snapshot: TelegramSupportThreadQueueSnapshot<TelegramSupportThreadQueueRecord> =
+    await listTelegramSupportThreadsForAdminQueue({
+      mode: input.mode,
+      limit: 8,
+    });
   const nextThread = snapshot.threads.find((thread) => thread.id !== (input.excludeThreadId || null)) || null;
   if (!nextThread) {
     await sendTelegramMessage(

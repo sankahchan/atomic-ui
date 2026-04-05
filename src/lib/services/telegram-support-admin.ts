@@ -3,6 +3,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
+import { type TelegramSupportThreadQueueSnapshot } from '@/lib/services/telegram-domain-types';
 import {
   addTelegramSupportReply,
   buildTelegramSupportThreadKeyboard,
@@ -31,7 +32,11 @@ export type TelegramSupportThreadMacro =
 export async function listTelegramSupportThreadsForAdminQueue(input: {
   mode: 'all' | 'admin' | 'user';
   limit?: number;
-}) {
+}): Promise<TelegramSupportThreadQueueSnapshot<
+  Awaited<ReturnType<typeof db.telegramSupportThread.findMany>>[number] & {
+    replies: Awaited<ReturnType<typeof db.telegramSupportReply.findMany>>;
+  }
+>> {
   const baseWhere: Prisma.TelegramSupportThreadWhereInput = {
     status: {
       in: ['OPEN', 'ESCALATED'],
@@ -561,4 +566,3 @@ export async function escalateTelegramSupportThreadToPanel(input: {
 
   return updatedThread;
 }
-
