@@ -2,7 +2,7 @@ import { createHmac } from 'crypto';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { sendNotificationEmail } from '@/lib/services/email';
-import { sendTelegramMessage } from '@/lib/services/telegram-bot';
+import { getTelegramConfig, sendTelegramMessageDetailed } from '@/lib/services/telegram-runtime';
 
 export const MAX_NOTIFICATION_COOLDOWN_MINUTES = 24 * 60;
 export const MAX_NOTIFICATION_WEBHOOK_HEADERS = 15;
@@ -256,9 +256,15 @@ async function sendTelegramChannelMessage(channel: ParsedNotificationChannel, me
     throw new Error('Telegram chat ID is not configured');
   }
 
-  const success = await sendTelegramMessage(botToken, chatId, message);
-  if (!success) {
-    throw new Error('Telegram API rejected the message');
+  const result = await sendTelegramMessageDetailed(botToken, chatId, message);
+  if (!result.success) {
+    const adminChatIds = (await getTelegramConfig())?.adminChatIds ?? [];
+    const adminHint =
+      result.error.toLowerCase().includes('chat not found') && adminChatIds.length > 0
+        ? ` Open the bot from that chat and send /start first, or switch this channel to a reachable admin chat like ${adminChatIds[0]}.`
+        : '';
+
+    throw new Error(`Telegram rejected the message: ${result.error}.${adminHint}`.replace(/\.\s*\./g, '.'));
   }
 }
 

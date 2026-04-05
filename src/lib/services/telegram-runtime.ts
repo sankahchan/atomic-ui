@@ -543,6 +543,27 @@ export async function sendTelegramMessage(
   text: string,
   options: SendMessageOptions = {},
 ): Promise<boolean> {
+  const result = await sendTelegramMessageDetailed(botToken, chatId, text, options);
+  return result.success;
+}
+
+export type SendTelegramMessageResult =
+  | {
+      success: true;
+      status: number;
+    }
+  | {
+      success: false;
+      status: number | null;
+      error: string;
+    };
+
+export async function sendTelegramMessageDetailed(
+  botToken: string,
+  chatId: number | string,
+  text: string,
+  options: SendMessageOptions = {},
+): Promise<SendTelegramMessageResult> {
   const parseMode = options.parseMode || 'HTML';
   const preparedMessage =
     parseMode === 'HTML'
@@ -569,14 +590,35 @@ export async function sendTelegramMessage(
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`Failed to send Telegram message to ${chatId}:`, data.description);
+      let description = `Telegram request failed with status ${response.status}`;
+      try {
+        const data = (await response.json()) as { description?: unknown };
+        if (typeof data.description === 'string' && data.description.trim().length > 0) {
+          description = data.description;
+        }
+      } catch {
+        // Keep the fallback description.
+      }
+
+      console.error(`Failed to send Telegram message to ${chatId}:`, description);
+      return {
+        success: false,
+        status: response.status,
+        error: description,
+      };
     }
 
-    return response.ok;
+    return {
+      success: true,
+      status: response.status,
+    };
   } catch (error) {
     console.error('Failed to send Telegram message:', error);
-    return false;
+    return {
+      success: false,
+      status: null,
+      error: error instanceof Error ? error.message : 'Failed to send Telegram message',
+    };
   }
 }
 

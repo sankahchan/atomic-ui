@@ -3232,6 +3232,10 @@ function ChannelDialog({
     webhookHeaders: parseStoredWebhookHeaders(editChannel?.type === 'WEBHOOK' ? editChannel.config.headers : undefined),
     events: editChannel?.events || [],
   });
+  const telegramSettingsQuery = trpc.telegramBot.getSettings.useQuery(undefined, {
+    enabled: open && formData.type === 'TELEGRAM',
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
     setFormData({
@@ -3249,6 +3253,10 @@ function ChannelDialog({
       events: editChannel?.events || [],
     });
   }, [editChannel, open]);
+
+  const configuredAdminChatIds = telegramSettingsQuery.data?.adminChatIds ?? [];
+  const trimmedTelegramChatId = formData.telegramChatId.trim();
+  const usingSuggestedAdminChat = trimmedTelegramChatId.length > 0 && configuredAdminChatIds.includes(trimmedTelegramChatId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3429,6 +3437,37 @@ function ChannelDialog({
               <p className="text-xs text-muted-foreground">
                 {t('notifications.dialog.chat_id_help')}
               </p>
+              {configuredAdminChatIds.length > 0 ? (
+                <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                  <p className="text-xs font-medium text-foreground/85">Configured admin chats</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {configuredAdminChatIds.map((chatId: string) => (
+                      <Button
+                        key={chatId}
+                        type="button"
+                        size="sm"
+                        variant={trimmedTelegramChatId === chatId ? 'default' : 'outline'}
+                        className="h-8 rounded-full px-3 text-xs"
+                        onClick={() => setFormData((prev) => ({ ...prev, telegramChatId: chatId }))}
+                      >
+                        {chatId}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    The bot can only send to chats that already started the bot. Using a configured admin chat is the safest way to make test delivery work.
+                  </p>
+                </div>
+              ) : null}
+              {trimmedTelegramChatId && configuredAdminChatIds.length > 0 && !usingSuggestedAdminChat ? (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <p>
+                    This chat ID is different from your configured admin chats. Make sure the bot can already message it, otherwise the test button will fail with
+                    {' '}<span className="font-semibold">chat not found</span>.
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
 
