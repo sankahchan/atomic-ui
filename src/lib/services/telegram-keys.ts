@@ -7,7 +7,6 @@ import {
 } from '@/lib/subscription-links';
 import { formatBytes } from '@/lib/utils';
 import {
-  buildTelegramMenuCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramOrderActionCallbackData,
   buildTelegramServerChangeActionCallbackData,
@@ -22,6 +21,7 @@ import {
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import { listTelegramPremiumSupportRequestsForUser } from '@/lib/services/telegram-premium';
+import { buildTelegramSupportHubKeyboard } from '@/lib/services/telegram-support';
 import {
   escapeHtml,
   formatExpirationSummary,
@@ -548,51 +548,6 @@ export async function handleSubscriptionLinksCommand(input: {
   return ui.subSent(keys.length + dynamicKeys.length);
 }
 
-function buildTelegramSupportHubKeyboard(input: {
-  locale: SupportedLocale;
-  supportLink?: string | null;
-}) {
-  const isMyanmar = input.locale === 'my';
-  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
-    [
-      {
-        text: isMyanmar ? '🧾 Order အကူအညီ' : '🧾 Order help',
-        callback_data: buildTelegramMenuCallbackData('support', 'orders'),
-      },
-      {
-        text: isMyanmar ? '💸 Refund' : '💸 Refunds',
-        callback_data: buildTelegramMenuCallbackData('support', 'refunds'),
-      },
-    ],
-    [
-      {
-        text: isMyanmar ? '📬 Inbox update' : '📬 Inbox updates',
-        callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
-      },
-      {
-        text: isMyanmar ? '🛠 Server ပြောင်း' : '🛠 Server change',
-        callback_data: buildTelegramMenuCallbackData('support', 'server'),
-      },
-    ],
-    [
-      {
-        text: isMyanmar ? '💎 Premium' : '💎 Premium',
-        callback_data: buildTelegramMenuCallbackData('support', 'premium'),
-      },
-      {
-        text: isMyanmar ? '🗂 My keys' : '🗂 My keys',
-        callback_data: buildTelegramMenuCallbackData('support', 'keys'),
-      },
-    ],
-  ];
-
-  if (input.supportLink) {
-    rows.push([{ text: isMyanmar ? '🛟 Admin ကို ဆက်သွယ်ရန်' : '🛟 Contact admin', url: input.supportLink }]);
-  }
-
-  return { inline_keyboard: rows };
-}
-
 export async function handleSupportCommand(input: {
   chatId: number;
   telegramUserId: number;
@@ -606,9 +561,14 @@ export async function handleSupportCommand(input: {
   const lines = [
     ui.supportHubTitle,
     '',
-    ui.supportHubHint,
+    input.locale === 'my'
+      ? 'Order, key, server, billing, or general help အတွက် category ကို ရွေးပြီး support thread တစ်ခုကို စတင်နိုင်ပါသည်။'
+      : 'Choose a category to start a real support thread for orders, keys, servers, billing, or general help.',
     '',
     locale === 'my' ? '<b>Quick paths</b>' : '<b>Quick paths</b>',
+    locale === 'my'
+      ? '• Category တစ်ခုရွေးပြီး message ပို့ပါ။ Admin reply ကို ဒီ chat ထဲမှာ thread အဖြစ် ပြန်ရပါမည်။'
+      : '• Choose a category and send your message. The admin reply comes back here in the same thread flow.',
     ui.supportHubOrdersHint,
     ui.supportHubInboxHint,
     ui.supportHubServerHint,
@@ -618,11 +578,14 @@ export async function handleSupportCommand(input: {
       ? '<b>When to use what</b>'
       : '<b>When to use what</b>',
     locale === 'my'
-      ? '• Screenshot / payment / order problem ရှိပါက /orders သို့မဟုတ် /order ကို စတင်အသုံးပြုပါ။'
-      : '• Start with /orders or /order if your issue is about payment, proof, or order review.',
+      ? '• Screenshot / payment / order problem များအတွက် Order / payment category ကို ရွေးပါ။'
+      : '• Use Order / payment for screenshot, payment, and order-review problems.',
     locale === 'my'
-      ? '• Notice, refund, support reply များကို /inbox တွင် တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
-      : '• Use /inbox to review announcements, refunds, and support replies in one place.',
+      ? '• Key connection, usage, renew, share page ပြဿနာအတွက် Key / usage ကို ရွေးပါ။'
+      : '• Use Key / usage for connection, usage, renew, and share-page issues.',
+    locale === 'my'
+      ? '• Notice, refund, support reply များကို /inbox နှင့် /supportstatus တွင် တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
+      : '• Use /inbox and /supportstatus to review notices, refunds, and support replies in one place.',
     locale === 'my'
       ? '• Premium route / preferred region အတွက် /premium သို့မဟုတ် /premiumregion ကို အသုံးပြုပါ။'
       : '• Use /premium or /premiumregion for preferred-region and routing issues.',

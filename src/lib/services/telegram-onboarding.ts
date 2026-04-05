@@ -13,6 +13,45 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 
+async function sendTelegramOfferNudgeIfAny(input: {
+  botToken: string;
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+}) {
+  const activeOffers = await db.telegramCouponRedemption.count({
+    where: {
+      AND: [
+        {
+          OR: [
+            { telegramChatId: String(input.chatId) },
+            { telegramUserId: String(input.telegramUserId) },
+          ],
+        },
+        { status: 'ISSUED' },
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+      ],
+    },
+  });
+
+  if (activeOffers <= 0) {
+    return;
+  }
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    input.locale === 'my'
+      ? `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`
+      : `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`,
+  );
+}
+
 export async function handleTelegramStartCommand(input: {
   chatId: number;
   telegramUserId: number;
@@ -159,6 +198,12 @@ export async function handleTelegramStartCommand(input: {
         replyMarkup: getCommandKeyboard(input.isAdmin, locale),
       },
     );
+    await sendTelegramOfferNudgeIfAny({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+      locale,
+    });
     return null;
   }
 
@@ -181,6 +226,12 @@ export async function handleTelegramStartCommand(input: {
         replyMarkup: getCommandKeyboard(input.isAdmin, locale),
       },
     );
+    await sendTelegramOfferNudgeIfAny({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+      locale,
+    });
     return null;
   }
 
@@ -199,5 +250,11 @@ export async function handleTelegramStartCommand(input: {
       replyMarkup: getCommandKeyboard(input.isAdmin, locale),
     },
   );
+  await sendTelegramOfferNudgeIfAny({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    locale,
+  });
   return null;
 }

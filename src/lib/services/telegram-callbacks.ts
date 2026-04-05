@@ -33,6 +33,8 @@ export type TelegramAdminMenuAction =
   | 'reviewqueue'
   | 'reviewqueue_mine'
   | 'reviewqueue_unclaimed'
+  | 'supportpremium'
+  | 'supportthreads'
   | 'refunds'
   | 'announcements'
   | 'finance'
@@ -53,6 +55,7 @@ export type TelegramInboxMenuAction =
 export type TelegramOffersMenuAction = 'all' | 'active' | 'used' | 'unavailable';
 export type TelegramOrdersMenuAction = 'all' | 'action' | 'review' | 'completed';
 export type TelegramSupportMenuAction =
+  | 'home'
   | 'orders'
   | 'refunds'
   | 'inbox'
@@ -60,6 +63,7 @@ export type TelegramSupportMenuAction =
   | 'premium'
   | 'keys';
 export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx';
+export type TelegramSupportThreadAction = 'new' | 'reply' | 'status' | 'escalate';
 export type TelegramNotificationPreferenceKey =
   | 'promo'
   | 'maintenance'
@@ -89,6 +93,7 @@ const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 const TELEGRAM_MENU_CALLBACK_PREFIX = 'tgmenu';
 const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
+const TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX = 'supthread';
 
 type TelegramCommandShortcut = {
   command: string;
@@ -589,6 +594,48 @@ export function parseTelegramSupportQueueCallbackData(data?: string | null) {
   return {
     action,
     requestId,
+    secondary: parts[3]?.trim() || null,
+  } as const;
+}
+
+export function buildTelegramSupportThreadCallbackData(
+  action: TelegramSupportThreadAction,
+  primary: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX}:${action}:${primary}:${secondary}`
+    : `${TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX}:${action}:${primary}`;
+}
+
+export function parseTelegramSupportThreadCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts.length > 4 || parts[0] !== TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action =
+    parts[1] === 'new'
+      ? 'new'
+      : parts[1] === 'reply'
+        ? 'reply'
+        : parts[1] === 'status'
+          ? 'status'
+          : parts[1] === 'escalate'
+            ? 'escalate'
+            : null;
+
+  if (!action || !parts[2]?.trim()) {
+    return null;
+  }
+
+  return {
+    action,
+    primary: parts[2].trim(),
     secondary: parts[3]?.trim() || null,
   } as const;
 }

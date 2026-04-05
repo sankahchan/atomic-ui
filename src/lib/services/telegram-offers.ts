@@ -155,6 +155,35 @@ function resolveTelegramOfferBestForLabel(
   }
 }
 
+function resolveTelegramOfferJourneyLabel(
+  offer: TelegramOfferRecord,
+  locale: SupportedLocale,
+) {
+  const isMyanmar = locale === 'my';
+  switch (offer.campaignType) {
+    case 'TRIAL_TO_PAID':
+      return isMyanmar
+        ? 'Journey: trial reminder → first paid order'
+        : 'Journey: trial reminder -> first paid order';
+    case 'RENEWAL_SOON':
+      return isMyanmar
+        ? 'Journey: renewal reminder → extend current key'
+        : 'Journey: renewal reminder -> extend current key';
+    case 'PREMIUM_UPSELL':
+      return isMyanmar
+        ? 'Journey: high usage → premium upgrade'
+        : 'Journey: high usage -> premium upgrade';
+    case 'WINBACK':
+      return isMyanmar
+        ? 'Journey: inactive user → welcome-back checkout'
+        : 'Journey: inactive user -> welcome-back checkout';
+    default:
+      return isMyanmar
+        ? 'Journey: offer → checkout'
+        : 'Journey: offer -> checkout';
+  }
+}
+
 function resolveTelegramOfferCallbackSource(
   campaignType: string,
 ): string | null {
@@ -366,6 +395,7 @@ export async function handleOffersCommand(input: {
         targetLabel ? `  ${input.locale === 'my' ? 'For' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
+        `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferActionLine(offer, input.locale, targetLabel))}`,
         `  ${escapeHtml(useNowLabel)}`,
         offer.expiresAt
@@ -419,6 +449,7 @@ export async function handleOffersCommand(input: {
         )}`,
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
+        `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferUnavailableReason(offer, input.locale))}`,
       );
     }

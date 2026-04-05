@@ -229,6 +229,42 @@ export async function getTelegramPendingPremiumReply(input: {
   };
 }
 
+export async function setTelegramPendingSupportReply(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  threadId?: string | null;
+}) {
+  return db.telegramUserProfile.upsert({
+    where: { telegramUserId: input.telegramUserId },
+    create: {
+      telegramUserId: input.telegramUserId,
+      telegramChatId: input.telegramChatId || null,
+      pendingSupportThreadId: input.threadId || null,
+      pendingSupportReplyStartedAt: input.threadId ? new Date() : null,
+    },
+    update: {
+      telegramChatId: input.telegramChatId || null,
+      pendingSupportThreadId: input.threadId || null,
+      pendingSupportReplyStartedAt: input.threadId ? new Date() : null,
+    },
+  });
+}
+
+export async function getTelegramPendingSupportReply(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+}) {
+  const profile = await getTelegramUserProfile(input.telegramUserId, input.telegramChatId || null);
+  if (!profile?.pendingSupportThreadId) {
+    return null;
+  }
+
+  return {
+    threadId: profile.pendingSupportThreadId,
+    startedAt: profile.pendingSupportReplyStartedAt || null,
+  };
+}
+
 export async function setTelegramUserLocale(input: {
   telegramUserId: string;
   telegramChatId?: string | null;

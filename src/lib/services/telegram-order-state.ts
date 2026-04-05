@@ -422,6 +422,25 @@ export async function handleBuyCommand(input: {
           coupon: couponResolution.coupon,
         })
       : order;
+  const activeOfferCount = await db.telegramCouponRedemption.count({
+    where: {
+      AND: [
+        {
+          OR: [
+            { telegramChatId: String(input.chatId) },
+            { telegramUserId: String(input.telegramUserId) },
+          ],
+        },
+        { status: 'ISSUED' },
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+      ],
+    },
+  });
 
   const enabledPlans = await input.deps.listAvailableTelegramPlansForOrder({
     kind: 'NEW',
@@ -454,6 +473,11 @@ export async function handleBuyCommand(input: {
     ui.orderPlanPrompt(preparedOrder.orderCode),
     '',
     ui.buyPlanChooseHint,
+    activeOfferCount > 0
+      ? input.locale === 'my'
+        ? `🎟 You already have ${activeOfferCount} active offer${activeOfferCount === 1 ? '' : 's'} • use /offers to compare them any time.`
+        : `🎟 You already have ${activeOfferCount} active offer${activeOfferCount === 1 ? '' : 's'} • use /offers to compare them any time.`
+      : '',
     '',
     input.locale === 'my'
       ? '<b>How buying works</b>\n• Plan ရွေးရန်\n• Server / payment ရွေးရန်\n• Screenshot ပို့ရန်\n• Admin approval စောင့်ရန်'
@@ -480,6 +504,9 @@ export async function handleBuyCommand(input: {
     ui.buyPremiumUpsell,
     ui.buyPremiumBestFor,
     ui.buyPremiumRegionExplain,
+    input.locale === 'my'
+      ? '• Better routing quality\n• Premium support queue\n• Region fallback awareness'
+      : '• Better routing quality\n• Premium support queue\n• Region fallback awareness',
     ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
     ...(trialPlanLines.length
       ? [

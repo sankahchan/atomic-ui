@@ -552,6 +552,8 @@ function buildTelegramAdminHomeKeyboard(input: {
   adminActor: TelegramAdminActor;
   pendingReview: number;
   supportOpen: number;
+  customerSupportOpen: number;
+  premiumSupportOpen: number;
   pendingRefunds: number;
   scheduledAnnouncements: number;
   failedDeliveries: number;
@@ -567,8 +569,18 @@ function buildTelegramAdminHomeKeyboard(input: {
         callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
       },
       {
-        text: withCount(isMyanmar ? '🛟 Support queue' : '🛟 Support queue', input.supportOpen),
+        text: withCount(isMyanmar ? '🛟 Support console' : '🛟 Support console', input.supportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
+      },
+    ]);
+    rows.push([
+      {
+        text: withCount(isMyanmar ? '🧵 Customer threads' : '🧵 Customer threads', input.customerSupportOpen),
+        callback_data: buildTelegramMenuCallbackData('admin', 'supportthreads'),
+      },
+      {
+        text: withCount(isMyanmar ? '💎 Premium queue' : '💎 Premium queue', input.premiumSupportOpen),
+        callback_data: buildTelegramMenuCallbackData('admin', 'supportpremium'),
       },
     ]);
   }
@@ -625,7 +637,23 @@ export async function handleAdminHomeCommand(input: {
   chatId?: string | number | null;
 }) {
   const isMyanmar = input.locale === 'my';
-  const [pendingReview, unclaimedReview, supportOpen, pendingRefunds, myRefunds, scheduledAnnouncements, failedDeliveries] =
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [
+    pendingReview,
+    unclaimedReview,
+    customerSupportOpen,
+    customerSupportWaitingAdmin,
+    premiumSupportOpen,
+    premiumSupportWaitingAdmin,
+    pendingRefunds,
+    myRefunds,
+    scheduledAnnouncements,
+    failedDeliveries,
+    todayFulfilledCount,
+    todayRevenueAggregate,
+  ] =
     await Promise.all([
       db.telegramOrder.count({
         where: {
@@ -638,11 +666,37 @@ export async function handleAdminHomeCommand(input: {
           assignedReviewerUserId: null,
         },
       }),
+      db.telegramSupportThread.count({
+        where: {
+          status: {
+            in: ['OPEN', 'ESCALATED'],
+          },
+        },
+      }),
+      db.telegramSupportThread.count({
+        where: {
+          status: {
+            in: ['OPEN', 'ESCALATED'],
+          },
+          waitingOn: 'ADMIN',
+        },
+      }),
       db.telegramPremiumSupportRequest.count({
         where: {
           status: {
             not: 'DISMISSED',
           },
+        },
+      }),
+      db.telegramPremiumSupportRequest.count({
+        where: {
+          status: {
+            not: 'DISMISSED',
+          },
+          OR: [
+            { followUpPending: true },
+            { replies: { none: {} } },
+          ],
         },
       }),
       db.telegramOrder.count({
@@ -668,7 +722,28 @@ export async function handleAdminHomeCommand(input: {
           status: 'FAILED',
         },
       }),
+      db.telegramOrder.count({
+        where: {
+          status: 'FULFILLED',
+          fulfilledAt: {
+            gte: todayStart,
+          },
+        },
+      }),
+      db.telegramOrder.aggregate({
+        _sum: {
+          priceAmount: true,
+        },
+        where: {
+          status: 'FULFILLED',
+          fulfilledAt: {
+            gte: todayStart,
+          },
+        },
+      }),
     ]);
+  const supportOpen = customerSupportOpen + premiumSupportOpen;
+  const todayRevenue = todayRevenueAggregate._sum.priceAmount || 0;
 
   const message = [
     isMyanmar ? '🧭 <b>Admin home</b>' : '🧭 <b>Admin home</b>',
@@ -686,8 +761,11 @@ export async function handleAdminHomeCommand(input: {
       ? `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`
       : `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`,
     isMyanmar
-      ? `• Support: ${supportOpen} open thread${supportOpen === 1 ? '' : 's'}`
-      : `• Support: ${supportOpen} open thread${supportOpen === 1 ? '' : 's'}`,
+      ? `• Support: ${supportOpen} total • ${customerSupportOpen} customer • ${premiumSupportOpen} premium`
+      : `• Support: ${supportOpen} total • ${customerSupportOpen} customer • ${premiumSupportOpen} premium`,
+    isMyanmar
+      ? `• Need admin: ${customerSupportWaitingAdmin} customer • ${premiumSupportWaitingAdmin} premium`
+      : `• Need admin: ${customerSupportWaitingAdmin} customer • ${premiumSupportWaitingAdmin} premium`,
     isMyanmar
       ? `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`
       : `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`,
@@ -695,9 +773,18 @@ export async function handleAdminHomeCommand(input: {
       ? `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`
       : `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`,
     '',
+    isMyanmar ? '<b>Finance snapshot</b>' : '<b>Finance snapshot</b>',
+    isMyanmar
+      ? `• Today fulfilled: ${todayFulfilledCount}`
+      : `• Today fulfilled: ${todayFulfilledCount}`,
+    isMyanmar
+      ? `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`
+      : `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`,
+    '',
     isMyanmar ? '<b>Quick next actions</b>' : '<b>Quick next actions</b>',
     '• /reviewqueue',
     '• /refunds',
+    '• /supportqueue',
     '• /announcements',
     '• /finance',
     '• /status',
@@ -710,6 +797,8 @@ export async function handleAdminHomeCommand(input: {
         adminActor: input.adminActor,
         pendingReview,
         supportOpen,
+        customerSupportOpen,
+        premiumSupportOpen,
         pendingRefunds,
         scheduledAnnouncements,
         failedDeliveries,
@@ -744,8 +833,8 @@ export function buildTelegramHelpMessage(input: {
 /notifications - notice preference များကို ပြောင်းမည်
 /premium - premium shortcut များကို ကြည့်မည်
 /premiumregion - premium region အခြေအနေကို ကြည့်မည်
-/supportstatus - premium support request အခြေအနေကို ကြည့်မည်
-/support - support link ကို ကြည့်မည်
+/supportstatus - support thread နှင့် premium request အခြေအနေကို ကြည့်မည်
+/support - category အလိုက် support thread စတင်မည်
 /server - normal key အတွက် server ပြောင်းရန် တောင်းဆိုမည်
 /refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
 
@@ -773,8 +862,8 @@ export function buildTelegramHelpMessage(input: {
 /notifications - Manage notice preferences
 /premium - Open premium shortcuts
 /premiumregion - View premium region health
-/supportstatus - Check your premium support request
-/support - Show the support link
+/supportstatus - Check your support threads and premium requests
+/support - Start a support thread by category
 /server - Request a server change for a normal key
 /refund - Show refund-eligible orders
 
@@ -802,7 +891,8 @@ export function buildTelegramHelpMessage(input: {
 /announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
 /announcehistory - announcement history ကို ကြည့်မည်
 /scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
-/supportqueue [admin|user] - premium support thread queue ကို chat ထဲတွင် ဖွင့်မည်
+/supportqueue - support console ကို chat ထဲတွင် ဖွင့်မည်
+/supportthreads [admin|user] - customer support thread queue ကို chat ထဲတွင် ဖွင့်မည်
 /finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
 /sendfinance - Finance digest ကို ယခုချက်ချင်း ပို့မည်
 /refunds - pending refund request များကို ကြည့်မည်
@@ -828,7 +918,8 @@ export function buildTelegramHelpMessage(input: {
 /announcements - Show recent announcements
 /announcehistory - Show recent announcement history
 /scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
-/supportqueue [admin|user] - Open the premium support thread queue in chat
+/supportqueue - Open the support console in chat
+/supportthreads [admin|user] - Open the customer support thread queue in chat
 /finance - Show the finance summary
 /sendfinance - Send the finance digest now
 /refunds - Show pending refund requests
