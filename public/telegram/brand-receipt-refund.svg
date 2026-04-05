@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="635" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="280" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCA5A5"/>
+      <stop offset="1" stop-color="#FB7185"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" rx="40" fill="url(#bg)"/>
+  <circle cx="1045" cy="120" r="128" fill="#FB7185" opacity="0.18"/>
+  <circle cx="250" cy="555" r="150" fill="#38BDF8" opacity="0.12"/>
+  <rect x="70" y="70" width="1060" height="535" rx="34" fill="#171C34" stroke="rgba(251,113,133,0.18)"/>
+  <text x="112" y="126" fill="#FFC6D2" font-size="20" font-family="Segoe UI, Arial, sans-serif" letter-spacing="3">ATOMIC-UI FINANCE</text>
+  <text x="112" y="188" fill="#F7FBFF" font-size="56" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Refund Confirmation</text>
+  <text x="112" y="230" fill="#C4CCE0" font-size="24" font-family="Segoe UI, Arial, sans-serif">Refund decisions, printable confirmation, and customer finance follow-up.</text>
+  <rect x="112" y="268" width="178" height="42" rx="21" fill="url(#accent)"/>
+  <text x="138" y="295" fill="#3A0F1E" font-size="18" font-weight="700" font-family="Segoe UI, Arial, sans-serif">FINANCE UPDATE</text>
+
+  <rect x="112" y="348" width="300" height="186" rx="24" fill="#12182D" stroke="rgba(251,113,133,0.14)"/>
+  <text x="142" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Decision summary</text>
+  <text x="142" y="430" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Order code and receipt number</text>
+  <text x="142" y="462" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Approved or rejected</text>
+  <text x="142" y="494" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Amount and customer note</text>
+
+  <rect x="450" y="348" width="300" height="186" rx="24" fill="#12182D" stroke="rgba(251,113,133,0.14)"/>
+  <text x="480" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Customer clarity</text>
+  <text x="480" y="430" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Same reply path in Telegram</text>
+  <text x="480" y="462" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Printable finance confirmation</text>
+  <text x="480" y="494" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Support follow-up if needed</text>
+
+  <rect x="788" y="348" width="300" height="186" rx="24" fill="#12182D" stroke="rgba(251,113,133,0.14)"/>
+  <text x="818" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Finance docs</text>
+  <text x="818" y="430" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• HTML confirmation</text>
+  <text x="818" y="462" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• PDF download</text>
+  <text x="818" y="494" fill="#D9E0EF" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Audit-friendly summary</text>
+
+  <text x="112" y="593" fill="#FDD5DE" font-size="18" font-family="Segoe UI, Arial, sans-serif">Atomic-UI • finance workflow • refund updates that stay readable in Telegram</text>
+</svg>

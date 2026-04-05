@@ -7,7 +7,11 @@ import {
   hasFinanceManageScope,
   normalizeAdminScope,
 } from '@/lib/admin-scope';
-import { getTelegramNotificationPreferences } from '@/lib/services/telegram-runtime';
+import {
+  getTelegramNotificationPreferences,
+  sendTelegramPhotoUrl,
+} from '@/lib/services/telegram-runtime';
+import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -546,21 +550,35 @@ export async function sendTelegramRefundDecisionMessage(input: {
       ? escapeHtml(ui.refundApprovedHelp)
       : escapeHtml(ui.refundRejectedHelp),
   ].filter(Boolean);
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: locale === 'my' ? 'Printable refund' : 'Printable refund', url: buildTelegramFinanceDocumentUrl({
+        orderCode: input.orderCode,
+        type: 'refund',
+        format: 'html',
+      }) }],
+      [{ text: locale === 'my' ? 'Download PDF' : 'Download PDF', url: buildTelegramFinanceDocumentUrl({
+        orderCode: input.orderCode,
+        type: 'refund',
+        format: 'pdf',
+      }) }],
+    ],
+  } as const;
+
+  const sentCard = await sendTelegramPhotoUrl(
+    telegramConfig.botToken,
+    input.chatId,
+    getTelegramBrandMediaUrl('receiptRefund'),
+    lines.join('\n'),
+    {
+      replyMarkup,
+    },
+  );
+  if (sentCard) {
+    return true;
+  }
 
   return sendTelegramMessageLite(telegramConfig.botToken, input.chatId, lines.join('\n'), {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: locale === 'my' ? 'Printable refund' : 'Printable refund', url: buildTelegramFinanceDocumentUrl({
-          orderCode: input.orderCode,
-          type: 'refund',
-          format: 'html',
-        }) }],
-        [{ text: locale === 'my' ? 'Download PDF' : 'Download PDF', url: buildTelegramFinanceDocumentUrl({
-          orderCode: input.orderCode,
-          type: 'refund',
-          format: 'pdf',
-        }) }],
-      ],
-    },
+    reply_markup: replyMarkup,
   });
 }

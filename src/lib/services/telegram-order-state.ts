@@ -10,8 +10,10 @@ import {
   getTelegramNotificationPreferences,
   getTelegramSupportLink,
   sendTelegramMessage,
+  sendTelegramPhotoUrl,
   type TelegramConfig,
 } from '@/lib/services/telegram-runtime';
+import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
   escapeHtml,
   formatExpirationSummary,
@@ -210,6 +212,54 @@ function buildTelegramOrderReceiptMessage(input: {
     .join('\n');
 }
 
+function buildTelegramOrderReceiptCaption(input: {
+  order: {
+    orderCode: string;
+    priceLabel?: string | null;
+    priceAmount?: number | null;
+    priceCurrency?: string | null;
+    planName?: string | null;
+    planCode?: string | null;
+    paymentMethodLabel?: string | null;
+    selectedServerName?: string | null;
+    selectedServerCountryCode?: string | null;
+    deliveryType?: string | null;
+  };
+  locale: SupportedLocale;
+  deliveredKeyName: string;
+  isTrial?: boolean;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const typeLabel = input.isTrial
+    ? ui.receiptTypeTrial
+    : input.order.deliveryType === 'DYNAMIC_KEY'
+      ? ui.receiptTypePremium
+      : ui.receiptTypeStandard;
+  const statusLabel = input.isTrial ? ui.receiptStatusTrial : ui.receiptStatusPaid;
+  const priceLabel = formatTelegramReceiptPriceLabel(input.order);
+  const serverLabel = input.order.selectedServerName
+    ? `${input.order.selectedServerName}${input.order.selectedServerCountryCode ? ` ${getFlagEmoji(input.order.selectedServerCountryCode)}` : ''}`
+    : null;
+
+  return [
+    ui.receiptTitle,
+    '',
+    `${ui.orderCodeLabel}: <b>${escapeHtml(input.order.orderCode)}</b>`,
+    `${ui.receiptTypeLabel}: <b>${escapeHtml(typeLabel)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(statusLabel)}</b>`,
+    input.order.planName || input.order.planCode
+      ? `${ui.planLabel}: <b>${escapeHtml(input.order.planName || input.order.planCode || '')}</b>`
+      : '',
+    priceLabel ? `${ui.priceLabel}: <b>${escapeHtml(priceLabel)}</b>` : '',
+    serverLabel ? `${ui.preferredServerLabel}: <b>${escapeHtml(serverLabel)}</b>` : '',
+    `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,
+    '',
+    escapeHtml(ui.receiptFooter),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export async function sendTelegramOrderReceiptConfirmation(input: {
   chatId: string;
   locale: SupportedLocale;
@@ -249,25 +299,40 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
     return true;
   }
 
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: getTelegramUi(input.locale).receiptActionPrintable, url: buildTelegramFinanceDocumentUrl({
+        orderCode: input.order.orderCode,
+        type: 'receipt',
+        format: 'html',
+      }) }],
+      [{ text: getTelegramUi(input.locale).receiptActionDownloadPdf, url: buildTelegramFinanceDocumentUrl({
+        orderCode: input.order.orderCode,
+        type: 'receipt',
+        format: 'pdf',
+      }) }],
+    ],
+  } as const;
+
+  const sentCard = await sendTelegramPhotoUrl(
+    config.botToken,
+    input.chatId,
+    getTelegramBrandMediaUrl('receiptPaid'),
+    buildTelegramOrderReceiptCaption(input),
+    {
+      replyMarkup,
+    },
+  );
+  if (sentCard) {
+    return true;
+  }
+
   return sendTelegramMessage(
     config.botToken,
     input.chatId,
     buildTelegramOrderReceiptMessage(input),
     {
-      replyMarkup: {
-        inline_keyboard: [
-          [{ text: getTelegramUi(input.locale).receiptActionPrintable, url: buildTelegramFinanceDocumentUrl({
-            orderCode: input.order.orderCode,
-            type: 'receipt',
-            format: 'html',
-          }) }],
-          [{ text: getTelegramUi(input.locale).receiptActionDownloadPdf, url: buildTelegramFinanceDocumentUrl({
-            orderCode: input.order.orderCode,
-            type: 'receipt',
-            format: 'pdf',
-          }) }],
-        ],
-      },
+      replyMarkup,
     },
   );
 }
@@ -469,6 +534,23 @@ export async function handleBuyCommand(input: {
       const price = resolveTelegramSalesPriceLabel(plan, input.locale);
       return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
     });
+
+  if (premiumPlanLines.length > 0) {
+    await sendTelegramPhotoUrl(
+      input.botToken,
+      input.chatId,
+      getTelegramBrandMediaUrl('premiumShowcase'),
+      [
+        ui.premiumHubTitle,
+        '',
+        ui.buyPremiumSummary,
+        ui.buyPremiumUpsell,
+        ui.buyPremiumBestFor,
+        ui.buyPremiumRegionExplain,
+      ].join('\n'),
+    );
+  }
+
   const lines = [
     ui.orderPlanPrompt(preparedOrder.orderCode),
     '',

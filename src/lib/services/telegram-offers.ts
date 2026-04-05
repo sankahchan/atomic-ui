@@ -8,7 +8,12 @@ import {
   buildTelegramMenuCallbackData,
   buildTelegramOrderActionCallbackData,
 } from '@/lib/services/telegram-callbacks';
-import { getTelegramSupportLink, sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import {
+  getTelegramSupportLink,
+  sendTelegramMessage,
+  sendTelegramPhotoUrl,
+} from '@/lib/services/telegram-runtime';
+import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import { escapeHtml, formatTelegramDateTime, getTelegramUi } from '@/lib/services/telegram-ui';
 
 type TelegramOfferRecord = Awaited<
@@ -359,6 +364,27 @@ export async function handleOffersCommand(input: {
     '',
   ];
 
+  await sendTelegramPhotoUrl(
+    input.botToken,
+    input.chatId,
+    getTelegramBrandMediaUrl('offersWallet'),
+    [
+      input.locale === 'my' ? '🎟 <b>Offer wallet</b>' : '🎟 <b>Offer wallet</b>',
+      '',
+      input.locale === 'my'
+        ? `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`
+        : `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`,
+      activeOffers[0]?.couponCode
+        ? `${input.locale === 'my' ? 'Live now' : 'Live now'}: <b>${escapeHtml(activeOffers[0].couponCode)}</b>`
+        : '',
+      input.locale === 'my'
+        ? 'Atomic-UI offers • buy, renew, win-back, premium upgrade'
+        : 'Atomic-UI offers • buy, renew, win-back, premium upgrade',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+
   if ((filter === 'ALL' || filter === 'ACTIVE') && activeOffers.length > 0) {
     lines.push(input.locale === 'my' ? '<b>Active offers</b>' : '<b>Active offers</b>');
     for (const offer of activeOffers) {
@@ -388,14 +414,16 @@ export async function handleOffersCommand(input: {
               ? 'Tap the action button below to continue with this offer.'
               : 'Tap the action button below to continue with this offer.';
       lines.push(
-        `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
+        `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(
           resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale),
-        )}`,
+        )}</b>`,
         offerLabel ? `  ${input.locale === 'my' ? 'Offer' : 'Offer'}: <b>${escapeHtml(offerLabel)}</b>` : '',
         targetLabel ? `  ${input.locale === 'my' ? 'For' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,
+        `  ${input.locale === 'my' ? 'Availability' : 'Availability'}: <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
         `  ${escapeHtml(resolveTelegramOfferActionLine(offer, input.locale, targetLabel))}`,
         `  ${escapeHtml(useNowLabel)}`,
         offer.expiresAt
@@ -419,9 +447,8 @@ export async function handleOffersCommand(input: {
     lines.push(input.locale === 'my' ? '<b>Used recently</b>' : '<b>Used recently</b>');
     for (const offer of usedOffers) {
       lines.push(
-        `• <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
-          resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale),
-        )}`,
+        `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
         `  ${input.locale === 'my' ? 'Used on' : 'Used on'}: <b>${escapeHtml(
           offer.redeemedOrderCode || 'Order',
         )}</b>`,
@@ -444,9 +471,8 @@ export async function handleOffersCommand(input: {
     lines.push(input.locale === 'my' ? '<b>Unavailable now</b>' : '<b>Unavailable now</b>');
     for (const offer of inactiveOffers.slice(0, 3)) {
       lines.push(
-        `• <b>${escapeHtml(offer.couponCode)}</b> • ${escapeHtml(
-          resolveTelegramOfferStatusLabel(offer, input.locale),
-        )}`,
+        `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,

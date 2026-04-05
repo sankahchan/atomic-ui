@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="635" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#070B17"/>
+      <stop offset="1" stop-color="#1D1240"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="290" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C084FC"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" rx="40" fill="url(#bg)"/>
+  <circle cx="1040" cy="118" r="132" fill="#8B5CF6" opacity="0.2"/>
+  <circle cx="900" cy="540" r="160" fill="#06B6D4" opacity="0.12"/>
+  <rect x="70" y="70" width="1060" height="535" rx="34" fill="#0E1730" stroke="rgba(192,132,252,0.18)"/>
+  <text x="112" y="126" fill="#D7B9FF" font-size="20" font-family="Segoe UI, Arial, sans-serif" letter-spacing="3">ATOMIC-UI PREMIUM</text>
+  <text x="112" y="188" fill="#F8FBFF" font-size="56" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Premium Dynamic Key</text>
+  <text x="112" y="230" fill="#B8C4DA" font-size="24" font-family="Segoe UI, Arial, sans-serif">Stable premium link, region-aware routing, and faster Telegram support for higher-confidence use.</text>
+  <rect x="112" y="268" width="188" height="42" rx="21" fill="url(#accent)"/>
+  <text x="138" y="295" fill="#12082A" font-size="18" font-weight="700" font-family="Segoe UI, Arial, sans-serif">PREMIUM UPSIDE</text>
+
+  <rect x="112" y="350" width="292" height="184" rx="24" fill="#111A33" stroke="rgba(192,132,252,0.14)"/>
+  <text x="142" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Stable premium link</text>
+  <text x="142" y="430" fill="#D3DCF0" font-size="20" font-family="Segoe UI, Arial, sans-serif">One durable link for Telegram delivery, renewals, and premium routing updates.</text>
+
+  <rect x="454" y="350" width="292" height="184" rx="24" fill="#111A33" stroke="rgba(192,132,252,0.14)"/>
+  <text x="484" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Region-aware routing</text>
+  <text x="484" y="430" fill="#D3DCF0" font-size="20" font-family="Segoe UI, Arial, sans-serif">Preferred region selection, fallback awareness, and clearer route recovery status.</text>
+
+  <rect x="796" y="350" width="292" height="184" rx="24" fill="#111A33" stroke="rgba(192,132,252,0.14)"/>
+  <text x="826" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Priority support</text>
+  <text x="826" y="430" fill="#D3DCF0" font-size="20" font-family="Segoe UI, Arial, sans-serif">Dedicated premium support threads, clearer status cards, and faster escalation paths.</text>
+
+  <text x="112" y="592" fill="#EBD8FF" font-size="18" font-family="Segoe UI, Arial, sans-serif">Atomic-UI Premium • better routing quality • region fallback awareness • clearer premium support</text>
+</svg>

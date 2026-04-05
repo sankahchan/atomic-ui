@@ -30,7 +30,9 @@ import {
   resolveTelegramChatIdForDynamicKey,
   resolveTelegramLocaleForRecipient,
   sendTelegramMessage,
+  sendTelegramPhotoUrl,
 } from '@/lib/services/telegram-runtime';
+import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
   buildTelegramLatestReplyPreviewLines,
   escapeHtml,
@@ -883,6 +885,24 @@ export async function handlePremiumCommand(input: {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
+  await sendTelegramPhotoUrl(
+    input.botToken,
+    input.chatId,
+    getTelegramBrandMediaUrl('premiumShowcase'),
+    [
+      ui.premiumHubTitle,
+      '',
+      input.locale === 'my'
+        ? `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`
+        : `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`,
+      ui.premiumStableLink,
+      ui.premiumAutoFailover,
+      input.locale === 'my'
+        ? 'Atomic-UI Premium • stable route • region-aware support'
+        : 'Atomic-UI Premium • stable route • region-aware support',
+    ].join('\n'),
+  );
+
   const message = lines.join('\n');
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: { inline_keyboard: inlineKeyboard.slice(0, 10) },
@@ -1287,6 +1307,20 @@ export async function handlePremiumRegionStatusCommand(input: {
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
+
+  await sendTelegramPhotoUrl(
+    input.botToken,
+    input.chatId,
+    getTelegramBrandMediaUrl('premiumShowcase'),
+    [
+      ui.premiumRegionStatusTitle,
+      '',
+      input.locale === 'my'
+        ? `${dynamicKeys.length} key(s) • live route health`
+        : `${dynamicKeys.length} key(s) • live route health`,
+      ui.premiumRegionStatusHint,
+    ].join('\n'),
+  );
 
   const message = lines.join('\n');
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {

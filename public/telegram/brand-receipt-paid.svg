@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="635" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#121C34"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="280" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" rx="40" fill="url(#bg)"/>
+  <circle cx="1035" cy="118" r="124" fill="#06B6D4" opacity="0.18"/>
+  <circle cx="930" cy="510" r="150" fill="#8B5CF6" opacity="0.12"/>
+  <rect x="70" y="70" width="1060" height="535" rx="34" fill="#0E1830" stroke="rgba(103,232,249,0.16)"/>
+  <text x="112" y="126" fill="#91EEFF" font-size="20" font-family="Segoe UI, Arial, sans-serif" letter-spacing="3">ATOMIC-UI RECEIPT</text>
+  <text x="112" y="188" fill="#F7FBFF" font-size="56" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Payment Delivered</text>
+  <text x="112" y="230" fill="#A9B7D2" font-size="24" font-family="Segoe UI, Arial, sans-serif">Receipt card for Telegram delivery, share page handoff, and PDF download.</text>
+  <rect x="112" y="268" width="196" height="42" rx="21" fill="url(#accent)"/>
+  <text x="138" y="295" fill="#04202A" font-size="18" font-weight="700" font-family="Segoe UI, Arial, sans-serif">PAID &amp; DELIVERED</text>
+
+  <rect x="112" y="348" width="300" height="186" rx="24" fill="#0C1428" stroke="rgba(103,232,249,0.14)"/>
+  <text x="142" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Receipt details</text>
+  <text x="142" y="430" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Order code</text>
+  <text x="142" y="462" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Plan and price</text>
+  <text x="142" y="494" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Delivered key name</text>
+
+  <rect x="450" y="348" width="300" height="186" rx="24" fill="#0C1428" stroke="rgba(103,232,249,0.14)"/>
+  <text x="480" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Next in chat</text>
+  <text x="480" y="430" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Share page</text>
+  <text x="480" y="462" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Subscription URL</text>
+  <text x="480" y="494" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Branded QR code</text>
+
+  <rect x="788" y="348" width="300" height="186" rx="24" fill="#0C1428" stroke="rgba(103,232,249,0.14)"/>
+  <text x="818" y="392" fill="#F7FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Downloads</text>
+  <text x="818" y="430" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Printable HTML receipt</text>
+  <text x="818" y="462" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• PDF receipt</text>
+  <text x="818" y="494" fill="#C8D4E8" font-size="20" font-family="Segoe UI, Arial, sans-serif">• Finance-ready order summary</text>
+
+  <rect x="112" y="560" width="976" height="1" fill="rgba(255,255,255,0.12)"/>
+  <text x="112" y="593" fill="#D9F8FF" font-size="18" font-family="Segoe UI, Arial, sans-serif">Atomic-UI • Telegram storefront • receipt, PDF, and share access all from one delivery flow</text>
+</svg>

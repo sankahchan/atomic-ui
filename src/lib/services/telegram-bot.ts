@@ -118,6 +118,10 @@ import {
   sendTelegramRefundRequestAlert,
 } from '@/lib/services/telegram-finance';
 import {
+  getTelegramBrandMediaUrl,
+  getTelegramProofExampleUrls,
+} from '@/lib/services/telegram-branding';
+import {
   dispatchTelegramAnnouncement,
   getTelegramAnnouncementAudienceMap,
   type TelegramAnnouncementAudience,
@@ -581,21 +585,39 @@ async function sendTelegramPaymentMethodMedia(input: {
   botToken: string;
   chatId: number | string;
   paymentMethod?: TelegramSalesPaymentMethod | null;
+  orderCode: string;
   locale: SupportedLocale;
 }) {
   const paymentMethod = input.paymentMethod;
-  const imageUrl = paymentMethod?.imageUrl?.trim();
-  if (!paymentMethod || !imageUrl) {
-    return;
-  }
-
   const ui = getTelegramUi(input.locale);
-  const label = resolveTelegramSalesPaymentMethodLabel(paymentMethod, input.locale);
+  const label = paymentMethod
+    ? resolveTelegramSalesPaymentMethodLabel(paymentMethod, input.locale)
+    : input.locale === 'my'
+      ? 'Available methods'
+      : 'Available methods';
+  const imageUrl = paymentMethod?.imageUrl?.trim() || getTelegramBrandMediaUrl('paymentGuide');
+  const note = paymentMethod ? resolveTelegramSalesPaymentMethodNote(paymentMethod, input.locale) : null;
   await sendTelegramPhotoUrl(
     input.botToken,
     input.chatId,
     imageUrl,
-    ui.paymentMethodImageCaption(escapeHtml(label)),
+    [
+      ui.paymentMethodImageCaption(escapeHtml(label)),
+      '',
+      `${ui.orderCodeLabel}: <b>${escapeHtml(input.orderCode)}</b>`,
+      paymentMethod?.accountName?.trim()
+        ? `${ui.accountNameLabel}: <b>${escapeHtml(paymentMethod.accountName.trim())}</b>`
+        : '',
+      paymentMethod?.accountNumber?.trim()
+        ? `${ui.accountNumberLabel}: <code>${escapeHtml(paymentMethod.accountNumber.trim())}</code>`
+        : '',
+      note ? escapeHtml(note) : '',
+      input.locale === 'my'
+        ? 'Atomic-UI payment guide • QR / account details • screenshot ready'
+        : 'Atomic-UI payment guide • QR / account details • screenshot ready',
+    ]
+      .filter(Boolean)
+      .join('\n'),
   );
 }
 
@@ -658,6 +680,7 @@ async function sendTelegramOrderPaymentPromptCard(input: {
     botToken: input.botToken,
     chatId: input.chatId,
     paymentMethod: input.paymentMethod,
+    orderCode: input.orderCode,
     locale: input.locale,
   });
 }
@@ -1288,14 +1311,6 @@ async function listTelegramSavedPaymentMethods(input: {
     (left, right) =>
       (right.lastUsedAt?.getTime() || 0) - (left.lastUsedAt?.getTime() || 0),
   );
-}
-
-function getTelegramProofExampleUrls() {
-  return {
-    good: withAbsoluteBasePath('/telegram/proof-example-good.png'),
-    bad: withAbsoluteBasePath('/telegram/proof-example-bad.png'),
-    common: withAbsoluteBasePath('/telegram/proof-example-common-mistake.png'),
-  };
 }
 
 function buildTelegramOrderActionKeyboard(input: {
@@ -2133,6 +2148,7 @@ function buildTelegramSupportThreadQueueReplyKeyboard(input: {
   mode: TelegramSupportQueueMode;
   claimedByMe: boolean;
   isClaimed: boolean;
+  attachmentUrl?: string | null;
 }) {
   const isMyanmar = input.locale === 'my';
   return {
@@ -2193,6 +2209,9 @@ function buildTelegramSupportThreadQueueReplyKeyboard(input: {
           callback_data: buildTelegramSupportQueueCallbackData('nx', `thr_${input.threadId}`, input.mode),
         },
       ],
+      ...(input.attachmentUrl?.trim()
+        ? [[{ text: isMyanmar ? '🖼 Open attachment' : '🖼 Open attachment', url: input.attachmentUrl.trim() }]]
+        : []),
       [{ text: isMyanmar ? 'Open panel' : 'Open panel', url: input.panelUrl }],
     ],
   };
@@ -2253,7 +2272,7 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
         maxLength: 140,
       }).map((line) => escapeHtml(line)),
       latestReply?.mediaUrl
-        ? `${input.locale === 'my' ? 'Attachment' : 'Attachment'}: ${latestReply.mediaUrl}`
+        ? (input.locale === 'my' ? 'Attachment ready below.' : 'Attachment ready below.')
         : '',
       `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
     ]
@@ -2271,6 +2290,7 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
           && input.thread.assignedAdminUserId === input.adminActor.userId,
         ),
         isClaimed: Boolean(input.thread.assignedAdminUserId),
+        attachmentUrl: latestReply?.mediaUrl || null,
       }),
     },
   );
@@ -7983,6 +8003,7 @@ async function handleTelegramCallbackQuery(
                 locale,
                 threadId: thread.id,
                 supportLink: await getTelegramSupportLink(),
+                attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
               }),
             },
           );
@@ -8033,6 +8054,7 @@ async function handleTelegramCallbackQuery(
                 threadId: thread.id,
                 supportLink: await getTelegramSupportLink(),
                 includeEscalate: thread.status !== 'ESCALATED',
+                attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
               }),
             },
           );
@@ -8084,6 +8106,7 @@ async function handleTelegramCallbackQuery(
                 threadId: thread.id,
                 supportLink: await getTelegramSupportLink(),
                 includeEscalate: false,
+                attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
               }),
             },
           );

@@ -302,6 +302,7 @@ export function buildTelegramSupportThreadKeyboard(input: {
   threadId: string;
   supportLink?: string | null;
   includeEscalate?: boolean;
+  attachmentUrl?: string | null;
 }) {
   const isMyanmar = input.locale === 'my';
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
@@ -336,6 +337,15 @@ export function buildTelegramSupportThreadKeyboard(input: {
       callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
     },
   ]);
+
+  if (input.attachmentUrl?.trim()) {
+    rows.push([
+      {
+        text: isMyanmar ? '🖼 Open attachment' : '🖼 Open attachment',
+        url: input.attachmentUrl.trim(),
+      },
+    ]);
+  }
 
   if (input.supportLink) {
     rows.push([{ text: isMyanmar ? '🔗 Direct admin link' : '🔗 Direct admin link', url: input.supportLink }]);
@@ -903,6 +913,8 @@ export async function replyTelegramSupportThreadAsAdmin(input: {
           locale,
           threadId: updatedThread.id,
           supportLink,
+          attachmentUrl:
+            updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
         }),
       },
     );
@@ -991,6 +1003,8 @@ export async function handleTelegramSupportThreadAsAdmin(input: {
           locale,
           threadId: updatedThread.id,
           supportLink,
+          attachmentUrl:
+            updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
         }),
       },
     );
@@ -1082,6 +1096,8 @@ export async function escalateTelegramSupportThreadToPanel(input: {
           threadId: updatedThread.id,
           supportLink,
           includeEscalate: false,
+          attachmentUrl:
+            updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
         }),
       },
     );
@@ -1157,6 +1173,11 @@ export function buildTelegramSupportThreadStatusMessage(input: {
               ? latestReply.mediaFilename || (input.locale === 'my' ? 'File' : 'File')
               : latestReply.mediaKind,
         )}</b>`
+      : '',
+    latestReply?.mediaUrl
+      ? input.locale === 'my'
+        ? 'Attachment is ready below.'
+        : 'Attachment is ready below.'
       : '',
     ...buildTelegramLatestReplyPreviewLines({
       reply: latestReply,
@@ -1251,6 +1272,12 @@ export async function sendTelegramSupportThreadAlertToAdmins(input: {
                   callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
                 },
           ],
+          ...(latestReply?.mediaUrl
+            ? [[{
+                text: input.locale === 'my' ? '🖼 Open attachment' : '🖼 Open attachment',
+                url: latestReply.mediaUrl,
+              }]]
+            : []),
         ],
       },
     });
@@ -1302,6 +1329,7 @@ export async function handleTelegramSupportThreadStart(input: {
       locale: input.locale,
       threadId: thread.id,
       supportLink,
+      attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
     }),
   });
 
@@ -1401,6 +1429,7 @@ export async function handleTelegramSupportReplyText(input: {
         locale: input.locale,
         threadId: thread.id,
         supportLink,
+        attachmentUrl: null,
       }),
     },
   );
@@ -1515,6 +1544,7 @@ export async function handleTelegramSupportReplyMedia(input: {
         locale: input.locale,
         threadId: thread.id,
         supportLink,
+        attachmentUrl: null,
       }),
     },
   );
@@ -1605,6 +1635,7 @@ export async function handleTelegramSupportStatusCommand(input: {
             locale: input.locale,
             threadId: latestThread.id,
             supportLink,
+            attachmentUrl: latestThread.replies[latestThread.replies.length - 1]?.mediaUrl || null,
           })
         : buildTelegramSupportHubKeyboard({
             locale: input.locale,

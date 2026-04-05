@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="635" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0C1020"/>
+      <stop offset="1" stop-color="#17304A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="280" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" rx="40" fill="url(#bg)"/>
+  <circle cx="1035" cy="120" r="124" fill="#F59E0B" opacity="0.16"/>
+  <circle cx="940" cy="530" r="154" fill="#06B6D4" opacity="0.12"/>
+  <rect x="70" y="70" width="1060" height="535" rx="34" fill="#0D172C" stroke="rgba(245,158,11,0.18)"/>
+  <text x="112" y="126" fill="#FFE29D" font-size="20" font-family="Segoe UI, Arial, sans-serif" letter-spacing="3">ATOMIC-UI OFFERS</text>
+  <text x="112" y="188" fill="#F8FBFF" font-size="56" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Offer Wallet</text>
+  <text x="112" y="230" fill="#BAC4DA" font-size="24" font-family="Segoe UI, Arial, sans-serif">Keep active coupons, renewal nudges, premium upgrade promos, and win-back offers in one place.</text>
+  <rect x="112" y="268" width="172" height="42" rx="21" fill="url(#accent)"/>
+  <text x="138" y="295" fill="#3B2602" font-size="18" font-weight="700" font-family="Segoe UI, Arial, sans-serif">PROMO WALLET</text>
+
+  <rect x="112" y="348" width="300" height="186" rx="24" fill="#111A33" stroke="rgba(245,158,11,0.14)"/>
+  <text x="142" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Buy now</text>
+  <text x="142" y="430" fill="#D6E0F2" font-size="20" font-family="Segoe UI, Arial, sans-serif">Use active promo and win-back offers directly in /buy.</text>
+
+  <rect x="450" y="348" width="300" height="186" rx="24" fill="#111A33" stroke="rgba(245,158,11,0.14)"/>
+  <text x="480" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Renew smarter</text>
+  <text x="480" y="430" fill="#D6E0F2" font-size="20" font-family="Segoe UI, Arial, sans-serif">Renewal offers stay tied to the right key so the renew button opens the correct flow.</text>
+
+  <rect x="788" y="348" width="300" height="186" rx="24" fill="#111A33" stroke="rgba(245,158,11,0.14)"/>
+  <text x="818" y="392" fill="#F8FBFF" font-size="26" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Upgrade paths</text>
+  <text x="818" y="430" fill="#D6E0F2" font-size="20" font-family="Segoe UI, Arial, sans-serif">See at a glance whether an offer is best for trial conversion, premium upsell, or coming back.</text>
+
+  <text x="112" y="592" fill="#FFE6B8" font-size="18" font-family="Segoe UI, Arial, sans-serif">Atomic-UI offers • clearer availability • best-for labels • buy vs renew guidance</text>
+</svg>
