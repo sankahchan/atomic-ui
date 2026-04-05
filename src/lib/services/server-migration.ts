@@ -286,7 +286,9 @@ export async function replaceAccessKeyServer(
     throw new Error('Target server not found');
   }
 
-  const assignmentCheck = canAssignKeysToServer(targetServer);
+  const assignmentCheck = canAssignKeysToServer(targetServer, {
+    allowDraining: true,
+  });
   if (!assignmentCheck.allowed) {
     throw new Error(assignmentCheck.reason);
   }

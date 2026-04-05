@@ -823,7 +823,9 @@ function buildTelegramRenewKeySelectionKeyboard(input: {
   };
 }
 
-async function listAssignableTelegramOrderServers() {
+async function listAssignableTelegramOrderServers(options?: {
+  allowDraining?: boolean;
+}) {
   const servers = await db.server.findMany({
     where: { isActive: true },
     select: {
@@ -838,7 +840,11 @@ async function listAssignableTelegramOrderServers() {
     orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
   });
 
-  return servers.filter((server) => canAssignKeysToServer(server).allowed);
+  return servers.filter((server) =>
+    canAssignKeysToServer(server, {
+      allowDraining: options?.allowDraining,
+    }).allowed,
+  );
 }
 
 function buildTelegramServerSelectionKeyboard(input: {
@@ -3078,7 +3084,9 @@ async function handleTrialCommand(
     },
   });
 
-  const servers = await listAssignableTelegramOrderServers();
+  const servers = await listAssignableTelegramOrderServers({
+    allowDraining: true,
+  });
   const message = buildTelegramServerSelectionPromptText({
     orderCode: order.orderCode,
     locale,
@@ -4261,7 +4269,9 @@ async function resolveTelegramProvisioningServer(input?: {
       throw new Error('The selected server could not be loaded.');
     }
 
-    const assignmentCheck = canAssignKeysToServer(selectedServer);
+    const assignmentCheck = canAssignKeysToServer(selectedServer, {
+      allowDraining: true,
+    });
     if (!assignmentCheck.allowed) {
       throw new Error(assignmentCheck.reason);
     }
@@ -7316,7 +7326,11 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            const candidateServers = (await listAssignableTelegramOrderServers()).filter(
+            const candidateServers = (
+              await listAssignableTelegramOrderServers({
+                allowDraining: true,
+              })
+            ).filter(
               (server) => server.id !== accessKey.serverId,
             );
             if (candidateServers.length === 0) {
@@ -7387,7 +7401,11 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            const requestedServer = (await listAssignableTelegramOrderServers()).find(
+            const requestedServer = (
+              await listAssignableTelegramOrderServers({
+                allowDraining: true,
+              })
+            ).find(
               (server) =>
                 server.id === userServerChangeAction.secondary && server.id !== accessKey.serverId,
             );
@@ -8054,7 +8072,9 @@ async function handleTelegramCallbackQuery(
             });
 
             if (nextStatus === 'AWAITING_SERVER_SELECTION') {
-              const servers = await listAssignableTelegramOrderServers();
+              const servers = await listAssignableTelegramOrderServers({
+                allowDraining: true,
+              });
               await sendTelegramMessage(
                 config.botToken,
                 chatId,
@@ -8158,7 +8178,9 @@ async function handleTelegramCallbackQuery(
               return null;
             }
 
-            const servers = await listAssignableTelegramOrderServers();
+            const servers = await listAssignableTelegramOrderServers({
+              allowDraining: true,
+            });
             const selectedServer =
               userOrderAction.secondary === 'auto'
                 ? null

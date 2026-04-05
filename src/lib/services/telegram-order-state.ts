@@ -780,7 +780,9 @@ export async function handleTelegramOrderTextMessage(input: {
       });
 
       if (nextStatus === 'AWAITING_SERVER_SELECTION') {
-        const servers = await input.deps.listAssignableTelegramOrderServers();
+        const servers = await input.deps.listAssignableTelegramOrderServers({
+          allowDraining: true,
+        });
         await sendTelegramMessage(
           input.botToken,
           input.chatId,
@@ -907,7 +909,9 @@ export async function handleTelegramOrderTextMessage(input: {
       });
 
       if (nextStatus === 'AWAITING_SERVER_SELECTION') {
-        const servers = await input.deps.listAssignableTelegramOrderServers();
+        const servers = await input.deps.listAssignableTelegramOrderServers({
+          allowDraining: true,
+        });
         await sendTelegramMessage(
           input.botToken,
           input.chatId,
@@ -986,7 +990,9 @@ export async function handleTelegramOrderTextMessage(input: {
       return null;
     }
     case 'AWAITING_SERVER_SELECTION': {
-      const servers = await input.deps.listAssignableTelegramOrderServers();
+      const servers = await input.deps.listAssignableTelegramOrderServers({
+        allowDraining: true,
+      });
       const numericIndex = Number.parseInt(trimmed, 10);
       const normalizedText = trimmed.toLowerCase();
 

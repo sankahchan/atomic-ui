@@ -419,8 +419,8 @@ export function getTelegramUi(locale: SupportedLocale) {
         : `⚠️ <b>${keyName}</b> has reached the server-change limit. Please buy a new key or contact the admin.`,
     serverChangeChooseServer: (keyName: string, currentServer: string, remainingChanges: number, limit: number) =>
       isMyanmar
-        ? `🖥 <b>${keyName}</b> အတွက် target server ကို ရွေးပါ။\n\nလက်ရှိ server: <b>${currentServer}</b>\nကျန်ရှိသောပြောင်းလဲခွင့်: <b>${remainingChanges}/${limit}</b>`
-        : `🖥 Choose the target server for <b>${keyName}</b>.\n\nCurrent server: <b>${currentServer}</b>\nRemaining changes: <b>${remainingChanges}/${limit}</b>`,
+        ? `🖥 <b>${keyName}</b> အတွက် target server ကို ရွေးပါ။\n\nလက်ရှိ server: <b>${currentServer}</b>\nကျန်ရှိသောပြောင်းလဲခွင့်: <b>${remainingChanges}/${limit}</b>\n\nAuto placement က draining server များကို ရှောင်ပါမည်။ သို့သော် သင်က တိုက်ရိုက်ရွေးချယ်ပါက draining server ကိုလည်း ဆက်လက်တောင်းဆိုနိုင်ပါသည်။`
+        : `🖥 Choose the target server for <b>${keyName}</b>.\n\nCurrent server: <b>${currentServer}</b>\nRemaining changes: <b>${remainingChanges}/${limit}</b>\n\nAuto placement avoids draining servers, but you can still request one here if you choose it explicitly.`,
     serverChangeRequestSubmitted: (code: string, keyName: string, targetServer: string) =>
       isMyanmar
         ? `📨 Server change request <b>${code}</b> ကို ပို့ပြီးပါပြီ။ <b>${keyName}</b> ကို <b>${targetServer}</b> သို့ ပြောင်းရန် admin review စောင့်နေပါသည်။`
@@ -513,8 +513,9 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '📆 Send the number of months for the unlimited plan. The minimum is 3 months.',
     orderServerPrompt: (code: string) =>
       isMyanmar
-        ? `🖥 <b>Order ${code}</b>\n\nအသုံးပြုလိုသော server ကို ရွေးပါ။ Auto ကို ရွေးပါက စနစ်မှ သင့်တော်သော server ကို အလိုအလျောက် ရွေးပေးပါမည်။`
-        : `🖥 <b>Order ${code}</b>\n\nChoose the server you prefer. Pick Auto if you want the system to choose a suitable server for you.`,
+        ? `🖥 <b>Order ${code}</b>\n\nအသုံးပြုလိုသော server ကို ရွေးပါ။ Auto ကို ရွေးပါက စနစ်မှ သင့်တော်သော server ကို အလိုအလျောက် ရွေးပေးပြီး draining server များကို ရှောင်ပါမည်။ သင်က တိုက်ရိုက်ရွေးချယ်ပါက draining server ကိုလည်း အသုံးပြုနိုင်ပါသည်။`
+        : `🖥 <b>Order ${code}</b>\n\nChoose the server you prefer. Pick Auto if you want the system to choose a suitable server and avoid draining servers. If you pick a server yourself, you can still use a draining server.`,
+    serverDrainingBadge: isMyanmar ? 'Draining' : 'Draining',
     orderNamePrompt: isMyanmar
       ? '✍️ Key card ပေါ်တွင် ပြမည့် အမည်ကို ပို့ပါ။ ဥပမာ - John iPhone 15'
       : '✍️ Send the name that should appear on the key card. Example: John iPhone 15',
@@ -1434,12 +1435,15 @@ export function formatTelegramServerChoiceLabel(
     id: string;
     name: string;
     countryCode?: string | null;
+    lifecycleMode?: string | null;
   },
   ui: TelegramUi,
 ) {
   return server.id === 'auto'
     ? ui.serverAutoSelect
-    : `${server.name}${server.countryCode ? ` ${getFlagEmoji(server.countryCode)}` : ''}`;
+    : `${server.name}${server.countryCode ? ` ${getFlagEmoji(server.countryCode)}` : ''}${
+        server.lifecycleMode === 'DRAINING' ? ` · ${ui.serverDrainingBadge}` : ''
+      }`;
 }
 
 export type TelegramDynamicRoutingSource = {
