@@ -55,16 +55,18 @@ import {
   type TelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
 import {
+  findTelegramSupportThreadByIdForAdmin,
+  resolveTelegramSupportIssueLabel,
+} from '@/lib/services/telegram-support';
+import {
   assignTelegramSupportThreadToAdmin,
   buildTelegramSupportMacroMessage,
   claimTelegramSupportThreadAsAdmin,
   escalateTelegramSupportThreadToPanel,
-  findTelegramSupportThreadByIdForAdmin,
   handleTelegramSupportThreadAsAdmin,
   replyTelegramSupportThreadAsAdmin,
-  resolveTelegramSupportIssueLabel,
   unclaimTelegramSupportThreadAsAdmin,
-} from '@/lib/services/telegram-support';
+} from '@/lib/services/telegram-support-admin';
 import { adminProcedure, router } from '../trpc';
 
 function parseJsonRecord(value: string | null) {
