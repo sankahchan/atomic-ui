@@ -898,22 +898,12 @@ export async function replyTelegramSupportThreadAsAdmin(input: {
     waitingOn: 'USER',
   });
 
-  const updatedThread = await db.telegramSupportThread.update({
-    where: { id: thread.id },
-    data: {
-      status: 'OPEN',
-      waitingOn: 'USER',
-      assignedAdminUserId: input.adminUserId ?? thread.assignedAdminUserId ?? null,
-      assignedAdminName: input.reviewerName ?? thread.assignedAdminName ?? null,
-      firstAdminReplyAt: thread.firstAdminReplyAt || new Date(),
-    },
-    include: {
-      replies: {
-        orderBy: [{ createdAt: 'asc' }],
-        take: 12,
-      },
-    },
+  const updatedThread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: thread.id,
   });
+  if (!updatedThread) {
+    throw new Error('Support thread not found after reply.');
+  }
 
   const config = await getTelegramConfig();
   const supportLink = await getTelegramSupportLink();
@@ -987,23 +977,12 @@ export async function handleTelegramSupportThreadAsAdmin(input: {
     markHandled: true,
   });
 
-  const updatedThread = await db.telegramSupportThread.update({
-    where: { id: thread.id },
-    data: {
-      status: 'HANDLED',
-      waitingOn: 'NONE',
-      handledAt: new Date(),
-      assignedAdminUserId: input.adminUserId ?? thread.assignedAdminUserId ?? null,
-      assignedAdminName: input.reviewerName ?? thread.assignedAdminName ?? null,
-      firstAdminReplyAt: thread.firstAdminReplyAt || new Date(),
-    },
-    include: {
-      replies: {
-        orderBy: [{ createdAt: 'asc' }],
-        take: 12,
-      },
-    },
+  const updatedThread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: thread.id,
   });
+  if (!updatedThread) {
+    throw new Error('Support thread not found after handling.');
+  }
 
   const config = await getTelegramConfig();
   const supportLink = await getTelegramSupportLink();
@@ -1078,24 +1057,12 @@ export async function escalateTelegramSupportThreadToPanel(input: {
     escalationReason: input.escalationReason ?? null,
   });
 
-  const updatedThread = await db.telegramSupportThread.update({
-    where: { id: thread.id },
-    data: {
-      status: 'ESCALATED',
-      waitingOn: 'ADMIN',
-      escalatedAt: new Date(),
-      escalatedReason: input.escalationReason?.trim() || null,
-      assignedAdminUserId: input.adminUserId ?? thread.assignedAdminUserId ?? null,
-      assignedAdminName: input.reviewerName ?? thread.assignedAdminName ?? null,
-      firstAdminReplyAt: thread.firstAdminReplyAt || new Date(),
-    },
-    include: {
-      replies: {
-        orderBy: [{ createdAt: 'asc' }],
-        take: 12,
-      },
-    },
+  const updatedThread = await findTelegramSupportThreadByIdForAdmin({
+    threadId: thread.id,
   });
+  if (!updatedThread) {
+    throw new Error('Support thread not found after escalation.');
+  }
 
   const config = await getTelegramConfig();
   const supportLink = await getTelegramSupportLink();

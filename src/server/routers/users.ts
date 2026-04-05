@@ -1114,7 +1114,7 @@ export const usersRouter = router({
         ];
       }
 
-      const [threads, openCount, waitingAdminCount, waitingUserCount, overdueCount, unassignedCount, mineCount, escalatedCount] =
+      const [threads, activeSummaryRows] =
         await Promise.all([
           db.telegramSupportThread.findMany({
             where,
@@ -1134,59 +1134,55 @@ export const usersRouter = router({
             orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
             take: limit,
           }),
-          db.telegramSupportThread.count({
+          db.telegramSupportThread.findMany({
             where: {
               status: { in: ['OPEN', 'ESCALATED'] },
             },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: { in: ['OPEN', 'ESCALATED'] },
-              waitingOn: 'ADMIN',
-            },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: { in: ['OPEN', 'ESCALATED'] },
-              waitingOn: 'USER',
-            },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: { in: ['OPEN', 'ESCALATED'] },
-              firstAdminReplyAt: null,
-              firstResponseDueAt: { lte: now },
-            },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: { in: ['OPEN', 'ESCALATED'] },
-              assignedAdminUserId: null,
-            },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: { in: ['OPEN', 'ESCALATED'] },
-              assignedAdminUserId: ctx.user.id,
-            },
-          }),
-          db.telegramSupportThread.count({
-            where: {
-              status: 'ESCALATED',
+            select: {
+              status: true,
+              waitingOn: true,
+              firstAdminReplyAt: true,
+              firstResponseDueAt: true,
+              assignedAdminUserId: true,
             },
           }),
         ]);
 
-      return {
-        summary: {
-          open: openCount,
-          waitingAdmin: waitingAdminCount,
-          waitingUser: waitingUserCount,
-          overdue: overdueCount,
-          unassigned: unassignedCount,
-          mine: mineCount,
-          escalated: escalatedCount,
+      const summary = activeSummaryRows.reduce(
+        (acc, thread) => {
+          acc.open += 1;
+          if (thread.waitingOn === 'USER') {
+            acc.waitingUser += 1;
+          } else {
+            acc.waitingAdmin += 1;
+          }
+          if (!thread.firstAdminReplyAt && thread.firstResponseDueAt && thread.firstResponseDueAt <= now) {
+            acc.overdue += 1;
+          }
+          if (!thread.assignedAdminUserId) {
+            acc.unassigned += 1;
+          }
+          if (thread.assignedAdminUserId === ctx.user.id) {
+            acc.mine += 1;
+          }
+          if (thread.status === 'ESCALATED') {
+            acc.escalated += 1;
+          }
+          return acc;
         },
+        {
+          open: 0,
+          waitingAdmin: 0,
+          waitingUser: 0,
+          overdue: 0,
+          unassigned: 0,
+          mine: 0,
+          escalated: 0,
+        },
+      );
+
+      return {
+        summary,
         threads: threads.map((thread) => {
           const latestReply = thread.replies[0] || null;
           return {
