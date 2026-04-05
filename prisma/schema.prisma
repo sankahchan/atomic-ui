@@ -508,6 +508,8 @@ model TelegramUserProfile {
   pendingPremiumReplyStartedAt DateTime?
   pendingSupportThreadId   String?
   pendingSupportReplyStartedAt DateTime?
+  pendingAdminFlow         String?
+  pendingAdminFlowStartedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

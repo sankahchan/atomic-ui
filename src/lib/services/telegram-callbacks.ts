@@ -30,6 +30,10 @@ export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' 
 export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
 export type TelegramAdminMenuAction =
   | 'home'
+  | 'createkey'
+  | 'createdynamic'
+  | 'managekey'
+  | 'managedynamic'
   | 'reviewqueue'
   | 'reviewqueue_mine'
   | 'reviewqueue_unclaimed'
@@ -94,6 +98,7 @@ const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 const TELEGRAM_MENU_CALLBACK_PREFIX = 'tgmenu';
 const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
 const TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX = 'supthread';
+const TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX = 'admkey';
 
 type TelegramCommandShortcut = {
   command: string;
@@ -140,6 +145,14 @@ const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
     { command: '/admin', labelEn: '🧭 Admin home', labelMy: '🧭 Admin home' },
     { command: '/reviewqueue', labelEn: '📋 Review queue', labelMy: '📋 Review queue' },
+  ],
+  [
+    { command: '/createkey', labelEn: '➕ Normal key', labelMy: '➕ Normal key' },
+    { command: '/createdynamic', labelEn: '💎 Dynamic key', labelMy: '💎 Dynamic key' },
+  ],
+  [
+    { command: '/managekey', labelEn: '🛠 Manage key', labelMy: '🛠 Manage key' },
+    { command: '/managedynamic', labelEn: '🧭 Manage dynamic', labelMy: '🧭 Manage dynamic' },
   ],
   [
     { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status' },
@@ -636,6 +649,38 @@ export function parseTelegramSupportThreadCallbackData(data?: string | null) {
   return {
     action,
     primary: parts[2].trim(),
+    secondary: parts[3]?.trim() || null,
+  } as const;
+}
+
+export function buildTelegramAdminKeyCallbackData(
+  action: string,
+  primary?: string | null,
+  secondary?: string | null,
+) {
+  return [
+    TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX,
+    action,
+    primary?.trim() || '',
+    secondary?.trim() || '',
+  ]
+    .filter((part, index) => index < 2 || part.length > 0)
+    .join(':');
+}
+
+export function parseTelegramAdminKeyCallbackData(data?: string | null) {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 2 || parts[0] !== TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  return {
+    action: parts[1]?.trim() || '',
+    primary: parts[2]?.trim() || null,
     secondary: parts[3]?.trim() || null,
   } as const;
 }

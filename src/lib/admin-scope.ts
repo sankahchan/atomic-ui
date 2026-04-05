@@ -68,6 +68,10 @@ export function hasTelegramAnnouncementManageScope(scope?: string | null) {
   return isOwnerOrAdminScope(scope);
 }
 
+export function hasKeyManageScope(scope?: string | null) {
+  return isOwnerOrAdminScope(scope);
+}
+
 export function hasUserManageScope(scope?: string | null) {
   return isOwnerLikeAdmin(scope);
 }

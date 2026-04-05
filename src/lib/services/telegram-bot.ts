@@ -16,6 +16,7 @@ import QRCode from 'qrcode';
 import si from 'systeminformation';
 import {
   hasFinanceManageScope,
+  hasKeyManageScope,
   hasOutageManageScope,
   hasTelegramAnnouncementManageScope,
   hasTelegramReviewManageScope,
@@ -178,6 +179,10 @@ import { handleOffersCommand } from '@/lib/services/telegram-offers';
 import { handleTelegramStartCommand } from '@/lib/services/telegram-onboarding';
 import {
   handleAdminHomeCommand,
+  handleAdminCreateAccessKeyCommand,
+  handleAdminCreateDynamicKeyCommand,
+  handleAdminManageAccessKeyCommand,
+  handleAdminManageDynamicKeyCommand,
   handleAdminToggleCommand,
   handleAnnounceCommand,
   handleAnnounceUserCommand,
@@ -200,11 +205,14 @@ import {
   handleServerUpdateCommand,
   handleStatusCommand,
   handleSysInfoCommand,
+  handleTelegramAdminKeyCallback,
+  handleTelegramAdminKeyTextInput,
   resolveAdminKeyQuery,
   resolveTelegramAdminActor,
   setAccessKeyEnabledState,
   telegramAdminScopeDeniedMessage,
   type TelegramAdminActor,
+  cancelTelegramAdminKeyFlow,
 } from '@/lib/services/telegram-admin';
 import {
   answerTelegramCallbackQuery,
@@ -214,6 +222,7 @@ import {
   getTelegramConfig,
   getTelegramConversationLocale,
   getTelegramDefaultLocale,
+  getTelegramPendingAdminFlow,
   getTelegramPendingPremiumReply,
   getTelegramPendingSupportReply,
   getTelegramNotificationPreferences,
@@ -264,6 +273,7 @@ import {
   getCommandKeyboard,
   isDynamicRenewalActionSecondary,
   parseTelegramMenuCallbackData,
+  parseTelegramAdminKeyCallbackData,
   normalizeTelegramReplyKeyboardCommand,
   parseTelegramDynamicSupportActionCallbackData,
   parseTelegramOrderActionCallbackData,
@@ -7415,6 +7425,48 @@ async function handleTelegramCallbackQuery(
       telegramChatId: chatId,
     });
     const ui = getTelegramUi(locale);
+    const adminKeyAction = parseTelegramAdminKeyCallbackData(callbackQuery.data);
+    if (adminKeyAction) {
+      if (!isAdmin) {
+        await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.adminOnly);
+        return null;
+      }
+      if (!hasKeyManageScope(adminActor.scope)) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          telegramAdminScopeDeniedMessage({ locale, area: 'keys' }),
+        );
+        return null;
+      }
+
+      const result = await handleTelegramAdminKeyCallback({
+        chatId,
+        telegramUserId: callbackQuery.from.id,
+        locale,
+        botToken: config.botToken,
+        adminActor,
+        action: adminKeyAction.action,
+        primary: adminKeyAction.primary,
+        secondary: adminKeyAction.secondary,
+        deps: {
+          sendTelegramMessage,
+          sendAccessKeySharePageToTelegram,
+          sendDynamicKeySharePageToTelegram,
+          createAccessKeyTelegramConnectLink,
+          createDynamicKeyTelegramConnectLink,
+        },
+      });
+      if (result.handled) {
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          result.callbackText || ui.orderActionSent,
+        );
+        return null;
+      }
+    }
+
     const menuAction = parseTelegramMenuCallbackData(callbackQuery.data);
     if (menuAction) {
       if (menuAction.section === 'admin') {
@@ -7430,6 +7482,104 @@ async function handleTelegramCallbackQuery(
               adminActor,
               botToken: config.botToken,
               chatId,
+            });
+            break;
+          case 'createkey':
+            if (!hasKeyManageScope(adminActor.scope)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                telegramAdminScopeDeniedMessage({ locale, area: 'keys' }),
+              );
+              return null;
+            }
+            await handleAdminCreateAccessKeyCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              adminActor,
+              argsText: '',
+              deps: {
+                sendTelegramMessage,
+                sendAccessKeySharePageToTelegram,
+                sendDynamicKeySharePageToTelegram,
+                createAccessKeyTelegramConnectLink,
+                createDynamicKeyTelegramConnectLink,
+              },
+            });
+            break;
+          case 'createdynamic':
+            if (!hasKeyManageScope(adminActor.scope)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                telegramAdminScopeDeniedMessage({ locale, area: 'keys' }),
+              );
+              return null;
+            }
+            await handleAdminCreateDynamicKeyCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              adminActor,
+              argsText: '',
+              deps: {
+                sendTelegramMessage,
+                sendAccessKeySharePageToTelegram,
+                sendDynamicKeySharePageToTelegram,
+                createAccessKeyTelegramConnectLink,
+                createDynamicKeyTelegramConnectLink,
+              },
+            });
+            break;
+          case 'managekey':
+            if (!hasKeyManageScope(adminActor.scope)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                telegramAdminScopeDeniedMessage({ locale, area: 'keys' }),
+              );
+              return null;
+            }
+            await handleAdminManageAccessKeyCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              argsText: '',
+              deps: {
+                sendTelegramMessage,
+                sendAccessKeySharePageToTelegram,
+                sendDynamicKeySharePageToTelegram,
+                createAccessKeyTelegramConnectLink,
+                createDynamicKeyTelegramConnectLink,
+              },
+            });
+            break;
+          case 'managedynamic':
+            if (!hasKeyManageScope(adminActor.scope)) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                telegramAdminScopeDeniedMessage({ locale, area: 'keys' }),
+              );
+              return null;
+            }
+            await handleAdminManageDynamicKeyCommand({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+              locale,
+              botToken: config.botToken,
+              argsText: '',
+              deps: {
+                sendTelegramMessage,
+                sendAccessKeySharePageToTelegram,
+                sendDynamicKeySharePageToTelegram,
+                createAccessKeyTelegramConnectLink,
+                createDynamicKeyTelegramConnectLink,
+              },
             });
             break;
           case 'reviewqueue':
@@ -10016,17 +10166,38 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
           telegramUserId: String(telegramUserId),
           telegramChatId: String(chatId),
         });
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!activeOrder && !pendingPremiumReply && !pendingSupportReply && emailRegex.test(text)) {
-    return handleEmailLink(chatId, telegramUserId, text, locale);
-  }
-
   const adminActor = await resolveTelegramAdminActor({
     telegramUserId,
     chatId,
     config,
   });
   const isAdmin = adminActor.isAdmin;
+  if (!activeOrder && !pendingPremiumReply && !pendingSupportReply && isAdmin) {
+    const handledAdminKeyText = await handleTelegramAdminKeyTextInput({
+      chatId,
+      telegramUserId,
+      locale,
+      botToken: config.botToken,
+      adminActor,
+      text,
+      deps: {
+        sendTelegramMessage,
+        sendAccessKeySharePageToTelegram,
+        sendDynamicKeySharePageToTelegram,
+        createAccessKeyTelegramConnectLink,
+        createDynamicKeyTelegramConnectLink,
+      },
+    });
+    if (handledAdminKeyText) {
+      return null;
+    }
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!activeOrder && !pendingPremiumReply && !pendingSupportReply && emailRegex.test(text)) {
+    return handleEmailLink(chatId, telegramUserId, text, locale);
+  }
+
   const normalizedShortcutCommand = normalizeTelegramReplyKeyboardCommand(text, isAdmin);
   const commandText = normalizedShortcutCommand || text;
   const commandMatch = commandText.match(/^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/);
@@ -10249,6 +10420,21 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
           ? 'Support reply draft ကို ဖျက်ပြီးပါပြီ။'
           : 'Cancelled the support reply draft.';
       }
+      const pendingAdminFlow = !currentOrder && isAdmin
+        ? await getTelegramPendingAdminFlow({
+            telegramUserId: String(telegramUserId),
+            telegramChatId: String(chatId),
+          })
+        : null;
+      if (!currentOrder && pendingAdminFlow) {
+        await cancelTelegramAdminKeyFlow({
+          telegramUserId,
+          chatId,
+        });
+        return locale === 'my'
+          ? 'Telegram admin key wizard ကို ပယ်ဖျက်ပြီးပါပြီ။'
+          : 'Cancelled the Telegram admin key wizard.';
+      }
 
       if (!currentOrder) {
         return ui.noOrderToCancel;
@@ -10276,6 +10462,84 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
             chatId,
           })
         : ui.adminOnly;
+    case 'createkey':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasKeyManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'keys' });
+      }
+      return handleAdminCreateAccessKeyCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        adminActor,
+        argsText,
+        deps: {
+          sendTelegramMessage,
+          sendAccessKeySharePageToTelegram,
+          sendDynamicKeySharePageToTelegram,
+          createAccessKeyTelegramConnectLink,
+          createDynamicKeyTelegramConnectLink,
+        },
+      });
+    case 'createdynamic':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasKeyManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'keys' });
+      }
+      return handleAdminCreateDynamicKeyCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        adminActor,
+        argsText,
+        deps: {
+          sendTelegramMessage,
+          sendAccessKeySharePageToTelegram,
+          sendDynamicKeySharePageToTelegram,
+          createAccessKeyTelegramConnectLink,
+          createDynamicKeyTelegramConnectLink,
+        },
+      });
+    case 'managekey':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasKeyManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'keys' });
+      }
+      return handleAdminManageAccessKeyCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        argsText,
+        deps: {
+          sendTelegramMessage,
+          sendAccessKeySharePageToTelegram,
+          sendDynamicKeySharePageToTelegram,
+          createAccessKeyTelegramConnectLink,
+          createDynamicKeyTelegramConnectLink,
+        },
+      });
+    case 'managedynamic':
+      if (!isAdmin) return ui.adminOnly;
+      if (!hasKeyManageScope(adminActor.scope)) {
+        return telegramAdminScopeDeniedMessage({ locale, area: 'keys' });
+      }
+      return handleAdminManageDynamicKeyCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        argsText,
+        deps: {
+          sendTelegramMessage,
+          sendAccessKeySharePageToTelegram,
+          sendDynamicKeySharePageToTelegram,
+          createAccessKeyTelegramConnectLink,
+          createDynamicKeyTelegramConnectLink,
+        },
+      });
     case 'reviewqueue':
       if (!isAdmin) return ui.adminOnly;
       if (!hasTelegramReviewManageScope(adminActor.scope)) {

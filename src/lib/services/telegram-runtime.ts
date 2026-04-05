@@ -265,6 +265,42 @@ export async function getTelegramPendingSupportReply(input: {
   };
 }
 
+export async function setTelegramPendingAdminFlow(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+  flow?: string | null;
+}) {
+  return db.telegramUserProfile.upsert({
+    where: { telegramUserId: input.telegramUserId },
+    create: {
+      telegramUserId: input.telegramUserId,
+      telegramChatId: input.telegramChatId || null,
+      pendingAdminFlow: input.flow || null,
+      pendingAdminFlowStartedAt: input.flow ? new Date() : null,
+    },
+    update: {
+      telegramChatId: input.telegramChatId || null,
+      pendingAdminFlow: input.flow || null,
+      pendingAdminFlowStartedAt: input.flow ? new Date() : null,
+    },
+  });
+}
+
+export async function getTelegramPendingAdminFlow(input: {
+  telegramUserId: string;
+  telegramChatId?: string | null;
+}) {
+  const profile = await getTelegramUserProfile(input.telegramUserId, input.telegramChatId || null);
+  if (!profile?.pendingAdminFlow) {
+    return null;
+  }
+
+  return {
+    flow: profile.pendingAdminFlow,
+    startedAt: profile.pendingAdminFlowStartedAt || null,
+  };
+}
+
 export async function setTelegramUserLocale(input: {
   telegramUserId: string;
   telegramChatId?: string | null;

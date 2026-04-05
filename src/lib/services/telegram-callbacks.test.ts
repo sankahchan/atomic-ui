@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildTelegramAdminKeyCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramOrderReviewCallbackData,
   buildTelegramSupportQueueCallbackData,
   getCommandKeyboard,
+  parseTelegramAdminKeyCallbackData,
   normalizeTelegramReplyKeyboardCommand,
   parseTelegramMenuCallbackData,
   parseTelegramOrderReviewCallbackData,
@@ -39,6 +41,9 @@ test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () =
   assert.equal(normalizeTelegramReplyKeyboardCommand('🧭 Admin home', true), '/admin');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📋 Review queue', true), '/reviewqueue');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', true), '/announcements');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('➕ Normal key', true), '/createkey');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('💎 Dynamic key', true), '/createdynamic');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🛠 Manage key', true), '/managekey');
 });
 
 test('telegram order review callbacks support quick reject presets', () => {
@@ -138,5 +143,18 @@ test('resolveTelegramRetentionSourceFromRenewAction supports dynamic coupon rene
   assert.equal(
     resolveTelegramRetentionSourceFromRenewAction('dynamic_renewal_coupon'),
     'renewal_coupon',
+  );
+});
+
+test('telegram admin key callbacks preserve action arguments', () => {
+  assert.deepEqual(
+    parseTelegramAdminKeyCallbackData(
+      buildTelegramAdminKeyCallbackData('quota', 'key_123', '30'),
+    ),
+    {
+      action: 'quota',
+      primary: 'key_123',
+      secondary: '30',
+    },
   );
 });

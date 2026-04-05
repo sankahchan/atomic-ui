@@ -4,6 +4,7 @@ import archiver from 'archiver';
 import si from 'systeminformation';
 import {
   hasFinanceManageScope,
+  hasKeyManageScope,
   hasOutageManageScope,
   hasTelegramAnnouncementManageScope,
   hasTelegramReviewManageScope,
@@ -39,6 +40,15 @@ export {
   handleAnnouncementsCommand,
   handleScheduleAnnouncementCommand,
 } from '@/lib/services/telegram-admin-announcements';
+export {
+  cancelTelegramAdminKeyFlow,
+  handleAdminCreateAccessKeyCommand,
+  handleAdminCreateDynamicKeyCommand,
+  handleAdminManageAccessKeyCommand,
+  handleAdminManageDynamicKeyCommand,
+  handleTelegramAdminKeyCallback,
+  handleTelegramAdminKeyTextInput,
+} from '@/lib/services/telegram-admin-keys';
 export {
   handleClaimRefundCommand,
   handleFinanceCommand,
@@ -562,6 +572,29 @@ function buildTelegramAdminHomeKeyboard(input: {
   const isMyanmar = input.locale === 'my';
   const withCount = (label: string, count: number) => (count > 0 ? `${label} (${count})` : label);
 
+  if (hasKeyManageScope(input.adminActor.scope)) {
+    rows.push([
+      {
+        text: isMyanmar ? '➕ Normal key' : '➕ Normal key',
+        callback_data: buildTelegramMenuCallbackData('admin', 'createkey'),
+      },
+      {
+        text: isMyanmar ? '💎 Dynamic key' : '💎 Dynamic key',
+        callback_data: buildTelegramMenuCallbackData('admin', 'createdynamic'),
+      },
+    ]);
+    rows.push([
+      {
+        text: isMyanmar ? '🛠 Manage key' : '🛠 Manage key',
+        callback_data: buildTelegramMenuCallbackData('admin', 'managekey'),
+      },
+      {
+        text: isMyanmar ? '🧭 Manage dynamic' : '🧭 Manage dynamic',
+        callback_data: buildTelegramMenuCallbackData('admin', 'managedynamic'),
+      },
+    ]);
+  }
+
   if (hasTelegramReviewManageScope(input.adminActor.scope)) {
     rows.push([
       {
@@ -745,6 +778,18 @@ export async function handleAdminHomeCommand(input: {
   const supportOpen = customerSupportOpen + premiumSupportOpen;
   const todayRevenue = todayRevenueAggregate._sum.priceAmount || 0;
 
+  const quickActionLines = [
+    ...(hasKeyManageScope(input.adminActor.scope)
+      ? ['• /createkey', '• /createdynamic', '• /managekey', '• /managedynamic']
+      : []),
+    ...(hasTelegramReviewManageScope(input.adminActor.scope)
+      ? ['• /reviewqueue', '• /supportqueue']
+      : []),
+    ...(hasFinanceManageScope(input.adminActor.scope) ? ['• /refunds', '• /finance'] : []),
+    ...(hasTelegramAnnouncementManageScope(input.adminActor.scope) ? ['• /announcements'] : []),
+    '• /status',
+  ];
+
   const message = [
     isMyanmar ? '🧭 <b>Admin home</b>' : '🧭 <b>Admin home</b>',
     '',
@@ -782,12 +827,7 @@ export async function handleAdminHomeCommand(input: {
       : `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`,
     '',
     isMyanmar ? '<b>Quick next actions</b>' : '<b>Quick next actions</b>',
-    '• /reviewqueue',
-    '• /refunds',
-    '• /supportqueue',
-    '• /announcements',
-    '• /finance',
-    '• /status',
+    ...quickActionLines,
   ].join('\n');
 
   if (input.botToken && input.chatId != null) {
@@ -883,6 +923,10 @@ export function buildTelegramHelpMessage(input: {
 /status - Server အခြေအနေအနှစ်ချုပ်
 /expiring [days] - မကြာမီ သက်တမ်းကုန်မည့် key များ
 /find &lt;query&gt; - Key ကို ရှာမည်
+/createkey [recipient] - normal key wizard ကို စတင်မည်
+/createdynamic [recipient] - dynamic key wizard ကို စတင်မည်
+/managekey [query] - normal key quota/expiry/access ကို စီမံမည်
+/managedynamic [query] - dynamic key quota/expiry/access ကို စီမံမည်
 /disable &lt;key-id&gt; - Key ကို ပိတ်မည်
 /enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
 /resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
@@ -910,6 +954,10 @@ export function buildTelegramHelpMessage(input: {
 /status - Server status summary
 /expiring [days] - Keys expiring soon
 /find &lt;query&gt; - Search for a key
+/createkey [recipient] - Start the normal-key wizard
+/createdynamic [recipient] - Start the dynamic-key wizard
+/managekey [query] - Manage a normal key from Telegram
+/managedynamic [query] - Manage a dynamic key from Telegram
 /disable &lt;key-id&gt; - Disable a key
 /enable &lt;key-id&gt; - Re-enable a key
 /resend &lt;key-id&gt; - Resend the share page

@@ -51,7 +51,7 @@ export async function resolveTelegramAdminActor(input: {
 
 export function telegramAdminScopeDeniedMessage(input: {
   locale: SupportedLocale;
-  area: 'announcement' | 'finance' | 'outage' | 'review';
+  area: 'announcement' | 'finance' | 'outage' | 'review' | 'keys';
 }) {
   const isMyanmar = input.locale === 'my';
   switch (input.area) {
@@ -71,6 +71,10 @@ export function telegramAdminScopeDeniedMessage(input: {
       return isMyanmar
         ? 'Review command များကို အသုံးပြုရန် Owner/Admin/Support scope လိုအပ်သည်။'
         : 'Owner, Admin, or Support scope is required for review commands.';
+    case 'keys':
+      return isMyanmar
+        ? 'Key create/manage command များကို အသုံးပြုရန် Owner/Admin scope လိုအပ်သည်။'
+        : 'Owner or Admin scope is required for Telegram key create/manage commands.';
     default:
       return isMyanmar ? 'ဤ command ကို အသုံးပြုခွင့်မရှိပါ။' : 'You do not have permission to use this command.';
   }
