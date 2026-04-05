@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
 import { getJwtSecretBytes } from './session-secret';
+import { normalizeLegacyAdminScopes } from './server-admin-scope';
 
 // Constants for authentication
 const SESSION_COOKIE_NAME = 'atomic-session';
@@ -139,6 +140,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     if (!payload) {
       return null;
+    }
+
+    if (payload.role === 'ADMIN') {
+      await normalizeLegacyAdminScopes();
     }
 
     // Fetch the full user from the database

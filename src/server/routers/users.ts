@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { hashPassword } from '@/lib/auth';
 import { coerceSupportedLocale } from '@/lib/i18n/config';
@@ -598,6 +599,29 @@ export const usersRouter = router({
           ].filter((value): value is string => Boolean(value && value.trim())),
         ),
       );
+      const supportThreadWhere: Prisma.TelegramSupportThreadWhereInput[] = [{ userId: user.id }];
+      if (telegramIdentifiers.length > 0) {
+        supportThreadWhere.push(
+          { telegramChatId: { in: telegramIdentifiers } },
+          { telegramUserId: { in: telegramIdentifiers } },
+        );
+      }
+      const supportThreads =
+        telegramIdentifiers.length > 0 || Boolean(user.id)
+          ? await db.telegramSupportThread.findMany({
+              where: {
+                OR: supportThreadWhere,
+              },
+              include: {
+                replies: {
+                  orderBy: [{ createdAt: 'desc' }],
+                  take: 6,
+                },
+              },
+              orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+              take: 24,
+            })
+          : [];
       const couponRedemptions =
         telegramIdentifiers.length > 0 || accessKeyIds.length > 0 || dynamicKeyIds.length > 0
           ? await db.telegramCouponRedemption.findMany({
@@ -621,6 +645,7 @@ export const usersRouter = router({
       type AnnouncementDeliveryItem = (typeof announcementDeliveries)[number];
       type KeyNotificationLogItem = (typeof keyNotificationLog)[number];
       type SupportNoteItem = (typeof supportNotes)[number];
+      type SupportThreadItem = (typeof supportThreads)[number];
 
       const revenueByCurrency = new Map<string, number>();
       const refundedByCurrency = new Map<string, number>();
@@ -829,6 +854,42 @@ export const usersRouter = router({
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
           createdBy: note.createdBy,
+        })),
+        supportThreads: supportThreads.map((thread: SupportThreadItem) => ({
+          id: thread.id,
+          threadCode: thread.threadCode,
+          status: thread.status,
+          waitingOn: thread.waitingOn,
+          issueCategory: thread.issueCategory,
+          locale: thread.locale,
+          subject: thread.subject,
+          relatedOrderCode: thread.relatedOrderCode,
+          relatedKeyName: thread.relatedKeyName,
+          relatedKeyType: thread.relatedKeyType,
+          relatedServerName: thread.relatedServerName,
+          firstResponseDueAt: thread.firstResponseDueAt,
+          firstAdminReplyAt: thread.firstAdminReplyAt,
+          lastCustomerReplyAt: thread.lastCustomerReplyAt,
+          lastAdminReplyAt: thread.lastAdminReplyAt,
+          handledAt: thread.handledAt,
+          escalatedAt: thread.escalatedAt,
+          escalatedReason: thread.escalatedReason,
+          assignedAdminUserId: thread.assignedAdminUserId,
+          assignedAdminName: thread.assignedAdminName,
+          createdAt: thread.createdAt,
+          updatedAt: thread.updatedAt,
+          replies: thread.replies
+            .slice()
+            .reverse()
+            .map((reply) => ({
+              id: reply.id,
+              senderType: reply.senderType,
+              senderName: reply.senderName,
+              message: reply.message,
+              mediaKind: reply.mediaKind,
+              mediaUrl: reply.mediaUrl,
+              createdAt: reply.createdAt,
+            })),
         })),
         financePermissions: {
           canManage: canUserManageFinance(ctx.user, financeControls),
@@ -1770,7 +1831,7 @@ export const usersRouter = router({
         const ownerCount = await db.user.count({
           where: {
             role: 'ADMIN',
-            OR: [{ adminScope: 'OWNER' }, { adminScope: null }],
+            adminScope: 'OWNER',
           },
         });
         if (ownerCount <= 1) {
@@ -1802,7 +1863,7 @@ export const usersRouter = router({
         entityId: target.id,
         details: {
           email: target.email,
-          previousScope: normalizeAdminScope(target.adminScope) || 'OWNER',
+          previousScope: normalizeAdminScope(target.adminScope) || 'UNASSIGNED',
           nextScope,
         },
       });

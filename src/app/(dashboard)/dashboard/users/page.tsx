@@ -143,7 +143,7 @@ export default function UsersPage() {
   const ownerCount = userList.filter(
     (user) =>
       user.role === 'ADMIN' &&
-      (!normalizeAdminScope(user.adminScope) || normalizeAdminScope(user.adminScope) === 'OWNER'),
+      normalizeAdminScope(user.adminScope) === 'OWNER',
   ).length;
   const clientCount = userList.filter((user) => user.role === 'CLIENT').length;
   const assignedKeyCount = userList.reduce(
@@ -1186,7 +1186,7 @@ export default function UsersPage() {
                           <TableCell>
                             {user.role === 'ADMIN' ? (
                               <Select
-                                value={normalizeAdminScope(user.adminScope) || 'OWNER'}
+                                value={normalizeAdminScope(user.adminScope) || 'ADMIN'}
                                 onValueChange={(value) =>
                                   updateAdminScopeMutation.mutate({
                                     userId: user.id,
@@ -1320,7 +1320,7 @@ export default function UsersPage() {
                     <div className="space-y-2">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Admin scope</p>
                       <Select
-                        value={normalizeAdminScope(user.adminScope) || 'OWNER'}
+                        value={normalizeAdminScope(user.adminScope) || 'ADMIN'}
                         onValueChange={(value) =>
                           updateAdminScopeMutation.mutate({
                             userId: user.id,

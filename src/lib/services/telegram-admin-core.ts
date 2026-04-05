@@ -1,6 +1,6 @@
-import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { type TelegramConfig } from '@/lib/services/telegram-runtime';
+import { resolveLinkedOrAutoLinkedTelegramAdmin } from '@/lib/server-admin-scope';
 
 export type TelegramAdminActor = {
   isAdmin: boolean;
@@ -18,19 +18,9 @@ export async function resolveTelegramAdminActor(input: {
     input.config.adminChatIds.includes(String(input.telegramUserId)) ||
     input.config.adminChatIds.includes(String(input.chatId));
 
-  const linkedAdmin = await db.user.findFirst({
-    where: {
-      role: 'ADMIN',
-      OR: [
-        { telegramChatId: String(input.chatId) },
-        { telegramChatId: String(input.telegramUserId) },
-      ],
-    },
-    select: {
-      id: true,
-      email: true,
-      adminScope: true,
-    },
+  const linkedAdmin = await resolveLinkedOrAutoLinkedTelegramAdmin({
+    telegramUserId: input.telegramUserId,
+    chatId: input.chatId,
   });
 
   if (linkedAdmin) {
@@ -38,16 +28,16 @@ export async function resolveTelegramAdminActor(input: {
       isAdmin: true,
       userId: linkedAdmin.id,
       email: linkedAdmin.email,
-      scope: linkedAdmin.adminScope || null,
+      scope: linkedAdmin.adminScope,
     };
   }
 
   if (adminChatMatch) {
     return {
-      isAdmin: true,
+      isAdmin: false,
       userId: null,
       email: null,
-      scope: 'OWNER',
+      scope: null,
     };
   }
 

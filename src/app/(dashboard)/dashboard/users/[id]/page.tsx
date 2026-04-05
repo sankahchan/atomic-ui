@@ -145,6 +145,7 @@ type CommunicationThreadEvent = {
   category:
     | 'announcement'
     | 'message'
+    | 'support_thread'
     | 'support_note'
     | 'receipt'
     | 'refund'
@@ -153,6 +154,44 @@ type CommunicationThreadEvent = {
   href?: string;
   meta?: string;
 };
+
+function getSupportThreadCategoryLabel(category: string) {
+  switch ((category || '').trim().toUpperCase()) {
+    case 'ORDER':
+      return 'Order / payment';
+    case 'KEY':
+      return 'Key / usage';
+    case 'SERVER':
+      return 'Server / route issue';
+    case 'BILLING':
+      return 'Billing / refund';
+    default:
+      return 'General help';
+  }
+}
+
+function getSupportThreadStateLabel(status: string, waitingOn: string) {
+  if (status === 'HANDLED') {
+    return 'Handled';
+  }
+  if (status === 'ESCALATED') {
+    return 'Escalated to panel';
+  }
+  if ((waitingOn || '').toUpperCase() === 'USER') {
+    return 'Waiting for customer';
+  }
+  return 'Waiting for admin';
+}
+
+function getSupportThreadTone(status: string, waitingOn: string): SupportTimelineEvent['tone'] {
+  if (status === 'HANDLED') {
+    return 'positive';
+  }
+  if (status === 'ESCALATED') {
+    return 'warning';
+  }
+  return (waitingOn || '').toUpperCase() === 'USER' ? 'default' : 'warning';
+}
 
 const CRM_DIRECT_MESSAGE_TEMPLATES = [
   {
@@ -702,6 +741,28 @@ export default function UserLedgerPage() {
       });
     }
 
+    for (const thread of ledgerQuery.data.supportThreads) {
+      const latestReply = thread.replies[thread.replies.length - 1];
+      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+
+      events.push({
+        id: `support-thread:${thread.id}`,
+        at: new Date(thread.updatedAt || thread.createdAt),
+        title: 'Telegram support thread',
+        detail: [
+          thread.threadCode,
+          getSupportThreadCategoryLabel(thread.issueCategory),
+          stateLabel,
+          latestReply
+            ? `${latestReply.senderType === 'ADMIN' ? 'Admin' : 'Customer'}: ${latestReply.message}`
+            : thread.subject || null,
+        ]
+          .filter(Boolean)
+          .join(' • '),
+        tone: getSupportThreadTone(thread.status, thread.waitingOn),
+      });
+    }
+
     for (const note of ledgerQuery.data.supportNotes) {
       events.push({
         id: `support-note:${note.id}`,
@@ -753,6 +814,31 @@ export default function UserLedgerPage() {
         category: 'key_notice',
         customerFacing: true,
         meta: [log.accessKeyName || 'Unlinked key', log.status].join(' • '),
+      });
+    }
+
+    for (const thread of ledgerQuery.data.supportThreads) {
+      const latestReply = thread.replies[thread.replies.length - 1];
+      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+
+      events.push({
+        id: `support-thread-thread:${thread.id}`,
+        at: new Date(thread.updatedAt || thread.createdAt),
+        title: `Support thread ${thread.threadCode}`,
+        detail: latestReply?.message || thread.subject || 'Thread created',
+        tone: getSupportThreadTone(thread.status, thread.waitingOn),
+        category: 'support_thread',
+        customerFacing: true,
+        meta: [
+          getSupportThreadCategoryLabel(thread.issueCategory),
+          stateLabel,
+          thread.assignedAdminName ? `Assigned ${thread.assignedAdminName}` : null,
+          latestReply
+            ? `${latestReply.senderType === 'ADMIN' ? 'Latest admin reply' : 'Latest customer reply'} ${formatRelativeTime(latestReply.createdAt)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' • ') || undefined,
       });
     }
 
@@ -925,7 +1011,7 @@ export default function UserLedgerPage() {
     );
   }
 
-  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, couponHistory, couponEligibility, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, financePermissions, crmPermissions } =
+  const { user, telegramProfile, summary, accessKeys, dynamicKeys, telegramOrders, couponHistory, couponEligibility, serverChangeRequests, premiumSupportRequests, premiumRoutingAlerts, customerNotifications, supportNotes, supportThreads, financePermissions, crmPermissions } =
     ledgerQuery.data;
   const announcementDeliveries = [...customerNotifications.announcements].sort((left, right) => {
     if (left.isPinned !== right.isPinned) {
@@ -937,6 +1023,7 @@ export default function UserLedgerPage() {
     return new Date(right.sentAt || right.createdAt).getTime() - new Date(left.sentAt || left.createdAt).getTime();
   });
   type SupportNoteItem = (typeof supportNotes)[number];
+  type SupportThreadItem = (typeof supportThreads)[number];
   type KeyNoticeItem = (typeof customerNotifications.keyNotices)[number];
   type ServerChangeRequestItem = (typeof serverChangeRequests)[number];
   type PremiumSupportRequestItem = (typeof premiumSupportRequests)[number];
@@ -1574,7 +1661,7 @@ export default function UserLedgerPage() {
                 Communication thread
               </CardTitle>
               <CardDescription>
-                One thread for support notes, direct messages, announcements, receipts, refund decisions, and key notices.
+                One thread for support notes, Telegram support threads, direct messages, announcements, receipts, refund decisions, and key notices.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1601,6 +1688,7 @@ export default function UserLedgerPage() {
                     <SelectItem value="INTERNAL">Internal only</SelectItem>
                     <SelectItem value="announcement">Announcements</SelectItem>
                     <SelectItem value="message">Direct messages</SelectItem>
+                    <SelectItem value="support_thread">Support threads</SelectItem>
                     <SelectItem value="receipt">Receipts</SelectItem>
                     <SelectItem value="refund">Refund decisions</SelectItem>
                     <SelectItem value="key_notice">Key notices</SelectItem>
@@ -1650,6 +1738,8 @@ export default function UserLedgerPage() {
                                   ? 'Announcement'
                                   : event.category === 'message'
                                     ? 'Direct message'
+                                    : event.category === 'support_thread'
+                                      ? 'Support thread'
                                     : event.category === 'receipt'
                                       ? 'Receipt'
                                       : event.category === 'refund'
@@ -2580,7 +2670,7 @@ export default function UserLedgerPage() {
                 Support timeline
               </CardTitle>
               <CardDescription>
-                One chronological feed for notices, premium requests, outage-related contact, and server-change history.
+                One chronological feed for support threads, notices, premium requests, outage-related contact, and server-change history.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -2633,9 +2723,52 @@ export default function UserLedgerPage() {
                 <ShieldAlert className="h-5 w-5 text-primary" />
                 Support activity
               </CardTitle>
-              <CardDescription>Recent server-change and premium support requests linked to this customer.</CardDescription>
+              <CardDescription>Recent Telegram support threads, server-change requests, and premium support requests linked to this customer.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <p className="mb-2 text-sm font-medium">Telegram support threads</p>
+                {supportThreads.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No Telegram support threads yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {supportThreads.map((thread: SupportThreadItem) => {
+                      const latestReply = thread.replies[thread.replies.length - 1];
+                      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+
+                      return (
+                        <div key={thread.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-medium">{thread.threadCode}</p>
+                            <Badge variant="outline">{stateLabel}</Badge>
+                          </div>
+                          <p className="mt-1 text-muted-foreground">
+                            {getSupportThreadCategoryLabel(thread.issueCategory)}
+                            {thread.assignedAdminName ? ` • ${thread.assignedAdminName}` : ''}
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {formatRelativeTime(thread.updatedAt || thread.createdAt)}
+                            {thread.firstResponseDueAt ? ` • SLA ${formatDateTime(thread.firstResponseDueAt)}` : ''}
+                          </p>
+                          {latestReply ? (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              {latestReply.senderType === 'ADMIN' ? 'Admin' : 'Customer'}: {latestReply.message}
+                            </p>
+                          ) : null}
+                          {thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {thread.relatedOrderCode ? <Badge variant="secondary">Order: {thread.relatedOrderCode}</Badge> : null}
+                              {thread.relatedKeyName ? <Badge variant="secondary">Key: {thread.relatedKeyName}</Badge> : null}
+                              {thread.relatedServerName ? <Badge variant="secondary">Server: {thread.relatedServerName}</Badge> : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <p className="mb-2 text-sm font-medium">Server change requests</p>
                 {serverChangeRequests.length === 0 ? (
