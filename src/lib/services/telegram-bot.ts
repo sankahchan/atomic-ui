@@ -12,7 +12,6 @@
 import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
-import QRCode from 'qrcode';
 import si from 'systeminformation';
 import {
   hasFinanceManageScope,
@@ -177,6 +176,7 @@ import {
 } from '@/lib/services/telegram-notifications';
 import { handleOffersCommand } from '@/lib/services/telegram-offers';
 import { handleTelegramStartCommand } from '@/lib/services/telegram-onboarding';
+import { generateTelegramQrBufferWithAtomicLogo } from '@/lib/services/telegram-qr';
 import {
   handleAdminHomeCommand,
   handleAdminCreateAccessKeyCommand,
@@ -6801,10 +6801,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   if (input.includeQr ?? true) {
     try {
-      const qrBuffer = await QRCode.toBuffer(key.accessUrl || sharePageUrl, {
-        width: 300,
-        margin: 2,
-      });
+      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(key.accessUrl || sharePageUrl);
       await sendTelegramPhoto(
         config.botToken,
         destinationChatId,
@@ -7019,10 +7016,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
 
   if (input.includeQr ?? true) {
     try {
-      const qrBuffer = await QRCode.toBuffer(outlineClientUrl, {
-        width: 300,
-        margin: 2,
-      });
+      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(outlineClientUrl);
       await sendTelegramPhoto(
         config.botToken,
         destinationChatId,
