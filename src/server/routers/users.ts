@@ -1045,6 +1045,203 @@ export const usersRouter = router({
       };
     }),
 
+  listSupportThreads: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(['ALL', 'ACTIVE', 'WAITING_ADMIN', 'WAITING_USER', 'ESCALATED', 'HANDLED', 'OVERDUE']).optional(),
+        assignment: z.enum(['ALL', 'UNASSIGNED', 'MINE', 'ASSIGNED']).optional(),
+        issueCategory: z.enum(['ALL', 'ORDER', 'KEY', 'SERVER', 'BILLING', 'GENERAL']).optional(),
+        query: z.string().trim().max(100).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view support threads.',
+        });
+      }
+
+      const now = new Date();
+      const statusFilter = input.status || 'ACTIVE';
+      const assignmentFilter = input.assignment || 'ALL';
+      const issueCategoryFilter = input.issueCategory || 'ALL';
+      const limit = input.limit ?? 40;
+      const query = input.query?.trim();
+
+      const where: Prisma.TelegramSupportThreadWhereInput = {};
+
+      if (statusFilter === 'ACTIVE') {
+        where.status = { in: ['OPEN', 'ESCALATED'] };
+      } else if (statusFilter === 'WAITING_ADMIN') {
+        where.status = { in: ['OPEN', 'ESCALATED'] };
+        where.waitingOn = 'ADMIN';
+      } else if (statusFilter === 'WAITING_USER') {
+        where.status = { in: ['OPEN', 'ESCALATED'] };
+        where.waitingOn = 'USER';
+      } else if (statusFilter === 'ESCALATED') {
+        where.status = 'ESCALATED';
+      } else if (statusFilter === 'HANDLED') {
+        where.status = 'HANDLED';
+      } else if (statusFilter === 'OVERDUE') {
+        where.status = { in: ['OPEN', 'ESCALATED'] };
+        where.firstAdminReplyAt = null;
+        where.firstResponseDueAt = { lte: now };
+      }
+
+      if (assignmentFilter === 'UNASSIGNED') {
+        where.assignedAdminUserId = null;
+      } else if (assignmentFilter === 'MINE') {
+        where.assignedAdminUserId = ctx.user.id;
+      } else if (assignmentFilter === 'ASSIGNED') {
+        where.assignedAdminUserId = { not: null };
+      }
+
+      if (issueCategoryFilter !== 'ALL') {
+        where.issueCategory = issueCategoryFilter;
+      }
+
+      if (query) {
+        where.OR = [
+          { threadCode: { contains: query } },
+          { subject: { contains: query } },
+          { telegramUsername: { contains: query } },
+          { relatedOrderCode: { contains: query } },
+          { relatedKeyName: { contains: query } },
+          { relatedServerName: { contains: query } },
+          { user: { is: { email: { contains: query } } } },
+        ];
+      }
+
+      const [threads, openCount, waitingAdminCount, waitingUserCount, overdueCount, unassignedCount, mineCount, escalatedCount] =
+        await Promise.all([
+          db.telegramSupportThread.findMany({
+            where,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  telegramChatId: true,
+                },
+              },
+              replies: {
+                orderBy: [{ createdAt: 'desc' }],
+                take: 1,
+              },
+            },
+            orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
+            take: limit,
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+              waitingOn: 'ADMIN',
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+              waitingOn: 'USER',
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+              firstAdminReplyAt: null,
+              firstResponseDueAt: { lte: now },
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+              assignedAdminUserId: null,
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: { in: ['OPEN', 'ESCALATED'] },
+              assignedAdminUserId: ctx.user.id,
+            },
+          }),
+          db.telegramSupportThread.count({
+            where: {
+              status: 'ESCALATED',
+            },
+          }),
+        ]);
+
+      return {
+        summary: {
+          open: openCount,
+          waitingAdmin: waitingAdminCount,
+          waitingUser: waitingUserCount,
+          overdue: overdueCount,
+          unassigned: unassignedCount,
+          mine: mineCount,
+          escalated: escalatedCount,
+        },
+        threads: threads.map((thread) => {
+          const latestReply = thread.replies[0] || null;
+          return {
+            id: thread.id,
+            threadCode: thread.threadCode,
+            status: thread.status,
+            waitingOn: thread.waitingOn,
+            issueCategory: thread.issueCategory,
+            issueLabel: resolveTelegramSupportIssueLabel(thread.issueCategory, coerceSupportedLocale(thread.locale) || 'en'),
+            locale: coerceSupportedLocale(thread.locale) || 'en',
+            telegramUsername: thread.telegramUsername,
+            userId: thread.userId,
+            subject: thread.subject,
+            relatedOrderCode: thread.relatedOrderCode,
+            relatedKeyName: thread.relatedKeyName,
+            relatedServerName: thread.relatedServerName,
+            firstResponseDueAt: thread.firstResponseDueAt,
+            firstAdminReplyAt: thread.firstAdminReplyAt,
+            lastCustomerReplyAt: thread.lastCustomerReplyAt,
+            lastAdminReplyAt: thread.lastAdminReplyAt,
+            handledAt: thread.handledAt,
+            escalatedAt: thread.escalatedAt,
+            escalatedReason: thread.escalatedReason,
+            assignedAdminUserId: thread.assignedAdminUserId,
+            assignedAdminName: thread.assignedAdminName,
+            createdAt: thread.createdAt,
+            updatedAt: thread.updatedAt,
+            isOverdue:
+              !thread.firstAdminReplyAt
+              && Boolean(thread.firstResponseDueAt)
+              && (thread.firstResponseDueAt?.getTime() || 0) <= Date.now(),
+            customer: thread.user
+              ? {
+                  id: thread.user.id,
+                  email: thread.user.email,
+                  telegramChatId: thread.user.telegramChatId,
+                }
+              : null,
+            latestReply: latestReply
+              ? {
+                  id: latestReply.id,
+                  senderType: latestReply.senderType,
+                  senderName: latestReply.senderName,
+                  message: latestReply.message,
+                  mediaKind: latestReply.mediaKind,
+                  mediaUrl: latestReply.mediaUrl,
+                  mediaFilename: latestReply.mediaFilename,
+                  createdAt: latestReply.createdAt,
+                }
+              : null,
+          };
+        }),
+      };
+    }),
+
   claimSupportThread: adminProcedure
     .input(
       z.object({
