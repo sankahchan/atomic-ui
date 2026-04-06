@@ -1,41 +1,46 @@
 # Atomic-UI
 
-Advanced Outline VPN management panel built with Next.js 14, TypeScript, Prisma, and tRPC.
+Advanced Outline VPN control center built with Next.js 14, TypeScript, Prisma, and tRPC.
+
+Atomic-UI combines:
+- multi-server Outline operations
+- access-key and dynamic-key lifecycle management
+- Telegram storefront, support, and admin operations
+- customer CRM, finance, and announcement tooling
+- direct VPS install/deploy flows for low-memory hosts
 
 ![Atomic-UI Screenshot](https://github.com/user-attachments/assets/e3a543e6-165f-472b-a46b-462a15c96ed0)
 
-## Features
+## What Atomic-UI Does
 
-### Server management
-- Multi-server Outline support from a single dashboard
-- Server sync and health checks (latency, uptime, status)
-- DigitalOcean-based server provisioning flow
-- Security probe dashboard (TLS/certificate visibility)
+### Control center
+- Multi-server Outline management with health, latency, lifecycle, and outage tools
+- Normal access keys and dynamic keys with quotas, expirations, templates, bulk actions, and QR/share delivery
+- Server lifecycle controls including draining, maintenance, and manual-vs-auto assignment behavior
 
-### Access key management
-- Full CRUD for access keys and dynamic access keys
-- Key templates and bulk actions (extend, enable/disable, tag, archive, delete)
-- Data limits and reset strategies (daily/weekly/monthly/never)
-- Expiration modes (never/fixed/duration/from first use)
-- Subscription links and QR generation
+### Telegram product surface
+- Customer commands for `/start`, `/buy`, `/renew`, `/mykeys`, `/orders`, `/inbox`, `/offers`, `/support`, `/premium`, and `/premiumregion`
+- Admin commands and button-driven flows for announcements, finance, refunds, review queues, support queues, and key management
+- Telegram-based creation and management of both normal keys and dynamic keys
+- Branded QR codes, receipt cards, promo cards, payment guides, and proof examples
 
-### Portal and self-service
-- Dedicated `/portal` experience for non-admin users
-- Dynamic subscription endpoint support (`/api/sub/:token`, `/api/subscription/:token`)
-- Live usage/device visibility
+### Customer operations
+- Customer CRM with keys, orders, refunds, announcements, outage notices, server-change history, and Telegram support-thread history
+- Dedicated support center with queue filtering, ownership, SLA visibility, and thread pages
+- Customer communication center with direct Telegram sends, templates, and delivery history
 
-### Security and auth
-- Roles: `ADMIN` and non-admin user roles (`USER` / `CLIENT`)
-- Session cookie auth with DB-backed session revocation
-- 2FA support: TOTP, recovery codes, and WebAuthn passkeys
-- Dashboard access rules (IP/CIDR/Country)
+### Notifications and growth
+- Channel-based notifications with delivery history and retry visibility
+- Telegram announcement editor with audience targeting, branded cards, scheduling, recurrence, preview-to-self, and analytics
+- Coupon campaigns, offer wallet, attribution, conversion analytics, and retention flows
 
-### Integrations
-- Telegram notification + command integration
-- Backup/restore flows (admin-protected)
-- CSV/JSON export (admin-protected)
+### Security and access control
+- Admin scopes: `OWNER`, `ADMIN`, `FINANCE`, `SUPPORT`
+- Session auth, 2FA, recovery codes, and WebAuthn passkeys
+- Dashboard access rules by IP/CIDR/country
+- Backup and restore flows with smoke validation
 
-## Quick start
+## Quick Start
 
 ### Local development
 
@@ -60,13 +65,13 @@ cp .env.example .env
 docker-compose up -d --build
 ```
 
-### One-command install (VPS)
+### One-command install on a VPS
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
-The installer now tries to enable HTTPS by default on the server IP using nginx plus a Let's Encrypt IP certificate. If HTTPS setup fails, it falls back to HTTP on port `80` and tells you how to enable HTTPS later.
+The installer now prefers HTTPS by default. If HTTPS setup fails, it falls back to HTTP and prints the next steps.
 
 Useful install-time overrides:
 
@@ -77,11 +82,9 @@ sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https
 sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 ```
 
-For production deployment details, see [DEPLOY.md](DEPLOY.md).
-
 ### Fresh VPS bootstrap from your workstation
 
-If you are provisioning a brand-new VPS remotely, use the bootstrap wrapper instead of running the install steps manually:
+For a brand-new VPS, use the remote bootstrap wrapper instead of hand-running the install path:
 
 ```bash
 BOOTSTRAP_HOST=your-server-ip \
@@ -90,82 +93,88 @@ BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
 bash scripts/bootstrap-vps.sh
 ```
 
-See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the domain/HTTPS examples and the full preflight checklist.
+See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS examples and the full checklist.
 
-## Environment variables
+## Production Workflow
+
+### Validate, typecheck, build
+
+Use these as the primary repo checks:
+
+```bash
+npm run env:check -- --env-file=.env
+npm run typecheck
+npm run build
+```
+
+`npm run typecheck` is the canonical source-only TypeScript pass for this repo.
+
+### Smoke tests
+
+```bash
+npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
+npm run smoke:telegram
+```
+
+### Low-memory VPS deploy
+
+```bash
+DEPLOY_HOST=your-server-ip \
+DEPLOY_PASSWORD=your-password \
+bash scripts/deploy-vps.sh
+```
+
+For direct VPS deployment details, see [DEPLOY.md](DEPLOY.md).
+
+## Releases
+
+This repository now uses semver-style Git tags:
+- `v1.0.0` first stable release
+- `v1.1.0` feature release
+- `v1.1.1` bug-fix release
+- `v2.0.0` breaking release
+
+### Recommended release flow
+
+Use `npm version` so `package.json` and `package-lock.json` stay aligned with the tag:
+
+```bash
+npm version patch   # or minor / major
+git push origin main --follow-tags
+```
+
+When a tag like `v1.1.0` is pushed:
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) publishes a GitHub release
+- [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) publishes container images
+
+If you need to publish an existing tag manually, run the `Publish GitHub Release` workflow from GitHub Actions and supply the tag.
+
+## Core Environment Variables
 
 Set these in `.env` before production use:
 
 | Variable | Required | Notes |
-|---|---|---|
-| `DATABASE_URL` | Yes | SQLite DSN (example: `file:./data/atomic-ui.db`) |
-| `JWT_SECRET` | Yes | Session signing secret; must be strong and unique |
-| `SESSION_EXPIRY_DAYS` | No | Session TTL in days (default: `7`) |
-| `TOTP_ENCRYPTION_KEY` | Strongly recommended | Stable key for encrypting TOTP secrets |
-| `CRON_SECRET` | Strongly recommended | Protects task endpoints (`/api/health-check`, `/api/tasks/check-expirations`) |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL used by webhook and server-side flows |
-| `APP_URL` | Recommended | Admin/app base URL for server-side flows |
-| `PUBLIC_SHARE_URL` | Optional | Public share host origin for `/s`, `/sub`, `/c`, and subscription APIs |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` |
+| `JWT_SECRET` | Yes | Session signing secret |
+| `CRON_SECRET` | Strongly recommended | Protects scheduled task endpoints |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL |
+| `APP_URL` | Recommended | Server-side admin/app base URL |
+| `PUBLIC_SHARE_URL` | Optional | Canonical public share host |
 | `NEXT_PUBLIC_PUBLIC_SHARE_URL` | Optional | Client-side mirror of `PUBLIC_SHARE_URL` |
-| `TELEGRAM_BOT_TOKEN` | Optional | Bot token from @BotFather |
-| `SMTP_HOST` | Optional | SMTP host for `EMAIL` notification channels |
-| `SMTP_PORT` | Optional | SMTP port (for example `587` or `465`) |
-| `SMTP_USER` | Optional | SMTP username; pair with `SMTP_PASS` if auth is required |
-| `SMTP_PASS` | Optional | SMTP password; pair with `SMTP_USER` if auth is required |
-| `SMTP_FROM` | Optional | Default sender address for `EMAIL` notification channels |
-| `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from UI |
-| `LOG_LEVEL` | Optional | `debug`, `info`, `warn`, or `error` (default: `info` in production) |
-| `LOG_VERBOSE_SCOPES` | Optional | Comma-separated debug scopes such as `sync,trpc` for temporary deep logs |
+| `TELEGRAM_BOT_TOKEN` | Optional | Telegram bot token |
+| `SMTP_HOST` | Optional | SMTP host for email channels |
+| `SMTP_PORT` | Optional | SMTP port |
+| `SMTP_USER` | Optional | SMTP username |
+| `SMTP_PASS` | Optional | SMTP password |
+| `SMTP_FROM` | Optional | Sender address for email delivery |
+| `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from the UI |
+| `LOG_LEVEL` | Optional | `debug`, `info`, `warn`, `error` |
+| `LOG_VERBOSE_SCOPES` | Optional | Temporary verbose scopes such as `sync,trpc` |
 
-## Security checklist
+See [DEPLOY.md](DEPLOY.md) for production examples and HTTPS notes.
 
-- Set `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, and `CRON_SECRET` before going live.
-- Use HTTPS in production.
-- If you are using the installer on a bare IP, expect a Let's Encrypt short-lived IP certificate. These typically last about 7 days and are renewed automatically by the installed `atomic-ui-cert-renew.timer`.
-- Set `NEXT_PUBLIC_APP_URL` to avoid host-header-derived callback URLs.
-- Restrict access to backup/export/admin routes to trusted users only.
-- Rotate credentials after initial setup.
-
-## HTTPS notes
-
-- Fresh VPS installs now prefer HTTPS by default.
-- The installer uses nginx in front of the app and keeps the internal Node process on port `2053`.
-- Set `PANEL_DOMAIN=panel.example.com` during install if you want the panel to use a real domain as its canonical public origin.
-- Set `PUBLIC_SHARE_DOMAIN=share.example.com` during install if you want all public share/client URLs to use a dedicated subdomain.
-- Set `ALLOW_IP_FALLBACK=true` to keep the original IP reachable alongside the domain on fresh installs. Leave it false if you want raw IP traffic redirected to the domain.
-- When `PUBLIC_SHARE_DOMAIN` is configured, nginx only serves public share routes on that host. `/login`, `/dashboard`, and other admin routes return `404`.
-- Point the `share` DNS record at the same VPS IP before running the installer if you want HTTPS on the public share host during the first install.
-- Bare-IP HTTPS uses Let's Encrypt's short-lived IP certificate profile, not a normal 90-day domain certificate.
-- Auto-renew is configured with `atomic-ui-cert-renew.timer` every 12 hours.
-- Domain installs use the standard Let's Encrypt domain flow and the system `certbot.timer`.
-- For long-term production use, a real domain is still recommended because standard domain certificates are longer-lived and easier to monitor.
-
-## Production readiness
-
-Run these before or after a production deploy:
-
-```bash
-npm run env:check -- --env-file=.env
-npm run build:low-memory
-npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
-```
-
-The live smoke test is intended for a running instance and verifies:
-- login mutation succeeds
-- dashboard routes respond
-- server/key/dynamic-key detail screens resolve when records exist
-
-## Backup and restore drill
-
-Use this short drill before major upgrades:
-
-1. Create a fresh backup from the dashboard.
-2. Copy the backup file off the VPS.
-3. Restore the backup into a staging or disposable instance.
-4. Run `npm run smoke` against that restored instance.
-5. Confirm you can log in and that keys/servers are visible before touching production.
-
-## Useful scripts
+## Useful Commands
 
 ```bash
 npm run dev
@@ -173,21 +182,32 @@ npm run build
 npm run build:low-memory
 npm run start
 npm run lint
+npm run typecheck
+npm run test
 npm run env:check -- --env-file=.env
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
+npm run smoke:telegram
 npm run deploy:vps
+npm run bootstrap:vps
 npm run db:generate
 npm run db:push
 npm run db:migrate
 npm run db:studio
 ```
 
-## Project structure
+## Documentation
+
+- [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
+- [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
+- [docs/worker-setup.md](docs/worker-setup.md): usage snapshot worker setup
+
+## Project Structure
 
 ```text
 atomic-ui/
 ├── prisma/
 ├── scripts/
+├── docs/
 ├── src/
 │   ├── app/
 │   ├── components/
@@ -196,11 +216,13 @@ atomic-ui/
 │   ├── server/
 │   │   └── routers/
 │   └── types/
+├── public/
+├── .github/workflows/
 ├── docker-compose.yml
 └── Dockerfile
 ```
 
-## Tech stack
+## Tech Stack
 
 - Next.js 14 (App Router)
 - TypeScript
@@ -208,6 +230,7 @@ atomic-ui/
 - tRPC + React Query
 - Tailwind CSS + shadcn/ui
 - Recharts
+- Telegram Bot API
 
 ## License
 
