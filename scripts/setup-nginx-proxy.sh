@@ -469,7 +469,6 @@ EOF
 fi
   systemctl enable fail2ban >/dev/null 2>&1 || true
   systemctl restart fail2ban
-fi
 
 if [[ -n "${PANEL_DOMAIN}" ]]; then
   if [[ "${ALLOW_IP_FALLBACK}" == "true" ]]; then
