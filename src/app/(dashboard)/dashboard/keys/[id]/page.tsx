@@ -42,6 +42,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -2418,6 +2419,7 @@ export default function KeyDetailPage() {
   const keyId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'overview' | 'delivery' | 'activity' | 'support'>('overview');
   const [replacementServerId, setReplacementServerId] = useState('none');
   const [notifyOnReplacement, setNotifyOnReplacement] = useState(true);
   const { data: currentUser } = trpc.auth.me.useQuery(undefined, {
@@ -2603,6 +2605,12 @@ export default function KeyDetailPage() {
   const serverChangeCount = keyRecord.serverChangeCount ?? 0;
   const serverChangeLimit = keyRecord.serverChangeLimit ?? 3;
   const remainingServerChanges = Math.max(0, serverChangeLimit - serverChangeCount);
+  const detailTabCopy: Record<'overview' | 'delivery' | 'activity' | 'support', string> = {
+    overview: 'Connection basics, quota, expiry, and contact details for this access key.',
+    delivery: 'Share links, client delivery, and distribution controls for handing the key to the customer cleanly.',
+    activity: 'Live usage, health, active sessions, and server operations for keeping the key stable.',
+    support: 'Billing history and support workflow context tied to this access key.',
+  };
 
   const handleDownloadQr = () => {
     if (!qrData?.qrCode) {
@@ -2640,115 +2648,7 @@ export default function KeyDetailPage() {
 
   return (
     <div className="space-y-6">
-      <section className="xl:hidden ops-hero">
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" size="icon" asChild className="rounded-full">
-              <Link href="/dashboard/keys">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-            </Button>
-            <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
-              <Key className="h-3.5 w-3.5" />
-              Access Key
-            </span>
-            <Badge className={cn('border rounded-full px-3 py-1', statusInfo.color)}>
-              <StatusIcon className="w-3 h-3 mr-1" />
-              {statusInfo.label}
-            </Badge>
-            {isOnline ? (
-              <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
-                <Wifi className="mr-1 h-3 w-3" />
-                {t('keys.status.online')}
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
-                <WifiOff className="mr-1 h-3 w-3" />
-                {t('keys.status.no_recent_traffic')}
-              </Badge>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">{key.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              Created {formatRelativeTime(key.createdAt)}
-              {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Total Usage
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{formatBytes(key.usedBytes)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Devices
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{estimatedDevices}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {activeSessions} active session{activeSessions === 1 ? '' : 's'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Expires
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {key.expirationType.replace(/_/g, ' ')}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Last Seen
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Outline ID {key.outlineKeyId}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <Button variant="outline" className="h-auto justify-start rounded-full px-5 py-3 text-left" onClick={() => setEditDialogOpen(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-            <Button asChild variant="outline" className="h-auto justify-start rounded-full px-5 py-3 text-left">
-              <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
-                <Server className="w-4 h-4 mr-2" />
-                View Server
-              </Link>
-            </Button>
-            <Button
-              variant="destructive"
-              className="h-auto justify-start rounded-full px-5 py-3 text-left"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Delete
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="hidden xl:block ops-hero">
+      <section className="ops-hero">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
@@ -2763,9 +2663,12 @@ export default function KeyDetailPage() {
                   Access Key
                 </span>
                 <Badge className={cn('border rounded-full px-3 py-1', statusInfo.color)}>
-                  <StatusIcon className="w-3 h-3 mr-1" />
+                  <StatusIcon className="mr-1 h-3 w-3" />
                   {statusInfo.label}
                 </Badge>
+                {keyRecord.server ? (
+                  <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
+                ) : null}
                 {isOnline ? (
                   <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
                     <Wifi className="mr-1 h-3 w-3" />
@@ -2788,14 +2691,14 @@ export default function KeyDetailPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 xl:justify-end">
+            <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
               <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="mr-2 h-4 w-4" />
                 Edit
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-full px-5">
                 <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
-                  <Server className="w-4 h-4 mr-2" />
+                  <Server className="mr-2 h-4 w-4" />
                   View Server
                 </Link>
               </Button>
@@ -2806,9 +2709,9 @@ export default function KeyDetailPage() {
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                 )}
                 Delete
               </Button>
@@ -2860,680 +2763,757 @@ export default function KeyDetailPage() {
         </div>
       </section>
 
-      <div className="ops-showcase-grid">
-        {/* Main content */}
-        <div className="ops-detail-stack">
-          {/* Server & Access Info */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="w-5 h-5 text-primary" />
-                Server & Access
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Server info */}
-              {keyRecord.server && (
-                <div className="ops-row-card">
-                  <div className="flex items-center gap-3">
-                    {keyRecord.server.countryCode && (
-                      <span className="text-xl">{getCountryFlag(keyRecord.server.countryCode)}</span>
-                    )}
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{keyRecord.server.name}</p>
-                        <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
-                      </div>
-                      {keyRecord.server.location && (
-                        <p className="text-sm text-muted-foreground">{keyRecord.server.location}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Link href={`/dashboard/servers/${keyRecord.server.id}`}>
-                    <Button variant="ghost" size="sm" className="rounded-full">
-                      View Server
-                    </Button>
-                  </Link>
-                </div>
-              )}
-
-              {/* Access URL */}
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Access URL</Label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                    {decoratedAccessUrl}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Subscription URL */}
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Subscription URL</Label>
-                <p className="text-xs text-muted-foreground">
-                  Share this URL with the user. Clients can fetch the latest config automatically.
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                    {subscriptionApiUrl || 'Loading subscription token...'}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (subscriptionApiUrl) {
-                        copyToClipboard(subscriptionApiUrl, 'Copied!', 'Subscription URL copied to clipboard.');
-                      }
-                    }}
-                    disabled={!subscriptionApiUrl}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Technical Details */}
-              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Port</p>
-                  <p className="font-mono">{key.port}</p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Encryption</p>
-                  <p className="font-mono">{key.method}</p>
-                </div>
-                {key.prefix && (
-                  <div className="ops-inline-stat col-span-2">
-                    <p className="text-sm text-muted-foreground">Prefix (Obfuscation)</p>
-                    <p className="font-mono">{key.prefix}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Traffic Usage */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                Traffic Usage
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <div className="ops-inline-stat">
-                  <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      of {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}
-                    </p>
-                  </div>
-                  {key.dataLimitBytes && (
-                    <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
-                      {usagePercent.toFixed(1)}%
-                    </p>
-                  )}
-                </div>
-
-                {key.dataLimitBytes && (
-                  <Progress
-                    value={usagePercent}
-                    className={cn(
-                      'h-3',
-                      usagePercent > 90 && '[&>div]:bg-red-500',
-                      usagePercent > 70 && usagePercent <= 90 && '[&>div]:bg-yellow-500'
-                    )}
-                  />
-                )}
-
-                {key.dataLimitBytes && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(key as any).autoDisableOnLimit && (
-                      <Badge variant="outline" className="text-xs">
-                        Auto-disable on limit
-                      </Badge>
-                    )}
-                    {(key as any).bandwidthAlertAt80 && (
-                      <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-600">
-                        80% alert sent
-                      </Badge>
-                    )}
-                    {(key as any).bandwidthAlertAt90 && (
-                      <Badge variant="outline" className="text-xs border-red-500 text-red-600">
-                        90% alert sent
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {(key as any).dataLimitResetStrategy && (key as any).dataLimitResetStrategy !== 'NEVER' && (
-                  <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
-                    <RefreshCw className="w-4 h-4" />
-                    <span>
-                      Resets {(key as any).dataLimitResetStrategy.toLowerCase()}
-                      {(key as any).lastDataLimitReset && ` (Last reset: ${(key as any).lastDataLimitReset ? formatRelativeTime((key as any).lastDataLimitReset) : 'Never'})`}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Real-time Graph */}
-              <div className="border-t border-border/50 pt-4">
-                <p className="text-sm font-medium mb-2">Live Activity</p>
-                {keyRecord.server ? (
-                  <TrafficGraph serverId={keyRecord.server.id} outlineKeyId={key.outlineKeyId} />
-                ) : null}
-              </div>
-
-              {/* Historical Chart */}
-              <div className="border-t border-border/50 pt-4">
-                <TrafficHistoryChart accessKeyId={key.id} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Expiration Info */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Expiration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Type</p>
-                  <p className="font-medium">{key.expirationType.replace(/_/g, ' ')}</p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Expires</p>
-                  <p className="font-medium">
-                    {key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}
-                  </p>
-                </div>
-                {key.firstUsedAt && (
-                  <div className="ops-inline-stat">
-                    <p className="text-sm text-muted-foreground">First Used</p>
-                    <p className="font-medium">{formatDateTime(key.firstUsedAt)}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contact & Notes */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="ops-inline-stat flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{key.email || '-'}</p>
-                  </div>
-                </div>
-                <div className="ops-inline-stat flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Telegram</p>
-                    <p className="font-medium">{key.telegramId || '-'}</p>
-                  </div>
-                </div>
-                <div className="ops-inline-stat flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Notes</p>
-                    <p className="font-medium">{key.notes || '-'}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'delivery' | 'activity' | 'support')} className="space-y-4">
+        <div className="ops-panel space-y-3 p-3 sm:p-4">
+          <div className="space-y-1">
+            <p className="ops-section-heading">Access key workspace</p>
+            <p className="text-sm text-muted-foreground">{detailTabCopy[detailTab]}</p>
+          </div>
+          <TabsList className={cn(
+            'grid h-auto gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 dark:bg-white/[0.03]',
+            isAdmin ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3',
+          )}>
+            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">Delivery</TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-[0.95rem] px-3 py-2 text-sm">Activity</TabsTrigger>
+            {isAdmin ? (
+              <TabsTrigger value="support" className="rounded-[0.95rem] px-3 py-2 text-sm">Support</TabsTrigger>
+            ) : null}
+          </TabsList>
         </div>
 
-        {/* Sidebar - QR Code */}
-        <div className="ops-detail-rail">
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-primary" />
-                QR Code
-              </CardTitle>
-              <CardDescription>
-                Scan with a Shadowsocks client to connect
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              {qrLoading ? (
-                <div className="h-[200px] w-[200px] rounded-[1.25rem] border border-border/60 bg-background/45 animate-pulse dark:bg-white/[0.03]" />
-              ) : qrData?.qrCode ? (
-                <QRCodeWithLogo
-                  dataUrl={qrData.qrCode}
-                  size={200}
-                  className="rounded-[1.1rem] bg-white p-2"
-                />
-              ) : (
-                <div className="ops-chart-empty h-[200px] w-[200px]">
-                  <p className="text-sm text-muted-foreground">Failed to generate</p>
-                </div>
-              )}
-
-              <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 md:grid-cols-2">
-                <Button
-                  variant="outline"
-                  className="h-auto w-full justify-start px-4 py-3 text-left"
-                  onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
-                >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy URL
-                </Button>
-                <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left" onClick={handleDownloadQr}>
-                  <QrCode className="w-4 h-4 mr-2" />
-                  Download QR
-                </Button>
-                <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left md:col-span-2" onClick={handleDownloadConfig}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Config
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Outline Key ID</span>
-                <span className="font-mono">{key.outlineKeyId}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Created</span>
-                <span>{formatDateTime(key.createdAt)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Updated</span>
-                <span>{formatDateTime(key.updatedAt)}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {isAdmin ? (
-            <Card className="ops-detail-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RotateCw className="w-5 h-5 text-primary" />
-                  Server Replacement
-                </CardTitle>
-                <CardDescription>
-                  Move this key to another server while keeping its usage and expiry unchanged.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="ops-inline-stat">
-                    <p className="text-sm text-muted-foreground">Current server</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <p className="font-medium">
-                        {keyRecord.server?.name || 'Unassigned'}
-                        {keyRecord.server?.countryCode ? ` (${keyRecord.server.countryCode})` : ''}
-                      </p>
-                      <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null } | null)?.lifecycleMode} />
-                    </div>
-                  </div>
-                  <div className="ops-inline-stat">
-                    <p className="text-sm text-muted-foreground">Changes used</p>
-                    <p className="font-medium">
-                      {serverChangeCount} / {serverChangeLimit}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {remainingServerChanges} change{remainingServerChanges === 1 ? '' : 's'} remaining
-                    </p>
-                  </div>
-                </div>
-
-                {keyRecord.lastServerChangeAt ? (
-                  <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                    Last moved {formatRelativeTime(keyRecord.lastServerChangeAt)}
-                  </div>
-                ) : null}
-
-                <div className="space-y-2">
-                  <Label>Replace to server</Label>
-                  <Select
-                    value={replacementServerId}
-                    onValueChange={setReplacementServerId}
-                    disabled={remainingServerChanges <= 0 || replaceServerMutation.isPending}
-                  >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a target server" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Choose a target server</SelectItem>
-                        {availableReplacementServers.map((server) => (
-                          <SelectItem
-                            key={server.id}
-                            value={server.id}
-                            disabled={server.lifecycleMode === 'MAINTENANCE'}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span>
-                                {server.name}
-                                {server.countryCode ? ` (${server.countryCode})` : ''}
-                              </span>
-                              <ServerLifecycleBadge mode={server.lifecycleMode} />
+        <div className="ops-showcase-grid">
+          <div className="ops-detail-stack self-start">
+            <TabsContent value="overview" className="mt-0 space-y-4">
+              <div className="ops-section-grid">
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Server className="h-5 w-5 text-primary" />
+                      Server & Access
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {keyRecord.server && (
+                      <div className="ops-row-card">
+                        <div className="flex items-center gap-3">
+                          {keyRecord.server.countryCode ? (
+                            <span className="text-xl">{getCountryFlag(keyRecord.server.countryCode)}</span>
+                          ) : null}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{keyRecord.server.name}</p>
+                              <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      The key stays on the same expiry date and keeps its existing usage.
-                    </p>
-                    {replacementServerId !== 'none' ? (
-                      <p className="text-xs text-muted-foreground">
-                        {getServerLifecycleMeta(
-                          availableReplacementServers.find((server) => server.id === replacementServerId)?.lifecycleMode,
-                        ).assignmentHint}
-                      </p>
+                            {keyRecord.server.location ? (
+                              <p className="text-sm text-muted-foreground">{keyRecord.server.location}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <Link href={`/dashboard/servers/${keyRecord.server.id}`}>
+                          <Button variant="ghost" size="sm" className="rounded-full">
+                            View Server
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Access URL</Label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
+                          {decoratedAccessUrl}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Port</p>
+                        <p className="font-mono">{key.port}</p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Encryption</p>
+                        <p className="font-mono">{key.method}</p>
+                      </div>
+                      {key.prefix ? (
+                        <div className="ops-inline-stat sm:col-span-2">
+                          <p className="text-sm text-muted-foreground">Prefix (Obfuscation)</p>
+                          <p className="font-mono">{key.prefix}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-primary" />
+                      Expiration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Type</p>
+                        <p className="font-medium">{key.expirationType.replace(/_/g, ' ')}</p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Expires</p>
+                        <p className="font-medium">{key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}</p>
+                      </div>
+                      {key.firstUsedAt ? (
+                        <div className="ops-inline-stat">
+                          <p className="text-sm text-muted-foreground">First Used</p>
+                          <p className="font-medium">{formatDateTime(key.firstUsedAt)}</p>
+                        </div>
+                      ) : null}
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Updated</p>
+                        <p className="font-medium">{formatDateTime(key.updatedAt)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Traffic Usage
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                      <div className="ops-inline-stat">
+                        <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          of {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}
+                        </p>
+                      </div>
+                      {key.dataLimitBytes ? (
+                        <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
+                          {usagePercent.toFixed(1)}%
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {key.dataLimitBytes ? (
+                      <Progress
+                        value={usagePercent}
+                        className={cn(
+                          'h-3',
+                          usagePercent > 90 && '[&>div]:bg-red-500',
+                          usagePercent > 70 && usagePercent <= 90 && '[&>div]:bg-yellow-500',
+                        )}
+                      />
+                    ) : null}
+
+                    {key.dataLimitBytes ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(key as any).autoDisableOnLimit ? (
+                          <Badge variant="outline" className="text-xs">
+                            Auto-disable on limit
+                          </Badge>
+                        ) : null}
+                        {(key as any).bandwidthAlertAt80 ? (
+                          <Badge variant="outline" className="border-yellow-500 text-xs text-yellow-600">
+                            80% alert sent
+                          </Badge>
+                        ) : null}
+                        {(key as any).bandwidthAlertAt90 ? (
+                          <Badge variant="outline" className="border-red-500 text-xs text-red-600">
+                            90% alert sent
+                          </Badge>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {(key as any).dataLimitResetStrategy && (key as any).dataLimitResetStrategy !== 'NEVER' ? (
+                      <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                        <RefreshCw className="h-4 w-4" />
+                        <span>
+                          Resets {(key as any).dataLimitResetStrategy.toLowerCase()}
+                          {(key as any).lastDataLimitReset
+                            ? ` (Last reset: ${formatRelativeTime((key as any).lastDataLimitReset)})`
+                            : ''}
+                        </span>
+                      </div>
                     ) : null}
                   </div>
 
-                <div className="flex items-center justify-between rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 dark:bg-white/[0.03]">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium">Notify user in Telegram</p>
+                  <div className="border-t border-border/50 pt-4">
+                    <p className="mb-2 text-sm font-medium">Live Activity</p>
+                    {keyRecord.server ? (
+                      <TrafficGraph serverId={keyRecord.server.id} outlineKeyId={key.outlineKeyId} />
+                    ) : null}
+                  </div>
+
+                  <div className="border-t border-border/50 pt-4">
+                    <TrafficHistoryChart accessKeyId={key.id} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle>Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="ops-inline-stat flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="font-medium">{key.email || '-'}</p>
+                      </div>
+                    </div>
+                    <div className="ops-inline-stat flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Telegram</p>
+                        <p className="font-medium">{key.telegramId || '-'}</p>
+                      </div>
+                    </div>
+                    <div className="ops-inline-stat flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Notes</p>
+                        <p className="font-medium">{key.notes || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="delivery" className="mt-0 space-y-4">
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Share2 className="h-5 w-5 text-primary" />
+                    Delivery & Share Links
+                  </CardTitle>
+                  <CardDescription>
+                    Use the subscription endpoint, short links, and share page controls without hunting across the page.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Subscription URL</Label>
                     <p className="text-xs text-muted-foreground">
-                      Resend the updated share page after the replacement is complete.
+                      Share this URL with the user. Clients can fetch the latest config automatically.
                     </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
+                        {subscriptionApiUrl || 'Loading subscription token...'}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          if (subscriptionApiUrl) {
+                            copyToClipboard(subscriptionApiUrl, 'Copied!', 'Subscription URL copied to clipboard.');
+                          }
+                        }}
+                        disabled={!subscriptionApiUrl}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <Switch
-                    checked={notifyOnReplacement}
-                    onCheckedChange={setNotifyOnReplacement}
-                    disabled={replaceServerMutation.isPending || !key.telegramDeliveryEnabled}
-                  />
-                </div>
 
-                <Button
-                  className="w-full"
-                  disabled={
-                    replacementServerId === 'none' ||
-                    remainingServerChanges <= 0 ||
-                    replaceServerMutation.isPending
-                  }
-                  onClick={() =>
-                    replaceServerMutation.mutate({
-                      id: key.id,
-                      targetServerId: replacementServerId,
-                      notifyUser: notifyOnReplacement,
-                    })
-                  }
-                >
-                  {replaceServerMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RotateCw className="mr-2 h-4 w-4" />
-                  )}
-                  Replace on selected server
-                </Button>
-
-                {remainingServerChanges <= 0 ? (
-                  <div className="rounded-[1.05rem] border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-                    This key has reached the 3-change limit. The user must buy a new key or contact admin.
+                  <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Short client link</p>
+                      <p className="font-mono text-xs break-all">
+                        {key.publicSlug
+                          ? buildShortClientUrl(key.publicSlug, {
+                              origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+                            })
+                          : 'Available after enabling public slug'}
+                      </p>
+                    </div>
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Share page</p>
+                      <p className="font-mono text-xs break-all">
+                        {key.publicSlug
+                          ? buildSharePageUrl(key.publicSlug, {
+                              origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+                            })
+                          : 'Available after enabling public slug'}
+                      </p>
+                    </div>
                   </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          ) : null}
+                </CardContent>
+              </Card>
 
-          <ClientEndpointTestCard
-            endpointUrl={subscriptionApiUrl}
-            probeUrl={subscriptionProbeUrl}
-            title="Client URL Test"
-            description="Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly."
-          />
+              <ClientEndpointTestCard
+                endpointUrl={subscriptionApiUrl}
+                probeUrl={subscriptionProbeUrl}
+                title="Client URL Test"
+                description="Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly."
+              />
 
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                Key Health
-              </CardTitle>
-              <CardDescription>
-                Recent share, client, and delivery activity for this key.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="ops-row-card">
-                <div>
-                  <p className="text-sm text-muted-foreground">Usage state</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {healthDiagnostics?.isActivelyUsed ? 'Recently active' : 'Idle'}
-                  </p>
-                </div>
-                <Badge variant="outline" className={cn(
-                  'rounded-full',
-                  healthDiagnostics?.isActivelyUsed
-                    ? 'border-emerald-500/30 text-emerald-500'
-                    : 'border-muted-foreground/30 text-muted-foreground',
-                )}>
-                  {healthDiagnostics?.isActivelyUsed ? 'In use' : 'Inactive'}
-                </Badge>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Last client fetch</p>
-                  <p className="font-medium">
-                    {healthDiagnostics?.lastClientFetchAt ? formatRelativeTime(healthDiagnostics.lastClientFetchAt) : 'Never'}
-                  </p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Last QR scan</p>
-                  <p className="font-medium">
-                    {healthDiagnostics?.lastQrScanAt ? formatRelativeTime(healthDiagnostics.lastQrScanAt) : 'Never'}
-                  </p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Last share page visit</p>
-                  <p className="font-medium">
-                    {healthDiagnostics?.lastSharePageVisitAt ? formatRelativeTime(healthDiagnostics.lastSharePageVisitAt) : 'Never'}
-                  </p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">Last Telegram send</p>
-                  <p className="font-medium">
-                    {healthDiagnostics?.lastTelegramSendAt ? formatRelativeTime(healthDiagnostics.lastTelegramSendAt) : 'Never'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last seen device</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">IP</span>
-                    <span className="font-mono">{healthDiagnostics?.lastSeenIp || '-'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Country</span>
-                    <span>{healthDiagnostics?.lastSeenCountryCode ? `${getCountryFlag(healthDiagnostics.lastSeenCountryCode)} ${healthDiagnostics.lastSeenCountryCode}` : '-'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Platform</span>
-                    <span>{healthDiagnostics?.lastSeenPlatform || '-'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Active sessions</span>
-                    <span>{healthDiagnostics?.activeSessionCount ?? 0}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                {t('keys.activity.title')}
-              </CardTitle>
-              <CardDescription>{t('keys.activity.description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="ops-row-card">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.state')}</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
-                  </p>
-                </div>
-                {isOnline ? (
-                  <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
-                    <Wifi className="mr-1 h-3 w-3" />
-                    {t('keys.status.online')}
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
-                    <WifiOff className="mr-1 h-3 w-3" />
-                    {t('keys.status.no_recent_traffic')}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.last_traffic')}</p>
-                  <p className="font-medium">
-                    {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
-                  </p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.last_meaningful_usage')}</p>
-                  <p className="font-medium">
-                    {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : t('keys.activity.none')}
-                  </p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.active_sessions')}</p>
-                  <p className="font-medium">{activeSessions}</p>
-                </div>
-                <div className="ops-inline-stat">
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.estimated_devices')}</p>
-                  <p className="font-medium">{estimatedDevices}</p>
-                </div>
-              </div>
-
-              <div className="ops-row-card">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t('keys.activity.recent_delta')}</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {recentTrafficDeltaBytes > BigInt(0)
-                      ? `+${formatBytes(recentTrafficDeltaBytes)}`
-                      : t('keys.activity.no_recent_delta')}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {t('keys.activity.window_label')} {activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s
-                </span>
-              </div>
+              <SubscriptionShareCard
+                keyId={key.id}
+                subscriptionToken={key.subscriptionToken}
+                publicSlug={key.publicSlug}
+                slugHistory={(key as any).slugHistory ?? []}
+                keyName={key.name}
+                currentTheme={(key as any).subscriptionTheme}
+                currentCoverImage={(key as any).coverImage}
+                currentCoverImageType={(key as any).coverImageType}
+                currentContactLinks={(key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null}
+                currentWelcomeMessage={(key as any).subscriptionWelcomeMessage}
+                currentSharePageEnabled={(key as any).sharePageEnabled ?? true}
+                currentClientLinkEnabled={(key as any).clientLinkEnabled ?? true}
+                currentTelegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
+                onThemeChange={() => refetch()}
+              />
 
               {isAdmin ? (
-                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {t('keys.activity.admin_debug')}
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{t('keys.activity.debug_outline_id')}</span>
-                      <span className="font-mono">{activitySnapshot?.outlineKeyId ?? key.outlineKeyId}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{t('keys.activity.debug_peak_devices')}</span>
-                      <span>{activitySnapshot?.peakDevices ?? (key as any).peakDevices ?? 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{t('keys.activity.debug_window')}</span>
-                      <span>{activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s</span>
-                    </div>
-                  </div>
-                </div>
+                <AccessDistributionSecurityCard
+                  keyId={key.id}
+                  keyName={key.name}
+                  hasPassword={Boolean((key as any).sharePagePasswordHash)}
+                  accessExpiresAt={(key as any).sharePageAccessExpiresAt ?? null}
+                  distributionLinks={(key as any).distributionLinks ?? []}
+                  auditTrail={(key as any).auditTrail ?? []}
+                  onUpdated={() => refetch()}
+                />
               ) : null}
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {/* Connection Sessions */}
-          <ConnectionSessionsCard keyId={key.id} />
+            <TabsContent value="activity" className="mt-0 space-y-4">
+              {isAdmin ? (
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RotateCw className="h-5 w-5 text-primary" />
+                      Server Replacement
+                    </CardTitle>
+                    <CardDescription>
+                      Move this key to another server while keeping its usage and expiry unchanged.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Current server</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <p className="font-medium">
+                            {keyRecord.server?.name || 'Unassigned'}
+                            {keyRecord.server?.countryCode ? ` (${keyRecord.server.countryCode})` : ''}
+                          </p>
+                          <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null } | null)?.lifecycleMode} />
+                        </div>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Changes used</p>
+                        <p className="font-medium">
+                          {serverChangeCount} / {serverChangeLimit}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {remainingServerChanges} change{remainingServerChanges === 1 ? '' : 's'} remaining
+                        </p>
+                      </div>
+                    </div>
 
-          {/* Subscription Page Share */}
-          <SubscriptionShareCard
-            keyId={key.id}
-            subscriptionToken={key.subscriptionToken}
-            publicSlug={key.publicSlug}
-            slugHistory={(key as any).slugHistory ?? []}
-            keyName={key.name}
-            currentTheme={(key as any).subscriptionTheme}
-            currentCoverImage={(key as any).coverImage}
-            currentCoverImageType={(key as any).coverImageType}
-            currentContactLinks={(key as any).contactLinks ? JSON.parse((key as any).contactLinks) : null}
-            currentWelcomeMessage={(key as any).subscriptionWelcomeMessage}
-            currentSharePageEnabled={(key as any).sharePageEnabled ?? true}
-            currentClientLinkEnabled={(key as any).clientLinkEnabled ?? true}
-            currentTelegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
-            onThemeChange={() => refetch()}
-          />
-          {isAdmin ? (
-            <AccessDistributionSecurityCard
-              keyId={key.id}
-              keyName={key.name}
-              hasPassword={Boolean((key as any).sharePagePasswordHash)}
-              accessExpiresAt={(key as any).sharePageAccessExpiresAt ?? null}
-              distributionLinks={(key as any).distributionLinks ?? []}
-              auditTrail={(key as any).auditTrail ?? []}
-              onUpdated={() => refetch()}
-            />
-          ) : null}
-          {isAdmin ? (
-            <TelegramBillingHistoryCard
-              title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
-              description={
-                isMyanmar
-                  ? 'ဤ key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
-                  : 'Review Telegram orders, renewals, and billing events related to this key.'
-              }
-              orders={(key as any).billingHistory ?? []}
-              emptyLabel={
-                isMyanmar
-                  ? 'ဤ key အတွက် Telegram billing history မရှိသေးပါ။'
-                  : 'No Telegram billing history for this key yet.'
-              }
-            />
-          ) : null}
-          {isAdmin ? (
-            <SupportWorkflowCard
-              keyId={key.id}
-              keyName={key.name}
-              telegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
-              supportActivity={(key as any).supportActivity ?? []}
-              openIncidents={(key as any).openIncidents ?? []}
-              onUpdated={() => refetch()}
-            />
-          ) : null}
+                    {keyRecord.lastServerChangeAt ? (
+                      <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                        Last moved {formatRelativeTime(keyRecord.lastServerChangeAt)}
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-2">
+                      <Label>Replace to server</Label>
+                      <Select
+                        value={replacementServerId}
+                        onValueChange={setReplacementServerId}
+                        disabled={remainingServerChanges <= 0 || replaceServerMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a target server" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Choose a target server</SelectItem>
+                          {availableReplacementServers.map((server) => (
+                            <SelectItem
+                              key={server.id}
+                              value={server.id}
+                              disabled={server.lifecycleMode === 'MAINTENANCE'}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {server.name}
+                                  {server.countryCode ? ` (${server.countryCode})` : ''}
+                                </span>
+                                <ServerLifecycleBadge mode={server.lifecycleMode} />
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        The key stays on the same expiry date and keeps its existing usage.
+                      </p>
+                      {replacementServerId !== 'none' ? (
+                        <p className="text-xs text-muted-foreground">
+                          {getServerLifecycleMeta(
+                            availableReplacementServers.find((server) => server.id === replacementServerId)?.lifecycleMode,
+                          ).assignmentHint}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 dark:bg-white/[0.03]">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">Notify user in Telegram</p>
+                        <p className="text-xs text-muted-foreground">
+                          Resend the updated share page after the replacement is complete.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifyOnReplacement}
+                        onCheckedChange={setNotifyOnReplacement}
+                        disabled={replaceServerMutation.isPending || !key.telegramDeliveryEnabled}
+                      />
+                    </div>
+
+                    <Button
+                      className="w-full"
+                      disabled={
+                        replacementServerId === 'none' ||
+                        remainingServerChanges <= 0 ||
+                        replaceServerMutation.isPending
+                      }
+                      onClick={() =>
+                        replaceServerMutation.mutate({
+                          id: key.id,
+                          targetServerId: replacementServerId,
+                          notifyUser: notifyOnReplacement,
+                        })
+                      }
+                    >
+                      {replaceServerMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="mr-2 h-4 w-4" />
+                      )}
+                      Replace on selected server
+                    </Button>
+
+                    {remainingServerChanges <= 0 ? (
+                      <div className="rounded-[1.05rem] border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                        This key has reached the 3-change limit. The user must buy a new key or contact admin.
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <div className="ops-section-grid">
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-primary" />
+                      Key Health
+                    </CardTitle>
+                    <CardDescription>
+                      Recent share, client, and delivery activity for this key.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="ops-row-card">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Usage state</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {healthDiagnostics?.isActivelyUsed ? 'Recently active' : 'Idle'}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'rounded-full',
+                          healthDiagnostics?.isActivelyUsed
+                            ? 'border-emerald-500/30 text-emerald-500'
+                            : 'border-muted-foreground/30 text-muted-foreground',
+                        )}
+                      >
+                        {healthDiagnostics?.isActivelyUsed ? 'In use' : 'Inactive'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Last client fetch</p>
+                        <p className="font-medium">
+                          {healthDiagnostics?.lastClientFetchAt ? formatRelativeTime(healthDiagnostics.lastClientFetchAt) : 'Never'}
+                        </p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Last QR scan</p>
+                        <p className="font-medium">
+                          {healthDiagnostics?.lastQrScanAt ? formatRelativeTime(healthDiagnostics.lastQrScanAt) : 'Never'}
+                        </p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Last share page visit</p>
+                        <p className="font-medium">
+                          {healthDiagnostics?.lastSharePageVisitAt ? formatRelativeTime(healthDiagnostics.lastSharePageVisitAt) : 'Never'}
+                        </p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">Last Telegram send</p>
+                        <p className="font-medium">
+                          {healthDiagnostics?.lastTelegramSendAt ? formatRelativeTime(healthDiagnostics.lastTelegramSendAt) : 'Never'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last seen device</p>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">IP</span>
+                          <span className="font-mono">{healthDiagnostics?.lastSeenIp || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Country</span>
+                          <span>
+                            {healthDiagnostics?.lastSeenCountryCode
+                              ? `${getCountryFlag(healthDiagnostics.lastSeenCountryCode)} ${healthDiagnostics.lastSeenCountryCode}`
+                              : '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Platform</span>
+                          <span>{healthDiagnostics?.lastSeenPlatform || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Active sessions</span>
+                          <span>{healthDiagnostics?.activeSessionCount ?? 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-primary" />
+                      {t('keys.activity.title')}
+                    </CardTitle>
+                    <CardDescription>{t('keys.activity.description')}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="ops-row-card">
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.state')}</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
+                        </p>
+                      </div>
+                      {isOnline ? (
+                        <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
+                          <Wifi className="mr-1 h-3 w-3" />
+                          {t('keys.status.online')}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
+                          <WifiOff className="mr-1 h-3 w-3" />
+                          {t('keys.status.no_recent_traffic')}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.last_traffic')}</p>
+                        <p className="font-medium">{lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}</p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.last_meaningful_usage')}</p>
+                        <p className="font-medium">
+                          {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : t('keys.activity.none')}
+                        </p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.active_sessions')}</p>
+                        <p className="font-medium">{activeSessions}</p>
+                      </div>
+                      <div className="ops-inline-stat">
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.estimated_devices')}</p>
+                        <p className="font-medium">{estimatedDevices}</p>
+                      </div>
+                    </div>
+
+                    <div className="ops-row-card">
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('keys.activity.recent_delta')}</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {recentTrafficDeltaBytes > BigInt(0)
+                            ? `+${formatBytes(recentTrafficDeltaBytes)}`
+                            : t('keys.activity.no_recent_delta')}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {t('keys.activity.window_label')} {activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s
+                      </span>
+                    </div>
+
+                    {isAdmin ? (
+                      <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {t('keys.activity.admin_debug')}
+                        </p>
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">{t('keys.activity.debug_outline_id')}</span>
+                            <span className="font-mono">{activitySnapshot?.outlineKeyId ?? key.outlineKeyId}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">{t('keys.activity.debug_peak_devices')}</span>
+                            <span>{activitySnapshot?.peakDevices ?? (key as any).peakDevices ?? 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">{t('keys.activity.debug_window')}</span>
+                            <span>{activitySnapshot?.activityWindowSeconds ?? Math.round(TRAFFIC_ACTIVE_WINDOW_MS / 1000)}s</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <ConnectionSessionsCard keyId={key.id} />
+            </TabsContent>
+
+            {isAdmin ? (
+              <TabsContent value="support" className="mt-0 space-y-4">
+                <TelegramBillingHistoryCard
+                  title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
+                  description={
+                    isMyanmar
+                      ? 'ဤ key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
+                      : 'Review Telegram orders, renewals, and billing events related to this key.'
+                  }
+                  orders={(key as any).billingHistory ?? []}
+                  emptyLabel={
+                    isMyanmar
+                      ? 'ဤ key အတွက် Telegram billing history မရှိသေးပါ။'
+                      : 'No Telegram billing history for this key yet.'
+                  }
+                />
+                <SupportWorkflowCard
+                  keyId={key.id}
+                  keyName={key.name}
+                  telegramDeliveryEnabled={(key as any).telegramDeliveryEnabled ?? true}
+                  supportActivity={(key as any).supportActivity ?? []}
+                  openIncidents={(key as any).openIncidents ?? []}
+                  onUpdated={() => refetch()}
+                />
+              </TabsContent>
+            ) : null}
+          </div>
+
+          <div className="ops-detail-rail">
+            <Card className="ops-detail-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-primary" />
+                  QR Code
+                </CardTitle>
+                <CardDescription>
+                  Scan with a Shadowsocks client to connect
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center">
+                {qrLoading ? (
+                  <div className="h-[200px] w-[200px] animate-pulse rounded-[1.25rem] border border-border/60 bg-background/45 dark:bg-white/[0.03]" />
+                ) : qrData?.qrCode ? (
+                  <QRCodeWithLogo
+                    dataUrl={qrData.qrCode}
+                    size={200}
+                    className="rounded-[1.1rem] bg-white p-2"
+                  />
+                ) : (
+                  <div className="ops-chart-empty h-[200px] w-[200px]">
+                    <p className="text-sm text-muted-foreground">Failed to generate</p>
+                  </div>
+                )}
+
+                <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 md:grid-cols-2">
+                  <Button
+                    variant="outline"
+                    className="h-auto w-full justify-start px-4 py-3 text-left"
+                    onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy URL
+                  </Button>
+                  <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left" onClick={handleDownloadQr}>
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Download QR
+                  </Button>
+                  <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left md:col-span-2" onClick={handleDownloadConfig}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Config
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="ops-detail-card">
+              <CardHeader>
+                <CardTitle>Snapshot</CardTitle>
+                <CardDescription>
+                  Core identifiers and assignment details that should always stay visible while you work.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Outline Key ID</span>
+                  <span className="font-mono">{key.outlineKeyId}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Public slug</span>
+                  <span className="font-mono">{key.publicSlug || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Created</span>
+                  <span>{formatDateTime(key.createdAt)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Updated</span>
+                  <span>{formatDateTime(key.updatedAt)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Server</span>
+                  <span className="text-right">{keyRecord.server?.name || 'Unassigned'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Quota policy</span>
+                  <span className="text-right">{key.dataLimitBytes ? 'Limited' : 'Unlimited'}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </Tabs>
 
       {/* Edit dialog */}
       {key && (

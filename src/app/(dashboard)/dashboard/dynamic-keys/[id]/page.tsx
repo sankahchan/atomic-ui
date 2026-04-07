@@ -22,6 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { trpc } from '@/lib/trpc';
@@ -3086,6 +3087,7 @@ export default function DynamicKeyDetailPage() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'overview' | 'routing' | 'delivery' | 'history'>('overview');
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
 
   // Fetch DAK data from API
@@ -3511,111 +3513,23 @@ export default function DynamicKeyDetailPage() {
     : 0;
   const attachedActiveKeys = dak.accessKeys.filter((key) => key.status === 'ACTIVE').length;
   const serverCoverage = new Set(dak.accessKeys.map((key) => key.server?.id).filter(Boolean)).size;
+  const detailTabCopy: Record<'overview' | 'routing' | 'delivery' | 'history', string> = {
+    overview: 'Subscription basics, quota, and attached access keys for this dynamic access key.',
+    routing: 'Health-aware routing, rotation policy, and backend diagnostics for premium delivery.',
+    delivery: 'Share pages, client delivery, templates, and access distribution settings for this subscription.',
+    history: 'Connection activity and billing history linked to this dynamic access key.',
+  };
 
   return (
     <div className="space-y-6">
-      <section className="xl:hidden ops-hero">
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" size="icon" asChild className="rounded-full">
-              <Link href="/dashboard/dynamic-keys">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-            </Button>
-            <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
-              <KeyRound className="h-3.5 w-3.5" />
-              Dynamic Key
-            </span>
-            <Badge variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
-              {dak.status}
-            </Badge>
-            <Badge variant="outline" className="rounded-full">
-              {t(typeConfig.labelKey)}
-            </Badge>
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">{dak.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t(typeConfig.descriptionKey)}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('dynamic_keys.detail.attached_keys')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{dak.accessKeys.length}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {attachedActiveKeys} active attached keys
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Server Coverage
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{serverCoverage}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Distinct servers serving this subscription
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('dynamic_keys.detail.traffic_usage')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{formatBytes(dak.usedBytes)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Rotation
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {dak.rotationEnabled ? dak.rotationInterval : 'Off'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-            <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {t('dynamic_keys.detail.refresh')}
-            </Button>
-            <Button
-              variant="destructive"
-              className="h-11 rounded-full px-5"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              {t('dynamic_keys.detail.delete')}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="hidden xl:block ops-hero">
+      <section className="ops-hero">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <Button variant="ghost" size="icon" asChild className="rounded-full">
                   <Link href="/dashboard/dynamic-keys">
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="h-5 w-5" />
                   </Link>
                 </Button>
                 <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
@@ -3638,13 +3552,13 @@ export default function DynamicKeyDetailPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 xl:justify-end">
+            <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
               <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="mr-2 h-4 w-4" />
                 Edit
               </Button>
               <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <RefreshCw className="mr-2 h-4 w-4" />
                 {t('dynamic_keys.detail.refresh')}
               </Button>
               <Button
@@ -3654,9 +3568,9 @@ export default function DynamicKeyDetailPage() {
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                 )}
                 {t('dynamic_keys.detail.delete')}
               </Button>
@@ -3706,377 +3620,429 @@ export default function DynamicKeyDetailPage() {
         </div>
       </section>
 
-      <div className="ops-showcase-grid">
-        {/* Main content */}
-        <div className="ops-detail-stack self-start">
-          {/* Type & Subscription Info */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TypeIcon className={cn('w-5 h-5', typeConfig.color)} />
-                {t(typeConfig.labelKey)}
-              </CardTitle>
-              <CardDescription>{t(typeConfig.descriptionKey)}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Subscription URL for Outline Client */}
-              {dak.dynamicUrl && (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">
-                      Outline Client URL (ssconf://)
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
-                        {ssconfUrl}
-                      </div>
-                      <Button variant="outline" size="icon" onClick={handleCopyUrl}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Copy this URL and paste it in Outline client to connect. The client will automatically fetch the latest server configuration.
-                    </p>
-                  </div>
+      <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'routing' | 'delivery' | 'history')} className="space-y-4">
+        <div className="ops-panel space-y-3 p-3 sm:p-4">
+          <div className="space-y-1">
+            <p className="ops-section-heading">Dynamic key workspace</p>
+            <p className="text-sm text-muted-foreground">{detailTabCopy[detailTab]}</p>
+          </div>
+          <TabsList className="grid h-auto grid-cols-2 gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 lg:grid-cols-4 dark:bg-white/[0.03]">
+            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="routing" className="rounded-[0.95rem] px-3 py-2 text-sm">Routing</TabsTrigger>
+            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">Delivery</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">History</TabsTrigger>
+          </TabsList>
+        </div>
 
-                  {/* API Endpoint */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">API Endpoint</Label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
-                        {subscriptionApiUrl}
-                      </div>
-                      <Button variant="outline" size="icon" onClick={handleCopyToken}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Traffic Usage */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                {t('dynamic_keys.detail.traffic_usage')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <div className="ops-inline-stat">
-                    <p className="text-3xl font-bold">{formatBytes(dak.usedBytes)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      of {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : 'unlimited'}
-                    </p>
-                  </div>
-                  {dak.dataLimitBytes && (
-                    <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
-                      {usagePercent.toFixed(1)}%
-                    </p>
-                  )}
-                </div>
-
-                {dak.dataLimitBytes && (
-                  <Progress
-                    value={usagePercent}
-                    className={cn(
-                      'h-3',
-                      usagePercent > 90 && '[&>div]:bg-red-500',
-                      usagePercent > 70 && usagePercent <= 90 && '[&>div]:bg-yellow-500'
-                    )}
-                  />
-                )}
-              </div>
-
-              {/* Real-time Graph */}
-              <div className="border-t border-border/50 pt-4">
-                <p className="text-sm font-medium mb-2">Live Activity</p>
-                <AggregatedTrafficGraph accessKeys={dak.accessKeys} />
-              </div>
-
-              {/* Historical Chart - show for first attached key if available */}
-              {dak.accessKeys.length > 0 && (
-                <div className="border-t border-border/50 pt-4">
-                  <TrafficHistoryChart accessKeyId={dak.accessKeys[0].id} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Attached Keys */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="w-5 h-5 text-primary" />
-                  {t('dynamic_keys.detail.attached_keys')} ({dak.accessKeys.length})
-                </CardTitle>
-                <Button
-                  size="sm"
-                  onClick={() => setAttachDialogOpen(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Attach Key
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {dak.accessKeys.length > 0 ? (
-                <div className="space-y-3">
-                  {dak.accessKeys.map((key) => (
-                    <div key={key.id} className="ops-row-card">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-[1rem] border border-border/60 bg-background/55 p-2 dark:bg-white/[0.03]">
-                          <Key className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{key.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {key.server?.name || 'Unknown Server'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{formatBytes(key.usedBytes)}</p>
-                          <Badge
-                            variant={key.status === 'ACTIVE' ? 'default' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {key.status}
-                          </Badge>
-                        </div>
-                        {dak.type === 'MANUAL' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            onClick={() => handleDetachKey(key.id)}
-                            disabled={detachKeyMutation.isPending}
-                          >
-                            Detach
+        <div className="ops-showcase-grid">
+          <div className="ops-detail-stack self-start">
+            <TabsContent value="overview" className="mt-0 space-y-4">
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TypeIcon className={cn('h-5 w-5', typeConfig.color)} />
+                    {t(typeConfig.labelKey)}
+                  </CardTitle>
+                  <CardDescription>{t(typeConfig.descriptionKey)}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {dak.dynamicUrl ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Outline Client URL (ssconf://)</Label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
+                            {ssconfUrl}
+                          </div>
+                          <Button variant="outline" size="icon" onClick={handleCopyUrl}>
+                            <Copy className="h-4 w-4" />
                           </Button>
-                        )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Copy this URL and paste it in Outline client to connect. The client will automatically fetch the latest server configuration.
+                        </p>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">API Endpoint</Label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
+                            {subscriptionApiUrl}
+                          </div>
+                          <Button variant="outline" size="icon" onClick={handleCopyToken}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+
+                  <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <p className="font-medium">{dak.status}</p>
                     </div>
-                  ))}
-                </div>
-              ) : (
-            <div className="ops-chart-empty py-8 text-muted-foreground">
-              <Key className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>{t('dynamic_keys.detail.no_keys')}</p>
-            </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Load balancer</p>
+                      <p className="font-medium">{dak.loadBalancerAlgorithm.replace(/_/g, ' ')}</p>
+                    </div>
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Preferred mode</p>
+                      <p className="font-medium">{dak.preferredRegionMode.replace(/_/g, ' ')}</p>
+                    </div>
+                    <div className="ops-inline-stat">
+                      <p className="text-sm text-muted-foreground">Rotation trigger</p>
+                      <p className="font-medium">{dak.rotationTriggerMode.replace(/_/g, ' ')}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Sidebar - QR Code & Details */}
-        <div className="ops-detail-rail">
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-primary" />
-                {t('dynamic_keys.detail.qr_code')}
-              </CardTitle>
-              <CardDescription>
-                {t('dynamic_keys.detail.scan_qr')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              {qrCode ? (
-                <Image
-                  src={qrCode}
-                  alt="QR Code"
-                  width={200}
-                  height={200}
-                  className="rounded-[1.1rem] bg-white p-2"
-                  unoptimized
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    {t('dynamic_keys.detail.traffic_usage')}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                      <div className="ops-inline-stat">
+                        <p className="text-3xl font-bold">{formatBytes(dak.usedBytes)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          of {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : 'unlimited'}
+                        </p>
+                      </div>
+                      {dak.dataLimitBytes ? (
+                        <p className="text-2xl font-semibold text-muted-foreground sm:self-center sm:justify-self-end">
+                          {usagePercent.toFixed(1)}%
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {dak.dataLimitBytes ? (
+                      <Progress
+                        value={usagePercent}
+                        className={cn(
+                          'h-3',
+                          usagePercent > 90 && '[&>div]:bg-red-500',
+                          usagePercent > 70 && usagePercent <= 90 && '[&>div]:bg-yellow-500',
+                        )}
+                      />
+                    ) : null}
+                  </div>
+
+                  <div className="border-t border-border/50 pt-4">
+                    <p className="mb-2 text-sm font-medium">Live Activity</p>
+                    <AggregatedTrafficGraph accessKeys={dak.accessKeys} />
+                  </div>
+
+                  {dak.accessKeys.length > 0 ? (
+                    <div className="border-t border-border/50 pt-4">
+                      <TrafficHistoryChart accessKeyId={dak.accessKeys[0].id} />
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center gap-2">
+                      <Key className="h-5 w-5 text-primary" />
+                      {t('dynamic_keys.detail.attached_keys')} ({dak.accessKeys.length})
+                    </CardTitle>
+                    <Button size="sm" onClick={() => setAttachDialogOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Attach Key
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {dak.accessKeys.length > 0 ? (
+                    <div className="space-y-3">
+                      {dak.accessKeys.map((key) => (
+                        <div key={key.id} className="ops-row-card">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-[1rem] border border-border/60 bg-background/55 p-2 dark:bg-white/[0.03]">
+                              <Key className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{key.name}</p>
+                              <p className="text-xs text-muted-foreground">{key.server?.name || 'Unknown Server'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-sm font-medium">{formatBytes(key.usedBytes)}</p>
+                              <Badge
+                                variant={key.status === 'ACTIVE' ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {key.status}
+                              </Badge>
+                            </div>
+                            {dak.type === 'MANUAL' ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => handleDetachKey(key.id)}
+                                disabled={detachKeyMutation.isPending}
+                              >
+                                Detach
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ops-chart-empty py-8 text-muted-foreground">
+                      <Key className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                      <p>{t('dynamic_keys.detail.no_keys')}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="routing" className="mt-0 space-y-4">
+              <DynamicRoutingDiagnosticsCard
+                data={routingDiagnosticsQuery.data}
+                isLoading={routingDiagnosticsQuery.isLoading}
+                onRefresh={() => {
+                  void routingDiagnosticsQuery.refetch();
+                }}
+                isRefreshing={routingDiagnosticsQuery.isFetching}
+                onPinCurrent={handlePinCurrentBackend}
+                onPinSuggestedFallback={handlePinSuggestedFallback}
+                onClearPin={handleClearPinnedBackend}
+                onSimulateFailover={handleSimulateFailover}
+                onTestCandidates={handleTestCandidates}
+                isPinning={pinBackendMutation.isPending}
+                isClearingPin={clearPinnedBackendMutation.isPending}
+                isSimulating={simulateFailoverMutation.isPending}
+                isTesting={testCandidatesMutation.isPending}
+                canPinCurrent={Boolean(routingDiagnosticsQuery.data?.currentSelection?.serverId)}
+                simulationResult={simulateFailoverMutation.data}
+                candidateTestResult={testCandidatesMutation.data}
+                onExportDiagnostics={handleExportDiagnostics}
+                isExporting={exportDiagnosticsMutation.isPending}
+              />
+
+              <div className="ops-section-grid">
+                <ServerLoadCard />
+                <KeyRotationCard
+                  dakId={dak.id}
+                  rotationEnabled={dak.rotationEnabled}
+                  rotationInterval={dak.rotationInterval}
+                  rotationTriggerMode={dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED'}
+                  rotationUsageThresholdPercent={dak.rotationUsageThresholdPercent}
+                  rotateOnHealthFailure={dak.rotateOnHealthFailure}
+                  lastRotatedAt={dak.lastRotatedAt ?? null}
+                  nextRotationAt={dak.nextRotationAt ?? null}
+                  rotationCount={dak.rotationCount}
+                  onUpdate={() => refetch()}
                 />
-              ) : (
-                <div className="ops-chart-empty h-[200px] w-[200px]">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+
+              <Card className="ops-detail-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Download className="h-5 w-5 text-primary" />
+                    Backend Access
+                  </CardTitle>
+                  <CardDescription>
+                    Export the currently selected backend config while reviewing routing and failover behavior.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="ops-inline-stat">
+                    <p className="text-sm text-muted-foreground">Current backend</p>
+                    <p className="font-medium">
+                      {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'No active backend selected'}
+                    </p>
+                  </div>
+                  <Button variant="outline" className="w-full" onClick={handleDownloadCurrentBackendConfig}>
+                    <Download className="mr-2 h-4 w-4" />
+                    {t('dynamic_keys.routing.action.download_current_backend')}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="delivery" className="mt-0 space-y-4">
+              <ClientEndpointTestCard
+                endpointUrl={subscriptionApiUrl}
+                probeUrl={subscriptionProbeUrl}
+                title="Client URL Test"
+                description="Probe the live Outline client endpoint and verify the current dynamic subscription payload."
+              />
+
+              <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
+
+              <SubscriptionShareCard
+                dakId={dak.id}
+                keyName={dak.name}
+                dynamicUrl={dak.dynamicUrl}
+                publicSlug={dak.publicSlug}
+                currentTheme={dak.subscriptionTheme}
+                currentCoverImage={dak.coverImage}
+                currentCoverImageType={dak.coverImageType}
+                currentContactLinks={dak.contactLinks}
+                currentWelcomeMessage={dak.subscriptionWelcomeMessage ?? null}
+                currentSharePageEnabled={dak.sharePageEnabled ?? true}
+                onUpdate={() => refetch()}
+              />
+
+              <DynamicKeyTemplateCard
+                dak={{
+                  id: dak.id,
+                  name: dak.name,
+                  type: dak.type,
+                  notes: dak.notes ?? null,
+                  dataLimitBytes: dak.dataLimitBytes,
+                  durationDays: dak.durationDays ?? null,
+                  method: dak.method ?? null,
+                  serverTagIds: dak.serverTagIds,
+                  loadBalancerAlgorithm: dak.loadBalancerAlgorithm,
+                  preferredServerIds: dak.preferredServerIds,
+                  preferredCountryCodes: dak.preferredCountryCodes,
+                  preferredServerWeights: dak.preferredServerWeights,
+                  preferredCountryWeights: dak.preferredCountryWeights,
+                  preferredRegionMode: dak.preferredRegionMode,
+                  sessionStickinessMode: dak.sessionStickinessMode,
+                  drainGraceMinutes: dak.drainGraceMinutes,
+                  rotationEnabled: dak.rotationEnabled,
+                  rotationInterval: dak.rotationInterval,
+                  rotationTriggerMode: dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED',
+                  rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
+                  rotateOnHealthFailure: dak.rotateOnHealthFailure,
+                  sharePageEnabled: dak.sharePageEnabled ?? true,
+                  subscriptionTheme: dak.subscriptionTheme ?? null,
+                  subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage ?? null,
+                  appliedTemplateId: dak.appliedTemplateId ?? null,
+                }}
+                onUpdate={() => refetch()}
+              />
+            </TabsContent>
+
+            <TabsContent value="history" className="mt-0 space-y-4">
+              <DAKConnectionSessionsCard dakId={dak.id} />
+              <TelegramBillingHistoryCard
+                title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
+                description={
+                  isMyanmar
+                    ? 'ဤ premium dynamic key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
+                    : 'Review Telegram orders, renewals, and billing events related to this premium dynamic key.'
+                }
+                orders={(dak as any).billingHistory ?? []}
+                emptyLabel={
+                  isMyanmar
+                    ? 'ဤ premium dynamic key အတွက် Telegram billing history မရှိသေးပါ။'
+                    : 'No Telegram billing history for this premium dynamic key yet.'
+                }
+              />
+            </TabsContent>
+          </div>
+
+          <div className="ops-detail-rail">
+            <Card className="ops-detail-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-primary" />
+                  {t('dynamic_keys.detail.qr_code')}
+                </CardTitle>
+                <CardDescription>{t('dynamic_keys.detail.scan_qr')}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center">
+                {qrCode ? (
+                  <Image
+                    src={qrCode}
+                    alt="QR Code"
+                    width={200}
+                    height={200}
+                    className="rounded-[1.1rem] bg-white p-2"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="ops-chart-empty h-[200px] w-[200px]">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+
+                <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Button variant="outline" className="w-full" onClick={handleCopyUrl}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy URL
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={handleDownloadQr}>
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Download QR
+                  </Button>
+                  <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadConfig}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Config
+                  </Button>
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button variant="outline" className="w-full" onClick={handleCopyUrl}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy URL
-                </Button>
-                <Button variant="outline" className="w-full" onClick={handleDownloadQr}>
-                  <QrCode className="w-4 h-4 mr-2" />
-                  Download QR
-                </Button>
-                <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadConfig}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Config
-                </Button>
-                <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadCurrentBackendConfig}>
-                  <Download className="w-4 h-4 mr-2" />
-                  {t('dynamic_keys.routing.action.download_current_backend')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card className="ops-detail-card">
-            <CardHeader>
-              <CardTitle>{t('dynamic_keys.detail.details')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('dynamic_keys.table.type')}</span>
-                <span className="font-medium">{t(typeConfig.labelKey)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('dynamic_keys.detail.attached_keys')}</span>
-                <span className="font-medium">{dak.accessKeys.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('dynamic_keys.table.status')}</span>
-                <span className="font-medium">{dak.status}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Load Balancer</span>
-                <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
-                  {dak.loadBalancerAlgorithm === 'IP_HASH' ? 'IP Hash'
-                    : dak.loadBalancerAlgorithm === 'ROUND_ROBIN' ? 'Round Robin'
-                    : dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? '⚡ Least Load'
-                    : dak.loadBalancerAlgorithm === 'RANDOM' ? 'Random'
-                    : dak.loadBalancerAlgorithm}
-                </Badge>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('dynamic_keys.detail.created')}</span>
-                <span>{formatDateTime(dak.createdAt)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('dynamic_keys.detail.updated')}</span>
-                <span>{formatDateTime(dak.updatedAt)}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <ClientEndpointTestCard
-            endpointUrl={subscriptionApiUrl}
-            probeUrl={subscriptionProbeUrl}
-            title="Client URL Test"
-            description="Probe the live Outline client endpoint and verify the current dynamic subscription payload."
-          />
-
-          <DynamicRoutingDiagnosticsCard
-            data={routingDiagnosticsQuery.data}
-            isLoading={routingDiagnosticsQuery.isLoading}
-            onRefresh={() => {
-              void routingDiagnosticsQuery.refetch();
-            }}
-            isRefreshing={routingDiagnosticsQuery.isFetching}
-            onPinCurrent={handlePinCurrentBackend}
-            onPinSuggestedFallback={handlePinSuggestedFallback}
-            onClearPin={handleClearPinnedBackend}
-            onSimulateFailover={handleSimulateFailover}
-            onTestCandidates={handleTestCandidates}
-            isPinning={pinBackendMutation.isPending}
-            isClearingPin={clearPinnedBackendMutation.isPending}
-            isSimulating={simulateFailoverMutation.isPending}
-            isTesting={testCandidatesMutation.isPending}
-            canPinCurrent={Boolean(routingDiagnosticsQuery.data?.currentSelection?.serverId)}
-            simulationResult={simulateFailoverMutation.data}
-            candidateTestResult={testCandidatesMutation.data}
-            onExportDiagnostics={handleExportDiagnostics}
-            isExporting={exportDiagnosticsMutation.isPending}
-          />
-
-          <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
-
-          <TelegramBillingHistoryCard
-            title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
-            description={
-              isMyanmar
-                ? 'ဤ premium dynamic key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
-                : 'Review Telegram orders, renewals, and billing events related to this premium dynamic key.'
-            }
-            orders={(dak as any).billingHistory ?? []}
-            emptyLabel={
-              isMyanmar
-                ? 'ဤ premium dynamic key အတွက် Telegram billing history မရှိသေးပါ။'
-                : 'No Telegram billing history for this premium dynamic key yet.'
-            }
-          />
-
-          <DynamicKeyTemplateCard
-            dak={{
-              id: dak.id,
-              name: dak.name,
-              type: dak.type,
-              notes: dak.notes ?? null,
-              dataLimitBytes: dak.dataLimitBytes,
-              durationDays: dak.durationDays ?? null,
-              method: dak.method ?? null,
-              serverTagIds: dak.serverTagIds,
-              loadBalancerAlgorithm: dak.loadBalancerAlgorithm,
-              preferredServerIds: dak.preferredServerIds,
-              preferredCountryCodes: dak.preferredCountryCodes,
-              preferredServerWeights: dak.preferredServerWeights,
-              preferredCountryWeights: dak.preferredCountryWeights,
-              preferredRegionMode: dak.preferredRegionMode,
-              sessionStickinessMode: dak.sessionStickinessMode,
-              drainGraceMinutes: dak.drainGraceMinutes,
-              rotationEnabled: dak.rotationEnabled,
-              rotationInterval: dak.rotationInterval,
-              rotationTriggerMode: dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED',
-              rotationUsageThresholdPercent: dak.rotationUsageThresholdPercent,
-              rotateOnHealthFailure: dak.rotateOnHealthFailure,
-              sharePageEnabled: dak.sharePageEnabled ?? true,
-              subscriptionTheme: dak.subscriptionTheme ?? null,
-              subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage ?? null,
-              appliedTemplateId: dak.appliedTemplateId ?? null,
-            }}
-            onUpdate={() => refetch()}
-          />
-
-          {/* Server Load Distribution */}
-          <ServerLoadCard />
-
-          {/* Key Auto-Rotation */}
-          <KeyRotationCard
-            dakId={dak.id}
-            rotationEnabled={dak.rotationEnabled}
-            rotationInterval={dak.rotationInterval}
-            rotationTriggerMode={dak.rotationTriggerMode as 'SCHEDULED' | 'USAGE' | 'HEALTH' | 'COMBINED'}
-            rotationUsageThresholdPercent={dak.rotationUsageThresholdPercent}
-            rotateOnHealthFailure={dak.rotateOnHealthFailure}
-            lastRotatedAt={dak.lastRotatedAt ?? null}
-            nextRotationAt={dak.nextRotationAt ?? null}
-            rotationCount={dak.rotationCount}
-            onUpdate={() => refetch()}
-          />
-
-          {/* Connection Sessions */}
-          <DAKConnectionSessionsCard dakId={dak.id} />
-
-          {/* Share Page Settings */}
-          <SubscriptionShareCard
-            dakId={dak.id}
-            keyName={dak.name}
-            dynamicUrl={dak.dynamicUrl}
-            publicSlug={dak.publicSlug}
-            currentTheme={dak.subscriptionTheme}
-            currentCoverImage={dak.coverImage}
-            currentCoverImageType={dak.coverImageType}
-            currentContactLinks={dak.contactLinks}
-            currentWelcomeMessage={dak.subscriptionWelcomeMessage ?? null}
-            currentSharePageEnabled={dak.sharePageEnabled ?? true}
-            onUpdate={() => refetch()}
-          />
+            <Card className="ops-detail-card">
+              <CardHeader>
+                <CardTitle>Snapshot</CardTitle>
+                <CardDescription>
+                  Keep subscription status, load balancing, and route context visible while you edit delivery or routing settings.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{t('dynamic_keys.table.type')}</span>
+                  <span className="font-medium">{t(typeConfig.labelKey)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{t('dynamic_keys.table.status')}</span>
+                  <span className="font-medium">{dak.status}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{t('dynamic_keys.detail.attached_keys')}</span>
+                  <span className="font-medium">{dak.accessKeys.length}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Load Balancer</span>
+                  <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
+                    {dak.loadBalancerAlgorithm === 'IP_HASH'
+                      ? 'IP Hash'
+                      : dak.loadBalancerAlgorithm === 'ROUND_ROBIN'
+                        ? 'Round Robin'
+                        : dak.loadBalancerAlgorithm === 'LEAST_LOAD'
+                          ? 'Least Load'
+                          : dak.loadBalancerAlgorithm === 'RANDOM'
+                            ? 'Random'
+                            : dak.loadBalancerAlgorithm}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">Current route</span>
+                  <span className="text-right">
+                    {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{t('dynamic_keys.detail.created')}</span>
+                  <span>{formatDateTime(dak.createdAt)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{t('dynamic_keys.detail.updated')}</span>
+                  <span>{formatDateTime(dak.updatedAt)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </Tabs>
 
       {/* Attach Key Dialog */}
       <Dialog open={attachDialogOpen} onOpenChange={setAttachDialogOpen}>
