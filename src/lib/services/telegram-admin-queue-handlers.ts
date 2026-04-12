@@ -2,7 +2,7 @@ export {
   handleTelegramReviewQueueCommand,
   sendTelegramNextReviewQueueCard,
   buildTelegramServerNoticeShortcutMessage,
-} from '@/lib/services/telegram-bot-core';
+} from '@/lib/services/telegram-review-queue';
 
 export {
   buildTelegramSupportQueueShortcutMessage,

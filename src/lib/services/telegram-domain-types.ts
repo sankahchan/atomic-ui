@@ -1,5 +1,71 @@
 import { type SupportedLocale } from '@/lib/i18n/config';
 
+export interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    message_id: number;
+    date: number;
+    text?: string;
+    caption?: string;
+    chat: {
+      id: number;
+      type: string;
+    };
+    from: {
+      id: number;
+      is_bot: boolean;
+      username?: string;
+      first_name: string;
+    };
+    reply_to_message?: {
+      message_id?: number;
+      from?: {
+        id: number;
+        is_bot: boolean;
+        username?: string;
+        first_name: string;
+      };
+      chat?: {
+        id: number;
+        type?: string;
+      };
+      text?: string;
+      caption?: string;
+    };
+    photo?: Array<{
+      file_id: string;
+      file_unique_id?: string;
+      width: number;
+      height: number;
+      file_size?: number;
+    }>;
+    document?: {
+      file_id: string;
+      file_unique_id?: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size?: number;
+    };
+  };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      is_bot: boolean;
+      username?: string;
+      first_name: string;
+    };
+    message?: {
+      chat: {
+        id: number;
+        type?: string;
+      };
+      message_id?: number;
+    };
+    data?: string;
+  };
+}
+
 export type TelegramLocaleSelectorContext = 'start' | 'switch';
 
 export type TelegramOrderReviewAction =

@@ -255,6 +255,7 @@ import {
   ensureAccessKeySubscriptionToken,
   getDynamicKeyMessagingUrls,
 } from '@/lib/services/telegram-links';
+import { type TelegramUpdate } from '@/lib/services/telegram-domain-types';
 import {
   runTelegramSalesDigestCycle,
   sendAccessKeyLifecycleTelegramNotification as sendAccessKeyLifecycleTelegramReminder,
@@ -368,72 +369,6 @@ export {
   sendTelegramDigestToAdmins,
   sendTelegramSalesDigestToAdmins,
 } from '@/lib/services/telegram-reminders';
-
-export interface TelegramUpdate {
-  update_id: number;
-  message?: {
-    message_id: number;
-    from: {
-      id: number;
-      is_bot: boolean;
-      first_name: string;
-      username?: string;
-    };
-    chat: {
-      id: number;
-      type: string;
-    };
-    date: number;
-    text?: string;
-    caption?: string;
-    photo?: Array<{
-      file_id: string;
-      file_unique_id: string;
-      width: number;
-      height: number;
-      file_size?: number;
-    }>;
-    document?: {
-      file_id: string;
-      file_unique_id: string;
-      file_name?: string;
-      mime_type?: string;
-      file_size?: number;
-    };
-    reply_to_message?: {
-      message_id: number;
-      from?: {
-        id: number;
-        is_bot: boolean;
-        first_name: string;
-        username?: string;
-      };
-      chat?: {
-        id: number;
-        type: string;
-      };
-      text?: string;
-      caption?: string;
-    };
-  };
-  callback_query?: {
-    id: string;
-    from: {
-      id: number;
-      is_bot: boolean;
-      first_name: string;
-      username?: string;
-    };
-    message?: {
-      message_id: number;
-      chat: {
-        id: number;
-        type: string;
-      };
-    };
-    data?: string;
-  };
-}
 
 type TelegramMessage = NonNullable<TelegramUpdate['message']>;
 type TelegramCallbackQuery = NonNullable<TelegramUpdate['callback_query']>;
@@ -703,7 +638,7 @@ export async function sendTelegramOrderPaymentPromptCard(input: {
   });
 }
 
-async function retryTelegramOrderForUser(input: {
+export async function retryTelegramOrderForUser(input: {
   sourceOrder: Awaited<ReturnType<typeof findTelegramOrderByIdForUser>>;
   chatId: number;
   telegramUserId: number;
@@ -888,7 +823,7 @@ function truncateTelegramButtonLabel(value: string, maxLength = 28) {
   return `${trimmed.slice(0, maxLength - 1)}…`;
 }
 
-function buildTelegramPlanSelectionKeyboard(input: {
+export function buildTelegramPlanSelectionKeyboard(input: {
   orderId: string;
   plans: TelegramSalesPlan[];
   locale: SupportedLocale;
@@ -907,7 +842,7 @@ function buildTelegramPlanSelectionKeyboard(input: {
   };
 }
 
-function buildTelegramRenewKeySelectionKeyboard(input: {
+export function buildTelegramRenewKeySelectionKeyboard(input: {
   orderId: string;
   keys: Array<{
     id: string;
@@ -1668,7 +1603,7 @@ export async function buildTelegramOrderStatusReplyMarkup(input: {
   return rows.length ? { inline_keyboard: rows } : undefined;
 }
 
-async function listAvailableTelegramPlansForOrder(input: {
+export async function listAvailableTelegramPlansForOrder(input: {
   kind: 'NEW' | 'RENEW';
   chatId: number;
   telegramUserId: number;
@@ -1701,7 +1636,7 @@ async function listAvailableTelegramPlansForOrder(input: {
   });
 }
 
-async function findTelegramOrderByIdForUser(input: {
+export async function findTelegramOrderByIdForUser(input: {
   orderId: string;
   chatId: number;
   telegramUserId: number;
@@ -1741,7 +1676,7 @@ function getTelegramOrderDynamicKeyMessagingUrls(
   );
 }
 
-async function sendTelegramOrderStatusCard(input: {
+export async function sendTelegramOrderStatusCard(input: {
   botToken: string;
   chatId: number;
   order: TelegramUserOrder;
@@ -3008,7 +2943,7 @@ function applyTelegramOrderDuration(input: {
   return addMonths(input.baseDate, input.durationMonths ?? 1);
 }
 
-async function isEligibleForTelegramFreeTrial(chatId: number, telegramUserId: number) {
+export async function isEligibleForTelegramFreeTrial(chatId: number, telegramUserId: number) {
   const [linkedKeyCount, fulfilledOrders, fulfilledTrialOrder] = await Promise.all([
     db.accessKey.count({
       where: {
@@ -3081,7 +3016,7 @@ async function resolveGeneratedAccessSlug(name: string, prefix?: string | null) 
   return null;
 }
 
-function isTelegramOrderTerminal(status: string) {
+export function isTelegramOrderTerminal(status: string) {
   return TELEGRAM_ORDER_TERMINAL_STATUSES.includes(status as TelegramOrderTerminalStatus);
 }
 
@@ -3773,7 +3708,7 @@ async function sendTelegramPremiumSupportAlert(input: {
   });
 }
 
-async function sendTelegramPremiumSupportFollowUpAlert(input: {
+export async function sendTelegramPremiumSupportFollowUpAlert(input: {
   requestId: string;
   requestCode: string;
   dynamicAccessKeyId: string;
@@ -3861,7 +3796,7 @@ function appendTelegramPremiumSupportAdminNote(existingNote?: string | null, nex
   return `${trimmedExisting}\n\n${trimmedNext}`;
 }
 
-function buildTelegramOrderPlanSnapshot(
+export function buildTelegramOrderPlanSnapshot(
   plan: TelegramSalesPlan,
   locale: SupportedLocale,
   overrides?: {
@@ -6611,7 +6546,7 @@ export async function handleLanguageCommand(
   return null;
 }
 
-async function handleTelegramCallbackQuery(
+export async function handleTelegramCallbackQuery(
   callbackQuery: TelegramCallbackQuery,
   config: TelegramConfig,
 ) {
