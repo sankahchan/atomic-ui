@@ -75,3 +75,19 @@ export function hasKeyManageScope(scope?: string | null) {
 export function hasUserManageScope(scope?: string | null) {
   return isOwnerLikeAdmin(scope);
 }
+
+export function hasBackupManageScope(scope?: string | null) {
+  return isOwnerLikeAdmin(scope);
+}
+
+export function hasRestoreManageScope(scope?: string | null) {
+  return isOwnerLikeAdmin(scope);
+}
+
+export function hasKeyExportScope(scope?: string | null) {
+  return hasKeyManageScope(scope);
+}
+
+export function hasReportDownloadScope(scope?: string | null) {
+  return hasFinanceManageScope(scope);
+}

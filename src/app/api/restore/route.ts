@@ -2,16 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasRestoreManageScope } from '@/lib/admin-scope';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 import { parseRestoreUploadFormData } from '@/lib/services/restore-upload';
 
 export async function POST(req: NextRequest) {
     try {
-        const user = await getCurrentUser();
-        if (!user || user.role !== 'ADMIN') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { user, response } = await requireAdminRouteScope({
+            canAccess: hasRestoreManageScope,
+            forbiddenMessage: 'Only owner-scoped admins can restore backups.',
+        });
+        if (response || !user) {
+            return response!;
         }
 
         const { formData, error } = await parseRestoreUploadFormData(req);

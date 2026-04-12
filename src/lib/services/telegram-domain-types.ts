@@ -162,6 +162,7 @@ export type TelegramAdminKeyCallbackPayload = {
 };
 
 export type TelegramSupportQueueMode = 'all' | 'admin' | 'user';
+export type TelegramReviewQueueMode = 'all' | 'mine' | 'unclaimed';
 
 export type TelegramSupportThreadQueueSnapshot<TThread> = {
   totalOpen: number;
@@ -187,6 +188,17 @@ export type TelegramDeliveryResult = {
   connectUrl?: string | null;
   connectExpiresAt?: Date | null;
 };
+
+export type SendTelegramMessageResult =
+  | {
+      success: true;
+      status: number;
+    }
+  | {
+      success: false;
+      status: number | null;
+      error: string;
+    };
 
 export type SendTelegramMessageFn = (
   botToken: string,

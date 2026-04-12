@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { APP_RELEASE_VERSION } from '@/lib/app-version';
 import { db as prisma } from '@/lib/db';
 
 /**
@@ -37,7 +38,7 @@ export async function GET() {
       {
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0',
+        version: APP_RELEASE_VERSION,
         database: 'connected',
       },
       { status: 200 }
@@ -52,7 +53,7 @@ export async function GET() {
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0',
+        version: APP_RELEASE_VERSION,
         database: 'disconnected',
         error: 'Database connectivity issue',
       },

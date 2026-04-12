@@ -1240,6 +1240,190 @@ export const usersRouter = router({
       };
     }),
 
+  supportThreadAnalytics: adminProcedure
+    .input(
+      z.object({
+        days: z.number().int().min(1).max(365).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view support analytics.',
+        });
+      }
+
+      const days = input.days ?? 30;
+      const now = new Date();
+      const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      const rows = await db.telegramSupportThread.findMany({
+        where: {
+          createdAt: {
+            gte: since,
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          waitingOn: true,
+          issueCategory: true,
+          assignedAdminUserId: true,
+          assignedAdminName: true,
+          createdAt: true,
+          firstResponseDueAt: true,
+          firstAdminReplyAt: true,
+          handledAt: true,
+        },
+      });
+
+      type AnalyticsBucket = {
+        key: string;
+        label: string;
+        total: number;
+        open: number;
+        handled: number;
+        overdue: number;
+        firstResponseTotalMinutes: number;
+        firstResponseCount: number;
+        handledTotalMinutes: number;
+        handledCount: number;
+      };
+
+      const createBucket = (key: string, label: string): AnalyticsBucket => ({
+        key,
+        label,
+        total: 0,
+        open: 0,
+        handled: 0,
+        overdue: 0,
+        firstResponseTotalMinutes: 0,
+        firstResponseCount: 0,
+        handledTotalMinutes: 0,
+        handledCount: 0,
+      });
+
+      const byAdmin = new Map<string, AnalyticsBucket>();
+      const byCategory = new Map<string, AnalyticsBucket>();
+      let total = 0;
+      let open = 0;
+      let handled = 0;
+      let overdue = 0;
+      let firstResponseTotalMinutes = 0;
+      let firstResponseCount = 0;
+      let handledTotalMinutes = 0;
+      let handledCount = 0;
+
+      for (const row of rows) {
+        total += 1;
+        if (row.status === 'HANDLED') {
+          handled += 1;
+        } else {
+          open += 1;
+        }
+
+        const adminKey = row.assignedAdminUserId || 'unassigned';
+        const adminLabel = row.assignedAdminName || 'Unassigned';
+        const adminBucket = byAdmin.get(adminKey) || createBucket(adminKey, adminLabel);
+        const categoryKey = row.issueCategory || 'GENERAL';
+        const categoryLabel = resolveTelegramSupportIssueLabel(
+          row.issueCategory || 'GENERAL',
+          'en',
+        );
+        const categoryBucket = byCategory.get(categoryKey) || createBucket(categoryKey, categoryLabel);
+
+        adminBucket.total += 1;
+        categoryBucket.total += 1;
+
+        if (row.status === 'HANDLED') {
+          adminBucket.handled += 1;
+          categoryBucket.handled += 1;
+        } else {
+          adminBucket.open += 1;
+          categoryBucket.open += 1;
+        }
+
+        const firstResponseMinutes = row.firstAdminReplyAt
+          ? Math.max(0, Math.round((row.firstAdminReplyAt.getTime() - row.createdAt.getTime()) / 60000))
+          : null;
+        if (firstResponseMinutes != null) {
+          firstResponseTotalMinutes += firstResponseMinutes;
+          firstResponseCount += 1;
+          adminBucket.firstResponseTotalMinutes += firstResponseMinutes;
+          adminBucket.firstResponseCount += 1;
+          categoryBucket.firstResponseTotalMinutes += firstResponseMinutes;
+          categoryBucket.firstResponseCount += 1;
+        }
+
+        const handledMinutes = row.handledAt
+          ? Math.max(0, Math.round((row.handledAt.getTime() - row.createdAt.getTime()) / 60000))
+          : null;
+        if (handledMinutes != null) {
+          handledTotalMinutes += handledMinutes;
+          handledCount += 1;
+          adminBucket.handledTotalMinutes += handledMinutes;
+          adminBucket.handledCount += 1;
+          categoryBucket.handledTotalMinutes += handledMinutes;
+          categoryBucket.handledCount += 1;
+        }
+
+        const isOverdue = Boolean(
+          row.firstResponseDueAt
+          && (
+            (!row.firstAdminReplyAt && row.firstResponseDueAt <= now)
+            || (row.firstAdminReplyAt && row.firstAdminReplyAt > row.firstResponseDueAt)
+          ),
+        );
+        if (isOverdue) {
+          overdue += 1;
+          adminBucket.overdue += 1;
+          categoryBucket.overdue += 1;
+        }
+
+        byAdmin.set(adminKey, adminBucket);
+        byCategory.set(categoryKey, categoryBucket);
+      }
+
+      const serializeBucket = (bucket: AnalyticsBucket) => ({
+        key: bucket.key,
+        label: bucket.label,
+        total: bucket.total,
+        open: bucket.open,
+        handled: bucket.handled,
+        overdue: bucket.overdue,
+        overdueRate: bucket.total > 0 ? Math.round((bucket.overdue / bucket.total) * 100) : 0,
+        firstResponseMinutes:
+          bucket.firstResponseCount > 0
+            ? Math.round(bucket.firstResponseTotalMinutes / bucket.firstResponseCount)
+            : null,
+        handledMinutes:
+          bucket.handledCount > 0
+            ? Math.round(bucket.handledTotalMinutes / bucket.handledCount)
+            : null,
+      });
+
+      return {
+        timeframeDays: days,
+        summary: {
+          total,
+          open,
+          handled,
+          overdue,
+          overdueRate: total > 0 ? Math.round((overdue / total) * 100) : 0,
+          firstResponseMinutes:
+            firstResponseCount > 0 ? Math.round(firstResponseTotalMinutes / firstResponseCount) : null,
+          handledMinutes:
+            handledCount > 0 ? Math.round(handledTotalMinutes / handledCount) : null,
+        },
+        byAdmin: Array.from(byAdmin.values())
+          .map(serializeBucket)
+          .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label)),
+        byCategory: Array.from(byCategory.values())
+          .map(serializeBucket)
+          .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label)),
+      };
+    }),
+
   claimSupportThread: adminProcedure
     .input(
       z.object({

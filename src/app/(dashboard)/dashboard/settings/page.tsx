@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { trpc } from '@/lib/trpc';
+import { APP_RELEASE_VERSION } from '@/lib/app-version';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { withBasePath } from '@/lib/base-path';
@@ -1992,7 +1993,7 @@ export default function SettingsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between py-2 border-b">
               <span className="text-muted-foreground">{t('settings.about.version')}</span>
-              <span className="font-mono">1.0.0</span>
+              <span className="font-mono">{APP_RELEASE_VERSION}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b">
               <span className="text-muted-foreground">{t('settings.about.author')}</span>

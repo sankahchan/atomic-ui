@@ -6,13 +6,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasKeyExportScope } from '@/lib/admin-scope';
 
 export async function GET(request: NextRequest) {
-  // Check authentication
-  const user = await getCurrentUser();
-  if (!user || user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { response } = await requireAdminRouteScope({
+    canAccess: hasKeyExportScope,
+    forbiddenMessage: 'You do not have permission to export dynamic keys.',
+  });
+  if (response) {
+    return response;
   }
 
   const { searchParams } = new URL(request.url);

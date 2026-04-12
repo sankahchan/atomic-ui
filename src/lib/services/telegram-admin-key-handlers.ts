@@ -18,21 +18,22 @@ import { type TelegramAdminKeyDeps } from '@/lib/services/telegram-domain-types'
 import {
   type AccessCreateDraft,
   type AccessManageDraft,
-  type DirectMessageDraft,
   type DynamicCreateDraft,
   type DynamicManageDraft,
-  type PendingAdminFlow,
-  type SupportReplyDraft,
   TELEGRAM_REPLY_RECIPIENT_PREFIX,
 } from '@/lib/services/telegram-admin-key-types';
+import {
+  buildCancelKeyboard,
+  buildRecipientKeyboard,
+  clearPendingAdminFlow,
+  loadPendingAdminFlow,
+  savePendingAdminFlow,
+} from '@/lib/services/telegram-admin-key-flow-state';
 import {
   resolveAdminKeyQuery,
   setAccessKeyEnabledState,
 } from '@/lib/services/telegram-admin-review';
-import {
-  getTelegramPendingAdminFlow,
-  setTelegramPendingAdminFlow,
-} from '@/lib/services/telegram-runtime';
+import { startTelegramAdminDirectMessageFlow } from '@/lib/services/telegram-admin-key-delivery';
 import { replyTelegramSupportThreadAsAdmin } from '@/lib/services/telegram-support-admin';
 import {
   buildRecipientGuidanceLines,
@@ -91,116 +92,6 @@ function calculateExpiration(
   }
 }
 
-function createEmptyAccessDraft(): AccessCreateDraft {
-  return {
-    kind: 'create_access',
-    step: 'recipient',
-    recipient: null,
-    name: null,
-    assignmentMode: 'AUTO',
-    serverId: null,
-    dataLimitGB: null,
-    expirationType: 'NEVER',
-    durationDays: null,
-    expiresAt: null,
-  };
-}
-
-function createEmptyDynamicDraft(): DynamicCreateDraft {
-  return {
-    kind: 'create_dynamic',
-    step: 'recipient',
-    recipient: null,
-    name: null,
-    keyType: 'SELF_MANAGED',
-    dataLimitGB: null,
-    expirationType: 'NEVER',
-    durationDays: null,
-    expiresAt: null,
-  };
-}
-
-function createAccessManageDraft(): AccessManageDraft {
-  return {
-    kind: 'manage_access',
-    step: 'query',
-    keyId: null,
-  };
-}
-
-function createDynamicManageDraft(): DynamicManageDraft {
-  return {
-    kind: 'manage_dynamic',
-    step: 'query',
-    dynamicKeyId: null,
-  };
-}
-
-function parsePendingAdminFlow(raw?: string | null): PendingAdminFlow | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as PendingAdminFlow;
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.kind !== 'string' || typeof parsed.step !== 'string') {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function savePendingAdminFlow(
-  telegramUserId: number,
-  chatId: number,
-  flow: PendingAdminFlow | null,
-) {
-  await setTelegramPendingAdminFlow({
-    telegramUserId: String(telegramUserId),
-    telegramChatId: String(chatId),
-    flow: flow ? JSON.stringify(flow) : null,
-  });
-}
-
-async function loadPendingAdminFlow(
-  telegramUserId: number,
-  chatId: number,
-) {
-  const pending = await getTelegramPendingAdminFlow({
-    telegramUserId: String(telegramUserId),
-    telegramChatId: String(chatId),
-  });
-  return parsePendingAdminFlow(pending?.flow);
-}
-
-function buildCancelKeyboard(locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
-  return {
-    inline_keyboard: [[
-      {
-        text: isMyanmar ? '🛑 Wizard ပယ်ဖျက်မည်' : '🛑 Cancel wizard',
-        callback_data: buildTelegramAdminKeyCallbackData('cancel'),
-      },
-    ]],
-  };
-}
-
-function buildRecipientKeyboard(locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
-  return {
-    inline_keyboard: [
-      [
-        {
-          text: isMyanmar ? '⏭ Recipient မသတ်မှတ်ပါ' : '⏭ Skip recipient',
-          callback_data: buildTelegramAdminKeyCallbackData('skip'),
-        },
-      ],
-      buildCancelKeyboard(locale).inline_keyboard[0],
-    ],
-  };
-}
 
 function buildQuotaKeyboard(locale: SupportedLocale, action = 'quota') {
   const isMyanmar = locale === 'my';
@@ -743,7 +634,7 @@ function describeExpirationDraft(
   );
 }
 
-async function promptAccessCreateName(input: {
+export async function promptAccessCreateName(input: {
   draft: AccessCreateDraft;
   chatId: number;
   botToken: string;
@@ -770,7 +661,7 @@ async function promptAccessCreateName(input: {
   );
 }
 
-async function promptDynamicCreateName(input: {
+export async function promptDynamicCreateName(input: {
   draft: DynamicCreateDraft;
   chatId: number;
   botToken: string;
@@ -1096,7 +987,7 @@ function parseExpirationUpdate(
   };
 }
 
-async function resolveDynamicKeyQuery(query: string) {
+export async function resolveDynamicKeyQuery(query: string) {
   const trimmed = query.trim();
   if (!trimmed) {
     return { kind: 'empty' as const };
@@ -1268,7 +1159,7 @@ function formatDynamicManageSummary(key: {
     .join('\n');
 }
 
-async function showAccessManageActions(input: {
+export async function showAccessManageActions(input: {
   chatId: number;
   botToken: string;
   locale: SupportedLocale;
@@ -1318,7 +1209,7 @@ async function showAccessManageActions(input: {
   );
 }
 
-async function showDynamicManageActions(input: {
+export async function showDynamicManageActions(input: {
   chatId: number;
   botToken: string;
   locale: SupportedLocale;
@@ -1370,7 +1261,7 @@ async function showDynamicManageActions(input: {
   );
 }
 
-async function promptManageMatches(input: {
+export async function promptManageMatches(input: {
   chatId: number;
   botToken: string;
   locale: SupportedLocale;
@@ -2235,392 +2126,6 @@ async function resolveDynamicKeyDirectMessageTarget(dynamicKeyId: string) {
   };
 }
 
-export async function startTelegramAdminSupportReplyFlow(input: {
-  telegramUserId: number;
-  chatId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  threadId: string;
-  customerChatId: string;
-  recipientLabel: string;
-  deps: TelegramAdminKeyDeps;
-}) {
-  const flow: SupportReplyDraft = {
-    kind: 'support_reply',
-    step: 'message',
-    threadId: input.threadId,
-    customerChatId: input.customerChatId,
-    recipientLabel: input.recipientLabel,
-  };
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, flow);
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my'
-        ? '💬 <b>Reply to support thread</b>'
-        : '💬 <b>Reply to support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Recipient' : 'Recipient'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
-      input.locale === 'my'
-        ? 'ယခု text, photo, သို့မဟုတ် document ကို ပို့နိုင်ပါသည်။'
-        : 'Send the text, photo, or document reply now.',
-    ].join('\n'),
-    {
-      replyMarkup: buildCancelKeyboard(input.locale),
-    },
-  );
-}
-
-async function startTelegramAdminDirectMessageFlow(input: {
-  telegramUserId: number;
-  chatId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  recipientChatId: string;
-  recipientLabel: string;
-  userId?: string | null;
-  accessKeyId?: string | null;
-  dynamicKeyId?: string | null;
-  deps: TelegramAdminKeyDeps;
-}) {
-  const flow: DirectMessageDraft = {
-    kind: 'direct_message',
-    step: 'message',
-    recipientChatId: input.recipientChatId,
-    recipientLabel: input.recipientLabel,
-    userId: input.userId || null,
-    accessKeyId: input.accessKeyId || null,
-    dynamicKeyId: input.dynamicKeyId || null,
-  };
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, flow);
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my'
-        ? '💬 <b>Message user</b>'
-        : '💬 <b>Message user</b>',
-      '',
-      `${input.locale === 'my' ? 'Recipient' : 'Recipient'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
-      input.locale === 'my'
-        ? 'ယခု text, photo, သို့မဟုတ် document ကို ပို့နိုင်ပါသည်။'
-        : 'Send the text, photo, or document now.',
-    ].join('\n'),
-    {
-      replyMarkup: buildCancelKeyboard(input.locale),
-    },
-  );
-}
-
-async function clearPendingAdminFlow(telegramUserId: number, chatId: number) {
-  await savePendingAdminFlow(telegramUserId, chatId, null);
-}
-
-export async function cancelTelegramAdminKeyFlow(input: {
-  telegramUserId: number;
-  chatId: number;
-}) {
-  await clearPendingAdminFlow(input.telegramUserId, input.chatId);
-}
-
-export async function handleAdminCreateAccessKeyCommand(input: {
-  chatId: number;
-  telegramUserId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  adminActor: TelegramAdminActor;
-  argsText: string;
-  deps: TelegramAdminKeyDeps;
-}) {
-  let draft = createEmptyAccessDraft();
-  const query = input.argsText.trim();
-  if (query) {
-    const recipient = await resolveRecipientTarget(query);
-    if (!recipient) {
-      await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-      await input.deps.sendTelegramMessage(
-        input.botToken,
-        input.chatId,
-        input.locale === 'my'
-          ? 'Recipient ကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
-          : 'Recipient not found. Send an email, @username, Telegram user ID, or chat ID.',
-        {
-          replyMarkup: buildRecipientKeyboard(input.locale),
-        },
-      );
-      return null;
-    }
-    draft = {
-      ...draft,
-      recipient,
-      step: 'name',
-    };
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-    await promptAccessCreateName({
-      draft,
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my' ? '➕ <b>Create normal key</b>' : '➕ <b>Create normal key</b>',
-      '',
-      input.locale === 'my'
-        ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'
-        : 'Send the recipient as an email, @username, Telegram user ID, or chat ID. Press Skip if you want to create without linking a recipient.',
-      input.locale === 'my'
-        ? 'Tip: user message ကို reply လုပ်ပြီး /createkey လို့ပို့လျှင် recipient ကို အလိုအလျောက်ယူပါမည်။'
-        : 'Tip: reply to a user message with /createkey to seed the recipient automatically.',
-    ].join('\n'),
-    {
-      replyMarkup: buildRecipientKeyboard(input.locale),
-    },
-  );
-  return null;
-}
-
-export async function handleAdminCreateDynamicKeyCommand(input: {
-  chatId: number;
-  telegramUserId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  adminActor: TelegramAdminActor;
-  argsText: string;
-  deps: TelegramAdminKeyDeps;
-}) {
-  let draft = createEmptyDynamicDraft();
-  const query = input.argsText.trim();
-  if (query) {
-    const recipient = await resolveRecipientTarget(query);
-    if (!recipient) {
-      await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-      await input.deps.sendTelegramMessage(
-        input.botToken,
-        input.chatId,
-        input.locale === 'my'
-          ? 'Recipient ကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
-          : 'Recipient not found. Send an email, @username, Telegram user ID, or chat ID.',
-        {
-          replyMarkup: buildRecipientKeyboard(input.locale),
-        },
-      );
-      return null;
-    }
-    draft = {
-      ...draft,
-      recipient,
-      step: 'name',
-    };
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-    await promptDynamicCreateName({
-      draft,
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my' ? '💎 <b>Create dynamic key</b>' : '💎 <b>Create dynamic key</b>',
-      '',
-      input.locale === 'my'
-        ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'
-        : 'Send the recipient as an email, @username, Telegram user ID, or chat ID. Press Skip if you want to create without linking a recipient.',
-      input.locale === 'my'
-        ? 'Tip: user message ကို reply လုပ်ပြီး /createdynamic လို့ပို့လျှင် recipient ကို အလိုအလျောက်ယူပါမည်။'
-        : 'Tip: reply to a user message with /createdynamic to seed the recipient automatically.',
-    ].join('\n'),
-    {
-      replyMarkup: buildRecipientKeyboard(input.locale),
-    },
-  );
-  return null;
-}
-
-export async function handleAdminManageAccessKeyCommand(input: {
-  chatId: number;
-  telegramUserId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  argsText: string;
-  deps: TelegramAdminKeyDeps;
-}) {
-  const draft = createAccessManageDraft();
-  const query = input.argsText.trim();
-  if (!query) {
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-    await input.deps.sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      input.locale === 'my'
-        ? '🛠 Manage normal key အတွက် KEY ID, Outline ID, name, email, သို့မဟုတ် Telegram ID ကို ပို့ပါ။'
-        : '🛠 Send the KEY ID, Outline ID, name, email, or Telegram ID for the normal key you want to manage.',
-      {
-        replyMarkup: buildCancelKeyboard(input.locale),
-      },
-    );
-    return null;
-  }
-
-  const result = await resolveAdminKeyQuery(query);
-  if (result.kind === 'single') {
-    const nextDraft: AccessManageDraft = {
-      kind: 'manage_access',
-      step: 'actions',
-      keyId: result.key.id,
-    };
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, nextDraft);
-    await showAccessManageActions({
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      keyId: result.key.id,
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-  if (result.kind === 'many' && result.matches.length > 0) {
-    await promptManageMatches({
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      type: 'access',
-      matches: result.matches.map((key) => ({
-        id: key.id,
-        name: key.name,
-        status: key.status,
-        details: [
-          `${key.server?.name || 'Unknown server'}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
-          formatExpirationSummary(
-            {
-              expiresAt: key.expiresAt,
-              expirationType: key.expirationType,
-              durationDays: key.durationDays,
-            },
-            input.locale,
-          ),
-          key.email || key.telegramId || 'No recipient',
-        ],
-      })),
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    input.locale === 'my' ? 'Access key ကို မတွေ့ပါ။' : 'Access key not found.',
-    {
-      replyMarkup: buildCancelKeyboard(input.locale),
-    },
-  );
-  return null;
-}
-
-export async function handleAdminManageDynamicKeyCommand(input: {
-  chatId: number;
-  telegramUserId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  argsText: string;
-  deps: TelegramAdminKeyDeps;
-}) {
-  const draft = createDynamicManageDraft();
-  const query = input.argsText.trim();
-  if (!query) {
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-    await input.deps.sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      input.locale === 'my'
-        ? '🧭 Manage dynamic key အတွက် key ID, name, email, public slug, သို့မဟုတ် Telegram ID ကို ပို့ပါ။'
-        : '🧭 Send the dynamic key ID, name, email, public slug, or Telegram ID you want to manage.',
-      {
-        replyMarkup: buildCancelKeyboard(input.locale),
-      },
-    );
-    return null;
-  }
-
-  const result = await resolveDynamicKeyQuery(query);
-  if (result.kind === 'single') {
-    const nextDraft: DynamicManageDraft = {
-      kind: 'manage_dynamic',
-      step: 'actions',
-      dynamicKeyId: result.key.id,
-    };
-    await savePendingAdminFlow(input.telegramUserId, input.chatId, nextDraft);
-    await showDynamicManageActions({
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      dynamicKeyId: result.key.id,
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await savePendingAdminFlow(input.telegramUserId, input.chatId, draft);
-  if (result.kind === 'many' && result.matches.length > 0) {
-    await promptManageMatches({
-      chatId: input.chatId,
-      botToken: input.botToken,
-      locale: input.locale,
-      type: 'dynamic',
-      matches: result.matches.map((key) => ({
-        id: key.id,
-        name: key.name,
-        status: key.status,
-        details: [
-          `${key.type}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
-          formatExpirationSummary(
-            {
-              expiresAt: key.expiresAt,
-              expirationType: key.expirationType,
-              durationDays: key.durationDays,
-            },
-            input.locale,
-          ),
-          formatTelegramDynamicPoolSummary(key, getTelegramUi(input.locale)),
-          key.email || key.telegramId || 'No recipient',
-        ],
-      })),
-      deps: input.deps,
-    });
-    return null;
-  }
-
-  await input.deps.sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    input.locale === 'my' ? 'Dynamic key ကို မတွေ့ပါ။' : 'Dynamic key not found.',
-    {
-      replyMarkup: buildCancelKeyboard(input.locale),
-    },
-  );
-  return null;
-}
-
 export async function handleTelegramAdminKeyTextInput(input: {
   chatId: number;
   telegramUserId: number;
@@ -2933,14 +2438,60 @@ export async function handleTelegramAdminKeyTextInput(input: {
 
   if (flow.kind === 'manage_access') {
     if (flow.step === 'query') {
-      await handleAdminManageAccessKeyCommand({
-        chatId: input.chatId,
-        telegramUserId: input.telegramUserId,
-        locale: input.locale,
-        botToken: input.botToken,
-        argsText: text,
-        deps: input.deps,
-      });
+      const result = await resolveAdminKeyQuery(text);
+      if (result.kind === 'single') {
+        const nextFlow: AccessManageDraft = {
+          kind: 'manage_access',
+          step: 'actions',
+          keyId: result.key.id,
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showAccessManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          keyId: result.key.id,
+          deps: input.deps,
+        });
+        return true;
+      }
+
+      if (result.kind === 'many' && result.matches.length > 0) {
+        await promptManageMatches({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          type: 'access',
+          matches: result.matches.map((key) => ({
+            id: key.id,
+            name: key.name,
+            status: key.status,
+            details: [
+              `${key.server?.name || 'Unknown server'}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
+              formatExpirationSummary(
+                {
+                  expiresAt: key.expiresAt,
+                  expirationType: key.expirationType,
+                  durationDays: key.durationDays,
+                },
+                input.locale,
+              ),
+              key.email || key.telegramId || 'No recipient',
+            ],
+          })),
+          deps: input.deps,
+        });
+        return true;
+      }
+
+      await input.deps.sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        input.locale === 'my' ? 'Access key ကို မတွေ့ပါ။' : 'Access key not found.',
+        {
+          replyMarkup: buildCancelKeyboard(input.locale),
+        },
+      );
       return true;
     }
 
@@ -3100,14 +2651,61 @@ export async function handleTelegramAdminKeyTextInput(input: {
 
   if (flow.kind === 'manage_dynamic') {
     if (flow.step === 'query') {
-      await handleAdminManageDynamicKeyCommand({
-        chatId: input.chatId,
-        telegramUserId: input.telegramUserId,
-        locale: input.locale,
-        botToken: input.botToken,
-        argsText: text,
-        deps: input.deps,
-      });
+      const result = await resolveDynamicKeyQuery(text);
+      if (result.kind === 'single') {
+        const nextFlow: DynamicManageDraft = {
+          kind: 'manage_dynamic',
+          step: 'actions',
+          dynamicKeyId: result.key.id,
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await showDynamicManageActions({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          dynamicKeyId: result.key.id,
+          deps: input.deps,
+        });
+        return true;
+      }
+
+      if (result.kind === 'many' && result.matches.length > 0) {
+        await promptManageMatches({
+          chatId: input.chatId,
+          botToken: input.botToken,
+          locale: input.locale,
+          type: 'dynamic',
+          matches: result.matches.map((key) => ({
+            id: key.id,
+            name: key.name,
+            status: key.status,
+            details: [
+              `${key.type}${key.dataLimitBytes ? ` • ${formatBytes(key.dataLimitBytes)}` : ' • Unlimited'}`,
+              formatExpirationSummary(
+                {
+                  expiresAt: key.expiresAt,
+                  expirationType: key.expirationType,
+                  durationDays: key.durationDays,
+                },
+                input.locale,
+              ),
+              formatTelegramDynamicPoolSummary(key, getTelegramUi(input.locale)),
+              key.email || key.telegramId || 'No recipient',
+            ],
+          })),
+          deps: input.deps,
+        });
+        return true;
+      }
+
+      await input.deps.sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        input.locale === 'my' ? 'Dynamic key ကို မတွေ့ပါ။' : 'Dynamic key not found.',
+        {
+          replyMarkup: buildCancelKeyboard(input.locale),
+        },
+      );
       return true;
     }
 

@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasReportDownloadScope } from '@/lib/admin-scope';
 import { generateReportCSV } from '@/lib/services/report-generator';
 
 function escapePdfText(value: string) {
@@ -105,9 +106,12 @@ function buildPdfLines(report: { name: string; periodStart: Date; periodEnd: Dat
 }
 
 export async function GET(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user || user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { response } = await requireAdminRouteScope({
+    canAccess: hasReportDownloadScope,
+    forbiddenMessage: 'You do not have permission to download reports.',
+  });
+  if (response) {
+    return response;
   }
 
   const { searchParams } = new URL(request.url);

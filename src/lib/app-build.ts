@@ -1,9 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { APP_RELEASE_LABEL, APP_RELEASE_VERSION } from '@/lib/app-version';
 
 export type AppBuildInfo = {
   buildId: string;
   builtAt: string | null;
+  releaseVersion: string;
+  releaseLabel: string;
 };
 
 function getPreferredBuildId() {
@@ -38,6 +41,8 @@ export function getAppBuildInfo(): AppBuildInfo {
       return {
         buildId: preferredBuildId || buildId || 'unknown',
         builtAt: Number.isFinite(stat.mtimeMs) ? new Date(stat.mtimeMs).toISOString() : null,
+        releaseVersion: APP_RELEASE_VERSION,
+        releaseLabel: APP_RELEASE_LABEL,
       };
     } catch {
       continue;
@@ -47,5 +52,7 @@ export function getAppBuildInfo(): AppBuildInfo {
   return {
     buildId: preferredBuildId || 'unknown',
     builtAt: null,
+    releaseVersion: APP_RELEASE_VERSION,
+    releaseLabel: APP_RELEASE_LABEL,
   };
 }

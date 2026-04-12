@@ -3,7 +3,8 @@ import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasBackupManageScope } from '@/lib/admin-scope';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 
@@ -23,9 +24,12 @@ function streamToWeb(nodeStream: Readable) {
 
 export async function GET(req: NextRequest) {
     try {
-        const user = await getCurrentUser();
-        if (!user || user.role !== 'ADMIN') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { user, response } = await requireAdminRouteScope({
+            canAccess: hasBackupManageScope,
+            forbiddenMessage: 'Only owner-scoped admins can export full backups.',
+        });
+        if (response || !user) {
+            return response!;
         }
 
         // Define files to backup

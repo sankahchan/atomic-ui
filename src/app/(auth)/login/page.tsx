@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { trpc } from '@/lib/trpc';
+import { APP_RELEASE_LABEL } from '@/lib/app-version';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -339,7 +340,7 @@ export default function LoginPage() {
 
       {/* Version badge */}
       <div className="absolute bottom-4 right-4 text-xs text-gray-400 dark:text-gray-600 z-10">
-        Atomic-UI v1.0.0
+        Atomic-UI {APP_RELEASE_LABEL}
       </div>
     </div>
   );

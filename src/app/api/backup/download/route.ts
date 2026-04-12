@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasBackupManageScope } from '@/lib/admin-scope';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 
 const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
 
 export async function GET(req: NextRequest) {
     try {
-        // Check authentication
-        const user = await getCurrentUser();
-        if (!user || user.role !== 'ADMIN') {
-            return new NextResponse('Unauthorized', { status: 401 });
+        const { user, response } = await requireAdminRouteScope({
+            canAccess: hasBackupManageScope,
+            forbiddenMessage: 'Only owner-scoped admins can download backup archives.',
+        });
+        if (response || !user) {
+            return response ?? new NextResponse('Unauthorized', { status: 401 });
         }
 
         const { searchParams } = new URL(req.url);
@@ -22,7 +25,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Prevent directory traversal
-        const safeFilename = path.basename(filename);
+        const safeFilename = path.basename(filename).replace(/[\r\n"]/g, '_');
         const filePath = path.join(BACKUP_DIR, safeFilename);
 
         if (!fs.existsSync(filePath)) {

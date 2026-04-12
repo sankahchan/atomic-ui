@@ -24,7 +24,6 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { createOutlineClient } from '@/lib/outline-api';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
-import { withAbsoluteBasePath } from '@/lib/base-path';
 import {
   buildDynamicOutlineUrl,
   buildDynamicSharePageUrl,
@@ -316,6 +315,14 @@ import {
   unclaimTelegramSupportThreadAsAdmin,
 } from '@/lib/services/telegram-support-admin';
 import {
+  buildTelegramSupportQueueShortcutMessage,
+  getTelegramSupportQueueSnapshot,
+  handleTelegramSupportQueueCommand,
+  sendTelegramNextSupportQueueCard,
+  sendTelegramSupportQueueCardToChat,
+  buildTelegramSupportQueueSummaryKeyboard,
+} from '@/lib/services/telegram-premium-support-queue';
+import {
   formatTelegramRelativeAge,
   handleTelegramSupportConsoleCommand,
   handleTelegramSupportThreadsQueueCommand,
@@ -323,6 +330,12 @@ import {
   sendTelegramNextSupportThreadQueueCard,
   type TelegramSupportQueueMode,
 } from '@/lib/services/telegram-support-console';
+import {
+  buildTelegramDynamicKeyPanelUrl,
+  buildTelegramOrderPanelUrl,
+  buildTelegramPremiumSupportPanelUrl,
+  buildTelegramServerChangePanelUrl,
+} from '@/lib/services/telegram-panel-links';
 import { computeArchiveAfterAt } from '@/lib/access-key-policies';
 import {
   buildPublicSlugSuggestionCandidates,
@@ -1964,20 +1977,6 @@ async function findTelegramServerChangeRequestByIdForUser(input: {
 
 type TelegramAdminReviewQueueOrder =
   Awaited<ReturnType<typeof getTelegramReviewQueueSnapshot>>['orders'][number];
-type TelegramAdminSupportQueueRequest = Awaited<
-  ReturnType<typeof db.telegramPremiumSupportRequest.findMany>
->[number] & {
-  dynamicAccessKey: {
-    id: string;
-    name: string;
-  };
-  replies: Array<{
-    id: string;
-    senderType: string;
-    message: string;
-    createdAt: Date;
-  }>;
-};
 
 export function resolveTelegramReviewQueueMode(argsText: string) {
   const normalized = argsText.trim().toLowerCase();
@@ -2034,251 +2033,6 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
   };
 }
 
-function getTelegramSupportQueueState(input: {
-  request: {
-    status: string;
-    followUpPending?: boolean | null;
-    replies?: Array<{ senderType: string; message: string; createdAt: Date }>;
-  };
-  locale: SupportedLocale;
-}) {
-  const isMyanmar = input.locale === 'my';
-  const latestReply = input.request.replies?.[input.request.replies.length - 1] || null;
-
-  if (input.request.followUpPending) {
-    return {
-      code: 'admin' as const,
-      label: isMyanmar ? 'Waiting for admin' : 'Waiting for admin',
-    };
-  }
-
-  if (latestReply?.senderType === 'ADMIN') {
-    return {
-      code: 'user' as const,
-      label: isMyanmar ? 'Waiting for user' : 'Waiting for user',
-    };
-  }
-
-  return {
-    code: 'admin' as const,
-    label: isMyanmar ? 'Pending review' : 'Pending review',
-  };
-}
-
-
-export async function getTelegramSupportQueueSnapshot(input: {
-  mode: TelegramSupportQueueMode;
-  limit?: number;
-}) {
-  const requests = await db.telegramPremiumSupportRequest.findMany({
-    where: {
-      status: {
-        not: 'DISMISSED',
-      },
-    },
-    include: {
-      dynamicAccessKey: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      replies: {
-        orderBy: [{ createdAt: 'asc' }],
-        take: 8,
-      },
-    },
-    orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
-    take: Math.max((input.limit ?? 4) * 4, 12),
-  });
-
-  const filtered = requests.filter((request) => {
-    const state = getTelegramSupportQueueState({
-      request,
-      locale: 'en',
-    });
-    return input.mode === 'all' ? true : state.code === input.mode;
-  });
-
-  return {
-    totalOpen: requests.length,
-    waitingAdmin: requests.filter(
-      (request) =>
-        getTelegramSupportQueueState({
-          request,
-          locale: 'en',
-        }).code === 'admin',
-    ).length,
-    waitingUser: requests.filter(
-      (request) =>
-        getTelegramSupportQueueState({
-          request,
-          locale: 'en',
-        }).code === 'user',
-    ).length,
-    requests: filtered.slice(0, input.limit ?? 4),
-  };
-}
-
-export function buildTelegramSupportQueueSummaryKeyboard(input: {
-  locale: SupportedLocale;
-  mode: TelegramSupportQueueMode;
-}) {
-  const isMyanmar = input.locale === 'my';
-  const option = (mode: TelegramSupportQueueMode, label: string) => ({
-    text: input.mode === mode ? `• ${label}` : label,
-    callback_data: buildTelegramMenuCallbackData(
-      'admin',
-      mode === 'all' ? 'supportqueue' : `supportqueue_${mode}`,
-    ),
-  });
-
-  return {
-    inline_keyboard: [
-      [
-        option('all', isMyanmar ? 'All' : 'All'),
-        option('admin', isMyanmar ? 'Need admin' : 'Need admin'),
-        option('user', isMyanmar ? 'Need user' : 'Need user'),
-      ],
-      [
-        {
-          text: isMyanmar ? '⚡ Next needing action' : '⚡ Next needing action',
-          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
-        },
-        {
-          text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
-          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
-        },
-        {
-          text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
-          callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
-        },
-      ],
-      [
-        {
-          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
-          callback_data: buildTelegramMenuCallbackData('admin', 'home'),
-        },
-      ],
-    ],
-  };
-}
-
-async function buildTelegramSupportQueuePanelUrl(requestId: string) {
-  return buildTelegramPremiumSupportPanelUrl(requestId);
-}
-
-function buildTelegramSupportQueueReplyKeyboard(input: {
-  requestId: string;
-  locale: SupportedLocale;
-  panelUrl: string;
-  mode: TelegramSupportQueueMode;
-}) {
-  const isMyanmar = input.locale === 'my';
-  return {
-    inline_keyboard: [
-      [
-        {
-          text: isMyanmar ? '👀 Working on it' : '👀 Working on it',
-          callback_data: buildTelegramSupportQueueCallbackData('wk', input.requestId, input.mode),
-        },
-        {
-          text: isMyanmar ? '❓ Need details' : '❓ Need details',
-          callback_data: buildTelegramSupportQueueCallbackData('nd', input.requestId, input.mode),
-        },
-      ],
-      [
-        {
-          text: isMyanmar ? '⬅️ Queue' : '⬅️ Queue',
-          callback_data: buildTelegramMenuCallbackData(
-            'admin',
-            input.mode === 'admin'
-              ? 'supportqueue_admin'
-              : input.mode === 'user'
-                ? 'supportqueue_user'
-                : 'supportqueue',
-          ),
-        },
-        {
-          text: isMyanmar ? '✅ Handled' : '✅ Handled',
-          callback_data: buildTelegramSupportQueueCallbackData('hd', input.requestId, input.mode),
-        },
-        {
-          text: isMyanmar ? '➡️ Next' : '➡️ Next',
-          callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
-        },
-      ],
-      [{ text: isMyanmar ? 'Open panel' : 'Open panel', url: input.panelUrl }],
-    ],
-  };
-}
-
-export async function sendTelegramSupportQueueCardToChat(input: {
-  botToken: string;
-  chatId: string | number;
-  locale: SupportedLocale;
-  request: TelegramAdminSupportQueueRequest;
-  mode: TelegramSupportQueueMode;
-}) {
-  const latestReply = input.request.replies?.[input.request.replies.length - 1] || null;
-  const state = getTelegramSupportQueueState({
-    request: input.request,
-    locale: input.locale,
-  });
-  const age = formatTelegramRelativeAge(
-    input.request.updatedAt || input.request.createdAt,
-    input.locale,
-  );
-  const overdue =
-    state.code === 'admin'
-    && Date.now() - (input.request.updatedAt || input.request.createdAt).getTime() > 6 * 60 * 60 * 1000;
-  const panelUrl = await buildTelegramSupportQueuePanelUrl(input.request.id);
-  const replyStateLabel =
-    latestReply?.senderType === 'ADMIN'
-      ? input.locale === 'my'
-        ? '🟡 Waiting for user'
-        : '🟡 Waiting for user'
-      : input.request.followUpPending
-        ? input.locale === 'my'
-          ? '🕒 Waiting for admin'
-          : '🕒 Waiting for admin'
-        : input.locale === 'my'
-          ? '✅ Up to date'
-          : '✅ Up to date';
-
-  await sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my'
-        ? '💎 <b>Premium support thread</b>'
-        : '💎 <b>Premium support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.request.requestCode)}</b>`,
-      `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
-      `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}</b>`,
-      `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'Overdue' : 'Overdue'}</b>` : ''}`,
-      `${input.locale === 'my' ? 'Reply state' : 'Reply state'}: <b>${escapeHtml(replyStateLabel)}</b>`,
-      `${input.locale === 'my' ? 'Age' : 'Age'}: <b>${escapeHtml(age)}</b>`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 120,
-      }).map((line) => escapeHtml(line)),
-      `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    {
-      replyMarkup: buildTelegramSupportQueueReplyKeyboard({
-        requestId: input.request.id,
-        locale: input.locale,
-        panelUrl,
-        mode: input.mode,
-      }),
-    },
-  );
-}
 
 function buildTelegramOrderReviewAlertMessage(input: {
   order: TelegramAdminReviewQueueOrder;
@@ -2608,119 +2362,6 @@ export async function sendTelegramNextReviewQueueCard(input: {
   return nextOrder;
 }
 
-export async function handleTelegramSupportQueueCommand(input: {
-  chatId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  argsText: string;
-}) {
-  const mode = resolveTelegramSupportQueueMode(input.argsText);
-  const snapshot = await getTelegramSupportQueueSnapshot({
-    mode,
-    limit: 3,
-  });
-
-  if (snapshot.requests.length === 0) {
-    await sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      input.locale === 'my'
-        ? '📭 Open support thread မရှိသေးပါ။'
-        : '📭 There are no open support threads right now.',
-      {
-        replyMarkup: buildTelegramSupportQueueSummaryKeyboard({
-          locale: input.locale,
-          mode,
-        }),
-      },
-    );
-    return null;
-  }
-
-  const modeLabel =
-    mode === 'admin'
-      ? input.locale === 'my'
-        ? 'Need admin reply'
-        : 'Need admin reply'
-      : mode === 'user'
-        ? input.locale === 'my'
-          ? 'Waiting for user'
-          : 'Waiting for user'
-        : input.locale === 'my'
-          ? 'All open threads'
-          : 'All open threads';
-
-  await sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    [
-      input.locale === 'my' ? '💎 <b>Premium support queue</b>' : '💎 <b>Premium support queue</b>',
-      '',
-      modeLabel,
-      input.locale === 'my'
-        ? `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user`
-        : `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user`,
-    ].join('\n'),
-    {
-      replyMarkup: buildTelegramSupportQueueSummaryKeyboard({
-        locale: input.locale,
-        mode,
-      }),
-    },
-  );
-
-  for (const request of snapshot.requests) {
-    await sendTelegramSupportQueueCardToChat({
-      botToken: input.botToken,
-      chatId: input.chatId,
-      locale: input.locale,
-      request,
-      mode,
-    });
-  }
-
-  return null;
-}
-
-export async function sendTelegramNextSupportQueueCard(input: {
-  chatId: number;
-  locale: SupportedLocale;
-  botToken: string;
-  mode: TelegramSupportQueueMode;
-  excludeRequestId?: string | null;
-}) {
-  const snapshot = await getTelegramSupportQueueSnapshot({
-    mode: input.mode,
-    limit: 8,
-  });
-  const nextRequest = snapshot.requests.find((request) => request.id !== (input.excludeRequestId || null)) || null;
-  if (!nextRequest) {
-    await sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      input.locale === 'my'
-        ? '📭 ဤ support queue filter အတွက် နောက်ထပ် thread မရှိတော့ပါ။'
-        : '📭 There are no more support threads in this queue filter.',
-      {
-        replyMarkup: buildTelegramSupportQueueSummaryKeyboard({
-          locale: input.locale,
-          mode: input.mode,
-        }),
-      },
-    );
-    return null;
-  }
-
-  await sendTelegramSupportQueueCardToChat({
-    botToken: input.botToken,
-    chatId: input.chatId,
-    locale: input.locale,
-    request: nextRequest,
-    mode: input.mode,
-  });
-  return nextRequest;
-}
-
 export function buildTelegramServerNoticeShortcutMessage(locale: SupportedLocale) {
   return locale === 'my'
     ? [
@@ -2747,29 +2388,6 @@ export function buildTelegramServerNoticeShortcutMessage(locale: SupportedLocale
         '/maintenance US',
         '/serverupdate US Recovery work is ongoing',
       ].join('\n');
-}
-
-export function buildTelegramSupportQueueShortcutMessage(
-  action: 'wk' | 'nd' | 'hd',
-  locale: SupportedLocale,
-) {
-  const isMyanmar = locale === 'my';
-  switch (action) {
-    case 'wk':
-      return isMyanmar
-        ? 'We are checking this now and will update you again shortly.'
-        : 'We are checking this now and will update you again shortly.';
-    case 'nd':
-      return isMyanmar
-        ? 'Please send a little more detail or a clearer screenshot so we can continue.'
-        : 'Please send a little more detail or a clearer screenshot so we can continue.';
-    case 'hd':
-      return isMyanmar
-        ? 'This issue has been handled. Please try again and reply here if you still need help.'
-        : 'This issue has been handled. Please try again and reply here if you still need help.';
-    default:
-      return '';
-  }
 }
 
 export async function sendTelegramOrderReviewAlert(
@@ -4082,46 +3700,6 @@ export async function runTelegramSalesOrderCycle() {
     salesDigestAdminChats,
     errors,
   };
-}
-
-async function buildTelegramOrderPanelUrl(orderId: string) {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    'http://localhost:3000';
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${origin}${basePath}/dashboard/notifications?telegramOrder=${encodeURIComponent(orderId)}`;
-}
-
-async function buildTelegramServerChangePanelUrl(requestId: string) {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    'http://localhost:3000';
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${origin}${basePath}/dashboard/notifications?serverChangeRequest=${encodeURIComponent(requestId)}`;
-}
-
-async function buildTelegramPremiumSupportPanelUrl(requestId: string) {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    'http://localhost:3000';
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${origin}${basePath}/dashboard/notifications?premiumSupportRequest=${encodeURIComponent(requestId)}`;
-}
-
-async function buildTelegramDynamicKeyPanelUrl(dynamicAccessKeyId: string) {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    'http://localhost:3000';
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${origin}${basePath}/dashboard/dynamic-keys/${encodeURIComponent(dynamicAccessKeyId)}`;
 }
 
 async function sendTelegramPremiumSupportAlert(input: {

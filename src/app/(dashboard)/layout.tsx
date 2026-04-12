@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc';
+import { APP_RELEASE_LABEL } from '@/lib/app-version';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -145,7 +146,7 @@ function Sidebar({
       {!isCollapsed && (
         <div className="rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,26,0.9),rgba(4,10,22,0.78))] dark:shadow-[0_16px_44px_rgba(1,6,20,0.3),inset_0_1px_0_rgba(125,211,252,0.04)]">
           <p className="text-center text-xs text-muted-foreground">
-            v1.0.0 • sankahchan
+            {APP_RELEASE_LABEL} • sankahchan
           </p>
         </div>
       )}

@@ -1,8 +1,11 @@
 export {
-  buildTelegramServerNoticeShortcutMessage,
-  buildTelegramSupportQueueShortcutMessage,
   handleTelegramReviewQueueCommand,
-  handleTelegramSupportQueueCommand,
   sendTelegramNextReviewQueueCard,
-  sendTelegramNextSupportQueueCard,
+  buildTelegramServerNoticeShortcutMessage,
 } from '@/lib/services/telegram-bot-core';
+
+export {
+  buildTelegramSupportQueueShortcutMessage,
+  handleTelegramSupportQueueCommand,
+  sendTelegramNextSupportQueueCard,
+} from '@/lib/services/telegram-premium-support-queue';

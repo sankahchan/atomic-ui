@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
   Clock3,
   Loader2,
   MessageSquare,
@@ -100,11 +101,25 @@ function SupportStatCard({
   );
 }
 
+function formatDurationLabel(minutes: number | null) {
+  if (minutes == null) {
+    return 'No data yet';
+  }
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 export default function SupportCenterPage() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<SupportStatusFilter>('ACTIVE');
   const [assignmentFilter, setAssignmentFilter] = useState<SupportAssignmentFilter>('ALL');
   const [issueFilter, setIssueFilter] = useState<SupportIssueFilter>('ALL');
+  const [analyticsWindowDays, setAnalyticsWindowDays] = useState(30);
   const [search, setSearch] = useState('');
 
   const currentUserQuery = trpc.auth.me.useQuery();
@@ -115,10 +130,13 @@ export default function SupportCenterPage() {
     query: search.trim() || undefined,
     limit: 60,
   });
+  const analyticsQuery = trpc.users.supportThreadAnalytics.useQuery({
+    days: analyticsWindowDays,
+  });
 
   const claimMutation = trpc.users.claimSupportThread.useMutation({
     onSuccess: async () => {
-      await threadsQuery.refetch();
+      await Promise.all([threadsQuery.refetch(), analyticsQuery.refetch()]);
       toast({ title: 'Support thread claimed' });
     },
     onError: (error) => {
@@ -128,7 +146,7 @@ export default function SupportCenterPage() {
 
   const unclaimMutation = trpc.users.unclaimSupportThread.useMutation({
     onSuccess: async () => {
-      await threadsQuery.refetch();
+      await Promise.all([threadsQuery.refetch(), analyticsQuery.refetch()]);
       toast({ title: 'Support thread unclaimed' });
     },
     onError: (error) => {
@@ -139,6 +157,64 @@ export default function SupportCenterPage() {
   const currentUserId = currentUserQuery.data?.id ?? null;
   const isBusy = claimMutation.isPending || unclaimMutation.isPending;
   const threads = threadsQuery.data?.threads || [];
+
+  const boardCards = [
+    {
+      id: 'unassigned',
+      title: 'Unassigned',
+      helper: 'Claimable threads with no owner.',
+      value: threadsQuery.data?.summary.unassigned || 0,
+      isActive: assignmentFilter === 'UNASSIGNED' && statusFilter === 'ACTIVE',
+      onClick: () => {
+        setAssignmentFilter('UNASSIGNED');
+        setStatusFilter('ACTIVE');
+      },
+    },
+    {
+      id: 'mine',
+      title: 'Mine',
+      helper: 'Your currently assigned queue.',
+      value: threadsQuery.data?.summary.mine || 0,
+      isActive: assignmentFilter === 'MINE' && statusFilter === 'ACTIVE',
+      onClick: () => {
+        setAssignmentFilter('MINE');
+        setStatusFilter('ACTIVE');
+      },
+    },
+    {
+      id: 'waiting-admin',
+      title: 'Waiting for admin',
+      helper: 'Threads blocked on operator action.',
+      value: threadsQuery.data?.summary.waitingAdmin || 0,
+      isActive: statusFilter === 'WAITING_ADMIN',
+      onClick: () => {
+        setAssignmentFilter('ALL');
+        setStatusFilter('WAITING_ADMIN');
+      },
+    },
+    {
+      id: 'waiting-user',
+      title: 'Waiting for customer',
+      helper: 'Threads awaiting customer follow-up.',
+      value: threadsQuery.data?.summary.waitingUser || 0,
+      isActive: statusFilter === 'WAITING_USER',
+      onClick: () => {
+        setAssignmentFilter('ALL');
+        setStatusFilter('WAITING_USER');
+      },
+    },
+    {
+      id: 'overdue',
+      title: 'Overdue',
+      helper: 'First-response SLA has already slipped.',
+      value: threadsQuery.data?.summary.overdue || 0,
+      isActive: statusFilter === 'OVERDUE',
+      onClick: () => {
+        setAssignmentFilter('ALL');
+        setStatusFilter('OVERDUE');
+      },
+    },
+  ];
 
   const emptyStateLabel = useMemo(() => {
     if (threadsQuery.isLoading) {
@@ -210,6 +286,35 @@ export default function SupportCenterPage() {
       <Card className="ops-detail-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            Assignment board
+          </CardTitle>
+          <CardDescription>Jump straight into the queue slice you need to work next.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {boardCards.map((card) => (
+            <button
+              key={card.id}
+              type="button"
+              onClick={card.onClick}
+              className={[
+                'rounded-[1rem] border p-4 text-left transition-all',
+                card.isActive
+                  ? 'border-primary/40 bg-primary/10 shadow-[0_14px_32px_rgba(14,165,233,0.12)]'
+                  : 'border-border/60 bg-background/40 hover:border-primary/20 hover:bg-background/70',
+              ].join(' ')}
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{card.title}</p>
+              <p className="mt-3 text-2xl font-semibold tracking-tight">{card.value}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{card.helper}</p>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="ops-detail-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             Filters
           </CardTitle>
@@ -259,6 +364,114 @@ export default function SupportCenterPage() {
               <SelectItem value="GENERAL">General help</SelectItem>
             </SelectContent>
           </Select>
+        </CardContent>
+      </Card>
+
+      <Card className="ops-detail-card">
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Support analytics
+            </CardTitle>
+            <CardDescription>Response speed, handled time, overdue rate, and workload split.</CardDescription>
+          </div>
+          <div className="w-full max-w-[180px]">
+            <Select
+              value={String(analyticsWindowDays)}
+              onValueChange={(value) => setAnalyticsWindowDays(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Analytics window" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {analyticsQuery.isLoading ? (
+            <div className="flex min-h-[180px] items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : analyticsQuery.data ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <SupportStatCard
+                  label="First response"
+                  value={formatDurationLabel(analyticsQuery.data.summary.firstResponseMinutes)}
+                  helper={`Average in the last ${analyticsQuery.data.timeframeDays} days`}
+                />
+                <SupportStatCard
+                  label="Handled time"
+                  value={formatDurationLabel(analyticsQuery.data.summary.handledMinutes)}
+                  helper="Average time from thread open to handled"
+                />
+                <SupportStatCard
+                  label="Overdue rate"
+                  value={`${analyticsQuery.data.summary.overdueRate}%`}
+                  helper={`${analyticsQuery.data.summary.overdue} overdue of ${analyticsQuery.data.summary.total} threads`}
+                  tone={analyticsQuery.data.summary.overdueRate >= 20 ? 'danger' : analyticsQuery.data.summary.overdueRate >= 10 ? 'warning' : 'default'}
+                />
+                <SupportStatCard
+                  label="Handled"
+                  value={analyticsQuery.data.summary.handled}
+                  helper={`${analyticsQuery.data.summary.open} still open in the same window`}
+                />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold">By admin</p>
+                    <p className="text-sm text-muted-foreground">Ownership load, response speed, and overdue rate.</p>
+                  </div>
+                  <div className="space-y-3">
+                    {analyticsQuery.data.byAdmin.map((bucket) => (
+                      <div key={bucket.key} className="rounded-[0.9rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{bucket.label}</p>
+                          <Badge variant="outline">{bucket.total} threads</Badge>
+                        </div>
+                        <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
+                          <p>Open: {bucket.open}</p>
+                          <p>Handled: {bucket.handled}</p>
+                          <p>First reply: {formatDurationLabel(bucket.firstResponseMinutes)}</p>
+                          <p>Overdue: {bucket.overdueRate}%</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold">By category</p>
+                    <p className="text-sm text-muted-foreground">See which issue types are driving response time.</p>
+                  </div>
+                  <div className="space-y-3">
+                    {analyticsQuery.data.byCategory.map((bucket) => (
+                      <div key={bucket.key} className="rounded-[0.9rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{bucket.label}</p>
+                          <Badge variant="outline">{bucket.total} threads</Badge>
+                        </div>
+                        <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
+                          <p>Open: {bucket.open}</p>
+                          <p>Handled: {bucket.handled}</p>
+                          <p>Handled time: {formatDurationLabel(bucket.handledMinutes)}</p>
+                          <p>Overdue: {bucket.overdueRate}%</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
         </CardContent>
       </Card>
 
