@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ToastAction } from '@/components/ui/toast';
 import { useToast } from '@/hooks/use-toast';
 import { getBasePath, withBasePath } from '@/lib/base-path';
+import { CLIENT_BUILD_HEADER_NAME } from '@/lib/deploy-guard';
 
 type DeployGuardProviderProps = {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ const STALE_SERVER_ACTION_PATTERNS = [
   'Cannot read properties of undefined (reading \'workers\')',
   'STALE_BUILD',
 ];
+const SAME_ORIGIN_POST_METHOD = 'POST';
 
 function isPublicSharePath(pathname: string | null) {
   const currentPath = pathname || '/';
@@ -70,6 +72,63 @@ function isStaleServerActionError(error: unknown) {
   return STALE_SERVER_ACTION_PATTERNS.some((pattern) => text.includes(pattern));
 }
 
+function getRequestUrl(input: RequestInfo | URL) {
+  if (typeof input === 'string') {
+    return input;
+  }
+
+  if (input instanceof URL) {
+    return input.toString();
+  }
+
+  return input.url;
+}
+
+function isSameOriginUrl(url: string) {
+  try {
+    return new URL(url, window.location.href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function buildFetchRequestWithClientBuild(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  buildId: string,
+) {
+  if (!buildId) {
+    return [input, init] as const;
+  }
+
+  const requestUrl = getRequestUrl(input);
+  if (!isSameOriginUrl(requestUrl)) {
+    return [input, init] as const;
+  }
+
+  const request = new Request(input, init);
+  request.headers.set(CLIENT_BUILD_HEADER_NAME, buildId);
+  return [request] as const;
+}
+
+function resolveSubmitMethod(form: HTMLFormElement, submitter: HTMLElement | null) {
+  const submitterMethod =
+    submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+      ? submitter.getAttribute('formmethod')
+      : null;
+
+  return (submitterMethod || form.getAttribute('method') || 'GET').toUpperCase();
+}
+
+function shouldGuardFormSubmit(form: HTMLFormElement, submitter: HTMLElement | null) {
+  const method = resolveSubmitMethod(form, submitter);
+  if (method !== SAME_ORIGIN_POST_METHOD) {
+    return false;
+  }
+
+  return isSameOriginUrl(form.getAttribute('action') || window.location.href);
+}
+
 export function DeployGuardProvider({
   children,
   initialBuildId,
@@ -80,6 +139,8 @@ export function DeployGuardProvider({
   const reloadTriggeredRef = useRef(false);
   const toastShownRef = useRef(false);
   const reloadTimerRef = useRef<number | null>(null);
+  const bypassedFormsRef = useRef(new WeakSet<HTMLFormElement>());
+  const pendingFormsRef = useRef(new WeakSet<HTMLFormElement>());
 
   const triggerReload = useCallback(
     (reason: 'new-build' | 'stale-action') => {
@@ -116,11 +177,7 @@ export function DeployGuardProvider({
     [toast],
   );
 
-  const checkForNewBuild = useCallback(async () => {
-    if (reloadTriggeredRef.current || isPublicSharePath(pathname)) {
-      return;
-    }
-
+  const resolveBuildStatus = useCallback(async () => {
     try {
       const response = await fetch(withBasePath('/api/app-version'), {
         cache: 'no-store',
@@ -130,7 +187,7 @@ export function DeployGuardProvider({
       });
 
       if (!response.ok) {
-        return;
+        return 'unknown' as const;
       }
 
       const payload = (await response.json()) as AppVersionPayload;
@@ -139,16 +196,28 @@ export function DeployGuardProvider({
 
       if (latestBuildId && !currentBuildId) {
         initialBuildIdRef.current = latestBuildId;
-        return;
+        return 'current' as const;
       }
 
       if (latestBuildId && currentBuildId && latestBuildId !== currentBuildId) {
-        triggerReload('new-build');
+        return 'stale' as const;
       }
+
+      return 'current' as const;
     } catch {
-      // Ignore transient version-check failures.
+      return 'unknown' as const;
     }
-  }, [pathname, triggerReload]);
+  }, []);
+
+  const checkForNewBuild = useCallback(async () => {
+    if (reloadTriggeredRef.current || isPublicSharePath(pathname)) {
+      return;
+    }
+
+    if ((await resolveBuildStatus()) === 'stale') {
+      triggerReload('new-build');
+    }
+  }, [pathname, resolveBuildStatus, triggerReload]);
 
   useEffect(() => {
     if (isPublicSharePath(pathname)) {
@@ -158,7 +227,12 @@ export function DeployGuardProvider({
     const originalFetch = window.fetch.bind(window);
 
     window.fetch = async (...args) => {
-      const response = await originalFetch(...args);
+      const buildId = initialBuildIdRef.current?.trim();
+      const requestArgs = buildFetchRequestWithClientBuild(args[0], args[1], buildId);
+      const response =
+        requestArgs.length === 1
+          ? await originalFetch(requestArgs[0])
+          : await originalFetch(requestArgs[0], requestArgs[1]);
 
       if (
         !reloadTriggeredRef.current &&
@@ -169,6 +243,58 @@ export function DeployGuardProvider({
       }
 
       return response;
+    };
+
+    const handleSubmitCapture = (event: Event) => {
+      const submitEvent = event as SubmitEvent;
+      const form = submitEvent.target;
+      if (!(form instanceof HTMLFormElement)) {
+        return;
+      }
+
+      const submitter = submitEvent.submitter instanceof HTMLElement ? submitEvent.submitter : null;
+      if (!shouldGuardFormSubmit(form, submitter)) {
+        return;
+      }
+
+      if (bypassedFormsRef.current.has(form)) {
+        bypassedFormsRef.current.delete(form);
+        return;
+      }
+
+      if (pendingFormsRef.current.has(form)) {
+        submitEvent.preventDefault();
+        return;
+      }
+
+      submitEvent.preventDefault();
+      pendingFormsRef.current.add(form);
+
+      void (async () => {
+        try {
+          if ((await resolveBuildStatus()) === 'stale') {
+            triggerReload('new-build');
+            return;
+          }
+
+          if (!form.isConnected) {
+            return;
+          }
+
+          bypassedFormsRef.current.add(form);
+          if (
+            (submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) &&
+            submitter.isConnected
+          ) {
+            form.requestSubmit(submitter);
+            return;
+          }
+
+          form.requestSubmit();
+        } finally {
+          pendingFormsRef.current.delete(form);
+        }
+      })();
     };
 
     const handleVisibilityChange = () => {
@@ -201,6 +327,7 @@ export function DeployGuardProvider({
     }, DEPLOY_GUARD_POLL_MS);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('submit', handleSubmitCapture, true);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleError);
@@ -211,6 +338,7 @@ export function DeployGuardProvider({
       window.fetch = originalFetch;
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('submit', handleSubmitCapture, true);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleError);
@@ -218,7 +346,7 @@ export function DeployGuardProvider({
         window.clearTimeout(reloadTimerRef.current);
       }
     };
-  }, [pathname, checkForNewBuild, triggerReload]);
+  }, [pathname, checkForNewBuild, resolveBuildStatus, triggerReload]);
 
   return children;
 }

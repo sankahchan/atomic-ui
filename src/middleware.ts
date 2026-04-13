@@ -20,9 +20,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import {
+  APP_BUILD_COOKIE_NAME,
+  CLIENT_BUILD_HEADER_NAME,
+  shouldRejectStaleServerAction,
+} from '@/lib/deploy-guard';
 import { getJwtSecretString } from '@/lib/session-secret';
 
-const APP_BUILD_COOKIE_NAME = 'atomic-app-build';
 const CURRENT_BUILD_ID = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || '';
 
 /**
@@ -198,15 +202,16 @@ export async function middleware(request: NextRequest) {
   const normalizedPath = normalizePathname(request, pathname);
   const publicShareHost = getPublicShareHost();
   const requestHost = getRequestHost(request);
-  const requestBuildId = request.cookies.get(APP_BUILD_COOKIE_NAME)?.value?.trim() || '';
   const isServerActionRequest =
     request.headers.has('next-action') || request.headers.has('Next-Action');
 
   if (
     isServerActionRequest &&
-    CURRENT_BUILD_ID &&
-    requestBuildId &&
-    requestBuildId !== CURRENT_BUILD_ID
+    shouldRejectStaleServerAction({
+      currentBuildId: CURRENT_BUILD_ID,
+      headerBuildId: request.headers.get(CLIENT_BUILD_HEADER_NAME),
+      cookieBuildId: request.cookies.get(APP_BUILD_COOKIE_NAME)?.value,
+    })
   ) {
     const response = NextResponse.json(
       {
