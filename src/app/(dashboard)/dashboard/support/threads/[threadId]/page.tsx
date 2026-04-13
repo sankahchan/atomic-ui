@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
+  BookmarkPlus,
   Clock3,
   ExternalLink,
   Loader2,
@@ -12,11 +13,13 @@ import {
   Paperclip,
   Send,
   ShieldAlert,
+  Trash2,
   UserCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,6 +64,21 @@ function getMacroLabel(macro: 'WORKING' | 'NEED_DETAILS' | 'ESCALATE' | 'HANDLED
   }
 }
 
+function getTemplateActionLabel(action: 'WORKING' | 'NEED_DETAILS' | 'ESCALATE' | 'HANDLED' | null | undefined) {
+  switch (action) {
+    case 'WORKING':
+      return 'Working';
+    case 'NEED_DETAILS':
+      return 'Need details';
+    case 'ESCALATE':
+      return 'Escalate';
+    case 'HANDLED':
+      return 'Handled';
+    default:
+      return 'Reply';
+  }
+}
+
 export default function SupportThreadDetailPage() {
   const params = useParams<{ threadId: string }>();
   const threadId = Array.isArray(params?.threadId) ? params.threadId[0] : params?.threadId || '';
@@ -68,10 +86,29 @@ export default function SupportThreadDetailPage() {
   const utils = trpc.useUtils();
   const [selectedAdminId, setSelectedAdminId] = useState<string>('unassigned');
   const [replyMessage, setReplyMessage] = useState('');
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateStatusAction, setTemplateStatusAction] = useState<'NONE' | 'WORKING' | 'NEED_DETAILS' | 'ESCALATE' | 'HANDLED'>('NONE');
 
   const detailQuery = trpc.users.getSupportThreadDetail.useQuery(
     { threadId },
     { enabled: threadId.length > 0 },
+  );
+  const templateLocale = detailQuery.data?.thread.locale === 'my' ? 'my' : 'en';
+  const templateCategory =
+    detailQuery.data?.thread.issueCategory === 'ORDER'
+    || detailQuery.data?.thread.issueCategory === 'KEY'
+    || detailQuery.data?.thread.issueCategory === 'SERVER'
+    || detailQuery.data?.thread.issueCategory === 'BILLING'
+      ? detailQuery.data.thread.issueCategory
+      : 'GENERAL';
+  const templatesQuery = trpc.users.listSupportReplyTemplates.useQuery(
+    {
+      category: templateCategory,
+      locale: templateLocale,
+    },
+    {
+      enabled: threadId.length > 0 && Boolean(detailQuery.data?.thread),
+    },
   );
 
   const claimMutation = trpc.users.claimSupportThread.useMutation({
@@ -125,6 +162,44 @@ export default function SupportThreadDetailPage() {
     },
   });
 
+  const applyTemplateMutation = trpc.users.applySupportReplyTemplate.useMutation({
+    onSuccess: async () => {
+      await utils.users.getSupportThreadDetail.invalidate({ threadId });
+      toast({ title: 'Template sent to customer' });
+    },
+    onError: (error) => {
+      toast({ title: 'Template failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const saveTemplateMutation = trpc.users.saveSupportReplyTemplate.useMutation({
+    onSuccess: async () => {
+      setTemplateTitle('');
+      setTemplateStatusAction('NONE');
+      await utils.users.listSupportReplyTemplates.invalidate({
+        category: templateCategory,
+        locale: templateLocale,
+      });
+      toast({ title: 'Support reply template saved' });
+    },
+    onError: (error) => {
+      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteTemplateMutation = trpc.users.deleteSupportReplyTemplate.useMutation({
+    onSuccess: async () => {
+      await utils.users.listSupportReplyTemplates.invalidate({
+        category: templateCategory,
+        locale: templateLocale,
+      });
+      toast({ title: 'Support reply template deleted' });
+    },
+    onError: (error) => {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
   useEffect(() => {
     if (detailQuery.data?.thread.assignedAdminUserId) {
       setSelectedAdminId(detailQuery.data.thread.assignedAdminUserId);
@@ -138,7 +213,10 @@ export default function SupportThreadDetailPage() {
     || unclaimMutation.isPending
     || assignMutation.isPending
     || replyMutation.isPending
-    || macroMutation.isPending;
+    || macroMutation.isPending
+    || applyTemplateMutation.isPending
+    || saveTemplateMutation.isPending
+    || deleteTemplateMutation.isPending;
 
   if (detailQuery.isLoading) {
     return (
@@ -420,6 +498,129 @@ export default function SupportThreadDetailPage() {
                   )}
                   Send reply
                 </Button>
+              </div>
+
+              <div className="space-y-3 rounded-[1rem] border border-border/60 bg-background/50 p-4 dark:bg-white/[0.025]">
+                <div>
+                  <p className="text-sm font-semibold">Saved replies</p>
+                  <p className="text-sm text-muted-foreground">
+                    Category-aware replies you can load into the editor or send directly.
+                  </p>
+                </div>
+
+                {templatesQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading templates…
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {(templatesQuery.data || []).map((template) => (
+                      <div
+                        key={template.id}
+                        className="rounded-[0.9rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.03]"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{template.title}</p>
+                              <Badge variant="outline">{getTemplateActionLabel(template.statusAction)}</Badge>
+                              {template.isDefault ? (
+                                <Badge variant="secondary">Default</Badge>
+                              ) : (
+                                <Badge variant="outline">Custom</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm leading-6 text-muted-foreground">{template.message}</p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isBusy}
+                              onClick={() => {
+                                setReplyMessage(template.message);
+                                setTemplateTitle(template.title);
+                                setTemplateStatusAction(template.statusAction || 'NONE');
+                              }}
+                            >
+                              Load
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={isBusy}
+                              onClick={() => applyTemplateMutation.mutate({ threadId, templateId: template.id })}
+                            >
+                              Send now
+                            </Button>
+                            {!template.isDefault ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full"
+                                disabled={isBusy}
+                                onClick={() => deleteTemplateMutation.mutate({ templateId: template.id })}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid gap-3 rounded-[0.9rem] border border-dashed border-border/60 p-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+                  <div className="space-y-2">
+                    <Label htmlFor="support-template-title">Save current reply as template</Label>
+                    <Input
+                      id="support-template-title"
+                      placeholder="Example: Need clearer payment proof"
+                      value={templateTitle}
+                      onChange={(event) => setTemplateTitle(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Template action</Label>
+                    <Select value={templateStatusAction} onValueChange={(value) => setTemplateStatusAction(value as typeof templateStatusAction)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Reply" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Reply only</SelectItem>
+                        <SelectItem value="WORKING">Working on it</SelectItem>
+                        <SelectItem value="NEED_DETAILS">Need details</SelectItem>
+                        <SelectItem value="ESCALATE">Escalate</SelectItem>
+                        <SelectItem value="HANDLED">Handled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={isBusy || templateTitle.trim().length < 2 || replyMessage.trim().length < 5}
+                      onClick={() =>
+                        saveTemplateMutation.mutate({
+                          title: templateTitle.trim(),
+                          category: templateCategory,
+                          locale: templateLocale,
+                          message: replyMessage.trim(),
+                          statusAction: templateStatusAction === 'NONE' ? null : templateStatusAction,
+                        })
+                      }
+                    >
+                      <BookmarkPlus className="mr-2 h-4 w-4" />
+                      Save template
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

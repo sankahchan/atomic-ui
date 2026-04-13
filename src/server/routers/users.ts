@@ -67,6 +67,11 @@ import {
   replyTelegramSupportThreadAsAdmin,
   unclaimTelegramSupportThreadAsAdmin,
 } from '@/lib/services/telegram-support-admin';
+import {
+  listSupportReplyTemplates,
+  resolveSupportReplyTemplateById,
+  type SupportReplyTemplateStatusAction,
+} from '@/lib/services/telegram-support-templates';
 import { adminProcedure, router } from '../trpc';
 
 function parseJsonRecord(value: string | null) {
@@ -131,6 +136,9 @@ async function resolveCustomerTelegramDestination(userId: string) {
     destinationChatId,
   };
 }
+
+const supportIssueCategorySchema = z.enum(['ORDER', 'KEY', 'SERVER', 'BILLING', 'GENERAL']);
+const supportReplyTemplateStatusSchema = z.enum(['WORKING', 'NEED_DETAILS', 'ESCALATE', 'HANDLED']);
 
 async function listAssignableSupportAdmins() {
   const admins = await db.user.findMany({
@@ -1422,6 +1430,181 @@ export const usersRouter = router({
           .map(serializeBucket)
           .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label)),
       };
+    }),
+
+  listSupportReplyTemplates: adminProcedure
+    .input(
+      z.object({
+        category: supportIssueCategorySchema.optional(),
+        locale: z.enum(['en', 'my']).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view support reply templates.',
+        });
+      }
+
+      return listSupportReplyTemplates({
+        category: input.category,
+        locale: input.locale || 'en',
+      });
+    }),
+
+  saveSupportReplyTemplate: adminProcedure
+    .input(
+      z.object({
+        templateId: z.string().optional(),
+        title: z.string().trim().min(2).max(80),
+        category: supportIssueCategorySchema,
+        locale: z.enum(['en', 'my']).default('en'),
+        message: z.string().trim().min(5).max(2000),
+        statusAction: supportReplyTemplateStatusSchema.nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage support reply templates.',
+        });
+      }
+
+      if (input.templateId?.startsWith('default:')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Default templates cannot be edited.',
+        });
+      }
+
+      if (input.templateId) {
+        const existing = await db.supportReplyTemplate.findUnique({
+          where: { id: input.templateId },
+          select: { id: true },
+        });
+        if (!existing) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Support reply template not found.',
+          });
+        }
+      }
+
+      const payload = {
+        title: input.title,
+        category: input.category,
+        locale: input.locale,
+        message: input.message,
+        statusAction: (input.statusAction ?? null) as SupportReplyTemplateStatusAction | null,
+        isDefault: false,
+        createdByUserId: ctx.user.id,
+      };
+
+      return input.templateId
+        ? db.supportReplyTemplate.update({
+            where: { id: input.templateId },
+            data: payload,
+          })
+        : db.supportReplyTemplate.create({
+            data: payload,
+          });
+    }),
+
+  deleteSupportReplyTemplate: adminProcedure
+    .input(
+      z.object({
+        templateId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to delete support reply templates.',
+        });
+      }
+
+      if (input.templateId.startsWith('default:')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Default templates cannot be deleted.',
+        });
+      }
+
+      await db.supportReplyTemplate.delete({
+        where: { id: input.templateId },
+      });
+
+      return { deleted: true };
+    }),
+
+  applySupportReplyTemplate: adminProcedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        templateId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!hasTelegramReviewManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to reply to support threads.',
+        });
+      }
+
+      const thread = await findTelegramSupportThreadByIdForAdmin({
+        threadId: input.threadId,
+      });
+
+      if (!thread) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Support thread not found.',
+        });
+      }
+
+      const template = await resolveSupportReplyTemplateById({
+        templateId: input.templateId,
+        locale: thread.locale,
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Support reply template not found.',
+        });
+      }
+
+      if (template.statusAction === 'HANDLED') {
+        return handleTelegramSupportThreadAsAdmin({
+          threadId: input.threadId,
+          adminUserId: ctx.user.id,
+          reviewerName: ctx.user.email || null,
+          adminNote: `Panel support template: ${template.title}`,
+          customerMessage: template.message,
+        });
+      }
+
+      if (template.statusAction === 'ESCALATE') {
+        return escalateTelegramSupportThreadToPanel({
+          threadId: input.threadId,
+          adminUserId: ctx.user.id,
+          reviewerName: ctx.user.email || null,
+          escalationReason: `template:${template.title}`,
+          customerMessage: template.message,
+        });
+      }
+
+      return replyTelegramSupportThreadAsAdmin({
+        threadId: input.threadId,
+        adminUserId: ctx.user.id,
+        reviewerName: ctx.user.email || null,
+        adminNote: `Panel support template: ${template.title}`,
+        customerMessage: template.message,
+      });
     }),
 
   claimSupportThread: adminProcedure

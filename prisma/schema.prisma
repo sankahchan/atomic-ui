@@ -46,6 +46,7 @@ model User {
   createdTelegramOrderFinanceActions TelegramOrderFinanceAction[] @relation("CreatedTelegramOrderFinanceActions")
   reviewedTelegramPremiumSupportRequests TelegramPremiumSupportRequest[] @relation("ReviewedTelegramPremiumSupportRequests")
   telegramSupportThreads TelegramSupportThread[]
+  supportReplyTemplates SupportReplyTemplate[] @relation("CreatedSupportReplyTemplates")
   customerSupportNotes CustomerSupportNote[]
   createdCustomerSupportNotes CustomerSupportNote[] @relation("CreatedCustomerSupportNotes")
   sessions           Session[]
@@ -268,6 +269,7 @@ model TelegramOrder {
   id                   String   @id @default(cuid())
   orderCode            String   @unique
   kind                 String
+  orderMode            String   @default("SELF") // SELF, GIFT
   status               String
   telegramChatId       String
   telegramUserId       String
@@ -285,6 +287,12 @@ model TelegramOrder {
   couponCode           String?
   couponDiscountAmount Int?
   couponDiscountLabel  String?
+  referralCode         String?
+  giftRecipientTelegramUsername String?
+  giftRecipientTelegramUserId String?
+  giftRecipientChatId  String?
+  giftRecipientLabel   String?
+  giftMessage          String?
   durationMonths       Int?
   durationDays         Int?
   dataLimitBytes       BigInt?
@@ -367,6 +375,8 @@ model TelegramOrder {
   @@index([paymentProofUniqueId, createdAt])
   @@index([couponCampaignType, createdAt])
   @@index([couponCode, createdAt])
+  @@index([referralCode, createdAt])
+  @@index([orderMode, createdAt])
 }
 
 model TelegramCouponRedemption {
@@ -505,6 +515,10 @@ model TelegramUserProfile {
   username       String?
   displayName    String?
   locale         String?
+  referralCode   String?  @unique
+  referredByCode String?
+  pendingReferralCode String?
+  lastReferralAcceptedAt DateTime?
   allowPromoAnnouncements   Boolean  @default(true)
   allowMaintenanceNotices   Boolean  @default(true)
   allowReceiptNotifications Boolean  @default(true)
@@ -519,6 +533,8 @@ model TelegramUserProfile {
   updatedAt      DateTime @updatedAt
 
   @@index([telegramChatId])
+  @@index([referralCode])
+  @@index([referredByCode])
 }
 
 model TelegramSupportThread {
@@ -540,6 +556,8 @@ model TelegramSupportThread {
   relatedServerName String?
   firstResponseDueAt DateTime?
   firstAdminReplyAt  DateTime?
+  firstResponseAlertSentAt DateTime?
+  firstResponseLastAlertAt DateTime?
   lastCustomerReplyAt DateTime?
   lastAdminReplyAt   DateTime?
   handledAt         DateTime?
@@ -557,6 +575,7 @@ model TelegramSupportThread {
   @@index([userId, status, createdAt])
   @@index([status, waitingOn, updatedAt])
   @@index([issueCategory, status, createdAt])
+  @@index([firstResponseDueAt, firstAdminReplyAt, status])
 }
 
 model TelegramSupportReply {
@@ -582,6 +601,9 @@ model TelegramSupportReply {
 
 model TelegramAnnouncement {
   id                   String   @id @default(cuid())
+  experimentId         String?
+  experimentVariantKey String?
+  experimentVariantLabel String?
   audience             String
   type                 String
   templateId           String?
@@ -616,6 +638,7 @@ model TelegramAnnouncement {
   updatedAt            DateTime @updatedAt
 
   deliveries           TelegramAnnouncementDelivery[]
+  experiment           TelegramAnnouncementExperiment? @relation(fields: [experimentId], references: [id], onDelete: SetNull)
 
   @@index([status, scheduledFor])
   @@index([createdAt])
@@ -628,6 +651,8 @@ model TelegramAnnouncement {
   @@index([targetSegment, status, createdAt])
   @@index([targetDirectChatId, status, createdAt])
   @@index([recurrenceParentId, createdAt])
+  @@index([experimentId, createdAt])
+  @@index([experimentVariantKey, createdAt])
 }
 
 model TelegramAnnouncementDelivery {
@@ -678,6 +703,70 @@ model TelegramAnnouncementTemplate {
   @@index([createdAt])
   @@index([createdByUserId, createdAt])
   @@index([targetSegment, createdAt])
+}
+
+model TelegramAnnouncementExperiment {
+  id                   String   @id @default(cuid())
+  name                 String
+  status               String   @default("DRAFT") // DRAFT, RUNNING, COMPLETED, PAUSED
+  audience             String
+  type                 String
+  targetTag            String?
+  targetSegment        String?
+  targetServerId       String?
+  targetServerName     String?
+  targetCountryCode    String?
+  includeSupportButton Boolean  @default(true)
+  pinToInbox           Boolean  @default(false)
+  createdByUserId      String?
+  createdByEmail       String?
+  launchedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  variants             TelegramAnnouncementExperimentVariant[]
+  announcements        TelegramAnnouncement[]
+
+  @@index([status, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model TelegramAnnouncementExperimentVariant {
+  id             String   @id @default(cuid())
+  experimentId   String
+  experiment     TelegramAnnouncementExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variantKey     String
+  label          String
+  allocationPercent Int    @default(50)
+  title          String
+  message        String
+  heroImageUrl   String?
+  cardStyle      String   @default("DEFAULT")
+  templateId     String?
+  templateName   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([experimentId, variantKey])
+  @@index([experimentId, createdAt])
+}
+
+model SupportReplyTemplate {
+  id              String   @id @default(cuid())
+  title           String
+  category        String
+  locale          String   @default("en")
+  message         String
+  statusAction    String? // WORKING, NEED_DETAILS, ESCALATE, HANDLED, null
+  isDefault       Boolean  @default(false)
+  createdByUserId String?
+  createdBy       User?    @relation("CreatedSupportReplyTemplates", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category, locale, createdAt])
+  @@index([statusAction, createdAt])
+  @@index([createdByUserId, createdAt])
 }
 
 model CustomerSupportNote {

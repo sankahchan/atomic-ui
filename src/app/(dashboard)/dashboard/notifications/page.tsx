@@ -228,6 +228,9 @@ type TelegramAnnouncementHistoryRow = {
   targetDirectUserLabel?: string | null;
   targetDirectChatId?: string | null;
   cardStyle: TelegramAnnouncementCardStyle;
+  experimentId?: string | null;
+  experimentVariantKey?: string | null;
+  experimentVariantLabel?: string | null;
   title: string;
   message: string;
   heroImageUrl?: string | null;
@@ -254,6 +257,61 @@ type TelegramAnnouncementHistoryRow = {
     error?: string | null;
     updatedAt: Date;
   }>;
+};
+
+type TelegramAnnouncementExperimentVariantRow = {
+  id: string;
+  variantKey: string;
+  label: string;
+  allocationPercent: number;
+  title: string;
+  message: string;
+  heroImageUrl?: string | null;
+  cardStyle: TelegramAnnouncementCardStyle;
+  templateId?: string | null;
+  templateName?: string | null;
+  announcements: number;
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  latestAnnouncementId?: string | null;
+  latestSentAt?: Date | null;
+};
+
+type TelegramAnnouncementExperimentRow = {
+  id: string;
+  name: string;
+  status: string;
+  audience: TelegramAnnouncementPanelAudience;
+  type: TelegramAnnouncementType;
+  targetTag?: string | null;
+  targetSegment?: string | null;
+  targetServerId?: string | null;
+  targetServerName?: string | null;
+  targetCountryCode?: string | null;
+  includeSupportButton: boolean;
+  pinToInbox: boolean;
+  createdByEmail?: string | null;
+  launchedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  latestAnnouncementId?: string | null;
+  latestSentAt?: Date | null;
+  recentAnnouncements: Array<{
+    id: string;
+    status: string;
+    experimentVariantKey?: string | null;
+    experimentVariantLabel?: string | null;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    sentAt?: Date | null;
+    createdAt: Date;
+  }>;
+  variants: TelegramAnnouncementExperimentVariantRow[];
 };
 
 type TelegramAnnouncementTargetOptions = {
@@ -319,6 +377,43 @@ type TelegramAnnouncementAnalytics = {
     openRate: number;
     clickRate: number;
     conversionRate: number;
+  }>;
+  byExperiment: Array<{
+    experimentId: string;
+    name: string;
+    status: string;
+    audience: string;
+    type: string;
+    announcements: number;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    openCount: number;
+    clickCount: number;
+    attributedOrders: number;
+    attributedRevenue: Array<{ currency: string; amount: number }>;
+    latestAnnouncementId: string | null;
+    deliverySuccessRate: number;
+    openRate: number;
+    clickRate: number;
+    conversionRate: number;
+    variants: Array<{
+      variantKey: string;
+      label: string;
+      announcements: number;
+      totalRecipients: number;
+      sentCount: number;
+      failedCount: number;
+      openCount: number;
+      clickCount: number;
+      attributedOrders: number;
+      attributedRevenue: Array<{ currency: string; amount: number }>;
+      latestAnnouncementId: string | null;
+      deliverySuccessRate: number;
+      openRate: number;
+      clickRate: number;
+      conversionRate: number;
+    }>;
   }>;
   bestSendTimes: Array<{
     hour: number;
@@ -1534,6 +1629,21 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     announcementSendScheduledNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
     announcementScheduled: isMyanmar ? 'Schedule လုပ်ပြီးပါပြီ' : 'Announcement scheduled',
     announcementScheduledDesc: (when: string) => isMyanmar ? `${when} တွင် ပို့မည်။` : `Scheduled for ${when}.`,
+    announcementExperimentsTitle: isMyanmar ? 'A/B experiments' : 'A/B experiments',
+    announcementExperimentsDesc: isMyanmar
+      ? 'Promo copy, hero image နှင့် banner variant များကို audience တစ်ခုအပေါ် compare လုပ်နိုင်သည်။'
+      : 'Compare promo copy, hero image, and banner variants against the same audience.',
+    announcementExperimentName: isMyanmar ? 'Experiment name' : 'Experiment name',
+    announcementExperimentVariantA: isMyanmar ? 'Variant A' : 'Variant A',
+    announcementExperimentVariantB: isMyanmar ? 'Variant B' : 'Variant B',
+    announcementExperimentSplit: isMyanmar ? 'Audience split' : 'Audience split',
+    announcementExperimentSave: isMyanmar ? 'Experiment သိမ်းမည်' : 'Save experiment',
+    announcementExperimentLaunch: isMyanmar ? 'Experiment စတင်မည်' : 'Launch experiment',
+    announcementExperimentSaved: isMyanmar ? 'Experiment သိမ်းပြီးပါပြီ' : 'Experiment saved',
+    announcementExperimentLaunched: isMyanmar ? 'Experiment စတင်ပြီးပါပြီ' : 'Experiment launched',
+    announcementExperimentCreateNew: isMyanmar ? 'အသစ်ဖန်တီးမည်' : 'Create new',
+    announcementExperimentJumpHistory: isMyanmar ? 'History သို့ သွားမည်' : 'Jump to history',
+    announcementExperimentLoad: isMyanmar ? 'Edit form ထဲသို့ ထည့်မည်' : 'Load into form',
   };
   const utils = trpc.useUtils();
   const currentUserQuery = trpc.auth.me.useQuery();
@@ -1576,6 +1686,36 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   const [announcementTargetSegment, setAnnouncementTargetSegment] = useState('ALL');
   const [announcementTargetServerId, setAnnouncementTargetServerId] = useState('ALL');
   const [announcementTargetCountryCode, setAnnouncementTargetCountryCode] = useState('ALL');
+  const [announcementExperimentId, setAnnouncementExperimentId] = useState<string | null>(null);
+  const [announcementExperimentName, setAnnouncementExperimentName] = useState('');
+  const [announcementExperimentAudience, setAnnouncementExperimentAudience] =
+    useState<TelegramAnnouncementPanelAudience>('ACTIVE_USERS');
+  const [announcementExperimentType, setAnnouncementExperimentType] =
+    useState<TelegramAnnouncementType>('PROMO');
+  const [announcementExperimentTargetTag, setAnnouncementExperimentTargetTag] = useState('ALL');
+  const [announcementExperimentTargetSegment, setAnnouncementExperimentTargetSegment] = useState('ALL');
+  const [announcementExperimentTargetServerId, setAnnouncementExperimentTargetServerId] = useState('ALL');
+  const [announcementExperimentTargetCountryCode, setAnnouncementExperimentTargetCountryCode] =
+    useState('ALL');
+  const [announcementExperimentIncludeSupportButton, setAnnouncementExperimentIncludeSupportButton] =
+    useState(true);
+  const [announcementExperimentPinToInbox, setAnnouncementExperimentPinToInbox] = useState(false);
+  const [announcementExperimentVariantASplit, setAnnouncementExperimentVariantASplit] =
+    useState('50');
+  const [announcementExperimentVariantATitle, setAnnouncementExperimentVariantATitle] = useState('');
+  const [announcementExperimentVariantAMessage, setAnnouncementExperimentVariantAMessage] =
+    useState('');
+  const [announcementExperimentVariantAHeroImageUrl, setAnnouncementExperimentVariantAHeroImageUrl] =
+    useState('');
+  const [announcementExperimentVariantACardStyle, setAnnouncementExperimentVariantACardStyle] =
+    useState<TelegramAnnouncementCardStyle>('PROMO');
+  const [announcementExperimentVariantBTitle, setAnnouncementExperimentVariantBTitle] = useState('');
+  const [announcementExperimentVariantBMessage, setAnnouncementExperimentVariantBMessage] =
+    useState('');
+  const [announcementExperimentVariantBHeroImageUrl, setAnnouncementExperimentVariantBHeroImageUrl] =
+    useState('');
+  const [announcementExperimentVariantBCardStyle, setAnnouncementExperimentVariantBCardStyle] =
+    useState<TelegramAnnouncementCardStyle>('PROMO');
   const [announcementAnalyticsRange, setAnnouncementAnalyticsRange] = useState<'7d' | '30d' | '90d'>('30d');
   const isBroadcastsTabActive = isActive && activeBotTab === 'broadcasts';
   const isTemplatesTabActive = isActive && activeBotTab === 'templates';
@@ -1751,11 +1891,17 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     },
   );
   const announcementTargetOptionsQuery = trpc.telegramBot.listAnnouncementTargetOptions.useQuery(undefined, {
-    enabled: isBroadcastsTabActive || isTemplatesTabActive,
+    enabled: isBroadcastsTabActive || isTemplatesTabActive || isAnalyticsTabActive,
   });
   const announcementTemplatesQuery = trpc.telegramBot.listAnnouncementTemplates.useQuery(undefined, {
-    enabled: isBroadcastsTabActive || isTemplatesTabActive,
+    enabled: isBroadcastsTabActive || isTemplatesTabActive || isAnalyticsTabActive,
   });
+  const announcementExperimentsQuery = trpc.telegramBot.listAnnouncementExperiments.useQuery(
+    undefined,
+    {
+      enabled: isTemplatesTabActive || isAnalyticsTabActive || isHistoryTabActive,
+    },
+  );
   const announcementHistoryQuery = trpc.telegramBot.listAnnouncementHistory.useQuery(
     { limit: 12, includeArchived: false },
     {
@@ -1850,6 +1996,57 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       });
     },
   });
+  const saveAnnouncementExperimentMutation =
+    trpc.telegramBot.saveAnnouncementExperiment.useMutation({
+      onSuccess: async (result) => {
+        await Promise.all([
+          utils.telegramBot.listAnnouncementExperiments.invalidate(),
+          utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+        ]);
+        if (result?.id) {
+          setAnnouncementExperimentId(result.id);
+        }
+        toast({
+          title: telegramUi.announcementExperimentSaved,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: telegramUi.announcementFailed,
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
+    });
+  const launchAnnouncementExperimentMutation =
+    trpc.telegramBot.launchAnnouncementExperiment.useMutation({
+      onSuccess: async (result) => {
+        await Promise.all([
+          utils.telegramBot.listAnnouncementExperiments.invalidate(),
+          utils.telegramBot.listAnnouncementHistory.invalidate(),
+          utils.telegramBot.getAnnouncementAnalytics.invalidate(),
+        ]);
+        toast({
+          title: telegramUi.announcementExperimentLaunched,
+          description: `${result.results.length} variant${result.results.length === 1 ? '' : 's'} dispatched.`,
+        });
+        if (result.firstAnnouncementId) {
+          setActiveBotTab('history');
+          updateTelegramUrlState({
+            workspace: 'telegram',
+            botTab: 'history',
+            announcementId: result.firstAnnouncementId,
+          });
+        }
+      },
+      onError: (error) => {
+        toast({
+          title: telegramUi.announcementFailed,
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
+    });
   const resendAnnouncementFailedMutation = trpc.telegramBot.resendAnnouncementFailed.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -1942,10 +2139,35 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     serverId: announcementTargetServerId === 'ALL' ? null : announcementTargetServerId,
     countryCode: announcementTargetCountryCode === 'ALL' ? null : announcementTargetCountryCode,
   };
+  const parsedExperimentVariantASplit = Number.parseInt(
+    announcementExperimentVariantASplit.trim() || '50',
+    10,
+  );
+  const normalizedExperimentVariantASplit = Number.isFinite(parsedExperimentVariantASplit)
+    ? Math.min(95, Math.max(5, parsedExperimentVariantASplit))
+    : 50;
+  const normalizedExperimentVariantBSplit = 100 - normalizedExperimentVariantASplit;
+  const announcementExperimentFilters = {
+    tag: announcementExperimentTargetTag === 'ALL' ? null : announcementExperimentTargetTag,
+    segment:
+      announcementExperimentTargetSegment === 'ALL'
+        ? null
+        : (announcementExperimentTargetSegment as TelegramAnnouncementSegment),
+    serverId:
+      announcementExperimentTargetServerId === 'ALL' ? null : announcementExperimentTargetServerId,
+    countryCode:
+      announcementExperimentTargetCountryCode === 'ALL'
+        ? null
+        : announcementExperimentTargetCountryCode,
+  };
   const announcementAudienceCount = announcementAudienceCountsQuery.data?.[announcementAudience] ?? 0;
   const announcementTemplates = useMemo(
     () => (announcementTemplatesQuery.data ?? []) as TelegramAnnouncementTemplateRow[],
     [announcementTemplatesQuery.data],
+  );
+  const announcementExperiments = useMemo(
+    () => (announcementExperimentsQuery.data ?? []) as TelegramAnnouncementExperimentRow[],
+    [announcementExperimentsQuery.data],
   );
   const announcementHistory = useMemo(
     () => (announcementHistoryQuery.data ?? []) as TelegramAnnouncementHistoryRow[],
@@ -1954,6 +2176,16 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   const announcementAnalytics = useMemo(
     () => (announcementAnalyticsQuery.data ?? null) as TelegramAnnouncementAnalytics | null,
     [announcementAnalyticsQuery.data],
+  );
+  const announcementAnalyticsByExperiment = useMemo(
+    () =>
+      new Map(
+        (announcementAnalytics?.byExperiment || []).map((experiment) => [
+          experiment.experimentId,
+          experiment,
+        ]),
+      ),
+    [announcementAnalytics],
   );
   const failedAnnouncementIds = useMemo(
     () =>
@@ -2039,6 +2271,53 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       announcementCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [announcementHistory, announcementIdParam, isHistoryTabActive]);
+
+  const resetAnnouncementExperimentForm = () => {
+    setAnnouncementExperimentId(null);
+    setAnnouncementExperimentName('');
+    setAnnouncementExperimentAudience('ACTIVE_USERS');
+    setAnnouncementExperimentType('PROMO');
+    setAnnouncementExperimentTargetTag('ALL');
+    setAnnouncementExperimentTargetSegment('ALL');
+    setAnnouncementExperimentTargetServerId('ALL');
+    setAnnouncementExperimentTargetCountryCode('ALL');
+    setAnnouncementExperimentIncludeSupportButton(true);
+    setAnnouncementExperimentPinToInbox(false);
+    setAnnouncementExperimentVariantASplit('50');
+    setAnnouncementExperimentVariantATitle('');
+    setAnnouncementExperimentVariantAMessage('');
+    setAnnouncementExperimentVariantAHeroImageUrl('');
+    setAnnouncementExperimentVariantACardStyle('PROMO');
+    setAnnouncementExperimentVariantBTitle('');
+    setAnnouncementExperimentVariantBMessage('');
+    setAnnouncementExperimentVariantBHeroImageUrl('');
+    setAnnouncementExperimentVariantBCardStyle('PROMO');
+  };
+
+  const loadAnnouncementExperimentIntoForm = (experiment: TelegramAnnouncementExperimentRow) => {
+    const variantA = experiment.variants[0];
+    const variantB = experiment.variants[1];
+
+    setAnnouncementExperimentId(experiment.id);
+    setAnnouncementExperimentName(experiment.name);
+    setAnnouncementExperimentAudience(experiment.audience);
+    setAnnouncementExperimentType(experiment.type);
+    setAnnouncementExperimentTargetTag(experiment.targetTag || 'ALL');
+    setAnnouncementExperimentTargetSegment(experiment.targetSegment || 'ALL');
+    setAnnouncementExperimentTargetServerId(experiment.targetServerId || 'ALL');
+    setAnnouncementExperimentTargetCountryCode(experiment.targetCountryCode || 'ALL');
+    setAnnouncementExperimentIncludeSupportButton(experiment.includeSupportButton);
+    setAnnouncementExperimentPinToInbox(experiment.pinToInbox);
+    setAnnouncementExperimentVariantASplit(String(variantA?.allocationPercent || 50));
+    setAnnouncementExperimentVariantATitle(variantA?.title || '');
+    setAnnouncementExperimentVariantAMessage(variantA?.message || '');
+    setAnnouncementExperimentVariantAHeroImageUrl(variantA?.heroImageUrl || '');
+    setAnnouncementExperimentVariantACardStyle(variantA?.cardStyle || 'PROMO');
+    setAnnouncementExperimentVariantBTitle(variantB?.title || '');
+    setAnnouncementExperimentVariantBMessage(variantB?.message || '');
+    setAnnouncementExperimentVariantBHeroImageUrl(variantB?.heroImageUrl || '');
+    setAnnouncementExperimentVariantBCardStyle(variantB?.cardStyle || 'PROMO');
+  };
 
   const handleSave = () => {
     const adminChatIds = adminChatIdsInput
@@ -2939,6 +3218,383 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading analytics…</div>
               ) : announcementAnalytics ? (
                 <div className="mt-4 space-y-4">
+                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">{telegramUi.announcementExperimentsTitle}</p>
+                        <p className="text-xs text-muted-foreground">{telegramUi.announcementExperimentsDesc}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={resetAnnouncementExperimentForm}>
+                          {telegramUi.announcementExperimentCreateNew}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            saveAnnouncementExperimentMutation.mutate({
+                              experimentId: announcementExperimentId || undefined,
+                              name: announcementExperimentName.trim(),
+                              audience: announcementExperimentAudience,
+                              type: announcementExperimentType,
+                              filters: announcementExperimentFilters,
+                              includeSupportButton: announcementExperimentIncludeSupportButton,
+                              pinToInbox: announcementExperimentPinToInbox,
+                              variants: [
+                                {
+                                  variantKey: 'A',
+                                  label: 'Variant A',
+                                  allocationPercent: normalizedExperimentVariantASplit,
+                                  title: announcementExperimentVariantATitle.trim(),
+                                  message: announcementExperimentVariantAMessage.trim(),
+                                  heroImageUrl: announcementExperimentVariantAHeroImageUrl.trim() || null,
+                                  cardStyle: announcementExperimentVariantACardStyle,
+                                },
+                                {
+                                  variantKey: 'B',
+                                  label: 'Variant B',
+                                  allocationPercent: normalizedExperimentVariantBSplit,
+                                  title: announcementExperimentVariantBTitle.trim(),
+                                  message: announcementExperimentVariantBMessage.trim(),
+                                  heroImageUrl: announcementExperimentVariantBHeroImageUrl.trim() || null,
+                                  cardStyle: announcementExperimentVariantBCardStyle,
+                                },
+                              ],
+                            })
+                          }
+                          disabled={
+                            !canManageAnnouncements ||
+                            saveAnnouncementExperimentMutation.isPending ||
+                            announcementExperimentName.trim().length < 3 ||
+                            announcementExperimentVariantATitle.trim().length < 3 ||
+                            announcementExperimentVariantAMessage.trim().length < 10 ||
+                            announcementExperimentVariantBTitle.trim().length < 3 ||
+                            announcementExperimentVariantBMessage.trim().length < 10
+                          }
+                        >
+                          {saveAnnouncementExperimentMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                          )}
+                          {telegramUi.announcementExperimentSave}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() =>
+                            announcementExperimentId
+                              ? launchAnnouncementExperimentMutation.mutate({
+                                  experimentId: announcementExperimentId,
+                                })
+                              : null
+                          }
+                          disabled={
+                            !canManageAnnouncements ||
+                            launchAnnouncementExperimentMutation.isPending ||
+                            !announcementExperimentId
+                          }
+                        >
+                          {launchAnnouncementExperimentMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <TestTube className="mr-2 h-4 w-4" />
+                          )}
+                          {telegramUi.announcementExperimentLaunch}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 xl:grid-cols-4">
+                      <div>
+                        <Label>{telegramUi.announcementExperimentName}</Label>
+                        <Input
+                          value={announcementExperimentName}
+                          onChange={(event) => setAnnouncementExperimentName(event.target.value)}
+                          placeholder="Premium upsell April"
+                          className="mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label>{telegramUi.announcementAudience}</Label>
+                        <Select
+                          value={announcementExperimentAudience}
+                          onValueChange={(value: TelegramAnnouncementPanelAudience) =>
+                            setAnnouncementExperimentAudience(value)
+                          }
+                        >
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ACTIVE_USERS">Active Telegram users</SelectItem>
+                            <SelectItem value="STANDARD_USERS">Standard users</SelectItem>
+                            <SelectItem value="PREMIUM_USERS">Premium users</SelectItem>
+                            <SelectItem value="TRIAL_USERS">Trial users</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>{telegramUi.announcementType}</Label>
+                        <Select
+                          value={announcementExperimentType}
+                          onValueChange={(value: TelegramAnnouncementType) =>
+                            setAnnouncementExperimentType(value)
+                          }
+                        >
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PROMO">Promo</SelectItem>
+                            <SelectItem value="ANNOUNCEMENT">Announcement</SelectItem>
+                            <SelectItem value="INFO">Info</SelectItem>
+                            <SelectItem value="NEW_SERVER">New server</SelectItem>
+                            <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>{telegramUi.announcementExperimentSplit}</Label>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={95}
+                          value={announcementExperimentVariantASplit}
+                          onChange={(event) => setAnnouncementExperimentVariantASplit(event.target.value)}
+                          className="mt-2"
+                        />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Variant A {normalizedExperimentVariantASplit}% • Variant B {normalizedExperimentVariantBSplit}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 xl:grid-cols-4">
+                      <div>
+                        <Label>{telegramUi.announcementTargetTag}</Label>
+                        <Select value={announcementExperimentTargetTag} onValueChange={setAnnouncementExperimentTargetTag}>
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                            {announcementTargetOptions.tags.map((tag) => (
+                              <SelectItem key={tag.value} value={tag.value}>{tag.value} ({tag.count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Segment</Label>
+                        <Select value={announcementExperimentTargetSegment} onValueChange={setAnnouncementExperimentTargetSegment}>
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                            {announcementTargetOptions.segments.map((segment) => (
+                              <SelectItem key={segment.value} value={segment.value}>{getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>{telegramUi.announcementTargetServer}</Label>
+                        <Select value={announcementExperimentTargetServerId} onValueChange={setAnnouncementExperimentTargetServerId}>
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                            {announcementTargetOptions.servers.map((server) => (
+                              <SelectItem key={server.value} value={server.value}>{server.label} ({server.count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>{telegramUi.announcementTargetRegion}</Label>
+                        <Select value={announcementExperimentTargetCountryCode} onValueChange={setAnnouncementExperimentTargetCountryCode}>
+                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
+                            {announcementTargetOptions.regions.map((region) => (
+                              <SelectItem key={region.value} value={region.value}>{region.value} ({region.count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-2xl border border-border/50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{telegramUi.announcementExperimentVariantA}</p>
+                          <Badge variant="outline">{normalizedExperimentVariantASplit}%</Badge>
+                        </div>
+                        <div className="mt-3 space-y-3">
+                          <div>
+                            <Label>{telegramUi.announcementSubject}</Label>
+                            <Input value={announcementExperimentVariantATitle} onChange={(event) => setAnnouncementExperimentVariantATitle(event.target.value)} className="mt-2" />
+                          </div>
+                          <div>
+                            <Label>{telegramUi.announcementBody}</Label>
+                            <Textarea value={announcementExperimentVariantAMessage} onChange={(event) => setAnnouncementExperimentVariantAMessage(event.target.value)} className="mt-2 min-h-[140px]" />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <Label>{telegramUi.announcementCardStyle}</Label>
+                              <Select value={announcementExperimentVariantACardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementExperimentVariantACardStyle(value)}>
+                                <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="DEFAULT">Default</SelectItem>
+                                  <SelectItem value="PROMO">Promo</SelectItem>
+                                  <SelectItem value="PREMIUM">Premium</SelectItem>
+                                  <SelectItem value="OPERATIONS">Operations</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>{telegramUi.announcementHeroImage}</Label>
+                              <Input value={announcementExperimentVariantAHeroImageUrl} onChange={(event) => setAnnouncementExperimentVariantAHeroImageUrl(event.target.value)} className="mt-2" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-border/50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{telegramUi.announcementExperimentVariantB}</p>
+                          <Badge variant="outline">{normalizedExperimentVariantBSplit}%</Badge>
+                        </div>
+                        <div className="mt-3 space-y-3">
+                          <div>
+                            <Label>{telegramUi.announcementSubject}</Label>
+                            <Input value={announcementExperimentVariantBTitle} onChange={(event) => setAnnouncementExperimentVariantBTitle(event.target.value)} className="mt-2" />
+                          </div>
+                          <div>
+                            <Label>{telegramUi.announcementBody}</Label>
+                            <Textarea value={announcementExperimentVariantBMessage} onChange={(event) => setAnnouncementExperimentVariantBMessage(event.target.value)} className="mt-2 min-h-[140px]" />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <Label>{telegramUi.announcementCardStyle}</Label>
+                              <Select value={announcementExperimentVariantBCardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementExperimentVariantBCardStyle(value)}>
+                                <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="DEFAULT">Default</SelectItem>
+                                  <SelectItem value="PROMO">Promo</SelectItem>
+                                  <SelectItem value="PREMIUM">Premium</SelectItem>
+                                  <SelectItem value="OPERATIONS">Operations</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>{telegramUi.announcementHeroImage}</Label>
+                              <Input value={announcementExperimentVariantBHeroImageUrl} onChange={(event) => setAnnouncementExperimentVariantBHeroImageUrl(event.target.value)} className="mt-2" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <Switch checked={announcementExperimentIncludeSupportButton} onCheckedChange={setAnnouncementExperimentIncludeSupportButton} />
+                        <span className="text-sm text-muted-foreground">{telegramUi.includeSupportButton}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={announcementExperimentPinToInbox} onCheckedChange={setAnnouncementExperimentPinToInbox} />
+                        <span className="text-sm text-muted-foreground">{telegramUi.announcementPinToInbox}</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {announcementExperiments.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No saved experiments yet.</p>
+                      ) : (
+                        announcementExperiments.map((experiment) => {
+                          const experimentAnalytics = announcementAnalyticsByExperiment.get(experiment.id);
+                          return (
+                            <div key={experiment.id} className="rounded-2xl border border-border/50 p-3">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium">{experiment.name}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {experiment.audience} • {experiment.type}
+                                    {experiment.targetSegment ? ` • ${getAnnouncementSegmentLabel(experiment.targetSegment, isMyanmar)}` : ''}
+                                    {experiment.targetServerName ? ` • ${experiment.targetServerName}` : ''}
+                                    {experiment.targetCountryCode ? ` • ${experiment.targetCountryCode}` : ''}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge variant="outline">{experiment.status}</Badge>
+                                  {experiment.launchedAt ? <Badge variant="secondary">{formatDateTime(experiment.launchedAt)}</Badge> : null}
+                                </div>
+                              </div>
+                              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                                {experiment.variants.map((variant) => {
+                                  const variantAnalytics = experimentAnalytics?.variants.find(
+                                    (entry) => entry.variantKey === variant.variantKey,
+                                  );
+                                  return (
+                                    <div key={`${experiment.id}:${variant.variantKey}`} className="rounded-xl border border-border/40 p-3">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <p className="text-sm font-medium">{variant.label}</p>
+                                        <Badge variant="outline">{variant.allocationPercent}%</Badge>
+                                      </div>
+                                      <p className="mt-1 text-xs text-muted-foreground">{variant.title}</p>
+                                      <p className="mt-2 text-xs text-muted-foreground">
+                                        {variantAnalytics
+                                          ? `${variantAnalytics.sentCount}/${variantAnalytics.totalRecipients} sent • ${variantAnalytics.attributedOrders} orders • ${Math.round(variantAnalytics.conversionRate * 100)}% conv.`
+                                          : `${variant.sentCount}/${variant.totalRecipients} sent • ${variant.failedCount} failed`}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {experimentAnalytics ? (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  {experimentAnalytics.sentCount}/{experimentAnalytics.totalRecipients} sent • {experimentAnalytics.openCount} opens • {experimentAnalytics.clickCount} clicks • {experimentAnalytics.attributedOrders} attributed orders
+                                </p>
+                              ) : (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  {experiment.sentCount}/{experiment.totalRecipients} sent • {experiment.failedCount} failed
+                                </p>
+                              )}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button type="button" size="sm" variant="outline" onClick={() => loadAnnouncementExperimentIntoForm(experiment)}>
+                                  {telegramUi.announcementExperimentLoad}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => launchAnnouncementExperimentMutation.mutate({ experimentId: experiment.id })}
+                                  disabled={
+                                    launchAnnouncementExperimentMutation.isPending ||
+                                    experiment.status === 'RUNNING'
+                                  }
+                                >
+                                  {telegramUi.announcementExperimentLaunch}
+                                </Button>
+                                {experimentAnalytics?.latestAnnouncementId || experiment.latestAnnouncementId ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const announcementId =
+                                        experimentAnalytics?.latestAnnouncementId ||
+                                        experiment.latestAnnouncementId ||
+                                        null;
+                                      if (!announcementId) {
+                                        return;
+                                      }
+                                      setActiveBotTab('history');
+                                      updateTelegramUrlState({
+                                        workspace: 'telegram',
+                                        botTab: 'history',
+                                        announcementId,
+                                      });
+                                    }}
+                                  >
+                                    {telegramUi.announcementExperimentJumpHistory}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementSuccessRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.deliverySuccessRate * 100)}%</p><Progress value={announcementAnalytics.totals.deliverySuccessRate * 100} className="mt-3 h-2" /></div>
                     <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementOpenRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.openRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.openCount} {telegramUi.announcementOpens.toLowerCase()}</p></div>
@@ -3101,12 +3757,18 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                         <Badge variant="outline">{announcement.type}</Badge>
                         <Badge variant="outline">{getAnnouncementCardStyleLabel(announcement.cardStyle, isMyanmar)}</Badge>
                         <Badge variant="outline">{announcement.status}</Badge>
+                        {announcement.experimentId ? (
+                          <Badge variant="secondary">
+                            {announcement.experimentVariantLabel || announcement.experimentVariantKey || 'Experiment'}
+                          </Badge>
+                        ) : null}
                         {announcement.recurrenceType && announcement.recurrenceType !== 'NONE' ? <Badge variant="secondary">{getAnnouncementRecurrenceLabel(announcement.recurrenceType, isMyanmar)}</Badge> : null}
                       </div>
                     </div>
                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                       <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
                       <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
+                      <p>{announcement.experimentId ? `Experiment: ${announcement.experimentVariantLabel || announcement.experimentVariantKey || announcement.experimentId}` : 'Ad hoc send'}</p>
                       <p>Resend attempts: {announcement.resendAttemptCount || 0}</p>
                       <p>Recovered: {announcement.resendRecoveredCount || 0}</p>
                       <p>Created: {formatDateTime(announcement.createdAt)}</p>

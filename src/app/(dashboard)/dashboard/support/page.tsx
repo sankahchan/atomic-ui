@@ -9,6 +9,7 @@ import {
   Clock3,
   Loader2,
   MessageSquare,
+  Paperclip,
   Search,
   ShieldAlert,
   UserCheck,
@@ -72,6 +73,21 @@ function getLatestReplyPreview(reply: {
     return `${prefix}: file attachment`;
   }
   return `${prefix}: update sent`;
+}
+
+function getLatestReplyAttachmentLabel(reply: {
+  mediaKind: string | null;
+  mediaFilename?: string | null;
+} | null) {
+  if (!reply?.mediaKind) {
+    return null;
+  }
+
+  if (reply.mediaKind === 'IMAGE') {
+    return reply.mediaFilename?.trim() || 'Image attachment';
+  }
+
+  return reply.mediaFilename?.trim() || 'File attachment';
 }
 
 function SupportStatCard({
@@ -564,8 +580,43 @@ export default function SupportCenterPage() {
                     <div className="space-y-2 rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Latest reply</p>
                       <p className="text-sm leading-6 text-foreground">{latestPreview}</p>
+                      {thread.latestReply?.mediaUrl ? (
+                        <div className="rounded-[0.85rem] border border-border/60 bg-background/70 p-2 dark:bg-white/[0.03]">
+                          {thread.latestReply.mediaKind === 'IMAGE' ? (
+                            <a
+                              href={thread.latestReply.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block overflow-hidden rounded-[0.7rem]"
+                            >
+                              <img
+                                src={thread.latestReply.mediaUrl}
+                                alt={getLatestReplyAttachmentLabel(thread.latestReply) || 'Support attachment'}
+                                className="h-32 w-full rounded-[0.7rem] object-cover"
+                              />
+                            </a>
+                          ) : (
+                            <a
+                              href={thread.latestReply.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 rounded-[0.7rem] px-2 py-2 text-sm text-foreground transition hover:bg-background/80"
+                            >
+                              <Paperclip className="h-4 w-4 text-primary" />
+                              <span className="truncate">{getLatestReplyAttachmentLabel(thread.latestReply)}</span>
+                            </a>
+                          )}
+                        </div>
+                      ) : null}
                       {thread.latestReply ? (
-                        <p className="text-xs text-muted-foreground">{formatDateTime(thread.latestReply.createdAt)}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>{formatDateTime(thread.latestReply.createdAt)}</span>
+                          {thread.latestReply.mediaKind ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              {thread.latestReply.mediaKind === 'IMAGE' ? 'Image attached' : 'File attached'}
+                            </Badge>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
 

@@ -35,7 +35,8 @@ import {
   handleTelegramOrderProofMessage as handleTelegramOrderProofMessageModule,
   handleTelegramOrderTextMessage as handleTelegramOrderTextMessageModule,
 } from '@/lib/services/telegram-order-state';
-import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
 import {
   generateTelegramOrderCode,
   getTelegramSalesSettings,
@@ -169,6 +170,107 @@ export async function handleBuyCommand(
       buildTelegramPlanSelectionKeyboard,
     },
   });
+}
+
+export async function handleGiftCommand(
+  chatId: number,
+  telegramUserId: number,
+  username: string,
+  locale: SupportedLocale,
+  botToken: string,
+  argsText?: string,
+) {
+  const trimmed = argsText?.trim() || '';
+  const ui = getTelegramUi(locale);
+  if (!trimmed) {
+    return locale === 'my'
+      ? '🎁 အသုံးပြုပုံ: /gift @recipient_username [COUPON]\n\nဥပမာ: /gift @friend TRIAL500\nRecipient က bot ကို အနည်းဆုံး တစ်ကြိမ် start လုပ်ထားပါက delivery ကို recipient chat ထဲသို့လည်း ပို့ရန် ကြိုးစားပါမည်။'
+      : '🎁 Usage: /gift @recipient_username [COUPON]\n\nExample: /gift @friend TRIAL500\nIf the recipient has already started the bot, we will also try to deliver the access details into the recipient chat.';
+  }
+
+  if (!trimmed.split(/\s+/)[0]?.startsWith('@')) {
+    return locale === 'my'
+      ? '❌ Gift flow အတွက် recipient Telegram username ကို @username ပုံစံဖြင့် အရင်ရေးပါ။'
+      : '❌ Start the gift flow with the recipient Telegram username in the @username format.';
+  }
+
+  return handleTelegramBuyCommand({
+    chatId,
+    telegramUserId,
+    username,
+    locale,
+    botToken,
+    argsText: trimmed,
+    retentionSource: null,
+    deps: {
+      createTelegramOrderRecord,
+      resolveTelegramCouponForOrderStart,
+      attachTelegramCouponToOrder: async (input: {
+        orderId: string;
+        coupon: {
+          campaignType: string;
+          couponCode: string;
+          couponDiscountAmount: number;
+          couponDiscountLabel?: string | null;
+        };
+      }) =>
+        db.telegramOrder.update({
+          where: { id: input.orderId },
+          data: {
+            couponCampaignType: input.coupon.campaignType,
+            couponCode: input.coupon.couponCode,
+            couponDiscountAmount: input.coupon.couponDiscountAmount,
+            couponDiscountLabel: input.coupon.couponDiscountLabel?.trim() || null,
+          },
+        }),
+      buildTelegramCouponReadyLines,
+      listAvailableTelegramPlansForOrder,
+      buildTelegramSalesPlanPromptText,
+      buildTelegramPlanSelectionKeyboard,
+    },
+  });
+}
+
+export async function handleReferralCommand(
+  chatId: number,
+  telegramUserId: number,
+  username: string,
+  locale: SupportedLocale,
+) {
+  const summary = await getTelegramReferralSummary({
+    telegramUserId: String(telegramUserId),
+    telegramChatId: String(chatId),
+    username,
+    displayName: username,
+  });
+  const config = await getTelegramConfig();
+  const botUsername = config?.botUsername?.trim().replace(/^@+/, '') || 'atomicui_bot';
+  const inviteLink = `https://t.me/${botUsername}?start=ref_${summary.referralCode}`;
+  const revenueLabel = summary.revenue > 0
+    ? new Intl.NumberFormat('en-US').format(summary.revenue)
+    : '0';
+
+  return locale === 'my'
+    ? [
+        '🔗 <b>Referral center</b>',
+        '',
+        `Code: <b>${summary.referralCode}</b>`,
+        `Invite link: ${inviteLink}`,
+        `Converted orders: <b>${summary.fulfilledOrders}</b>`,
+        `Revenue: <b>${revenueLabel} MMK</b>`,
+        '',
+        'ဤ link ကို သူငယ်ချင်းထံ ပို့ပြီး bot ကို start လုပ်ခိုင်းပါ။ နောက်ထပ် /buy order တွင် code ကို attach လုပ်ပေးပါမည်။',
+      ].join('\n')
+    : [
+        '🔗 <b>Referral center</b>',
+        '',
+        `Code: <b>${summary.referralCode}</b>`,
+        `Invite link: ${inviteLink}`,
+        `Converted orders: <b>${summary.fulfilledOrders}</b>`,
+        `Revenue: <b>${revenueLabel} MMK</b>`,
+        '',
+        'Share this link with a friend. When they start the bot and place their next /buy order, the referral code will be attached automatically.',
+      ].join('\n');
 }
 
 export async function handleTrialCommand(

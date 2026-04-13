@@ -126,6 +126,7 @@ import {
   type TelegramAnnouncementAudience,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
+import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
 import {
   addTelegramPremiumSupportReply,
   buildTelegramDynamicPremiumPendingKeyboard,
@@ -827,18 +828,30 @@ export function buildTelegramPlanSelectionKeyboard(input: {
   orderId: string;
   plans: TelegramSalesPlan[];
   locale: SupportedLocale;
+  hasCouponApplied?: boolean;
 }) {
+  const rows = input.plans.map((plan) => {
+    const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+    const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+    return [
+      {
+        text: truncateTelegramButtonLabel(price ? `${label} • ${price}` : label, 42),
+        callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, plan.code),
+      },
+    ];
+  });
+
+  if (input.hasCouponApplied) {
+    rows.push([
+      {
+        text: input.locale === 'my' ? '🏷 Coupon ဖယ်ရှားရန်' : '🏷 Remove coupon',
+        callback_data: buildTelegramOrderActionCallbackData('cp', input.orderId),
+      },
+    ]);
+  }
+
   return {
-    inline_keyboard: input.plans.map((plan) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return [
-        {
-          text: truncateTelegramButtonLabel(price ? `${label} • ${price}` : label, 42),
-          callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, plan.code),
-        },
-      ];
-    }),
+    inline_keyboard: rows,
   };
 }
 
@@ -1736,12 +1749,20 @@ export async function createTelegramOrderRecord(input: {
   couponCode?: string | null;
   couponDiscountAmount?: number | null;
   couponDiscountLabel?: string | null;
+  orderMode?: 'SELF' | 'GIFT';
+  referralCode?: string | null;
+  giftRecipientTelegramUsername?: string | null;
+  giftRecipientTelegramUserId?: string | null;
+  giftRecipientChatId?: string | null;
+  giftRecipientLabel?: string | null;
+  giftMessage?: string | null;
 }) {
   const orderCode = await generateTelegramOrderCode();
   return db.telegramOrder.create({
     data: {
       orderCode,
       kind: input.kind,
+      orderMode: input.orderMode || 'SELF',
       status: input.initialStatus,
       ...buildTelegramOrderPaymentStageFields({
         nextStatus: input.initialStatus,
@@ -1766,6 +1787,7 @@ export async function createTelegramOrderRecord(input: {
       selectedServerCountryCode: input.selectedServerCountryCode ?? null,
       retryOfOrderId: input.retryOfOrderId ?? null,
       retentionSource: input.retentionSource ?? null,
+      referralCode: input.referralCode?.trim().toUpperCase() || null,
       couponCampaignType: input.couponCampaignType ?? null,
       couponCode: input.couponCode?.trim().toUpperCase() || null,
       couponDiscountAmount:
@@ -1773,6 +1795,11 @@ export async function createTelegramOrderRecord(input: {
           ? Math.max(0, Math.floor(input.couponDiscountAmount))
           : null,
       couponDiscountLabel: input.couponDiscountLabel?.trim() || null,
+      giftRecipientTelegramUsername: input.giftRecipientTelegramUsername?.trim() || null,
+      giftRecipientTelegramUserId: input.giftRecipientTelegramUserId?.trim() || null,
+      giftRecipientChatId: input.giftRecipientChatId?.trim() || null,
+      giftRecipientLabel: input.giftRecipientLabel?.trim() || null,
+      giftMessage: input.giftMessage?.trim() || null,
     },
   });
 }
@@ -4623,6 +4650,7 @@ export async function approveTelegramOrder(input: {
       | Awaited<ReturnType<typeof sendAccessKeySharePageToTelegram>>
       | Awaited<ReturnType<typeof sendDynamicKeySharePageToTelegram>>
       | null = null;
+    let giftDeliveryError: string | null = null;
 
     try {
       const config = await getTelegramConfig();
@@ -4650,6 +4678,42 @@ export async function approveTelegramOrder(input: {
             reason: order.kind === 'RENEW' ? 'RESENT' : 'CREATED',
             source: 'telegram_order',
           });
+
+      if (
+        config
+        && order.orderMode === 'GIFT'
+        && order.giftRecipientChatId
+        && order.giftRecipientChatId !== order.telegramChatId
+      ) {
+        try {
+          await sendTelegramMessage(
+            config.botToken,
+            order.giftRecipientChatId,
+            locale === 'my'
+              ? `🎁 <b>Gift access delivered</b>\n\n${order.planName ? `Plan: <b>${escapeHtml(order.planName)}</b>\n` : ''}Access details are in the next message.`
+              : `🎁 <b>Gift access delivered</b>\n\n${order.planName ? `Plan: <b>${escapeHtml(order.planName)}</b>\n` : ''}Access details are in the next message.`,
+          );
+
+          if (isDynamic) {
+            await sendDynamicKeySharePageToTelegram({
+              dynamicAccessKeyId: key.id,
+              chatId: order.giftRecipientChatId,
+              planName: order.planName,
+              reason: order.kind === 'RENEW' ? 'RESENT' : 'CREATED',
+              source: 'telegram_gift_order',
+            });
+          } else {
+            await sendAccessKeySharePageToTelegram({
+              accessKeyId: key.id,
+              chatId: order.giftRecipientChatId,
+              reason: order.kind === 'RENEW' ? 'RESENT' : 'CREATED',
+              source: 'telegram_gift_order',
+            });
+          }
+        } catch (error) {
+          giftDeliveryError = (error as Error).message;
+        }
+      }
     } catch (error) {
       deliveryError = (error as Error).message;
     }
@@ -4667,6 +4731,9 @@ export async function approveTelegramOrder(input: {
         approvedAccessKeyId: isDynamic ? null : key.id,
         approvedDynamicKeyId: isDynamic ? key.id : null,
         deliveryError,
+        giftDeliveryError,
+        orderMode: order.orderMode,
+        giftRecipientTelegramUsername: order.giftRecipientTelegramUsername,
       },
     });
 
@@ -4677,6 +4744,7 @@ export async function approveTelegramOrder(input: {
       dynamicAccessKeyId: isDynamic ? key.id : null,
       accessKeyName: key.name,
       deliveryError,
+      giftDeliveryError,
       sharePageUrl: deliveryResult?.sharePageUrl || null,
       subscriptionUrl: deliveryResult?.subscriptionUrl || null,
     };
@@ -8719,6 +8787,22 @@ export async function handleTelegramCallbackQuery(
               offer?.couponCode || '',
             );
           }
+          case 'cp': {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Coupon removed. Restarting checkout…' : 'Coupon removed. Restarting checkout…',
+            );
+            return handleBuyCommand(
+              chatId,
+              callbackQuery.from.id,
+              callbackQuery.from.username || callbackQuery.from.first_name,
+              locale,
+              config.botToken,
+              null,
+              '',
+            );
+          }
           case 'rt': {
             const order = await findTelegramOrderByIdForUser({
               orderId: userOrderAction.primary,
@@ -9584,6 +9668,41 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
+    case 'gift':
+      if (!argsText.trim() || !argsText.trim().split(/\s+/)[0]?.startsWith('@')) {
+        return locale === 'my'
+          ? '🎁 အသုံးပြုပုံ: /gift @recipient_username [COUPON]\n\nဥပမာ: /gift @friend TRIAL500'
+          : '🎁 Usage: /gift @recipient_username [COUPON]\n\nExample: /gift @friend TRIAL500';
+      }
+      return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
+    case 'referral': {
+      const summary = await getTelegramReferralSummary({
+        telegramUserId: String(telegramUserId),
+        telegramChatId: String(chatId),
+        username,
+        displayName: username,
+      });
+      const botUsername = config.botUsername?.trim().replace(/^@+/, '') || 'atomicui_bot';
+      const inviteLink = `https://t.me/${botUsername}?start=ref_${summary.referralCode}`;
+      const revenueLabel = new Intl.NumberFormat('en-US').format(summary.revenue);
+      return locale === 'my'
+        ? [
+            '🔗 <b>Referral center</b>',
+            '',
+            `Code: <b>${summary.referralCode}</b>`,
+            `Invite link: ${inviteLink}`,
+            `Converted orders: <b>${summary.fulfilledOrders}</b>`,
+            `Revenue: <b>${revenueLabel} MMK</b>`,
+          ].join('\n')
+        : [
+            '🔗 <b>Referral center</b>',
+            '',
+            `Code: <b>${summary.referralCode}</b>`,
+            `Invite link: ${inviteLink}`,
+            `Converted orders: <b>${summary.fulfilledOrders}</b>`,
+            `Revenue: <b>${revenueLabel} MMK</b>`,
+          ].join('\n');
+    }
     case 'offers':
       return handleOffersCommand({
         chatId,

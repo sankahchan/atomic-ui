@@ -45,6 +45,7 @@ import {
   buildTelegramPromoDeliveryCandidates,
   resolveTelegramPromoAttribution,
 } from '@/lib/services/telegram-attribution';
+import { countTelegramAnnouncementExperimentAssignments } from '@/lib/services/telegram-announcement-experiments';
 import { simulateTelegramCouponCampaignAudience } from '@/lib/services/telegram-campaigns';
 import {
   approveTelegramOrder,
@@ -117,6 +118,37 @@ const telegramAnnouncementTargetFiltersSchema = z.object({
   serverId: z.string().trim().min(1).max(64).nullable().optional(),
   countryCode: z.string().trim().length(2).nullable().optional(),
 });
+const telegramAnnouncementExperimentVariantSchema = z.object({
+  variantKey: z.string().trim().min(1).max(16).regex(/^[A-Za-z0-9_-]+$/).optional(),
+  label: z.string().trim().min(1).max(60),
+  allocationPercent: z.number().int().min(1).max(99),
+  title: z.string().trim().min(3).max(120),
+  message: z.string().trim().min(10).max(2000),
+  heroImageUrl: z.string().trim().max(1000).optional().nullable(),
+  cardStyle: telegramAnnouncementCardStyleSchema.default('DEFAULT'),
+  templateId: z.string().cuid().optional().nullable(),
+  templateName: z.string().trim().min(2).max(120).optional().nullable(),
+});
+
+function normalizeTelegramAnnouncementExperimentVariantKey(index: number, variantKey?: string | null) {
+  const normalized = (variantKey || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '');
+
+  if (normalized) {
+    return normalized;
+  }
+
+  return String.fromCharCode(65 + index);
+}
+
+function mapRevenueSummary(revenue: Map<string, number>) {
+  return Array.from(revenue.entries()).map(([currency, amount]) => ({
+    currency,
+    amount,
+  }));
+}
 
 function assertTelegramReviewScope(scope?: string | null) {
   if (!hasTelegramReviewManageScope(scope)) {
@@ -2135,6 +2167,13 @@ export const telegramBotRouter = router({
           OR: [{ createdAt: { gte: cutoff } }, { sentAt: { gte: cutoff } }],
         },
         include: {
+          experiment: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
           deliveries: {
             select: {
               id: true,
@@ -2208,6 +2247,37 @@ export const telegramBotRouter = router({
         clickCount: number;
         attributedOrders: number;
         attributedRevenue: Map<string, number>;
+      }>();
+      const byExperiment = new Map<string, {
+        experimentId: string;
+        name: string;
+        status: string;
+        audience: string;
+        type: string;
+        announcements: number;
+        totalRecipients: number;
+        sentCount: number;
+        failedCount: number;
+        openCount: number;
+        clickCount: number;
+        attributedOrders: number;
+        attributedRevenue: Map<string, number>;
+        latestAnnouncementId: string | null;
+        latestAnnouncementAt: Date | null;
+        variants: Map<string, {
+          variantKey: string;
+          label: string;
+          announcements: number;
+          totalRecipients: number;
+          sentCount: number;
+          failedCount: number;
+          openCount: number;
+          clickCount: number;
+          attributedOrders: number;
+          attributedRevenue: Map<string, number>;
+          latestAnnouncementId: string | null;
+          latestAnnouncementAt: Date | null;
+        }>;
       }>();
       const sendTimeHints = new Map<number, {
         hour: number;
@@ -2391,6 +2461,73 @@ export const telegramBotRouter = router({
         templateSummary.totalRecipients += announcement.totalRecipients;
         templateSummary.sentCount += announcement.sentCount;
         templateSummary.failedCount += announcement.failedCount;
+        const experimentSummary =
+          announcement.experimentId && announcement.experiment
+            ? byExperiment.get(announcement.experimentId) || {
+                experimentId: announcement.experimentId,
+                name: announcement.experiment.name,
+                status: announcement.experiment.status,
+                audience: announcement.audience,
+                type: announcement.type,
+                announcements: 0,
+                totalRecipients: 0,
+                sentCount: 0,
+                failedCount: 0,
+                openCount: 0,
+                clickCount: 0,
+                attributedOrders: 0,
+                attributedRevenue: new Map<string, number>(),
+                latestAnnouncementId: null,
+                latestAnnouncementAt: null,
+                variants: new Map(),
+              }
+            : null;
+        const experimentVariantSummary =
+          experimentSummary
+            ? experimentSummary.variants.get(announcement.experimentVariantKey || 'UNASSIGNED') || {
+                variantKey: announcement.experimentVariantKey || 'UNASSIGNED',
+                label:
+                  announcement.experimentVariantLabel ||
+                  announcement.experimentVariantKey ||
+                  'Unassigned',
+                announcements: 0,
+                totalRecipients: 0,
+                sentCount: 0,
+                failedCount: 0,
+                openCount: 0,
+                clickCount: 0,
+                attributedOrders: 0,
+                attributedRevenue: new Map<string, number>(),
+                latestAnnouncementId: null,
+                latestAnnouncementAt: null,
+              }
+            : null;
+
+        if (experimentSummary && experimentVariantSummary) {
+          experimentSummary.announcements += 1;
+          experimentSummary.totalRecipients += announcement.totalRecipients;
+          experimentSummary.sentCount += announcement.sentCount;
+          experimentSummary.failedCount += announcement.failedCount;
+          if (
+            !experimentSummary.latestAnnouncementAt ||
+            announcement.createdAt.getTime() > experimentSummary.latestAnnouncementAt.getTime()
+          ) {
+            experimentSummary.latestAnnouncementId = announcement.id;
+            experimentSummary.latestAnnouncementAt = announcement.createdAt;
+          }
+
+          experimentVariantSummary.announcements += 1;
+          experimentVariantSummary.totalRecipients += announcement.totalRecipients;
+          experimentVariantSummary.sentCount += announcement.sentCount;
+          experimentVariantSummary.failedCount += announcement.failedCount;
+          if (
+            !experimentVariantSummary.latestAnnouncementAt ||
+            announcement.createdAt.getTime() > experimentVariantSummary.latestAnnouncementAt.getTime()
+          ) {
+            experimentVariantSummary.latestAnnouncementId = announcement.id;
+            experimentVariantSummary.latestAnnouncementAt = announcement.createdAt;
+          }
+        }
 
         const segmentKey = announcement.targetSegment?.trim().toUpperCase() || 'UNSEGMENTED';
         const segmentSummary = bySegment.get(segmentKey) || {
@@ -2411,6 +2548,12 @@ export const telegramBotRouter = router({
           typeSummary.clickCount += delivery.clickCount;
           templateSummary.openCount += delivery.openCount;
           templateSummary.clickCount += delivery.clickCount;
+          if (experimentSummary && experimentVariantSummary) {
+            experimentSummary.openCount += delivery.openCount;
+            experimentSummary.clickCount += delivery.clickCount;
+            experimentVariantSummary.openCount += delivery.openCount;
+            experimentVariantSummary.clickCount += delivery.clickCount;
+          }
 
           if (delivery.status === 'SENT' && delivery.sentAt) {
             const hour = delivery.sentAt.getHours();
@@ -2450,11 +2593,30 @@ export const telegramBotRouter = router({
               (templateSummary.attributedRevenue.get(currency) || 0) + amount,
             );
           }
+
+          if (experimentSummary && experimentVariantSummary) {
+            experimentSummary.attributedOrders += attributedSummary.orders;
+            experimentVariantSummary.attributedOrders += attributedSummary.orders;
+            for (const [currency, amount] of Array.from(attributedSummary.revenue.entries())) {
+              experimentSummary.attributedRevenue.set(
+                currency,
+                (experimentSummary.attributedRevenue.get(currency) || 0) + amount,
+              );
+              experimentVariantSummary.attributedRevenue.set(
+                currency,
+                (experimentVariantSummary.attributedRevenue.get(currency) || 0) + amount,
+              );
+            }
+          }
         }
 
         byType.set(announcement.type, typeSummary);
         byAudience.set(announcement.audience, audienceSummary);
         byTemplate.set(templateKey, templateSummary);
+        if (experimentSummary && experimentVariantSummary) {
+          experimentSummary.variants.set(experimentVariantSummary.variantKey, experimentVariantSummary);
+          byExperiment.set(experimentSummary.experimentId, experimentSummary);
+        }
       }
 
       return {
@@ -2473,10 +2635,7 @@ export const telegramBotRouter = router({
           resendRecovered,
           resendRecoveryRate: resendAttempts > 0 ? resendRecovered / resendAttempts : 0,
           promoAttributedOrders,
-          promoAttributedRevenue: Array.from(promoAttributedRevenue.entries()).map(([currency, amount]) => ({
-            currency,
-            amount,
-          })),
+          promoAttributedRevenue: mapRevenueSummary(promoAttributedRevenue),
         },
         byType: Array.from(byType.entries())
           .map(([type, summary]) => ({
@@ -2492,10 +2651,7 @@ export const telegramBotRouter = router({
           .map(([audience, summary]) => ({
             audience,
             ...summary,
-            attributedRevenue: Array.from(summary.attributedRevenue.entries()).map(([currency, amount]) => ({
-              currency,
-              amount,
-            })),
+            attributedRevenue: mapRevenueSummary(summary.attributedRevenue),
             deliverySuccessRate:
               summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
             conversionRate:
@@ -2505,10 +2661,7 @@ export const telegramBotRouter = router({
         byTemplate: Array.from(byTemplate.values())
           .map((summary) => ({
             ...summary,
-            attributedRevenue: Array.from(summary.attributedRevenue.entries()).map(([currency, amount]) => ({
-              currency,
-              amount,
-            })),
+            attributedRevenue: mapRevenueSummary(summary.attributedRevenue),
             deliverySuccessRate:
               summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
             openRate: summary.sentCount > 0 ? summary.openCount / summary.sentCount : 0,
@@ -2517,13 +2670,44 @@ export const telegramBotRouter = router({
               summary.sentCount > 0 ? summary.attributedOrders / summary.sentCount : 0,
           }))
           .sort((left, right) => right.attributedOrders - left.attributedOrders || right.sentCount - left.sentCount),
+        byExperiment: Array.from(byExperiment.values())
+          .map(({ latestAnnouncementAt: _latestAnnouncementAt, variants, ...summary }) => ({
+            ...summary,
+            attributedRevenue: mapRevenueSummary(summary.attributedRevenue),
+            deliverySuccessRate:
+              summary.totalRecipients > 0 ? summary.sentCount / summary.totalRecipients : 0,
+            openRate: summary.sentCount > 0 ? summary.openCount / summary.sentCount : 0,
+            clickRate: summary.sentCount > 0 ? summary.clickCount / summary.sentCount : 0,
+            conversionRate:
+              summary.sentCount > 0 ? summary.attributedOrders / summary.sentCount : 0,
+            variants: Array.from(variants.values())
+              .map(({ latestAnnouncementAt: _latestVariantAt, ...variant }) => ({
+                ...variant,
+                attributedRevenue: mapRevenueSummary(variant.attributedRevenue),
+                deliverySuccessRate:
+                  variant.totalRecipients > 0 ? variant.sentCount / variant.totalRecipients : 0,
+                openRate: variant.sentCount > 0 ? variant.openCount / variant.sentCount : 0,
+                clickRate: variant.sentCount > 0 ? variant.clickCount / variant.sentCount : 0,
+                conversionRate:
+                  variant.sentCount > 0 ? variant.attributedOrders / variant.sentCount : 0,
+              }))
+              .sort(
+                (left, right) =>
+                  right.attributedOrders - left.attributedOrders ||
+                  right.sentCount - left.sentCount ||
+                  left.variantKey.localeCompare(right.variantKey),
+              ),
+          }))
+          .sort(
+            (left, right) =>
+              right.attributedOrders - left.attributedOrders ||
+              right.sentCount - left.sentCount ||
+              left.name.localeCompare(right.name),
+          ),
         bySegment: Array.from(bySegment.values())
           .map((summary) => ({
             ...summary,
-            attributedRevenue: Array.from(summary.attributedRevenue.entries()).map(([currency, amount]) => ({
-              currency,
-              amount,
-            })),
+            attributedRevenue: mapRevenueSummary(summary.attributedRevenue),
             conversionRate: summary.sentCount > 0 ? summary.attributedOrders / summary.sentCount : 0,
           }))
           .sort((left, right) => right.attributedOrders - left.attributedOrders || right.sentCount - left.sentCount),
@@ -2538,10 +2722,7 @@ export const telegramBotRouter = router({
         bySendHour: Array.from(bySendHour.values())
           .map((entry) => ({
             ...entry,
-            attributedRevenue: Array.from(entry.attributedRevenue.entries()).map(([currency, amount]) => ({
-              currency,
-              amount,
-            })),
+            attributedRevenue: mapRevenueSummary(entry.attributedRevenue),
             conversionRate: entry.sentCount > 0 ? entry.attributedOrders / entry.sentCount : 0,
           }))
           .sort((left, right) => right.conversionRate - left.conversionRate || right.sentCount - left.sentCount),
@@ -2785,6 +2966,439 @@ export const telegramBotRouter = router({
 
       return {
         archivedCount: updated.count,
+      };
+    }),
+
+  listAnnouncementExperiments: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+    const experiments = await db.telegramAnnouncementExperiment.findMany({
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        variants: {
+          orderBy: [{ createdAt: 'asc' }, { variantKey: 'asc' }],
+        },
+        announcements: {
+          select: {
+            id: true,
+            status: true,
+            experimentVariantKey: true,
+            experimentVariantLabel: true,
+            totalRecipients: true,
+            sentCount: true,
+            failedCount: true,
+            sentAt: true,
+            createdAt: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        },
+      },
+    });
+
+    return experiments.map((experiment) => {
+      const variantSummary = experiment.variants.map((variant) => {
+        const announcements = experiment.announcements.filter(
+          (announcement) => announcement.experimentVariantKey === variant.variantKey,
+        );
+
+        return {
+          ...variant,
+          announcements: announcements.length,
+          totalRecipients: announcements.reduce(
+            (sum, announcement) => sum + announcement.totalRecipients,
+            0,
+          ),
+          sentCount: announcements.reduce((sum, announcement) => sum + announcement.sentCount, 0),
+          failedCount: announcements.reduce(
+            (sum, announcement) => sum + announcement.failedCount,
+            0,
+          ),
+          latestAnnouncementId: announcements[0]?.id ?? null,
+          latestSentAt:
+            announcements.find((announcement) => Boolean(announcement.sentAt))?.sentAt ?? null,
+        };
+      });
+
+      return {
+        ...experiment,
+        totalRecipients: experiment.announcements.reduce(
+          (sum, announcement) => sum + announcement.totalRecipients,
+          0,
+        ),
+        sentCount: experiment.announcements.reduce(
+          (sum, announcement) => sum + announcement.sentCount,
+          0,
+        ),
+        failedCount: experiment.announcements.reduce(
+          (sum, announcement) => sum + announcement.failedCount,
+          0,
+        ),
+        latestAnnouncementId: experiment.announcements[0]?.id ?? null,
+        latestSentAt:
+          experiment.announcements.find((announcement) => Boolean(announcement.sentAt))?.sentAt ??
+          null,
+        recentAnnouncements: experiment.announcements.slice(0, 6),
+        variants: variantSummary,
+      };
+    });
+  }),
+
+  saveAnnouncementExperiment: adminProcedure
+    .input(
+      z.object({
+        experimentId: z.string().cuid().optional(),
+        name: z.string().trim().min(3).max(120),
+        audience: telegramAnnouncementAudienceSchema.default('ACTIVE_USERS'),
+        type: telegramAnnouncementTypeSchema.default('PROMO'),
+        filters: telegramAnnouncementTargetFiltersSchema.optional(),
+        includeSupportButton: z.boolean().default(true),
+        pinToInbox: z.boolean().default(false),
+        variants: z.array(telegramAnnouncementExperimentVariantSchema).min(2).max(4),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+      const targetServer = input.filters?.serverId
+        ? await db.server.findUnique({
+            where: { id: input.filters.serverId },
+            select: { id: true, name: true, countryCode: true },
+          })
+        : null;
+      const templateIds = Array.from(
+        new Set(
+          input.variants
+            .map((variant) => variant.templateId?.trim())
+            .filter((templateId): templateId is string => Boolean(templateId)),
+        ),
+      );
+      const templates = templateIds.length
+        ? await db.telegramAnnouncementTemplate.findMany({
+            where: {
+              id: {
+                in: templateIds,
+              },
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+          })
+        : [];
+      const templateMap = new Map(templates.map((template) => [template.id, template.name]));
+      const normalizedVariants = input.variants.map((variant, index) => ({
+        variantKey: normalizeTelegramAnnouncementExperimentVariantKey(index, variant.variantKey),
+        label: variant.label.trim(),
+        allocationPercent: variant.allocationPercent,
+        title: variant.title.trim(),
+        message: variant.message.trim(),
+        heroImageUrl: variant.heroImageUrl?.trim() || null,
+        cardStyle: variant.cardStyle,
+        templateId: variant.templateId?.trim() || null,
+        templateName:
+          (variant.templateId?.trim() ? templateMap.get(variant.templateId.trim()) : null) ||
+          variant.templateName?.trim() ||
+          null,
+      }));
+      const variantKeys = new Set(normalizedVariants.map((variant) => variant.variantKey));
+      if (variantKeys.size !== normalizedVariants.length) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Experiment variant keys must be unique.',
+        });
+      }
+
+      if (input.experimentId) {
+        const existingExperiment = await db.telegramAnnouncementExperiment.findUnique({
+          where: { id: input.experimentId },
+          select: {
+            id: true,
+            launchedAt: true,
+            _count: {
+              select: {
+                announcements: true,
+              },
+            },
+          },
+        });
+
+        if (!existingExperiment) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Experiment not found.',
+          });
+        }
+
+        if (existingExperiment.launchedAt || existingExperiment._count.announcements > 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Launched experiments are read-only. Create a new experiment for the next test.',
+          });
+        }
+      }
+
+      const experimentData = {
+        name: input.name.trim(),
+        status: 'DRAFT',
+        audience: input.audience,
+        type: input.type,
+        targetTag: input.filters?.tag?.trim().toLowerCase() || null,
+        targetSegment: input.filters?.segment || null,
+        targetServerId: targetServer?.id || null,
+        targetServerName: targetServer?.name || null,
+        targetCountryCode:
+          (input.filters?.countryCode || targetServer?.countryCode || null)?.trim().toUpperCase() ||
+          null,
+        includeSupportButton: input.includeSupportButton,
+        pinToInbox: input.pinToInbox,
+        createdByUserId: ctx.user.id,
+        createdByEmail: ctx.user.email ?? null,
+      };
+
+      if (input.experimentId) {
+        return db.$transaction(async (transaction) => {
+          await transaction.telegramAnnouncementExperiment.update({
+            where: { id: input.experimentId },
+            data: experimentData,
+          });
+          await transaction.telegramAnnouncementExperimentVariant.deleteMany({
+            where: { experimentId: input.experimentId },
+          });
+          await transaction.telegramAnnouncementExperimentVariant.createMany({
+            data: normalizedVariants.map((variant) => ({
+              experimentId: input.experimentId as string,
+              variantKey: variant.variantKey,
+              label: variant.label,
+              allocationPercent: variant.allocationPercent,
+              title: variant.title,
+              message: variant.message,
+              heroImageUrl: variant.heroImageUrl,
+              cardStyle: variant.cardStyle,
+              templateId: variant.templateId,
+              templateName: variant.templateName,
+            })),
+          });
+
+          return transaction.telegramAnnouncementExperiment.findUnique({
+            where: { id: input.experimentId },
+            include: {
+              variants: {
+                orderBy: [{ createdAt: 'asc' }, { variantKey: 'asc' }],
+              },
+            },
+          });
+        });
+      }
+
+      return db.telegramAnnouncementExperiment.create({
+        data: {
+          ...experimentData,
+          variants: {
+            create: normalizedVariants.map((variant) => ({
+              variantKey: variant.variantKey,
+              label: variant.label,
+              allocationPercent: variant.allocationPercent,
+              title: variant.title,
+              message: variant.message,
+              heroImageUrl: variant.heroImageUrl,
+              cardStyle: variant.cardStyle,
+              templateId: variant.templateId,
+              templateName: variant.templateName,
+            })),
+          },
+        },
+        include: {
+          variants: {
+            orderBy: [{ createdAt: 'asc' }, { variantKey: 'asc' }],
+          },
+        },
+      });
+    }),
+
+  launchAnnouncementExperiment: adminProcedure
+    .input(
+      z.object({
+        experimentId: z.string().cuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+      const experiment = await db.telegramAnnouncementExperiment.findUnique({
+        where: { id: input.experimentId },
+        include: {
+          variants: {
+            orderBy: [{ createdAt: 'asc' }, { variantKey: 'asc' }],
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Experiment not found.',
+        });
+      }
+
+      if (experiment.variants.length < 2) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Experiments need at least two variants.',
+        });
+      }
+
+      const activeRunCount = await db.telegramAnnouncement.count({
+        where: {
+          experimentId: experiment.id,
+          status: {
+            in: ['PROCESSING', 'SCHEDULED'],
+          },
+        },
+      });
+      if (activeRunCount > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This experiment already has an active send in progress.',
+        });
+      }
+
+      const recipients = await resolveTelegramAnnouncementRecipients({
+        audience: experiment.audience as TelegramAnnouncementAudience,
+        type: experiment.type as TelegramAnnouncementType,
+        filters: {
+          tag: experiment.targetTag,
+          segment: experiment.targetSegment,
+          serverId: experiment.targetServerId,
+          countryCode: experiment.targetCountryCode,
+        },
+      });
+      if (recipients.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No Telegram users matched this experiment audience.',
+        });
+      }
+
+      const allocation = countTelegramAnnouncementExperimentAssignments({
+        experimentId: experiment.id,
+        chatIds: recipients,
+        variants: experiment.variants.map((variant) => ({
+          variantKey: variant.variantKey,
+          allocationPercent: variant.allocationPercent,
+        })),
+      });
+
+      const createdAnnouncements = await db.$transaction(async (transaction) => {
+        await transaction.telegramAnnouncementExperiment.update({
+          where: { id: experiment.id },
+          data: {
+            status: 'RUNNING',
+            launchedAt: new Date(),
+          },
+        });
+
+        const created = [] as Array<{
+          id: string;
+          experimentVariantKey: string | null;
+          experimentVariantLabel: string | null;
+        }>;
+
+        for (const variant of experiment.variants) {
+          const announcement = await transaction.telegramAnnouncement.create({
+            data: {
+              audience: experiment.audience,
+              type: experiment.type,
+              templateId: variant.templateId || null,
+              templateName:
+                variant.templateName || `${experiment.name.trim()} · ${variant.label.trim()}`,
+              targetTag: experiment.targetTag,
+              targetSegment: experiment.targetSegment,
+              targetServerId: experiment.targetServerId,
+              targetServerName: experiment.targetServerName,
+              targetCountryCode: experiment.targetCountryCode,
+              title: variant.title,
+              message: variant.message,
+              heroImageUrl: variant.heroImageUrl,
+              cardStyle: variant.cardStyle,
+              includeSupportButton: experiment.includeSupportButton,
+              pinToInbox: experiment.pinToInbox,
+              status: 'PROCESSING',
+              totalRecipients: allocation[variant.variantKey] || 0,
+              createdByUserId: ctx.user.id,
+              createdByEmail: ctx.user.email ?? null,
+              experimentId: experiment.id,
+              experimentVariantKey: variant.variantKey,
+              experimentVariantLabel: variant.label,
+            },
+            select: {
+              id: true,
+              experimentVariantKey: true,
+              experimentVariantLabel: true,
+            },
+          });
+          created.push(announcement);
+        }
+
+        return created;
+      });
+
+      const results = [] as Array<{
+        announcementId: string;
+        variantKey: string | null;
+        variantLabel: string | null;
+        status: string;
+        sentCount: number;
+        failedCount: number;
+        expectedRecipients: number;
+        skipped: boolean;
+        reason?: string;
+      }>;
+
+      for (const announcement of createdAnnouncements) {
+        const result = await dispatchTelegramAnnouncement({
+          announcementId: announcement.id,
+        });
+
+        results.push({
+          announcementId: announcement.id,
+          variantKey: announcement.experimentVariantKey,
+          variantLabel: announcement.experimentVariantLabel,
+          status: result.skipped ? 'FAILED' : result.status,
+          sentCount: result.skipped ? 0 : result.sentCount,
+          failedCount: result.skipped ? 0 : result.failedCount,
+          expectedRecipients:
+            announcement.experimentVariantKey ? allocation[announcement.experimentVariantKey] || 0 : 0,
+          skipped: result.skipped,
+          reason: result.skipped ? result.reason : undefined,
+        });
+      }
+
+      await db.telegramAnnouncementExperiment.update({
+        where: { id: experiment.id },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'TELEGRAM_ANNOUNCEMENT_EXPERIMENT_LAUNCH',
+        entity: 'TELEGRAM',
+        entityId: experiment.id,
+        details: {
+          name: experiment.name,
+          audience: experiment.audience,
+          type: experiment.type,
+          allocation,
+          results,
+        },
+      });
+
+      return {
+        experimentId: experiment.id,
+        firstAnnouncementId: results[0]?.announcementId ?? null,
+        results,
       };
     }),
 

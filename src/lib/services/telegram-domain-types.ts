@@ -89,6 +89,7 @@ export type TelegramOrderUserAction =
   | 'rf'
   | 'ca'
   | 'by'
+  | 'cp'
   | 'rt'
   | 'sh'
   | 'rc';

@@ -291,6 +291,14 @@ export async function buildTelegramOrderStatusMessage(input: {
     lines.push(`${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>`);
   }
 
+  if (order.orderMode === 'GIFT' && order.giftRecipientLabel) {
+    lines.push(`${isMyanmar ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`);
+  }
+
+  if (order.referralCode) {
+    lines.push(`${isMyanmar ? 'Referral' : 'Referral'}: <b>${escapeHtml(order.referralCode)}</b>`);
+  }
+
   if (order.requestedEmail) {
     lines.push(`${ui.emailLabel}: <code>${escapeHtml(order.requestedEmail)}</code>`);
   }

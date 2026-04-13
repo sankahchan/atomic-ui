@@ -33,6 +33,7 @@ import { runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
 import { runTelegramAnnouncementCycle } from '@/lib/services/telegram-announcements';
 import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
 import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-premium';
+import { runTelegramSupportSlaAlertCycle } from '@/lib/services/telegram-support';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -223,6 +224,18 @@ export function initScheduler() {
             }
         } catch (error) {
             logger.error('Telegram digest cycle failed', error);
+        }
+    });
+
+    // 12b. Support SLA breach alerts (Every 15 minutes)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            const result = await runTelegramSupportSlaAlertCycle();
+            if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
+                logger.warn(`Support SLA alerts: ${result.alerted} alerted, ${result.errors.length} errors`);
+            }
+        } catch (error) {
+            logger.error('Support SLA alert cycle failed', error);
         }
     });
 

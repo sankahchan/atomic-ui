@@ -13,6 +13,10 @@ import {
   sendTelegramPhotoUrl,
   type TelegramConfig,
 } from '@/lib/services/telegram-runtime';
+import {
+  consumePendingTelegramReferralCode,
+  parseReferralCodeToken,
+} from '@/lib/services/telegram-referrals';
 import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
   escapeHtml,
@@ -231,6 +235,78 @@ function buildTelegramPremiumPlanCard(input: {
     .join('\n');
 }
 
+function parseTelegramBuyArgs(argsText?: string | null) {
+  const tokens = (argsText || '').trim().split(/\s+/).filter(Boolean);
+  let giftRecipientTelegramUsername: string | null = null;
+  let couponCode: string | null = null;
+  let referralCode: string | null = null;
+
+  for (const token of tokens) {
+    const normalizedToken = token.trim();
+    if (!normalizedToken) {
+      continue;
+    }
+
+    const referralToken = parseReferralCodeToken(normalizedToken);
+    if (!referralCode && referralToken) {
+      referralCode = referralToken;
+      continue;
+    }
+
+    if (!giftRecipientTelegramUsername) {
+      if (normalizedToken.startsWith('@')) {
+        giftRecipientTelegramUsername = normalizedToken;
+        continue;
+      }
+      if (normalizedToken.toLowerCase().startsWith('gift:@')) {
+        giftRecipientTelegramUsername = normalizedToken.slice(5);
+        continue;
+      }
+      if (normalizedToken.toLowerCase().startsWith('gift=')) {
+        giftRecipientTelegramUsername = normalizedToken.slice(5);
+        continue;
+      }
+    }
+
+    if (!couponCode) {
+      couponCode = normalizedToken;
+    }
+  }
+
+  return {
+    giftRecipientTelegramUsername:
+      giftRecipientTelegramUsername?.replace(/^@+/, '').trim() || null,
+    couponCode: couponCode?.trim() || null,
+    referralCode: referralCode?.trim() || null,
+  };
+}
+
+async function resolveTelegramGiftRecipient(username?: string | null) {
+  const normalizedUsername = username?.trim().replace(/^@+/, '') || null;
+  if (!normalizedUsername) {
+    return null;
+  }
+
+  const profile = await db.telegramUserProfile.findFirst({
+    where: {
+      username: normalizedUsername,
+    },
+    select: {
+      telegramUserId: true,
+      telegramChatId: true,
+      username: true,
+      displayName: true,
+    },
+  });
+
+  return {
+    username: `@${profile?.username || normalizedUsername}`,
+    telegramUserId: profile?.telegramUserId || null,
+    chatId: profile?.telegramChatId || null,
+    label: profile?.displayName?.trim() || `@${profile?.username || normalizedUsername}`,
+  };
+}
+
 function buildTelegramOrderReceiptMessage(input: {
   order: {
     orderCode: string;
@@ -243,6 +319,9 @@ function buildTelegramOrderReceiptMessage(input: {
     durationMonths?: number | null;
     durationDays?: number | null;
     requestedName?: string | null;
+    referralCode?: string | null;
+    orderMode?: string | null;
+    giftRecipientLabel?: string | null;
     selectedServerName?: string | null;
     selectedServerCountryCode?: string | null;
     deliveryType?: string | null;
@@ -291,6 +370,12 @@ function buildTelegramOrderReceiptMessage(input: {
     input.order.requestedName
       ? `${ui.requestedNameLabel}: <b>${escapeHtml(input.order.requestedName)}</b>`
       : '',
+    input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
+      ? `${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      : '',
+    input.order.referralCode
+      ? `${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      : '',
     `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,
     '',
     escapeHtml(ui.receiptFooter),
@@ -308,6 +393,9 @@ function buildTelegramOrderReceiptCaption(input: {
     planName?: string | null;
     planCode?: string | null;
     paymentMethodLabel?: string | null;
+    referralCode?: string | null;
+    orderMode?: string | null;
+    giftRecipientLabel?: string | null;
     selectedServerName?: string | null;
     selectedServerCountryCode?: string | null;
     deliveryType?: string | null;
@@ -338,6 +426,12 @@ function buildTelegramOrderReceiptCaption(input: {
       ? `${ui.planLabel}: <b>${escapeHtml(input.order.planName || input.order.planCode || '')}</b>`
       : '',
     priceLabel ? `${ui.priceLabel}: <b>${escapeHtml(priceLabel)}</b>` : '',
+    input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
+      ? `${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      : '',
+    input.order.referralCode
+      ? `${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      : '',
     serverLabel ? `${ui.preferredServerLabel}: <b>${escapeHtml(serverLabel)}</b>` : '',
     `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,
     '',
@@ -362,6 +456,9 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
     durationMonths?: number | null;
     durationDays?: number | null;
     requestedName?: string | null;
+    referralCode?: string | null;
+    orderMode?: string | null;
+    giftRecipientLabel?: string | null;
     selectedServerName?: string | null;
     selectedServerCountryCode?: string | null;
     deliveryType?: string | null;
@@ -549,6 +646,15 @@ export async function handleBuyCommand(input: {
 
   await cancelStaleTelegramConversationOrders(input.chatId, input.telegramUserId);
 
+  const parsedArgs = parseTelegramBuyArgs(input.argsText);
+  const giftRecipient = await resolveTelegramGiftRecipient(parsedArgs.giftRecipientTelegramUsername);
+  const referralCode =
+    parsedArgs.referralCode
+    || (await consumePendingTelegramReferralCode({
+      telegramUserId: String(input.telegramUserId),
+      telegramChatId: String(input.chatId),
+    }));
+
   const order = await input.deps.createTelegramOrderRecord({
     kind: 'NEW',
     chatId: input.chatId,
@@ -557,6 +663,12 @@ export async function handleBuyCommand(input: {
     locale: input.locale,
     initialStatus: 'AWAITING_PLAN',
     retentionSource: input.retentionSource ?? null,
+    orderMode: parsedArgs.giftRecipientTelegramUsername ? 'GIFT' : 'SELF',
+    referralCode,
+    giftRecipientTelegramUsername: giftRecipient?.username || parsedArgs.giftRecipientTelegramUsername,
+    giftRecipientTelegramUserId: giftRecipient?.telegramUserId || null,
+    giftRecipientChatId: giftRecipient?.chatId || null,
+    giftRecipientLabel: giftRecipient?.label || (parsedArgs.giftRecipientTelegramUsername ? `@${parsedArgs.giftRecipientTelegramUsername}` : null),
   });
 
   const couponResolution = input.deps.resolveTelegramCouponForOrderStart
@@ -564,7 +676,7 @@ export async function handleBuyCommand(input: {
         chatId: input.chatId,
         telegramUserId: input.telegramUserId,
         source: input.retentionSource ?? null,
-        couponCode: input.argsText?.trim() || null,
+        couponCode: parsedArgs.couponCode,
       })
     : null;
   const preparedOrder =
@@ -671,6 +783,25 @@ export async function handleBuyCommand(input: {
           requestedCouponCode: couponResolution?.requestedCouponCode || null,
         })
       : []),
+    parsedArgs.giftRecipientTelegramUsername
+      ? input.locale === 'my'
+        ? `🎁 Gift for: <b>${escapeHtml(giftRecipient?.label || `@${parsedArgs.giftRecipientTelegramUsername}`)}</b>`
+        : `🎁 Gift for: <b>${escapeHtml(giftRecipient?.label || `@${parsedArgs.giftRecipientTelegramUsername}`)}</b>`
+      : '',
+    parsedArgs.giftRecipientTelegramUsername
+      ? giftRecipient?.chatId
+        ? input.locale === 'my'
+          ? 'Recipient က bot ကို စတင်ထားပြီးဖြစ်သောကြောင့် access details ကို recipient chat ထဲသို့လည်း ပို့ရန် ကြိုးစားပါမည်။'
+          : 'The recipient has already started the bot, so we will also try to deliver the access details in the recipient chat.'
+        : input.locale === 'my'
+          ? 'Recipient သည် bot ကို မစတင်ရသေးလျှင် buyer chat ထဲသို့ အရင်ပို့ပြီး admin မှ handoff လုပ်နိုင်ပါသည်။'
+          : 'If the recipient has not started the bot yet, delivery will land in your chat first and the admin can hand it off manually.'
+      : '',
+    referralCode
+      ? input.locale === 'my'
+        ? `🔗 Referral: <b>${escapeHtml(referralCode)}</b>`
+        : `🔗 Referral: <b>${escapeHtml(referralCode)}</b>`
+      : '',
     '',
     input.locale === 'my' ? '<b>Compare your options</b>' : '<b>Compare your options</b>',
     '',
@@ -700,6 +831,9 @@ export async function handleBuyCommand(input: {
     input.locale === 'my'
       ? '<b>ရွေးချယ်ရန် အသင့်ဖြစ်ပါပြီ</b>'
       : '<b>Ready to choose?</b>',
+    input.locale === 'my'
+      ? 'Gift flow ကို စတင်ရန် /gift @recipient_username ကို သုံးနိုင်ပါသည်။ Referral code လိုအပ်ပါက /referral ကို သုံးပါ။'
+      : 'Use /gift @recipient_username to buy for a friend. Use /referral when you want your invite code.',
     ui.buyPlanCardChooseHint,
     input.locale === 'my'
       ? 'Button မသုံးနိုင်ပါက အောက်ပါနံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
@@ -717,6 +851,7 @@ export async function handleBuyCommand(input: {
       orderId: preparedOrder.id,
       plans: enabledPlans,
       locale: input.locale,
+      hasCouponApplied: Boolean(preparedOrder.couponCode),
     }),
   });
 

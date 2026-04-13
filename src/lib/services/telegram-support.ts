@@ -24,7 +24,10 @@ export {
   listTelegramSupportThreadsForUser,
 } from '@/lib/services/telegram-support-data';
 
-export { sendTelegramSupportThreadAlertToAdmins } from '@/lib/services/telegram-support-notifications';
+export {
+  runTelegramSupportSlaAlertCycle,
+  sendTelegramSupportThreadAlertToAdmins,
+} from '@/lib/services/telegram-support-notifications';
 
 export {
   handleTelegramSupportReplyMedia,

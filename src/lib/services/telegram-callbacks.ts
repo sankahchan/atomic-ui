@@ -98,6 +98,10 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
   ],
   [
+    { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
+    { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+  ],
+  [
     { command: '/sub', labelEn: '📎 Sub links', labelMy: '📎 Sub Links' },
     { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
   ],
@@ -304,7 +308,7 @@ export function parseTelegramOrderActionCallbackData(data?: string | null): Tele
   }
 
   const action = parts[1];
-  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'rf', 'ca', 'by', 'rt', 'sh', 'rc'].includes(action)) {
+  if (!['pl', 'ky', 'sv', 'pm', 'pay', 'up', 'st', 'rf', 'ca', 'by', 'cp', 'rt', 'sh', 'rc'].includes(action)) {
     return null;
   }
 

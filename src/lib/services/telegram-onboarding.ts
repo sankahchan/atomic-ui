@@ -11,6 +11,7 @@ import {
   sendTelegramMessage,
   type TelegramConfig,
 } from '@/lib/services/telegram-runtime';
+import { acceptTelegramReferralCode, parseReferralStartArg } from '@/lib/services/telegram-referrals';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 
 async function sendTelegramOfferNudgeIfAny(input: {
@@ -129,6 +130,45 @@ export async function handleTelegramStartCommand(input: {
   const ui = getTelegramUi(locale);
 
   if (trimmedArgs) {
+    const referralCode = parseReferralStartArg(trimmedArgs);
+    if (referralCode) {
+      const referralResult = await acceptTelegramReferralCode({
+        telegramUserId: String(input.telegramUserId),
+        telegramChatId: String(input.chatId),
+        referralCode,
+      });
+
+      const referralMessage =
+        referralResult.status === 'accepted'
+          ? locale === 'my'
+            ? `🎁 Referral code <b>${escapeHtml(referralResult.referralCode)}</b> ကို သိမ်းထားပြီးပါပြီ။ /buy ဖြင့် order စတင်သောအခါ apply လုပ်ပေးပါမည်။`
+            : `🎁 Saved referral code <b>${escapeHtml(referralResult.referralCode)}</b>. It will be applied the next time you start an order with /buy.`
+          : referralResult.status === 'already-applied'
+            ? locale === 'my'
+              ? `ℹ️ Referral code <b>${escapeHtml(referralResult.referralCode || referralCode)}</b> ကို မကြာသေးမီက သိမ်းထားပြီးဖြစ်ပါသည်။ /buy ဖြင့် ဆက်လုပ်နိုင်ပါသည်။`
+              : `ℹ️ Referral code <b>${escapeHtml(referralResult.referralCode || referralCode)}</b> is already saved. Continue with /buy when you are ready.`
+            : referralResult.status === 'self'
+              ? locale === 'my'
+                ? '❌ ကိုယ်ပိုင် referral code ကို မသုံးနိုင်ပါ။'
+                : '❌ You cannot use your own referral code.'
+              : locale === 'my'
+                ? '❌ Referral code ကို မတွေ့ပါ။'
+                : '❌ Referral code was not found.';
+
+      await sendTelegramMessage(input.botToken, input.chatId, referralMessage, {
+        replyMarkup: getCommandKeyboard(input.isAdmin, locale),
+      });
+      if (referralResult.status === 'accepted' || referralResult.status === 'already-applied') {
+        await sendTelegramOfferNudgeIfAny({
+          botToken: input.botToken,
+          chatId: input.chatId,
+          telegramUserId: input.telegramUserId,
+          locale,
+        });
+      }
+      return null;
+    }
+
     const linkResult = await input.deps.markTelegramLinkTokenConsumed({
       token: trimmedArgs,
       chatId: String(input.chatId),

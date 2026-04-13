@@ -6,6 +6,7 @@ import {
   sendTelegramPhotoUrl,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
+import { assignTelegramAnnouncementExperimentVariant } from '@/lib/services/telegram-announcement-experiments';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 
 export type TelegramAnnouncementAudience =
@@ -647,19 +648,64 @@ export async function dispatchTelegramAnnouncement(input: {
     return { skipped: true as const, reason: 'not-configured' };
   }
 
-  const audience = announcement.audience as TelegramAnnouncementAudience;
-  const chatIds = await resolveTelegramAnnouncementRecipients({
-    audience,
-    type: announcement.type as TelegramAnnouncementType,
-    filters: {
-      tag: announcement.targetTag,
-      segment: announcement.targetSegment,
-      serverId: announcement.targetServerId,
-      countryCode: announcement.targetCountryCode,
+  const existingDeliveries = await db.telegramAnnouncementDelivery.findMany({
+    where: { announcementId: announcement.id },
+    select: {
+      id: true,
+      chatId: true,
+      status: true,
     },
-    directChatId: announcement.targetDirectChatId,
-    bypassPreferences: Boolean(announcement.targetDirectChatId),
   });
+
+  const experimentVariants = announcement.experimentId
+    ? await db.telegramAnnouncementExperimentVariant.findMany({
+        where: { experimentId: announcement.experimentId },
+        orderBy: [{ createdAt: 'asc' }, { variantKey: 'asc' }],
+        select: {
+          variantKey: true,
+          allocationPercent: true,
+        },
+      })
+    : [];
+
+  let chatIds = Array.from(
+    new Set(
+      existingDeliveries
+        .map((delivery) => delivery.chatId.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (chatIds.length === 0) {
+    const audience = announcement.audience as TelegramAnnouncementAudience;
+    chatIds = await resolveTelegramAnnouncementRecipients({
+      audience,
+      type: announcement.type as TelegramAnnouncementType,
+      filters: {
+        tag: announcement.targetTag,
+        segment: announcement.targetSegment,
+        serverId: announcement.targetServerId,
+        countryCode: announcement.targetCountryCode,
+      },
+      directChatId: announcement.targetDirectChatId,
+      bypassPreferences: Boolean(announcement.targetDirectChatId),
+    });
+
+    if (
+      announcement.experimentId &&
+      announcement.experimentVariantKey &&
+      experimentVariants.length > 0
+    ) {
+      chatIds = chatIds.filter(
+        (chatId) =>
+          assignTelegramAnnouncementExperimentVariant({
+            experimentId: announcement.experimentId as string,
+            chatId,
+            variants: experimentVariants,
+          }) === announcement.experimentVariantKey,
+      );
+    }
+  }
 
   if (chatIds.length === 0) {
     await db.telegramAnnouncement.update({
@@ -675,15 +721,6 @@ export async function dispatchTelegramAnnouncement(input: {
     });
     return { skipped: true as const, reason: 'no-matching-users' };
   }
-
-  const existingDeliveries = await db.telegramAnnouncementDelivery.findMany({
-    where: { announcementId: announcement.id },
-    select: {
-      id: true,
-      chatId: true,
-      status: true,
-    },
-  });
 
   const existingByChatId = new Map(existingDeliveries.map((delivery) => [delivery.chatId, delivery]));
   const missingChatIds = chatIds.filter((chatId) => !existingByChatId.has(chatId));
