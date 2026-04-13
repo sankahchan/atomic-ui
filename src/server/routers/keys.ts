@@ -57,6 +57,7 @@ import {
 } from '@/lib/services/subscription-events';
 import {
   computeArchiveAfterAt,
+  getQuotaAlertState,
   parseQuotaAlertThresholds,
   stringifyQuotaAlertThresholds,
 } from '@/lib/access-key-policies';
@@ -71,6 +72,10 @@ import {
   DEVICE_LIMIT_DISABLE_DELAY_MS,
   getAccessKeyDeviceLimitSnapshots,
 } from '@/lib/services/device-limits';
+import {
+  resetAccessKeyBandwidthAlertState,
+  sendManualAccessKeyBandwidthAlert,
+} from '@/lib/services/bandwidth-alerts';
 
 /**
  * Validation schema for creating a new access key.
@@ -3653,6 +3658,74 @@ export const keysRouter = router({
       topTags: tagSummary.topTags,
     };
   }),
+
+  sendBandwidthAlert: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      const result = await sendManualAccessKeyBandwidthAlert(input.id);
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'ACCESS_KEY_BANDWIDTH_ALERT_SENT',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          keyName: key.name,
+          level: result.level,
+          usagePercent: Number(result.usagePercent.toFixed(1)),
+        },
+      });
+
+      return result;
+    }),
+
+  resetBandwidthAlertState: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      await resetAccessKeyBandwidthAlertState(input.id);
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'ACCESS_KEY_BANDWIDTH_ALERTS_RESET',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          keyName: key.name,
+        },
+      });
+
+      return { success: true };
+    }),
 
   /**
    * Get traffic-active users (keys with recent observed traffic).

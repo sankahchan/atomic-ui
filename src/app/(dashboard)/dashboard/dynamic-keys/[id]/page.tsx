@@ -30,6 +30,7 @@ import { cn, formatBytes, formatDateTime, formatRelativeTime, getCountryFlag } f
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildDownloadFilename, downloadDataUrl, downloadTextFile } from '@/lib/download';
 import { normalizePublicSlug } from '@/lib/public-slug';
+import { getQuotaAlertState } from '@/lib/access-key-policies';
 import {
   buildDynamicOutlineUrl,
   buildDynamicDistributionLinkUrl,
@@ -3167,6 +3168,40 @@ export default function DynamicKeyDetailPage() {
       });
     },
   });
+  const sendBandwidthAlertMutation = trpc.dynamicKeys.sendBandwidthAlert.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: result.level === 'DISABLED' ? 'Limit notice sent' : `${result.level}% alert sent`,
+        description: result.level === 'DISABLED'
+          ? 'The manual dynamic-key limit notice was delivered.'
+          : `The manual ${result.level}% dynamic-key alert was delivered.`,
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to send bandwidth alert',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const resetBandwidthAlertStateMutation = trpc.dynamicKeys.resetBandwidthAlertState.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Alert history reset',
+        description: 'Quota alert flags were cleared for this dynamic key.',
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to reset alert history',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Delete mutation
   const deleteMutation = trpc.dynamicKeys.delete.useMutation({
@@ -3511,6 +3546,17 @@ export default function DynamicKeyDetailPage() {
   const usagePercent = dak.dataLimitBytes
     ? Number((dak.usedBytes * BigInt(100)) / dak.dataLimitBytes)
     : 0;
+  const quotaAlertState = dak.dataLimitBytes
+    ? getQuotaAlertState({
+        usagePercent,
+        thresholds: dak.quotaAlertThresholds,
+        sentThresholds: dak.quotaAlertsSent,
+      })
+    : null;
+  const manualBandwidthLevel = quotaAlertState?.recommendedLevel ?? null;
+  const bandwidthThresholdLabel = quotaAlertState?.thresholds.length
+    ? quotaAlertState.thresholds.map((threshold) => `${threshold}%`).join(', ')
+    : 'None';
   const attachedActiveKeys = dak.accessKeys.filter((key) => key.status === 'ACTIVE').length;
   const serverCoverage = new Set(dak.accessKeys.map((key) => key.server?.id).filter(Boolean)).size;
   const detailTabCopy: Record<'overview' | 'routing' | 'delivery' | 'history', string> = {
@@ -3730,6 +3776,77 @@ export default function DynamicKeyDetailPage() {
                           usagePercent > 70 && usagePercent <= 90 && '[&>div]:bg-yellow-500',
                         )}
                       />
+                    ) : null}
+
+                    {dak.dataLimitBytes ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {dak.autoDisableOnLimit ? (
+                            <Badge variant="outline" className="text-xs">
+                              Auto-disable on limit
+                            </Badge>
+                          ) : null}
+                          <Badge variant="outline" className="text-xs">
+                            Manual alerts · {bandwidthThresholdLabel}
+                          </Badge>
+                          {dak.bandwidthAlertAt80 ? (
+                            <Badge variant="outline" className="border-yellow-500 text-xs text-yellow-600">
+                              80% alert sent
+                            </Badge>
+                          ) : null}
+                          {dak.bandwidthAlertAt90 ? (
+                            <Badge variant="outline" className="border-red-500 text-xs text-red-600">
+                              90% alert sent
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="rounded-[1rem] border border-border/60 bg-background/45 p-3 text-sm dark:bg-white/[0.03]">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">Bandwidth alerts are manual-only</p>
+                              <p className="text-muted-foreground">
+                                Threshold notices are no longer auto-sent. Trigger the Telegram alert only when you want it sent.
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {manualBandwidthLevel === 'DISABLED'
+                                  ? 'This dynamic key is at or above 100%. You can send a limit-reached notice manually.'
+                                  : manualBandwidthLevel
+                                    ? quotaAlertState?.pendingThresholds.length
+                                      ? `Ready to send the ${manualBandwidthLevel}% alert now.`
+                                      : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
+                                    : quotaAlertState?.nextThreshold
+                                      ? `Next threshold: ${quotaAlertState.nextThreshold}%`
+                                      : 'No threshold reached yet.'}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => sendBandwidthAlertMutation.mutate({ id: dak.id })}
+                                disabled={!manualBandwidthLevel || sendBandwidthAlertMutation.isPending}
+                              >
+                                {sendBandwidthAlertMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {manualBandwidthLevel === 'DISABLED'
+                                  ? 'Send limit notice'
+                                  : manualBandwidthLevel
+                                    ? `Send ${manualBandwidthLevel}% alert`
+                                    : 'Threshold not reached'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                onClick={() => resetBandwidthAlertStateMutation.mutate({ id: dak.id })}
+                                disabled={
+                                  resetBandwidthAlertStateMutation.isPending ||
+                                  !quotaAlertState?.sentThresholds.length
+                                }
+                              >
+                                {resetBandwidthAlertStateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Reset alert history
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     ) : null}
                   </div>
 

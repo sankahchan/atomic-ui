@@ -72,12 +72,14 @@ export function initScheduler() {
         }
     });
 
-    // 3. Bandwidth Alert Check (Every 5 minutes)
+    // 3. Bandwidth quota review + auto-disable (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
             const result = await checkBandwidthAlerts();
-            if (result.alertsSent80 > 0 || result.alertsSent90 > 0 || result.autoDisabled > 0) {
-                logger.info(`Bandwidth alerts: ${result.alertsSent80} at 80%, ${result.alertsSent90} at 90%, ${result.autoDisabled} auto-disabled`);
+            if (result.pendingAlerts80 > 0 || result.pendingAlerts90 > 0 || result.autoDisabled > 0) {
+                logger.info(
+                    `Bandwidth review: ${result.pendingAlerts80} pending at 80%, ${result.pendingAlerts90} pending at 90%, ${result.autoDisabled} auto-disabled`,
+                );
             }
         } catch (error) {
             logger.error('Bandwidth alert check failed', error);

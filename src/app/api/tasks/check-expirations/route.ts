@@ -47,6 +47,8 @@ export async function POST(request: NextRequest) {
         archivedKeys: expirationResult.archivedKeys,
         alerts80: bandwidthResult.alertsSent80,
         alerts90: bandwidthResult.alertsSent90,
+        pendingAlerts80: bandwidthResult.pendingAlerts80,
+        pendingAlerts90: bandwidthResult.pendingAlerts90,
         autoDisabled: bandwidthResult.autoDisabled,
       },
     });
@@ -62,6 +64,8 @@ export async function POST(request: NextRequest) {
         archivedKeys: expirationResult.archivedKeys,
         alertsSent80: bandwidthResult.alertsSent80,
         alertsSent90: bandwidthResult.alertsSent90,
+        pendingAlerts80: bandwidthResult.pendingAlerts80,
+        pendingAlerts90: bandwidthResult.pendingAlerts90,
         autoDisabled: bandwidthResult.autoDisabled,
         errors: [
           ...trafficSnapshot.errors,

@@ -61,6 +61,10 @@ import {
 } from '@/lib/services/telegram-bot';
 import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { getServerLoadStats } from '@/lib/services/load-balancer';
+import {
+  resetDynamicKeyBandwidthAlertState,
+  sendManualDynamicKeyBandwidthAlert,
+} from '@/lib/services/bandwidth-alerts';
 
 const routingWeightsSchema = z.record(z.number().positive()).optional();
 const sessionStickinessSchema = z.enum(['NONE', 'DRAIN']).default('DRAIN');
@@ -923,6 +927,11 @@ export const dynamicKeysRouter = router({
         publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
+        autoDisableOnLimit: dak.autoDisableOnLimit,
+        quotaAlertThresholds: dak.quotaAlertThresholds,
+        quotaAlertsSent: dak.quotaAlertsSent,
+        bandwidthAlertAt80: dak.bandwidthAlertAt80,
+        bandwidthAlertAt90: dak.bandwidthAlertAt90,
         expiresAt: dak.expiresAt,
         expirationType: dak.expirationType,
         durationDays: dak.durationDays,
@@ -979,6 +988,74 @@ export const dynamicKeysRouter = router({
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
+    }),
+
+  sendBandwidthAlert: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      const result = await sendManualDynamicKeyBandwidthAlert(input.id);
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'DYNAMIC_KEY_BANDWIDTH_ALERT_SENT',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          keyName: key.name,
+          level: result.level,
+          usagePercent: Number(result.usagePercent.toFixed(1)),
+        },
+      });
+
+      return result;
+    }),
+
+  resetBandwidthAlertState: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      await resetDynamicKeyBandwidthAlertState(input.id);
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'DYNAMIC_KEY_BANDWIDTH_ALERTS_RESET',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          keyName: key.name,
+        },
+      });
+
+      return { success: true };
     }),
 
   getSharePageAnalytics: protectedProcedure

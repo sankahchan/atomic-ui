@@ -1,7 +1,7 @@
 /**
  * Bandwidth Alerts Service
  *
- * Monitors access key data usage and sends Telegram alerts at 80% and 90%.
+ * Monitors access key data usage and tracks threshold crossings for manual review.
  * Auto-disables keys when they reach 100% of their data limit.
  *
  * Runs every 5 minutes via the scheduler alongside expiration checks.
@@ -10,6 +10,7 @@
 import { db } from '@/lib/db';
 import {
     computeArchiveAfterAt,
+    getQuotaAlertState,
     parseQuotaAlertsSent,
     parseQuotaAlertThresholds,
     serializeQuotaAlertsSent,
@@ -22,27 +23,34 @@ import { formatBytes } from '@/lib/utils';
 interface BandwidthAlertResult {
     alertsSent80: number;
     alertsSent90: number;
+    pendingAlerts80: number;
+    pendingAlerts90: number;
     autoDisabled: number;
     errors: string[];
 }
 
+interface BandwidthCheckOptions {
+    sendNotifications?: boolean;
+}
+
 /**
  * Check bandwidth usage for all active keys with data limits.
- * - Sends Telegram alert at 80% usage (once)
- * - Sends Telegram alert at 90% usage (once)
+ * - Tracks threshold crossings for manual admin review
  * - Auto-disables key at 100% if autoDisableOnLimit is true
  */
-export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
+export async function checkBandwidthAlerts(options: BandwidthCheckOptions = {}): Promise<BandwidthAlertResult> {
     const result: BandwidthAlertResult = {
         alertsSent80: 0,
         alertsSent90: 0,
+        pendingAlerts80: 0,
+        pendingAlerts90: 0,
         autoDisabled: 0,
         errors: [],
     };
 
     try {
-        // Get Telegram config for sending alerts
-        const telegramConfig = await getTelegramConfig();
+        const shouldSendNotifications = options.sendNotifications === true;
+        const telegramConfig = shouldSendNotifications ? await getTelegramConfig() : null;
 
         // Find all active keys with data limits
         const keys = await db.accessKey.findMany({
@@ -84,6 +92,11 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
             const usagePercent = (usedBytes / limitBytes) * 100;
             const thresholds = parseQuotaAlertThresholds(key.quotaAlertThresholds);
             const sentThresholds = parseQuotaAlertsSent(key.quotaAlertsSent);
+            const quotaAlertState = getQuotaAlertState({
+                usagePercent,
+                thresholds,
+                sentThresholds,
+            });
 
             try {
                 // --- 100% Check: Auto-disable ---
@@ -91,8 +104,7 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     await autoDisableKey(key);
                     result.autoDisabled++;
 
-                    // Notify about auto-disable
-                    if (telegramConfig && key.telegramDeliveryEnabled) {
+                    if (shouldSendNotifications && telegramConfig && key.telegramDeliveryEnabled) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             key,
@@ -105,22 +117,24 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     continue; // Skip lower threshold checks
                 }
 
-                const crossedThresholds = thresholds.filter((threshold) => usagePercent >= threshold);
-                const newlyCrossed = crossedThresholds.filter((threshold) => !sentThresholds.includes(threshold));
+                const crossedThresholds = quotaAlertState.crossedThresholds;
+                const newlyCrossed = quotaAlertState.pendingThresholds;
 
                 if (newlyCrossed.length > 0) {
                     const highestThreshold = newlyCrossed[newlyCrossed.length - 1];
 
-                    await db.accessKey.update({
-                        where: { id: key.id },
-                        data: {
-                            quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
-                            bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
-                            bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
-                        },
-                    });
+                    if (shouldSendNotifications) {
+                        await db.accessKey.update({
+                            where: { id: key.id },
+                            data: {
+                                quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
+                                bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
+                                bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
+                            },
+                        });
+                    }
 
-                    if (telegramConfig && key.telegramDeliveryEnabled) {
+                    if (shouldSendNotifications && telegramConfig && key.telegramDeliveryEnabled) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             key,
@@ -131,16 +145,26 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                         );
                     }
 
-                    await logNotification(
-                        key.id,
-                        `BANDWIDTH_${highestThreshold}`,
-                        `Key "${key.name}" reached ${usagePercent.toFixed(1)}% of data limit`
-                    );
+                    if (shouldSendNotifications) {
+                        await logNotification(
+                            key.id,
+                            `BANDWIDTH_${highestThreshold}`,
+                            `Key "${key.name}" reached ${usagePercent.toFixed(1)}% of data limit`
+                        );
+                    }
 
                     if (highestThreshold >= 90) {
-                        result.alertsSent90++;
+                        if (shouldSendNotifications) {
+                            result.alertsSent90++;
+                        } else {
+                            result.pendingAlerts90++;
+                        }
                     } else {
-                        result.alertsSent80++;
+                        if (shouldSendNotifications) {
+                            result.alertsSent80++;
+                        } else {
+                            result.pendingAlerts80++;
+                        }
                     }
                 }
             } catch (keyError) {
@@ -175,13 +199,18 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
             const usagePercent = (usedBytes / limitBytes) * 100;
             const thresholds = parseQuotaAlertThresholds(key.quotaAlertThresholds);
             const sentThresholds = parseQuotaAlertsSent(key.quotaAlertsSent);
+            const quotaAlertState = getQuotaAlertState({
+                usagePercent,
+                thresholds,
+                sentThresholds,
+            });
 
             try {
                 if (usagePercent >= 100 && key.autoDisableOnLimit) {
                     await autoDisableDynamicKey(key.id);
                     result.autoDisabled++;
 
-                    if (telegramConfig) {
+                    if (shouldSendNotifications && telegramConfig) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             {
@@ -199,22 +228,24 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     continue;
                 }
 
-                const crossedThresholds = thresholds.filter((threshold) => usagePercent >= threshold);
-                const newlyCrossed = crossedThresholds.filter((threshold) => !sentThresholds.includes(threshold));
+                const crossedThresholds = quotaAlertState.crossedThresholds;
+                const newlyCrossed = quotaAlertState.pendingThresholds;
 
                 if (newlyCrossed.length > 0) {
                     const highestThreshold = newlyCrossed[newlyCrossed.length - 1];
 
-                    await db.dynamicAccessKey.update({
-                        where: { id: key.id },
-                        data: {
-                            quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
-                            bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
-                            bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
-                        },
-                    });
+                    if (shouldSendNotifications) {
+                        await db.dynamicAccessKey.update({
+                            where: { id: key.id },
+                            data: {
+                                quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
+                                bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
+                                bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
+                            },
+                        });
+                    }
 
-                    if (telegramConfig) {
+                    if (shouldSendNotifications && telegramConfig) {
                         await sendBandwidthNotification(
                             telegramConfig.botToken,
                             {
@@ -231,9 +262,17 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                     }
 
                     if (highestThreshold >= 90) {
-                        result.alertsSent90++;
+                        if (shouldSendNotifications) {
+                            result.alertsSent90++;
+                        } else {
+                            result.pendingAlerts90++;
+                        }
                     } else {
-                        result.alertsSent80++;
+                        if (shouldSendNotifications) {
+                            result.alertsSent80++;
+                        } else {
+                            result.pendingAlerts80++;
+                        }
                     }
                 }
             } catch (keyError) {
@@ -376,6 +415,210 @@ async function sendBandwidthNotification(
     }
 }
 
+export async function sendManualAccessKeyBandwidthAlert(keyId: string) {
+    const key = await db.accessKey.findUnique({
+        where: { id: keyId },
+        select: {
+            id: true,
+            name: true,
+            usedBytes: true,
+            dataLimitBytes: true,
+            telegramId: true,
+            telegramDeliveryEnabled: true,
+            quotaAlertThresholds: true,
+            quotaAlertsSent: true,
+            bandwidthAlertAt80: true,
+            bandwidthAlertAt90: true,
+            server: {
+                select: {
+                    name: true,
+                },
+            },
+        },
+    });
+
+    if (!key) {
+        throw new Error('Access key not found.');
+    }
+
+    if (!key.dataLimitBytes) {
+        throw new Error('This key has no data limit configured.');
+    }
+
+    const usagePercent = (Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100;
+    const quotaAlertState = getQuotaAlertState({
+        usagePercent,
+        thresholds: key.quotaAlertThresholds,
+        sentThresholds: key.quotaAlertsSent,
+    });
+
+    if (!quotaAlertState.recommendedLevel) {
+        throw new Error(
+            quotaAlertState.nextThreshold
+                ? `This key has not reached the ${quotaAlertState.nextThreshold}% threshold yet.`
+                : 'This key has not reached any configured quota threshold yet.',
+        );
+    }
+
+    const telegramConfig = await getTelegramConfig();
+    if (!telegramConfig) {
+        throw new Error('Telegram bot is not configured.');
+    }
+
+    if (!key.telegramId && telegramConfig.adminChatIds.length === 0) {
+        throw new Error('No Telegram recipients are configured for this alert.');
+    }
+
+    await sendBandwidthNotification(
+        telegramConfig.botToken,
+        {
+            name: key.name,
+            telegramId: key.telegramDeliveryEnabled ? key.telegramId : null,
+            usedBytes: key.usedBytes,
+            dataLimitBytes: key.dataLimitBytes,
+        },
+        usagePercent,
+        quotaAlertState.recommendedLevel,
+        telegramConfig.adminChatIds,
+        { serverName: key.server?.name }
+    );
+
+    if (quotaAlertState.recommendedLevel !== 'DISABLED') {
+        await db.accessKey.update({
+            where: { id: key.id },
+            data: {
+                quotaAlertsSent: serializeQuotaAlertsSent([...quotaAlertState.sentThresholds, quotaAlertState.recommendedLevel]),
+                bandwidthAlertAt80: key.bandwidthAlertAt80 || quotaAlertState.recommendedLevel >= 80,
+                bandwidthAlertAt90: key.bandwidthAlertAt90 || quotaAlertState.recommendedLevel >= 90,
+            },
+        });
+    }
+
+    await logNotification(
+        key.id,
+        quotaAlertState.recommendedLevel === 'DISABLED'
+            ? 'BANDWIDTH_DISABLED_MANUAL'
+            : `BANDWIDTH_${quotaAlertState.recommendedLevel}_MANUAL`,
+        `Manual bandwidth alert sent for "${key.name}" at ${usagePercent.toFixed(1)}% usage`,
+    );
+
+    return {
+        usagePercent,
+        level: quotaAlertState.recommendedLevel,
+    };
+}
+
+export async function sendManualDynamicKeyBandwidthAlert(dynamicKeyId: string) {
+    const key = await db.dynamicAccessKey.findUnique({
+        where: { id: dynamicKeyId },
+        select: {
+            id: true,
+            name: true,
+            usedBytes: true,
+            dataLimitBytes: true,
+            telegramId: true,
+            quotaAlertThresholds: true,
+            quotaAlertsSent: true,
+            bandwidthAlertAt80: true,
+            bandwidthAlertAt90: true,
+        },
+    });
+
+    if (!key) {
+        throw new Error('Dynamic key not found.');
+    }
+
+    if (!key.dataLimitBytes) {
+        throw new Error('This dynamic key has no data limit configured.');
+    }
+
+    const usagePercent = (Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100;
+    const quotaAlertState = getQuotaAlertState({
+        usagePercent,
+        thresholds: key.quotaAlertThresholds,
+        sentThresholds: key.quotaAlertsSent,
+    });
+
+    if (!quotaAlertState.recommendedLevel) {
+        throw new Error(
+            quotaAlertState.nextThreshold
+                ? `This dynamic key has not reached the ${quotaAlertState.nextThreshold}% threshold yet.`
+                : 'This dynamic key has not reached any configured quota threshold yet.',
+        );
+    }
+
+    const telegramConfig = await getTelegramConfig();
+    if (!telegramConfig) {
+        throw new Error('Telegram bot is not configured.');
+    }
+
+    if (!key.telegramId && telegramConfig.adminChatIds.length === 0) {
+        throw new Error('No Telegram recipients are configured for this alert.');
+    }
+
+    await sendBandwidthNotification(
+        telegramConfig.botToken,
+        {
+            name: key.name,
+            telegramId: key.telegramId,
+            usedBytes: key.usedBytes,
+            dataLimitBytes: key.dataLimitBytes,
+        },
+        usagePercent,
+        quotaAlertState.recommendedLevel,
+        telegramConfig.adminChatIds,
+        { keyTypeLabel: 'Dynamic key', serverName: 'Dynamic routing' }
+    );
+
+    if (quotaAlertState.recommendedLevel !== 'DISABLED') {
+        await db.dynamicAccessKey.update({
+            where: { id: key.id },
+            data: {
+                quotaAlertsSent: serializeQuotaAlertsSent([...quotaAlertState.sentThresholds, quotaAlertState.recommendedLevel]),
+                bandwidthAlertAt80: key.bandwidthAlertAt80 || quotaAlertState.recommendedLevel >= 80,
+                bandwidthAlertAt90: key.bandwidthAlertAt90 || quotaAlertState.recommendedLevel >= 90,
+            },
+        });
+    }
+
+    await db.notificationLog.create({
+        data: {
+            event: quotaAlertState.recommendedLevel === 'DISABLED'
+                ? 'DYNAMIC_BANDWIDTH_DISABLED_MANUAL'
+                : `DYNAMIC_BANDWIDTH_${quotaAlertState.recommendedLevel}_MANUAL`,
+            message: `Manual bandwidth alert sent for dynamic key "${key.name}" at ${usagePercent.toFixed(1)}% usage`,
+            status: 'SUCCESS',
+        },
+    });
+
+    return {
+        usagePercent,
+        level: quotaAlertState.recommendedLevel,
+    };
+}
+
+export async function resetAccessKeyBandwidthAlertState(keyId: string) {
+    await db.accessKey.update({
+        where: { id: keyId },
+        data: {
+            bandwidthAlertAt80: false,
+            bandwidthAlertAt90: false,
+            quotaAlertsSent: '[]',
+        },
+    });
+}
+
+export async function resetDynamicKeyBandwidthAlertState(dynamicKeyId: string) {
+    await db.dynamicAccessKey.update({
+        where: { id: dynamicKeyId },
+        data: {
+            bandwidthAlertAt80: false,
+            bandwidthAlertAt90: false,
+            quotaAlertsSent: '[]',
+        },
+    });
+}
+
 /**
  * Log a notification event to prevent duplicate alerts.
  */
@@ -395,14 +638,7 @@ async function logNotification(accessKeyId: string, event: string, message: stri
  * Called when a key's data limit is reset (periodic reset) or manually.
  */
 export async function resetBandwidthAlerts(keyId: string) {
-    await db.accessKey.update({
-        where: { id: keyId },
-        data: {
-            bandwidthAlertAt80: false,
-            bandwidthAlertAt90: false,
-            quotaAlertsSent: '[]',
-        },
-    });
+    await resetAccessKeyBandwidthAlertState(keyId);
 }
 
 async function autoDisableDynamicKey(dynamicKeyId: string) {

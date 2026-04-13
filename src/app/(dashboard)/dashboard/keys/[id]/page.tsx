@@ -60,6 +60,7 @@ import {
   getPublicBasePath,
 } from '@/lib/subscription-links';
 import { normalizePublicSlug } from '@/lib/public-slug';
+import { getQuotaAlertState } from '@/lib/access-key-policies';
 import {
   ArrowLeft,
   Key,
@@ -327,7 +328,7 @@ function EditKeyDialog({
                 <div className="space-y-0.5">
                   <Label htmlFor="autoDisable" className="text-sm font-medium">Auto-disable on limit</Label>
                   <p className="text-xs text-muted-foreground">
-                    Automatically disable key when data limit is reached. Alerts are sent at 80% and 90%.
+                    Automatically disable the key when its quota is fully consumed. Threshold alerts are now sent manually by an admin.
                   </p>
                 </div>
                 <Switch
@@ -2531,6 +2532,40 @@ export default function KeyDetailPage() {
       });
     },
   });
+  const sendBandwidthAlertMutation = trpc.keys.sendBandwidthAlert.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: result.level === 'DISABLED' ? 'Limit notice sent' : `${result.level}% alert sent`,
+        description: result.level === 'DISABLED'
+          ? 'The manual limit-reached notice was delivered.'
+          : `The manual ${result.level}% quota alert was delivered.`,
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to send bandwidth alert',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const resetBandwidthAlertStateMutation = trpc.keys.resetBandwidthAlertState.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Alert history reset',
+        description: 'Quota alert flags were cleared for this key.',
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to reset alert history',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -2617,6 +2652,17 @@ export default function KeyDetailPage() {
   const usagePercent = key.dataLimitBytes
     ? Number((key.usedBytes * BigInt(100)) / key.dataLimitBytes)
     : 0;
+  const quotaAlertState = key.dataLimitBytes
+    ? getQuotaAlertState({
+        usagePercent,
+        thresholds: keyRecord.quotaAlertThresholds,
+        sentThresholds: keyRecord.quotaAlertsSent,
+      })
+    : null;
+  const manualBandwidthLevel = quotaAlertState?.recommendedLevel ?? null;
+  const bandwidthThresholdLabel = quotaAlertState?.thresholds.length
+    ? quotaAlertState.thresholds.map((threshold) => `${threshold}%`).join(', ')
+    : 'None';
   const estimatedDevices = activitySnapshot?.estimatedDevices ?? Number((key as any).estimatedDevices || 0);
   const activeSessions =
     activitySnapshot?.activeSessions ??
@@ -2971,6 +3017,9 @@ export default function KeyDetailPage() {
                             Auto-disable on limit
                           </Badge>
                         ) : null}
+                        <Badge variant="outline" className="text-xs">
+                          Manual alerts · {bandwidthThresholdLabel}
+                        </Badge>
                         {(key as any).bandwidthAlertAt80 ? (
                           <Badge variant="outline" className="border-yellow-500 text-xs text-yellow-600">
                             80% alert sent
@@ -2981,6 +3030,55 @@ export default function KeyDetailPage() {
                             90% alert sent
                           </Badge>
                         ) : null}
+                      </div>
+                    ) : null}
+
+                    {key.dataLimitBytes ? (
+                      <div className="rounded-[1rem] border border-border/60 bg-background/45 p-3 text-sm dark:bg-white/[0.03]">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">Bandwidth alerts are manual-only</p>
+                            <p className="text-muted-foreground">
+                              No quota warning is sent automatically. Review usage here and trigger Telegram notices yourself.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {manualBandwidthLevel === 'DISABLED'
+                                ? 'This key is at or above 100%. You can send a limit-reached notice manually.'
+                                : manualBandwidthLevel
+                                  ? quotaAlertState?.pendingThresholds.length
+                                    ? `Ready to send the ${manualBandwidthLevel}% alert now.`
+                                    : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
+                                  : quotaAlertState?.nextThreshold
+                                    ? `Next threshold: ${quotaAlertState.nextThreshold}%`
+                                    : 'No threshold reached yet.'}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => sendBandwidthAlertMutation.mutate({ id: key.id })}
+                              disabled={!manualBandwidthLevel || sendBandwidthAlertMutation.isPending}
+                            >
+                              {sendBandwidthAlertMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              {manualBandwidthLevel === 'DISABLED'
+                                ? 'Send limit notice'
+                                : manualBandwidthLevel
+                                  ? `Send ${manualBandwidthLevel}% alert`
+                                  : 'Threshold not reached'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              onClick={() => resetBandwidthAlertStateMutation.mutate({ id: key.id })}
+                              disabled={
+                                resetBandwidthAlertStateMutation.isPending ||
+                                !quotaAlertState?.sentThresholds.length
+                              }
+                            >
+                              {resetBandwidthAlertStateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              Reset alert history
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ) : null}
 
