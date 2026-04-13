@@ -68,6 +68,8 @@ import {
   Copy,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
+import { AnnouncementAnalyticsInsights } from './_components/announcement-analytics-insights';
+import { AnnouncementHistoryTab } from './_components/announcement-history-tab';
 
 /**
  * Notification channel type definitions
@@ -3595,226 +3597,67 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                       )}
                     </div>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementSuccessRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.deliverySuccessRate * 100)}%</p><Progress value={announcementAnalytics.totals.deliverySuccessRate * 100} className="mt-3 h-2" /></div>
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementOpenRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.openRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.openCount} {telegramUi.announcementOpens.toLowerCase()}</p></div>
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementClickRate}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.clickRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.clickCount} {telegramUi.announcementClicks.toLowerCase()}</p></div>
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{telegramUi.announcementResendRecovery}</p><p className="mt-2 text-2xl font-semibold">{Math.round(announcementAnalytics.totals.resendRecoveryRate * 100)}%</p><p className="mt-2 text-xs text-muted-foreground">{announcementAnalytics.totals.resendRecovered}/{announcementAnalytics.totals.resendAttempts || 0}</p></div>
-                  </div>
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <p className="text-sm font-medium">{telegramUi.announcementByType}</p>
-                      <div className="mt-3 space-y-2">
-                        {announcementAnalytics.byType.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.byType.map((entry) => (
-                          <div key={entry.type} className="rounded-xl border border-border/50 p-3">
-                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.type}</p><Badge variant="outline">{Math.round(entry.deliverySuccessRate * 100)}%</Badge></div>
-                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <p className="text-sm font-medium">{telegramUi.announcementByAudience}</p>
-                      <div className="mt-3 space-y-2">
-                        {announcementAnalytics.byAudience.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.byAudience.map((entry) => (
-                          <div key={entry.audience} className="rounded-xl border border-border/50 p-3">
-                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.audience}</p><Badge variant="outline">{Math.round(entry.conversionRate * 100)}% conv.</Badge></div>
-                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.failedCount} failed</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{entry.attributedOrders} attributed orders • {entry.attributedRevenue.length > 0 ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ') : '0 revenue'}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium">Template comparison</p>
-                        <Badge variant="outline">{announcementAnalytics.byTemplate.length >= 2 ? 'Side by side' : 'Need 2 templates'}</Badge>
-                      </div>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {announcementAnalytics.byTemplate.length >= 2 ? announcementAnalytics.byTemplate.slice(0, 2).map((entry) => (
-                          <div key={`compare:${entry.templateId || entry.templateName}`} className="rounded-xl border border-border/50 p-3">
-                            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.templateName}</p><Badge variant="outline">{Math.round(entry.conversionRate * 100)}% conv.</Badge></div>
-                            <p className="mt-3 text-xs text-muted-foreground">{entry.sentCount}/{entry.totalRecipients} sent • {entry.openCount} opens • {entry.clickCount} clicks</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{entry.attributedOrders} orders • {entry.attributedRevenue.length > 0 ? entry.attributedRevenue.map((value) => formatAnnouncementMoney(value.amount, value.currency)).join(' • ') : '0 revenue'}</p>
-                          </div>
-                        )) : <p className="text-xs text-muted-foreground">Send at least two announcement templates to compare them side by side.</p>}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <p className="text-sm font-medium">Best send time hints</p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {announcementAnalytics.bestSendTimes.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.bestSendTimes.map((entry) => (
-                          <div key={entry.hour} className="rounded-xl border border-border/50 p-3">
-                            <p className="text-sm font-medium">{String(entry.hour).padStart(2, '0')}:00</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{entry.sentCount} sent</p>
-                            <p className="mt-2 text-xs text-muted-foreground">{Math.round(entry.openRate * 100)}% open • {Math.round(entry.clickRate * 100)}% click</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                    <p className="text-sm font-medium">Recent promo attribution</p>
-                    <div className="mt-3 space-y-2">
-                      {announcementAnalytics.recentAttribution.length === 0 ? <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p> : announcementAnalytics.recentAttribution.map((entry) => (
-                        <div key={`${entry.orderId}:${entry.announcementId}`} className="rounded-xl border border-border/50 p-3">
-                          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{entry.orderCode}</p><Badge variant="outline">{entry.minutesFromSend} min</Badge></div>
-                          <p className="mt-1 text-xs text-muted-foreground">{entry.announcementTitle}{entry.templateName ? ` • ${entry.templateName}` : ''}{entry.targetSegment ? ` • ${entry.targetSegment}` : ''}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{entry.audience} • {formatAnnouncementMoney(entry.priceAmount, entry.priceCurrency)}{entry.couponCode ? ` • coupon ${entry.couponCode}` : ''}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setActiveBotTab('history');
-                                updateTelegramUrlState({
-                                  workspace: 'telegram',
-                                  botTab: 'history',
-                                  announcementId: entry.announcementId,
-                                });
-                              }}
-                            >
-                              Jump to history item
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <AnnouncementAnalyticsInsights
+                    ui={{
+                      announcementSuccessRate: telegramUi.announcementSuccessRate,
+                      announcementOpenRate: telegramUi.announcementOpenRate,
+                      announcementOpens: telegramUi.announcementOpens,
+                      announcementClickRate: telegramUi.announcementClickRate,
+                      announcementClicks: telegramUi.announcementClicks,
+                      announcementResendRecovery: telegramUi.announcementResendRecovery,
+                      announcementByType: telegramUi.announcementByType,
+                      announcementByAudience: telegramUi.announcementByAudience,
+                      announcementNoHistory: telegramUi.announcementNoHistory,
+                    }}
+                    analytics={announcementAnalytics}
+                    formatMoney={formatAnnouncementMoney}
+                    onJumpToHistoryItem={(announcementId) => {
+                      setActiveBotTab('history');
+                      updateTelegramUrlState({
+                        workspace: 'telegram',
+                        botTab: 'history',
+                        announcementId,
+                      });
+                    }}
+                  />
                 </div>
               ) : null}
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4">
-            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{telegramUi.announcementHistoryTitle}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementHistoryDesc}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      resendAnnouncementFailedBatchMutation.mutate({
-                        announcementIds: failedAnnouncementIds,
-                      })
-                    }
-                    disabled={
-                      resendAnnouncementFailedBatchMutation.isPending || failedAnnouncementIds.length === 0
-                    }
-                  >
-                    {resendAnnouncementFailedBatchMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                    )}
-                    Bulk resend failed
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      archiveAnnouncementsMutation.mutate({
-                        announcementIds: archivableAnnouncementIds,
-                      })
-                    }
-                    disabled={archiveAnnouncementsMutation.isPending || archivableAnnouncementIds.length === 0}
-                  >
-                    {archiveAnnouncementsMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Bulk archive old
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-3 space-y-3">
-                {announcementHistory.length ? announcementHistory.map((announcement) => (
-                  <div
-                    key={announcement.id}
-                    id={`announcement-history-${announcement.id}`}
-                    className={cn(
-                      'rounded-2xl border border-border/60 bg-background/70 p-3',
-                      announcement.id === announcementIdParam && 'border-primary/50 bg-primary/5 shadow-sm',
-                    )}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{announcement.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{announcement.message}</p>
-                        {announcement.heroImageUrl ? <p className="mt-2 text-[11px] text-muted-foreground break-all">Image: {announcement.heroImageUrl}</p> : null}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">{announcement.type}</Badge>
-                        <Badge variant="outline">{getAnnouncementCardStyleLabel(announcement.cardStyle, isMyanmar)}</Badge>
-                        <Badge variant="outline">{announcement.status}</Badge>
-                        {announcement.experimentId ? (
-                          <Badge variant="secondary">
-                            {announcement.experimentVariantLabel || announcement.experimentVariantKey || 'Experiment'}
-                          </Badge>
-                        ) : null}
-                        {announcement.recurrenceType && announcement.recurrenceType !== 'NONE' ? <Badge variant="secondary">{getAnnouncementRecurrenceLabel(announcement.recurrenceType, isMyanmar)}</Badge> : null}
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                      <p>{telegramUi.recipientsLabel}: {announcement.totalRecipients}</p>
-                      <p>Sent: {announcement.sentCount} · Failed: {announcement.failedCount}</p>
-                      <p>{announcement.experimentId ? `Experiment: ${announcement.experimentVariantLabel || announcement.experimentVariantKey || announcement.experimentId}` : 'Ad hoc send'}</p>
-                      <p>Resend attempts: {announcement.resendAttemptCount || 0}</p>
-                      <p>Recovered: {announcement.resendRecoveredCount || 0}</p>
-                      <p>Created: {formatDateTime(announcement.createdAt)}</p>
-                      <p>{announcement.scheduledFor ? `Scheduled: ${formatDateTime(announcement.scheduledFor)}` : announcement.sentAt ? `Sent: ${formatDateTime(announcement.sentAt)}` : `Updated: ${formatDateTime(announcement.updatedAt)}`}</p>
-                    </div>
-                    {announcement.deliveries.length > 0 ? (
-                      <div className="mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
-                        <p className="text-xs font-medium text-foreground">Recent failures</p>
-                        <div className="mt-2 space-y-2">
-                          {announcement.deliveries.map((delivery) => (
-                            <div key={delivery.id} className="rounded-xl border border-border/50 px-3 py-2 text-xs text-muted-foreground">
-                              <p>Chat: {delivery.chatId}</p>
-                              <p>Error: {delivery.error || 'send-failed'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {announcement.status === 'SCHEDULED' ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => dispatchScheduledAnnouncementMutation.mutate({ announcementId: announcement.id })} disabled={dispatchScheduledAnnouncementMutation.isPending}>
-                          {telegramUi.announcementSendScheduledNow}
-                        </Button>
-                      ) : null}
-                      {announcement.failedCount > 0 ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => resendAnnouncementFailedMutation.mutate({ announcementId: announcement.id })} disabled={resendAnnouncementFailedMutation.isPending}>
-                          {telegramUi.announcementResendFailed}
-                        </Button>
-                      ) : null}
-                      {['SENT', 'FAILED', 'COMPLETED'].includes(announcement.status) ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => archiveAnnouncementsMutation.mutate({ announcementIds: [announcement.id] })}
-                          disabled={archiveAnnouncementsMutation.isPending}
-                        >
-                          Archive
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                )) : <p className="text-xs text-muted-foreground">{telegramUi.announcementNoHistory}</p>}
-              </div>
-            </div>
-          </TabsContent>
+          <AnnouncementHistoryTab
+            ui={{
+              announcementHistoryTitle: telegramUi.announcementHistoryTitle,
+              announcementHistoryDesc: telegramUi.announcementHistoryDesc,
+              announcementNoHistory: telegramUi.announcementNoHistory,
+              announcementSendScheduledNow: telegramUi.announcementSendScheduledNow,
+              announcementResendFailed: telegramUi.announcementResendFailed,
+              recipientsLabel: telegramUi.recipientsLabel,
+            }}
+            isMyanmar={isMyanmar}
+            history={announcementHistory}
+            announcementIdParam={announcementIdParam}
+            failedAnnouncementIds={failedAnnouncementIds}
+            archivableAnnouncementIds={archivableAnnouncementIds}
+            resendAnnouncementFailedBatchPending={resendAnnouncementFailedBatchMutation.isPending}
+            archiveAnnouncementsPending={archiveAnnouncementsMutation.isPending}
+            dispatchScheduledAnnouncementPending={dispatchScheduledAnnouncementMutation.isPending}
+            resendAnnouncementFailedPending={resendAnnouncementFailedMutation.isPending}
+            onResendFailedBatch={(announcementIds) =>
+              resendAnnouncementFailedBatchMutation.mutate({ announcementIds })
+            }
+            onArchiveAnnouncements={(announcementIds) =>
+              archiveAnnouncementsMutation.mutate({ announcementIds })
+            }
+            onDispatchScheduledAnnouncement={(announcementId) =>
+              dispatchScheduledAnnouncementMutation.mutate({ announcementId })
+            }
+            onResendFailed={(announcementId) =>
+              resendAnnouncementFailedMutation.mutate({ announcementId })
+            }
+            getAnnouncementCardStyleLabel={getAnnouncementCardStyleLabel}
+            getAnnouncementRecurrenceLabel={getAnnouncementRecurrenceLabel}
+          />
         </Tabs>
       </CardContent>
     </Card>

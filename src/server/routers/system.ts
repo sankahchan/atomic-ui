@@ -2,6 +2,8 @@ import { router, protectedProcedure, adminProcedure } from '../trpc';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { db } from '@/lib/db';
+import { syncSchedulerJobCatalog } from '@/lib/services/scheduler-jobs';
 
 const execAsync = promisify(exec);
 
@@ -91,6 +93,32 @@ export const systemRouter = router({
                 free: 0,
                 percent: 0,
             },
+        };
+    }),
+    getSchedulerJobs: adminProcedure.query(async () => {
+        await syncSchedulerJobCatalog();
+
+        const jobs = await db.schedulerJob.findMany({
+            orderBy: [{ category: 'asc' }, { name: 'asc' }],
+            include: {
+                runs: {
+                    orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }],
+                    take: 6,
+                },
+            },
+        });
+
+        const totals = {
+            jobs: jobs.length,
+            running: jobs.filter((job) => job.lastStatus === 'RUNNING').length,
+            failed: jobs.filter((job) => job.lastStatus === 'FAILED').length,
+            skipped: jobs.filter((job) => job.lastStatus === 'SKIPPED').length,
+            healthy: jobs.filter((job) => ['SUCCESS', 'IDLE'].includes(job.lastStatus)).length,
+        };
+
+        return {
+            totals,
+            jobs,
         };
     }),
     getMyIp: protectedProcedure.query(({ ctx }) => {

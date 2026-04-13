@@ -22,6 +22,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': 'Audit Log',
     'nav.sessions': 'Sessions',
     'nav.migration': 'Migration',
+    'nav.jobs': 'Job Monitor',
     'nav.onboarding': 'Onboarding',
     'nav.tools': 'Admin Tools',
   },
@@ -44,6 +45,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': '审计日志',
     'nav.sessions': '会话',
     'nav.migration': '迁移',
+    'nav.jobs': '任务监控',
   },
   my: {
     'nav.dashboard': 'ဒက်ရှ်ဘုတ်',
@@ -65,6 +67,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': 'စစ်ဆေးမှတ်တမ်း',
     'nav.sessions': 'ချိတ်ဆက်မှုများ',
     'nav.migration': 'ပြောင်းရွှေ့ခြင်း',
+    'nav.jobs': 'အလုပ်စောင့်ကြည့်မှု',
     'nav.onboarding': 'စတင်တပ်ဆင်ခြင်း',
     'nav.tools': 'စီမံခန့်ခွဲမှု ကိရိယာများ',
   },
@@ -87,6 +90,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': '監査ログ',
     'nav.sessions': 'セッション',
     'nav.migration': '移行',
+    'nav.jobs': 'ジョブ監視',
   },
   ko: {
     'nav.dashboard': '대시보드',
@@ -107,6 +111,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': '감사 로그',
     'nav.sessions': '세션',
     'nav.migration': '마이그레이션',
+    'nav.jobs': '작업 모니터',
   },
   ru: {
     'nav.dashboard': 'Панель',
@@ -127,6 +132,7 @@ const navTranslations: Record<Locale, Record<string, string>> = {
     'nav.audit': 'Журнал аудита',
     'nav.sessions': 'Сессии',
     'nav.migration': 'Миграция',
+    'nav.jobs': 'Монитор заданий',
   },
 };
 
@@ -3625,6 +3631,7 @@ const settingsTranslations: Record<Locale, Record<string, string>> = {
     'tools.reports.desc': 'Review system reports and exported operational summaries.',
     'tools.incidents.desc': 'Track active server incidents, alert history, and resolution timelines.',
     'tools.support.desc': 'Work the Telegram support queue with SLA, ownership, and thread history.',
+    'tools.jobs.desc': 'Inspect scheduler job health, last run results, and recent failures.',
     'tools.audit.desc': 'Inspect admin actions, retention events, and audit alerts.',
     'tools.sessions.desc': 'Inspect live or stale device sessions and terminate them.',
     'tools.migration.desc': 'Move keys between servers and manage migration runs.',
@@ -3872,6 +3879,7 @@ const settingsTranslations: Record<Locale, Record<string, string>> = {
     'tools.reports.desc': 'စနစ်အစီရင်ခံစာများနှင့် export summary များကို ပြန်လည်ကြည့်ရှုပါ။',
     'tools.incidents.desc': 'အသက်ဝင်နေသော incident များ၊ alert history နှင့် resolution timeline များကို စောင့်ကြည့်ပါ။',
     'tools.support.desc': 'Telegram support queue ကို SLA, ownership နှင့် thread history ဖြင့် စီမံပါ။',
+    'tools.jobs.desc': 'Scheduler job များ၏ health, last run result နှင့် recent failure များကို စစ်ဆေးပါ။',
     'tools.audit.desc': 'Admin လုပ်ဆောင်ချက်များ၊ retention event များနှင့် audit alert များကို စစ်ဆေးပါ။',
     'tools.sessions.desc': 'အသက်ဝင် သို့မဟုတ် အဟောင်း device session များကို စစ်ဆေးပြီး ဖြတ်တောက်ပါ။',
     'tools.migration.desc': 'သော့များကို ဆာဗာများအကြား ရွှေ့ပြောင်းပြီး migration run များကို စီမံပါ။',

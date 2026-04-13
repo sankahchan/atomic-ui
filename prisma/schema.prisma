@@ -1448,6 +1448,55 @@ model Settings {
   @@map("settings")
 }
 
+model SchedulerJob {
+  key                 String   @id
+  name                String
+  description         String?
+  category            String?
+  cadenceLabel        String?
+  cronExpression      String?
+  startupOnly         Boolean  @default(false)
+  lastStatus          String   @default("IDLE") // IDLE, RUNNING, SUCCESS, FAILED, SKIPPED
+  lastTrigger         String? // SCHEDULED, STARTUP, MANUAL
+  lastStartedAt       DateTime?
+  lastFinishedAt      DateTime?
+  lastSucceededAt     DateTime?
+  lastDurationMs      Int?
+  lastSummary         String?
+  lastError           String?
+  nextRunAt           DateTime?
+  runCount            Int      @default(0)
+  successCount        Int      @default(0)
+  failureCount        Int      @default(0)
+  skippedCount        Int      @default(0)
+  consecutiveFailures Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  runs SchedulerJobRun[]
+
+  @@index([category, updatedAt])
+  @@index([lastStatus, updatedAt])
+}
+
+model SchedulerJobRun {
+  id           String   @id @default(cuid())
+  jobKey        String
+  job           SchedulerJob @relation(fields: [jobKey], references: [key], onDelete: Cascade)
+  trigger       String
+  status        String // SUCCESS, FAILED, SKIPPED
+  startedAt     DateTime
+  finishedAt    DateTime?
+  durationMs    Int?
+  summary       String?
+  error         String?
+  resultPreview String?
+  createdAt     DateTime @default(now())
+
+  @@index([jobKey, startedAt])
+  @@index([status, startedAt])
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?

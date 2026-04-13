@@ -39,8 +39,21 @@ import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
 import { runServerOutageCycle } from '@/lib/services/server-outage';
 import { runAccessKeyDeviceLimitCycle } from '@/lib/services/device-limits';
+import {
+    runObservedSchedulerJob,
+    SCHEDULER_JOB_DEFINITIONS,
+    syncSchedulerJobCatalog,
+} from '@/lib/services/scheduler-jobs';
 
 let isSchedulerRunning = false;
+
+function getSkippedSummary(result: { skipped: boolean } & Record<string, unknown>) {
+    if ('reason' in result && typeof result.reason === 'string' && result.reason.trim().length > 0) {
+        return `Skipped: ${result.reason}`;
+    }
+
+    return 'Skipped';
+}
 
 export function initScheduler() {
     if (isSchedulerRunning) {
@@ -49,22 +62,55 @@ export function initScheduler() {
     }
 
     logger.verbose('scheduler', 'Initializing scheduler');
+    void syncSchedulerJobCatalog().catch((error) => {
+        logger.error('Scheduler job catalog sync failed', error);
+    });
 
     // 1. Hourly Traffic Snapshot (At minute 0 of every hour)
     cron.schedule('0 * * * *', async () => {
-        const result = await snapshotTraffic();
-        if (result.success > 0 || result.failed > 0) {
-            logger.info(`Traffic snapshot complete: ${result.success} success, ${result.failed} failed`);
-        }
-        if (result.errors.length > 0) {
-            logger.warn('Traffic snapshot completed with errors', result.errors);
+        try {
+            await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.trafficSnapshot,
+                'SCHEDULED',
+                async () => {
+                    const result = await snapshotTraffic();
+                    if (result.success > 0 || result.failed > 0) {
+                        logger.info(`Traffic snapshot complete: ${result.success} success, ${result.failed} failed`);
+                    }
+                    if (result.errors.length > 0) {
+                        logger.warn('Traffic snapshot completed with errors', result.errors);
+                    }
+                    return {
+                        value: result,
+                        summary: `${result.success} success, ${result.failed} failed`,
+                        resultPreview: {
+                            success: result.success,
+                            failed: result.failed,
+                            errors: result.errors.length,
+                        },
+                    };
+                },
+            );
+        } catch (error) {
+            logger.error('Traffic snapshot failed', error);
         }
     });
 
     // 2. Expiration Check (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const result = await checkExpirations();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.expirationCheck,
+                'SCHEDULED',
+                async () => {
+                    const result = await checkExpirations();
+                    return {
+                        value: result,
+                        summary: `${result.expiredKeys} expired, ${result.depletedKeys} depleted, ${result.archivedKeys} archived`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.expiredKeys > 0 || result.depletedKeys > 0 || result.archivedKeys > 0) {
                 logger.info(`Expiration check complete: ${result.expiredKeys} expired, ${result.depletedKeys} depleted, ${result.archivedKeys} archived`);
             }
@@ -76,7 +122,23 @@ export function initScheduler() {
     // 3. Bandwidth quota review + auto-disable (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const result = await checkBandwidthAlerts();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.bandwidthReview,
+                'SCHEDULED',
+                async () => {
+                    const result = await checkBandwidthAlerts();
+                    return {
+                        value: result,
+                        summary: `${result.pendingAlertsTotal} pending, ${result.autoDisabled} auto-disabled`,
+                        resultPreview: {
+                            pendingAlertsTotal: result.pendingAlertsTotal,
+                            pendingAlertsByThreshold: result.pendingAlertsByThreshold,
+                            autoDisabled: result.autoDisabled,
+                            errors: result.errors.length,
+                        },
+                    };
+                },
+            );
             if (result.pendingAlertsTotal > 0 || result.autoDisabled > 0) {
                 logger.info(
                     `Bandwidth review: ${result.pendingAlertsTotal} pending (${formatThresholdCountSummary(result.pendingAlertsByThreshold)}), ${result.autoDisabled} auto-disabled`,
@@ -89,7 +151,23 @@ export function initScheduler() {
 
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const result = await runAccessKeyDeviceLimitCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.deviceLimits,
+                'SCHEDULED',
+                async () => {
+                    const result = await runAccessKeyDeviceLimitCycle();
+                    return {
+                        value: result,
+                        summary: `${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared`,
+                        resultPreview: {
+                            warned: result.warned,
+                            disabled: result.disabled,
+                            cleared: result.cleared,
+                            errors: result.errors.length,
+                        },
+                    };
+                },
+            );
             if (result.warned > 0 || result.disabled > 0 || result.cleared > 0 || result.errors.length > 0) {
                 logger.info(
                     `Device limits: ${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared, ${result.errors.length} errors`,
@@ -103,8 +181,19 @@ export function initScheduler() {
     // 4. Health Check (Every 2 minutes)
     cron.schedule('*/2 * * * *', async () => {
         try {
-            const result = await runHealthChecks();
-            await syncIncidentState('scheduler');
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.healthCheck,
+                'SCHEDULED',
+                async () => {
+                    const result = await runHealthChecks();
+                    await syncIncidentState('scheduler');
+                    return {
+                        value: result,
+                        summary: `${result.up} up, ${result.down} down, ${result.slow} slow`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.down > 0 || result.slow > 0) {
                 logger.warn(`Health check summary: ${result.up} up, ${result.down} down, ${result.slow} slow`);
             }
@@ -116,7 +205,17 @@ export function initScheduler() {
     // 5. Traffic activity collection (Every minute)
     cron.schedule('* * * * *', async () => {
         try {
-            await collectTrafficActivity();
+            await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.trafficActivity,
+                'SCHEDULED',
+                async () => {
+                    await collectTrafficActivity();
+                    return {
+                        value: null,
+                        summary: 'Traffic activity collected',
+                    };
+                },
+            );
         } catch (error) {
             logger.error('Traffic activity collection failed', error);
         }
@@ -125,8 +224,18 @@ export function initScheduler() {
     // 6. Dynamic Key Smart Alerts (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const { evaluateDynamicKeyAlerts } = await import('@/lib/services/dynamic-routing-events');
-            await evaluateDynamicKeyAlerts();
+            await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.dynamicKeyAlerts,
+                'SCHEDULED',
+                async () => {
+                    const { evaluateDynamicKeyAlerts } = await import('@/lib/services/dynamic-routing-events');
+                    await evaluateDynamicKeyAlerts();
+                    return {
+                        value: null,
+                        summary: 'Dynamic key alerts evaluated',
+                    };
+                },
+            );
         } catch (error) {
             logger.error('Dynamic key smart alerts check failed', error);
         }
@@ -135,7 +244,22 @@ export function initScheduler() {
     // 6. Key Rotation Check (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await checkKeyRotations();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.keyRotation,
+                'SCHEDULED',
+                async () => {
+                    const result = await checkKeyRotations();
+                    return {
+                        value: result,
+                        summary: `${result.rotated} rotated, ${result.skipped} skipped`,
+                        resultPreview: {
+                            rotated: result.rotated,
+                            skipped: result.skipped,
+                            errors: result.errors.length,
+                        },
+                    };
+                },
+            );
             if (result.rotated > 0 || result.errors.length > 0) {
                 logger.info(`Key rotation: ${result.rotated} rotated, ${result.skipped} skipped, ${result.errors.length} errors`);
             }
@@ -147,7 +271,21 @@ export function initScheduler() {
     // 7. Audit Log Cleanup (Daily at 03:30)
     cron.schedule('30 3 * * *', async () => {
         try {
-            const result = await cleanupOldAuditLogs({ triggeredBy: 'scheduler' });
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.auditCleanup,
+                'SCHEDULED',
+                async () => {
+                    const result = await cleanupOldAuditLogs({ triggeredBy: 'scheduler' });
+                    return {
+                        value: result,
+                        status: result.cleanupEnabled ? 'SUCCESS' : 'SKIPPED',
+                        summary: result.cleanupEnabled
+                            ? `${result.deletedCount} entries removed`
+                            : 'Cleanup disabled',
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.cleanupEnabled) {
                 return;
             }
@@ -163,7 +301,18 @@ export function initScheduler() {
     // 8. Notification Queue Processing (Every minute)
     cron.schedule('* * * * *', async () => {
         try {
-            const result = await processNotificationQueue({ limit: 50 });
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.notificationQueue,
+                'SCHEDULED',
+                async () => {
+                    const result = await processNotificationQueue({ limit: 50 });
+                    return {
+                        value: result,
+                        summary: `${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.claimed > 0) {
                 logger.info(`Notification queue: ${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`);
             }
@@ -175,7 +324,21 @@ export function initScheduler() {
     // 9. Backup Verification (Daily at 04:00)
     cron.schedule('0 4 * * *', async () => {
         try {
-            const result = await verifyLatestBackups({ limit: 3, triggeredBy: 'scheduler' });
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.backupVerification,
+                'SCHEDULED',
+                async () => {
+                    const result = await verifyLatestBackups({ limit: 3, triggeredBy: 'scheduler' });
+                    return {
+                        value: result,
+                        status: result.length === 0 ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.length === 0
+                            ? 'No backups to verify'
+                            : `${result.filter((item) => item.status !== 'FAILED').length} passed, ${result.filter((item) => item.status === 'FAILED').length} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.length > 0) {
                 const failed = result.filter((item) => item.status === 'FAILED').length;
                 logger.info(`Backup verification: ${result.length - failed} passed, ${failed} failed`);
@@ -188,7 +351,21 @@ export function initScheduler() {
     // 10. Smart Rebalance Planning (Every 30 minutes)
     cron.schedule('*/30 * * * *', async () => {
         try {
-            const result = await runScheduledRebalanceCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.rebalancePlanner,
+                'SCHEDULED',
+                async () => {
+                    const result = await runScheduledRebalanceCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? 'Rebalance cycle skipped'
+                            : `${result.recommendations} recommendations, ${result.autoApplied} auto-applied`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.skipped) {
                 return;
             }
@@ -206,7 +383,21 @@ export function initScheduler() {
     // 11. Scheduled report delivery (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const result = await runScheduledReportsCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.scheduledReports,
+                'SCHEDULED',
+                async () => {
+                    const result = await runScheduledReportsCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `Generated ${result.reportName}`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Scheduled report generated: ${result.reportName}`);
             }
@@ -218,7 +409,21 @@ export function initScheduler() {
     // 12. Telegram digest delivery (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runTelegramDigestCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramDigest,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramDigestCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `Delivered to ${result.adminChats} admin chats`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Telegram digest delivered to ${result.adminChats} admin chat(s)`);
             }
@@ -230,7 +435,21 @@ export function initScheduler() {
     // 12b. Support SLA breach alerts (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runTelegramSupportSlaAlertCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramSupportSla,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramSupportSlaAlertCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.alerted} alerted, ${result.errors.length} errors`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
                 logger.warn(`Support SLA alerts: ${result.alerted} alerted, ${result.errors.length} errors`);
             }
@@ -242,7 +461,21 @@ export function initScheduler() {
     // 13. Admin login incident digest delivery (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runAdminLoginIncidentDigestCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.adminLoginDigest,
+                'SCHEDULED',
+                async () => {
+                    const result = await runAdminLoginIncidentDigestCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.incidentCount} incidents, ${result.adminChats} admin chats`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(
                     `Admin login incident digest delivered to ${result.adminChats} admin chat(s) for ${result.incidentCount} incident(s)`,
@@ -256,7 +489,21 @@ export function initScheduler() {
     // 14. Telegram unpaid order reminders / expiry (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runTelegramSalesOrderCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramSalesOrders,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramSalesOrderCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.reminded} payment reminders, ${result.expired} expired`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (
                 !result.skipped &&
                 (
@@ -289,7 +536,18 @@ export function initScheduler() {
     // 15. Delayed server outage user alerts (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runServerOutageCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.serverOutage,
+                'SCHEDULED',
+                async () => {
+                    const result = await runServerOutageCycle();
+                    return {
+                        value: result,
+                        summary: `${result.alerted} alerted, ${result.resolved} resolved, ${result.skipped} skipped`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.alerted > 0 || result.resolved > 0) {
                 logger.info(
                     `Server outage cycle: ${result.alerted} user alert(s), ${result.resolved} resolved, ${result.skipped} skipped`,
@@ -303,7 +561,21 @@ export function initScheduler() {
     // 16. Telegram finance digest delivery (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runTelegramFinanceDigestCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramFinanceDigest,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramFinanceDigestCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `Delivered to ${result.adminChats} admin chats`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Telegram finance digest delivered to ${result.adminChats} admin chat(s)`);
             }
@@ -315,7 +587,21 @@ export function initScheduler() {
     // 17. Scheduled Telegram announcements (Every 5 minutes)
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const result = await runTelegramAnnouncementCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramAnnouncements,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramAnnouncementCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.processed} processed, ${result.sent} sent, ${result.failed} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Telegram announcements: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
             }
@@ -327,7 +613,21 @@ export function initScheduler() {
     // 18. Premium region degradation alerts (Every 15 minutes)
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await runTelegramPremiumRegionAlertCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramPremiumAlerts,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramPremiumRegionAlertCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.alerted} alerted, ${result.recovered} recovered`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped && (result.alerted > 0 || result.fallbackPinned > 0 || result.recovered > 0 || result.errors.length > 0)) {
                 logger.info(
                     `Premium region alerts: ${result.alerted} alerted, ${result.fallbackPinned} fallback-pinned, ${result.recovered} recovered, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
@@ -342,7 +642,18 @@ export function initScheduler() {
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
         try {
-            const result = await checkExpirations();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.expirationCheck,
+                'STARTUP',
+                async () => {
+                    const result = await checkExpirations();
+                    return {
+                        value: result,
+                        summary: `${result.expiredKeys} expired, ${result.depletedKeys} depleted, ${result.archivedKeys} archived`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.expiredKeys > 0 || result.depletedKeys > 0 || result.archivedKeys > 0) {
                 logger.info(`Initial expiration check complete: ${result.expiredKeys} expired, ${result.depletedKeys} depleted, ${result.archivedKeys} archived`);
             }
@@ -351,7 +662,18 @@ export function initScheduler() {
         }
 
         try {
-            const result = await processNotificationQueue({ limit: 25 });
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.notificationQueue,
+                'STARTUP',
+                async () => {
+                    const result = await processNotificationQueue({ limit: 25 });
+                    return {
+                        value: result,
+                        summary: `${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.claimed > 0) {
                 logger.info(`Initial notification queue: ${result.delivered} delivered, ${result.rescheduled} rescheduled, ${result.failed} failed`);
             }
@@ -360,13 +682,34 @@ export function initScheduler() {
         }
 
         try {
-            await collectTrafficActivity();
+            await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.trafficActivity,
+                'STARTUP',
+                async () => {
+                    await collectTrafficActivity();
+                    return {
+                        value: null,
+                        summary: 'Traffic activity collected',
+                    };
+                },
+            );
         } catch (error) {
             logger.error('Initial traffic activity collection failed', error);
         }
 
         try {
-            const result = await runAccessKeyDeviceLimitCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.deviceLimits,
+                'STARTUP',
+                async () => {
+                    const result = await runAccessKeyDeviceLimitCycle();
+                    return {
+                        value: result,
+                        summary: `${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (result.warned > 0 || result.disabled > 0 || result.cleared > 0 || result.errors.length > 0) {
                 logger.info(
                     `Initial device limit cycle: ${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared, ${result.errors.length} errors`,
@@ -377,7 +720,21 @@ export function initScheduler() {
         }
 
         try {
-            const result = await runTelegramSalesOrderCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramSalesOrders,
+                'STARTUP',
+                async () => {
+                    const result = await runTelegramSalesOrderCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.reminded} payment reminders, ${result.expired} expired`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (
                 !result.skipped &&
                 (
@@ -406,7 +763,21 @@ export function initScheduler() {
         }
 
         try {
-            const result = await runTelegramFinanceDigestCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramFinanceDigest,
+                'STARTUP',
+                async () => {
+                    const result = await runTelegramFinanceDigestCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `Delivered to ${result.adminChats} admin chats`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Initial Telegram finance digest delivered to ${result.adminChats} admin chat(s)`);
             }
@@ -415,7 +786,21 @@ export function initScheduler() {
         }
 
         try {
-            const result = await runTelegramAnnouncementCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramAnnouncements,
+                'STARTUP',
+                async () => {
+                    const result = await runTelegramAnnouncementCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.processed} processed, ${result.sent} sent, ${result.failed} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped) {
                 logger.info(`Initial Telegram announcement cycle: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
             }
@@ -424,7 +809,21 @@ export function initScheduler() {
         }
 
         try {
-            const result = await runTelegramPremiumRegionAlertCycle();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramPremiumAlerts,
+                'STARTUP',
+                async () => {
+                    const result = await runTelegramPremiumRegionAlertCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.alerted} alerted, ${result.recovered} recovered`,
+                        resultPreview: result,
+                    };
+                },
+            );
             if (!result.skipped && (result.alerted > 0 || result.fallbackPinned > 0 || result.recovered > 0 || result.errors.length > 0)) {
                 logger.info(
                     `Initial premium region alert cycle: ${result.alerted} alerted, ${result.fallbackPinned} fallback-pinned, ${result.recovered} recovered, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
@@ -442,7 +841,21 @@ export function initScheduler() {
             }
 
             // Run initial health check
-            const result = await runHealthChecks();
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.healthCheck,
+                'STARTUP',
+                async () => {
+                    const result = await runHealthChecks();
+                    return {
+                        value: result,
+                        summary: `${result.up} up, ${result.down} down, ${result.slow} slow`,
+                        resultPreview: {
+                            ...result,
+                            createdHealthChecks: created,
+                        },
+                    };
+                },
+            );
             if (result.down > 0 || result.slow > 0) {
                 logger.warn(`Initial health check summary: ${result.up} up, ${result.down} down, ${result.slow} slow`);
             }
