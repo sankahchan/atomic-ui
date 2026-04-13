@@ -18,6 +18,7 @@ export type SchedulerJobDefinition = {
   cadenceLabel: string;
   cronExpression?: string;
   startupOnly?: boolean;
+  manualRunSupported?: boolean;
 };
 
 type SchedulerObservedOutcome<T> = {
@@ -37,6 +38,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'CORE',
     cadenceLabel: 'Hourly',
     cronExpression: '0 * * * *',
+    manualRunSupported: true,
   },
   expirationCheck: {
     key: 'expiration_check',
@@ -45,6 +47,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'CORE',
     cadenceLabel: 'Every 5 minutes',
     cronExpression: '*/5 * * * *',
+    manualRunSupported: true,
   },
   bandwidthReview: {
     key: 'bandwidth_review',
@@ -53,6 +56,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'CORE',
     cadenceLabel: 'Every 5 minutes',
     cronExpression: '*/5 * * * *',
+    manualRunSupported: true,
   },
   deviceLimits: {
     key: 'device_limits',
@@ -61,6 +65,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'SECURITY',
     cadenceLabel: 'Every 5 minutes',
     cronExpression: '*/5 * * * *',
+    manualRunSupported: true,
   },
   healthCheck: {
     key: 'health_check',
@@ -69,6 +74,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'OPERATIONS',
     cadenceLabel: 'Every 2 minutes',
     cronExpression: '*/2 * * * *',
+    manualRunSupported: true,
   },
   trafficActivity: {
     key: 'traffic_activity',
@@ -77,6 +83,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'CORE',
     cadenceLabel: 'Every minute',
     cronExpression: '* * * * *',
+    manualRunSupported: true,
   },
   dynamicKeyAlerts: {
     key: 'dynamic_key_alerts',
@@ -85,6 +92,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'OPERATIONS',
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
   },
   keyRotation: {
     key: 'key_rotation',
@@ -93,6 +101,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'SECURITY',
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
   },
   auditCleanup: {
     key: 'audit_cleanup',
@@ -109,6 +118,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'NOTIFICATIONS',
     cadenceLabel: 'Every minute',
     cronExpression: '* * * * *',
+    manualRunSupported: true,
   },
   backupVerification: {
     key: 'backup_verification',
@@ -117,6 +127,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'OPERATIONS',
     cadenceLabel: 'Daily at 04:00',
     cronExpression: '0 4 * * *',
+    manualRunSupported: true,
   },
   rebalancePlanner: {
     key: 'rebalance_planner',
@@ -125,6 +136,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'OPERATIONS',
     cadenceLabel: 'Every 30 minutes',
     cronExpression: '*/30 * * * *',
+    manualRunSupported: true,
   },
   scheduledReports: {
     key: 'scheduled_reports',
@@ -133,6 +145,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'NOTIFICATIONS',
     cadenceLabel: 'Every 5 minutes',
     cronExpression: '*/5 * * * *',
+    manualRunSupported: true,
   },
   telegramDigest: {
     key: 'telegram_digest',
@@ -149,6 +162,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'TELEGRAM',
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
   },
   adminLoginDigest: {
     key: 'admin_login_digest',
@@ -173,6 +187,7 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     category: 'OPERATIONS',
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
   },
   telegramFinanceDigest: {
     key: 'telegram_finance_digest',
@@ -202,6 +217,14 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
 
 export function listSchedulerJobDefinitions() {
   return Object.values(SCHEDULER_JOB_DEFINITIONS);
+}
+
+export function getSchedulerJobDefinitionByKey(jobKey: string) {
+  return listSchedulerJobDefinitions().find((job) => job.key === jobKey) || null;
+}
+
+export function isSchedulerJobManualRunSupported(jobKey: string) {
+  return Boolean(getSchedulerJobDefinitionByKey(jobKey)?.manualRunSupported);
 }
 
 export function computeNextSchedulerJobRun(cronExpression: string, now = new Date()) {

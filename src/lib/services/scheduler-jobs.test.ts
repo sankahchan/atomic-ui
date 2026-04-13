@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { computeNextSchedulerJobRun } from './scheduler-jobs';
+import {
+  computeNextSchedulerJobRun,
+  isSchedulerJobManualRunSupported,
+} from './scheduler-jobs';
 
 test('computeNextSchedulerJobRun handles every-minute cadence', () => {
   const next = computeNextSchedulerJobRun('* * * * *', new Date('2026-04-13T11:26:57.000Z'));
@@ -22,4 +25,12 @@ test('computeNextSchedulerJobRun handles daily fixed time cadence', () => {
     expected.setDate(expected.getDate() + 1);
   }
   assert.equal(next?.toISOString(), expected.toISOString());
+});
+
+test('manual scheduler support is only enabled for safe job keys', () => {
+  assert.equal(isSchedulerJobManualRunSupported('health_check'), true);
+  assert.equal(isSchedulerJobManualRunSupported('notification_queue'), true);
+  assert.equal(isSchedulerJobManualRunSupported('telegram_digest'), false);
+  assert.equal(isSchedulerJobManualRunSupported('telegram_sales_orders'), false);
+  assert.equal(isSchedulerJobManualRunSupported('missing_job'), false);
 });

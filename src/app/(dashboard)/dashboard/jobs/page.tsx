@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/hooks/use-locale';
+import { useToast } from '@/hooks/use-toast';
 import { trpc } from '@/lib/trpc';
 import { cn, formatDateTime, formatRelativeTime } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ type SchedulerJobRow = {
   failureCount: number;
   skippedCount: number;
   consecutiveFailures: number;
+  manualRunSupported?: boolean;
   runs: SchedulerJobRunRow[];
 };
 
@@ -77,8 +79,25 @@ function formatDuration(durationMs?: number | null) {
 
 export default function SchedulerJobsPage() {
   const { t } = useLocale();
+  const { toast } = useToast();
   const jobsQuery = trpc.system.getSchedulerJobs.useQuery(undefined, {
     refetchInterval: 30_000,
+  });
+  const runJobMutation = trpc.system.runSchedulerJob.useMutation({
+    onSuccess: async () => {
+      await jobsQuery.refetch();
+      toast({
+        title: 'Scheduler job started',
+        description: 'The manual run finished and the scheduler state has been refreshed.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Scheduler job failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   const jobs = useMemo(
@@ -212,7 +231,11 @@ export default function SchedulerJobsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {categoryJobs.map((job) => (
-                <div key={job.key} className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                <div
+                  key={job.key}
+                  data-testid={`scheduler-job-${job.key}`}
+                  className="rounded-2xl border border-border/60 bg-background/70 p-4"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -233,6 +256,26 @@ export default function SchedulerJobsPage() {
                       <p className="mt-1">{job.nextRunAt ? `Next: ${formatRelativeTime(job.nextRunAt)}` : 'No next run'}</p>
                     </div>
                   </div>
+
+                  {job.manualRunSupported ? (
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        data-testid={`scheduler-run-${job.key}`}
+                        onClick={() => runJobMutation.mutate({ jobKey: job.key })}
+                        disabled={runJobMutation.isPending || job.lastStatus === 'RUNNING'}
+                      >
+                        {runJobMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                        )}
+                        Run now
+                      </Button>
+                    </div>
+                  ) : null}
 
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
                     <p>Last trigger: {job.lastTrigger || '—'}</p>

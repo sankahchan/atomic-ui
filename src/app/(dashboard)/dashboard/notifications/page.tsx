@@ -68,8 +68,11 @@ import {
   Copy,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
+import { AnnouncementBroadcastsTab } from './_components/announcement-broadcasts-tab';
+import { AnnouncementExperimentsPanel } from './_components/announcement-experiments-panel';
 import { AnnouncementAnalyticsInsights } from './_components/announcement-analytics-insights';
 import { AnnouncementHistoryTab } from './_components/announcement-history-tab';
+import { AnnouncementTemplatesTab } from './_components/announcement-templates-tab';
 
 /**
  * Notification channel type definitions
@@ -2728,474 +2731,249 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
             </Collapsible>
           </TabsContent>
 
-          <TabsContent value="broadcasts" className="space-y-4">
-            <div className="rounded-2xl border border-border/60 bg-background/75 p-4 dark:bg-white/[0.02]">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{telegramUi.announcementTitle}</p>
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementDesc}</p>
-              </div>
+          <AnnouncementBroadcastsTab
+            ui={{
+              announcementTitle: telegramUi.announcementTitle,
+              announcementDesc: telegramUi.announcementDesc,
+              announcementAudience: telegramUi.announcementAudience,
+              recipientsLabel: telegramUi.recipientsLabel,
+              announcementType: telegramUi.announcementType,
+              announcementSubject: telegramUi.announcementSubject,
+              announcementBody: telegramUi.announcementBody,
+              announcementCardStyle: telegramUi.announcementCardStyle,
+              announcementRecurrence: telegramUi.announcementRecurrence,
+              announcementOneTime: telegramUi.announcementOneTime,
+              announcementDaily: telegramUi.announcementDaily,
+              announcementWeekly: telegramUi.announcementWeekly,
+              announcementTargetTag: telegramUi.announcementTargetTag,
+              announcementAllTargets: telegramUi.announcementAllTargets,
+              announcementTargetServer: telegramUi.announcementTargetServer,
+              announcementTargetRegion: telegramUi.announcementTargetRegion,
+              announcementHeroImage: telegramUi.announcementHeroImage,
+              announcementHeroImageHint: telegramUi.announcementHeroImageHint,
+              announcementScheduleAt: telegramUi.announcementScheduleAt,
+              announcementScheduleHint: telegramUi.announcementScheduleHint,
+              includeSupportButton: telegramUi.includeSupportButton,
+              announcementPinToInbox: telegramUi.announcementPinToInbox,
+              announcementPinToInboxHint: telegramUi.announcementPinToInboxHint,
+              announcementCardPreview: telegramUi.announcementCardPreview,
+              announcementCardPreviewDesc: telegramUi.announcementCardPreviewDesc,
+              announcementPreviewSelf: telegramUi.announcementPreviewSelf,
+              sendAnnouncementNow: telegramUi.sendAnnouncementNow,
+              announcementScheduleNow: telegramUi.announcementScheduleNow,
+            }}
+            isMyanmar={isMyanmar}
+            hasToken={hasToken}
+            canManageAnnouncements={canManageAnnouncements}
+            audience={announcementAudience}
+            audienceCount={announcementAudienceCount}
+            audienceCountLoading={announcementAudienceCountsQuery.isLoading}
+            type={announcementType}
+            title={announcementTitle}
+            message={announcementMessage}
+            cardStyle={announcementCardStyle}
+            recurrenceType={announcementRecurrenceType}
+            targetTag={announcementTargetTag}
+            targetSegment={announcementTargetSegment}
+            targetServerId={announcementTargetServerId}
+            targetCountryCode={announcementTargetCountryCode}
+            heroImageUrl={announcementHeroImageUrl}
+            scheduledFor={announcementScheduledFor}
+            includeSupportButton={announcementIncludeSupportButton}
+            pinToInbox={announcementPinToInbox}
+            targetOptions={announcementTargetOptions}
+            previewPending={previewAnnouncementToSelfMutation.isPending}
+            sendPending={sendAnnouncementMutation.isPending}
+            onAudienceChange={setAnnouncementAudience}
+            onTypeChange={setAnnouncementType}
+            onTitleChange={setAnnouncementTitle}
+            onMessageChange={setAnnouncementMessage}
+            onCardStyleChange={setAnnouncementCardStyle}
+            onRecurrenceTypeChange={setAnnouncementRecurrenceType}
+            onTargetTagChange={setAnnouncementTargetTag}
+            onTargetSegmentChange={setAnnouncementTargetSegment}
+            onTargetServerIdChange={setAnnouncementTargetServerId}
+            onTargetCountryCodeChange={setAnnouncementTargetCountryCode}
+            onHeroImageUrlChange={setAnnouncementHeroImageUrl}
+            onScheduledForChange={setAnnouncementScheduledFor}
+            onIncludeSupportButtonChange={setAnnouncementIncludeSupportButton}
+            onPinToInboxChange={setAnnouncementPinToInbox}
+            onPreviewSelf={() =>
+              previewAnnouncementToSelfMutation.mutate({
+                type: announcementType,
+                title: announcementTitle.trim(),
+                message: announcementMessage.trim(),
+                cardStyle: announcementCardStyle,
+                heroImageUrl: announcementHeroImageUrl.trim() || null,
+                includeSupportButton: announcementIncludeSupportButton,
+                pinToInbox: announcementPinToInbox,
+              })
+            }
+            onSendNow={() =>
+              sendAnnouncementMutation.mutate({
+                audience: announcementAudience,
+                type: announcementType,
+                filters: announcementFilters,
+                title: announcementTitle.trim(),
+                message: announcementMessage.trim(),
+                cardStyle: announcementCardStyle,
+                templateId: announcementSourceTemplateId,
+                templateName: announcementSourceTemplateName,
+                heroImageUrl: announcementHeroImageUrl.trim() || null,
+                includeSupportButton: announcementIncludeSupportButton,
+                pinToInbox: announcementPinToInbox,
+                scheduledFor: null,
+                recurrenceType: announcementRecurrenceType,
+              })
+            }
+            onSchedule={() =>
+              sendAnnouncementMutation.mutate({
+                audience: announcementAudience,
+                type: announcementType,
+                filters: announcementFilters,
+                title: announcementTitle.trim(),
+                message: announcementMessage.trim(),
+                cardStyle: announcementCardStyle,
+                templateId: announcementSourceTemplateId,
+                templateName: announcementSourceTemplateName,
+                heroImageUrl: announcementHeroImageUrl.trim() || null,
+                includeSupportButton: announcementIncludeSupportButton,
+                pinToInbox: announcementPinToInbox,
+                scheduledFor: announcementScheduledFor
+                  ? new Date(announcementScheduledFor).toISOString()
+                  : null,
+                recurrenceType: announcementRecurrenceType,
+              })
+            }
+            getAnnouncementCardStyleLabel={getAnnouncementCardStyleLabel}
+            getAnnouncementRecurrenceLabel={getAnnouncementRecurrenceLabel}
+            getAnnouncementSegmentLabel={getAnnouncementSegmentLabel}
+            getAnnouncementCardPreviewClass={getAnnouncementCardPreviewClass}
+          />
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementAudience}</Label>
-                  <Select value={announcementAudience} onValueChange={(value: TelegramAnnouncementPanelAudience) => setAnnouncementAudience(value)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE_USERS">{isMyanmar ? 'Active Telegram users' : 'Active Telegram users'}</SelectItem>
-                      <SelectItem value="STANDARD_USERS">{isMyanmar ? 'Standard key users' : 'Standard key users'}</SelectItem>
-                      <SelectItem value="PREMIUM_USERS">{isMyanmar ? 'Premium users' : 'Premium users'}</SelectItem>
-                      <SelectItem value="TRIAL_USERS">{isMyanmar ? 'Trial users' : 'Trial users'}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">{telegramUi.recipientsLabel}: {announcementAudienceCountsQuery.isLoading ? '…' : announcementAudienceCount}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>{telegramUi.announcementType}</Label>
-                  <Select value={announcementType} onValueChange={(value: TelegramAnnouncementType) => setAnnouncementType(value)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INFO">{isMyanmar ? 'Information' : 'Information'}</SelectItem>
-                      <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'Announcement' : 'Announcement'}</SelectItem>
-                      <SelectItem value="PROMO">{isMyanmar ? 'Discount / Promo' : 'Discount / Promo'}</SelectItem>
-                      <SelectItem value="NEW_SERVER">{isMyanmar ? 'New server' : 'New server'}</SelectItem>
-                      <SelectItem value="MAINTENANCE">{isMyanmar ? 'Maintenance' : 'Maintenance'}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="telegram-announcement-title">{telegramUi.announcementSubject}</Label>
-                <Input id="telegram-announcement-title" value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} placeholder={isMyanmar ? 'ဥပမာ - New SG server is ready' : 'Example: New SG server is ready'} />
-              </div>
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="telegram-announcement-message">{telegramUi.announcementBody}</Label>
-                <Textarea id="telegram-announcement-message" rows={5} value={announcementMessage} onChange={(event) => setAnnouncementMessage(event.target.value)} placeholder={isMyanmar ? 'အသုံးပြုသူများထံ ပို့လိုသော မက်ဆေ့ချ်ကို ဒီနေရာမှာ ရိုက်ပါ။' : 'Write the manual message you want to send to users here.'} />
-              </div>
-
-              <Collapsible className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Advanced targeting and presentation</p>
-                    <p className="text-xs text-muted-foreground">Card style, targeting, scheduling, inbox pinning, and image presentation.</p>
-                  </div>
-                  <CollapsibleTrigger asChild>
-                    <Button type="button" variant="outline" size="sm">
-                      Show options
-                      <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-                <CollapsibleContent className="mt-4 space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>{telegramUi.announcementCardStyle}</Label>
-                      <Select value={announcementCardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementCardStyle(value)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DEFAULT">{getAnnouncementCardStyleLabel('DEFAULT', isMyanmar)}</SelectItem>
-                          <SelectItem value="PROMO">{getAnnouncementCardStyleLabel('PROMO', isMyanmar)}</SelectItem>
-                          <SelectItem value="PREMIUM">{getAnnouncementCardStyleLabel('PREMIUM', isMyanmar)}</SelectItem>
-                          <SelectItem value="OPERATIONS">{getAnnouncementCardStyleLabel('OPERATIONS', isMyanmar)}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{telegramUi.announcementRecurrence}</Label>
-                      <Select value={announcementRecurrenceType} onValueChange={(value: TelegramAnnouncementRecurrenceType) => setAnnouncementRecurrenceType(value)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="NONE">{telegramUi.announcementOneTime}</SelectItem>
-                          <SelectItem value="DAILY">{telegramUi.announcementDaily}</SelectItem>
-                          <SelectItem value="WEEKLY">{telegramUi.announcementWeekly}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="space-y-2">
-                      <Label>{telegramUi.announcementTargetTag}</Label>
-                      <Select value={announcementTargetTag} onValueChange={setAnnouncementTargetTag}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                          {announcementTargetOptions.tags.map((tag) => <SelectItem key={tag.value} value={tag.value}>{tag.value} ({tag.count})</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{isMyanmar ? 'Customer segment' : 'Customer segment'}</Label>
-                      <Select value={announcementTargetSegment} onValueChange={setAnnouncementTargetSegment}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                          {announcementTargetOptions.segments.map((segment) => <SelectItem key={segment.value} value={segment.value}>{getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{telegramUi.announcementTargetServer}</Label>
-                      <Select value={announcementTargetServerId} onValueChange={setAnnouncementTargetServerId}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                          {announcementTargetOptions.servers.map((server) => <SelectItem key={server.value} value={server.value}>{server.label}{server.countryCode ? ` (${server.countryCode})` : ''} ({server.count})</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{telegramUi.announcementTargetRegion}</Label>
-                      <Select value={announcementTargetCountryCode} onValueChange={setAnnouncementTargetCountryCode}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                          {announcementTargetOptions.regions.map((region) => <SelectItem key={region.value} value={region.value}>{region.value} ({region.count})</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="telegram-announcement-hero-image">{telegramUi.announcementHeroImage}</Label>
-                      <Input id="telegram-announcement-hero-image" value={announcementHeroImageUrl} onChange={(event) => setAnnouncementHeroImageUrl(event.target.value)} placeholder="https://example.com/promo-banner.jpg" />
-                      <p className="text-xs text-muted-foreground">{telegramUi.announcementHeroImageHint}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="telegram-announcement-scheduled-for">{telegramUi.announcementScheduleAt}</Label>
-                      <Input id="telegram-announcement-scheduled-for" type="datetime-local" value={announcementScheduledFor} onChange={(event) => setAnnouncementScheduledFor(event.target.value)} />
-                      <p className="text-xs text-muted-foreground">{telegramUi.announcementScheduleHint}</p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-3">
-                      <div>
-                        <p className="text-sm font-medium">{telegramUi.includeSupportButton}</p>
-                        <p className="text-xs text-muted-foreground">Adds the configured support link as an inline button when available.</p>
-                      </div>
-                      <Switch checked={announcementIncludeSupportButton} onCheckedChange={setAnnouncementIncludeSupportButton} />
-                    </div>
-                    <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-3">
-                      <div>
-                        <p className="text-sm font-medium">{telegramUi.announcementPinToInbox}</p>
-                        <p className="text-xs text-muted-foreground">{telegramUi.announcementPinToInboxHint}</p>
-                      </div>
-                      <Switch checked={announcementPinToInbox} onCheckedChange={setAnnouncementPinToInbox} />
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              <div className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{telegramUi.announcementCardPreview}</p>
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementCardPreviewDesc}</p>
-                </div>
-                <div className={cn('mt-3 overflow-hidden rounded-2xl border p-4', getAnnouncementCardPreviewClass(announcementCardStyle))}>
-                  {announcementHeroImageUrl.trim() ? (
-                    <div className="mb-3 overflow-hidden rounded-xl border border-white/10">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={announcementHeroImageUrl.trim()} alt={announcementTitle.trim() || 'Announcement preview'} className="h-36 w-full object-cover" />
-                    </div>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{getAnnouncementCardStyleLabel(announcementCardStyle, isMyanmar)}</Badge>
-                    <Badge variant="outline">{announcementType}</Badge>
-                    <Badge variant="outline">{getAnnouncementRecurrenceLabel(announcementRecurrenceType, isMyanmar)}</Badge>
-                    {announcementPinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
-                  </div>
-                  <p className="mt-3 text-lg font-semibold">{announcementTitle.trim() || (isMyanmar ? 'Announcement title preview' : 'Announcement title preview')}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
-                    {announcementMessage.trim() || (isMyanmar ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message preview ကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။' : 'This is where the branded Telegram announcement preview appears.')}
-                  </p>
-                </div>
-              </div>
-
-              {!canManageAnnouncements ? (
-                <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  Only Owner/Admin scoped accounts can send Telegram announcements from the panel.
-                </div>
-              ) : null}
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="rounded-full"
-                  onClick={() => previewAnnouncementToSelfMutation.mutate({
-                    type: announcementType,
-                    title: announcementTitle.trim(),
-                    message: announcementMessage.trim(),
-                    cardStyle: announcementCardStyle,
-                    heroImageUrl: announcementHeroImageUrl.trim() || null,
-                    includeSupportButton: announcementIncludeSupportButton,
-                    pinToInbox: announcementPinToInbox,
-                  })}
-                  disabled={!hasToken || !canManageAnnouncements || previewAnnouncementToSelfMutation.isPending || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10}
-                >
-                  {previewAnnouncementToSelfMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
-                  {telegramUi.announcementPreviewSelf}
-                </Button>
-                <Button
-                  type="button"
-                  className="rounded-full"
-                  onClick={() => sendAnnouncementMutation.mutate({
-                    audience: announcementAudience,
-                    type: announcementType,
-                    filters: announcementFilters,
-                    title: announcementTitle.trim(),
-                    message: announcementMessage.trim(),
-                    cardStyle: announcementCardStyle,
-                    templateId: announcementSourceTemplateId,
-                    templateName: announcementSourceTemplateName,
-                    heroImageUrl: announcementHeroImageUrl.trim() || null,
-                    includeSupportButton: announcementIncludeSupportButton,
-                    pinToInbox: announcementPinToInbox,
-                    scheduledFor: null,
-                    recurrenceType: announcementRecurrenceType,
-                  })}
-                  disabled={!hasToken || !canManageAnnouncements || sendAnnouncementMutation.isPending || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10 || announcementAudienceCount === 0}
-                >
-                  {sendAnnouncementMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bell className="mr-2 h-4 w-4" />}
-                  {telegramUi.sendAnnouncementNow}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => sendAnnouncementMutation.mutate({
-                    audience: announcementAudience,
-                    type: announcementType,
-                    filters: announcementFilters,
-                    title: announcementTitle.trim(),
-                    message: announcementMessage.trim(),
-                    cardStyle: announcementCardStyle,
-                    templateId: announcementSourceTemplateId,
-                    templateName: announcementSourceTemplateName,
-                    heroImageUrl: announcementHeroImageUrl.trim() || null,
-                    includeSupportButton: announcementIncludeSupportButton,
-                    pinToInbox: announcementPinToInbox,
-                    scheduledFor: announcementScheduledFor ? new Date(announcementScheduledFor).toISOString() : null,
-                    recurrenceType: announcementRecurrenceType,
-                  })}
-                  disabled={!hasToken || !canManageAnnouncements || sendAnnouncementMutation.isPending || !announcementScheduledFor || Number.isNaN(new Date(announcementScheduledFor).getTime()) || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10 || announcementAudienceCount === 0}
-                >
-                  {sendAnnouncementMutation.isPending && announcementScheduledFor ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />}
-                  {telegramUi.announcementScheduleNow}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="templates" className="space-y-4">
-            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{telegramUi.announcementPresetTemplatesTitle}</p>
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementPresetTemplatesDesc}</p>
-              </div>
-              <div className="mt-3 space-y-2">
-                {announcementPresetTemplates.map((preset) => (
-                  <div key={preset.code} className="rounded-2xl border border-border/60 bg-background/70 p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{preset.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{preset.title}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">{preset.type}</Badge>
-                        <Badge variant="outline">{preset.audience}</Badge>
-                        <Badge variant="outline">{getAnnouncementCardStyleLabel(preset.cardStyle, isMyanmar)}</Badge>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{preset.message}</p>
-                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{telegramUi.announcementCommandPreview}</p>
-                      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{preset.command}</pre>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setAnnouncementAudience(preset.audience);
-                          setAnnouncementType(preset.type);
-                          setAnnouncementTargetTag(preset.targetTag || 'ALL');
-                          setAnnouncementTargetSegment(preset.targetSegment || 'ALL');
-                          setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
-                          setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
-                          setAnnouncementTitle(preset.title);
-                          setAnnouncementMessage(preset.message);
-                          setAnnouncementCardStyle(preset.cardStyle);
-                          setAnnouncementHeroImageUrl('');
-                          setAnnouncementIncludeSupportButton(preset.includeSupportButton);
-                          setAnnouncementPinToInbox(false);
-                          setAnnouncementScheduledFor('');
-                          setAnnouncementRecurrenceType(preset.recurrenceType);
-                          setAnnouncementSourceTemplateId(null);
-                          setAnnouncementSourceTemplateName(preset.name);
-                          setActiveBotTab('broadcasts');
-                        }}
-                      >
-                        {telegramUi.announcementApplyTemplate}
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" onClick={() => void copyAnnouncementCommand(preset.command)}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        {telegramUi.announcementCopyCommand}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => saveAnnouncementTemplateMutation.mutate({
-                          name: preset.name,
-                          audience: preset.audience,
-                          type: preset.type,
-                          filters: {
-                            tag: preset.targetTag,
-                            segment: (preset.targetSegment as TelegramAnnouncementSegment | null) || null,
-                            serverId: preset.targetServerId,
-                            countryCode: preset.targetCountryCode,
-                          },
-                          title: preset.title,
-                          message: preset.message,
-                          cardStyle: preset.cardStyle,
-                          includeSupportButton: preset.includeSupportButton,
-                          pinToInbox: false,
-                          recurrenceType: preset.recurrenceType,
-                        })}
-                        disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending}
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        {telegramUi.announcementSavePreset}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{telegramUi.announcementTemplatesTitle}</p>
-                <p className="text-xs text-muted-foreground">{telegramUi.announcementTemplatesDesc}</p>
-              </div>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <Input value={announcementTemplateName} onChange={(event) => setAnnouncementTemplateName(event.target.value)} placeholder={telegramUi.announcementTemplateName} />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => saveAnnouncementTemplateMutation.mutate({
-                    name: announcementTemplateName.trim(),
-                    audience: announcementAudience,
-                    type: announcementType,
-                    filters: announcementFilters,
-                    title: announcementTitle.trim(),
-                    message: announcementMessage.trim(),
-                    cardStyle: announcementCardStyle,
-                    heroImageUrl: announcementHeroImageUrl.trim() || null,
-                    includeSupportButton: announcementIncludeSupportButton,
-                    pinToInbox: announcementPinToInbox,
-                    recurrenceType: announcementRecurrenceType,
-                  })}
-                  disabled={!canManageAnnouncements || saveAnnouncementTemplateMutation.isPending || announcementTemplateName.trim().length < 2 || announcementTitle.trim().length < 3 || announcementMessage.trim().length < 10}
-                >
-                  {saveAnnouncementTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {telegramUi.announcementSaveTemplate}
-                </Button>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                {announcementTemplates.length ? (
-                  announcementTemplates.map((template) => (
-                    <div key={template.id} className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{template.name}</p>
-                          <p className="text-xs text-muted-foreground">{template.title}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">{template.type}</Badge>
-                          <Badge variant="outline">{getAnnouncementCardStyleLabel(template.cardStyle, isMyanmar)}</Badge>
-                          {template.recurrenceType && template.recurrenceType !== 'NONE' ? <Badge variant="secondary">{getAnnouncementRecurrenceLabel(template.recurrenceType, isMyanmar)}</Badge> : null}
-                          {template.pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{telegramUi.announcementCommandPreview}</p>
-                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                          {buildTelegramAnnouncementTemplateCommand({
-                            audience: template.audience,
-                            type: template.type,
-                            title: template.title,
-                            message: template.message,
-                            cardStyle: template.cardStyle,
-                            includeSupportButton: template.includeSupportButton,
-                            targetTag: template.targetTag,
-                            targetSegment: template.targetSegment,
-                            targetServerId: template.targetServerId,
-                            targetCountryCode: template.targetCountryCode,
-                          })}
-                        </pre>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setAnnouncementAudience(template.audience);
-                            setAnnouncementType(template.type);
-                            setAnnouncementTargetTag(template.targetTag || 'ALL');
-                            setAnnouncementTargetSegment(template.targetSegment || 'ALL');
-                            setAnnouncementTargetServerId(template.targetServerId || 'ALL');
-                            setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
-                            setAnnouncementTitle(template.title);
-                            setAnnouncementMessage(template.message);
-                            setAnnouncementCardStyle(template.cardStyle);
-                            setAnnouncementHeroImageUrl(template.heroImageUrl || '');
-                            setAnnouncementIncludeSupportButton(template.includeSupportButton);
-                            setAnnouncementPinToInbox(template.pinToInbox);
-                            setAnnouncementScheduledFor('');
-                            setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
-                            setAnnouncementSourceTemplateId(template.id);
-                            setAnnouncementSourceTemplateName(template.name);
-                            setActiveBotTab('broadcasts');
-                            updateTelegramUrlState({
-                              workspace: 'telegram',
-                              botTab: 'broadcasts',
-                              announcementId: null,
-                            });
-                          }}
-                        >
-                          {telegramUi.announcementApplyTemplate}
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => void copyAnnouncementCommand(buildTelegramAnnouncementTemplateCommand({
-                          audience: template.audience,
-                          type: template.type,
-                          title: template.title,
-                          message: template.message,
-                          cardStyle: template.cardStyle,
-                          includeSupportButton: template.includeSupportButton,
-                          targetTag: template.targetTag,
-                          targetSegment: template.targetSegment,
-                          targetServerId: template.targetServerId,
-                          targetCountryCode: template.targetCountryCode,
-                        }))}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          {telegramUi.announcementCopyCommand}
-                        </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => deleteAnnouncementTemplateMutation.mutate({ templateId: template.id })} disabled={deleteAnnouncementTemplateMutation.isPending}>
-                          {telegramUi.announcementDeleteTemplate}
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground">{telegramUi.announcementNoTemplates}</p>
-                )}
-              </div>
-            </div>
-          </TabsContent>
+          <AnnouncementTemplatesTab
+            ui={{
+              announcementPresetTemplatesTitle: telegramUi.announcementPresetTemplatesTitle,
+              announcementPresetTemplatesDesc: telegramUi.announcementPresetTemplatesDesc,
+              announcementTemplatesTitle: telegramUi.announcementTemplatesTitle,
+              announcementTemplatesDesc: telegramUi.announcementTemplatesDesc,
+              announcementTemplateName: telegramUi.announcementTemplateName,
+              announcementSaveTemplate: telegramUi.announcementSaveTemplate,
+              announcementSavePreset: telegramUi.announcementSavePreset,
+              announcementApplyTemplate: telegramUi.announcementApplyTemplate,
+              announcementCopyCommand: telegramUi.announcementCopyCommand,
+              announcementDeleteTemplate: telegramUi.announcementDeleteTemplate,
+              announcementNoTemplates: telegramUi.announcementNoTemplates,
+              announcementCommandPreview: telegramUi.announcementCommandPreview,
+            }}
+            isMyanmar={isMyanmar}
+            canManageAnnouncements={canManageAnnouncements}
+            templateName={announcementTemplateName}
+            presetTemplates={announcementPresetTemplates}
+            templates={announcementTemplates}
+            savePending={saveAnnouncementTemplateMutation.isPending}
+            deletePending={deleteAnnouncementTemplateMutation.isPending}
+            onTemplateNameChange={setAnnouncementTemplateName}
+            onSaveCurrentTemplate={() =>
+              saveAnnouncementTemplateMutation.mutate({
+                name: announcementTemplateName.trim(),
+                audience: announcementAudience,
+                type: announcementType,
+                filters: announcementFilters,
+                title: announcementTitle.trim(),
+                message: announcementMessage.trim(),
+                cardStyle: announcementCardStyle,
+                heroImageUrl: announcementHeroImageUrl.trim() || null,
+                includeSupportButton: announcementIncludeSupportButton,
+                pinToInbox: announcementPinToInbox,
+                recurrenceType: announcementRecurrenceType,
+              })
+            }
+            onApplyPresetTemplate={(preset) => {
+              setAnnouncementAudience(preset.audience);
+              setAnnouncementType(preset.type);
+              setAnnouncementTargetTag(preset.targetTag || 'ALL');
+              setAnnouncementTargetSegment(preset.targetSegment || 'ALL');
+              setAnnouncementTargetServerId(preset.targetServerId || 'ALL');
+              setAnnouncementTargetCountryCode(preset.targetCountryCode || 'ALL');
+              setAnnouncementTitle(preset.title);
+              setAnnouncementMessage(preset.message);
+              setAnnouncementCardStyle(preset.cardStyle);
+              setAnnouncementHeroImageUrl('');
+              setAnnouncementIncludeSupportButton(preset.includeSupportButton);
+              setAnnouncementPinToInbox(false);
+              setAnnouncementScheduledFor('');
+              setAnnouncementRecurrenceType(preset.recurrenceType);
+              setAnnouncementSourceTemplateId(null);
+              setAnnouncementSourceTemplateName(preset.name);
+              setActiveBotTab('broadcasts');
+            }}
+            onCopyCommand={(command) => {
+              void copyAnnouncementCommand(command);
+            }}
+            onSavePresetTemplate={(preset) =>
+              saveAnnouncementTemplateMutation.mutate({
+                name: preset.name,
+                audience: preset.audience,
+                type: preset.type,
+                filters: {
+                  tag: preset.targetTag,
+                  segment: (preset.targetSegment as TelegramAnnouncementSegment | null) || null,
+                  serverId: preset.targetServerId,
+                  countryCode: preset.targetCountryCode,
+                },
+                title: preset.title,
+                message: preset.message,
+                cardStyle: preset.cardStyle,
+                includeSupportButton: preset.includeSupportButton,
+                pinToInbox: false,
+                recurrenceType: preset.recurrenceType,
+              })
+            }
+            onApplyTemplate={(template) => {
+              setAnnouncementAudience(template.audience);
+              setAnnouncementType(template.type);
+              setAnnouncementTargetTag(template.targetTag || 'ALL');
+              setAnnouncementTargetSegment(template.targetSegment || 'ALL');
+              setAnnouncementTargetServerId(template.targetServerId || 'ALL');
+              setAnnouncementTargetCountryCode(template.targetCountryCode || 'ALL');
+              setAnnouncementTitle(template.title);
+              setAnnouncementMessage(template.message);
+              setAnnouncementCardStyle(template.cardStyle);
+              setAnnouncementHeroImageUrl(template.heroImageUrl || '');
+              setAnnouncementIncludeSupportButton(template.includeSupportButton);
+              setAnnouncementPinToInbox(template.pinToInbox);
+              setAnnouncementScheduledFor('');
+              setAnnouncementRecurrenceType(template.recurrenceType || 'NONE');
+              setAnnouncementSourceTemplateId(template.id);
+              setAnnouncementSourceTemplateName(template.name);
+              setActiveBotTab('broadcasts');
+              updateTelegramUrlState({
+                workspace: 'telegram',
+                botTab: 'broadcasts',
+                announcementId: null,
+              });
+            }}
+            onDeleteTemplate={(templateId) =>
+              deleteAnnouncementTemplateMutation.mutate({ templateId })
+            }
+            buildTemplateCommand={(template) =>
+              buildTelegramAnnouncementTemplateCommand({
+                audience: template.audience,
+                type: template.type,
+                title: template.title,
+                message: template.message,
+                cardStyle: template.cardStyle,
+                includeSupportButton: template.includeSupportButton,
+                targetTag: template.targetTag,
+                targetSegment: template.targetSegment,
+                targetServerId: template.targetServerId,
+                targetCountryCode: template.targetCountryCode,
+              })
+            }
+            getAnnouncementCardStyleLabel={getAnnouncementCardStyleLabel}
+            getAnnouncementRecurrenceLabel={getAnnouncementRecurrenceLabel}
+          />
 
           <TabsContent value="analytics" className="space-y-4">
             <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
@@ -3220,383 +2998,135 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading analytics…</div>
               ) : announcementAnalytics ? (
                 <div className="mt-4 space-y-4">
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">{telegramUi.announcementExperimentsTitle}</p>
-                        <p className="text-xs text-muted-foreground">{telegramUi.announcementExperimentsDesc}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={resetAnnouncementExperimentForm}>
-                          {telegramUi.announcementExperimentCreateNew}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            saveAnnouncementExperimentMutation.mutate({
-                              experimentId: announcementExperimentId || undefined,
-                              name: announcementExperimentName.trim(),
-                              audience: announcementExperimentAudience,
-                              type: announcementExperimentType,
-                              filters: announcementExperimentFilters,
-                              includeSupportButton: announcementExperimentIncludeSupportButton,
-                              pinToInbox: announcementExperimentPinToInbox,
-                              variants: [
-                                {
-                                  variantKey: 'A',
-                                  label: 'Variant A',
-                                  allocationPercent: normalizedExperimentVariantASplit,
-                                  title: announcementExperimentVariantATitle.trim(),
-                                  message: announcementExperimentVariantAMessage.trim(),
-                                  heroImageUrl: announcementExperimentVariantAHeroImageUrl.trim() || null,
-                                  cardStyle: announcementExperimentVariantACardStyle,
-                                },
-                                {
-                                  variantKey: 'B',
-                                  label: 'Variant B',
-                                  allocationPercent: normalizedExperimentVariantBSplit,
-                                  title: announcementExperimentVariantBTitle.trim(),
-                                  message: announcementExperimentVariantBMessage.trim(),
-                                  heroImageUrl: announcementExperimentVariantBHeroImageUrl.trim() || null,
-                                  cardStyle: announcementExperimentVariantBCardStyle,
-                                },
-                              ],
-                            })
-                          }
-                          disabled={
-                            !canManageAnnouncements ||
-                            saveAnnouncementExperimentMutation.isPending ||
-                            announcementExperimentName.trim().length < 3 ||
-                            announcementExperimentVariantATitle.trim().length < 3 ||
-                            announcementExperimentVariantAMessage.trim().length < 10 ||
-                            announcementExperimentVariantBTitle.trim().length < 3 ||
-                            announcementExperimentVariantBMessage.trim().length < 10
-                          }
-                        >
-                          {saveAnnouncementExperimentMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                          )}
-                          {telegramUi.announcementExperimentSave}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() =>
-                            announcementExperimentId
-                              ? launchAnnouncementExperimentMutation.mutate({
-                                  experimentId: announcementExperimentId,
-                                })
-                              : null
-                          }
-                          disabled={
-                            !canManageAnnouncements ||
-                            launchAnnouncementExperimentMutation.isPending ||
-                            !announcementExperimentId
-                          }
-                        >
-                          {launchAnnouncementExperimentMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <TestTube className="mr-2 h-4 w-4" />
-                          )}
-                          {telegramUi.announcementExperimentLaunch}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 xl:grid-cols-4">
-                      <div>
-                        <Label>{telegramUi.announcementExperimentName}</Label>
-                        <Input
-                          value={announcementExperimentName}
-                          onChange={(event) => setAnnouncementExperimentName(event.target.value)}
-                          placeholder="Premium upsell April"
-                          className="mt-2"
-                        />
-                      </div>
-                      <div>
-                        <Label>{telegramUi.announcementAudience}</Label>
-                        <Select
-                          value={announcementExperimentAudience}
-                          onValueChange={(value: TelegramAnnouncementPanelAudience) =>
-                            setAnnouncementExperimentAudience(value)
-                          }
-                        >
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ACTIVE_USERS">Active Telegram users</SelectItem>
-                            <SelectItem value="STANDARD_USERS">Standard users</SelectItem>
-                            <SelectItem value="PREMIUM_USERS">Premium users</SelectItem>
-                            <SelectItem value="TRIAL_USERS">Trial users</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>{telegramUi.announcementType}</Label>
-                        <Select
-                          value={announcementExperimentType}
-                          onValueChange={(value: TelegramAnnouncementType) =>
-                            setAnnouncementExperimentType(value)
-                          }
-                        >
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PROMO">Promo</SelectItem>
-                            <SelectItem value="ANNOUNCEMENT">Announcement</SelectItem>
-                            <SelectItem value="INFO">Info</SelectItem>
-                            <SelectItem value="NEW_SERVER">New server</SelectItem>
-                            <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>{telegramUi.announcementExperimentSplit}</Label>
-                        <Input
-                          type="number"
-                          min={5}
-                          max={95}
-                          value={announcementExperimentVariantASplit}
-                          onChange={(event) => setAnnouncementExperimentVariantASplit(event.target.value)}
-                          className="mt-2"
-                        />
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Variant A {normalizedExperimentVariantASplit}% • Variant B {normalizedExperimentVariantBSplit}%
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 xl:grid-cols-4">
-                      <div>
-                        <Label>{telegramUi.announcementTargetTag}</Label>
-                        <Select value={announcementExperimentTargetTag} onValueChange={setAnnouncementExperimentTargetTag}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                            {announcementTargetOptions.tags.map((tag) => (
-                              <SelectItem key={tag.value} value={tag.value}>{tag.value} ({tag.count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Segment</Label>
-                        <Select value={announcementExperimentTargetSegment} onValueChange={setAnnouncementExperimentTargetSegment}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                            {announcementTargetOptions.segments.map((segment) => (
-                              <SelectItem key={segment.value} value={segment.value}>{getAnnouncementSegmentLabel(segment.value, isMyanmar)} ({segment.count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>{telegramUi.announcementTargetServer}</Label>
-                        <Select value={announcementExperimentTargetServerId} onValueChange={setAnnouncementExperimentTargetServerId}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                            {announcementTargetOptions.servers.map((server) => (
-                              <SelectItem key={server.value} value={server.value}>{server.label} ({server.count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>{telegramUi.announcementTargetRegion}</Label>
-                        <Select value={announcementExperimentTargetCountryCode} onValueChange={setAnnouncementExperimentTargetCountryCode}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">{telegramUi.announcementAllTargets}</SelectItem>
-                            {announcementTargetOptions.regions.map((region) => (
-                              <SelectItem key={region.value} value={region.value}>{region.value} ({region.count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-2xl border border-border/50 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{telegramUi.announcementExperimentVariantA}</p>
-                          <Badge variant="outline">{normalizedExperimentVariantASplit}%</Badge>
-                        </div>
-                        <div className="mt-3 space-y-3">
-                          <div>
-                            <Label>{telegramUi.announcementSubject}</Label>
-                            <Input value={announcementExperimentVariantATitle} onChange={(event) => setAnnouncementExperimentVariantATitle(event.target.value)} className="mt-2" />
-                          </div>
-                          <div>
-                            <Label>{telegramUi.announcementBody}</Label>
-                            <Textarea value={announcementExperimentVariantAMessage} onChange={(event) => setAnnouncementExperimentVariantAMessage(event.target.value)} className="mt-2 min-h-[140px]" />
-                          </div>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div>
-                              <Label>{telegramUi.announcementCardStyle}</Label>
-                              <Select value={announcementExperimentVariantACardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementExperimentVariantACardStyle(value)}>
-                                <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="DEFAULT">Default</SelectItem>
-                                  <SelectItem value="PROMO">Promo</SelectItem>
-                                  <SelectItem value="PREMIUM">Premium</SelectItem>
-                                  <SelectItem value="OPERATIONS">Operations</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>{telegramUi.announcementHeroImage}</Label>
-                              <Input value={announcementExperimentVariantAHeroImageUrl} onChange={(event) => setAnnouncementExperimentVariantAHeroImageUrl(event.target.value)} className="mt-2" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-border/50 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{telegramUi.announcementExperimentVariantB}</p>
-                          <Badge variant="outline">{normalizedExperimentVariantBSplit}%</Badge>
-                        </div>
-                        <div className="mt-3 space-y-3">
-                          <div>
-                            <Label>{telegramUi.announcementSubject}</Label>
-                            <Input value={announcementExperimentVariantBTitle} onChange={(event) => setAnnouncementExperimentVariantBTitle(event.target.value)} className="mt-2" />
-                          </div>
-                          <div>
-                            <Label>{telegramUi.announcementBody}</Label>
-                            <Textarea value={announcementExperimentVariantBMessage} onChange={(event) => setAnnouncementExperimentVariantBMessage(event.target.value)} className="mt-2 min-h-[140px]" />
-                          </div>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div>
-                              <Label>{telegramUi.announcementCardStyle}</Label>
-                              <Select value={announcementExperimentVariantBCardStyle} onValueChange={(value: TelegramAnnouncementCardStyle) => setAnnouncementExperimentVariantBCardStyle(value)}>
-                                <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="DEFAULT">Default</SelectItem>
-                                  <SelectItem value="PROMO">Promo</SelectItem>
-                                  <SelectItem value="PREMIUM">Premium</SelectItem>
-                                  <SelectItem value="OPERATIONS">Operations</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>{telegramUi.announcementHeroImage}</Label>
-                              <Input value={announcementExperimentVariantBHeroImageUrl} onChange={(event) => setAnnouncementExperimentVariantBHeroImageUrl(event.target.value)} className="mt-2" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <Switch checked={announcementExperimentIncludeSupportButton} onCheckedChange={setAnnouncementExperimentIncludeSupportButton} />
-                        <span className="text-sm text-muted-foreground">{telegramUi.includeSupportButton}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={announcementExperimentPinToInbox} onCheckedChange={setAnnouncementExperimentPinToInbox} />
-                        <span className="text-sm text-muted-foreground">{telegramUi.announcementPinToInbox}</span>
-                      </div>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      {announcementExperiments.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">No saved experiments yet.</p>
-                      ) : (
-                        announcementExperiments.map((experiment) => {
-                          const experimentAnalytics = announcementAnalyticsByExperiment.get(experiment.id);
-                          return (
-                            <div key={experiment.id} className="rounded-2xl border border-border/50 p-3">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium">{experiment.name}</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {experiment.audience} • {experiment.type}
-                                    {experiment.targetSegment ? ` • ${getAnnouncementSegmentLabel(experiment.targetSegment, isMyanmar)}` : ''}
-                                    {experiment.targetServerName ? ` • ${experiment.targetServerName}` : ''}
-                                    {experiment.targetCountryCode ? ` • ${experiment.targetCountryCode}` : ''}
-                                  </p>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  <Badge variant="outline">{experiment.status}</Badge>
-                                  {experiment.launchedAt ? <Badge variant="secondary">{formatDateTime(experiment.launchedAt)}</Badge> : null}
-                                </div>
-                              </div>
-                              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                                {experiment.variants.map((variant) => {
-                                  const variantAnalytics = experimentAnalytics?.variants.find(
-                                    (entry) => entry.variantKey === variant.variantKey,
-                                  );
-                                  return (
-                                    <div key={`${experiment.id}:${variant.variantKey}`} className="rounded-xl border border-border/40 p-3">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <p className="text-sm font-medium">{variant.label}</p>
-                                        <Badge variant="outline">{variant.allocationPercent}%</Badge>
-                                      </div>
-                                      <p className="mt-1 text-xs text-muted-foreground">{variant.title}</p>
-                                      <p className="mt-2 text-xs text-muted-foreground">
-                                        {variantAnalytics
-                                          ? `${variantAnalytics.sentCount}/${variantAnalytics.totalRecipients} sent • ${variantAnalytics.attributedOrders} orders • ${Math.round(variantAnalytics.conversionRate * 100)}% conv.`
-                                          : `${variant.sentCount}/${variant.totalRecipients} sent • ${variant.failedCount} failed`}
-                                      </p>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {experimentAnalytics ? (
-                                <p className="mt-3 text-xs text-muted-foreground">
-                                  {experimentAnalytics.sentCount}/{experimentAnalytics.totalRecipients} sent • {experimentAnalytics.openCount} opens • {experimentAnalytics.clickCount} clicks • {experimentAnalytics.attributedOrders} attributed orders
-                                </p>
-                              ) : (
-                                <p className="mt-3 text-xs text-muted-foreground">
-                                  {experiment.sentCount}/{experiment.totalRecipients} sent • {experiment.failedCount} failed
-                                </p>
-                              )}
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <Button type="button" size="sm" variant="outline" onClick={() => loadAnnouncementExperimentIntoForm(experiment)}>
-                                  {telegramUi.announcementExperimentLoad}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => launchAnnouncementExperimentMutation.mutate({ experimentId: experiment.id })}
-                                  disabled={
-                                    launchAnnouncementExperimentMutation.isPending ||
-                                    experiment.status === 'RUNNING'
-                                  }
-                                >
-                                  {telegramUi.announcementExperimentLaunch}
-                                </Button>
-                                {experimentAnalytics?.latestAnnouncementId || experiment.latestAnnouncementId ? (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      const announcementId =
-                                        experimentAnalytics?.latestAnnouncementId ||
-                                        experiment.latestAnnouncementId ||
-                                        null;
-                                      if (!announcementId) {
-                                        return;
-                                      }
-                                      setActiveBotTab('history');
-                                      updateTelegramUrlState({
-                                        workspace: 'telegram',
-                                        botTab: 'history',
-                                        announcementId,
-                                      });
-                                    }}
-                                  >
-                                    {telegramUi.announcementExperimentJumpHistory}
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
+                  <AnnouncementExperimentsPanel
+                    ui={{
+                      announcementExperimentsTitle: telegramUi.announcementExperimentsTitle,
+                      announcementExperimentsDesc: telegramUi.announcementExperimentsDesc,
+                      announcementExperimentCreateNew: telegramUi.announcementExperimentCreateNew,
+                      announcementExperimentSave: telegramUi.announcementExperimentSave,
+                      announcementExperimentLaunch: telegramUi.announcementExperimentLaunch,
+                      announcementExperimentName: telegramUi.announcementExperimentName,
+                      announcementAudience: telegramUi.announcementAudience,
+                      announcementType: telegramUi.announcementType,
+                      announcementExperimentSplit: telegramUi.announcementExperimentSplit,
+                      announcementTargetTag: telegramUi.announcementTargetTag,
+                      announcementTargetServer: telegramUi.announcementTargetServer,
+                      announcementTargetRegion: telegramUi.announcementTargetRegion,
+                      announcementAllTargets: telegramUi.announcementAllTargets,
+                      announcementExperimentVariantA: telegramUi.announcementExperimentVariantA,
+                      announcementExperimentVariantB: telegramUi.announcementExperimentVariantB,
+                      announcementSubject: telegramUi.announcementSubject,
+                      announcementBody: telegramUi.announcementBody,
+                      announcementCardStyle: telegramUi.announcementCardStyle,
+                      announcementHeroImage: telegramUi.announcementHeroImage,
+                      includeSupportButton: telegramUi.includeSupportButton,
+                      announcementPinToInbox: telegramUi.announcementPinToInbox,
+                      announcementExperimentLoad: telegramUi.announcementExperimentLoad,
+                      announcementExperimentJumpHistory: telegramUi.announcementExperimentJumpHistory,
+                    }}
+                    isMyanmar={isMyanmar}
+                    canManageAnnouncements={canManageAnnouncements}
+                    targetOptions={announcementTargetOptions}
+                    experiments={announcementExperiments}
+                    analyticsByExperiment={announcementAnalyticsByExperiment}
+                    experimentId={announcementExperimentId}
+                    experimentName={announcementExperimentName}
+                    experimentAudience={announcementExperimentAudience}
+                    experimentType={announcementExperimentType}
+                    experimentTargetTag={announcementExperimentTargetTag}
+                    experimentTargetSegment={announcementExperimentTargetSegment}
+                    experimentTargetServerId={announcementExperimentTargetServerId}
+                    experimentTargetCountryCode={announcementExperimentTargetCountryCode}
+                    experimentIncludeSupportButton={announcementExperimentIncludeSupportButton}
+                    experimentPinToInbox={announcementExperimentPinToInbox}
+                    experimentVariantASplit={announcementExperimentVariantASplit}
+                    normalizedExperimentVariantASplit={normalizedExperimentVariantASplit}
+                    normalizedExperimentVariantBSplit={normalizedExperimentVariantBSplit}
+                    experimentVariantATitle={announcementExperimentVariantATitle}
+                    experimentVariantAMessage={announcementExperimentVariantAMessage}
+                    experimentVariantAHeroImageUrl={announcementExperimentVariantAHeroImageUrl}
+                    experimentVariantACardStyle={announcementExperimentVariantACardStyle}
+                    experimentVariantBTitle={announcementExperimentVariantBTitle}
+                    experimentVariantBMessage={announcementExperimentVariantBMessage}
+                    experimentVariantBHeroImageUrl={announcementExperimentVariantBHeroImageUrl}
+                    experimentVariantBCardStyle={announcementExperimentVariantBCardStyle}
+                    savePending={saveAnnouncementExperimentMutation.isPending}
+                    launchPending={launchAnnouncementExperimentMutation.isPending}
+                    onReset={resetAnnouncementExperimentForm}
+                    onSave={() =>
+                      saveAnnouncementExperimentMutation.mutate({
+                        experimentId: announcementExperimentId || undefined,
+                        name: announcementExperimentName.trim(),
+                        audience: announcementExperimentAudience,
+                        type: announcementExperimentType,
+                        filters: announcementExperimentFilters,
+                        includeSupportButton: announcementExperimentIncludeSupportButton,
+                        pinToInbox: announcementExperimentPinToInbox,
+                        variants: [
+                          {
+                            variantKey: 'A',
+                            label: 'Variant A',
+                            allocationPercent: normalizedExperimentVariantASplit,
+                            title: announcementExperimentVariantATitle.trim(),
+                            message: announcementExperimentVariantAMessage.trim(),
+                            heroImageUrl: announcementExperimentVariantAHeroImageUrl.trim() || null,
+                            cardStyle: announcementExperimentVariantACardStyle,
+                          },
+                          {
+                            variantKey: 'B',
+                            label: 'Variant B',
+                            allocationPercent: normalizedExperimentVariantBSplit,
+                            title: announcementExperimentVariantBTitle.trim(),
+                            message: announcementExperimentVariantBMessage.trim(),
+                            heroImageUrl: announcementExperimentVariantBHeroImageUrl.trim() || null,
+                            cardStyle: announcementExperimentVariantBCardStyle,
+                          },
+                        ],
+                      })
+                    }
+                    onLaunchCurrent={() => {
+                      if (!announcementExperimentId) {
+                        return;
+                      }
+                      launchAnnouncementExperimentMutation.mutate({
+                        experimentId: announcementExperimentId,
+                      });
+                    }}
+                    onExperimentNameChange={setAnnouncementExperimentName}
+                    onExperimentAudienceChange={setAnnouncementExperimentAudience}
+                    onExperimentTypeChange={setAnnouncementExperimentType}
+                    onExperimentVariantASplitChange={setAnnouncementExperimentVariantASplit}
+                    onExperimentTargetTagChange={setAnnouncementExperimentTargetTag}
+                    onExperimentTargetSegmentChange={setAnnouncementExperimentTargetSegment}
+                    onExperimentTargetServerIdChange={setAnnouncementExperimentTargetServerId}
+                    onExperimentTargetCountryCodeChange={setAnnouncementExperimentTargetCountryCode}
+                    onExperimentVariantATitleChange={setAnnouncementExperimentVariantATitle}
+                    onExperimentVariantAMessageChange={setAnnouncementExperimentVariantAMessage}
+                    onExperimentVariantAHeroImageUrlChange={setAnnouncementExperimentVariantAHeroImageUrl}
+                    onExperimentVariantACardStyleChange={setAnnouncementExperimentVariantACardStyle}
+                    onExperimentVariantBTitleChange={setAnnouncementExperimentVariantBTitle}
+                    onExperimentVariantBMessageChange={setAnnouncementExperimentVariantBMessage}
+                    onExperimentVariantBHeroImageUrlChange={setAnnouncementExperimentVariantBHeroImageUrl}
+                    onExperimentVariantBCardStyleChange={setAnnouncementExperimentVariantBCardStyle}
+                    onExperimentIncludeSupportButtonChange={setAnnouncementExperimentIncludeSupportButton}
+                    onExperimentPinToInboxChange={setAnnouncementExperimentPinToInbox}
+                    onLoadExperiment={loadAnnouncementExperimentIntoForm}
+                    onLaunchExperiment={(experimentId) =>
+                      launchAnnouncementExperimentMutation.mutate({ experimentId })
+                    }
+                    onJumpToHistory={(announcementId) => {
+                      if (!announcementId) {
+                        return;
+                      }
+                      setActiveBotTab('history');
+                      updateTelegramUrlState({
+                        workspace: 'telegram',
+                        botTab: 'history',
+                        announcementId,
+                      });
+                    }}
+                    getAnnouncementSegmentLabel={getAnnouncementSegmentLabel}
+                  />
                   <AnnouncementAnalyticsInsights
                     ui={{
                       announcementSuccessRate: telegramUi.announcementSuccessRate,
@@ -7538,7 +7068,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           ) : (
             <div className="space-y-3">
               {matchedOrders.map((order) => (
-                <div key={order.id} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                <div
+                  key={order.id}
+                  className="rounded-2xl border border-border/60 bg-background/55 p-4"
+                  data-testid={`review-order-${order.orderCode}`}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -7592,6 +7126,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                               variant="secondary"
                               onClick={() => handleClaimOrder(order.id, true)}
                               disabled={!canManageTelegramReviews || claimOrderMutation.isPending}
+                              data-testid={`review-order-claim-${order.orderCode}`}
                             >
                               <KeyRound className="mr-2 h-4 w-4" />
                               {salesUi.claimOrder}
@@ -7645,6 +7180,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                             variant="secondary"
                             onClick={() => handleApplyOrderMacro(order.id, 'APPROVE_QUICK')}
                             disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            data-testid={`review-order-quick-approve-${order.orderCode}`}
                           >
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             {salesUi.quickApprove}
@@ -7659,6 +7195,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                               )
                             }
                             disabled={!canManageTelegramReviews || applyOrderMacroMutation.isPending || isOrderClaimedByOtherUser(order)}
+                            data-testid={`review-order-reject-primary-${order.orderCode}`}
                           >
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             {order.duplicateProofOrderCode

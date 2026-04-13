@@ -25,6 +25,7 @@
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
     "smoke": "tsx scripts/smoke-test.ts",
     "smoke:telegram": "tsx scripts/smoke-test-telegram.ts",
+    "smoke:e2e": "playwright test --config=playwright.config.ts",
     "env:check": "tsx scripts/validate-production.ts",
     "bootstrap:vps": "bash scripts/bootstrap-vps.sh",
     "deploy:vps": "bash scripts/deploy-vps.sh",
@@ -92,6 +93,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/adm-zip": "^0.5.7",
     "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^2.4.6",

@@ -442,6 +442,7 @@ export default function SupportThreadDetailPage() {
                   variant="outline"
                   disabled={isBusy}
                   onClick={() => claimMutation.mutate({ threadId })}
+                  data-testid="support-claim"
                 >
                   Claim to me
                 </Button>
@@ -490,6 +491,7 @@ export default function SupportThreadDetailPage() {
                 <Button
                   disabled={isBusy || replyMessage.trim().length === 0}
                   onClick={() => replyMutation.mutate({ threadId, message: replyMessage })}
+                  data-testid="support-send-reply"
                 >
                   {replyMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1649,7 +1649,7 @@ function CreateKeyDialog({
             >
               {t('keys.cancel')}
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" disabled={createMutation.isPending} data-testid="create-access-key-submit">
               {createMutation.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
@@ -3963,7 +3963,11 @@ export default function KeysPage() {
                 <p className="text-sm text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-                <Button onClick={() => setCreateDialogOpen(true)} className="h-10 w-full justify-center rounded-2xl sm:col-span-3 xl:col-span-1">
+                <Button
+                  onClick={() => setCreateDialogOpen(true)}
+                  className="h-10 w-full justify-center rounded-2xl sm:col-span-3 xl:col-span-1"
+                  data-testid="create-access-key"
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   {t('keys.create')}
                 </Button>
@@ -3994,7 +3998,11 @@ export default function KeysPage() {
 
         <div className="grid gap-2 sm:hidden">
           <div className="grid grid-cols-2 gap-2">
-            <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
+            <Button
+              onClick={() => setCreateDialogOpen(true)}
+              className="h-11 w-full justify-center rounded-full"
+              data-testid="create-access-key"
+            >
               <Plus className="w-4 h-4 mr-2" />
               {t('keys.create')}
             </Button>

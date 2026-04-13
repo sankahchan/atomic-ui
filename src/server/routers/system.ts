@@ -3,7 +3,14 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { db } from '@/lib/db';
-import { syncSchedulerJobCatalog } from '@/lib/services/scheduler-jobs';
+import {
+    isSchedulerJobManualRunSupported,
+    syncSchedulerJobCatalog,
+} from '@/lib/services/scheduler-jobs';
+import { runManualSchedulerJob } from '@/lib/services/scheduler-job-manual';
+import { writeAuditLog } from '@/lib/audit';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 const execAsync = promisify(exec);
 
@@ -118,9 +125,77 @@ export const systemRouter = router({
 
         return {
             totals,
-            jobs,
+            jobs: jobs.map((job) => ({
+                ...job,
+                manualRunSupported: isSchedulerJobManualRunSupported(job.key),
+            })),
         };
     }),
+    runSchedulerJob: adminProcedure
+        .input(
+            z.object({
+                jobKey: z.string().trim().min(1),
+            }),
+        )
+        .mutation(async ({ ctx, input }) => {
+            await syncSchedulerJobCatalog();
+
+            if (!isSchedulerJobManualRunSupported(input.jobKey)) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: 'This scheduler job cannot be triggered manually.',
+                });
+            }
+
+            const existingJob = await db.schedulerJob.findUnique({
+                where: { key: input.jobKey },
+                select: {
+                    key: true,
+                    name: true,
+                    lastStatus: true,
+                },
+            });
+
+            if (existingJob?.lastStatus === 'RUNNING') {
+                throw new TRPCError({
+                    code: 'CONFLICT',
+                    message: 'This scheduler job is already running.',
+                });
+            }
+
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'SCHEDULER_JOB_RUN_MANUAL',
+                entity: 'SCHEDULER_JOB',
+                entityId: input.jobKey,
+                details: {
+                    jobKey: input.jobKey,
+                    jobName: existingJob?.name || input.jobKey,
+                },
+            });
+
+            await runManualSchedulerJob(input.jobKey);
+
+            const job = await db.schedulerJob.findUnique({
+                where: { key: input.jobKey },
+                include: {
+                    runs: {
+                        orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }],
+                        take: 6,
+                    },
+                },
+            });
+
+            return {
+                job: job
+                    ? {
+                        ...job,
+                        manualRunSupported: isSchedulerJobManualRunSupported(job.key),
+                    }
+                    : null,
+            };
+        }),
     getMyIp: protectedProcedure.query(({ ctx }) => {
         return {
             ip: ctx.clientIp,
