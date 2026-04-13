@@ -232,7 +232,7 @@ export default function MigrationPage() {
 
   const previewQuery = trpc.servers.migrationPreview.useQuery(
     { sourceServerId, targetServerId },
-    { enabled: step === 'preview' && !!sourceServerId && !!targetServerId },
+    { enabled: !!sourceServerId && !!targetServerId && sourceServerId !== targetServerId },
   );
 
   const migrateMutation = trpc.servers.migrateKeys.useMutation({
@@ -302,8 +302,8 @@ export default function MigrationPage() {
     });
   }
 
-  function handleStartMigration() {
-    if (selectedKeyIds.size === 0) {
+  function startMigrationRun(keyIds: string[]) {
+    if (keyIds.length === 0) {
       toast({ title: 'Please select at least one key', variant: 'destructive' });
       return;
     }
@@ -312,9 +312,24 @@ export default function MigrationPage() {
     migrateMutation.mutate({
       sourceServerId,
       targetServerId,
-      keyIds: Array.from(selectedKeyIds),
+      keyIds,
       deleteFromSource,
     });
+  }
+
+  function handleStartMigration() {
+    startMigrationRun(Array.from(selectedKeyIds));
+  }
+
+  function handleMigrateAllNow() {
+    const allPreviewIds = previewKeys.map((key) => key.id);
+    if (allPreviewIds.length === 0) {
+      toast({ title: 'No eligible keys found', description: 'The selected source server has no active or pending keys to move.', variant: 'destructive' });
+      return;
+    }
+
+    setSelectedKeyIds(new Set(allPreviewIds));
+    startMigrationRun(allPreviewIds);
   }
 
   function handleReset() {
@@ -487,6 +502,8 @@ export default function MigrationPage() {
                 value={sourceServerId}
                 onValueChange={(v) => {
                   setSourceServerId(v);
+                  setSelectedKeyIds(new Set());
+                  setMigrationResult(null);
                   if (step !== 'select') setStep('select');
                 }}
                 disabled={step === 'migrating'}
@@ -524,6 +541,8 @@ export default function MigrationPage() {
                 value={targetServerId}
                 onValueChange={(v) => {
                   setTargetServerId(v);
+                  setSelectedKeyIds(new Set());
+                  setMigrationResult(null);
                   if (step !== 'select') setStep('select');
                 }}
                 disabled={step === 'migrating'}
@@ -563,14 +582,50 @@ export default function MigrationPage() {
                 Delete old keys from source server after migration
               </Label>
             </div>
-            <Button
-              className="sm:min-w-[160px]"
-              onClick={handleLoadPreview}
-              disabled={!sourceServerId || !targetServerId || step === 'migrating'}
-            >
-              Load Keys
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="outline"
+                className="sm:min-w-[160px]"
+                onClick={handleLoadPreview}
+                disabled={!sourceServerId || !targetServerId || step === 'migrating'}
+              >
+                Load Keys
+              </Button>
+              <Button
+                className="sm:min-w-[220px]"
+                onClick={handleMigrateAllNow}
+                disabled={
+                  !sourceServerId ||
+                  !targetServerId ||
+                  step === 'migrating' ||
+                  previewQuery.isLoading ||
+                  previewKeys.length === 0
+                }
+              >
+                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                Migrate all active keys
+              </Button>
+            </div>
           </div>
+          {sourceServerId && targetServerId ? (
+            <div className="mt-4 rounded-[1.1rem] border border-border/60 bg-background/40 p-4 text-sm dark:bg-white/[0.03]">
+              {previewQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading migration preview…
+                </div>
+              ) : previewQuery.data ? (
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    {previewQuery.data.totalKeys} active or pending key{previewQuery.data.totalKeys === 1 ? '' : 's'} can move from {previewQuery.data.sourceServer.name} to {previewQuery.data.targetServer.name}.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use “Migrate all active keys” for a one-step run, or load the preview to choose specific keys.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

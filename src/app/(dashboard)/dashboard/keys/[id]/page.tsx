@@ -2422,6 +2422,8 @@ export default function KeyDetailPage() {
   const [detailTab, setDetailTab] = useState<'overview' | 'delivery' | 'activity' | 'support'>('overview');
   const [replacementServerId, setReplacementServerId] = useState('none');
   const [notifyOnReplacement, setNotifyOnReplacement] = useState(true);
+  const [rotationEnabledDraft, setRotationEnabledDraft] = useState(false);
+  const [rotationIntervalDraft, setRotationIntervalDraft] = useState<'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('NEVER');
   const { data: currentUser } = trpc.auth.me.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
@@ -2497,6 +2499,38 @@ export default function KeyDetailPage() {
       });
     },
   });
+  const updateRotationMutation = trpc.keys.updateRotationSettings.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Rotation policy updated',
+        description: 'The auto-rotation schedule has been saved for this access key.',
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to save rotation policy',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const rotateNowMutation = trpc.keys.rotateNow.useMutation({
+    onSuccess: async () => {
+      toast({
+        title: 'Access key rotated',
+        description: 'The ss:// credential was replaced. The subscription link stays the same.',
+      });
+      await refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Rotation failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -2504,6 +2538,11 @@ export default function KeyDetailPage() {
     setReplacementServerId('none');
     setNotifyOnReplacement(Boolean(key?.telegramDeliveryEnabled));
   }, [key?.id, key?.telegramDeliveryEnabled]);
+
+  useEffect(() => {
+    setRotationEnabledDraft(Boolean((key as any)?.rotationEnabled));
+    setRotationIntervalDraft(((key as any)?.rotationInterval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY') || 'NEVER');
+  }, [key?.id, (key as any)?.rotationEnabled, (key as any)?.rotationInterval]);
 
   const handleDelete = () => {
     setDeleteDialogOpen(true);
@@ -2608,7 +2647,7 @@ export default function KeyDetailPage() {
   const detailTabCopy: Record<'overview' | 'delivery' | 'activity' | 'support', string> = {
     overview: 'Connection basics, quota, expiry, and contact details for this access key.',
     delivery: 'Share links, client delivery, and distribution controls for handing the key to the customer cleanly.',
-    activity: 'Live usage, health, active sessions, and server operations for keeping the key stable.',
+    activity: 'Live usage, rotation policy, health, and server operations for keeping the key stable.',
     support: 'Billing history and support workflow context tied to this access key.',
   };
 
@@ -2645,6 +2684,12 @@ export default function KeyDetailPage() {
       description: `${configDownloadFilename} has been saved.`,
     });
   };
+
+  const isDynamicChildKey = Boolean((key as any).dynamicKeyId);
+  const currentRotationInterval = ((key as any).rotationInterval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY') || 'NEVER';
+  const hasRotationChanges =
+    rotationEnabledDraft !== Boolean((key as any).rotationEnabled) ||
+    rotationIntervalDraft !== currentRotationInterval;
 
   return (
     <div className="space-y-6">
@@ -3096,6 +3141,127 @@ export default function KeyDetailPage() {
             </TabsContent>
 
             <TabsContent value="activity" className="mt-0 space-y-4">
+              {isAdmin ? (
+                <Card className="ops-detail-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-primary" />
+                      Auto-Rotation
+                    </CardTitle>
+                    <CardDescription>
+                      Rotate the underlying ss:// credential on a schedule without changing the subscription link your customer already uses.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {isDynamicChildKey ? (
+                      <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
+                        This key belongs to a dynamic key, so its rotation policy is controlled from the parent dynamic-key workspace.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 dark:bg-white/[0.03]">
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium">Enable scheduled rotation</p>
+                            <p className="text-xs text-muted-foreground">
+                              Scheduled rotation waits if the key had recent traffic in the last 20 minutes, then tries again on the next cycle.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={rotationEnabledDraft}
+                            onCheckedChange={setRotationEnabledDraft}
+                            disabled={updateRotationMutation.isPending}
+                          />
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Rotation interval</Label>
+                            <Select
+                              value={rotationIntervalDraft}
+                              onValueChange={(value) =>
+                                setRotationIntervalDraft(value as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY')
+                              }
+                              disabled={!rotationEnabledDraft}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="DAILY">Daily</SelectItem>
+                                <SelectItem value="WEEKLY">Weekly</SelectItem>
+                                <SelectItem value="BIWEEKLY">Every 2 weeks</SelectItem>
+                                <SelectItem value="MONTHLY">Monthly</SelectItem>
+                                <SelectItem value="NEVER">Disabled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Rotation health</Label>
+                            <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm dark:bg-white/[0.03]">
+                              <p className="font-medium">
+                                {(key as any).rotationEnabled ? ((key as any).nextRotationAt ? formatRelativeTime((key as any).nextRotationAt) : 'Waiting for the next scheduler run') : 'Disabled'}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Next scheduled rotation
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="ops-inline-stat">
+                            <p className="text-sm text-muted-foreground">Last rotated</p>
+                            <p className="font-medium">
+                              {(key as any).lastRotatedAt ? formatRelativeTime((key as any).lastRotatedAt) : 'Never'}
+                            </p>
+                          </div>
+                          <div className="ops-inline-stat">
+                            <p className="text-sm text-muted-foreground">Rotations</p>
+                            <p className="font-medium">{(key as any).rotationCount ?? 0}</p>
+                          </div>
+                          <div className="ops-inline-stat">
+                            <p className="text-sm text-muted-foreground">Subscription link</p>
+                            <p className="font-medium">Stable</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={() =>
+                              updateRotationMutation.mutate({
+                                id: key.id,
+                                rotationEnabled: rotationEnabledDraft && rotationIntervalDraft !== 'NEVER',
+                                rotationInterval: rotationIntervalDraft,
+                              })
+                            }
+                            disabled={updateRotationMutation.isPending || !hasRotationChanges}
+                          >
+                            {updateRotationMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Shield className="mr-2 h-4 w-4" />
+                            )}
+                            Save rotation policy
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => rotateNowMutation.mutate({ id: key.id })}
+                            disabled={rotateNowMutation.isPending || !(key as any).rotationEnabled}
+                          >
+                            {rotateNowMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCw className="mr-2 h-4 w-4" />
+                            )}
+                            Rotate now
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
+
               {isAdmin ? (
                 <Card className="ops-detail-card">
                   <CardHeader>

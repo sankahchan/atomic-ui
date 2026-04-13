@@ -157,7 +157,7 @@ export default function StatusPage() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch(withBasePath('/api/health-check'));
+      const res = await fetch(withBasePath('/api/health-check'), { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch status');
       const json = await res.json();
       setData(json);

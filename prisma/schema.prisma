@@ -190,6 +190,11 @@ model AccessKey {
   archiveAfterAt       DateTime?
   autoRenewPolicy      String  @default("NONE") // NONE, EXTEND_DURATION
   autoRenewDurationDays Int?
+  rotationEnabled      Boolean @default(false)
+  rotationInterval     String  @default("NEVER") // NEVER, DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  lastRotatedAt        DateTime?
+  nextRotationAt       DateTime?
+  rotationCount        Int     @default(0)
 
   // Dynamic key association
   dynamicKeyId String?

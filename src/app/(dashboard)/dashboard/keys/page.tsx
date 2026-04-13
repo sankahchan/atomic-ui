@@ -3250,6 +3250,18 @@ export default function KeysPage() {
             </div>
           </div>
           <div className="ml-3 flex flex-col items-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => handleSelectKey(key.id)}
+            >
+              {selectedKeys.has(key.id) ? (
+                <CheckSquare className="h-4 w-4 text-primary" />
+              ) : (
+                <Square className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
             <Badge className={cn('border', config.color)}>
               <StatusIcon className="w-3 h-3 mr-1" />
               {t(config.labelKey)}
@@ -4960,10 +4972,24 @@ export default function KeysPage() {
                           )}
                         </div>
                       </div>
-                      <Badge className={cn('border shrink-0', config.color)}>
-                        <StatusIcon className="w-3 h-3 mr-1" />
-                        {t(config.labelKey)}
-                      </Badge>
+                      <div className="ml-3 flex items-start gap-2 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full"
+                          onClick={() => handleSelectKey(key.id)}
+                        >
+                          {selectedKeys.has(key.id) ? (
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                        <Badge className={cn('border shrink-0', config.color)}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {t(config.labelKey)}
+                        </Badge>
+                      </div>
                     </div>
 
                     {key.status === 'ACTIVE' ? (

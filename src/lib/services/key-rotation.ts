@@ -1,8 +1,11 @@
 /**
  * Key Auto-Rotation Service
  *
- * Rotates underlying access keys for Dynamic Access Keys on a schedule.
- * The subscription URL remains stable — only the server-side keys change.
+ * Rotates credentials for:
+ * - Dynamic Access Keys, by replacing their attached backend keys
+ * - Standalone Access Keys, by replacing the underlying Outline key
+ *
+ * The subscription URL remains stable — only the server-side ss:// credential changes.
  *
  * Rotation process:
  * 1. Create new access keys on the same (or load-balanced) servers
@@ -17,6 +20,7 @@
 
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
+import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { generateRandomString } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
@@ -30,7 +34,11 @@ interface RotationResult {
   rotated: number;
   skipped: number;
   errors: string[];
+  rotatedDynamicKeys: number;
+  rotatedAccessKeys: number;
 }
+
+const STANDALONE_ACCESS_KEY_ROTATION_GRACE_MINUTES = 20;
 
 /**
  * Calculate the next rotation date based on interval.
@@ -197,6 +205,113 @@ async function rotateDakKeys(dakId: string): Promise<{ success: boolean; error?:
   }
 }
 
+async function rotateStandaloneAccessKey(input: {
+  accessKeyId: string;
+  respectRecentActivity?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const key = await db.accessKey.findUnique({
+      where: { id: input.accessKeyId },
+      include: {
+        server: true,
+      },
+    });
+
+    if (!key) {
+      return { success: false, error: 'Access key not found' };
+    }
+
+    if (key.dynamicKeyId) {
+      return {
+        success: false,
+        error: 'This access key belongs to a dynamic key. Configure rotation on the dynamic key instead.',
+      };
+    }
+
+    if (!key.rotationEnabled || key.rotationInterval === 'NEVER') {
+      return { success: false, error: 'Rotation is disabled for this access key.' };
+    }
+
+    if (key.status !== 'ACTIVE') {
+      return { success: false, error: 'Only active access keys can be rotated.' };
+    }
+
+    if (input.respectRecentActivity !== false) {
+      const activeSession = await shouldSkipRotationForDrain({
+        accessKeyIds: [key.id],
+        drainGraceMinutes: STANDALONE_ACCESS_KEY_ROTATION_GRACE_MINUTES,
+      });
+
+      if (activeSession) {
+        return {
+          success: false,
+          error: `Rotation skipped because the key had recent activity within ${STANDALONE_ACCESS_KEY_ROTATION_GRACE_MINUTES} minutes.`,
+        };
+      }
+    }
+
+    const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+    const newOutlineKey = await client.createAccessKey({
+      name: key.name,
+      method: key.method || 'chacha20-ietf-poly1305',
+    });
+
+    if (key.dataLimitBytes) {
+      try {
+        await client.setAccessKeyDataLimit(newOutlineKey.id, Number(key.dataLimitBytes));
+      } catch {
+        logger.warn(`Could not copy data limit to rotated access key ${newOutlineKey.id}`);
+      }
+    }
+
+    const now = new Date();
+
+    await db.connectionSession.updateMany({
+      where: {
+        accessKeyId: key.id,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        endedAt: now,
+        endedReason: 'KEY_ROTATED',
+      },
+    });
+
+    await db.accessKey.update({
+      where: { id: key.id },
+      data: {
+        outlineKeyId: newOutlineKey.id,
+        accessUrl: decorateOutlineAccessUrl(newOutlineKey.accessUrl, key.name),
+        password: newOutlineKey.password ?? null,
+        port: newOutlineKey.port ?? null,
+        method: newOutlineKey.method ?? key.method,
+        usageOffset: -key.usedBytes,
+        lastRotatedAt: now,
+        nextRotationAt: calculateNextRotation(key.rotationInterval, now),
+        rotationCount: { increment: 1 },
+      },
+    });
+
+    try {
+      await client.deleteAccessKey(key.outlineKeyId);
+    } catch (error) {
+      logger.warn(
+        `Could not delete old rotated Outline key ${key.outlineKeyId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    logger.info(`🔄 Rotated standalone access key "${key.name}" (${key.id})`);
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown rotation error';
+    logger.error(`Rotation failed for access key ${input.accessKeyId}: ${msg}`);
+    return { success: false, error: msg };
+  }
+}
+
 async function shouldSkipRotationForDrain(input: {
   accessKeyIds: string[];
   drainGraceMinutes: number;
@@ -266,6 +381,21 @@ function resolveRotationTrigger(input: {
   }
 }
 
+function isStandaloneAccessKeyRotationDue(input: {
+  nextRotationAt: Date | null;
+  rotationEnabled: boolean;
+  status: string;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  return Boolean(
+    input.rotationEnabled &&
+      input.status === 'ACTIVE' &&
+      input.nextRotationAt &&
+      input.nextRotationAt <= now,
+  );
+}
+
 /**
  * Check all DAKs with rotation enabled and rotate any that are due.
  * Called periodically by the scheduler.
@@ -275,6 +405,8 @@ export async function checkKeyRotations(): Promise<RotationResult> {
     rotated: 0,
     skipped: 0,
     errors: [],
+    rotatedDynamicKeys: 0,
+    rotatedAccessKeys: 0,
   };
 
   const now = new Date();
@@ -384,8 +516,46 @@ export async function checkKeyRotations(): Promise<RotationResult> {
 
     if (rotationResult.success) {
       result.rotated++;
+      result.rotatedDynamicKeys++;
     } else {
       result.errors.push(`${dak.name}: ${rotationResult.error}`);
+    }
+  }
+
+  const standaloneKeysToRotate = await db.accessKey.findMany({
+    where: {
+      rotationEnabled: true,
+      status: 'ACTIVE',
+      dynamicKeyId: null,
+    },
+    select: {
+      id: true,
+      name: true,
+      rotationEnabled: true,
+      rotationInterval: true,
+      nextRotationAt: true,
+      status: true,
+    },
+  });
+
+  for (const key of standaloneKeysToRotate) {
+    if (!isStandaloneAccessKeyRotationDue(key)) {
+      result.skipped++;
+      continue;
+    }
+
+    const rotationResult = await rotateStandaloneAccessKey({
+      accessKeyId: key.id,
+      respectRecentActivity: true,
+    });
+
+    if (rotationResult.success) {
+      result.rotated++;
+      result.rotatedAccessKeys++;
+    } else if (rotationResult.error?.includes('recent activity')) {
+      result.skipped++;
+    } else {
+      result.errors.push(`${key.name}: ${rotationResult.error}`);
     }
   }
 
@@ -402,4 +572,13 @@ export async function triggerManualRotation(
   return rotateDakKeys(dakId);
 }
 
-export { calculateNextRotation };
+export async function triggerManualAccessKeyRotation(
+  accessKeyId: string,
+): Promise<{ success: boolean; error?: string }> {
+  return rotateStandaloneAccessKey({
+    accessKeyId,
+    respectRecentActivity: true,
+  });
+}
+
+export { calculateNextRotation, isStandaloneAccessKeyRotationDue };

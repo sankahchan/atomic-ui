@@ -37,6 +37,7 @@ const publicRoutes = [
   '/s/',                    // Short subscription URLs (Pages)
   '/share/',                // Expiring public invite links
   '/c/',                    // Short client URLs
+  '/status',                // Public uptime page
   '/api/subscription/',     // Subscription API (Bypass auth)
   '/api/sub/',              // Alternative Subscription API
   '/api/health',            // Health check endpoint
@@ -75,12 +76,20 @@ const shareDomainRoutes = [
  * Check if a path matches any of the public route patterns
  * Uses startsWith for prefix matching to handle dynamic segments.
  */
-function isPublicRoute(pathname: string): boolean {
-  return publicRoutes.some((route) => pathname.startsWith(route));
+export function isPublicRoute(pathname: string): boolean {
+  return publicRoutes.some((route) =>
+    route.endsWith('/')
+      ? pathname.startsWith(route)
+      : pathname === route || pathname.startsWith(`${route}/`)
+  );
 }
 
 function isShareDomainRoute(pathname: string): boolean {
-  return shareDomainRoutes.some((route) => pathname.startsWith(route));
+  return shareDomainRoutes.some((route) =>
+    route.endsWith('/')
+      ? pathname.startsWith(route)
+      : pathname === route || pathname.startsWith(`${route}/`)
+  );
 }
 
 function normalizeHost(value: string | null | undefined) {

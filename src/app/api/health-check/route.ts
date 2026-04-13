@@ -26,6 +26,15 @@ import {
 } from '@/lib/services/notification-channels';
 import { enqueueNotificationsForChannels } from '@/lib/services/notification-queue';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
 /**
  * Health check result for a single server.
  */
@@ -103,11 +112,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (servers.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No active servers to check',
-        results: [],
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'No active servers to check',
+          results: [],
+        },
+        { headers: NO_STORE_HEADERS },
+      );
     }
 
     // Run health checks in parallel
@@ -127,22 +139,25 @@ export async function POST(request: NextRequest) {
     // Check for status changes and send notifications
     await processStatusChanges(results, previousStatusByServerId);
 
-    return NextResponse.json({
-      success: true,
-      message: `Checked ${results.length} server(s)`,
-      results: results.map((r) => ({
-        serverId: r.serverId,
-        serverName: r.serverName,
-        status: r.status,
-        latencyMs: r.latencyMs,
-        error: r.error,
-      })),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: `Checked ${results.length} server(s)`,
+        results: results.map((r) => ({
+          serverId: r.serverId,
+          serverName: r.serverName,
+          status: r.status,
+          latencyMs: r.latencyMs,
+          error: r.error,
+        })),
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error('Health check error:', error);
     return NextResponse.json(
       { error: 'Health check failed', details: String(error) },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -175,16 +190,19 @@ export async function GET() {
       keyCount: server._count.accessKeys,
     }));
 
-    return NextResponse.json({
-      success: true,
-      servers: status,
-      checkedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        servers: status,
+        checkedAt: new Date().toISOString(),
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error('Health status error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch health status' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

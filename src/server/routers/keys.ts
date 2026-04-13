@@ -89,6 +89,8 @@ const ENCRYPTION_METHODS = [
   'aes-256-gcm',
 ] as const;
 
+const accessKeyRotationIntervalSchema = z.enum(['NEVER', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']);
+
 const createKeySchema = z.object({
   serverId: z.string().optional().nullable(),
   assignmentMode: z.enum(['MANUAL', 'AUTO']).default('MANUAL'),
@@ -1759,6 +1761,12 @@ export const keysRouter = router({
               await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
             }
 
+            const { calculateNextRotation } = await import('@/lib/services/key-rotation');
+            const nextRotationAt =
+              key.rotationEnabled && key.rotationInterval !== 'NEVER'
+                ? calculateNextRotation(key.rotationInterval, new Date())
+                : null;
+
             await db.accessKey.update({
               where: { id },
               data: {
@@ -1772,6 +1780,7 @@ export const keysRouter = router({
                 disabledOutlineKeyId: null,
                 // Set negative offset to preserve the existing usedBytes during sync
                 usageOffset: BigInt(preservedUsageOffset),
+                nextRotationAt,
               },
             });
           } else {
@@ -1789,6 +1798,7 @@ export const keysRouter = router({
                 disabledAt: new Date(),
                 disabledOutlineKeyId: key.outlineKeyId,
                 estimatedDevices: 0,
+                nextRotationAt: null,
               },
             });
 
@@ -2117,6 +2127,12 @@ export const keysRouter = router({
             await client.setAccessKeyDataLimit(newOutlineKey.id, serverLimit);
           }
 
+          const { calculateNextRotation } = await import('@/lib/services/key-rotation');
+          const nextRotationAt =
+            key.rotationEnabled && key.rotationInterval !== 'NEVER'
+              ? calculateNextRotation(key.rotationInterval, new Date())
+              : null;
+
           // Update DB with new Outline key details, preserving usage data
           const updatedKey = await db.accessKey.update({
             where: { id: input.id },
@@ -2135,6 +2151,7 @@ export const keysRouter = router({
               deviceLimitAutoDisabledAt: null,
               // Set negative offset to preserve the existing usedBytes during sync
               usageOffset: BigInt(preservedUsageOffset),
+              nextRotationAt,
             },
             include: {
               server: {
@@ -2178,6 +2195,7 @@ export const keysRouter = router({
             status: 'DISABLED',
             disabledAt: new Date(),
             disabledOutlineKeyId: key.outlineKeyId,
+            nextRotationAt: null,
             // Clear online tracking since key is disabled
             estimatedDevices: 0,
             deviceLimitExceededAt: null,
@@ -3222,6 +3240,132 @@ export const keysRouter = router({
           message: (error as Error).message || 'Failed to replace server for this key.',
         });
       }
+    }),
+
+  updateRotationSettings: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        rotationEnabled: z.boolean(),
+        rotationInterval: accessKeyRotationIntervalSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          dynamicKeyId: true,
+          rotationEnabled: true,
+          rotationInterval: true,
+          nextRotationAt: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (key.dynamicKeyId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This access key belongs to a dynamic key. Configure rotation on the dynamic key instead.',
+        });
+      }
+
+      const { calculateNextRotation } = await import('@/lib/services/key-rotation');
+      const now = new Date();
+      const nextRotationAt =
+        input.rotationEnabled && input.rotationInterval !== 'NEVER' && key.status === 'ACTIVE'
+          ? calculateNextRotation(input.rotationInterval, now)
+          : null;
+
+      await db.accessKey.update({
+        where: { id: input.id },
+        data: {
+          rotationEnabled: input.rotationEnabled,
+          rotationInterval: input.rotationInterval,
+          nextRotationAt,
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_ROTATION_SETTINGS_UPDATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          previousRotationEnabled: key.rotationEnabled,
+          previousRotationInterval: key.rotationInterval,
+          rotationEnabled: input.rotationEnabled,
+          rotationInterval: input.rotationInterval,
+          nextRotationAt: nextRotationAt?.toISOString() ?? null,
+        },
+      });
+
+      return {
+        success: true,
+        nextRotationAt: nextRotationAt?.toISOString() ?? null,
+      };
+    }),
+
+  rotateNow: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          dynamicKeyId: true,
+          rotationCount: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (key.dynamicKeyId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This access key belongs to a dynamic key. Rotate the dynamic key instead.',
+        });
+      }
+
+      const { triggerManualAccessKeyRotation } = await import('@/lib/services/key-rotation');
+      const result = await triggerManualAccessKeyRotation(input.id);
+
+      if (!result.success) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: result.error || 'Rotation failed.',
+        });
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_ROTATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          previousRotationCount: key.rotationCount,
+          newRotationCount: key.rotationCount + 1,
+          triggeredBy: 'manual',
+        },
+      });
+
+      return { success: true };
     }),
 
   getSharePageAnalytics: protectedProcedure
