@@ -7,7 +7,7 @@
  * Allows users to view connection details, usage stats, and download configs.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,27 +27,36 @@ import {
     Server as ServerIcon,
     AlertTriangle,
     Key,
+    Activity,
+    RotateCcw,
+    MessageSquare,
 } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'react-qr-code';
+import { TrafficChart } from '@/components/ui/traffic-chart';
 
 export default function PortalPage() {
     const { t } = useLocale();
     const { toast } = useToast();
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [usageKey, setUsageKey] = useState<{ id: string; name: string; type: 'ACCESS_KEY' | 'DYNAMIC_KEY' } | null>(null);
+    const [requestKey, setRequestKey] = useState<{ id: string; name: string; type: 'ACCESS_KEY' | 'DYNAMIC_KEY' } | null>(null);
+    const [requestMessage, setRequestMessage] = useState('');
+    const utils = trpc.useUtils();
 
     // Fetch user's keys
-    const { data, isLoading } = trpc.keys.list.useQuery({
+    const keysQuery = trpc.keys.list.useQuery({
         page: 1,
         pageSize: 50,
     });
 
     // Fetch user's dynamic keys
-    const { data: dynamicKeysData, isLoading: isLoadingDAKs } = trpc.dynamicKeys.list.useQuery({
+    const dynamicKeysQuery = trpc.dynamicKeys.list.useQuery({
         page: 1,
         pageSize: 50,
     });
@@ -56,8 +65,8 @@ export default function PortalPage() {
     const { data: ipData, isLoading: isLoadingIp } = trpc.system.getMyIp.useQuery();
     const myIp = ipData?.ip;
 
-    const keys = data?.items || [];
-    const dynamicKeys = dynamicKeysData?.items || [];
+    const keys = keysQuery.data?.items || [];
+    const dynamicKeys = dynamicKeysQuery.data?.items || [];
 
     // Simple detection: Check if user IP matches any access key's server IP
     // Note: detailed matching would require resolving hostnames if they are domains
@@ -67,7 +76,97 @@ export default function PortalPage() {
         copyToClipboard(text, 'Copied to clipboard', 'URL has been copied.');
     };
 
-    if (isLoading || isLoadingDAKs || isLoadingIp) {
+    const submitRequest = () => {
+        if (!requestKey) {
+            return;
+        }
+        const message = requestMessage.trim();
+        if (requestKey.type === 'ACCESS_KEY') {
+            requestAccessDataMutation.mutate({ id: requestKey.id, message: message || undefined });
+        } else {
+            requestDynamicDataMutation.mutate({ id: requestKey.id, message: message || undefined });
+        }
+    };
+
+    const usageHistoryQuery = trpc.analytics.usageHistory.useQuery(
+        {
+            keyId: usageKey?.id || '',
+            keyType: usageKey?.type || 'ACCESS_KEY',
+            range: '7d',
+        },
+        { enabled: !!usageKey },
+    );
+
+    const regenAccessKeyMutation = trpc.keys.regenerateSubscriptionTokenSelf.useMutation({
+        onSuccess: () => {
+            toast({ title: 'Link regenerated', description: 'Your subscription link has been refreshed.' });
+            utils.keys.list.invalidate();
+        },
+        onError: (error) => {
+            toast({ title: 'Unable to regenerate link', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const regenDynamicKeyMutation = trpc.dynamicKeys.regenerateDynamicUrlSelf.useMutation({
+        onSuccess: () => {
+            toast({ title: 'Link regenerated', description: 'Your dynamic subscription link has been refreshed.' });
+            utils.dynamicKeys.list.invalidate();
+        },
+        onError: (error) => {
+            toast({ title: 'Unable to regenerate link', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const extendMutation = trpc.keys.selfExtend.useMutation({
+        onSuccess: () => {
+            toast({ title: 'Extension complete', description: 'Your access key has been extended.' });
+            utils.keys.list.invalidate();
+        },
+        onError: (error) => {
+            toast({ title: 'Unable to extend', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const requestAccessDataMutation = trpc.keys.requestMoreData.useMutation({
+        onSuccess: () => {
+            toast({ title: 'Request sent', description: 'We notified the support team.' });
+            setRequestKey(null);
+            setRequestMessage('');
+        },
+        onError: (error) => {
+            toast({ title: 'Unable to send request', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const requestDynamicDataMutation = trpc.dynamicKeys.requestMoreData.useMutation({
+        onSuccess: () => {
+            toast({ title: 'Request sent', description: 'We notified the support team.' });
+            setRequestKey(null);
+            setRequestMessage('');
+        },
+        onError: (error) => {
+            toast({ title: 'Unable to send request', description: error.message, variant: 'destructive' });
+        },
+    });
+
+    const usageChartData = useMemo(() => {
+        if (!usageHistoryQuery.data) {
+            return [];
+        }
+        const grouped = new Map<string, number>();
+        for (const entry of usageHistoryQuery.data) {
+            const date = new Date(entry.timestamp);
+            const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const current = grouped.get(label) ?? 0;
+            grouped.set(label, current + Number(entry.deltaBytes));
+        }
+        return Array.from(grouped.entries()).map(([label, bytes]) => ({
+            date: label,
+            bytes,
+        }));
+    }, [usageHistoryQuery.data]);
+
+    if (keysQuery.isLoading || dynamicKeysQuery.isLoading || isLoadingIp) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
                 {[1, 2, 3].map((i) => (
@@ -216,15 +315,44 @@ export default function PortalPage() {
                                             </div>
                                         </CardContent>
                                         <CardFooter className="bg-muted/10 pt-4">
-                                            <Button
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={() => dynamicSubscriptionUrl && window.open(dynamicSubscriptionUrl, '_blank')}
-                                                disabled={!dynamicSubscriptionUrl}
-                                            >
-                                                <Download className="w-4 h-4 mr-2" />
-                                                Open Subscription
-                                            </Button>
+                                            <div className="flex w-full flex-col gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={() => dynamicSubscriptionUrl && window.open(dynamicSubscriptionUrl, '_blank')}
+                                                    disabled={!dynamicSubscriptionUrl}
+                                                >
+                                                    <Download className="w-4 h-4 mr-2" />
+                                                    Open Subscription
+                                                </Button>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="justify-start"
+                                                        onClick={() => setUsageKey({ id: dak.id, name: dak.name, type: 'DYNAMIC_KEY' })}
+                                                    >
+                                                        <Activity className="w-4 h-4 mr-2" />
+                                                        Usage
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="justify-start"
+                                                        onClick={() => setRequestKey({ id: dak.id, name: dak.name, type: 'DYNAMIC_KEY' })}
+                                                    >
+                                                        <MessageSquare className="w-4 h-4 mr-2" />
+                                                        Request data
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="justify-start"
+                                                        onClick={() => regenDynamicKeyMutation.mutate({ id: dak.id })}
+                                                        disabled={regenDynamicKeyMutation.isPending}
+                                                    >
+                                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                                        Regenerate link
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         </CardFooter>
                                     </Card>
                                 );
@@ -307,24 +435,66 @@ export default function PortalPage() {
                                     </div>
                                 </CardContent>
 
-                                <CardFooter className="pt-2 gap-2">
-                                    <Button
-                                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
-                                        onClick={() => key.accessUrl && setSelectedKey(key.accessUrl)}
-                                        disabled={!key.accessUrl}
-                                    >
-                                        <Smartphone className="w-4 h-4 mr-2" />
-                                        Connect
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => key.accessUrl && handleCopyAccessKey(key.accessUrl)}
-                                        disabled={!key.accessUrl}
-                                        title="Copy Access Key"
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
+                                <CardFooter className="pt-2">
+                                    <div className="flex w-full flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <Button
+                                                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                                                onClick={() => key.accessUrl && setSelectedKey(key.accessUrl)}
+                                                disabled={!key.accessUrl}
+                                            >
+                                                <Smartphone className="w-4 h-4 mr-2" />
+                                                Connect
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => key.accessUrl && handleCopyAccessKey(key.accessUrl)}
+                                                disabled={!key.accessUrl}
+                                                title="Copy Access Key"
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                className="justify-start"
+                                                onClick={() => setUsageKey({ id: key.id, name: key.name, type: 'ACCESS_KEY' })}
+                                            >
+                                                <Activity className="w-4 h-4 mr-2" />
+                                                Usage
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                className="justify-start"
+                                                onClick={() => setRequestKey({ id: key.id, name: key.name, type: 'ACCESS_KEY' })}
+                                            >
+                                                <MessageSquare className="w-4 h-4 mr-2" />
+                                                Request data
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                className="justify-start"
+                                                onClick={() => regenAccessKeyMutation.mutate({ id: key.id })}
+                                                disabled={regenAccessKeyMutation.isPending}
+                                            >
+                                                <RotateCcw className="w-4 h-4 mr-2" />
+                                                Regenerate link
+                                            </Button>
+                                        </div>
+                                        {key.autoRenewPolicy === 'EXTEND_DURATION' && key.autoRenewDurationDays ? (
+                                            <Button
+                                                variant="outline"
+                                                className="justify-start"
+                                                onClick={() => extendMutation.mutate({ id: key.id })}
+                                                disabled={extendMutation.isPending}
+                                            >
+                                                <Clock className="w-4 h-4 mr-2" />
+                                                Extend {key.autoRenewDurationDays} days
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                 </CardFooter>
                             </Card>
                         ))}
@@ -390,6 +560,68 @@ export default function PortalPage() {
                             <a href="https://getoutline.org/get-started/" target="_blank" className="hover:text-primary transition-colors flex items-center gap-1">
                                 Download Outline <Globe className="h-3 w-3" />
                             </a>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!usageKey} onOpenChange={(open) => !open && setUsageKey(null)}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Usage history</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Key</p>
+                                <p className="text-lg font-semibold">{usageKey?.name}</p>
+                            </div>
+                            <Badge variant="secondary">{usageKey?.type === 'DYNAMIC_KEY' ? 'Dynamic' : 'Access'}</Badge>
+                        </div>
+                        {usageHistoryQuery.isLoading ? (
+                            <div className="h-40 rounded-xl bg-muted animate-pulse" />
+                        ) : usageChartData.length > 0 ? (
+                            <TrafficChart data={usageChartData} height={220} color="hsl(var(--primary))" />
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No usage data yet.</p>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={!!requestKey}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setRequestKey(null);
+                        setRequestMessage('');
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Request more data</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Let the support team know you need more data for <span className="font-medium">{requestKey?.name}</span>.
+                        </p>
+                        <Textarea
+                            value={requestMessage}
+                            onChange={(event) => setRequestMessage(event.target.value)}
+                            placeholder="Add any details or timing preferences (optional)"
+                            className="min-h-[120px]"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setRequestKey(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={submitRequest}
+                                disabled={requestAccessDataMutation.isPending || requestDynamicDataMutation.isPending}
+                            >
+                                Send request
+                            </Button>
                         </div>
                     </div>
                 </DialogContent>

@@ -17,6 +17,9 @@ import { NextResponse } from 'next/server';
 import { APP_RELEASE_VERSION } from '@/lib/app-version';
 import { db as prisma } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/health
  * 
@@ -41,7 +44,14 @@ export async function GET() {
         version: APP_RELEASE_VERSION,
         database: 'connected',
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
     );
   } catch (error) {
     // If the database check fails, the application is unhealthy.
@@ -57,7 +67,14 @@ export async function GET() {
         database: 'disconnected',
         error: 'Database connectivity issue',
       },
-      { status: 503 }
+      {
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
     );
   }
 }

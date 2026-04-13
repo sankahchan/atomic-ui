@@ -98,7 +98,8 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                             key,
                             usagePercent,
                             'DISABLED',
-                            telegramConfig.adminChatIds
+                            telegramConfig.adminChatIds,
+                            { serverName: key.server.name }
                         );
                     }
                     continue; // Skip lower threshold checks
@@ -125,7 +126,8 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                             key,
                             usagePercent,
                             highestThreshold,
-                            telegramConfig.adminChatIds
+                            telegramConfig.adminChatIds,
+                            { serverName: key.server.name }
                         );
                     }
 
@@ -143,6 +145,99 @@ export async function checkBandwidthAlerts(): Promise<BandwidthAlertResult> {
                 }
             } catch (keyError) {
                 result.errors.push(`Key ${key.name}: ${(keyError as Error).message}`);
+            }
+        }
+
+        const dynamicKeys = await db.dynamicAccessKey.findMany({
+            where: {
+                status: 'ACTIVE',
+                dataLimitBytes: { not: null },
+            },
+            select: {
+                id: true,
+                name: true,
+                usedBytes: true,
+                dataLimitBytes: true,
+                telegramId: true,
+                bandwidthAlertAt80: true,
+                bandwidthAlertAt90: true,
+                quotaAlertThresholds: true,
+                quotaAlertsSent: true,
+                autoDisableOnLimit: true,
+            },
+        });
+
+        for (const key of dynamicKeys) {
+            if (!key.dataLimitBytes) continue;
+
+            const usedBytes = Number(key.usedBytes);
+            const limitBytes = Number(key.dataLimitBytes);
+            const usagePercent = (usedBytes / limitBytes) * 100;
+            const thresholds = parseQuotaAlertThresholds(key.quotaAlertThresholds);
+            const sentThresholds = parseQuotaAlertsSent(key.quotaAlertsSent);
+
+            try {
+                if (usagePercent >= 100 && key.autoDisableOnLimit) {
+                    await autoDisableDynamicKey(key.id);
+                    result.autoDisabled++;
+
+                    if (telegramConfig) {
+                        await sendBandwidthNotification(
+                            telegramConfig.botToken,
+                            {
+                                name: key.name,
+                                telegramId: key.telegramId,
+                                usedBytes: key.usedBytes,
+                                dataLimitBytes: key.dataLimitBytes,
+                            },
+                            usagePercent,
+                            'DISABLED',
+                            telegramConfig.adminChatIds,
+                            { keyTypeLabel: 'Dynamic key', serverName: 'Dynamic routing' }
+                        );
+                    }
+                    continue;
+                }
+
+                const crossedThresholds = thresholds.filter((threshold) => usagePercent >= threshold);
+                const newlyCrossed = crossedThresholds.filter((threshold) => !sentThresholds.includes(threshold));
+
+                if (newlyCrossed.length > 0) {
+                    const highestThreshold = newlyCrossed[newlyCrossed.length - 1];
+
+                    await db.dynamicAccessKey.update({
+                        where: { id: key.id },
+                        data: {
+                            quotaAlertsSent: serializeQuotaAlertsSent([...sentThresholds, ...crossedThresholds]),
+                            bandwidthAlertAt80: key.bandwidthAlertAt80 || crossedThresholds.some((threshold) => threshold >= 80),
+                            bandwidthAlertAt90: key.bandwidthAlertAt90 || crossedThresholds.some((threshold) => threshold >= 90),
+                        },
+                    });
+
+                    if (telegramConfig) {
+                        await sendBandwidthNotification(
+                            telegramConfig.botToken,
+                            {
+                                name: key.name,
+                                telegramId: key.telegramId,
+                                usedBytes: key.usedBytes,
+                                dataLimitBytes: key.dataLimitBytes,
+                            },
+                            usagePercent,
+                            highestThreshold,
+                            telegramConfig.adminChatIds,
+                            { keyTypeLabel: 'Dynamic key', serverName: 'Dynamic routing' }
+                        );
+                    }
+
+                    if (highestThreshold >= 90) {
+                        result.alertsSent90++;
+                    } else {
+                        result.alertsSent80++;
+                    }
+                }
+            } catch (keyError) {
+                result.errors.push(`Dynamic key ${key.name}: ${(keyError as Error).message}`);
             }
         }
     } catch (error) {
@@ -212,17 +307,19 @@ async function sendBandwidthNotification(
         telegramId: string | null;
         usedBytes: bigint;
         dataLimitBytes: bigint | null;
-        server: { name: string };
     },
     usagePercent: number,
     level: number | 'DISABLED',
-    adminChatIds: string[]
+    adminChatIds: string[],
+    options?: { keyTypeLabel?: string; serverName?: string }
 ) {
     const used = formatBytes(key.usedBytes);
     const limit = key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'N/A';
     const remaining = key.dataLimitBytes
         ? formatBytes(BigInt(Math.max(0, Number(key.dataLimitBytes) - Number(key.usedBytes))))
         : 'N/A';
+    const keyTypeLabel = options?.keyTypeLabel ?? 'Key';
+    const serverName = options?.serverName;
 
     let emoji = '⚠️';
     let title = 'Data Usage Warning';
@@ -254,8 +351,8 @@ async function sendBandwidthNotification(
     const message = [
         `${emoji} <b>${title}</b>`,
         '',
-        `🔑 Key: <b>${key.name}</b>`,
-        `🖥 Server: ${key.server.name}`,
+        `🔑 ${keyTypeLabel}: <b>${key.name}</b>`,
+        serverName ? `🖥 Server: ${serverName}` : null,
         '',
         statusLine,
         `📈 Used: ${used} / ${limit}`,
@@ -304,6 +401,59 @@ export async function resetBandwidthAlerts(keyId: string) {
             bandwidthAlertAt80: false,
             bandwidthAlertAt90: false,
             quotaAlertsSent: '[]',
+        },
+    });
+}
+
+async function autoDisableDynamicKey(dynamicKeyId: string) {
+    const dak = await db.dynamicAccessKey.findUnique({
+        where: { id: dynamicKeyId },
+        include: {
+            accessKeys: {
+                include: {
+                    server: true,
+                },
+            },
+        },
+    });
+
+    if (!dak) {
+        return;
+    }
+
+    for (const key of dak.accessKeys) {
+        if (!key.server) {
+            continue;
+        }
+
+        const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+        try {
+            await client.deleteAccessKey(key.outlineKeyId);
+        } catch {
+            // Key might already be gone
+        }
+
+        await db.accessKey.update({
+            where: { id: key.id },
+            data: {
+                status: 'DEPLETED',
+                disabledAt: new Date(),
+                disabledOutlineKeyId: key.outlineKeyId,
+                estimatedDevices: 0,
+            },
+        });
+
+        await db.connectionSession.updateMany({
+            where: { accessKeyId: key.id, isActive: true },
+            data: { isActive: false, endedAt: new Date(), endedReason: 'KEY_DEPLETED' },
+        });
+    }
+
+    await db.dynamicAccessKey.update({
+        where: { id: dynamicKeyId },
+        data: {
+            status: 'DEPLETED',
+            sharePageEnabled: false,
         },
     });
 }

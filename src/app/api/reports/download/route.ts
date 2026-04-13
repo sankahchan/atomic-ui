@@ -102,6 +102,7 @@ function buildPdfLines(report: { name: string; periodStart: Date; periodEnd: Dat
     `Depleted keys: ${reportData.summary?.depletedKeys ?? 0}`,
     `Total used bytes: ${reportData.summary?.totalBytesUsed ?? '0'}`,
     `Total delta bytes: ${reportData.summary?.totalDeltaBytes ?? '0'}`,
+    reportData.summary?.peakHourUtc != null ? `Peak hour (UTC): ${reportData.summary?.peakHourUtc}:00` : 'Peak hour (UTC): N/A',
   ];
 }
 

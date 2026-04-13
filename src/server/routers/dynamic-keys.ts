@@ -42,6 +42,7 @@ import {
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
 import { getDynamicKeySubscriptionAnalytics } from '@/lib/services/subscription-events';
+import { writeAuditLog } from '@/lib/audit';
 import {
   DYNAMIC_ROUTING_EVENT_TYPES,
   getDynamicRoutingAlerts,
@@ -55,8 +56,11 @@ import {
 } from '@/lib/services/premium-region-routing';
 import {
   createDynamicKeyTelegramConnectLink,
+  getTelegramConfig,
   sendDynamicKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
+import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getServerLoadStats } from '@/lib/services/load-balancer';
 
 const routingWeightsSchema = z.record(z.number().positive()).optional();
 const sessionStickinessSchema = z.enum(['NONE', 'DRAIN']).default('DRAIN');
@@ -99,6 +103,8 @@ const createDAKSchema = z.object({
   rotationTriggerMode: rotationTriggerSchema,
   rotationUsageThresholdPercent: z.number().int().min(50).max(100).default(85),
   rotateOnHealthFailure: z.boolean().optional(),
+  autoDisableOnLimit: z.boolean().optional(),
+  quotaAlertThresholds: z.string().max(32).optional().nullable(),
   appliedTemplateId: z.string().optional().nullable(),
   autoClearStalePins: z.boolean().optional(),
   autoFallbackToPrefer: z.boolean().optional(),
@@ -149,6 +155,8 @@ const updateDAKSchema = z.object({
   rotationTriggerMode: rotationTriggerSchema.optional(),
   rotationUsageThresholdPercent: z.number().int().min(50).max(100).optional(),
   rotateOnHealthFailure: z.boolean().optional(),
+  autoDisableOnLimit: z.boolean().optional(),
+  quotaAlertThresholds: z.string().max(32).optional().nullable(),
   appliedTemplateId: z.string().optional().nullable(),
   autoClearStalePins: z.boolean().optional(),
   autoFallbackToPrefer: z.boolean().optional(),
@@ -2190,7 +2198,7 @@ export const dynamicKeysRouter = router({
       // Generate unique dynamic URL token
       const dynamicUrl = generateRandomString(32);
       const publicSlug = await resolveDynamicKeySlug(input.publicSlug, input.name);
-      const routingPreferences = normalizeDynamicRoutingPreferences({
+      let routingPreferences = normalizeDynamicRoutingPreferences({
         preferredServerIds: input.preferredServerIds,
         preferredCountryCodes: input.preferredCountryCodes,
         preferredServerWeights: input.preferredServerWeights,
@@ -2199,6 +2207,28 @@ export const dynamicKeysRouter = router({
         sessionStickinessMode: input.sessionStickinessMode,
         drainGraceMinutes: input.drainGraceMinutes,
       });
+      const hasManualPreferences =
+        routingPreferences.preferredServerIds.length > 0 || routingPreferences.preferredCountryCodes.length > 0;
+      let loadBalancerAlgorithm = input.loadBalancerAlgorithm;
+      if (!hasManualPreferences) {
+        const loadStats = await getServerLoadStats(input.serverTagIds);
+        const autoPreferredServerIds = loadStats
+          .filter((server) => server.isAssignable)
+          .slice(0, 3)
+          .map((server) => server.serverId);
+        if (autoPreferredServerIds.length > 0) {
+          routingPreferences = normalizeDynamicRoutingPreferences({
+            preferredServerIds: autoPreferredServerIds,
+            preferredCountryCodes: routingPreferences.preferredCountryCodes,
+            preferredServerWeights: routingPreferences.preferredServerWeights,
+            preferredCountryWeights: routingPreferences.preferredCountryWeights,
+            preferredRegionMode: routingPreferences.preferredRegionMode,
+            sessionStickinessMode: routingPreferences.sessionStickinessMode,
+            drainGraceMinutes: routingPreferences.drainGraceMinutes,
+          });
+          loadBalancerAlgorithm = 'LEAST_LOAD';
+        }
+      }
       const now = new Date();
       const rotationInterval = input.rotationInterval ?? 'NEVER';
       const rotationEnabled = input.rotationEnabled ?? false;
@@ -2227,7 +2257,7 @@ export const dynamicKeysRouter = router({
           ...serializeRoutingPreferences(routingPreferences),
           prefix: input.prefix,
           method: input.method || 'chacha20-ietf-poly1305',
-          loadBalancerAlgorithm: input.loadBalancerAlgorithm,
+          loadBalancerAlgorithm,
           subscriptionWelcomeMessage: input.subscriptionWelcomeMessage,
           sharePageEnabled: input.sharePageEnabled ?? true,
           rotationEnabled,
@@ -2237,6 +2267,8 @@ export const dynamicKeysRouter = router({
           rotateOnHealthFailure: input.rotateOnHealthFailure ?? false,
           nextRotationAt,
           appliedTemplateId: input.appliedTemplateId,
+          autoDisableOnLimit: input.autoDisableOnLimit ?? true,
+          quotaAlertThresholds: input.quotaAlertThresholds ?? '80,90',
           autoClearStalePins: input.autoClearStalePins ?? true,
           autoFallbackToPrefer: input.autoFallbackToPrefer ?? false,
           autoSkipUnhealthy: input.autoSkipUnhealthy ?? false,
@@ -2319,6 +2351,8 @@ export const dynamicKeysRouter = router({
         rotationTriggerMode,
         rotationUsageThresholdPercent,
         rotateOnHealthFailure,
+        autoDisableOnLimit,
+        quotaAlertThresholds,
         appliedTemplateId,
         autoClearStalePins,
         autoFallbackToPrefer,
@@ -2360,6 +2394,13 @@ export const dynamicKeysRouter = router({
 
       if (dataLimitGB !== undefined) {
         updateData.dataLimitBytes = dataLimitGB ? gbToBytes(dataLimitGB) : null;
+        updateData.bandwidthAlertAt80 = false;
+        updateData.bandwidthAlertAt90 = false;
+        updateData.quotaAlertsSent = '[]';
+        if (data.status === undefined && existing.status === 'DEPLETED') {
+          updateData.status = 'ACTIVE';
+          updateData.sharePageEnabled = sharePageEnabled ?? true;
+        }
       }
 
       if (dataLimitResetStrategy !== undefined) {
@@ -2376,6 +2417,14 @@ export const dynamicKeysRouter = router({
 
       if (loadBalancerAlgorithm !== undefined) {
         updateData.loadBalancerAlgorithm = loadBalancerAlgorithm;
+      }
+
+      if (autoDisableOnLimit !== undefined) {
+        updateData.autoDisableOnLimit = autoDisableOnLimit;
+      }
+
+      if (quotaAlertThresholds !== undefined) {
+        updateData.quotaAlertThresholds = quotaAlertThresholds;
       }
 
       if (
@@ -2603,6 +2652,123 @@ export const dynamicKeysRouter = router({
         createdAt: dak.createdAt,
         updatedAt: dak.updatedAt,
       };
+    }),
+
+  regenerateDynamicUrlSelf: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          dynamicUrl: true,
+          name: true,
+          publicSlug: true,
+          userId: true,
+        },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic Access Key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && existing.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this dynamic key.',
+        });
+      }
+
+      const dynamicUrl = generateRandomString(32);
+      await db.dynamicAccessKey.update({
+        where: { id: input.id },
+        data: { dynamicUrl },
+      });
+
+      return {
+        dynamicUrl,
+        sharePageUrl: buildDynamicSharePageUrl(dynamicUrl),
+        clientUrl: buildDynamicOutlineUrl(dynamicUrl, existing.name),
+        shortSharePageUrl: existing.publicSlug ? buildDynamicShortShareUrl(existing.publicSlug) : null,
+        shortClientUrl: existing.publicSlug ? buildDynamicOutlineUrl(existing.publicSlug, existing.name, { shortPath: true }) : null,
+      };
+    }),
+
+  requestMoreData: protectedProcedure
+    .input(z.object({ id: z.string(), message: z.string().max(800).optional().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.dynamicAccessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          usedBytes: true,
+          dataLimitBytes: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Dynamic access key not found',
+        });
+      }
+
+      if (!key.userId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This key is not assigned to a user.',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to request updates for this key.',
+        });
+      }
+
+      const note = await db.customerSupportNote.create({
+        data: {
+          userId: key.userId,
+          createdByUserId: ctx.user.id,
+          kind: 'USAGE_REQUEST',
+          note: [
+            `Customer requested more data for dynamic key "${key.name}".`,
+            `Used: ${key.usedBytes.toString()} / ${key.dataLimitBytes?.toString() ?? 'unlimited'}`,
+            input.message ? `Message: ${input.message}` : null,
+          ].filter(Boolean).join('\n'),
+        },
+      });
+
+      const telegramConfig = await getTelegramConfig();
+      if (telegramConfig) {
+        const message = [
+          '📈 <b>Dynamic key data increase request</b>',
+          `Key: <b>${key.name}</b>`,
+          `Usage: ${key.usedBytes.toString()} / ${key.dataLimitBytes?.toString() ?? 'unlimited'}`,
+          input.message ? `Message: ${input.message}` : null,
+        ].filter(Boolean).join('\n');
+
+        for (const adminId of telegramConfig.adminChatIds) {
+          await sendTelegramMessage(telegramConfig.botToken, adminId, message);
+        }
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'DYNAMIC_KEY_DATA_INCREASE_REQUESTED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: input.id,
+        details: { noteId: note.id },
+      });
+
+      return { success: true };
     }),
 
   regeneratePublicSlug: adminProcedure

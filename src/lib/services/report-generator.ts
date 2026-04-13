@@ -44,6 +44,10 @@ export interface ReportData {
       serverName: string;
       usedBytes: string;
     }>;
+    hourlyUsage: Array<{
+      hourUtc: number;
+      deltaBytes: string;
+    }>;
     summary: {
       totalServers: number;
       totalKeys: number;
@@ -53,6 +57,7 @@ export interface ReportData {
       totalBytesUsed: string;
       totalDeltaBytes: string;
       averageBytesPerKey: string;
+      peakHourUtc: number | null;
     };
   };
   totalServers: number;
@@ -107,14 +112,20 @@ export async function generateReportData(
     select: {
       accessKeyId: true,
       deltaBytes: true,
+      recordedAt: true,
     },
   });
 
   // Calculate delta bytes per key during this period
   const deltaByKey = new Map<string, bigint>();
+  const deltaByHour = new Map<number, bigint>();
   for (const log of trafficLogs) {
     const current = deltaByKey.get(log.accessKeyId) ?? BigInt(0);
     deltaByKey.set(log.accessKeyId, current + log.deltaBytes);
+
+    const hourUtc = log.recordedAt.getUTCHours();
+    const existing = deltaByHour.get(hourUtc) ?? BigInt(0);
+    deltaByHour.set(hourUtc, existing + log.deltaBytes);
   }
 
   // Build per-server reports
@@ -199,6 +210,18 @@ export async function generateReportData(
     usedBytes: k.usedBytes.toString(),
   }));
 
+  const hourlyUsage: Array<{ hourUtc: number; deltaBytes: string }> = Array.from({ length: 24 }).map((_, hour) => ({
+    hourUtc: hour,
+    deltaBytes: (deltaByHour.get(hour) ?? BigInt(0)).toString(),
+  }));
+  const hasUsage = hourlyUsage.some((entry) => BigInt(entry.deltaBytes) > BigInt(0));
+  const peakHour = hasUsage
+    ? hourlyUsage.reduce(
+        (acc, entry) => (BigInt(entry.deltaBytes) > acc.bytes ? { hour: entry.hourUtc, bytes: BigInt(entry.deltaBytes) } : acc),
+        { hour: null as number | null, bytes: BigInt(-1) },
+      ).hour
+    : null;
+
   // Average bytes per key
   const avgBytesPerKey = totalKeyCount > 0
     ? grandTotalUsed / BigInt(totalKeyCount)
@@ -211,6 +234,7 @@ export async function generateReportData(
       periodEnd: periodEnd.toISOString(),
       servers: serverReports,
       topConsumers,
+      hourlyUsage,
       summary: {
         totalServers: servers.length,
         totalKeys: totalKeyCount,
@@ -220,6 +244,7 @@ export async function generateReportData(
         totalBytesUsed: grandTotalUsed.toString(),
         totalDeltaBytes: grandTotalDelta.toString(),
         averageBytesPerKey: avgBytesPerKey.toString(),
+        peakHourUtc: peakHour,
       },
     },
     totalServers: servers.length,
@@ -239,6 +264,7 @@ export function generateReportCSV(reportData: {
   servers: ServerReport[];
   periodStart: string;
   periodEnd: string;
+  hourlyUsage?: Array<{ hourUtc: number; deltaBytes: string }>;
 }): string {
   const headers = [
     'Server',
@@ -282,6 +308,10 @@ export function generateReportCSV(reportData: {
     ...rows.map((row) =>
       row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
     ),
+    '',
+    '# Hourly Usage (UTC)',
+    'Hour (UTC),Delta Bytes',
+    ...(reportData.hourlyUsage ?? []).map((entry) => `${entry.hourUtc},"${entry.deltaBytes}"`),
   ].join('\n');
 
   return csvContent;

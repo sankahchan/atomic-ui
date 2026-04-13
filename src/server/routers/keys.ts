@@ -44,11 +44,13 @@ import {
 } from '@/lib/services/traffic-activity';
 import {
   createAccessKeyTelegramConnectLink,
+  getTelegramConfig,
   sendAccessKeyRenewalReminder,
   sendAccessKeyLifecycleTelegramNotification,
   sendAccessKeySupportMessage,
   sendAccessKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
+import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import {
   getAccessKeySubscriptionAnalytics,
   SUBSCRIPTION_EVENT_TYPES,
@@ -2356,6 +2358,193 @@ export const keysRouter = router({
         token,
         publicSlug,
       };
+    }),
+
+  regenerateSubscriptionTokenSelf: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          accessUrl: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this access key.',
+        });
+      }
+
+      const token = generateRandomString(32);
+      await db.accessKey.update({
+        where: { id: input.id },
+        data: { subscriptionToken: token },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_SUBSCRIPTION_REGENERATED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+      });
+
+      return {
+        subscriptionUrl: buildSubscriptionApiUrl(token),
+        accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
+        token,
+      };
+    }),
+
+  selfExtend: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          expiresAt: true,
+          autoRenewPolicy: true,
+          autoRenewDurationDays: true,
+          status: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to extend this access key.',
+        });
+      }
+
+      if (key.autoRenewPolicy !== 'EXTEND_DURATION' || !key.autoRenewDurationDays) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This key is not eligible for self-extension.',
+        });
+      }
+
+      const baseDate = key.expiresAt && key.expiresAt > new Date() ? key.expiresAt : new Date();
+      const newExpiresAt = new Date(baseDate);
+      newExpiresAt.setDate(newExpiresAt.getDate() + key.autoRenewDurationDays);
+
+      const updated = await db.accessKey.update({
+        where: { id: input.id },
+        data: {
+          expiresAt: newExpiresAt,
+          expirationType: 'FIXED_DATE',
+          status: 'ACTIVE',
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_SELF_EXTENDED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: {
+          days: key.autoRenewDurationDays,
+          expiresAt: newExpiresAt.toISOString(),
+        },
+      });
+
+      return { expiresAt: updated.expiresAt?.toISOString() ?? null };
+    }),
+
+  requestMoreData: protectedProcedure
+    .input(z.object({ id: z.string(), message: z.string().max(800).optional().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const key = await db.accessKey.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          usedBytes: true,
+          dataLimitBytes: true,
+        },
+      });
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Access key not found',
+        });
+      }
+
+      if (!key.userId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This key is not assigned to a user.',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to request updates for this key.',
+        });
+      }
+
+      const note = await db.customerSupportNote.create({
+        data: {
+          userId: key.userId,
+          createdByUserId: ctx.user.id,
+          kind: 'USAGE_REQUEST',
+          note: [
+            `Customer requested more data for key "${key.name}".`,
+            `Used: ${key.usedBytes.toString()} / ${key.dataLimitBytes?.toString() ?? 'unlimited'}`,
+            input.message ? `Message: ${input.message}` : null,
+          ].filter(Boolean).join('\n'),
+        },
+      });
+
+      const telegramConfig = await getTelegramConfig();
+      if (telegramConfig) {
+        const message = [
+          '📈 <b>Data increase request</b>',
+          `Key: <b>${key.name}</b>`,
+          `Usage: ${key.usedBytes.toString()} / ${key.dataLimitBytes?.toString() ?? 'unlimited'}`,
+          input.message ? `Message: ${input.message}` : null,
+        ].filter(Boolean).join('\n');
+
+        for (const adminId of telegramConfig.adminChatIds) {
+          await sendTelegramMessage(telegramConfig.botToken, adminId, message);
+        }
+      }
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        ip: ctx.clientIp,
+        action: 'ACCESS_KEY_DATA_INCREASE_REQUESTED',
+        entity: 'ACCESS_KEY',
+        entityId: input.id,
+        details: { noteId: note.id },
+      });
+
+      return { success: true };
     }),
 
   updateShareProtection: adminProcedure

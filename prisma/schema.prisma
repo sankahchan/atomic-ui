@@ -730,6 +730,11 @@ model DynamicAccessKey {
   // Limits
   dataLimitBytes BigInt?
   usedBytes      BigInt  @default(0)
+  bandwidthAlertAt80 Boolean @default(false)
+  bandwidthAlertAt90 Boolean @default(false)
+  quotaAlertThresholds String @default("80,90")
+  quotaAlertsSent String @default("[]")
+  autoDisableOnLimit Boolean @default(true)
 
   // Periodic Limits
   dataLimitResetStrategy String    @default("NEVER")

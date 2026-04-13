@@ -22,7 +22,7 @@
     "setup": "npx tsx scripts/setup.ts",
     "change-password": "npx tsx scripts/change-credentials.ts",
     "password:change": "tsx scripts/change-password.ts",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test $(find src -name '*.test.ts' -print)",
     "smoke": "tsx scripts/smoke-test.ts",
     "smoke:telegram": "tsx scripts/smoke-test-telegram.ts",
     "env:check": "tsx scripts/validate-production.ts",

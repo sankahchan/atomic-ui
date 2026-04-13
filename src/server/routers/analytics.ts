@@ -598,26 +598,48 @@ export const analyticsRouter = router({
   usageHistory: protectedProcedure
     .input(z.object({
       keyId: z.string(),
+      keyType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY']).default('ACCESS_KEY'),
       range: timeRangeSchema.default('7d'),
     }))
     .query(async ({ ctx, input }) => {
-      const key = await db.accessKey.findUnique({
-        where: { id: input.keyId },
-        select: { userId: true },
-      });
-
-      if (!key) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Access key not found',
+      if (input.keyType === 'ACCESS_KEY') {
+        const key = await db.accessKey.findUnique({
+          where: { id: input.keyId },
+          select: { userId: true },
         });
-      }
 
-      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You do not have permission to view this usage history',
+        if (!key) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Access key not found',
+          });
+        }
+
+        if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to view this usage history',
+          });
+        }
+      } else {
+        const key = await db.dynamicAccessKey.findUnique({
+          where: { id: input.keyId },
+          select: { userId: true },
         });
+
+        if (!key) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Dynamic access key not found',
+          });
+        }
+
+        if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to view this usage history',
+          });
+        }
       }
 
       const cutoff = getDateCutoff(input.range);
@@ -625,6 +647,7 @@ export const analyticsRouter = router({
       const snapshots = await db.usageSnapshot.findMany({
         where: {
           keyId: input.keyId,
+          keyType: input.keyType,
           createdAt: { gte: cutoff },
         },
         orderBy: { createdAt: 'asc' },

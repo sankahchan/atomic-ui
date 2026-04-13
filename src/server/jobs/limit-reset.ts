@@ -3,6 +3,45 @@ import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { logger } from '@/lib/logger';
 
+function shouldResetQuota(lastReset: Date | null, strategy: string, now: Date) {
+    if (!strategy || strategy === 'NEVER') {
+        return false;
+    }
+
+    const previousReset = lastReset ? new Date(lastReset) : new Date(0);
+    const diffTime = now.getTime() - previousReset.getTime();
+    const diffDays = diffTime / (1000 * 3600 * 24);
+
+    switch (strategy) {
+        case 'DAILY':
+            return diffDays >= 1;
+        case 'WEEKLY':
+            return diffDays >= 7;
+        case 'MONTHLY':
+            return diffDays >= 30;
+        default:
+            return false;
+    }
+}
+
+async function getRawMetricBytesForKey(input: {
+    outlineKeyId: string;
+    apiUrl: string;
+    apiCertSha256: string;
+    usedBytes: bigint;
+    usageOffset: bigint | null;
+    status: string;
+}) {
+    if (input.status === 'DISABLED') {
+        return input.usedBytes + (input.usageOffset ?? BigInt(0));
+    }
+
+    const client = createOutlineClient(input.apiUrl, input.apiCertSha256);
+    const metrics = await client.getMetrics();
+    const raw = metrics.bytesTransferredByUserId[input.outlineKeyId] ?? metrics.bytesTransferredByUserId[String(input.outlineKeyId)] ?? 0;
+    return BigInt(Math.floor(raw));
+}
+
 export async function checkPeriodicLimits() {
     logger.debug('🔄 Checking periodic data limits...');
 
@@ -29,25 +68,8 @@ export async function checkPeriodicLimits() {
             for (const key of server.accessKeys) {
                 if (!key.dataLimitResetStrategy || key.dataLimitResetStrategy === 'NEVER') continue;
 
-                const lastReset = key.lastDataLimitReset ? new Date(key.lastDataLimitReset) : new Date(0);
                 const now = new Date();
-                let shouldReset = false;
-
-                // Check interval
-                const diffTime = now.getTime() - lastReset.getTime();
-                const diffDays = diffTime / (1000 * 3600 * 24);
-
-                switch (key.dataLimitResetStrategy) {
-                    case 'DAILY':
-                        if (diffDays >= 1) shouldReset = true;
-                        break;
-                    case 'WEEKLY':
-                        if (diffDays >= 7) shouldReset = true;
-                        break;
-                    case 'MONTHLY':
-                        if (diffDays >= 30) shouldReset = true;
-                        break;
-                }
+                const shouldReset = shouldResetQuota(key.lastDataLimitReset, key.dataLimitResetStrategy, now);
 
                 if (shouldReset) {
                     logger.debug(`♻️ Resetting limit for key ${key.name} (${key.dataLimitResetStrategy})`);
@@ -92,6 +114,83 @@ export async function checkPeriodicLimits() {
             }
         } catch (error) {
             logger.error(`Error checking limits for server ${server.name}:`, error);
+        }
+    }
+
+    const dynamicKeys = await db.dynamicAccessKey.findMany({
+        where: {
+            dataLimitResetStrategy: { not: 'NEVER' },
+        },
+        include: {
+            accessKeys: {
+                include: {
+                    server: true,
+                },
+            },
+        },
+    });
+
+    for (const dynamicKey of dynamicKeys) {
+        const now = new Date();
+        const shouldReset = shouldResetQuota(dynamicKey.lastDataLimitReset, dynamicKey.dataLimitResetStrategy, now);
+
+        if (!shouldReset) {
+            continue;
+        }
+
+        logger.debug(`♻️ Resetting limit for dynamic key ${dynamicKey.name} (${dynamicKey.dataLimitResetStrategy})`);
+
+        try {
+            for (const key of dynamicKey.accessKeys) {
+                if (!key.server) {
+                    continue;
+                }
+
+                const metricBytes = await getRawMetricBytesForKey({
+                    outlineKeyId: key.outlineKeyId,
+                    apiUrl: key.server.apiUrl,
+                    apiCertSha256: key.server.apiCertSha256,
+                    usedBytes: key.usedBytes,
+                    usageOffset: key.usageOffset,
+                    status: key.status,
+                });
+
+                if (key.status !== 'DISABLED' && key.dataLimitBytes) {
+                    const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+                    await client.setAccessKeyDataLimit(
+                        key.outlineKeyId,
+                        Number(metricBytes + key.dataLimitBytes),
+                    );
+                }
+
+                await db.accessKey.update({
+                    where: { id: key.id },
+                    data: {
+                        usedBytes: BigInt(0),
+                        usageOffset: metricBytes,
+                        lastDataLimitReset: now,
+                        status: key.status === 'DEPLETED' ? 'ACTIVE' : key.status === 'DISABLED' ? 'ACTIVE' : key.status,
+                        bandwidthAlertAt80: false,
+                        bandwidthAlertAt90: false,
+                        quotaAlertsSent: '[]',
+                    },
+                });
+            }
+
+            await db.dynamicAccessKey.update({
+                where: { id: dynamicKey.id },
+                data: {
+                    usedBytes: BigInt(0),
+                    lastDataLimitReset: now,
+                    status: dynamicKey.status === 'DEPLETED' ? 'ACTIVE' : dynamicKey.status,
+                    sharePageEnabled: dynamicKey.status === 'DEPLETED' ? true : dynamicKey.sharePageEnabled,
+                    bandwidthAlertAt80: false,
+                    bandwidthAlertAt90: false,
+                    quotaAlertsSent: '[]',
+                },
+            });
+        } catch (error) {
+            logger.error(`Error checking limits for dynamic key ${dynamicKey.name}:`, error);
         }
     }
 }

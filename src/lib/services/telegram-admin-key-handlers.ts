@@ -1508,6 +1508,8 @@ async function applyDynamicQuota(input: {
     data: {
       dataLimitBytes: limitBytes,
       quotaAlertsSent: '[]',
+      bandwidthAlertAt80: false,
+      bandwidthAlertAt90: false,
     },
   });
 
@@ -1515,6 +1517,11 @@ async function applyDynamicQuota(input: {
     where: { id: dynamicKey.id },
     data: {
       dataLimitBytes: limitBytes,
+      quotaAlertsSent: '[]',
+      bandwidthAlertAt80: false,
+      bandwidthAlertAt90: false,
+      status: dynamicKey.status === 'DEPLETED' ? 'ACTIVE' : dynamicKey.status,
+      sharePageEnabled: dynamicKey.status === 'DEPLETED' ? true : dynamicKey.sharePageEnabled,
     },
     include: {
       accessKeys: {
@@ -1563,6 +1570,9 @@ async function resetDynamicUsage(dynamicKeyId: string) {
         usageOffset: metricBytes,
         lastDataLimitReset: now,
         quotaAlertsSent: '[]',
+        bandwidthAlertAt80: false,
+        bandwidthAlertAt90: false,
+        status: key.status === 'DEPLETED' ? 'ACTIVE' : key.status,
       },
     });
   }
@@ -1572,6 +1582,11 @@ async function resetDynamicUsage(dynamicKeyId: string) {
     data: {
       usedBytes: BigInt(0),
       lastDataLimitReset: now,
+      quotaAlertsSent: '[]',
+      bandwidthAlertAt80: false,
+      bandwidthAlertAt90: false,
+      status: dynamicKey.status === 'DEPLETED' ? 'ACTIVE' : dynamicKey.status,
+      sharePageEnabled: dynamicKey.status === 'DEPLETED' ? true : dynamicKey.sharePageEnabled,
     },
     include: {
       accessKeys: {
