@@ -10,6 +10,11 @@ export type SchedulerJobCategory =
 
 export type SchedulerJobTrigger = 'SCHEDULED' | 'STARTUP' | 'MANUAL';
 export type SchedulerJobStatus = 'IDLE' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+export type SchedulerExecutionGate = {
+  allowed: boolean;
+  reason?: 'PAUSED';
+  summary?: string;
+};
 
 export type SchedulerJobDefinition = {
   key: string;
@@ -32,6 +37,8 @@ type SchedulerObservedOutcome<T> = {
 const MAX_STORED_RUNS_PER_JOB = 25;
 const SQLITE_DATABASE_URL_PREFIX = 'file:';
 const SCHEDULER_CATALOG_SYNC_TTL_MS = 60_000;
+const SCHEDULER_RUNTIME_STATE_TTL_MS = 15_000;
+const SCHEDULER_FAILURE_BACKOFF_MINUTES = [0, 2, 5, 15, 30, 60];
 const shouldSerializeObservedSchedulerJobs =
   process.env.DATABASE_URL?.startsWith(SQLITE_DATABASE_URL_PREFIX) ?? false;
 
@@ -39,6 +46,22 @@ let lastSchedulerJobCatalogSyncAt = 0;
 let schedulerJobCatalogSyncPromise: Promise<void> | null = null;
 let observedSchedulerQueue: Promise<void> = Promise.resolve();
 const executingSchedulerJobKeys = new Set<string>();
+const pausedSchedulerJobKeys = new Set<string>();
+const schedulerRuntimeStateCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    state: {
+      isPaused: boolean;
+      pausedAt: Date | null;
+      pausedReason: string | null;
+      pausedBy: string | null;
+      lastStatus: string;
+      lastFinishedAt: Date | null;
+      consecutiveFailures: number;
+    };
+  }
+>();
 
 export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> = {
   trafficSnapshot: {
@@ -245,6 +268,130 @@ export function getExecutingSchedulerJobKeys() {
   return Array.from(executingSchedulerJobKeys);
 }
 
+export function isSchedulerJobPaused(jobKey: string) {
+  return pausedSchedulerJobKeys.has(jobKey);
+}
+
+export function computeSchedulerJobFailureBackoffMinutes(consecutiveFailures: number) {
+  if (!Number.isFinite(consecutiveFailures) || consecutiveFailures <= 1) {
+    return 0;
+  }
+
+  const index = Math.min(
+    SCHEDULER_FAILURE_BACKOFF_MINUTES.length - 1,
+    Math.max(1, consecutiveFailures - 1),
+  );
+  return SCHEDULER_FAILURE_BACKOFF_MINUTES[index];
+}
+
+export function computeSchedulerJobBackoffUntil(
+  lastFinishedAt?: Date | null,
+  consecutiveFailures = 0,
+) {
+  if (!lastFinishedAt) {
+    return null;
+  }
+
+  const backoffMinutes = computeSchedulerJobFailureBackoffMinutes(consecutiveFailures);
+  if (backoffMinutes <= 0) {
+    return null;
+  }
+
+  return new Date(lastFinishedAt.getTime() + backoffMinutes * 60_000);
+}
+
+function setSchedulerRuntimeStateCache(
+  jobKey: string,
+  state: {
+    isPaused: boolean;
+    pausedAt: Date | null;
+    pausedReason: string | null;
+    pausedBy: string | null;
+    lastStatus: string;
+    lastFinishedAt: Date | null;
+    consecutiveFailures: number;
+  },
+) {
+  schedulerRuntimeStateCache.set(jobKey, {
+    expiresAt: Date.now() + SCHEDULER_RUNTIME_STATE_TTL_MS,
+    state,
+  });
+
+  if (state.isPaused) {
+    pausedSchedulerJobKeys.add(jobKey);
+  } else {
+    pausedSchedulerJobKeys.delete(jobKey);
+  }
+}
+
+export function invalidateSchedulerJobRuntimeState(jobKey?: string) {
+  if (jobKey) {
+    schedulerRuntimeStateCache.delete(jobKey);
+    return;
+  }
+
+  schedulerRuntimeStateCache.clear();
+}
+
+export async function hydratePausedSchedulerJobState() {
+  const jobs = await db.schedulerJob.findMany({
+    where: { isPaused: true },
+    select: { key: true },
+  });
+
+  pausedSchedulerJobKeys.clear();
+  for (const job of jobs) {
+    pausedSchedulerJobKeys.add(job.key);
+  }
+}
+
+async function getSchedulerRuntimeState(jobKey: string) {
+  const cached = schedulerRuntimeStateCache.get(jobKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.state;
+  }
+
+  const job = await db.schedulerJob.findUnique({
+    where: { key: jobKey },
+    select: {
+      isPaused: true,
+      pausedAt: true,
+      pausedReason: true,
+      pausedBy: true,
+      lastStatus: true,
+      lastFinishedAt: true,
+      consecutiveFailures: true,
+    },
+  });
+
+  const state = {
+    isPaused: job?.isPaused ?? false,
+    pausedAt: job?.pausedAt ?? null,
+    pausedReason: job?.pausedReason ?? null,
+    pausedBy: job?.pausedBy ?? null,
+    lastStatus: job?.lastStatus ?? 'IDLE',
+    lastFinishedAt: job?.lastFinishedAt ?? null,
+    consecutiveFailures: job?.consecutiveFailures ?? 0,
+  };
+  setSchedulerRuntimeStateCache(jobKey, state);
+  return state;
+}
+
+export async function getSchedulerJobExecutionGate(jobKey: string): Promise<SchedulerExecutionGate> {
+  const state = await getSchedulerRuntimeState(jobKey);
+  if (state.isPaused) {
+    return {
+      allowed: false,
+      reason: 'PAUSED',
+      summary: state.pausedReason?.trim()
+        ? `Paused: ${state.pausedReason.trim()}`
+        : 'Paused by an admin operator',
+    };
+  }
+
+  return { allowed: true };
+}
+
 export function computeNextSchedulerJobRun(cronExpression: string, now = new Date()) {
   const trimmed = cronExpression.trim();
   if (trimmed === '* * * * *') {
@@ -352,6 +499,80 @@ async function pruneSchedulerJobRuns(jobKey: string) {
   }
 }
 
+async function sendSchedulerJobFailureDigest(input: {
+  job: SchedulerJobDefinition;
+  summary?: string | null;
+  error?: string | null;
+  consecutiveFailures: number;
+  finishedAt: Date;
+}) {
+  const lines = [
+    `Scheduler job failed: ${input.job.name}`,
+    `Key: ${input.job.key}`,
+    `Consecutive failures: ${input.consecutiveFailures}`,
+    `Time: ${input.finishedAt.toISOString()}`,
+  ];
+
+  if (input.summary?.trim()) {
+    lines.push(`Summary: ${input.summary.trim()}`);
+  }
+
+  if (input.error?.trim()) {
+    lines.push(`Error: ${input.error.trim()}`);
+  }
+
+  const message = lines.join('\n');
+
+  try {
+    const { parseNotificationChannelRecord, channelSupportsEvent } = await import('@/lib/services/notification-channels');
+    const { enqueueNotificationsForChannels } = await import('@/lib/services/notification-queue');
+
+    const channels = await db.notificationChannel.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        isActive: true,
+        config: true,
+        events: true,
+      },
+    });
+
+    const channelIds = channels
+      .map((channel) => parseNotificationChannelRecord(channel))
+      .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
+      .filter((channel) => channelSupportsEvent(channel, 'AUDIT_ALERT'))
+      .map((channel) => channel.id);
+
+    if (channelIds.length > 0) {
+      await enqueueNotificationsForChannels({
+        channelIds,
+        event: 'AUDIT_ALERT',
+        message,
+        payload: {
+          source: 'scheduler_job',
+          jobKey: input.job.key,
+          consecutiveFailures: input.consecutiveFailures,
+          finishedAt: input.finishedAt.toISOString(),
+        },
+        cooldownKey: input.job.key,
+        cooldownMs: 60 * 60_000,
+      });
+      return;
+    }
+  } catch (error) {
+    logger.warn(`Scheduler failure digest queue failed for ${input.job.key}`, error);
+  }
+
+  try {
+    const { sendAdminAlert } = await import('@/lib/services/telegram-bot');
+    await sendAdminAlert(message);
+  } catch (error) {
+    logger.warn(`Scheduler failure digest Telegram fallback failed for ${input.job.key}`, error);
+  }
+}
+
 export async function syncSchedulerJobCatalog(now = new Date(), options?: { force?: boolean }) {
   const nowMs = now.getTime();
   if (!options?.force && lastSchedulerJobCatalogSyncAt > 0 && nowMs - lastSchedulerJobCatalogSyncAt < SCHEDULER_CATALOG_SYNC_TTL_MS) {
@@ -402,6 +623,35 @@ export async function syncSchedulerJobCatalog(now = new Date(), options?: { forc
   });
 
   return schedulerJobCatalogSyncPromise;
+}
+
+export async function setSchedulerJobPausedState(input: {
+  jobKey: string;
+  paused: boolean;
+  reason?: string | null;
+  pausedBy?: string | null;
+}) {
+  const updated = await db.schedulerJob.update({
+    where: { key: input.jobKey },
+    data: {
+      isPaused: input.paused,
+      pausedAt: input.paused ? new Date() : null,
+      pausedReason: input.paused ? input.reason?.trim() || null : null,
+      pausedBy: input.paused ? input.pausedBy?.trim() || null : null,
+    },
+  });
+
+  setSchedulerRuntimeStateCache(input.jobKey, {
+    isPaused: updated.isPaused,
+    pausedAt: updated.pausedAt,
+    pausedReason: updated.pausedReason,
+    pausedBy: updated.pausedBy,
+    lastStatus: updated.lastStatus,
+    lastFinishedAt: updated.lastFinishedAt,
+    consecutiveFailures: updated.consecutiveFailures,
+  });
+
+  return updated;
 }
 
 async function markSchedulerJobStart(
@@ -463,7 +713,7 @@ async function markSchedulerJobFinish(input: {
   const truncatedSummary = truncateText(input.summary, 500);
   const truncatedError = truncateText(input.error, 1000);
 
-  await db.schedulerJob.upsert({
+  const persistedJob = await db.schedulerJob.upsert({
     where: { key: input.job.key },
     update: {
       name: input.job.name,
@@ -521,7 +771,29 @@ async function markSchedulerJobFinish(input: {
     },
   });
 
+  setSchedulerRuntimeStateCache(input.job.key, {
+    isPaused: persistedJob.isPaused,
+    pausedAt: persistedJob.pausedAt,
+    pausedReason: persistedJob.pausedReason,
+    pausedBy: persistedJob.pausedBy,
+    lastStatus: persistedJob.lastStatus,
+    lastFinishedAt: persistedJob.lastFinishedAt,
+    consecutiveFailures: persistedJob.consecutiveFailures,
+  });
+
   if (!input.storeRunHistory) {
+    if (
+      input.status === 'FAILED' &&
+      (persistedJob.consecutiveFailures === 1 || persistedJob.consecutiveFailures % 3 === 0)
+    ) {
+      await sendSchedulerJobFailureDigest({
+        job: input.job,
+        summary: truncatedSummary,
+        error: truncatedError,
+        consecutiveFailures: persistedJob.consecutiveFailures,
+        finishedAt: input.finishedAt,
+      });
+    }
     return;
   }
 
@@ -540,6 +812,19 @@ async function markSchedulerJobFinish(input: {
   });
 
   await pruneSchedulerJobRuns(input.job.key);
+
+  if (
+    input.status === 'FAILED' &&
+    (persistedJob.consecutiveFailures === 1 || persistedJob.consecutiveFailures % 3 === 0)
+  ) {
+    await sendSchedulerJobFailureDigest({
+      job: input.job,
+      summary: truncatedSummary,
+      error: truncatedError,
+      consecutiveFailures: persistedJob.consecutiveFailures,
+      finishedAt: input.finishedAt,
+    });
+  }
 }
 
 async function bestEffortMarkSchedulerJobStart(

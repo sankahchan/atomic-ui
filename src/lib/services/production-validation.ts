@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { getDatabaseRuntimeSummary } from '@/lib/database-engine';
 
 export interface ProductionValidationResult {
   errors: string[];
@@ -113,9 +114,8 @@ export function validateProductionEnvironment(
     warnings.push('SMTP_FROM is missing while SMTP delivery variables are present');
   }
 
-  if (!env.DATABASE_URL?.startsWith('file:') && !env.DATABASE_URL?.startsWith('postgres')) {
-    warnings.push('DATABASE_URL does not look like a SQLite or Postgres connection string');
-  }
+  const databaseRuntime = getDatabaseRuntimeSummary(env);
+  warnings.push(...databaseRuntime.warnings);
 
   return { errors, warnings };
 }

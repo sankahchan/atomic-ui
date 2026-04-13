@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { writeAuditLog } from '@/lib/audit';
 import { BACKUP_DIR, verifyBackupFile } from '@/lib/services/backup-verification';
+import { isSqliteDatabaseUrl } from '@/lib/database-engine';
 
 if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -16,6 +17,12 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 // Helper to get DB path
 function getDbPath() {
+    if (!isSqliteDatabaseUrl()) {
+        throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Dashboard backup create/restore currently supports SQLite file databases only. Use the Postgres cutover scripts for production database migration.',
+        });
+    }
     return resolveSqliteDbPath();
 }
 
@@ -44,7 +51,7 @@ export const backupRouter = router({
             const files = fs.readdirSync(BACKUP_DIR);
 
             const backups = files
-                .filter(file => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak'))
+                .filter(file => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak') || file.endsWith('.sql') || file.endsWith('.dump'))
                 .map(file => {
                     const stats = fs.statSync(path.join(BACKUP_DIR, file));
                     return {

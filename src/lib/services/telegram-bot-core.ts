@@ -126,7 +126,6 @@ import {
   type TelegramAnnouncementAudience,
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
-import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
 import {
   addTelegramPremiumSupportReply,
   buildTelegramDynamicPremiumPendingKeyboard,
@@ -181,6 +180,10 @@ import {
 import { handleOffersCommand } from '@/lib/services/telegram-offers';
 import { handleTelegramStartCommand } from '@/lib/services/telegram-onboarding';
 import { generateTelegramQrBufferWithAtomicLogo } from '@/lib/services/telegram-qr';
+import {
+  buildTelegramGiftUsageMessage,
+  buildTelegramReferralCenterMessage,
+} from '@/lib/services/telegram-storefront-shortcuts';
 import {
   handleAdminHomeCommand,
   handleAdminCreateAccessKeyCommand,
@@ -9670,38 +9673,17 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
     case 'gift':
       if (!argsText.trim() || !argsText.trim().split(/\s+/)[0]?.startsWith('@')) {
-        return locale === 'my'
-          ? '🎁 အသုံးပြုပုံ: /gift @recipient_username [COUPON]\n\nဥပမာ: /gift @friend TRIAL500'
-          : '🎁 Usage: /gift @recipient_username [COUPON]\n\nExample: /gift @friend TRIAL500';
+        return buildTelegramGiftUsageMessage(locale);
       }
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
     case 'referral': {
-      const summary = await getTelegramReferralSummary({
-        telegramUserId: String(telegramUserId),
-        telegramChatId: String(chatId),
+      return buildTelegramReferralCenterMessage({
+        locale,
+        telegramUserId,
+        chatId,
         username,
-        displayName: username,
+        botUsername: config.botUsername,
       });
-      const botUsername = config.botUsername?.trim().replace(/^@+/, '') || 'atomicui_bot';
-      const inviteLink = `https://t.me/${botUsername}?start=ref_${summary.referralCode}`;
-      const revenueLabel = new Intl.NumberFormat('en-US').format(summary.revenue);
-      return locale === 'my'
-        ? [
-            '🔗 <b>Referral center</b>',
-            '',
-            `Code: <b>${summary.referralCode}</b>`,
-            `Invite link: ${inviteLink}`,
-            `Converted orders: <b>${summary.fulfilledOrders}</b>`,
-            `Revenue: <b>${revenueLabel} MMK</b>`,
-          ].join('\n')
-        : [
-            '🔗 <b>Referral center</b>',
-            '',
-            `Code: <b>${summary.referralCode}</b>`,
-            `Invite link: ${inviteLink}`,
-            `Converted orders: <b>${summary.fulfilledOrders}</b>`,
-            `Revenue: <b>${revenueLabel} MMK</b>`,
-          ].join('\n');
     }
     case 'offers':
       return handleOffersCommand({

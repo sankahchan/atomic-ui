@@ -112,6 +112,7 @@ import {
   buildSubscriptionClientUrl,
 } from '@/lib/subscription-links';
 import { normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
+import { KeysBulkActionsBar } from './_components/keys-bulk-actions-bar';
 
 /**
  * Status badge configuration for visual consistency
@@ -4759,149 +4760,31 @@ export default function KeysPage() {
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
-        <div className="ops-mobile-action-bar sticky bottom-4 z-20 flex flex-col gap-2.5 border-primary/20 bg-primary/6 shadow-[0_18px_36px_rgba(1,6,20,0.34)] sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs font-medium sm:text-sm">
-            {selectedKeys.size} {t('keys.selected_count')}
-          </span>
-          <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center">
-            {/* Enable/Disable dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
-                  disabled={bulkToggleStatusMutation.isPending}
-                >
-                  {bulkToggleStatusMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Power className="w-4 h-4 mr-2" />
-                  )}
-                  {t('keys.bulk.enable_disable')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleBulkToggleStatus(true)}>
-                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
-                  {t('keys.bulk.enable_all')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleBulkToggleStatus(false)}>
-                  <XCircle className="w-4 h-4 mr-2 text-orange-500" />
-                  {t('keys.bulk.disable_all')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Extend Expiry */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              onClick={() => setBulkExtendDialogOpen(true)}
-              disabled={isBulkBusy}
-            >
-              {bulkExtendMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Clock className="w-4 h-4 mr-2" />
-              )}
-              {t('keys.bulk.extend_expiry')}
-            </Button>
-
-            {/* Tags dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
-                  disabled={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
-                >
-                  {bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Tag className="w-4 h-4 mr-2" />
-                  )}
-                  {t('keys.bulk.tags')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => {
-                  setBulkTagsMode('add');
-                  setBulkTagsDialogOpen(true);
-                }}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('keys.bulk.add_tags')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  setBulkTagsMode('remove');
-                  setBulkTagsDialogOpen(true);
-                }}>
-                  <X className="w-4 h-4 mr-2" />
-                  {t('keys.bulk.remove_tags')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Move to Server */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              onClick={() => setBulkMoveDialogOpen(true)}
-              disabled={isBulkBusy}
-            >
-              {bulkMoveMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ArrowRightLeft className="w-4 h-4 mr-2" />
-              )}
-              {t('keys.bulk.move')}
-            </Button>
-
-            {/* Archive */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              onClick={handleBulkArchive}
-              disabled={bulkArchiveMutation.isPending}
-            >
-              {bulkArchiveMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Archive className="w-4 h-4 mr-2" />
-              )}
-              {bulkArchiveMutation.isPending ? t('keys.bulk.archiving') : t('keys.bulk.archive')}
-            </Button>
-
-            {/* Delete */}
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              onClick={handleBulkDelete}
-              disabled={bulkDeleteMutation.isPending}
-            >
-              {bulkDeleteMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              {t('keys.delete_selected')}
-            </Button>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedKeys(new Set())}
-            className="h-8 w-full rounded-full px-3 text-xs sm:ml-auto sm:w-auto"
-            disabled={isBulkBusy}
-          >
-            {t('keys.clear_selection')}
-          </Button>
-        </div>
+        <KeysBulkActionsBar
+          t={t}
+          selectedCount={selectedKeys.size}
+          isBulkBusy={isBulkBusy}
+          bulkTogglePending={bulkToggleStatusMutation.isPending}
+          bulkExtendPending={bulkExtendMutation.isPending}
+          bulkTagsPending={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
+          bulkMovePending={bulkMoveMutation.isPending}
+          bulkArchivePending={bulkArchiveMutation.isPending}
+          bulkDeletePending={bulkDeleteMutation.isPending}
+          onToggleStatus={handleBulkToggleStatus}
+          onOpenExtend={() => setBulkExtendDialogOpen(true)}
+          onOpenAddTags={() => {
+            setBulkTagsMode('add');
+            setBulkTagsDialogOpen(true);
+          }}
+          onOpenRemoveTags={() => {
+            setBulkTagsMode('remove');
+            setBulkTagsDialogOpen(true);
+          }}
+          onOpenMove={() => setBulkMoveDialogOpen(true)}
+          onArchive={handleBulkArchive}
+          onDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedKeys(new Set())}
+        />
       )}
 
       {/* Mobile Card View - only show when viewMode is 'grid' */}

@@ -7,6 +7,7 @@ import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasBackupManageScope } from '@/lib/admin-scope';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
+import { isSqliteDatabaseUrl } from '@/lib/database-engine';
 
 // Helper to convert Node stream to Web stream (for Next.js Response)
 function streamToWeb(nodeStream: Readable) {
@@ -30,6 +31,15 @@ export async function GET(req: NextRequest) {
         });
         if (response || !user) {
             return response!;
+        }
+
+        if (!isSqliteDatabaseUrl()) {
+            return NextResponse.json(
+                {
+                    error: 'File-download backups currently support SQLite only. Use the Postgres cutover scripts or pg_dump for Postgres environments.',
+                },
+                { status: 409 },
+            );
         }
 
         // Define files to backup

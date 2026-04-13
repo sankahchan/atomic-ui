@@ -402,6 +402,7 @@ export async function enqueueNotificationsForChannels({
   payloadMode = 'WRAPPED',
   cooldownKey,
   bypassCooldown = false,
+  cooldownMs,
 }: {
   channelIds: string[];
   event: string;
@@ -412,6 +413,7 @@ export async function enqueueNotificationsForChannels({
   payloadMode?: WebhookPayloadMode;
   cooldownKey?: string;
   bypassCooldown?: boolean;
+  cooldownMs?: number;
 }) {
   const uniqueChannelIds = Array.from(new Set(channelIds.filter(Boolean)));
   if (uniqueChannelIds.length === 0) {
@@ -438,6 +440,7 @@ export async function enqueueNotificationsForChannels({
       payloadMode,
       cooldownKey,
       bypassCooldown,
+      cooldownMs,
     });
 
     if ('suppressed' in result && result.suppressed) {

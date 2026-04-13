@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { isSqliteDatabaseUrl } from '@/lib/database-engine';
 
 // PrismaClient is attached to the `global` object in development to prevent
 // exhausting your database connection limit.
@@ -21,10 +22,12 @@ async function initializeDatabase() {
   if (globalForPrisma.prismaInitialized) return;
   
   try {
-    // Use $queryRawUnsafe for PRAGMA commands since they return results
-    await db.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
-    await db.$queryRawUnsafe('PRAGMA busy_timeout = 30000;');
-    await db.$queryRawUnsafe('PRAGMA foreign_keys = ON;');
+    if (isSqliteDatabaseUrl()) {
+      // Use $queryRawUnsafe for PRAGMA commands since they return results
+      await db.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
+      await db.$queryRawUnsafe('PRAGMA busy_timeout = 30000;');
+      await db.$queryRawUnsafe('PRAGMA foreign_keys = ON;');
+    }
     
     globalForPrisma.prismaInitialized = true;
   } catch (error) {

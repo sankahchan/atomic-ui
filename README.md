@@ -155,7 +155,7 @@ Set these in `.env` before production use:
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` |
+| `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` or a Postgres DSN for cutover work |
 | `JWT_SECRET` | Yes | Session signing secret |
 | `CRON_SECRET` | Strongly recommended | Protects scheduled task endpoints |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL |
@@ -192,8 +192,12 @@ npm run bootstrap:vps
 npm run db:generate
 npm run db:push
 npm run db:migrate
+npm run db:cutover:report
+npm run db:cutover:preflight -- TARGET_DATABASE_URL=postgresql://...
 npm run db:studio
 ```
+
+`db:cutover:report` prints the current database engine, data counts, and production warnings. `db:cutover:preflight` validates a planned SQLite-to-Postgres cutover before you switch production.
 
 ## Documentation
 

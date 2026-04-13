@@ -17,6 +17,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
+    "db:cutover:report": "tsx scripts/database-cutover-report.ts",
+    "db:cutover:preflight": "tsx scripts/database-cutover-preflight.ts",
     "db:studio": "prisma studio",
     "typecheck": "tsc --project tsconfig.typecheck.json --noEmit --pretty false --incremental false",
     "setup": "npx tsx scripts/setup.ts",

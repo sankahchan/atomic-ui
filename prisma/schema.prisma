@@ -1456,6 +1456,10 @@ model SchedulerJob {
   cadenceLabel        String?
   cronExpression      String?
   startupOnly         Boolean  @default(false)
+  isPaused            Boolean  @default(false)
+  pausedAt            DateTime?
+  pausedReason        String?
+  pausedBy            String?
   lastStatus          String   @default("IDLE") // IDLE, RUNNING, SUCCESS, FAILED, SKIPPED
   lastTrigger         String? // SCHEDULED, STARTUP, MANUAL
   lastStartedAt       DateTime?

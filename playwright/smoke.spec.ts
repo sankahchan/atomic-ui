@@ -2,17 +2,23 @@ import { expect, test } from '@playwright/test';
 
 const smokeAdminEmail = 'smoke-admin@example.com';
 const smokeAdminPassword = 'Admin123!';
+const smokePortalEmail = 'smoke-portal@example.com';
+const smokePortalPassword = 'Portal123!';
 
-async function login(page: import('@playwright/test').Page) {
+async function login(
+  page: import('@playwright/test').Page,
+  email = smokeAdminEmail,
+  password = smokeAdminPassword,
+) {
   await page.goto('/login');
-  await page.locator('#email').fill(smokeAdminEmail);
-  await page.locator('#password').fill(smokeAdminPassword);
+  await page.locator('#email').fill(email);
+  await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/, { timeout: 30_000 });
 }
 
 test('admin smoke journeys stay functional', async ({ page }) => {
   await login(page);
+  await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/, { timeout: 30_000 });
 
   await test.step('manual scheduler run works from jobs page', async () => {
     await page.goto('/dashboard/jobs');
@@ -20,6 +26,15 @@ test('admin smoke journeys stay functional', async ({ page }) => {
     await expect(healthJob).toBeVisible();
     await healthJob.getByTestId('scheduler-run-health_check').click();
     await expect(healthJob).toContainText('Last trigger: MANUAL');
+  });
+
+  await test.step('scheduler pause and resume controls work', async () => {
+    await page.goto('/dashboard/jobs');
+    const healthJob = page.getByTestId('scheduler-job-health_check');
+    await healthJob.getByTestId('scheduler-pause-health_check').click();
+    await expect(healthJob).toContainText('PAUSED');
+    await healthJob.getByTestId('scheduler-pause-health_check').click();
+    await expect(healthJob).not.toContainText('PAUSED');
   });
 
   await test.step('access key creation works from the panel', async () => {
@@ -48,4 +63,27 @@ test('admin smoke journeys stay functional', async ({ page }) => {
     await page.getByTestId('review-order-reject-primary-PW-ORDER-001').click();
     await expect(reviewCard).toContainText(/Rejected|REJECTED/);
   });
+
+  await test.step('restore endpoint rejects the wrong content type cleanly', async () => {
+    const response = await page.evaluate(async () => {
+      const res = await fetch('/api/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ bad: true }),
+      });
+      return {
+        status: res.status,
+        body: await res.text(),
+      };
+    });
+
+    expect(response.status).toBe(415);
+    expect(response.body).toContain('multipart/form-data');
+  });
+});
+
+test('portal smoke login stays functional', async ({ page }) => {
+  await login(page, smokePortalEmail, smokePortalPassword);
+  await expect(page).toHaveURL(/\/portal(?:\?.*)?$/, { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /My Access Keys/i })).toBeVisible();
 });

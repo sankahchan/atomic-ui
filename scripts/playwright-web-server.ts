@@ -15,6 +15,8 @@ const templateDbPath = path.join(repoRoot, 'prisma', 'data', 'atomic-ui.db');
 const smokeDbPath = path.join(repoRoot, 'prisma', 'data', 'playwright-smoke.db');
 const smokeAdminEmail = 'smoke-admin@example.com';
 const smokeAdminPassword = 'Admin123!';
+const smokePortalEmail = 'smoke-portal@example.com';
+const smokePortalPassword = 'Portal123!';
 const smokeSupportThreadId = 'smoke-support-thread';
 
 function setSmokeEnv() {
@@ -226,6 +228,7 @@ async function resetAndSeedDatabase() {
 
   try {
     const passwordHash = await bcrypt.hash(smokeAdminPassword, 10);
+    const portalPasswordHash = await bcrypt.hash(smokePortalPassword, 10);
 
     await prisma.telegramSupportReply.deleteMany({
       where: { threadId: smokeSupportThreadId },
@@ -244,6 +247,9 @@ async function resetAndSeedDatabase() {
     });
     await prisma.user.deleteMany({
       where: { id: 'smoke-admin-user' },
+    });
+    await prisma.user.deleteMany({
+      where: { id: 'smoke-portal-user' },
     });
 
     await prisma.settings.upsert({
@@ -280,6 +286,14 @@ async function resetAndSeedDatabase() {
         passwordHash,
         role: 'ADMIN',
         adminScope: 'OWNER',
+      },
+    });
+    await prisma.user.create({
+      data: {
+        id: 'smoke-portal-user',
+        email: smokePortalEmail,
+        passwordHash: portalPasswordHash,
+        role: 'USER',
       },
     });
 

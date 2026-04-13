@@ -7,6 +7,7 @@ import { hasRestoreManageScope } from '@/lib/admin-scope';
 import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 import { parseRestoreUploadFormData } from '@/lib/services/restore-upload';
+import { isSqliteDatabaseUrl } from '@/lib/database-engine';
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,6 +17,15 @@ export async function POST(req: NextRequest) {
         });
         if (response || !user) {
             return response!;
+        }
+
+        if (!isSqliteDatabaseUrl()) {
+            return NextResponse.json(
+                {
+                    error: 'Backup restore currently supports SQLite file databases only. Use pg_restore or a controlled Postgres cutover for production Postgres environments.',
+                },
+                { status: 409 },
+            );
         }
 
         const { formData, error } = await parseRestoreUploadFormData(req);

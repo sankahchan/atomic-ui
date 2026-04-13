@@ -4,15 +4,20 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { db } from '@/lib/db';
 import {
+    computeSchedulerJobBackoffUntil,
+    computeSchedulerJobFailureBackoffMinutes,
     getExecutingSchedulerJobKeys,
     isSchedulerJobManualRunSupported,
     isSchedulerJobExecuting,
+    isSchedulerJobPaused,
+    setSchedulerJobPausedState,
     syncSchedulerJobCatalog,
 } from '@/lib/services/scheduler-jobs';
 import { runManualSchedulerJob } from '@/lib/services/scheduler-job-manual';
 import { writeAuditLog } from '@/lib/audit';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { getDatabaseRuntimeSummary } from '@/lib/database-engine';
 
 const execAsync = promisify(exec);
 
@@ -120,21 +125,35 @@ export const systemRouter = router({
         const executingKeys = new Set(getExecutingSchedulerJobKeys());
         const normalizedJobs = jobs.map((job) => ({
             ...job,
-            lastStatus: executingKeys.has(job.key) ? 'RUNNING' : job.lastStatus,
+            runtimeStatus: job.isPaused
+                ? 'PAUSED'
+                : executingKeys.has(job.key)
+                    ? 'RUNNING'
+                    : job.lastStatus,
+            backoffMinutes:
+                job.lastStatus === 'FAILED'
+                    ? computeSchedulerJobFailureBackoffMinutes(job.consecutiveFailures)
+                    : 0,
+            backoffUntil:
+                job.lastStatus === 'FAILED'
+                    ? computeSchedulerJobBackoffUntil(job.lastFinishedAt, job.consecutiveFailures)
+                    : null,
             manualRunSupported: isSchedulerJobManualRunSupported(job.key),
         }));
 
         const totals = {
             jobs: normalizedJobs.length,
-            running: normalizedJobs.filter((job) => job.lastStatus === 'RUNNING').length,
-            failed: normalizedJobs.filter((job) => job.lastStatus === 'FAILED').length,
-            skipped: normalizedJobs.filter((job) => job.lastStatus === 'SKIPPED').length,
-            healthy: normalizedJobs.filter((job) => ['SUCCESS', 'IDLE'].includes(job.lastStatus)).length,
+            running: normalizedJobs.filter((job) => job.runtimeStatus === 'RUNNING').length,
+            failed: normalizedJobs.filter((job) => job.runtimeStatus === 'FAILED').length,
+            skipped: normalizedJobs.filter((job) => job.runtimeStatus === 'SKIPPED').length,
+            paused: normalizedJobs.filter((job) => job.runtimeStatus === 'PAUSED').length,
+            healthy: normalizedJobs.filter((job) => ['SUCCESS', 'IDLE'].includes(job.runtimeStatus)).length,
         };
 
         return {
             totals,
             jobs: normalizedJobs,
+            databaseRuntime: getDatabaseRuntimeSummary(),
         };
     }),
     runSchedulerJob: adminProcedure
@@ -159,6 +178,7 @@ export const systemRouter = router({
                     key: true,
                     name: true,
                     lastStatus: true,
+                    isPaused: true,
                 },
             });
 
@@ -166,6 +186,13 @@ export const systemRouter = router({
                 throw new TRPCError({
                     code: 'CONFLICT',
                     message: 'This scheduler job is already running.',
+                });
+            }
+
+            if (existingJob?.isPaused || isSchedulerJobPaused(input.jobKey)) {
+                throw new TRPCError({
+                    code: 'CONFLICT',
+                    message: 'Resume the scheduler job before running it manually.',
                 });
             }
 
@@ -197,9 +224,81 @@ export const systemRouter = router({
                 job: job
                     ? {
                         ...job,
+                        runtimeStatus: isSchedulerJobExecuting(job.key)
+                            ? 'RUNNING'
+                            : job.isPaused
+                                ? 'PAUSED'
+                                : job.lastStatus,
+                        backoffMinutes:
+                            job.lastStatus === 'FAILED'
+                                ? computeSchedulerJobFailureBackoffMinutes(job.consecutiveFailures)
+                                : 0,
+                        backoffUntil:
+                            job.lastStatus === 'FAILED'
+                                ? computeSchedulerJobBackoffUntil(job.lastFinishedAt, job.consecutiveFailures)
+                                : null,
                         manualRunSupported: isSchedulerJobManualRunSupported(job.key),
                     }
                     : null,
+            };
+        }),
+    setSchedulerJobPaused: adminProcedure
+        .input(
+            z.object({
+                jobKey: z.string().trim().min(1),
+                paused: z.boolean(),
+                reason: z.string().trim().max(200).optional(),
+            }),
+        )
+        .mutation(async ({ ctx, input }) => {
+            await syncSchedulerJobCatalog();
+
+            const existingJob = await db.schedulerJob.findUnique({
+                where: { key: input.jobKey },
+                select: { key: true, name: true },
+            });
+
+            if (!existingJob) {
+                throw new TRPCError({
+                    code: 'NOT_FOUND',
+                    message: 'Scheduler job not found.',
+                });
+            }
+
+            const updatedJob = await setSchedulerJobPausedState({
+                jobKey: input.jobKey,
+                paused: input.paused,
+                reason: input.reason,
+                pausedBy: input.paused ? ctx.user.email : null,
+            });
+
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: input.paused ? 'SCHEDULER_JOB_PAUSED' : 'SCHEDULER_JOB_RESUMED',
+                entity: 'SCHEDULER_JOB',
+                entityId: input.jobKey,
+                details: {
+                    jobKey: input.jobKey,
+                    jobName: existingJob.name || input.jobKey,
+                    reason: input.reason?.trim() || null,
+                },
+            });
+
+            return {
+                job: {
+                    ...updatedJob,
+                    runtimeStatus: updatedJob.isPaused ? 'PAUSED' : updatedJob.lastStatus,
+                    backoffMinutes:
+                        updatedJob.lastStatus === 'FAILED'
+                            ? computeSchedulerJobFailureBackoffMinutes(updatedJob.consecutiveFailures)
+                            : 0,
+                    backoffUntil:
+                        updatedJob.lastStatus === 'FAILED'
+                            ? computeSchedulerJobBackoffUntil(updatedJob.lastFinishedAt, updatedJob.consecutiveFailures)
+                            : null,
+                    manualRunSupported: isSchedulerJobManualRunSupported(updatedJob.key),
+                },
             };
         }),
     getMyIp: protectedProcedure.query(({ ctx }) => {
