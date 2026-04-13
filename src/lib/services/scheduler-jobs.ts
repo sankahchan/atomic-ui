@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 export type SchedulerJobCategory =
   | 'CORE'
@@ -29,6 +30,15 @@ type SchedulerObservedOutcome<T> = {
 };
 
 const MAX_STORED_RUNS_PER_JOB = 25;
+const SQLITE_DATABASE_URL_PREFIX = 'file:';
+const SCHEDULER_CATALOG_SYNC_TTL_MS = 60_000;
+const shouldSerializeObservedSchedulerJobs =
+  process.env.DATABASE_URL?.startsWith(SQLITE_DATABASE_URL_PREFIX) ?? false;
+
+let lastSchedulerJobCatalogSyncAt = 0;
+let schedulerJobCatalogSyncPromise: Promise<void> | null = null;
+let observedSchedulerQueue: Promise<void> = Promise.resolve();
+const executingSchedulerJobKeys = new Set<string>();
 
 export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> = {
   trafficSnapshot: {
@@ -227,6 +237,14 @@ export function isSchedulerJobManualRunSupported(jobKey: string) {
   return Boolean(getSchedulerJobDefinitionByKey(jobKey)?.manualRunSupported);
 }
 
+export function isSchedulerJobExecuting(jobKey: string) {
+  return executingSchedulerJobKeys.has(jobKey);
+}
+
+export function getExecutingSchedulerJobKeys() {
+  return Array.from(executingSchedulerJobKeys);
+}
+
 export function computeNextSchedulerJobRun(cronExpression: string, now = new Date()) {
   const trimmed = cronExpression.trim();
   if (trimmed === '* * * * *') {
@@ -334,10 +352,19 @@ async function pruneSchedulerJobRuns(jobKey: string) {
   }
 }
 
-export async function syncSchedulerJobCatalog(now = new Date()) {
+export async function syncSchedulerJobCatalog(now = new Date(), options?: { force?: boolean }) {
+  const nowMs = now.getTime();
+  if (!options?.force && lastSchedulerJobCatalogSyncAt > 0 && nowMs - lastSchedulerJobCatalogSyncAt < SCHEDULER_CATALOG_SYNC_TTL_MS) {
+    return;
+  }
+
+  if (schedulerJobCatalogSyncPromise) {
+    return schedulerJobCatalogSyncPromise;
+  }
+
   const jobs = listSchedulerJobDefinitions();
-  await Promise.all(
-    jobs.map((job) =>
+  schedulerJobCatalogSyncPromise = (async () => {
+    const syncJob = async (job: SchedulerJobDefinition) =>
       db.schedulerJob.upsert({
         where: { key: job.key },
         update: {
@@ -359,9 +386,22 @@ export async function syncSchedulerJobCatalog(now = new Date()) {
           startupOnly: job.startupOnly ?? false,
           nextRunAt: job.cronExpression ? computeNextSchedulerJobRun(job.cronExpression, now) : null,
         },
-      }),
-    ),
-  );
+      });
+
+    if (shouldSerializeObservedSchedulerJobs) {
+      for (const job of jobs) {
+        await syncJob(job);
+      }
+    } else {
+      await Promise.all(jobs.map((job) => syncJob(job)));
+    }
+
+    lastSchedulerJobCatalogSyncAt = Date.now();
+  })().finally(() => {
+    schedulerJobCatalogSyncPromise = null;
+  });
+
+  return schedulerJobCatalogSyncPromise;
 }
 
 async function markSchedulerJobStart(
@@ -386,9 +426,6 @@ async function markSchedulerJobStart(
       lastSummary: null,
       lastError: null,
       nextRunAt: job.cronExpression ? computeNextSchedulerJobRun(job.cronExpression, startedAt) : null,
-      runCount: {
-        increment: 1,
-      },
     },
     create: {
       key: job.key,
@@ -402,7 +439,7 @@ async function markSchedulerJobStart(
       lastTrigger: trigger,
       lastStartedAt: startedAt,
       nextRunAt: job.cronExpression ? computeNextSchedulerJobRun(job.cronExpression, startedAt) : null,
-      runCount: 1,
+      runCount: 0,
     },
   });
 }
@@ -416,6 +453,7 @@ async function markSchedulerJobFinish(input: {
   summary?: string | null;
   error?: string | null;
   resultPreview?: unknown;
+  storeRunHistory?: boolean;
 }) {
   const durationMs = Math.max(
     0,
@@ -425,95 +463,132 @@ async function markSchedulerJobFinish(input: {
   const truncatedSummary = truncateText(input.summary, 500);
   const truncatedError = truncateText(input.error, 1000);
 
-  await db.$transaction(async (transaction) => {
-    await transaction.schedulerJob.upsert({
-      where: { key: input.job.key },
-      update: {
-        name: input.job.name,
-        description: input.job.description,
-        category: input.job.category,
-        cadenceLabel: input.job.cadenceLabel,
-        cronExpression: input.job.cronExpression || null,
-        startupOnly: input.job.startupOnly ?? false,
-        lastStatus: input.status,
-        lastTrigger: input.trigger,
-        lastStartedAt: input.startedAt,
-        lastFinishedAt: input.finishedAt,
-        lastSucceededAt:
-          input.status === 'SUCCESS' ? input.finishedAt : undefined,
-        lastDurationMs: durationMs,
-        lastSummary: truncatedSummary,
-        lastError: truncatedError,
-        nextRunAt: input.job.cronExpression
-          ? computeNextSchedulerJobRun(input.job.cronExpression, input.finishedAt)
-          : null,
-        successCount:
-          input.status === 'SUCCESS' ? { increment: 1 } : undefined,
-        failureCount:
-          input.status === 'FAILED' ? { increment: 1 } : undefined,
-        skippedCount:
-          input.status === 'SKIPPED' ? { increment: 1 } : undefined,
-        consecutiveFailures:
-          input.status === 'FAILED' ? { increment: 1 } : 0,
-      },
-      create: {
-        key: input.job.key,
-        name: input.job.name,
-        description: input.job.description,
-        category: input.job.category,
-        cadenceLabel: input.job.cadenceLabel,
-        cronExpression: input.job.cronExpression || null,
-        startupOnly: input.job.startupOnly ?? false,
-        lastStatus: input.status,
-        lastTrigger: input.trigger,
-        lastStartedAt: input.startedAt,
-        lastFinishedAt: input.finishedAt,
-        lastSucceededAt: input.status === 'SUCCESS' ? input.finishedAt : null,
-        lastDurationMs: durationMs,
-        lastSummary: truncatedSummary,
-        lastError: truncatedError,
-        nextRunAt: input.job.cronExpression
-          ? computeNextSchedulerJobRun(input.job.cronExpression, input.finishedAt)
-          : null,
-        runCount: 1,
-        successCount: input.status === 'SUCCESS' ? 1 : 0,
-        failureCount: input.status === 'FAILED' ? 1 : 0,
-        skippedCount: input.status === 'SKIPPED' ? 1 : 0,
-        consecutiveFailures: input.status === 'FAILED' ? 1 : 0,
-      },
-    });
+  await db.schedulerJob.upsert({
+    where: { key: input.job.key },
+    update: {
+      name: input.job.name,
+      description: input.job.description,
+      category: input.job.category,
+      cadenceLabel: input.job.cadenceLabel,
+      cronExpression: input.job.cronExpression || null,
+      startupOnly: input.job.startupOnly ?? false,
+      lastStatus: input.status,
+      lastTrigger: input.trigger,
+      lastStartedAt: input.startedAt,
+      lastFinishedAt: input.finishedAt,
+      lastSucceededAt:
+        input.status === 'SUCCESS' ? input.finishedAt : undefined,
+      lastDurationMs: durationMs,
+      lastSummary: truncatedSummary,
+      lastError: truncatedError,
+      nextRunAt: input.job.cronExpression
+        ? computeNextSchedulerJobRun(input.job.cronExpression, input.finishedAt)
+        : null,
+      runCount: { increment: 1 },
+      successCount:
+        input.status === 'SUCCESS' ? { increment: 1 } : undefined,
+      failureCount:
+        input.status === 'FAILED' ? { increment: 1 } : undefined,
+      skippedCount:
+        input.status === 'SKIPPED' ? { increment: 1 } : undefined,
+      consecutiveFailures:
+        input.status === 'FAILED' ? { increment: 1 } : 0,
+    },
+    create: {
+      key: input.job.key,
+      name: input.job.name,
+      description: input.job.description,
+      category: input.job.category,
+      cadenceLabel: input.job.cadenceLabel,
+      cronExpression: input.job.cronExpression || null,
+      startupOnly: input.job.startupOnly ?? false,
+      lastStatus: input.status,
+      lastTrigger: input.trigger,
+      lastStartedAt: input.startedAt,
+      lastFinishedAt: input.finishedAt,
+      lastSucceededAt: input.status === 'SUCCESS' ? input.finishedAt : null,
+      lastDurationMs: durationMs,
+      lastSummary: truncatedSummary,
+      lastError: truncatedError,
+      nextRunAt: input.job.cronExpression
+        ? computeNextSchedulerJobRun(input.job.cronExpression, input.finishedAt)
+        : null,
+      runCount: 1,
+      successCount: input.status === 'SUCCESS' ? 1 : 0,
+      failureCount: input.status === 'FAILED' ? 1 : 0,
+      skippedCount: input.status === 'SKIPPED' ? 1 : 0,
+      consecutiveFailures: input.status === 'FAILED' ? 1 : 0,
+    },
+  });
 
-    await transaction.schedulerJobRun.create({
-      data: {
-        jobKey: input.job.key,
-        trigger: input.trigger,
-        status: input.status,
-        startedAt: input.startedAt,
-        finishedAt: input.finishedAt,
-        durationMs,
-        summary: truncatedSummary,
-        error: truncatedError,
-        resultPreview: preview,
-      },
-    });
+  if (!input.storeRunHistory) {
+    return;
+  }
+
+  await db.schedulerJobRun.create({
+    data: {
+      jobKey: input.job.key,
+      trigger: input.trigger,
+      status: input.status,
+      startedAt: input.startedAt,
+      finishedAt: input.finishedAt,
+      durationMs,
+      summary: truncatedSummary,
+      error: truncatedError,
+      resultPreview: preview,
+    },
   });
 
   await pruneSchedulerJobRuns(input.job.key);
 }
 
-export async function runObservedSchedulerJob<T>(
+async function bestEffortMarkSchedulerJobStart(
+  job: SchedulerJobDefinition,
+  trigger: SchedulerJobTrigger,
+  startedAt: Date,
+) {
+  try {
+    await markSchedulerJobStart(job, trigger, startedAt);
+  } catch (error) {
+    logger.warn(`Scheduler telemetry start update failed for ${job.key}`, error);
+  }
+}
+
+async function bestEffortMarkSchedulerJobFinish(
+  input: Parameters<typeof markSchedulerJobFinish>[0],
+) {
+  try {
+    await markSchedulerJobFinish(input);
+  } catch (error) {
+    logger.warn(`Scheduler telemetry finish update failed for ${input.job.key}`, error);
+  }
+}
+
+function shouldStoreSchedulerRunHistory(
+  trigger: SchedulerJobTrigger,
+  status: Extract<SchedulerJobStatus, 'SUCCESS' | 'FAILED' | 'SKIPPED'>,
+) {
+  return trigger !== 'SCHEDULED' || status !== 'SUCCESS';
+}
+
+async function runObservedSchedulerJobExecution<T>(
   job: SchedulerJobDefinition,
   trigger: SchedulerJobTrigger,
   handler: () => Promise<SchedulerObservedOutcome<T>>,
 ) {
   const startedAt = new Date();
-  await markSchedulerJobStart(job, trigger, startedAt);
+  const shouldPersistRunningState = trigger !== 'SCHEDULED';
+  executingSchedulerJobKeys.add(job.key);
 
   try {
+    if (shouldPersistRunningState) {
+      await bestEffortMarkSchedulerJobStart(job, trigger, startedAt);
+    }
+
     const outcome = await handler();
     const status = outcome.status || 'SUCCESS';
     const finishedAt = new Date();
-    await markSchedulerJobFinish({
+    await bestEffortMarkSchedulerJobFinish({
       job,
       trigger,
       status,
@@ -521,18 +596,44 @@ export async function runObservedSchedulerJob<T>(
       finishedAt,
       summary: outcome.summary,
       resultPreview: outcome.resultPreview ?? outcome.value,
+      storeRunHistory: shouldStoreSchedulerRunHistory(trigger, status),
     });
     return outcome.value;
   } catch (error) {
     const finishedAt = new Date();
-    await markSchedulerJobFinish({
+    await bestEffortMarkSchedulerJobFinish({
       job,
       trigger,
       status: 'FAILED',
       startedAt,
       finishedAt,
       error: error instanceof Error ? error.message : String(error),
+      storeRunHistory: true,
     });
     throw error;
+  } finally {
+    executingSchedulerJobKeys.delete(job.key);
   }
+}
+
+export async function runObservedSchedulerJob<T>(
+  job: SchedulerJobDefinition,
+  trigger: SchedulerJobTrigger,
+  handler: () => Promise<SchedulerObservedOutcome<T>>,
+) {
+  if (!shouldSerializeObservedSchedulerJobs) {
+    return runObservedSchedulerJobExecution(job, trigger, handler);
+  }
+
+  const queuedExecution = observedSchedulerQueue.then(
+    () => runObservedSchedulerJobExecution(job, trigger, handler),
+    () => runObservedSchedulerJobExecution(job, trigger, handler),
+  );
+
+  observedSchedulerQueue = queuedExecution.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return queuedExecution;
 }

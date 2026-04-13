@@ -23,7 +23,7 @@ async function initializeDatabase() {
   try {
     // Use $queryRawUnsafe for PRAGMA commands since they return results
     await db.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
-    await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000;');
+    await db.$queryRawUnsafe('PRAGMA busy_timeout = 30000;');
     await db.$queryRawUnsafe('PRAGMA foreign_keys = ON;');
     
     globalForPrisma.prismaInitialized = true;

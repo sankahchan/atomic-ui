@@ -4,7 +4,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { db } from '@/lib/db';
 import {
+    getExecutingSchedulerJobKeys,
     isSchedulerJobManualRunSupported,
+    isSchedulerJobExecuting,
     syncSchedulerJobCatalog,
 } from '@/lib/services/scheduler-jobs';
 import { runManualSchedulerJob } from '@/lib/services/scheduler-job-manual';
@@ -115,20 +117,24 @@ export const systemRouter = router({
             },
         });
 
+        const executingKeys = new Set(getExecutingSchedulerJobKeys());
+        const normalizedJobs = jobs.map((job) => ({
+            ...job,
+            lastStatus: executingKeys.has(job.key) ? 'RUNNING' : job.lastStatus,
+            manualRunSupported: isSchedulerJobManualRunSupported(job.key),
+        }));
+
         const totals = {
-            jobs: jobs.length,
-            running: jobs.filter((job) => job.lastStatus === 'RUNNING').length,
-            failed: jobs.filter((job) => job.lastStatus === 'FAILED').length,
-            skipped: jobs.filter((job) => job.lastStatus === 'SKIPPED').length,
-            healthy: jobs.filter((job) => ['SUCCESS', 'IDLE'].includes(job.lastStatus)).length,
+            jobs: normalizedJobs.length,
+            running: normalizedJobs.filter((job) => job.lastStatus === 'RUNNING').length,
+            failed: normalizedJobs.filter((job) => job.lastStatus === 'FAILED').length,
+            skipped: normalizedJobs.filter((job) => job.lastStatus === 'SKIPPED').length,
+            healthy: normalizedJobs.filter((job) => ['SUCCESS', 'IDLE'].includes(job.lastStatus)).length,
         };
 
         return {
             totals,
-            jobs: jobs.map((job) => ({
-                ...job,
-                manualRunSupported: isSchedulerJobManualRunSupported(job.key),
-            })),
+            jobs: normalizedJobs,
         };
     }),
     runSchedulerJob: adminProcedure
@@ -156,7 +162,7 @@ export const systemRouter = router({
                 },
             });
 
-            if (existingJob?.lastStatus === 'RUNNING') {
+            if (existingJob?.lastStatus === 'RUNNING' || isSchedulerJobExecuting(input.jobKey)) {
                 throw new TRPCError({
                     code: 'CONFLICT',
                     message: 'This scheduler job is already running.',
