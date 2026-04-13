@@ -20,11 +20,15 @@ import { getTelegramConfig } from '@/lib/services/telegram-bot';
 import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { formatBytes } from '@/lib/utils';
 
+interface ThresholdCountMap {
+    [threshold: string]: number;
+}
+
 interface BandwidthAlertResult {
-    alertsSent80: number;
-    alertsSent90: number;
-    pendingAlerts80: number;
-    pendingAlerts90: number;
+    alertsSentTotal: number;
+    alertsSentByThreshold: ThresholdCountMap;
+    pendingAlertsTotal: number;
+    pendingAlertsByThreshold: ThresholdCountMap;
     autoDisabled: number;
     errors: string[];
 }
@@ -40,10 +44,10 @@ interface BandwidthCheckOptions {
  */
 export async function checkBandwidthAlerts(options: BandwidthCheckOptions = {}): Promise<BandwidthAlertResult> {
     const result: BandwidthAlertResult = {
-        alertsSent80: 0,
-        alertsSent90: 0,
-        pendingAlerts80: 0,
-        pendingAlerts90: 0,
+        alertsSentTotal: 0,
+        alertsSentByThreshold: {},
+        pendingAlertsTotal: 0,
+        pendingAlertsByThreshold: {},
         autoDisabled: 0,
         errors: [],
     };
@@ -153,18 +157,12 @@ export async function checkBandwidthAlerts(options: BandwidthCheckOptions = {}):
                         );
                     }
 
-                    if (highestThreshold >= 90) {
-                        if (shouldSendNotifications) {
-                            result.alertsSent90++;
-                        } else {
-                            result.pendingAlerts90++;
-                        }
+                    if (shouldSendNotifications) {
+                        incrementThresholdCount(result.alertsSentByThreshold, highestThreshold);
+                        result.alertsSentTotal++;
                     } else {
-                        if (shouldSendNotifications) {
-                            result.alertsSent80++;
-                        } else {
-                            result.pendingAlerts80++;
-                        }
+                        incrementThresholdCount(result.pendingAlertsByThreshold, highestThreshold);
+                        result.pendingAlertsTotal++;
                     }
                 }
             } catch (keyError) {
@@ -261,18 +259,12 @@ export async function checkBandwidthAlerts(options: BandwidthCheckOptions = {}):
                         );
                     }
 
-                    if (highestThreshold >= 90) {
-                        if (shouldSendNotifications) {
-                            result.alertsSent90++;
-                        } else {
-                            result.pendingAlerts90++;
-                        }
+                    if (shouldSendNotifications) {
+                        incrementThresholdCount(result.alertsSentByThreshold, highestThreshold);
+                        result.alertsSentTotal++;
                     } else {
-                        if (shouldSendNotifications) {
-                            result.alertsSent80++;
-                        } else {
-                            result.pendingAlerts80++;
-                        }
+                        incrementThresholdCount(result.pendingAlertsByThreshold, highestThreshold);
+                        result.pendingAlertsTotal++;
                     }
                 }
             } catch (keyError) {
@@ -284,6 +276,26 @@ export async function checkBandwidthAlerts(options: BandwidthCheckOptions = {}):
     }
 
     return result;
+}
+
+function incrementThresholdCount(map: ThresholdCountMap, threshold: number) {
+    const key = String(threshold);
+    map[key] = (map[key] ?? 0) + 1;
+}
+
+export function formatThresholdCountSummary(map: ThresholdCountMap) {
+    const entries = Object.entries(map)
+        .map(([threshold, count]) => ({ threshold: Number.parseInt(threshold, 10), count }))
+        .filter((entry) => Number.isFinite(entry.threshold) && entry.count > 0)
+        .sort((left, right) => left.threshold - right.threshold);
+
+    if (entries.length === 0) {
+        return 'none';
+    }
+
+    return entries
+        .map((entry) => `${entry.count} at ${entry.threshold}%`)
+        .join(', ');
 }
 
 /**

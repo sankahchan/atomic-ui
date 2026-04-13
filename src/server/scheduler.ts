@@ -19,7 +19,7 @@
 import cron from 'node-cron';
 import { snapshotTraffic } from '@/lib/services/analytics';
 import { checkExpirations } from '@/lib/services/expiration';
-import { checkBandwidthAlerts } from '@/lib/services/bandwidth-alerts';
+import { checkBandwidthAlerts, formatThresholdCountSummary } from '@/lib/services/bandwidth-alerts';
 import { runHealthChecks, ensureHealthChecks } from '@/lib/services/health-check';
 import { checkKeyRotations } from '@/lib/services/key-rotation';
 import { cleanupOldAuditLogs } from '@/lib/services/audit-log';
@@ -76,9 +76,9 @@ export function initScheduler() {
     cron.schedule('*/5 * * * *', async () => {
         try {
             const result = await checkBandwidthAlerts();
-            if (result.pendingAlerts80 > 0 || result.pendingAlerts90 > 0 || result.autoDisabled > 0) {
+            if (result.pendingAlertsTotal > 0 || result.autoDisabled > 0) {
                 logger.info(
-                    `Bandwidth review: ${result.pendingAlerts80} pending at 80%, ${result.pendingAlerts90} pending at 90%, ${result.autoDisabled} auto-disabled`,
+                    `Bandwidth review: ${result.pendingAlertsTotal} pending (${formatThresholdCountSummary(result.pendingAlertsByThreshold)}), ${result.autoDisabled} auto-disabled`,
                 );
             }
         } catch (error) {
