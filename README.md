@@ -116,6 +116,12 @@ npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin
 npm run smoke:telegram
 ```
 
+### Operator notes
+
+- SQLite restore runs offline only. Stop `atomic-ui.service`, then run `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
+- Telegram webhook set/reset in the dashboard registers a secret token with Telegram. Incoming webhook calls without a matching `x-telegram-bot-api-secret-token` header are rejected with `401`. Set `TELEGRAM_WEBHOOK_SECRET` only if you need to override the derived default.
+- Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
+
 ### Low-memory VPS deploy
 
 ```bash
@@ -191,6 +197,7 @@ npm run deploy:vps
 npm run bootstrap:vps
 npm run db:generate
 npm run db:push
+npm run restore:sqlite -- --backup /absolute/path/to/backup.zip
 npm run db:migrate
 npm run db:cutover:report
 npm run db:cutover:preflight -- TARGET_DATABASE_URL=postgresql://...
