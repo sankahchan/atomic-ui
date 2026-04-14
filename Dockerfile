@@ -18,7 +18,7 @@
 # This stage installs all npm dependencies including devDependencies needed
 # for building. The node_modules are cached in this layer for faster rebuilds.
 
-FROM node:20-alpine AS deps
+FROM node:25-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 ARG PRISMA_DATABASE_URL="file:./data/build.db"
@@ -38,7 +38,7 @@ RUN npm ci
 # This stage builds the Next.js application and generates the Prisma client.
 # The output includes the optimized production build and standalone server.
 
-FROM node:20-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 ARG PRISMA_DATABASE_URL="file:./data/build.db"
 
@@ -84,7 +84,7 @@ RUN mkdir -p .next/static
 # This is the final production image. It only includes the necessary files
 # to run the application, resulting in a smaller and more secure image.
 
-FROM node:20-alpine AS runner
+FROM node:25-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app
 
