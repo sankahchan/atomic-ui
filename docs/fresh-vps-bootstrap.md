@@ -8,6 +8,7 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 - installs the minimal system packages needed to run the installer
 - downloads `install.sh` from the GitHub ref you choose
 - runs the normal Atomic-UI installer with your panel/share domain settings
+- applies the Prisma schema through the repo's non-interactive safety wrapper so fresh SQLite installs do not stall on a confirmation prompt
 - verifies that `atomic-ui.service` is running
 - probes the local panel route before finishing
 
@@ -80,11 +81,10 @@ bash scripts/bootstrap-vps.sh
    - login page loads
    - dashboard loads
    - share page host is correct
-5. If Telegram is configured, confirm the webhook later with:
+5. If Telegram is configured, sign in to the dashboard Notifications workspace and use the webhook set/reset controls there.
+6. Confirm inbound Telegram delivery against the public panel URL after the webhook is set.
 
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://your-panel-host/your-panel-path/api/telegram/webhook
-```
+Atomic-UI registers Telegram webhooks with a secret token and rejects incoming webhook requests that do not include the matching `x-telegram-bot-api-secret-token` header.
 
 ## Common causes of failure on fresh VPS
 

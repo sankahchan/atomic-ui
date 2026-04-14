@@ -249,7 +249,7 @@ Before major upgrades:
 
 1. Create a backup in the dashboard.
 2. Copy it off the server.
-3. Restore it in a staging/disposable instance.
+3. Restore it in a staging/disposable instance with `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip` while the app service is stopped.
 4. Run the smoke test against that restored instance.
 
 For SQLite-to-Postgres migrations, replace the dashboard backup/restore steps with:
@@ -264,6 +264,12 @@ If a direct VPS deploy fails:
 2. Rebuild with `NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
 3. Restart `atomic-ui.service`.
 4. Re-run the smoke test and inspect `journalctl -u atomic-ui.service -n 50`.
+
+## Operator notes
+
+- SQLite restore is offline-only. The running web app blocks restore requests and points operators to `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
+- Telegram webhook set/reset uses Telegram's `secret_token` support. Atomic-UI sends a derived secret when registering the webhook and rejects incoming webhook requests that do not include the matching `x-telegram-bot-api-secret-token` header.
+- Subscription branding custom CSS is intentionally removed. Legacy `subscriptionCustomCss` values are ignored and any new settings save clears that stale key.
 
 ## Troubleshooting
 - **Logs**: `docker-compose logs -f`
