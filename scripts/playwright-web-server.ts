@@ -12,6 +12,7 @@ const outlinePort = 18443;
 const baseUrl = `http://127.0.0.1:${appPort}`;
 const outlineUrl = `https://127.0.0.1:${outlinePort}`;
 const templateDbPath = path.join(repoRoot, 'prisma', 'data', 'atomic-ui.db');
+const templateSchemaPath = path.join(repoRoot, 'scripts', 'playwright-smoke-schema.sql');
 const smokeDbPath = path.join(repoRoot, 'prisma', 'data', 'playwright-smoke.db');
 const smokeAdminEmail = 'smoke-admin@example.com';
 const smokeAdminPassword = 'Admin123!';
@@ -210,11 +211,6 @@ function createMockOutlineServer() {
 
 async function resetAndSeedDatabase() {
   fs.mkdirSync(path.dirname(smokeDbPath), { recursive: true });
-  if (!fs.existsSync(templateDbPath)) {
-    throw new Error(
-      `Smoke database template is missing at ${templateDbPath}. Run the normal local setup first.`,
-    );
-  }
   if (fs.existsSync(smokeDbPath)) {
     fs.rmSync(smokeDbPath, { force: true });
   }
@@ -222,10 +218,31 @@ async function resetAndSeedDatabase() {
   if (fs.existsSync(journalPath)) {
     fs.rmSync(journalPath, { force: true });
   }
-  execFileSync('sqlite3', [templateDbPath, `.backup ${smokeDbPath}`], {
-    cwd: repoRoot,
-    stdio: 'ignore',
-  });
+  const walPath = `${smokeDbPath}-wal`;
+  if (fs.existsSync(walPath)) {
+    fs.rmSync(walPath, { force: true });
+  }
+  const shmPath = `${smokeDbPath}-shm`;
+  if (fs.existsSync(shmPath)) {
+    fs.rmSync(shmPath, { force: true });
+  }
+
+  if (fs.existsSync(templateDbPath)) {
+    execFileSync('sqlite3', [templateDbPath, `.backup ${smokeDbPath}`], {
+      cwd: repoRoot,
+      stdio: 'ignore',
+    });
+  } else if (fs.existsSync(templateSchemaPath)) {
+    execFileSync('sqlite3', [smokeDbPath], {
+      cwd: repoRoot,
+      input: fs.readFileSync(templateSchemaPath),
+      stdio: ['pipe', 'ignore', 'inherit'],
+    });
+  } else {
+    throw new Error(
+      `Smoke database bootstrap is missing both ${templateDbPath} and ${templateSchemaPath}.`,
+    );
+  }
 
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
