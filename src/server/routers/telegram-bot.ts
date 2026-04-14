@@ -59,6 +59,7 @@ import {
   runTelegramSalesDigestCycle,
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
+import { getTelegramWebhookSecret } from '@/lib/services/telegram-runtime';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
 
 const TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES = new Set([
@@ -1787,6 +1788,7 @@ export const telegramBotRouter = router({
           body: JSON.stringify({
             url: input.webhookUrl,
             allowed_updates: ['message', 'callback_query'],
+            secret_token: getTelegramWebhookSecret(parsed.botToken),
           }),
         },
       );

@@ -6,13 +6,31 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import {
   handleTelegramUpdate,
   getTelegramConfig,
   sendTelegramMessage,
   TelegramUpdate
 } from '@/lib/services/telegram-bot';
-import { getPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
+import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/services/telegram-runtime';
+import { getConfiguredPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasTelegramAnnouncementManageScope } from '@/lib/admin-scope';
+
+function hasMatchingSecretToken(actual: string | null, expected: string) {
+  if (!actual) {
+    return false;
+  }
+
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(actualBuffer, expectedBuffer);
+}
 
 /**
  * POST /api/telegram/webhook
@@ -22,6 +40,19 @@ import { getPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links'
 export async function POST(request: NextRequest) {
   try {
     const config = await getTelegramConfig();
+    if (!config?.botToken || !config.webhookSecretToken) {
+      return NextResponse.json({ ok: false, error: 'Telegram bot is not configured' }, { status: 503 });
+    }
+
+    if (
+      !hasMatchingSecretToken(
+        request.headers.get(TELEGRAM_WEBHOOK_SECRET_HEADER),
+        config.webhookSecretToken,
+      )
+    ) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized webhook request' }, { status: 401 });
+    }
+
     let update: TelegramUpdate;
     try {
       update = await request.json();
@@ -66,6 +97,14 @@ export async function POST(request: NextRequest) {
  * Add ?setWebhook=true to register the webhook with Telegram.
  */
 export async function GET(request: NextRequest) {
+  const { response } = await requireAdminRouteScope({
+    canAccess: hasTelegramAnnouncementManageScope,
+    forbiddenMessage: 'You do not have permission to manage the Telegram webhook.',
+  });
+  if (response) {
+    return response;
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const setWebhook = searchParams.get('setWebhook') === 'true';
 
@@ -78,8 +117,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (setWebhook) {
-    // Get the base URL from environment or request
-    const webhookUrl = `${getPublicAppOrigin(request.nextUrl.origin)}${getPublicBasePath()}/api/telegram/webhook`;
+    const appOrigin = getConfiguredPublicAppOrigin();
+    if (!appOrigin) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          message: 'APP_URL or NEXT_PUBLIC_APP_URL must be configured before setting the Telegram webhook.',
+        },
+        { status: 500 },
+      );
+    }
+
+    const webhookUrl = `${appOrigin}${getPublicBasePath()}/api/telegram/webhook`;
 
     try {
       const response = await fetch(
@@ -90,6 +139,7 @@ export async function GET(request: NextRequest) {
           body: JSON.stringify({
             url: webhookUrl,
             allowed_updates: ['message', 'callback_query'],
+            secret_token: config.webhookSecretToken,
           }),
         }
       );

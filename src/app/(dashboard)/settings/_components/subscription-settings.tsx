@@ -33,7 +33,6 @@ import {
     Sparkles,
     Bell,
     Smartphone,
-    Code,
     FileText,
 } from "lucide-react";
 import {
@@ -80,7 +79,6 @@ export function SubscriptionSettings() {
         animations: false,
         alerts: false,
         apps: false,
-        css: false,
     });
 
     const toggleSection = (section: string) => {
@@ -243,9 +241,6 @@ export function SubscriptionSettings() {
         primaryCta: isMyanmar ? "Primary CTA" : "Primary CTA",
         orderPosition: (index: number) => isMyanmar ? `အစဉ် ${index}` : `Order position ${index}`,
         noApps: isMyanmar ? "Subscription page ပေါ်တွင် install button ပြသရန် အနည်းဆုံး app တစ်ခုကို ဖွင့်ပါ။" : "Enable at least one app to show install buttons on the subscription page.",
-        customCssTitle: isMyanmar ? "Custom CSS" : "Custom CSS",
-        customCssDesc: isMyanmar ? "အဆင့်မြင့် styling စိတ်ကြိုက် ပြင်ဆင်မှုများအတွက် custom CSS ထည့်သွင်းပါ။" : "Inject custom CSS for advanced styling customizations.",
-        customCssHelp: isMyanmar ? "အဆင့်မြင့်: default style များကို override လုပ်ရန် custom CSS ထည့်နိုင်သည်။" : "Advanced: Add custom CSS to override default styles.",
         unsplashTitle: isMyanmar ? "Unsplash ချိတ်ဆက်မှု" : "Unsplash Integration",
         unsplashDesc: isMyanmar ? "Subscription page များအတွက် Unsplash မှ cover image များကို အသုံးပြုရန် ဖွင့်ပါ။ အခမဲ့ API key ကို unsplash.com/developers မှ ရယူနိုင်သည်။" : "Enable cover images from Unsplash for subscription pages. Get a free API key at unsplash.com/developers",
         unsplashAccessKey: isMyanmar ? "Access Key" : "Access Key",
@@ -1252,52 +1247,6 @@ export function SubscriptionSettings() {
                                     {settingsUi.noApps}
                                 </div>
                             )}
-                        </CardContent>
-                    </CollapsibleContent>
-                </Card>
-            </Collapsible>
-
-            {/* Custom CSS */}
-            <Collapsible open={openSections.css} onOpenChange={() => toggleSection("css")}>
-                <Card>
-                    <CollapsibleTrigger asChild>
-                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Code className="w-5 h-5" />
-                                    <CardTitle className="text-base">{settingsUi.customCssTitle}</CardTitle>
-                                </div>
-                                <ChevronDown
-                                    className={`w-5 h-5 transition-transform ${openSections.css ? "rotate-180" : ""}`}
-                                />
-                            </div>
-                            <CardDescription>
-                                {settingsUi.customCssDesc}
-                            </CardDescription>
-                        </CardHeader>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                        <CardContent className="space-y-4 pt-0">
-                            <div className="space-y-2">
-                                <Label htmlFor="customCss">{settingsUi.customCssTitle}</Label>
-                                <Textarea
-                                    id="customCss"
-                                    placeholder={`.subscription-page {
-  /* Your custom styles */
-}
-
-.qr-code {
-  border-radius: 12px;
-}`}
-                                    value={branding.customCss || ""}
-                                    onChange={(e) => updateBranding("customCss", e.target.value)}
-                                    rows={8}
-                                    className="font-mono text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    {settingsUi.customCssHelp}
-                                </p>
-                            </div>
                         </CardContent>
                     </CollapsibleContent>
                 </Card>

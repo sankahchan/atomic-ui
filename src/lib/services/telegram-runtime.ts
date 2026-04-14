@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { db } from '@/lib/db';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
@@ -15,15 +16,18 @@ import {
   type SendTelegramMessageResult,
   type TelegramNotificationPreferenceKey,
 } from '@/lib/services/telegram-domain-types';
+import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
+export const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
 export type TelegramParseMode = 'HTML' | 'Markdown';
 
 export interface TelegramConfig {
   botToken: string;
   botUsername?: string;
+  webhookSecretToken?: string;
   adminChatIds: string[];
   welcomeMessage?: string;
   keyNotFoundMessage?: string;
@@ -435,6 +439,17 @@ export async function getTelegramBotUsername(
   return null;
 }
 
+export function getTelegramWebhookSecret(botToken: string) {
+  const configured = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  return createHmac('sha256', getJwtSecretString())
+    .update(`telegram-webhook:${botToken}`)
+    .digest('hex');
+}
+
 export async function getTelegramConfig(): Promise<TelegramConfig | null> {
   const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
   if (settings) {
@@ -456,6 +471,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.botUsername === 'string' && config.botUsername.trim()
               ? config.botUsername
               : undefined,
+          webhookSecretToken: getTelegramWebhookSecret(config.botToken),
           adminChatIds: Array.isArray(config.adminChatIds)
             ? config.adminChatIds.filter(
                 (value): value is string => typeof value === 'string' && value.trim().length > 0,
@@ -523,6 +539,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.botUsername === 'string' && config.botUsername.trim()
               ? config.botUsername
               : undefined,
+          webhookSecretToken: getTelegramWebhookSecret(botToken),
           adminChatIds,
           dailyDigestEnabled: false,
           dailyDigestHour: 9,

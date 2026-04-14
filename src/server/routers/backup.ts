@@ -221,7 +221,6 @@ export const backupRouter = router({
         .mutation(async ({ ctx, input }) => {
             try {
                 const backupPath = path.join(BACKUP_DIR, input.filename);
-                const dbPath = getDbPath();
 
                 if (!fs.existsSync(backupPath)) {
                     throw new TRPCError({
@@ -243,31 +242,27 @@ export const backupRouter = router({
                     });
                 }
 
-                // Create a safety backup of current state before restoring
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const safetyBackup = path.join(BACKUP_DIR, `pre-restore-${timestamp}.db`);
-                if (fs.existsSync(dbPath)) {
-                    fs.copyFileSync(dbPath, safetyBackup);
-                }
-
-                // Restore
-                fs.copyFileSync(backupPath, dbPath);
-
                 await writeAuditLog({
                     userId: ctx.user.id,
                     ip: ctx.clientIp,
-                    action: 'BACKUP_RESTORE',
+                    action: 'BACKUP_RESTORE_BLOCKED',
                     entity: 'BACKUP',
                     entityId: input.filename,
                     details: {
                         filename: input.filename,
-                        safetyBackup: path.basename(safetyBackup),
                         verificationStatus: verification.status,
+                        restoreCommand: `npm run restore:sqlite -- --backup ${backupPath}`,
                     },
                 });
 
-                return { success: true };
+                throw new TRPCError({
+                    code: 'PRECONDITION_FAILED',
+                    message: `Dashboard restore is disabled while the app is running. Stop the service first, then run: npm run restore:sqlite -- --backup ${backupPath}`,
+                });
             } catch (error: any) {
+                if (error instanceof TRPCError) {
+                    throw error;
+                }
                 logger.error('Failed to restore backup:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',

@@ -423,7 +423,7 @@ setup_database() {
     fi
 
     print_step "Pushing database schema..."
-    if ! sh scripts/prisma-command.sh db push 2>&1; then
+    if ! node scripts/prisma-safe-db-push.js 2>&1; then
         print_error "Prisma db push failed"
         return 1
     fi
@@ -1489,7 +1489,7 @@ update_service() {
     
     print_step "Updating database..."
     sh scripts/prisma-command.sh generate
-    sh scripts/prisma-command.sh db push
+    node scripts/prisma-safe-db-push.js
     
     print_step "Building application..."
     NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
