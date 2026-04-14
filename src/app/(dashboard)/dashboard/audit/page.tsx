@@ -401,7 +401,7 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <div className="grid gap-5">
           <div className="space-y-4">
             <BackButton href="/dashboard" label={t('nav.dashboard')} />
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">

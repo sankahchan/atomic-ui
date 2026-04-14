@@ -458,7 +458,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <section className="ops-showcase">
-        <div className="ops-showcase-grid">
+        <div className="grid gap-5">
           <div className="space-y-5 self-start">
             <Badge variant="outline" className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
               <FileText className="h-3.5 w-3.5" />

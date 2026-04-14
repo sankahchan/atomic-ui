@@ -488,7 +488,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <section className="ops-showcase">
-        <div className="ops-showcase-grid">
+        <div className="grid gap-5">
           <div className="space-y-5 self-start">
             <Badge
               variant="outline"

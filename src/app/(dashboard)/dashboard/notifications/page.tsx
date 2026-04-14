@@ -9822,7 +9822,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6 dark:[&_.ops-section-heading]:text-slate-300/90 dark:[&_.text-muted-foreground]:text-slate-300/82">
       <section className="ops-showcase">
-        <div className="grid gap-5 min-[1700px]:grid-cols-[minmax(0,1.2fr)_320px]">
+        <div className="grid gap-5">
           <div className="space-y-5">
             <BackButton href="/dashboard" label={t('nav.dashboard')} />
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
@@ -9860,7 +9860,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 min-[1700px]:hidden">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={handleOpenCreate} className="h-11 rounded-full px-5">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('notifications.add_channel')}
@@ -9868,7 +9868,7 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          <div className="hidden min-[1700px]:block">
+          <div>
             <div className="ops-hero-aside space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
