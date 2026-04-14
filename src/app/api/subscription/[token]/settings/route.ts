@@ -64,7 +64,6 @@ export async function GET(
       'subscriptionWelcomeMessage',
       'subscriptionLocalizedWelcomeMessages',
       'subscriptionShowWelcome',
-      'subscriptionCustomCss',
       'subscriptionFontFamily',
       'subscriptionFontUrl',
       'subscriptionLayout',
@@ -125,7 +124,7 @@ export async function GET(
       showWelcome: settingsMap.get('subscriptionShowWelcome')
         ? settingsMap.get('subscriptionShowWelcome') === 'true'
         : defaultBranding.showWelcome,
-      customCss: settingsMap.get('subscriptionCustomCss') || defaultBranding.customCss,
+      customCss: '',
       fontFamily: settingsMap.get('subscriptionFontFamily') || defaultBranding.fontFamily,
       fontUrl: settingsMap.get('subscriptionFontUrl') || defaultBranding.fontUrl,
       layout: (settingsMap.get('subscriptionLayout') as SubscriptionBranding['layout']) || defaultBranding.layout,

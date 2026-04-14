@@ -438,16 +438,6 @@ export default function SettingsPage() {
     },
   });
 
-  const restoreBackupMutation = trpc.backup.restore.useMutation({
-    onSuccess: () => {
-      toast({ title: t('settings.backup.restore_success') });
-      router.refresh();
-    },
-    onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    },
-  });
-
   const deleteBackupMutation = trpc.backup.delete.useMutation({
     onSuccess: () => {
       toast({ title: t('settings.backup.delete_success') });
@@ -576,9 +566,11 @@ export default function SettingsPage() {
   };
 
   const handleRestoreBackup = (filename: string) => {
-    if (confirm(t('settings.backup.restore_desc'))) {
-      restoreBackupMutation.mutate({ filename });
-    }
+    toast({
+      title: 'Restore runs offline only',
+      description: `Stop the service first, then run: npm run restore:sqlite -- --backup /absolute/path/to/${filename}`,
+      variant: 'destructive',
+    });
   };
 
   const handleDeleteBackup = (filename: string) => {
@@ -1226,10 +1218,9 @@ export default function SettingsPage() {
                         size="sm"
                         className="w-full justify-center"
                         onClick={() => handleRestoreBackup(backup.filename)}
-                        disabled={restoreBackupMutation.isPending}
                       >
-                        <RefreshCw className={`w-4 h-4 mr-2 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
-                        Restore
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Offline restore
                       </Button>
                       <Button
                         variant="outline"
@@ -1325,9 +1316,8 @@ export default function SettingsPage() {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => handleRestoreBackup(backup.filename)}
-                          disabled={restoreBackupMutation.isPending}
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${restoreBackupMutation.isPending ? 'animate-spin' : ''}`} />
+                          <RefreshCw className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           variant="ghost"

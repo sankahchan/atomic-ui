@@ -105,9 +105,36 @@ async function findDuplicateReferralCodes(engine) {
   }
 }
 
+async function hasSqliteUserTables() {
+  const { PrismaClient } = require('@prisma/client');
+  const prisma = new PrismaClient();
+
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%' LIMIT 1",
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const knownMissingDatabase =
+      message.includes('no such table') ||
+      message.includes('unable to open database file') ||
+      message.includes('The table') ||
+      message.includes('P2021');
+
+    if (knownMissingDatabase) {
+      return false;
+    }
+
+    throw error;
+  } finally {
+    await prisma.$disconnect().catch(() => {});
+  }
+}
+
 function runPrismaDbPush(schemaPath, engine) {
   const prismaArgs = ['prisma', 'db', 'push', '--schema', schemaPath];
-  if (engine === 'sqlite') {
+  if (engine === 'sqlite' && process.env.PRISMA_FORCE_ACCEPT_SQLITE_DATA_LOSS === '1') {
     prismaArgs.push('--accept-data-loss');
   }
 
@@ -140,6 +167,19 @@ async function main() {
     throw new Error(
       `Refusing to continue because duplicate Telegram referral codes already exist.\n${details}\nResolve the duplicates in TelegramUserProfile before running Prisma db push again.`,
     );
+  }
+
+  if (engine === 'sqlite') {
+    const populatedSqliteDatabase = await hasSqliteUserTables();
+    if (populatedSqliteDatabase && process.env.PRISMA_FORCE_ACCEPT_SQLITE_DATA_LOSS !== '1') {
+      throw new Error(
+        'Refusing to auto-accept Prisma schema warnings on a populated SQLite database. Review the schema changes manually or rerun with PRISMA_FORCE_ACCEPT_SQLITE_DATA_LOSS=1 if you have already verified the migration impact.',
+      );
+    }
+
+    if (!populatedSqliteDatabase) {
+      process.env.PRISMA_FORCE_ACCEPT_SQLITE_DATA_LOSS = '1';
+    }
   }
 
   runPrismaDbPush(schemaPath, engine);

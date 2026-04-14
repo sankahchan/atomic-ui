@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasSubscriptionSettingsManageScope } from '@/lib/admin-scope';
 import { defaultBranding } from '@/lib/subscription-themes';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
@@ -22,7 +23,6 @@ const brandingKeys = [
   'subscriptionWelcomeMessage',
   'subscriptionLocalizedWelcomeMessages',
   'subscriptionShowWelcome',
-  'subscriptionCustomCss',
   'subscriptionFontFamily',
   'subscriptionFontUrl',
   'subscriptionLayout',
@@ -44,6 +44,14 @@ const brandingKeys = [
 
 export async function GET() {
   try {
+    const { response } = await requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
+    }
+
     // Fetch all settings
     const allKeys = [
       'supportLink',
@@ -93,7 +101,7 @@ export async function GET() {
       showWelcome: settingsMap.get('subscriptionShowWelcome')
         ? settingsMap.get('subscriptionShowWelcome') === 'true'
         : defaultBranding.showWelcome,
-      customCss: settingsMap.get('subscriptionCustomCss') || '',
+      customCss: '',
       fontFamily: settingsMap.get('subscriptionFontFamily') || '',
       fontUrl: settingsMap.get('subscriptionFontUrl') || '',
       layout: settingsMap.get('subscriptionLayout') || defaultBranding.layout,
@@ -153,10 +161,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin session
-    const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { response } = await requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
     }
 
     const body = await request.json();
@@ -213,7 +223,6 @@ export async function POST(request: NextRequest) {
         subscriptionBrandName: branding.brandName,
         subscriptionFooterText: branding.footerText,
         subscriptionWelcomeMessage: branding.welcomeMessage,
-        subscriptionCustomCss: branding.customCss,
         subscriptionFontFamily: branding.fontFamily,
         subscriptionFontUrl: branding.fontUrl,
         subscriptionLayout: branding.layout,
@@ -295,6 +304,12 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    operations.push(
+      db.settings.deleteMany({
+        where: { key: 'subscriptionCustomCss' },
+      })
+    );
 
     await Promise.all(operations);
 
