@@ -34,7 +34,19 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildDynamicSubscriptionApiUrl } from '@/lib/subscription-links';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogSection,
+    DialogSectionDescription,
+    DialogSectionHeader,
+    DialogSectionTitle,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'react-qr-code';
@@ -516,76 +528,105 @@ export default function PortalPage() {
 
             {/* Connection Details Modal */}
             <Dialog open={!!selectedKey} onOpenChange={(open) => !open && setSelectedKey(null)}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
+                <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-md">
+                    <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
                         <DialogTitle>Connect to VPN</DialogTitle>
+                        <DialogDescription>
+                            Scan the QR code in Outline or copy the raw key if you need to paste it into another device manually.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex flex-col items-center space-y-6 py-4">
-                        {/* QR Code */}
-                        <div className="p-4 bg-white rounded-xl shadow-sm border">
-                            {selectedKey && (
-                                <QRCode value={selectedKey} size={200} />
-                            )}
-                        </div>
+                    <DialogBody>
+                        <DialogSection>
+                            <DialogSectionHeader>
+                                <DialogSectionTitle>QR connection</DialogSectionTitle>
+                                <DialogSectionDescription>
+                                    Open the Outline app on your phone or desktop and scan this code to import the key instantly.
+                                </DialogSectionDescription>
+                            </DialogSectionHeader>
+                            <div className="flex justify-center">
+                                <div className="ops-modal-stat-card bg-white p-4 dark:bg-white">
+                                    {selectedKey && (
+                                        <QRCode value={selectedKey} size={200} />
+                                    )}
+                                </div>
+                            </div>
+                        </DialogSection>
 
-                        <div className="text-center space-y-2">
-                            <h3 className="font-medium">Scan with Outline App</h3>
-                            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                                Open the Outline app on your device and scan this QR code, or copy the access key below.
-                            </p>
-                        </div>
-
-                        {/* Copy Key */}
-                        <div className="w-full space-y-2">
+                        <DialogSection>
+                            <DialogSectionHeader>
+                                <DialogSectionTitle>Raw access key</DialogSectionTitle>
+                                <DialogSectionDescription>
+                                    Use this when you need to paste the connection key manually instead of scanning the QR code.
+                                </DialogSectionDescription>
+                            </DialogSectionHeader>
                             <div className="relative">
                                 <input
                                     readOnly
                                     value={selectedKey || ''}
-                                    className="w-full text-xs font-mono bg-muted p-3 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    className="w-full rounded-xl border border-border bg-muted p-3 pr-10 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                 />
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="absolute right-1 top-1 h-7 w-7"
+                                    className="absolute right-1 top-1 h-8 w-8"
                                     onClick={() => selectedKey && handleCopyAccessKey(selectedKey)}
                                 >
                                     <Copy className="h-3 w-3" />
                                 </Button>
                             </div>
-                        </div>
+                        </DialogSection>
+                    </DialogBody>
 
-                        {/* Download Links */}
-                        <div className="flex gap-4 text-xs text-muted-foreground pt-2">
-                            <a href="https://getoutline.org/get-started/" target="_blank" className="hover:text-primary transition-colors flex items-center gap-1">
-                                Download Outline <Globe className="h-3 w-3" />
+                    <DialogFooter className="ops-modal-sticky-footer">
+                        <Button asChild variant="outline">
+                            <a href="https://getoutline.org/get-started/" target="_blank" rel="noreferrer">
+                                Download Outline <Globe className="ml-2 h-3 w-3" />
                             </a>
-                        </div>
-                    </div>
+                        </Button>
+                        <Button onClick={() => selectedKey && handleCopyAccessKey(selectedKey)} disabled={!selectedKey}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy access key
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={!!usageKey} onOpenChange={(open) => !open && setUsageKey(null)}>
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
+                <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-2xl">
+                    <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
                         <DialogTitle>Usage history</DialogTitle>
+                        <DialogDescription>
+                            Review recent traffic and spot whether this key is actively being used before you request support or more data.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground">Key</p>
-                                <p className="text-lg font-semibold">{usageKey?.name}</p>
+                    <DialogBody>
+                        <DialogSection>
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Key</p>
+                                    <p className="text-lg font-semibold">{usageKey?.name}</p>
+                                </div>
+                                <Badge variant="secondary">{usageKey?.type === 'DYNAMIC_KEY' ? 'Dynamic' : 'Access'}</Badge>
                             </div>
-                            <Badge variant="secondary">{usageKey?.type === 'DYNAMIC_KEY' ? 'Dynamic' : 'Access'}</Badge>
-                        </div>
-                        {usageHistoryQuery.isLoading ? (
-                            <div className="h-40 rounded-xl bg-muted animate-pulse" />
-                        ) : usageChartData.length > 0 ? (
-                            <TrafficChart data={usageChartData} height={220} color="hsl(var(--primary))" />
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No usage data yet.</p>
-                        )}
-                    </div>
+                        </DialogSection>
+
+                        <DialogSection>
+                            <DialogSectionHeader>
+                                <DialogSectionTitle>Traffic chart</DialogSectionTitle>
+                                <DialogSectionDescription>
+                                    Usage is shown as the recent consumption pattern for this key or routing identity.
+                                </DialogSectionDescription>
+                            </DialogSectionHeader>
+                            {usageHistoryQuery.isLoading ? (
+                                <div className="h-40 rounded-xl bg-muted animate-pulse" />
+                            ) : usageChartData.length > 0 ? (
+                                <TrafficChart data={usageChartData} height={220} color="hsl(var(--primary))" />
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No usage data yet.</p>
+                            )}
+                        </DialogSection>
+                    </DialogBody>
                 </DialogContent>
             </Dialog>
 
@@ -598,32 +639,40 @@ export default function PortalPage() {
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
+                <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+                    <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
                         <DialogTitle>Request more data</DialogTitle>
+                        <DialogDescription>
+                            Send a quick note to the support team so they can review quota needs for this key.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            Let the support team know you need more data for <span className="font-medium">{requestKey?.name}</span>.
-                        </p>
-                        <Textarea
-                            value={requestMessage}
-                            onChange={(event) => setRequestMessage(event.target.value)}
-                            placeholder="Add any details or timing preferences (optional)"
-                            className="min-h-[120px]"
-                        />
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setRequestKey(null)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={submitRequest}
-                                disabled={requestAccessDataMutation.isPending || requestDynamicDataMutation.isPending}
-                            >
-                                Send request
-                            </Button>
-                        </div>
-                    </div>
+                    <DialogBody>
+                        <DialogSection>
+                            <DialogSectionHeader>
+                                <DialogSectionTitle>{requestKey?.name}</DialogSectionTitle>
+                                <DialogSectionDescription>
+                                    Tell the team how much more data you need, or add timing details that might help them prioritise the request.
+                                </DialogSectionDescription>
+                            </DialogSectionHeader>
+                            <Textarea
+                                value={requestMessage}
+                                onChange={(event) => setRequestMessage(event.target.value)}
+                                placeholder="Add any details or timing preferences (optional)"
+                                className="min-h-[140px]"
+                            />
+                        </DialogSection>
+                    </DialogBody>
+                    <DialogFooter className="ops-modal-sticky-footer">
+                        <Button variant="outline" onClick={() => setRequestKey(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={submitRequest}
+                            disabled={requestAccessDataMutation.isPending || requestDynamicDataMutation.isPending}
+                        >
+                            Send request
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
