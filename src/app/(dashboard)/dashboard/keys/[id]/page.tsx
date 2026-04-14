@@ -2740,117 +2740,167 @@ export default function KeyDetailPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="space-y-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Button variant="ghost" size="icon" asChild className="rounded-full">
-                  <Link href="/dashboard/keys">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Link>
-                </Button>
-                <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
-                  <Key className="h-3.5 w-3.5" />
-                  Access Key
-                </span>
-                <Badge className={cn('border rounded-full px-3 py-1', statusInfo.color)}>
-                  <StatusIcon className="mr-1 h-3 w-3" />
-                  {statusInfo.label}
-                </Badge>
-                {keyRecord.server ? (
-                  <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
-                ) : null}
-                {isOnline ? (
-                  <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
-                    <Wifi className="mr-1 h-3 w-3" />
-                    {t('keys.status.online')}
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="ghost" size="icon" asChild className="rounded-full">
+                    <Link href="/dashboard/keys">
+                      <ArrowLeft className="w-5 h-5" />
+                    </Link>
+                  </Button>
+                  <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
+                    <Key className="h-3.5 w-3.5" />
+                    Access Key
+                  </span>
+                  <Badge className={cn('border rounded-full px-3 py-1', statusInfo.color)}>
+                    <StatusIcon className="mr-1 h-3 w-3" />
+                    {statusInfo.label}
                   </Badge>
-                ) : (
-                  <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
-                    <WifiOff className="mr-1 h-3 w-3" />
-                    {t('keys.status.no_recent_traffic')}
-                  </Badge>
-                )}
+                  {keyRecord.server ? (
+                    <ServerLifecycleBadge mode={(keyRecord.server as { lifecycleMode?: string | null }).lifecycleMode} />
+                  ) : null}
+                  {isOnline ? (
+                    <Badge variant="outline" className="rounded-full border-emerald-500/30 text-emerald-500">
+                      <Wifi className="mr-1 h-3 w-3" />
+                      {t('keys.status.online')}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="rounded-full border-muted-foreground/30 text-muted-foreground">
+                      <WifiOff className="mr-1 h-3 w-3" />
+                      {t('keys.status.no_recent_traffic')}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{key.name}</h1>
+                  <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                    Created {formatRelativeTime(key.createdAt)}
+                    {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{key.name}</h1>
-                <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                  Created {formatRelativeTime(key.createdAt)}
-                  {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
+              <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
+                <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-full px-5">
+                  <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
+                    <Server className="mr-2 h-4 w-4" />
+                    View Server
+                  </Link>
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="h-11 rounded-full px-5"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Total Usage
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{formatBytes(key.usedBytes)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Devices
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{estimatedDevices}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {activeSessions} active session{activeSessions === 1 ? '' : 's'}
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Expires
+                </p>
+                <p className="mt-3 text-2xl font-semibold">
+                  {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {key.expirationType.replace(/_/g, ' ')}
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Last Seen
+                </p>
+                <p className="mt-3 text-2xl font-semibold">
+                  {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Outline ID {key.outlineKeyId}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <aside className="ops-hero-aside space-y-4">
+            <div className="space-y-1">
+              <p className="ops-section-heading">Key summary</p>
+              <p className="text-sm text-muted-foreground">
+                Keep customer delivery, quota, and server linkage visible while you move through usage, delivery, or support actions.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer link</p>
+                <p className="mt-2 break-words text-sm font-medium">{key.email || key.telegramId || 'Not linked'}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Server route</p>
+                <p className="mt-2 text-sm font-medium">{keyRecord.server?.name || 'Unassigned server'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {(keyRecord.server as { country?: string | null })?.country || 'No server country'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Delivery state</p>
+                <p className="mt-2 text-sm font-medium">
+                  {keyRecord.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {keyRecord.clientLinkEnabled === false ? 'Client link off' : 'Client link on'} • {keyRecord.telegramDeliveryEnabled === false ? 'Telegram off' : 'Telegram on'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota watch</p>
+                <p className="mt-2 text-sm font-medium">
+                  {key.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {key.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
-              <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button asChild variant="outline" className="h-11 rounded-full px-5">
-                <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
-                  <Server className="mr-2 h-4 w-4" />
-                  View Server
-                </Link>
-              </Button>
-              <Button
-                variant="destructive"
-                className="h-11 rounded-full px-5"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                Delete
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Total Usage
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{formatBytes(key.usedBytes)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Devices
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{estimatedDevices}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {activeSessions} active session{activeSessions === 1 ? '' : 's'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Expires
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {key.expirationType.replace(/_/g, ' ')}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Last Seen
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Outline ID {key.outlineKeyId}
-              </p>
-            </div>
-          </div>
+            {key.notes ? (
+              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
+                <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{key.notes}</p>
+              </div>
+            ) : null}
+          </aside>
         </div>
       </section>
 
@@ -3748,30 +3798,30 @@ export default function KeyDetailPage() {
                   Core identifiers and assignment details that should always stay visible while you work.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Outline Key ID</span>
-                  <span className="font-mono">{key.outlineKeyId}</span>
+              <CardContent className="grid gap-3">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Outline Key ID</p>
+                  <p className="mt-2 break-all font-mono text-xs text-foreground">{key.outlineKeyId}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Public slug</span>
-                  <span className="font-mono">{key.publicSlug || '-'}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public slug</p>
+                  <p className="mt-2 break-all font-mono text-xs text-foreground">{key.publicSlug || '-'}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Created</span>
-                  <span>{formatDateTime(key.createdAt)}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Created</p>
+                  <p className="mt-2 text-sm font-medium">{formatDateTime(key.createdAt)}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Updated</span>
-                  <span>{formatDateTime(key.updatedAt)}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Updated</p>
+                  <p className="mt-2 text-sm font-medium">{formatDateTime(key.updatedAt)}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Server</span>
-                  <span className="text-right">{keyRecord.server?.name || 'Unassigned'}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Server</p>
+                  <p className="mt-2 text-sm font-medium">{keyRecord.server?.name || 'Unassigned'}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Quota policy</span>
-                  <span className="text-right">{key.dataLimitBytes ? 'Limited' : 'Unlimited'}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota policy</p>
+                  <p className="mt-2 text-sm font-medium">{key.dataLimitBytes ? 'Limited' : 'Unlimited'}</p>
                 </div>
               </CardContent>
             </Card>

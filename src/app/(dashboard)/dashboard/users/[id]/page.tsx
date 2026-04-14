@@ -1036,81 +1036,137 @@ export default function UserLedgerPage() {
   type DynamicKeyItem = (typeof dynamicKeys)[number];
   type CouponHistoryItem = (typeof couponHistory)[number];
   type CouponEligibilityItem = (typeof couponEligibility)[number];
+  const openSupportThreadCount = supportThreads.filter((thread) => thread.status !== 'HANDLED').length;
+  const waitingOnCustomerCount = supportThreads.filter(
+    (thread) => thread.status !== 'HANDLED' && (thread.waitingOn || '').toUpperCase() === 'USER',
+  ).length;
+  const unreadAnnouncementCount = announcementDeliveries.filter((delivery) => !delivery.readAt).length;
+  const pinnedAnnouncementCount = announcementDeliveries.filter((delivery) => delivery.isPinned).length;
+  const directIdentityLabel = telegramProfile?.username
+    ? `@${telegramProfile.username}`
+    : telegramProfile?.telegramChatId || user.telegramChatId || 'Not linked';
+  const latestDeliveredOrder = telegramOrders
+    .filter((order) => order.status === 'FULFILLED' && order.reviewedAt)
+    .sort((left, right) => new Date(right.reviewedAt || right.createdAt).getTime() - new Date(left.reviewedAt || left.createdAt).getTime())[0] || null;
 
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <BackButton href="/dashboard/users" label="Back" />
-              <Badge
-                variant="outline"
-                className="ops-pill border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
-              >
-                <Wallet className="mr-2 h-3.5 w-3.5" />
-                Customer CRM
-              </Badge>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <BackButton href="/dashboard/users" label="Back" />
+                <Badge
+                  variant="outline"
+                  className="ops-pill border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
+                >
+                  <Wallet className="mr-2 h-3.5 w-3.5" />
+                  Customer CRM
+                </Badge>
+              </div>
+
+              <Button variant="outline" className="rounded-full" onClick={() => ledgerQuery.refetch()} disabled={ledgerQuery.isFetching}>
+                {ledgerQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Refresh
+              </Button>
             </div>
 
-            <Button variant="outline" onClick={() => ledgerQuery.refetch()} disabled={ledgerQuery.isFetching}>
-              {ledgerQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Refresh
-            </Button>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{user.email}</h1>
+              <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+                Review keys, Telegram orders, refunds, receipts, announcements, support requests, and server-change history for this customer from one place.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Active keys
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">
+                  {summary.activeAccessKeys + summary.activeDynamicKeys}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {summary.activeAccessKeys} standard • {summary.activeDynamicKeys} premium dynamic
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Paid purchases
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.fulfilledPaidOrders}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Refund unlocks after more than 3 fulfilled paid purchases.
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Gross revenue
+                </p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight">{revenueSummary}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Total fulfilled Telegram order value for this customer.
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Refundable now
+                </p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.refundEligibleCount}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Refund closes automatically above 5 GB usage. Refunded: {refundedSummary}
+                </p>
+              </div>
+            </div>
+            {!financePermissions.canManage ? (
+              <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.
+              </div>
+            ) : null}
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{user.email}</h1>
-            <p className="text-sm text-muted-foreground sm:text-base">
-              Review keys, Telegram orders, refunds, receipts, announcements, support requests, and server-change history for this customer from one place.
-            </p>
-          </div>
+          <aside className="ops-hero-aside space-y-4">
+            <div className="space-y-1">
+              <p className="ops-section-heading">Customer state</p>
+              <p className="text-sm text-muted-foreground">
+                Keep the customer’s contact channel, support load, and recent delivery status visible while you work through CRM actions.
+              </p>
+            </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Active keys
-              </p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight">
-                {summary.activeAccessKeys + summary.activeDynamicKeys}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {summary.activeAccessKeys} standard • {summary.activeDynamicKeys} premium dynamic
-              </p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram identity</p>
+                <p className="mt-2 text-sm font-medium">{directIdentityLabel}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {telegramProfile?.locale ? `Locale ${telegramProfile.locale}` : 'Locale not set'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Support load</p>
+                <p className="mt-2 text-sm font-medium">{openSupportThreadCount} open thread{openSupportThreadCount === 1 ? '' : 's'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {waitingOnCustomerCount} waiting for customer • {premiumSupportRequests.length} premium support request{premiumSupportRequests.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Inbox delivery</p>
+                <p className="mt-2 text-sm font-medium">{unreadAnnouncementCount} unread announcement{unreadAnnouncementCount === 1 ? '' : 's'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {pinnedAnnouncementCount} pinned • {customerNotifications.summary.openCount} opens • {customerNotifications.summary.clickCount} clicks
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest fulfillment</p>
+                <p className="mt-2 text-sm font-medium">
+                  {latestDeliveredOrder ? latestDeliveredOrder.orderCode : 'No fulfilled order'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {latestDeliveredOrder?.reviewedAt ? formatRelativeTime(latestDeliveredOrder.reviewedAt) : 'No receipt delivered yet'}
+                </p>
+              </div>
             </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Paid purchases
-              </p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.fulfilledPaidOrders}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Refund unlocks after more than 3 fulfilled paid purchases.
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Gross revenue
-              </p>
-              <p className="mt-3 text-2xl font-semibold tracking-tight">{revenueSummary}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Total fulfilled Telegram order value for this customer.
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Refundable now
-              </p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.refundEligibleCount}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Refund closes automatically above 5 GB usage. Refunded: {refundedSummary}
-              </p>
-            </div>
-          </div>
-          {!financePermissions.canManage ? (
-            <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-              You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.
-            </div>
-          ) : null}
+          </aside>
         </div>
       </section>
 

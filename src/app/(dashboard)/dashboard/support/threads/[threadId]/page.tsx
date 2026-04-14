@@ -26,7 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { withBasePath } from '@/lib/base-path';
 import { trpc } from '@/lib/trpc';
-import { formatDateTime, formatRelativeTime } from '@/lib/utils';
+import { cn, formatDateTime, formatRelativeTime } from '@/lib/utils';
 
 function getThreadStateLabel(status: string, waitingOn: string) {
   if (status === 'HANDLED') {
@@ -249,123 +249,260 @@ export default function SupportThreadDetailPage() {
   const customerHref = thread.customer
     ? withBasePath(`/dashboard/users/${thread.customer.id}`)
     : null;
+  const latestReply = thread.replies[thread.replies.length - 1] || null;
+  const adminReplyCount = thread.replies.filter((reply) => reply.senderType === 'ADMIN').length;
+  const customerReplyCount = thread.replies.length - adminReplyCount;
+  const participantLabel = thread.customer?.email || thread.telegramUsername || thread.telegramUserId || 'Telegram user';
+  const contextItems = [
+    thread.relatedOrderCode ? `Order ${thread.relatedOrderCode}` : null,
+    thread.relatedKeyName ? `Key ${thread.relatedKeyName}` : null,
+    thread.relatedServerName ? `Server ${thread.relatedServerName}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href={withBasePath('/dashboard/support')}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Support center
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={customerHref || withBasePath('/dashboard/users')}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {customerHref ? 'Back to CRM' : 'Back to users'}
-              </Link>
-            </Button>
-            <Badge variant="outline" className={getThreadStateBadgeClass(thread.status, thread.waitingOn)}>
-              {getThreadStateLabel(thread.status, thread.waitingOn)}
-            </Badge>
-            <Badge variant="outline">{thread.issueLabel}</Badge>
-            {thread.isOverdue ? (
-              <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-100">
-                Overdue
-              </Badge>
-            ) : null}
-          </div>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">{thread.threadCode}</h1>
-            <p className="text-sm text-muted-foreground">
-              Telegram support thread with ownership, SLA, reply history, and escalation controls.
-            </p>
-          </div>
-        </div>
+      <section className="ops-hero">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+          <div className="space-y-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button asChild variant="outline" size="sm" className="rounded-full">
+                    <Link href={withBasePath('/dashboard/support')}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Support center
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="rounded-full">
+                    <Link href={customerHref || withBasePath('/dashboard/users')}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      {customerHref ? 'Back to CRM' : 'Back to users'}
+                    </Link>
+                  </Button>
+                  <Badge variant="outline" className={cn('rounded-full', getThreadStateBadgeClass(thread.status, thread.waitingOn))}>
+                    {getThreadStateLabel(thread.status, thread.waitingOn)}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full">{thread.issueLabel}</Badge>
+                  {thread.isOverdue ? (
+                    <Badge variant="outline" className="rounded-full border-red-500/30 bg-red-500/10 text-red-100">
+                      Overdue
+                    </Badge>
+                  ) : null}
+                </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {thread.customer ? (
-            <Button asChild variant="outline">
-              <Link href={customerHref || '#'}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open customer CRM
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{thread.threadCode}</h1>
+                  <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                    Telegram support thread with ownership, SLA, saved replies, and attachment-aware history in one workspace.
+                  </p>
+                </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
-        <Card className="ops-detail-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              Thread history
-            </CardTitle>
-            <CardDescription>Full reply history, including attachment previews and latest thread context.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {thread.replies.length === 0 ? (
-              <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                No replies yet.
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="ops-kpi-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Replies
+                    </p>
+                    <p className="mt-3 text-3xl font-semibold tracking-tight">{thread.replies.length}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {adminReplyCount} admin • {customerReplyCount} customer
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Waiting on
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold tracking-tight">
+                      {(thread.waitingOn || '').toUpperCase() === 'USER' ? 'Customer' : 'Admin'}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {thread.firstResponseDueAt ? `SLA ${formatDateTime(thread.firstResponseDueAt)}` : 'No SLA deadline set'}
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Last update
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold tracking-tight">{formatRelativeTime(thread.updatedAt)}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Created {formatRelativeTime(thread.createdAt)}
+                    </p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              thread.replies.map((reply) => {
-                const isAdmin = reply.senderType === 'ADMIN';
-                return (
-                  <div
-                    key={reply.id}
-                    className={`rounded-[1rem] border p-4 ${
-                      isAdmin
-                        ? 'border-sky-500/20 bg-sky-500/10'
-                        : 'border-border/60 bg-background/40 dark:bg-white/[0.03]'
-                    }`}
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={isAdmin ? 'secondary' : 'outline'}>
-                            {isAdmin ? 'Admin' : 'Customer'}
-                          </Badge>
-                          {reply.senderName ? (
-                            <span className="text-sm font-medium">{reply.senderName}</span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {thread.customer ? (
+                  <Button asChild variant="outline" className="rounded-full">
+                    <Link href={customerHref || '#'}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open customer CRM
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <aside className="ops-hero-aside space-y-4">
+            <div className="space-y-1">
+              <p className="ops-section-heading">Thread summary</p>
+              <p className="text-sm text-muted-foreground">
+                Keep ownership, customer identity, and latest context visible while replying.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer</p>
+                <p className="mt-2 break-words text-sm font-medium">{participantLabel}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Assigned admin</p>
+                <p className="mt-2 text-sm font-medium">{thread.assignedAdminName || 'Unassigned'}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thread opened</p>
+                <p className="mt-2 text-sm font-medium">{formatDateTime(thread.createdAt)}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest reply</p>
+                <p className="mt-2 text-sm font-medium">{latestReply ? formatRelativeTime(latestReply.createdAt) : 'No replies yet'}</p>
+              </div>
+            </div>
+
+            <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Linked context</p>
+              {contextItems.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {contextItems.map((item) => (
+                    <span key={item} className="ops-pill">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">No order, key, or server context was attached to this thread.</p>
+              )}
+            </div>
+
+            {latestReply ? (
+              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest preview</p>
+                <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{latestReply.message}</p>
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      </section>
+
+      <div className="ops-showcase-grid">
+        <div className="ops-detail-stack">
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Thread history
+              </CardTitle>
+              <CardDescription>Full reply history, including attachment previews and latest thread context.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="ops-panel space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="ops-pill">{thread.issueLabel}</span>
+                  <span className="ops-pill">{getThreadStateLabel(thread.status, thread.waitingOn)}</span>
+                  <span className="ops-pill">{thread.locale === 'my' ? 'Burmese' : 'English'}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thread code</p>
+                    <p className="mt-2 text-sm font-medium">{thread.threadCode}</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last update</p>
+                    <p className="mt-2 text-sm font-medium">{formatDateTime(thread.updatedAt)}</p>
+                  </div>
+                  <div className="ops-mini-tile">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">SLA target</p>
+                    <p className="mt-2 text-sm font-medium">
+                      {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : 'Open'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {thread.replies.length === 0 ? (
+                <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  No replies yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {thread.replies.map((reply) => {
+                    const isAdmin = reply.senderType === 'ADMIN';
+                    return (
+                      <div
+                        key={reply.id}
+                        className={cn('flex', isAdmin ? 'justify-end' : 'justify-start')}
+                      >
+                        <div
+                          className={cn(
+                            'w-full max-w-[58rem] rounded-[1.35rem] border p-4 shadow-[0_16px_36px_rgba(15,23,42,0.05)]',
+                            isAdmin
+                              ? 'border-sky-500/20 bg-sky-500/10'
+                              : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
+                          )}
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant={isAdmin ? 'secondary' : 'outline'} className="rounded-full">
+                                  {isAdmin ? 'Admin' : 'Customer'}
+                                </Badge>
+                                {reply.senderName ? (
+                                  <span className="text-sm font-medium">{reply.senderName}</span>
+                                ) : null}
+                                {reply.mediaUrl ? (
+                                  <Badge variant="outline" className="rounded-full">
+                                    {reply.mediaKind === 'IMAGE' ? 'Attachment image' : 'Attachment file'}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{formatDateTime(reply.createdAt)}</p>
+                            </div>
+                            {reply.mediaUrl ? (
+                              <div className="flex flex-wrap gap-2">
+                                <Button asChild size="sm" variant="outline" className="rounded-full">
+                                  <Link href={reply.mediaUrl} target="_blank">
+                                    <Paperclip className="mr-2 h-4 w-4" />
+                                    Open attachment
+                                  </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="rounded-full">
+                                  <Link href={`${reply.mediaUrl}?download=1`} target="_blank">
+                                    Download
+                                  </Link>
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                          <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-foreground">{reply.message}</p>
+                          {reply.mediaKind ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              {reply.mediaKind === 'IMAGE' ? 'Image attachment' : 'File attachment'}
+                              {reply.mediaFilename ? ` • ${reply.mediaFilename}` : ''}
+                            </p>
                           ) : null}
                         </div>
-                        <p className="text-sm text-muted-foreground">{formatDateTime(reply.createdAt)}</p>
                       </div>
-                      {reply.mediaUrl ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={reply.mediaUrl} target="_blank">
-                              <Paperclip className="mr-2 h-4 w-4" />
-                              Open attachment
-                            </Link>
-                          </Button>
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`${reply.mediaUrl}?download=1`} target="_blank">
-                              Download
-                            </Link>
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{reply.message}</p>
-                    {reply.mediaKind ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {reply.mediaKind === 'IMAGE' ? 'Image attachment' : 'File attachment'}
-                        {reply.mediaFilename ? ` • ${reply.mediaFilename}` : ''}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <div className="space-y-6">
+        </div>
+
+        <div className="ops-detail-rail">
           <Card className="ops-detail-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -376,21 +513,21 @@ export default function SupportThreadDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <div className="ops-mini-tile">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Assigned</p>
                   <p className="mt-2 text-sm font-medium">{thread.assignedAdminName || 'Unassigned'}</p>
                 </div>
-                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <div className="ops-mini-tile">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">SLA</p>
                   <p className="mt-2 text-sm font-medium">
                     {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : 'Open'}
                   </p>
                 </div>
-                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <div className="ops-mini-tile">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Created</p>
                   <p className="mt-2 text-sm font-medium">{formatRelativeTime(thread.createdAt)}</p>
                 </div>
-                <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
+                <div className="ops-mini-tile">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last update</p>
                   <p className="mt-2 text-sm font-medium">{formatRelativeTime(thread.updatedAt)}</p>
                 </div>
@@ -437,12 +574,13 @@ export default function SupportThreadDetailPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Button
                   variant="outline"
                   disabled={isBusy}
                   onClick={() => claimMutation.mutate({ threadId })}
                   data-testid="support-claim"
+                  className="rounded-full"
                 >
                   Claim to me
                 </Button>
@@ -450,6 +588,7 @@ export default function SupportThreadDetailPage() {
                   variant="outline"
                   disabled={isBusy}
                   onClick={() => unclaimMutation.mutate({ threadId })}
+                  className="rounded-full"
                 >
                   Unclaim
                 </Button>
@@ -473,6 +612,7 @@ export default function SupportThreadDetailPage() {
                     variant="outline"
                     disabled={isBusy}
                     onClick={() => macroMutation.mutate({ threadId, macro })}
+                    className="h-auto justify-start rounded-[1rem] px-4 py-3 text-left"
                   >
                     {getMacroLabel(macro)}
                   </Button>
@@ -492,6 +632,7 @@ export default function SupportThreadDetailPage() {
                   disabled={isBusy || replyMessage.trim().length === 0}
                   onClick={() => replyMutation.mutate({ threadId, message: replyMessage })}
                   data-testid="support-send-reply"
+                  className="rounded-full"
                 >
                   {replyMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -520,7 +661,7 @@ export default function SupportThreadDetailPage() {
                     {(templatesQuery.data || []).map((template) => (
                       <div
                         key={template.id}
-                        className="rounded-[0.9rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.03]"
+                        className="ops-support-card"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="space-y-2">
@@ -542,6 +683,7 @@ export default function SupportThreadDetailPage() {
                               variant="outline"
                               size="sm"
                               disabled={isBusy}
+                              className="rounded-full"
                               onClick={() => {
                                 setReplyMessage(template.message);
                                 setTemplateTitle(template.title);
@@ -554,6 +696,7 @@ export default function SupportThreadDetailPage() {
                               type="button"
                               size="sm"
                               disabled={isBusy}
+                              className="rounded-full"
                               onClick={() => applyTemplateMutation.mutate({ threadId, templateId: template.id })}
                             >
                               Send now

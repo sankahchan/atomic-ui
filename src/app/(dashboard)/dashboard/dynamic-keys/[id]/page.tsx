@@ -3569,100 +3569,150 @@ export default function DynamicKeyDetailPage() {
   return (
     <div className="space-y-6">
       <section className="ops-hero">
-        <div className="space-y-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Button variant="ghost" size="icon" asChild className="rounded-full">
-                  <Link href="/dashboard/dynamic-keys">
-                    <ArrowLeft className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
-                  <KeyRound className="h-3.5 w-3.5" />
-                  Dynamic Key
-                </span>
-                <Badge variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
-                  {dak.status}
-                </Badge>
-                <Badge variant="outline" className="rounded-full">
-                  {t(typeConfig.labelKey)}
-                </Badge>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="ghost" size="icon" asChild className="rounded-full">
+                    <Link href="/dashboard/dynamic-keys">
+                      <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                  <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Dynamic Key
+                  </span>
+                  <Badge variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
+                    {dak.status}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full">
+                    {t(typeConfig.labelKey)}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{dak.name}</h1>
+                  <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                    {t(typeConfig.descriptionKey)}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{dak.name}</h1>
-                <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                  {t(typeConfig.descriptionKey)}. {t('dynamic_keys.detail.created')} {formatRelativeTime(dak.createdAt)}.
+              <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
+                <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {t('dynamic_keys.detail.refresh')}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="h-11 rounded-full px-5"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  {t('dynamic_keys.detail.delete')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('dynamic_keys.detail.attached_keys')}
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{dak.accessKeys.length}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {attachedActiveKeys} active attached keys
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Server Coverage
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{serverCoverage}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Distinct servers serving this subscription
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('dynamic_keys.detail.traffic_usage')}
+                </p>
+                <p className="mt-3 text-2xl font-semibold">{formatBytes(dak.usedBytes)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
+                </p>
+              </div>
+              <div className="ops-kpi-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Rotation
+                </p>
+                <p className="mt-3 text-2xl font-semibold">
+                  {dak.rotationEnabled ? dak.rotationInterval : 'Off'}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <aside className="ops-hero-aside space-y-4">
+            <div className="space-y-1">
+              <p className="ops-section-heading">Subscription summary</p>
+              <p className="text-sm text-muted-foreground">
+                Keep route selection, delivery state, and share identity visible while editing routing or attached access keys.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current route</p>
+                <p className="mt-2 text-sm font-medium">
+                  {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {routingDiagnosticsQuery.data?.currentSelection?.keyName || 'No pinned backend'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Share identity</p>
+                <p className="mt-2 break-all text-sm font-medium">{dak.publicSlug || dak.dynamicUrl || 'Not generated'}</p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Delivery state</p>
+                <p className="mt-2 text-sm font-medium">{dak.sharePageEnabled === false ? 'Share page off' : 'Share page on'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dak.dynamicUrl ? 'Client URL ready' : 'Client URL unavailable'}
+                </p>
+              </div>
+              <div className="ops-mini-tile">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota watch</p>
+                <p className="mt-2 text-sm font-medium">
+                  {dak.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dak.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
-              <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {t('dynamic_keys.detail.refresh')}
-              </Button>
-              <Button
-                variant="destructive"
-                className="h-11 rounded-full px-5"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                {t('dynamic_keys.detail.delete')}
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('dynamic_keys.detail.attached_keys')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{dak.accessKeys.length}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {attachedActiveKeys} active attached keys
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Server Coverage
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{serverCoverage}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Distinct servers serving this subscription
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {t('dynamic_keys.detail.traffic_usage')}
-              </p>
-              <p className="mt-3 text-2xl font-semibold">{formatBytes(dak.usedBytes)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
-              </p>
-            </div>
-            <div className="ops-kpi-tile">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Rotation
-              </p>
-              <p className="mt-3 text-2xl font-semibold">
-                {dak.rotationEnabled ? dak.rotationInterval : 'Off'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
-              </p>
-            </div>
-          </div>
+            {dak.notes ? (
+              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
+                <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{dak.notes}</p>
+              </div>
+            ) : null}
+          </aside>
         </div>
       </section>
 
@@ -4114,46 +4164,48 @@ export default function DynamicKeyDetailPage() {
                   Keep subscription status, load balancing, and route context visible while you edit delivery or routing settings.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{t('dynamic_keys.table.type')}</span>
-                  <span className="font-medium">{t(typeConfig.labelKey)}</span>
+              <CardContent className="grid gap-3">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.type')}</p>
+                  <p className="mt-2 text-sm font-medium">{t(typeConfig.labelKey)}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{t('dynamic_keys.table.status')}</span>
-                  <span className="font-medium">{dak.status}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.table.status')}</p>
+                  <p className="mt-2 text-sm font-medium">{dak.status}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{t('dynamic_keys.detail.attached_keys')}</span>
-                  <span className="font-medium">{dak.accessKeys.length}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.detail.attached_keys')}</p>
+                  <p className="mt-2 text-sm font-medium">{dak.accessKeys.length}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Load Balancer</span>
-                  <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
-                    {dak.loadBalancerAlgorithm === 'IP_HASH'
-                      ? 'IP Hash'
-                      : dak.loadBalancerAlgorithm === 'ROUND_ROBIN'
-                        ? 'Round Robin'
-                        : dak.loadBalancerAlgorithm === 'LEAST_LOAD'
-                          ? 'Least Load'
-                          : dak.loadBalancerAlgorithm === 'RANDOM'
-                            ? 'Random'
-                            : dak.loadBalancerAlgorithm}
-                  </Badge>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load Balancer</p>
+                  <div className="mt-2">
+                    <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
+                      {dak.loadBalancerAlgorithm === 'IP_HASH'
+                        ? 'IP Hash'
+                        : dak.loadBalancerAlgorithm === 'ROUND_ROBIN'
+                          ? 'Round Robin'
+                          : dak.loadBalancerAlgorithm === 'LEAST_LOAD'
+                            ? 'Least Load'
+                            : dak.loadBalancerAlgorithm === 'RANDOM'
+                              ? 'Random'
+                              : dak.loadBalancerAlgorithm}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">Current route</span>
-                  <span className="text-right">
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current route</p>
+                  <p className="mt-2 text-sm font-medium">
                     {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{t('dynamic_keys.detail.created')}</span>
-                  <span>{formatDateTime(dak.createdAt)}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.detail.created')}</p>
+                  <p className="mt-2 text-sm font-medium">{formatDateTime(dak.createdAt)}</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{t('dynamic_keys.detail.updated')}</span>
-                  <span>{formatDateTime(dak.updatedAt)}</span>
+                <div className="ops-mini-tile">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dynamic_keys.detail.updated')}</p>
+                  <p className="mt-2 text-sm font-medium">{formatDateTime(dak.updatedAt)}</p>
                 </div>
               </CardContent>
             </Card>
