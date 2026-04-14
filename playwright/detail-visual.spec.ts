@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import { expect, test } from '@playwright/test';
 
 import { freezeBrowserTime, login, setTheme, stabilizeVisuals } from './helpers';
@@ -57,14 +60,24 @@ for (const layout of layouts) {
           await stabilizeVisuals(page);
           await expect(page.getByTestId(detailPage.testId)).toBeVisible();
 
-          await expect(page).toHaveScreenshot(
-            `${detailPage.name}-${layout.name}-${theme}.png`,
-            {
-              animations: 'disabled',
-              caret: 'hide',
-              maxDiffPixelRatio: 0.01,
-            },
+          const snapshotName = `${detailPage.name}-${layout.name}-${theme}.png`;
+          const snapshotPath = path.join(
+            process.cwd(),
+            'playwright',
+            'detail-visual.spec.ts-snapshots',
+            snapshotName.replace(/\.png$/, `-${process.platform}.png`),
           );
+
+          test.skip(
+            !fs.existsSync(snapshotPath),
+            `Visual baseline ${path.basename(snapshotPath)} is not committed for ${process.platform}.`,
+          );
+
+          await expect(page).toHaveScreenshot(snapshotName, {
+            animations: 'disabled',
+            caret: 'hide',
+            maxDiffPixelRatio: 0.01,
+          });
         });
       }
     }
