@@ -40,6 +40,16 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DetailHero,
+  DetailHeroAside,
+  DetailHeroGrid,
+  DetailKpiTile,
+  DetailMetricGrid,
+  DetailMiniTile,
+  DetailMiniTileGrid,
+  DetailNoteBlock,
+} from '@/components/ui/detail-workspace';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -2738,9 +2748,9 @@ export default function KeyDetailPage() {
     rotationIntervalDraft !== currentRotationInterval;
 
   return (
-    <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+    <div className="space-y-6" data-testid="access-key-detail-page">
+      <DetailHero data-testid="access-key-detail-hero">
+        <DetailHeroGrid>
           <div className="space-y-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-4">
@@ -2810,99 +2820,66 @@ export default function KeyDetailPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Total Usage
-                </p>
-                <p className="mt-3 text-2xl font-semibold">{formatBytes(key.usedBytes)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Devices
-                </p>
-                <p className="mt-3 text-2xl font-semibold">{estimatedDevices}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {activeSessions} active session{activeSessions === 1 ? '' : 's'}
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Expires
-                </p>
-                <p className="mt-3 text-2xl font-semibold">
-                  {key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {key.expirationType.replace(/_/g, ' ')}
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Last Seen
-                </p>
-                <p className="mt-3 text-2xl font-semibold">
-                  {lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Outline ID {key.outlineKeyId}
-                </p>
-              </div>
-            </div>
+            <DetailMetricGrid>
+              <DetailKpiTile
+                label="Total Usage"
+                value={formatBytes(key.usedBytes)}
+                meta={key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
+              />
+              <DetailKpiTile
+                label="Devices"
+                value={estimatedDevices}
+                meta={`${activeSessions} active session${activeSessions === 1 ? '' : 's'}`}
+              />
+              <DetailKpiTile
+                label="Expires"
+                value={key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+                meta={key.expirationType.replace(/_/g, ' ')}
+              />
+              <DetailKpiTile
+                label="Last Seen"
+                value={lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
+                meta={`Outline ID ${key.outlineKeyId}`}
+              />
+            </DetailMetricGrid>
           </div>
 
-          <aside className="ops-hero-aside space-y-4">
-            <div className="space-y-1">
-              <p className="ops-section-heading">Key summary</p>
-              <p className="text-sm text-muted-foreground">
-                Keep customer delivery, quota, and server linkage visible while you move through usage, delivery, or support actions.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer link</p>
-                <p className="mt-2 break-words text-sm font-medium">{key.email || key.telegramId || 'Not linked'}</p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Server route</p>
-                <p className="mt-2 text-sm font-medium">{keyRecord.server?.name || 'Unassigned server'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {(keyRecord.server as { country?: string | null })?.country || 'No server country'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Delivery state</p>
-                <p className="mt-2 text-sm font-medium">
-                  {keyRecord.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {keyRecord.clientLinkEnabled === false ? 'Client link off' : 'Client link on'} • {keyRecord.telegramDeliveryEnabled === false ? 'Telegram off' : 'Telegram on'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota watch</p>
-                <p className="mt-2 text-sm font-medium">
-                  {key.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {key.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
-                </p>
-              </div>
-            </div>
+          <DetailHeroAside
+            title="Key summary"
+            description="Keep customer delivery, quota, and server linkage visible while you move through usage, delivery, or support actions."
+          >
+            <DetailMiniTileGrid>
+              <DetailMiniTile
+                label="Customer link"
+                value={key.email || key.telegramId || 'Not linked'}
+                valueClassName="break-words"
+              />
+              <DetailMiniTile
+                label="Server route"
+                value={keyRecord.server?.name || 'Unassigned server'}
+                meta={(keyRecord.server as { country?: string | null })?.country || 'No server country'}
+              />
+              <DetailMiniTile
+                label="Delivery state"
+                value={keyRecord.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
+                meta={`${keyRecord.clientLinkEnabled === false ? 'Client link off' : 'Client link on'} • ${keyRecord.telegramDeliveryEnabled === false ? 'Telegram off' : 'Telegram on'}`}
+              />
+              <DetailMiniTile
+                label="Quota watch"
+                value={key.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
+                meta={key.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
+              />
+            </DetailMiniTileGrid>
 
             {key.notes ? (
-              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+              <DetailNoteBlock>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{key.notes}</p>
-              </div>
+              </DetailNoteBlock>
             ) : null}
-          </aside>
-        </div>
-      </section>
+          </DetailHeroAside>
+        </DetailHeroGrid>
+      </DetailHero>
 
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'delivery' | 'activity' | 'support')} className="space-y-4">
         <div className="ops-panel space-y-3 p-3 sm:p-4">

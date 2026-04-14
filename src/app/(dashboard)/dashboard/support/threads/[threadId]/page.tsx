@@ -19,6 +19,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DetailHero,
+  DetailHeroAside,
+  DetailHeroGrid,
+  DetailKpiTile,
+  DetailMetricGrid,
+  DetailMiniTile,
+  DetailMiniTileGrid,
+  DetailNoteBlock,
+} from '@/components/ui/detail-workspace';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -260,9 +270,9 @@ export default function SupportThreadDetailPage() {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+    <div className="space-y-6" data-testid="support-thread-detail-page">
+      <DetailHero data-testid="support-thread-detail-hero">
+        <DetailHeroGrid>
           <div className="space-y-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-3">
@@ -298,35 +308,24 @@ export default function SupportThreadDetailPage() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="ops-kpi-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Replies
-                    </p>
-                    <p className="mt-3 text-3xl font-semibold tracking-tight">{thread.replies.length}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {adminReplyCount} admin • {customerReplyCount} customer
-                    </p>
-                  </div>
-                  <div className="ops-kpi-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Waiting on
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold tracking-tight">
-                      {(thread.waitingOn || '').toUpperCase() === 'USER' ? 'Customer' : 'Admin'}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {thread.firstResponseDueAt ? `SLA ${formatDateTime(thread.firstResponseDueAt)}` : 'No SLA deadline set'}
-                    </p>
-                  </div>
-                  <div className="ops-kpi-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Last update
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold tracking-tight">{formatRelativeTime(thread.updatedAt)}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Created {formatRelativeTime(thread.createdAt)}
-                    </p>
-                  </div>
+                  <DetailKpiTile
+                    label="Replies"
+                    value={thread.replies.length}
+                    meta={`${adminReplyCount} admin • ${customerReplyCount} customer`}
+                    valueClassName="text-3xl tracking-tight"
+                  />
+                  <DetailKpiTile
+                    label="Waiting on"
+                    value={(thread.waitingOn || '').toUpperCase() === 'USER' ? 'Customer' : 'Admin'}
+                    meta={thread.firstResponseDueAt ? `SLA ${formatDateTime(thread.firstResponseDueAt)}` : 'No SLA deadline set'}
+                    valueClassName="tracking-tight"
+                  />
+                  <DetailKpiTile
+                    label="Last update"
+                    value={formatRelativeTime(thread.updatedAt)}
+                    meta={`Created ${formatRelativeTime(thread.createdAt)}`}
+                    valueClassName="tracking-tight"
+                  />
                 </div>
               </div>
 
@@ -343,34 +342,21 @@ export default function SupportThreadDetailPage() {
             </div>
           </div>
 
-          <aside className="ops-hero-aside space-y-4">
-            <div className="space-y-1">
-              <p className="ops-section-heading">Thread summary</p>
-              <p className="text-sm text-muted-foreground">
-                Keep ownership, customer identity, and latest context visible while replying.
-              </p>
-            </div>
+          <DetailHeroAside
+            title="Thread summary"
+            description="Keep ownership, customer identity, and latest context visible while replying."
+          >
+            <DetailMiniTileGrid>
+              <DetailMiniTile label="Customer" value={participantLabel} valueClassName="break-words" />
+              <DetailMiniTile label="Assigned admin" value={thread.assignedAdminName || 'Unassigned'} />
+              <DetailMiniTile label="Thread opened" value={formatDateTime(thread.createdAt)} />
+              <DetailMiniTile
+                label="Latest reply"
+                value={latestReply ? formatRelativeTime(latestReply.createdAt) : 'No replies yet'}
+              />
+            </DetailMiniTileGrid>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer</p>
-                <p className="mt-2 break-words text-sm font-medium">{participantLabel}</p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Assigned admin</p>
-                <p className="mt-2 text-sm font-medium">{thread.assignedAdminName || 'Unassigned'}</p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thread opened</p>
-                <p className="mt-2 text-sm font-medium">{formatDateTime(thread.createdAt)}</p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest reply</p>
-                <p className="mt-2 text-sm font-medium">{latestReply ? formatRelativeTime(latestReply.createdAt) : 'No replies yet'}</p>
-              </div>
-            </div>
-
-            <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+            <DetailNoteBlock>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Linked context</p>
               {contextItems.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -383,17 +369,17 @@ export default function SupportThreadDetailPage() {
               ) : (
                 <p className="mt-3 text-sm text-muted-foreground">No order, key, or server context was attached to this thread.</p>
               )}
-            </div>
+            </DetailNoteBlock>
 
             {latestReply ? (
-              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+              <DetailNoteBlock>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest preview</p>
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{latestReply.message}</p>
-              </div>
+              </DetailNoteBlock>
             ) : null}
-          </aside>
-        </div>
-      </section>
+          </DetailHeroAside>
+        </DetailHeroGrid>
+      </DetailHero>
 
       <div className="ops-showcase-grid">
         <div className="ops-detail-stack">

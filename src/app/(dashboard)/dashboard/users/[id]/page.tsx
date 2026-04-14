@@ -8,6 +8,15 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DetailHero,
+  DetailHeroAside,
+  DetailHeroGrid,
+  DetailKpiTile,
+  DetailMetricGrid,
+  DetailMiniTile,
+  DetailMiniTileGrid,
+} from '@/components/ui/detail-workspace';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1050,9 +1059,9 @@ export default function UserLedgerPage() {
     .sort((left, right) => new Date(right.reviewedAt || right.createdAt).getTime() - new Date(left.reviewedAt || left.createdAt).getTime())[0] || null;
 
   return (
-    <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+    <div className="space-y-6" data-testid="customer-crm-detail-page">
+      <DetailHero data-testid="customer-crm-detail-hero">
+        <DetailHeroGrid>
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -1079,46 +1088,32 @@ export default function UserLedgerPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Active keys
-                </p>
-                <p className="mt-3 text-3xl font-semibold tracking-tight">
-                  {summary.activeAccessKeys + summary.activeDynamicKeys}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {summary.activeAccessKeys} standard • {summary.activeDynamicKeys} premium dynamic
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Paid purchases
-                </p>
-                <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.fulfilledPaidOrders}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Refund unlocks after more than 3 fulfilled paid purchases.
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Gross revenue
-                </p>
-                <p className="mt-3 text-2xl font-semibold tracking-tight">{revenueSummary}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Total fulfilled Telegram order value for this customer.
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Refundable now
-                </p>
-                <p className="mt-3 text-3xl font-semibold tracking-tight">{summary.refundEligibleCount}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Refund closes automatically above 5 GB usage. Refunded: {refundedSummary}
-                </p>
-              </div>
-            </div>
+            <DetailMetricGrid>
+              <DetailKpiTile
+                label="Active keys"
+                value={summary.activeAccessKeys + summary.activeDynamicKeys}
+                meta={`${summary.activeAccessKeys} standard • ${summary.activeDynamicKeys} premium dynamic`}
+                valueClassName="text-3xl tracking-tight"
+              />
+              <DetailKpiTile
+                label="Paid purchases"
+                value={summary.fulfilledPaidOrders}
+                meta="Refund unlocks after more than 3 fulfilled paid purchases."
+                valueClassName="text-3xl tracking-tight"
+              />
+              <DetailKpiTile
+                label="Gross revenue"
+                value={revenueSummary}
+                meta="Total fulfilled Telegram order value for this customer."
+                valueClassName="tracking-tight"
+              />
+              <DetailKpiTile
+                label="Refundable now"
+                value={summary.refundEligibleCount}
+                meta={`Refund closes automatically above 5 GB usage. Refunded: ${refundedSummary}`}
+                valueClassName="text-3xl tracking-tight"
+              />
+            </DetailMetricGrid>
             {!financePermissions.canManage ? (
               <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                 You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.
@@ -1126,49 +1121,35 @@ export default function UserLedgerPage() {
             ) : null}
           </div>
 
-          <aside className="ops-hero-aside space-y-4">
-            <div className="space-y-1">
-              <p className="ops-section-heading">Customer state</p>
-              <p className="text-sm text-muted-foreground">
-                Keep the customer’s contact channel, support load, and recent delivery status visible while you work through CRM actions.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram identity</p>
-                <p className="mt-2 text-sm font-medium">{directIdentityLabel}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {telegramProfile?.locale ? `Locale ${telegramProfile.locale}` : 'Locale not set'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Support load</p>
-                <p className="mt-2 text-sm font-medium">{openSupportThreadCount} open thread{openSupportThreadCount === 1 ? '' : 's'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {waitingOnCustomerCount} waiting for customer • {premiumSupportRequests.length} premium support request{premiumSupportRequests.length === 1 ? '' : 's'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Inbox delivery</p>
-                <p className="mt-2 text-sm font-medium">{unreadAnnouncementCount} unread announcement{unreadAnnouncementCount === 1 ? '' : 's'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {pinnedAnnouncementCount} pinned • {customerNotifications.summary.openCount} opens • {customerNotifications.summary.clickCount} clicks
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Latest fulfillment</p>
-                <p className="mt-2 text-sm font-medium">
-                  {latestDeliveredOrder ? latestDeliveredOrder.orderCode : 'No fulfilled order'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {latestDeliveredOrder?.reviewedAt ? formatRelativeTime(latestDeliveredOrder.reviewedAt) : 'No receipt delivered yet'}
-                </p>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
+          <DetailHeroAside
+            title="Customer state"
+            description="Keep the customer’s contact channel, support load, and recent delivery status visible while you work through CRM actions."
+          >
+            <DetailMiniTileGrid>
+              <DetailMiniTile
+                label="Telegram identity"
+                value={directIdentityLabel}
+                meta={telegramProfile?.locale ? `Locale ${telegramProfile.locale}` : 'Locale not set'}
+              />
+              <DetailMiniTile
+                label="Support load"
+                value={`${openSupportThreadCount} open thread${openSupportThreadCount === 1 ? '' : 's'}`}
+                meta={`${waitingOnCustomerCount} waiting for customer • ${premiumSupportRequests.length} premium support request${premiumSupportRequests.length === 1 ? '' : 's'}`}
+              />
+              <DetailMiniTile
+                label="Inbox delivery"
+                value={`${unreadAnnouncementCount} unread announcement${unreadAnnouncementCount === 1 ? '' : 's'}`}
+                meta={`${pinnedAnnouncementCount} pinned • ${customerNotifications.summary.openCount} opens • ${customerNotifications.summary.clickCount} clicks`}
+              />
+              <DetailMiniTile
+                label="Latest fulfillment"
+                value={latestDeliveredOrder ? latestDeliveredOrder.orderCode : 'No fulfilled order'}
+                meta={latestDeliveredOrder?.reviewedAt ? formatRelativeTime(latestDeliveredOrder.reviewedAt) : 'No receipt delivered yet'}
+              />
+            </DetailMiniTileGrid>
+          </DetailHeroAside>
+        </DetailHeroGrid>
+      </DetailHero>
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
         <div className="space-y-6">

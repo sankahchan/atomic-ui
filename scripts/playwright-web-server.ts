@@ -18,6 +18,11 @@ const smokeAdminPassword = 'Admin123!';
 const smokePortalEmail = 'smoke-portal@example.com';
 const smokePortalPassword = 'Portal123!';
 const smokeSupportThreadId = 'smoke-support-thread';
+const smokePortalTelegramId = '3001';
+const smokeAccessKeyId = 'smoke-access-key';
+const smokeDynamicKeyId = 'smoke-dynamic-key';
+const smokeDynamicChildKeyId = 'smoke-dynamic-child-key';
+const fixedNow = new Date('2026-04-14T03:00:00.000Z');
 
 function setSmokeEnv() {
   process.env.DATABASE_URL = `file:${smokeDbPath}`;
@@ -224,7 +229,7 @@ async function resetAndSeedDatabase() {
 
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
-  const now = new Date();
+  const now = fixedNow;
 
   try {
     const passwordHash = await bcrypt.hash(smokeAdminPassword, 10);
@@ -237,14 +242,22 @@ async function resetAndSeedDatabase() {
       where: { id: smokeSupportThreadId },
     });
     await prisma.telegramOrder.deleteMany({
+      where: { id: 'smoke-order-fulfilled' },
+    });
+    await prisma.telegramOrder.deleteMany({
       where: { id: 'smoke-order-review' },
     });
-    await prisma.healthCheck.deleteMany({
-      where: { serverId: 'smoke-server' },
+    await prisma.telegramUserProfile.deleteMany({
+      where: { telegramUserId: smokePortalTelegramId },
     });
-    await prisma.server.deleteMany({
-      where: { id: 'smoke-server' },
+    await prisma.accessKey.deleteMany({
+      where: { id: { in: [smokeAccessKeyId, smokeDynamicChildKeyId] } },
     });
+    await prisma.dynamicAccessKey.deleteMany({
+      where: { id: smokeDynamicKeyId },
+    });
+    await prisma.healthCheck.deleteMany({});
+    await prisma.server.deleteMany({});
     await prisma.user.deleteMany({
       where: { id: 'smoke-admin-user' },
     });
@@ -286,6 +299,8 @@ async function resetAndSeedDatabase() {
         passwordHash,
         role: 'ADMIN',
         adminScope: 'OWNER',
+        createdAt: new Date('2026-03-01T08:00:00.000Z'),
+        updatedAt: new Date('2026-04-14T03:00:00.000Z'),
       },
     });
     await prisma.user.create({
@@ -294,6 +309,22 @@ async function resetAndSeedDatabase() {
         email: smokePortalEmail,
         passwordHash: portalPasswordHash,
         role: 'USER',
+        telegramChatId: smokePortalTelegramId,
+        createdAt: new Date('2026-03-05T10:35:00.000Z'),
+        updatedAt: new Date('2026-04-14T02:45:00.000Z'),
+      },
+    });
+
+    await prisma.telegramUserProfile.create({
+      data: {
+        telegramUserId: smokePortalTelegramId,
+        telegramChatId: smokePortalTelegramId,
+        username: 'pw_portal',
+        displayName: 'Playwright Portal User',
+        locale: 'en',
+        referralCode: 'PWREF',
+        createdAt: new Date('2026-03-05T10:35:00.000Z'),
+        updatedAt: new Date('2026-04-14T02:45:00.000Z'),
       },
     });
 
@@ -322,6 +353,101 @@ async function resetAndSeedDatabase() {
             totalChecks: 1,
             successfulChecks: 1,
             failedChecks: 0,
+          },
+        },
+      },
+    });
+
+    await prisma.accessKey.create({
+      data: {
+        id: smokeAccessKeyId,
+        outlineKeyId: 'outline-smoke-access',
+        name: 'Playwright Access Key',
+        email: smokePortalEmail,
+        telegramId: smokePortalTelegramId,
+        notes: 'High-touch customer key for desktop and mobile detail-page visual checks.',
+        userId: 'smoke-portal-user',
+        serverId: 'smoke-server',
+        accessUrl: 'ss://chacha20-ietf-poly1305:pw-smoke-access@127.0.0.1:12345#Playwright%20Access%20Key',
+        password: 'pw-smoke-access',
+        port: 12345,
+        method: 'chacha20-ietf-poly1305',
+        dataLimitBytes: BigInt(30 * 1024 * 1024 * 1024),
+        usedBytes: BigInt(12 * 1024 * 1024 * 1024),
+        expirationType: 'FIXED_DATE',
+        expiresAt: new Date('2026-05-01T00:00:00.000Z'),
+        status: 'ACTIVE',
+        lastTrafficAt: new Date('2026-04-14T02:35:00.000Z'),
+        lastUsedAt: new Date('2026-04-14T02:20:00.000Z'),
+        sharePageEnabled: true,
+        clientLinkEnabled: true,
+        telegramDeliveryEnabled: true,
+        subscriptionToken: 'smoke-access-subscription-token',
+        publicSlug: 'playwright-access-key',
+        quotaAlertThresholds: '70,85,95',
+        quotaAlertsSent: JSON.stringify([70]),
+        estimatedDevices: 2,
+        maxDevices: 4,
+        createdAt: new Date('2026-03-25T10:00:00.000Z'),
+        updatedAt: new Date('2026-04-14T02:35:00.000Z'),
+      },
+    });
+
+    await prisma.dynamicAccessKey.create({
+      data: {
+        id: smokeDynamicKeyId,
+        name: 'Playwright Dynamic Key',
+        type: 'SELF_MANAGED',
+        email: smokePortalEmail,
+        telegramId: smokePortalTelegramId,
+        notes: 'Premium subscription fixture with routing and rotation state for visual coverage.',
+        userId: 'smoke-portal-user',
+        dataLimitBytes: BigInt(120 * 1024 * 1024 * 1024),
+        usedBytes: BigInt(48 * 1024 * 1024 * 1024),
+        dynamicUrl: 'pw-dynamic-001',
+        publicSlug: 'playwright-dynamic-key',
+        status: 'ACTIVE',
+        method: 'chacha20-ietf-poly1305',
+        loadBalancerAlgorithm: 'LEAST_LOAD',
+        preferredCountryCodesJson: JSON.stringify(['SG']),
+        sharePageEnabled: true,
+        rotationEnabled: true,
+        rotationInterval: 'WEEKLY',
+        nextRotationAt: new Date('2026-04-18T03:00:00.000Z'),
+        lastRotatedAt: new Date('2026-04-11T03:00:00.000Z'),
+        rotationCount: 3,
+        lastResolvedAccessKeyId: smokeDynamicChildKeyId,
+        lastResolvedServerId: 'smoke-server',
+        lastResolvedAt: new Date('2026-04-14T02:32:00.000Z'),
+        quotaAlertThresholds: '70,85,95',
+        quotaAlertsSent: JSON.stringify([70]),
+        createdAt: new Date('2026-03-20T09:00:00.000Z'),
+        updatedAt: new Date('2026-04-14T02:40:00.000Z'),
+        accessKeys: {
+          create: {
+            id: smokeDynamicChildKeyId,
+            outlineKeyId: 'outline-smoke-dynamic-child',
+            name: 'Playwright Dynamic Backend',
+            email: smokePortalEmail,
+            telegramId: smokePortalTelegramId,
+            serverId: 'smoke-server',
+            accessUrl: 'ss://chacha20-ietf-poly1305:pw-smoke-dynamic@127.0.0.1:12345#Playwright%20Dynamic%20Backend',
+            password: 'pw-smoke-dynamic',
+            port: 12345,
+            method: 'chacha20-ietf-poly1305',
+            dataLimitBytes: BigInt(120 * 1024 * 1024 * 1024),
+            usedBytes: BigInt(24 * 1024 * 1024 * 1024),
+            expirationType: 'NEVER',
+            status: 'ACTIVE',
+            lastTrafficAt: new Date('2026-04-14T02:32:00.000Z'),
+            lastUsedAt: new Date('2026-04-14T02:18:00.000Z'),
+            sharePageEnabled: true,
+            clientLinkEnabled: true,
+            telegramDeliveryEnabled: true,
+            estimatedDevices: 3,
+            maxDevices: 5,
+            createdAt: new Date('2026-03-20T09:15:00.000Z'),
+            updatedAt: new Date('2026-04-14T02:32:00.000Z'),
           },
         },
       },
@@ -356,6 +482,41 @@ async function resetAndSeedDatabase() {
       },
     });
 
+    await prisma.telegramOrder.create({
+      data: {
+        id: 'smoke-order-fulfilled',
+        orderCode: 'PW-ORDER-002',
+        kind: 'RENEW',
+        orderMode: 'SELF',
+        status: 'FULFILLED',
+        telegramChatId: smokePortalTelegramId,
+        telegramUserId: smokePortalTelegramId,
+        telegramUsername: 'pw_portal',
+        locale: 'en',
+        requestedName: 'Playwright Renewal',
+        requestedEmail: smokePortalEmail,
+        planCode: 'PREM30',
+        planName: 'Premium 30 Days',
+        priceAmount: 12000,
+        priceCurrency: 'MMK',
+        priceLabel: '12,000 Kyat',
+        selectedServerId: 'smoke-server',
+        selectedServerName: 'Playwright SG',
+        selectedServerCountryCode: 'SG',
+        paymentMethodCode: 'KBZPAY',
+        paymentMethodLabel: 'KBZPay',
+        targetAccessKeyId: smokeAccessKeyId,
+        approvedAccessKeyId: smokeAccessKeyId,
+        paymentSubmittedAt: new Date('2026-04-12T12:00:00.000Z'),
+        reviewedByUserId: 'smoke-admin-user',
+        reviewedAt: new Date('2026-04-12T12:15:00.000Z'),
+        fulfilledAt: new Date('2026-04-12T12:18:00.000Z'),
+        financeStatus: 'VERIFIED',
+        createdAt: new Date('2026-04-12T11:45:00.000Z'),
+        updatedAt: new Date('2026-04-12T12:18:00.000Z'),
+      },
+    });
+
     await prisma.telegramSupportThread.create({
       data: {
         id: smokeSupportThreadId,
@@ -364,20 +525,41 @@ async function resetAndSeedDatabase() {
         waitingOn: 'ADMIN',
         issueCategory: 'KEY',
         locale: 'en',
-        telegramChatId: '2001',
-        telegramUserId: '2001',
-        telegramUsername: 'pw_support_user',
+        telegramChatId: smokePortalTelegramId,
+        telegramUserId: smokePortalTelegramId,
+        telegramUsername: 'pw_portal',
+        userId: 'smoke-portal-user',
         subject: 'Playwright support thread',
-        relatedKeyName: 'PW-Key',
-        firstResponseDueAt: new Date(now.getTime() + 60 * 60 * 1000),
+        relatedOrderCode: 'PW-ORDER-002',
+        relatedKeyName: 'Playwright Access Key',
+        relatedServerName: 'Playwright SG',
+        firstResponseDueAt: new Date('2026-04-14T04:00:00.000Z'),
+        lastCustomerReplyAt: new Date('2026-04-14T02:42:00.000Z'),
+        createdAt: new Date('2026-04-13T18:00:00.000Z'),
+        updatedAt: new Date('2026-04-14T02:42:00.000Z'),
         replies: {
-          create: {
-            senderType: 'USER',
-            telegramUserId: '2001',
-            telegramUsername: 'pw_support_user',
-            senderName: 'pw_support_user',
-            message: 'I need help with my key.',
-          },
+          create: [
+            {
+              senderType: 'USER',
+              telegramUserId: smokePortalTelegramId,
+              telegramUsername: 'pw_portal',
+              senderName: 'pw_portal',
+              message: 'My subscription is connecting, but the mobile client keeps dropping after a few minutes.',
+              createdAt: new Date('2026-04-14T02:10:00.000Z'),
+            },
+            {
+              senderType: 'USER',
+              telegramUserId: smokePortalTelegramId,
+              telegramUsername: 'pw_portal',
+              senderName: 'pw_portal',
+              message: 'Here is the screenshot from the app so you can see the server warning.',
+              mediaKind: 'IMAGE',
+              mediaUrl: 'https://example.com/playwright-support-proof.png',
+              mediaFilename: 'support-proof.png',
+              mediaContentType: 'image/png',
+              createdAt: new Date('2026-04-14T02:42:00.000Z'),
+            },
+          ],
         },
       },
     });

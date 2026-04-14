@@ -14,6 +14,16 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DetailHero,
+  DetailHeroAside,
+  DetailHeroGrid,
+  DetailKpiTile,
+  DetailMetricGrid,
+  DetailMiniTile,
+  DetailMiniTileGrid,
+  DetailNoteBlock,
+} from '@/components/ui/detail-workspace';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -3567,9 +3577,9 @@ export default function DynamicKeyDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="ops-hero">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start">
+    <div className="space-y-6" data-testid="dynamic-key-detail-page">
+      <DetailHero data-testid="dynamic-key-detail-hero">
+        <DetailHeroGrid>
           <div className="space-y-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-4">
@@ -3624,97 +3634,66 @@ export default function DynamicKeyDetailPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {t('dynamic_keys.detail.attached_keys')}
-                </p>
-                <p className="mt-3 text-2xl font-semibold">{dak.accessKeys.length}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {attachedActiveKeys} active attached keys
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Server Coverage
-                </p>
-                <p className="mt-3 text-2xl font-semibold">{serverCoverage}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Distinct servers serving this subscription
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {t('dynamic_keys.detail.traffic_usage')}
-                </p>
-                <p className="mt-3 text-2xl font-semibold">{formatBytes(dak.usedBytes)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
-                </p>
-              </div>
-              <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Rotation
-                </p>
-                <p className="mt-3 text-2xl font-semibold">
-                  {dak.rotationEnabled ? dak.rotationInterval : 'Off'}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
-                </p>
-              </div>
-            </div>
+            <DetailMetricGrid>
+              <DetailKpiTile
+                label={t('dynamic_keys.detail.attached_keys')}
+                value={dak.accessKeys.length}
+                meta={`${attachedActiveKeys} active attached keys`}
+              />
+              <DetailKpiTile
+                label="Server Coverage"
+                value={serverCoverage}
+                meta="Distinct servers serving this subscription"
+              />
+              <DetailKpiTile
+                label={t('dynamic_keys.detail.traffic_usage')}
+                value={formatBytes(dak.usedBytes)}
+                meta={dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
+              />
+              <DetailKpiTile
+                label="Rotation"
+                value={dak.rotationEnabled ? dak.rotationInterval : 'Off'}
+                meta={dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
+              />
+            </DetailMetricGrid>
           </div>
 
-          <aside className="ops-hero-aside space-y-4">
-            <div className="space-y-1">
-              <p className="ops-section-heading">Subscription summary</p>
-              <p className="text-sm text-muted-foreground">
-                Keep route selection, delivery state, and share identity visible while editing routing or attached access keys.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current route</p>
-                <p className="mt-2 text-sm font-medium">
-                  {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {routingDiagnosticsQuery.data?.currentSelection?.keyName || 'No pinned backend'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Share identity</p>
-                <p className="mt-2 break-all text-sm font-medium">{dak.publicSlug || dak.dynamicUrl || 'Not generated'}</p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Delivery state</p>
-                <p className="mt-2 text-sm font-medium">{dak.sharePageEnabled === false ? 'Share page off' : 'Share page on'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {dak.dynamicUrl ? 'Client URL ready' : 'Client URL unavailable'}
-                </p>
-              </div>
-              <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota watch</p>
-                <p className="mt-2 text-sm font-medium">
-                  {dak.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {dak.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
-                </p>
-              </div>
-            </div>
+          <DetailHeroAside
+            title="Subscription summary"
+            description="Keep route selection, delivery state, and share identity visible while editing routing or attached access keys."
+          >
+            <DetailMiniTileGrid>
+              <DetailMiniTile
+                label="Current route"
+                value={routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
+                meta={routingDiagnosticsQuery.data?.currentSelection?.keyName || 'No pinned backend'}
+              />
+              <DetailMiniTile
+                label="Share identity"
+                value={dak.publicSlug || dak.dynamicUrl || 'Not generated'}
+                valueClassName="break-all"
+              />
+              <DetailMiniTile
+                label="Delivery state"
+                value={dak.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
+                meta={dak.dynamicUrl ? 'Client URL ready' : 'Client URL unavailable'}
+              />
+              <DetailMiniTile
+                label="Quota watch"
+                value={dak.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
+                meta={dak.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
+              />
+            </DetailMiniTileGrid>
 
             {dak.notes ? (
-              <div className="rounded-[1.15rem] border border-border/60 bg-background/45 p-4 dark:bg-white/[0.03]">
+              <DetailNoteBlock>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{dak.notes}</p>
-              </div>
+              </DetailNoteBlock>
             ) : null}
-          </aside>
-        </div>
-      </section>
+          </DetailHeroAside>
+        </DetailHeroGrid>
+      </DetailHero>
 
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'routing' | 'delivery' | 'history')} className="space-y-4">
         <div className="ops-panel space-y-3 p-3 sm:p-4">

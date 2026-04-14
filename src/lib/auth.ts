@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
@@ -82,6 +83,7 @@ export async function createSession(
     adminScope: adminScope || null,
   })
     .setProtectedHeader({ alg: 'HS256' })
+    .setJti(randomUUID())
     .setIssuedAt()
     .setExpirationTime(expiresAt)
     .sign(jwtSecret);

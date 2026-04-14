@@ -1,20 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const smokeAdminEmail = 'smoke-admin@example.com';
-const smokeAdminPassword = 'Admin123!';
-const smokePortalEmail = 'smoke-portal@example.com';
-const smokePortalPassword = 'Portal123!';
-
-async function login(
-  page: import('@playwright/test').Page,
-  email = smokeAdminEmail,
-  password = smokeAdminPassword,
-) {
-  await page.goto('/login');
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill(password);
-  await page.getByRole('button', { name: /sign in/i }).click();
-}
+import { login, smokePortalEmail, smokePortalPassword } from './helpers';
 
 test('admin smoke journeys stay functional', async ({ page }) => {
   await login(page);
