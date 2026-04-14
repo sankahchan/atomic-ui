@@ -533,7 +533,7 @@ export default function AccountSecurityPage() {
     return (
         <div className="space-y-6">
             <section className="ops-showcase">
-                <div className="ops-showcase-grid">
+                <div className="grid gap-5">
                     <div className="space-y-5 self-start">
                         <div className="flex flex-wrap items-center gap-3">
                             <Button variant="ghost" size="icon" asChild className="h-10 w-10 rounded-full border border-border/60">
