@@ -42,7 +42,7 @@ export function DetailHeroGrid({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_360px] xl:items-start', className)}
+      className={cn('grid gap-4 min-[1700px]:grid-cols-[minmax(0,1.42fr)_320px] min-[1700px]:items-start', className)}
       {...props}
     >
       {children}
@@ -56,7 +56,7 @@ export function DetailHeroMain({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('space-y-6', className)} {...props}>
+    <div className={cn('space-y-5', className)} {...props}>
       {children}
     </div>
   );
@@ -101,7 +101,7 @@ export function DetailHeroAside({
   ...props
 }: DetailHeroAsideProps) {
   return (
-    <aside className={cn('ops-hero-aside space-y-4', className)} {...props}>
+    <aside className={cn('ops-hero-aside space-y-3', className)} {...props}>
       <div className="space-y-1">
         <p className="ops-section-heading">{title}</p>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
@@ -117,7 +117,7 @@ export function DetailMiniTileGrid({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-1', className)} {...props}>
+    <div className={cn('grid gap-3 sm:grid-cols-2 min-[1700px]:grid-cols-1', className)} {...props}>
       {children}
     </div>
   );

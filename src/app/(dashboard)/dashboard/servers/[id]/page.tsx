@@ -1016,54 +1016,54 @@ export default function ServerDetailPage() {
                 </div>
               ) : healthDiagnostics ? (
                 <>
-                  <div className="grid gap-3 md:grid-cols-5">
-                    <div className="rounded-xl border border-border/40 p-3">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="min-w-0 rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current reason</p>
-                      <p className="mt-1 text-sm font-medium">{healthDiagnostics.current.reason}</p>
+                      <p className="mt-1 break-words text-sm font-medium leading-5">{healthDiagnostics.current.reason}</p>
                     </div>
-                    <div className="rounded-xl border border-border/40 p-3">
+                    <div className="min-w-0 rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow streak</p>
                       <p className="mt-1 text-xl font-semibold">{healthDiagnostics.current.slowConsecutiveCount}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs leading-5 text-muted-foreground">
                         Auto-drain at {healthDiagnostics.current.autoDrainThreshold} consecutive slow checks
                       </p>
                     </div>
-                    <div className="rounded-xl border border-border/40 p-3">
+                    <div className="min-w-0 rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-drain</p>
-                      <p className="mt-1 text-sm font-medium">
+                      <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.autoDrainEnabled
                           ? healthDiagnostics.current.autoDrainActive
                             ? 'Active now'
                             : 'Armed'
                           : 'Disabled'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs leading-5 text-muted-foreground">
                         {healthDiagnostics.current.autoDrainEnabled
                           ? `Threshold ${healthDiagnostics.current.autoDrainThreshold} slow checks`
                           : 'No automatic drain'}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-border/40 p-3">
+                    <div className="min-w-0 rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-migrate</p>
-                      <p className="mt-1 text-sm font-medium">
+                      <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.autoMigrateEnabled
                           ? `After ${healthDiagnostics.current.autoMigrateThreshold} slow checks`
                           : 'Disabled'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs leading-5 text-muted-foreground">
                         Wait window {healthDiagnostics.current.autoMigrateGraceHours} hour(s)
                       </p>
                     </div>
-                    <div className="rounded-xl border border-border/40 p-3">
+                    <div className="min-w-0 rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">User notice</p>
-                      <p className="mt-1 text-sm font-medium">
+                      <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.slowUserAlertSentAt
                           ? `Sent ${formatRelativeTime(healthDiagnostics.current.slowUserAlertSentAt)}`
                           : healthDiagnostics.current.userNotifyEnabled
                             ? `After ${healthDiagnostics.current.userNotifyThreshold} slow checks`
                             : 'Disabled'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs leading-5 text-muted-foreground">
                         Cooldown {healthDiagnostics.current.userNotifyCooldownMins} min
                       </p>
                     </div>
