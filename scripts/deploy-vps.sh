@@ -56,7 +56,7 @@ restart_service() {
 trap restart_service ERR
 
 systemctl stop "${SERVICE_NAME}"
-sh scripts/prisma-command.sh db push
+node scripts/prisma-safe-db-push.js
 sh scripts/prisma-command.sh generate
 NODE_HEAP_MB="${NODE_HEAP_MB}" PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 trap - ERR

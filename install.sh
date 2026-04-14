@@ -394,7 +394,7 @@ if ! sh scripts/prisma-command.sh generate 2>&1; then
 fi
 
 echo -e "${BLUE}[*]${NC} Pushing database schema..."
-if ! sh scripts/prisma-command.sh db push 2>&1; then
+if ! node scripts/prisma-safe-db-push.js 2>&1; then
     echo -e "${RED}[✗]${NC} Prisma db push failed"
     exit 1
 fi

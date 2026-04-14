@@ -15,7 +15,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:generate": "sh scripts/prisma-command.sh generate",
-    "db:push": "sh scripts/prisma-command.sh db push",
+  "db:push": "node scripts/prisma-safe-db-push.js",
     "db:migrate": "sh scripts/prisma-command.sh migrate deploy",
     "db:cutover:report": "tsx scripts/database-cutover-report.ts",
     "db:cutover:preflight": "tsx scripts/database-cutover-preflight.ts",
