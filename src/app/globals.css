@@ -1044,6 +1044,66 @@
     @apply text-xs leading-5 text-muted-foreground;
   }
 
+  .ops-modal-card-grid {
+    @apply grid gap-3;
+  }
+
+  .ops-modal-card-grid-2 {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .ops-modal-stat-card {
+    @apply rounded-[1.1rem] border px-4 py-3;
+    border-color: rgba(214, 225, 239, 0.88);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(246, 249, 252, 0.5));
+    box-shadow:
+      0 18px 34px rgba(148, 163, 184, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-stat-card {
+    border-color: rgba(214, 227, 255, 0.12);
+    background:
+      radial-gradient(circle at top right, rgba(110, 175, 255, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(14, 21, 35, 0.6), rgba(6, 11, 22, 0.42));
+    box-shadow:
+      0 22px 44px rgba(0, 3, 12, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .ops-modal-note {
+    @apply rounded-[1.15rem] border px-4 py-3 text-sm leading-6 text-muted-foreground;
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(248, 250, 252, 0.72);
+  }
+
+  .dark .ops-modal-note {
+    border-color: rgba(34, 211, 238, 0.12);
+    background: rgba(7, 14, 28, 0.62);
+  }
+
+  .ops-modal-note-danger {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(254, 242, 242, 0.82);
+  }
+
+  .dark .ops-modal-note-danger {
+    border-color: rgba(248, 113, 113, 0.22);
+    background: rgba(45, 10, 15, 0.44);
+  }
+
+  .ops-modal-code-panel {
+    @apply rounded-[1rem] border px-3 py-3 font-mono text-xs leading-6 break-all;
+    border-color: rgba(214, 225, 239, 0.88);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-code-panel {
+    border-color: rgba(214, 227, 255, 0.12);
+    background: rgba(5, 11, 22, 0.74);
+  }
+
   .ops-modal-sticky-footer {
     @apply sticky bottom-0 z-10 mt-2 border-t px-6 py-4;
     border-color: rgba(148, 163, 184, 0.22);

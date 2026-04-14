@@ -1987,40 +1987,65 @@ function QRCodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('keys.actions.show_qr')}: {keyName}</DialogTitle>
           <DialogDescription>
-            {t('keys.dialog.qr_desc')}
+            Scan this code in Outline or copy the raw access URL if you need to deliver the key manually.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col items-center py-4">
-          {isLoading ? (
-            <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
-          ) : data?.qrCode ? (
-            <QRCodeWithLogo
-              dataUrl={data.qrCode}
-              size={200}
-            />
-          ) : (
-            <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">{t('keys.dialog.qr_failed')}</p>
-            </div>
-          )}
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>QR connection</DialogSectionTitle>
+              <DialogSectionDescription>
+                This is the fastest way to move the key into a device without exposing the full URL in chat.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
 
-          {keyData?.accessUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={handleCopyUrl}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              {t('keys.actions.copy_access_url')}
-            </Button>
-          )}
-        </div>
+            <div className="flex flex-col items-center gap-4">
+              {isLoading ? (
+                <div className="h-[220px] w-[220px] animate-pulse rounded-[1.2rem] bg-muted" />
+              ) : data?.qrCode ? (
+                <div className="ops-modal-stat-card flex items-center justify-center p-4">
+                  <QRCodeWithLogo dataUrl={data.qrCode} size={200} />
+                </div>
+              ) : (
+                <div className="ops-modal-stat-card flex h-[220px] w-full items-center justify-center text-center text-sm text-muted-foreground">
+                  {t('keys.dialog.qr_failed')}
+                </div>
+              )}
+            </div>
+          </DialogSection>
+
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Direct access URL</DialogSectionTitle>
+              <DialogSectionDescription>
+                Use this when the user cannot scan the QR code or when you need to paste the key into another tool.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+
+            <div className="ops-modal-code-panel">
+              {keyData?.accessUrl || '-'}
+            </div>
+          </DialogSection>
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button
+            type="button"
+            onClick={handleCopyUrl}
+            disabled={!keyData?.accessUrl}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            {t('keys.actions.copy_access_url')}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -2048,21 +2073,32 @@ function DeleteKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('keys.delete_title')}</DialogTitle>
           <DialogDescription>
-            {t('keys.confirm_delete')} &quot;{keyName}&quot;?
-            <br />
-            {t('keys.confirm_delete_desc')}
+            Review the impact before removing this key from inventory.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>{keyName}</DialogSectionTitle>
+              <DialogSectionDescription>
+                The access URL, QR code, share page, and renewal trail for this key will stop working immediately after deletion.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="ops-modal-note ops-modal-note-danger">
+              {t('keys.confirm_delete')} &quot;{keyName}&quot;? {t('keys.confirm_delete_desc')}
+            </div>
+          </DialogSection>
+        </DialogBody>
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('keys.cancel')}
           </Button>
           <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
-            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('keys.delete')}
           </Button>
         </DialogFooter>
@@ -2100,10 +2136,10 @@ function BulkExtendDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
+            <Clock className="h-5 w-5 text-primary" />
             {t('keys.bulk.extend_title')}
           </DialogTitle>
           <DialogDescription>
@@ -2114,8 +2150,15 @@ function BulkExtendDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Extension window</DialogSectionTitle>
+              <DialogSectionDescription>
+                Pick a quick preset or enter a custom duration for the selected access keys.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="flex flex-wrap gap-2">
             {quickOptions.map((d) => (
               <Button
                 key={d}
@@ -2136,25 +2179,35 @@ function BulkExtendDialog({
             >
               {t('keys.bulk.custom')}
             </Button>
-          </div>
-
-          {useCustom && (
-            <div className="space-y-2">
-              <Label htmlFor="customDays">{t('keys.bulk.custom_days')}</Label>
-              <Input
-                id="customDays"
-                type="number"
-                min="1"
-                placeholder={t('keys.bulk.custom_days_placeholder')}
-                value={customDays}
-                onChange={(e) => setCustomDays(e.target.value)}
-              />
             </div>
-          )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {useCustom && (
+              <div className="space-y-2">
+                <Label htmlFor="customDays">{t('keys.bulk.custom_days')}</Label>
+                <Input
+                  id="customDays"
+                  type="number"
+                  min="1"
+                  placeholder={t('keys.bulk.custom_days_placeholder')}
+                  value={customDays}
+                  onChange={(e) => setCustomDays(e.target.value)}
+                />
+              </div>
+            )}
+          </DialogSection>
+
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Apply to selection</DialogSectionTitle>
+            </DialogSectionHeader>
+            <div className="ops-modal-note">
+              {count} {selectedLabel} will be extended by {useCustom ? (customDays || '0') : days} days.
+            </div>
+          </DialogSection>
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('keys.cancel')}
           </Button>
           <Button
@@ -2204,10 +2257,10 @@ function BulkTagsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
-            <Tag className="w-5 h-5 text-primary" />
+            <Tag className="h-5 w-5 text-primary" />
             {mode === 'add' ? t('keys.bulk.tags_add_title') : t('keys.bulk.tags_remove_title')}
           </DialogTitle>
           <DialogDescription>
@@ -2218,23 +2271,31 @@ function BulkTagsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="tags">{t('keys.bulk.tags_label')}</Label>
-            <Input
-              id="tags"
-              placeholder={t('keys.bulk.tags_placeholder')}
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('keys.bulk.tags_help')}
-            </p>
-          </div>
-        </div>
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Tag list</DialogSectionTitle>
+              <DialogSectionDescription>
+                Enter one or more tags separated by commas. The same list will be applied to the current selection.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="space-y-2">
+              <Label htmlFor="tags">{t('keys.bulk.tags_label')}</Label>
+              <Input
+                id="tags"
+                placeholder={t('keys.bulk.tags_placeholder')}
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('keys.bulk.tags_help')}
+              </p>
+            </div>
+          </DialogSection>
+        </DialogBody>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('keys.cancel')}
           </Button>
           <Button
@@ -2272,47 +2333,60 @@ function BulkProgressDialog({
   const { t } = useLocale();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-lg overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Review the result before you close the operation window or start another bulk action.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
+        <DialogBody>
           {isPending ? (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <DialogSection className="items-center text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">{t('keys.bulk.progress.processing')}</p>
-            </div>
+            </DialogSection>
           ) : results ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <>
+              <DialogSection>
+                <DialogSectionHeader>
+                  <DialogSectionTitle>Operation summary</DialogSectionTitle>
+                </DialogSectionHeader>
+                <div className="ops-modal-card-grid-2">
+                  <div className="ops-modal-stat-card">
                   <p className="text-2xl font-bold text-green-500">{results.success}</p>
                   <p className="text-sm text-green-500">{t('keys.bulk.progress.successful')}</p>
-                </div>
-                <div className="flex-1 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  </div>
+                  <div className="ops-modal-stat-card">
                   <p className="text-2xl font-bold text-red-500">{results.failed}</p>
                   <p className="text-sm text-red-500">{t('keys.bulk.progress.failed')}</p>
+                  </div>
                 </div>
-              </div>
+              </DialogSection>
 
               {results.errors && results.errors.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">{t('keys.bulk.progress.errors')}</p>
-                  <div className="max-h-40 overflow-y-auto space-y-1">
+                <DialogSection>
+                  <DialogSectionHeader>
+                    <DialogSectionTitle>{t('keys.bulk.progress.errors')}</DialogSectionTitle>
+                    <DialogSectionDescription>
+                      These items were not completed and may need a retry or a smaller batch.
+                    </DialogSectionDescription>
+                  </DialogSectionHeader>
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
                     {results.errors.map((err, i) => (
-                      <div key={i} className="text-xs p-2 rounded bg-red-500/10 text-red-400">
+                      <div key={i} className="ops-modal-note ops-modal-note-danger text-xs text-red-500 dark:text-red-300">
                         <span className="font-medium">{err.name || err.id}:</span> {err.error}
                       </div>
                     ))}
                   </div>
-                </div>
+                </DialogSection>
               )}
-            </div>
+            </>
           ) : null}
-        </div>
+        </DialogBody>
 
-        <DialogFooter>
+        <DialogFooter className="ops-modal-sticky-footer">
           <Button onClick={() => onOpenChange(false)} disabled={isPending}>
             {isPending ? t('keys.bulk.progress.processing') : t('keys.bulk.progress.close')}
           </Button>
@@ -2435,137 +2509,167 @@ function EditKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(860px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('keys.dialog.edit_title')}</DialogTitle>
           <DialogDescription>
-            {t('keys.dialog.edit_desc')}
+            Update the key record, customer contact info, and lifecycle rules in one pass.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="editName">{t('keys.form.name')}</Label>
-            <Input
-              id="editName"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Identity and contact</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Keep the key name and owner contact fields accurate so support, renewals, and Telegram delivery stay aligned.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="editEmail">{t('keys.form.email')}</Label>
-            <Input
-              id="editEmail"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="editName">{t('keys.form.name')}</Label>
+                  <Input
+                    id="editName"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editTelegram">{t('keys.form.telegram')}</Label>
-            <Input
-              id="editTelegram"
-              value={formData.telegramId}
-              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editEmail">{t('keys.form.email')}</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editDataLimit">{t('keys.form.data_limit')}</Label>
-            <Input
-              id="editDataLimit"
-              type="number"
-              placeholder={t('keys.form.data_limit_placeholder')}
-              value={formData.dataLimitGB}
-              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
-              min="0"
-              step="0.5"
-            />
-          </div>
-
-          {formData.dataLimitGB && (
-            <>
-              <div className="space-y-2">
-                <Label>{t('keys.form.reset_strategy')}</Label>
-                <Select
-                  value={formData.dataLimitResetStrategy}
-                  onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
-                    setFormData({ ...formData, dataLimitResetStrategy: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
-                    <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
-                    <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
-                    <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editTelegram">{t('keys.form.telegram')}</Label>
+                  <Input
+                    id="editTelegram"
+                    value={formData.telegramId}
+                    onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+                  />
+                </div>
               </div>
+            </DialogSection>
 
-            </>
-          )}
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Limits and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Control quota, device guidance, and expiration behavior without jumping into the detail page.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
-            <Input
-              id="editMaxDevices"
-              type="number"
-              min="1"
-              max="20"
-              placeholder="Leave empty for no device limit"
-              value={formData.maxDevices}
-              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
-            />
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="editDataLimit">{t('keys.form.data_limit')}</Label>
+                  <Input
+                    id="editDataLimit"
+                    type="number"
+                    placeholder={t('keys.form.data_limit_placeholder')}
+                    value={formData.dataLimitGB}
+                    onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editDuration">{t('keys.form.duration')}</Label>
-            <Input
-              id="editDuration"
-              type="number"
-              placeholder="30"
-              value={formData.durationDays}
-              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-              min="1"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('keys.form.duration_help')}
-            </p>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editMaxDevices">Device guidance</Label>
+                  <Input
+                    id="editMaxDevices"
+                    type="number"
+                    min="1"
+                    max="20"
+                    placeholder="Leave empty for no device cap"
+                    value={formData.maxDevices}
+                    onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editExpiration">{t('keys.form.expiration_date')}</Label>
-            <Input
-              id="editExpiration"
-              type="date"
-              value={formData.expiresAt}
-              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('keys.form.expiration_date_help')}
-            </p>
-          </div>
+                {formData.dataLimitGB && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>{t('keys.form.reset_strategy')}</Label>
+                    <Select
+                      value={formData.dataLimitResetStrategy}
+                      onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                        setFormData({ ...formData, dataLimitResetStrategy: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NEVER">{t('keys.form.reset.never')}</SelectItem>
+                        <SelectItem value="DAILY">{t('keys.form.reset.daily')}</SelectItem>
+                        <SelectItem value="WEEKLY">{t('keys.form.reset.weekly')}</SelectItem>
+                        <SelectItem value="MONTHLY">{t('keys.form.reset.monthly')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-          <div className="space-y-2">
-            <Label htmlFor="editNotes">{t('keys.form.notes')}</Label>
-            <Input
-              id="editNotes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editDuration">{t('keys.form.duration')}</Label>
+                  <Input
+                    id="editDuration"
+                    type="number"
+                    placeholder="30"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                    min="1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('keys.form.duration_help')}
+                  </p>
+                </div>
 
-          <DialogFooter>
+                <div className="space-y-2">
+                  <Label htmlFor="editExpiration">{t('keys.form.expiration_date')}</Label>
+                  <Input
+                    id="editExpiration"
+                    type="date"
+                    value={formData.expiresAt}
+                    onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('keys.form.expiration_date_help')}
+                  </p>
+                </div>
+              </div>
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Internal note</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Leave a short operational note for future support or admin handoff.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-2">
+                <Label htmlFor="editNotes">{t('keys.form.notes')}</Label>
+                <Input
+                  id="editNotes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                />
+              </div>
+            </DialogSection>
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('keys.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('keys.dialog.save')}
             </Button>
           </DialogFooter>
@@ -2686,140 +2790,162 @@ function BulkCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Bulk create keys</DialogTitle>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(960px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
+          <DialogTitle>Bulk create access keys</DialogTitle>
           <DialogDescription>
-            Create the same number of keys across one or more servers. This is always a manual admin action, so draining servers are allowed after confirmation.
+            Generate repeatable batches across one or more servers. Draining targets are allowed here only because this is explicit admin placement.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="bulk-name-prefix">Name prefix</Label>
-              <Input
-                id="bulk-name-prefix"
-                value={namePrefix}
-                onChange={(event) => setNamePrefix(event.target.value)}
-                placeholder="Batch"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bulk-count">Keys per server</Label>
-              <Input
-                id="bulk-count"
-                type="number"
-                min={1}
-                max={100}
-                value={count}
-                onChange={(event) => setCount(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bulk-limit">Data limit (GB)</Label>
-              <Input
-                id="bulk-limit"
-                type="number"
-                min={1}
-                value={dataLimitGB}
-                onChange={(event) => setDataLimitGB(event.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-          </div>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Naming and quantity</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Set the shared prefix, the number of keys per target, and an optional quota for every new key in the batch.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-            <div className="space-y-2">
-              <Label>Target servers</Label>
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-border/60 bg-background/45 p-3 dark:bg-white/[0.03]">
-                {(servers ?? []).map((server) => {
-                  const lifecycleMeta = getServerLifecycleMeta(server.lifecycleMode);
-                  const isDisabled = !server.isActive || server.lifecycleMode === 'MAINTENANCE';
-                  const isChecked = selectedServerIds.includes(server.id);
-
-                  return (
-                    <label
-                      key={server.id}
-                      className={cn(
-                        'flex items-start gap-3 rounded-xl border px-3 py-3 text-sm',
-                        isChecked ? 'border-cyan-500/30 bg-cyan-500/10' : 'border-border/50 bg-background/40 dark:bg-white/[0.02]',
-                        isDisabled && 'opacity-50',
-                      )}
-                    >
-                      <Checkbox
-                        checked={isChecked}
-                        disabled={isDisabled}
-                        onCheckedChange={(checked) => toggleServer(server.id, Boolean(checked))}
-                      />
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-foreground">
-                            {server.countryCode && `${getCountryFlag(server.countryCode)} `}{server.name}
-                          </span>
-                          <ServerLifecycleBadge mode={server.lifecycleMode} />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {server.location || lifecycleMeta.assignmentHint}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label>Expiry mode</Label>
-                <Select value={expirationType} onValueChange={(value) => setExpirationType(value as 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NEVER">Never expire</SelectItem>
-                    <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
-                    <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {expirationType === 'DURATION_FROM_CREATION' ? (
+              <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-duration">Duration (days)</Label>
+                  <Label htmlFor="bulk-name-prefix">Name prefix</Label>
                   <Input
-                    id="bulk-duration"
-                    type="number"
-                    min={1}
-                    value={durationDays}
-                    onChange={(event) => setDurationDays(event.target.value)}
+                    id="bulk-name-prefix"
+                    value={namePrefix}
+                    onChange={(event) => setNamePrefix(event.target.value)}
+                    placeholder="Batch"
                   />
                 </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-border/60 bg-background/45 p-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
-                <p className="font-medium text-foreground">Assignment policy</p>
-                <p className="mt-1">Bulk create is explicit admin placement. Draining servers are allowed when selected here, but maintenance remains blocked.</p>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-count">Keys per server</Label>
+                  <Input
+                    id="bulk-count"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={count}
+                    onChange={(event) => setCount(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-limit">Data limit (GB)</Label>
+                  <Input
+                    id="bulk-limit"
+                    type="number"
+                    min={1}
+                    value={dataLimitGB}
+                    onChange={(event) => setDataLimitGB(event.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
               </div>
-            </div>
-          </div>
+            </DialogSection>
 
-          {needsDrainingConfirmation ? (
-            <label className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
-              <Checkbox
-                checked={confirmDrainingServers}
-                onCheckedChange={(checked) => setConfirmDrainingServers(Boolean(checked))}
-              />
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">Confirm draining targets</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedDrainingServers.map((server) => server.name).join(', ')} {selectedDrainingServers.length === 1 ? 'is' : 'are'} draining. Auto-placement avoids them, but this bulk action will still create keys there because you selected them explicitly.
-                </p>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Placement and expiry</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Choose the destination servers and the expiry model that should apply to the whole batch.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="space-y-2">
+                  <Label>Target servers</Label>
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-border/60 bg-background/45 p-3 dark:bg-white/[0.03]">
+                    {(servers ?? []).map((server) => {
+                      const lifecycleMeta = getServerLifecycleMeta(server.lifecycleMode);
+                      const isDisabled = !server.isActive || server.lifecycleMode === 'MAINTENANCE';
+                      const isChecked = selectedServerIds.includes(server.id);
+
+                      return (
+                        <label
+                          key={server.id}
+                          className={cn(
+                            'flex items-start gap-3 rounded-xl border px-3 py-3 text-sm',
+                            isChecked ? 'border-cyan-500/30 bg-cyan-500/10' : 'border-border/50 bg-background/40 dark:bg-white/[0.02]',
+                            isDisabled && 'opacity-50',
+                          )}
+                        >
+                          <Checkbox
+                            checked={isChecked}
+                            disabled={isDisabled}
+                            onCheckedChange={(checked) => toggleServer(server.id, Boolean(checked))}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">
+                                {server.countryCode && `${getCountryFlag(server.countryCode)} `}{server.name}
+                              </span>
+                              <ServerLifecycleBadge mode={server.lifecycleMode} />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {server.location || lifecycleMeta.assignmentHint}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Expiry mode</Label>
+                    <Select value={expirationType} onValueChange={(value) => setExpirationType(value as 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NEVER">Never expire</SelectItem>
+                        <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
+                        <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {expirationType === 'DURATION_FROM_CREATION' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-duration">Duration (days)</Label>
+                      <Input
+                        id="bulk-duration"
+                        type="number"
+                        min={1}
+                        value={durationDays}
+                        onChange={(event) => setDurationDays(event.target.value)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="ops-modal-note text-xs">
+                    <p className="font-medium text-foreground">Assignment policy</p>
+                    <p className="mt-1">Maintenance targets stay blocked. Draining targets remain allowed only because you selected them intentionally.</p>
+                  </div>
+                </div>
               </div>
-            </label>
-          ) : null}
+            </DialogSection>
 
-          <DialogFooter>
+            {needsDrainingConfirmation ? (
+              <DialogSection>
+                <label className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
+                  <Checkbox
+                    checked={confirmDrainingServers}
+                    onCheckedChange={(checked) => setConfirmDrainingServers(Boolean(checked))}
+                  />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Confirm draining targets</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedDrainingServers.map((server) => server.name).join(', ')} {selectedDrainingServers.length === 1 ? 'is' : 'are'} draining. Auto-placement avoids them, but this batch will still create keys there because you selected them explicitly.
+                    </p>
+                  </div>
+                </label>
+              </DialogSection>
+            ) : null}
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -5297,8 +5423,8 @@ export default function KeysPage() {
 
       {/* Bulk Move Dialog */}
       <Dialog open={bulkMoveDialogOpen} onOpenChange={setBulkMoveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-lg overflow-hidden p-0">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle>{t('keys.bulk.move_title')}</DialogTitle>
             <DialogDescription>
               {fillTemplate(t('keys.bulk.move_desc'), {
@@ -5309,39 +5435,52 @@ export default function KeysPage() {
               {t('keys.bulk.move_desc_extra')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>{t('keys.bulk.move_target_server')}</Label>
-            <Select value={bulkMoveTargetServerId} onValueChange={setBulkMoveTargetServerId}>
-              <SelectTrigger>
-                <SelectValue placeholder={t('keys.bulk.move_target_placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {(servers ?? []).map((s: { id: string; name: string; location?: string | null; lifecycleMode?: string | null; isActive?: boolean }) => (
-                  <SelectItem key={s.id} value={s.id} disabled={s.lifecycleMode === 'MAINTENANCE' || s.isActive === false}>
-                    <div className="flex items-center gap-2">
-                      <span>{s.name}{s.location ? ` (${s.location})` : ''}</span>
-                      <ServerLifecycleBadge mode={s.lifecycleMode} />
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="rounded-2xl border border-border/60 bg-background/45 px-3 py-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
-              <p className="font-medium text-foreground">Assignment policy</p>
-              <p className="mt-1">
-                Maintenance targets are blocked. Draining targets are still allowed because bulk move is an explicit admin action.
-              </p>
-            </div>
-            {selectedBulkMoveServer?.lifecycleMode === 'DRAINING' ? (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Manual draining target selected</p>
-                <p className="mt-1">
-                  {selectedBulkMoveServer.name} is draining. Auto-placement avoids it, but this explicit bulk move will still assign keys there.
-                </p>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Target server</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Pick the new destination for the selected keys. This keeps maintenance targets blocked while still allowing explicit draining moves.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-3">
+                <Label>{t('keys.bulk.move_target_server')}</Label>
+                <Select value={bulkMoveTargetServerId} onValueChange={setBulkMoveTargetServerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('keys.bulk.move_target_placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(servers ?? []).map((s: { id: string; name: string; location?: string | null; lifecycleMode?: string | null; isActive?: boolean }) => (
+                      <SelectItem key={s.id} value={s.id} disabled={s.lifecycleMode === 'MAINTENANCE' || s.isActive === false}>
+                        <div className="flex items-center gap-2">
+                          <span>{s.name}{s.location ? ` (${s.location})` : ''}</span>
+                          <ServerLifecycleBadge mode={s.lifecycleMode} />
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="ops-modal-note text-xs">
+                  <p className="font-medium text-foreground">Assignment policy</p>
+                  <p className="mt-1">
+                    Maintenance targets are blocked. Draining targets are still allowed because bulk move is an explicit admin action.
+                  </p>
+                </div>
+
+                {selectedBulkMoveServer?.lifecycleMode === 'DRAINING' ? (
+                  <div className="ops-modal-note ops-modal-note-danger text-xs">
+                    <p className="font-medium text-foreground">Manual draining target selected</p>
+                    <p className="mt-1">
+                      {selectedBulkMoveServer.name} is draining. Auto-placement avoids it, but this explicit bulk move will still assign keys there.
+                    </p>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-          <DialogFooter>
+            </DialogSection>
+          </DialogBody>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setBulkMoveDialogOpen(false)}>{t('keys.cancel')}</Button>
             <Button onClick={handleBulkMove} disabled={!bulkMoveTargetServerId}>
               <ArrowRightLeft className="w-4 h-4 mr-2" />
