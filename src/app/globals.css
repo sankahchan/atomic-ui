@@ -1008,6 +1008,57 @@
     border-color: rgba(34, 211, 238, 0.1);
   }
 
+  .ops-modal-body {
+    @apply space-y-5 px-6 pb-6;
+  }
+
+  .ops-modal-section {
+    @apply space-y-4 rounded-[1.45rem] border p-4;
+    border-color: rgba(214, 225, 239, 0.92);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 250, 253, 0.46));
+    box-shadow:
+      0 18px 40px rgba(148, 163, 184, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-section {
+    border-color: rgba(214, 227, 255, 0.12);
+    background:
+      radial-gradient(circle at top right, rgba(110, 175, 255, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(13, 20, 35, 0.52), rgba(8, 12, 22, 0.34));
+    box-shadow:
+      0 24px 52px rgba(0, 3, 12, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .ops-modal-section-header {
+    @apply space-y-1;
+  }
+
+  .ops-modal-section-title {
+    @apply text-sm font-semibold tracking-tight text-foreground;
+  }
+
+  .ops-modal-section-description {
+    @apply text-xs leading-5 text-muted-foreground;
+  }
+
+  .ops-modal-sticky-footer {
+    @apply sticky bottom-0 z-10 mt-2 border-t px-6 py-4;
+    border-color: rgba(148, 163, 184, 0.22);
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.8), rgba(244, 248, 252, 0.96));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .dark .ops-modal-sticky-footer {
+    border-color: rgba(34, 211, 238, 0.1);
+    background:
+      linear-gradient(180deg, rgba(8, 12, 22, 0.56), rgba(6, 13, 27, 0.92));
+  }
+
   .ops-tooltip-shell {
     border-color: rgba(34, 211, 238, 0.16);
     background:

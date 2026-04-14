@@ -27,7 +27,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { SegmentedUsageBarCompact } from '@/components/ui/segmented-usage-bar';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -761,8 +773,8 @@ function CreateKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(1040px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <Key className="w-5 h-5 text-primary" />
             {t('keys.dialog.create.title')}
@@ -772,7 +784,16 @@ function CreateKeyDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-0">
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Basics</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Start with the right template, choose assignment mode, and set the short links the customer will actually see.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           {/* Template Selection */}
           <div className="space-y-2">
             <Label>{t('keys.dialog.apply_template')}</Label>
@@ -791,8 +812,6 @@ function CreateKeyDialog({
               </SelectContent>
             </Select>
           </div>
-
-          <div className="border-t border-border pt-4"></div>
 
           {/* Server selection */}
           <div className="space-y-2">
@@ -1001,6 +1020,16 @@ function CreateKeyDialog({
             ) : null}
           </div>
 
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Ownership and access</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Assign the key, choose the connection method, and capture the contact context you will need later.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           {/* User Assignment */}
           <div className="space-y-2">
             <Label>{t('keys.form.user')}</Label>
@@ -1110,6 +1139,16 @@ function CreateKeyDialog({
               })}
             </div>
           </div>
+
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Limits and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Define quota, expiration, device caps, and the automation policy that should take over after create.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
           {/* Data limit */}
           <div className="space-y-2">
@@ -1328,7 +1367,15 @@ function CreateKeyDialog({
             />
           </div>
 
-          <div className="border-t border-border pt-4" />
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Share page and delivery</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Configure the customer-facing page, delivery options, and the actions that should happen the moment the key is created.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
           <div className="space-y-4">
             <div className="space-y-1">
@@ -1642,7 +1689,10 @@ function CreateKeyDialog({
             </div>
           </div>
 
-          <DialogFooter>
+            </DialogSection>
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button
               type="button"
               variant="outline"

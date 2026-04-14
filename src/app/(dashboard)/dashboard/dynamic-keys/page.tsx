@@ -18,7 +18,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
@@ -576,8 +588,8 @@ function CreateDAKDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(920px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-primary" />
             {t('dynamic_keys.dialog.create_title')}
@@ -587,7 +599,15 @@ function CreateDAKDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-0">
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Basics</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Choose the template, short link identity, and dynamic-key type before you move into routing policy.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
           <div className="space-y-2">
             <Label>Routing Template</Label>
             <Select
@@ -712,6 +732,16 @@ function CreateDAKDialog({
               ))}
             </div>
           </div>
+
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Routing policy</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Tune encryption, load balancing, preferred regions, automatic rotation, and recovery behavior in one place.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
           {/* Encryption method */}
           <div className="space-y-2">
@@ -939,6 +969,16 @@ function CreateDAKDialog({
             compact
           />
 
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Limits and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Capture contact info, set quota and expiration, and leave the routing identity with the right context for future support.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           {/* Contact info */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -1063,6 +1103,16 @@ function CreateDAKDialog({
             />
           </div>
 
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>After create</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Decide what should happen immediately after the dynamic key is created so the next admin step is automatic.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
             <div className="space-y-1">
               <p className="text-sm font-medium">After create</p>
@@ -1113,7 +1163,10 @@ function CreateDAKDialog({
             </div>
           </div>
 
-          <DialogFooter>
+            </DialogSection>
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button
               type="button"
               variant="outline"
