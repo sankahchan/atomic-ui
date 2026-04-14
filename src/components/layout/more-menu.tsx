@@ -49,14 +49,14 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm"
+        className="ops-mobile-sheet-overlay fixed inset-0 z-40"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Sheet */}
       <div
-        className="fixed inset-x-3 top-16 bottom-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+0.75rem)] z-50 overflow-y-auto px-5 pb-6 pt-5 text-slate-100 animate-in slide-in-from-bottom-6 duration-200 ops-mobile-sheet lg:inset-x-auto lg:bottom-6 lg:right-6 lg:top-24 lg:w-[28rem] lg:rounded-[2rem] lg:px-6 lg:pb-6 lg:pt-6"
+        className="fixed inset-x-3 top-16 bottom-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+0.75rem)] z-50 overflow-y-auto px-5 pb-6 pt-5 text-foreground animate-in slide-in-from-bottom-6 duration-200 ops-mobile-sheet lg:inset-x-auto lg:bottom-6 lg:right-6 lg:top-24 lg:w-[28rem] lg:rounded-[2rem] lg:px-6 lg:pb-6 lg:pt-6"
         style={{
           paddingBottom: 'calc(var(--safe-area-bottom) + 1.5rem)',
         }}
@@ -65,7 +65,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">{t('nav.tools')}</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               Secondary pages, settings shortcuts, and operator workflows.
             </p>
           </div>
@@ -83,10 +83,10 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           {sections.map((section) => (
             <section key={section.title} className="space-y-3">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                   {section.title}
                 </p>
-                <p className="text-xs leading-5 text-slate-400">
+                <p className="text-xs leading-5 text-muted-foreground">
                   {section.description}
                 </p>
               </div>
@@ -103,25 +103,25 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
                       className={cn(
                         'ops-interactive-surface flex items-center gap-4 rounded-[1.6rem] border p-4 transition-colors',
                         active
-                          ? 'border-cyan-400/26 bg-cyan-400/10 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_0_24px_rgba(34,211,238,0.08)]'
-                          : 'text-white hover:border-cyan-400/18 hover:bg-white/[0.05]'
+                          ? 'border-cyan-400/26 bg-cyan-400/10 text-cyan-900 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_0_24px_rgba(34,211,238,0.08)] dark:text-cyan-100'
+                          : 'text-slate-900 hover:border-cyan-400/18 hover:bg-white/[0.42] dark:text-white dark:hover:bg-white/[0.05]'
                       )}
                     >
                       <div className={cn(
                         'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border transition-colors',
                         active
-                          ? 'border-cyan-300/20 bg-cyan-400/12 text-cyan-200'
-                          : 'border-white/8 bg-white/6 text-slate-300'
+                          ? 'border-cyan-300/30 bg-cyan-400/12 text-cyan-700 dark:text-cyan-200'
+                          : 'border-slate-300/60 bg-white/55 text-slate-600 dark:border-white/8 dark:bg-white/6 dark:text-slate-300'
                       )}>
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{t(item.labelKey)}</p>
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                           {t(item.descriptionKey)}
                         </p>
                       </div>
-                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-500 dark:text-slate-500" />
                     </Link>
                   );
                 })}
@@ -130,14 +130,14 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           ))}
         </div>
 
-        <div className="mt-5 rounded-[1.4rem] border border-white/10 bg-white/[0.04] p-4">
+        <div className="mt-5 rounded-[1.4rem] border border-border/70 bg-background/60 p-4 dark:border-white/10 dark:bg-white/[0.04]">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-slate-200">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/70 bg-background/60 text-foreground dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-200">
               <Settings className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">Need the full workspace hub?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Open the tools page for a broader overview, grouped cards, and the settings hub.
               </p>
             </div>
@@ -145,7 +145,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           <Link
             href="/dashboard/tools"
             onClick={onClose}
-            className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:border-cyan-400/24 hover:bg-cyan-400/10"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-border/70 bg-background/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-cyan-400/24 hover:bg-cyan-400/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-100"
           >
             Open tools hub
           </Link>

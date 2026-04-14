@@ -413,7 +413,7 @@
   }
 
   .ops-hero {
-    @apply relative overflow-hidden rounded-[2rem] border px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-6 sm:py-6 lg:px-7 lg:py-7;
+    @apply relative overflow-hidden rounded-[2rem] border px-4 py-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-5 sm:py-5 lg:px-6 lg:py-6;
     border-color: rgba(255, 255, 255, 0.5);
     background:
       radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
@@ -644,7 +644,7 @@
   }
 
   .ops-detail-rail {
-    @apply space-y-4 xl:sticky xl:top-6 xl:self-start;
+    @apply grid gap-4 md:grid-cols-2 min-[1700px]:grid-cols-1 min-[1700px]:sticky min-[1700px]:top-6 min-[1700px]:self-start;
   }
 
   .ops-hero-aside {
@@ -677,7 +677,7 @@
   }
 
   .ops-showcase-grid {
-    @apply grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_340px] xl:items-start;
+    @apply grid gap-4 min-[1700px]:grid-cols-[minmax(0,1.55fr)_320px] min-[1700px]:items-start;
   }
 
   .ops-detail-card {

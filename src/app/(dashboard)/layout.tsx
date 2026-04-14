@@ -218,7 +218,6 @@ function Header({
             <Atom className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Frosted workspace</p>
             <p className="truncate text-sm font-semibold text-foreground">Operations dashboard</p>
           </div>
         </div>
