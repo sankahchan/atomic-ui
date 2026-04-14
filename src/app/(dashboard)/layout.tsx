@@ -53,12 +53,6 @@ const navItems = [
   { href: '/dashboard/tools' },
 ];
 
-const sidebarSections = [
-  { title: 'Core', items: primaryDashboardNavItems },
-  { title: 'Operations', items: adminToolNavItems },
-  { title: 'Workspace', items: settingsShortcutItems },
-] as const;
-
 /**
  * Sidebar Component (Desktop only)
  *
@@ -116,47 +110,41 @@ function Sidebar({
 
       {/* Navigation links */}
       <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-5">
-        <div className="space-y-5">
-          {sidebarSections.map((section) => (
-            <div key={section.title} className="space-y-2">
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
-                  {section.title}
-                </p>
-              )}
-              <ul className="space-y-1.5">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.href ||
-                    (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+        {!isCollapsed && (
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
+            Core
+          </p>
+        )}
+        <ul className="space-y-1.5">
+          {primaryDashboardNavItems.map((item) => {
+            const isActive = pathname === item.href ||
+              (item.href !== '/dashboard' && pathname?.startsWith(item.href));
 
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          'ops-sidebar-item',
-                          isCollapsed && 'justify-center px-0',
-                          isActive
-                            ? 'border border-white/55 bg-white/70 text-primary shadow-[0_16px_28px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-white/[0.07] dark:text-cyan-100 dark:shadow-[0_18px_34px_rgba(0,3,12,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]'
-                            : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
-                        )}
-                        title={isCollapsed ? t(item.labelKey) : undefined}
-                      >
-                        <item.icon className={cn(
-                          'w-5 h-5 flex-shrink-0',
-                          isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
-                        )} />
-                        {!isCollapsed && (
-                          <span className="text-sm font-medium">{t(item.labelKey)}</span>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'ops-sidebar-item',
+                    isCollapsed && 'justify-center px-0',
+                    isActive
+                      ? 'border border-white/55 bg-white/70 text-primary shadow-[0_16px_28px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-white/[0.07] dark:text-cyan-100 dark:shadow-[0_18px_34px_rgba(0,3,12,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]'
+                      : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
+                  )}
+                  title={isCollapsed ? t(item.labelKey) : undefined}
+                >
+                  <item.icon className={cn(
+                    'w-5 h-5 flex-shrink-0',
+                    isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
+                  )} />
+                  {!isCollapsed && (
+                    <span className="text-sm font-medium">{t(item.labelKey)}</span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* Sidebar footer */}
@@ -176,7 +164,9 @@ function Sidebar({
               Release
             </p>
             <p className="mt-2 text-sm font-semibold text-foreground">{APP_RELEASE_LABEL}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Frosted command center for keys, servers, automation, and customer ops.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Core navigation stays here. Everything else lives in the tools menu.
+            </p>
           </>
         )}
       </div>
@@ -188,7 +178,8 @@ function Sidebar({
  * Header Component
  *
  * Glass-styled header with theme toggle, notifications, and user actions.
- * No hamburger menu on mobile — bottom tab bar handles navigation instead.
+ * Core navigation stays in the sidebar/bottom tabs, with a secondary tools menu
+ * for the rest of the dashboard surface.
  */
 function Header({
   user,
@@ -236,12 +227,14 @@ function Header({
         <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             variant="ghost"
-            size="icon"
             onClick={onOpenTools}
             title={t('nav.tools')}
-            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm lg:hidden"
+            className="h-10 rounded-full border border-border/70 bg-background/70 px-3 text-muted-foreground shadow-sm hover:text-foreground dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-300 dark:hover:text-cyan-100"
           >
             <LayoutGrid className="h-4 w-4" />
+            <span className="ml-2 hidden text-sm font-medium sm:inline">
+              {t('nav.tools')}
+            </span>
           </Button>
 
           {mounted && (
