@@ -3,6 +3,7 @@ import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasRestoreManageScope } from '@/lib/admin-scope';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 import { isSqliteDatabaseUrl } from '@/lib/database-engine';
+import { isMultipartFormDataContentType } from '@/lib/services/restore-upload';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,13 @@ export async function POST(req: NextRequest) {
     });
     if (response || !user) {
       return response!;
+    }
+
+    if (!isMultipartFormDataContentType(req.headers.get('content-type'))) {
+      return NextResponse.json(
+        { error: 'Backup restore expects a multipart/form-data upload.' },
+        { status: 415 },
+      );
     }
 
     const restoreCommand = 'npm run restore:sqlite -- --backup /absolute/path/to/backup.zip';
