@@ -34,7 +34,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
@@ -134,96 +146,124 @@ function EditServerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('server_details.edit.title')}</DialogTitle>
           <DialogDescription>
             {t('server_details.edit.desc')}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">{t('server_details.edit.name')}</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Server identity</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Update the name, location, and display tags used across routing, health, and reporting views.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="location">{t('server_details.edit.location')}</Label>
-              <Input
-                id="location"
-                placeholder={t('server_details.edit.location_placeholder')}
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t('server_details.edit.country')}</Label>
-              <Select value={countryCode} onValueChange={setCountryCode}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('server_details.edit.country_select')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">{t('server_details.edit.none')}</SelectItem>
-                  {COUNTRY_OPTIONS.map((country) => (
-                    <SelectItem key={country.code} value={country.code}>
-                      {getCountryFlag(country.code)} {country.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">{t('server_details.edit.name')}</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
 
-          {tags && tags.length > 0 && (
-            <div className="space-y-2">
-              <Label>{t('server_details.edit.tags')}</Label>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTags((prev) =>
-                        prev.includes(tag.id)
-                          ? prev.filter((id) => id !== tag.id)
-                          : [...prev, tag.id]
-                      );
-                    }}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium transition-all',
-                      selectedTags.includes(tag.id)
-                        ? 'text-white'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    )}
-                    style={selectedTags.includes(tag.id) ? { backgroundColor: tag.color } : {}}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="location">{t('server_details.edit.location')}</Label>
+                    <Input
+                      id="location"
+                      placeholder={t('server_details.edit.location_placeholder')}
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t('server_details.edit.country')}</Label>
+                    <Select value={countryCode} onValueChange={setCountryCode}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('server_details.edit.country_select')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">{t('server_details.edit.none')}</SelectItem>
+                        {COUNTRY_OPTIONS.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {getCountryFlag(country.code)} {country.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            </DialogSection>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isDefault"
-              checked={isDefault}
-              onChange={(e) => setIsDefault(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="isDefault" className="font-normal">
-              {t('server_details.edit.default')}
-            </Label>
-          </div>
+            {tags && tags.length > 0 && (
+              <DialogSection>
+                <DialogSectionHeader>
+                  <DialogSectionTitle>{t('server_details.edit.tags')}</DialogSectionTitle>
+                  <DialogSectionDescription>
+                    Highlight which routing or reporting groups this server should appear in.
+                  </DialogSectionDescription>
+                </DialogSectionHeader>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTags((prev) =>
+                          prev.includes(tag.id)
+                            ? prev.filter((id) => id !== tag.id)
+                            : [...prev, tag.id]
+                        );
+                      }}
+                      className={cn(
+                        'rounded-full px-3 py-1 text-sm font-medium transition-all',
+                        selectedTags.includes(tag.id)
+                          ? 'text-white'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      )}
+                      style={selectedTags.includes(tag.id) ? { backgroundColor: tag.color } : {}}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </DialogSection>
+            )}
 
-          <DialogFooter>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Default routing behavior</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Mark this server as a default target when new items need a preferred home.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 dark:bg-white/[0.03]">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isDefault" className="text-sm font-medium">
+                    {t('server_details.edit.default')}
+                  </Label>
+                </div>
+                <input
+                  type="checkbox"
+                  id="isDefault"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+              </div>
+            </DialogSection>
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('server_details.edit.cancel')}
             </Button>

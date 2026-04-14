@@ -17,7 +17,19 @@ import {
   DetailMiniTile,
   DetailMiniTileGrid,
 } from '@/components/ui/detail-workspace';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2868,8 +2880,8 @@ export default function UserLedgerPage() {
       </div>
 
       <Dialog open={!!financeDialog} onOpenChange={(open) => (!open ? setFinanceDialog(null) : undefined)}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle>
               {financeDialog?.action === 'VERIFY'
                 ? 'Verify payment'
@@ -2884,38 +2896,48 @@ export default function UserLedgerPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="finance-amount">
-                Amount {financeDialog?.currency ? `(${financeDialog.currency})` : ''}
-              </Label>
-              <Input
-                id="finance-amount"
-                type="number"
-                min="0"
-                placeholder={financeDialog?.defaultAmount?.toString() || 'Optional'}
-                value={financeAmount}
-                onChange={(event) => setFinanceAmount(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="finance-note">Note</Label>
-              <Textarea
-                id="finance-note"
-                rows={4}
-                placeholder="Internal reconciliation note"
-                value={financeNote}
-                onChange={(event) => setFinanceNote(event.target.value)}
-              />
-            </div>
-            {financeDialog?.action === 'REFUND' ? (
-              <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                Refunds are only allowed after more than 3 paid purchases and while usage stays at or below 5 GB.
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Finance adjustment</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Record the amount and internal note that should follow this order into the finance timeline.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="finance-amount">
+                    Amount {financeDialog?.currency ? `(${financeDialog.currency})` : ''}
+                  </Label>
+                  <Input
+                    id="finance-amount"
+                    type="number"
+                    min="0"
+                    placeholder={financeDialog?.defaultAmount?.toString() || 'Optional'}
+                    value={financeAmount}
+                    onChange={(event) => setFinanceAmount(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-note">Note</Label>
+                  <Textarea
+                    id="finance-note"
+                    rows={4}
+                    placeholder="Internal reconciliation note"
+                    value={financeNote}
+                    onChange={(event) => setFinanceNote(event.target.value)}
+                  />
+                </div>
+                {financeDialog?.action === 'REFUND' ? (
+                  <div className="ops-modal-note border-amber-500/20 bg-amber-500/10 text-amber-100">
+                    Refunds are only allowed after more than 3 paid purchases and while usage stays at or below 5 GB.
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </DialogSection>
+          </DialogBody>
 
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setFinanceDialog(null)}>
               Cancel
             </Button>
