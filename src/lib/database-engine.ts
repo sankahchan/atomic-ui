@@ -68,7 +68,7 @@ export function getDatabaseRuntimeSummary(env: Record<string, string | undefined
 
   if (engine === 'postgres') {
     warnings.push(
-      'App runtime is Postgres-ready at the environment layer, but file-based backup and restore routes must use pg_dump/pg_restore instead of SQLite file copy.',
+      'Postgres runtime is enabled. Use the repo Prisma wrapper scripts plus the cutover/export tooling instead of SQLite file-copy backup and restore flows.',
     );
   }
 

@@ -9837,21 +9837,21 @@ export default function NotificationsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:max-w-3xl">
-              <div className="ops-support-card">
+              <div className="ops-kpi-tile p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {t('notifications.summary.channels')}
                 </p>
                 <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t('notifications.summary.channels_desc')}</p>
               </div>
-              <div className="ops-support-card">
+              <div className="ops-kpi-tile p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {t('notifications.summary.active_channels')}
                 </p>
                 <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{t('notifications.channel_inactive')}: {Math.max(0, channels.length - activeChannels)}</p>
               </div>
-              <div className="ops-support-card">
+              <div className="ops-kpi-tile p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {t('notifications.summary.coverage')}
                 </p>
@@ -9869,16 +9869,65 @@ export default function NotificationsPage() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-3">
-              <div className="space-y-1">
-                <p className="ops-section-heading">{t('notifications.add_channel')}</p>
-                <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
-                <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
+            <div className="ops-hero-aside space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="ops-section-heading">Command rail</p>
+                  <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
+                  <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
+                </div>
+                <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                  {workspaces.length} workspaces
+                </Badge>
               </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="ops-kpi-tile p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Active workspace
+                  </p>
+                  <p className="mt-2 text-lg font-semibold leading-tight">
+                    {workspaces.find((workspace) => workspace.id === activeWorkspace)?.title}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {workspaces.find((workspace) => workspace.id === activeWorkspace)?.meta}
+                  </p>
+                </div>
+                <div className="ops-kpi-tile p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Delivery focus
+                  </p>
+                  <p className="mt-2 text-lg font-semibold leading-tight">{activeChannels} live</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{subscribedEventCount} subscribed events</p>
+                </div>
+              </div>
+
               <Button onClick={handleOpenCreate} className="h-11 w-full rounded-full">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('notifications.add_channel')}
               </Button>
+
+              <div className="flex flex-wrap gap-2">
+                {workspaces.map((workspace) => (
+                  <button
+                    key={`hero:${workspace.id}`}
+                    type="button"
+                    onClick={() => {
+                      setActiveWorkspace(workspace.id);
+                      updateWorkspaceUrlState(workspace.id);
+                    }}
+                    className={cn(
+                      'ops-pill transition-colors',
+                      activeWorkspace === workspace.id
+                        ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    <workspace.icon className="h-3.5 w-3.5" />
+                    {workspace.title}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -10041,19 +10090,19 @@ export default function NotificationsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="ops-kpi-tile p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       {t('notifications.summary.channels')}
                     </p>
                     <p className="mt-3 text-2xl font-semibold">{channels.length}</p>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="ops-kpi-tile p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       {t('notifications.summary.active_channels')}
                     </p>
                     <p className="mt-3 text-2xl font-semibold">{activeChannels}</p>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="ops-kpi-tile p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       {t('notifications.summary.coverage')}
                     </p>

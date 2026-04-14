@@ -53,6 +53,12 @@ const navItems = [
   { href: '/dashboard/tools' },
 ];
 
+const sidebarSections = [
+  { title: 'Core', items: primaryDashboardNavItems },
+  { title: 'Operations', items: adminToolNavItems },
+  { title: 'Workspace', items: settingsShortcutItems },
+] as const;
+
 /**
  * Sidebar Component (Desktop only)
  *
@@ -71,9 +77,9 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'glass-sidebar fixed inset-y-0 left-0 z-50 flex flex-col px-3 py-4 text-foreground',
+        'glass-sidebar fixed bottom-4 left-4 top-4 z-50 flex flex-col rounded-[2rem] border px-3 py-4 text-foreground',
         'transition-all duration-300 ease-in-out',
-        isCollapsed ? 'w-20' : 'w-72'
+        isCollapsed ? 'w-24' : 'w-[18.5rem]'
       )}
     >
       {/* Logo and brand */}
@@ -109,47 +115,71 @@ function Sidebar({
       </div>
 
       {/* Navigation links */}
-      <nav className="flex-1 overflow-y-auto px-2 py-5">
-        <ul className="space-y-1.5">
-          {primaryDashboardNavItems.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+      <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-5">
+        <div className="space-y-5">
+          {sidebarSections.map((section) => (
+            <div key={section.title} className="space-y-2">
+              {!isCollapsed && (
+                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
+                  {section.title}
+                </p>
+              )}
+              <ul className="space-y-1.5">
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href ||
+                    (item.href !== '/dashboard' && pathname?.startsWith(item.href));
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'ops-sidebar-item',
-                    isCollapsed && 'justify-center px-0',
-                    isActive
-                      ? 'bg-gradient-to-r from-primary/18 to-primary/6 text-primary shadow-[0_16px_30px_rgba(14,165,233,0.14)] dark:before:absolute dark:before:inset-y-3 dark:before:left-0 dark:before:w-[3px] dark:before:rounded-full dark:before:bg-cyan-300 dark:before:shadow-[0_0_16px_rgba(34,211,238,0.55)] dark:bg-[linear-gradient(90deg,rgba(34,211,238,0.14),rgba(34,211,238,0.04))] dark:text-cyan-100 dark:shadow-[0_16px_32px_rgba(1,10,24,0.46),0_0_26px_rgba(34,211,238,0.08)]'
-                      : 'text-muted-foreground hover:bg-background/65 hover:text-foreground dark:text-slate-400 dark:hover:bg-[rgba(34,211,238,0.06)] dark:hover:text-slate-100'
-                  )}
-                  title={isCollapsed ? t(item.labelKey) : undefined}
-                >
-                  <item.icon className={cn(
-                    'w-5 h-5 flex-shrink-0',
-                    isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
-                  )} />
-                  {!isCollapsed && (
-                    <span className="text-sm font-medium">{t(item.labelKey)}</span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          'ops-sidebar-item',
+                          isCollapsed && 'justify-center px-0',
+                          isActive
+                            ? 'border border-white/55 bg-white/70 text-primary shadow-[0_16px_28px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-white/[0.07] dark:text-cyan-100 dark:shadow-[0_18px_34px_rgba(0,3,12,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]'
+                            : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
+                        )}
+                        title={isCollapsed ? t(item.labelKey) : undefined}
+                      >
+                        <item.icon className={cn(
+                          'w-5 h-5 flex-shrink-0',
+                          isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
+                        )} />
+                        {!isCollapsed && (
+                          <span className="text-sm font-medium">{t(item.labelKey)}</span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </nav>
 
       {/* Sidebar footer */}
-      {!isCollapsed && (
-        <div className="rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,26,0.9),rgba(4,10,22,0.78))] dark:shadow-[0_16px_44px_rgba(1,6,20,0.3),inset_0_1px_0_rgba(125,211,252,0.04)]">
-          <p className="text-center text-xs text-muted-foreground">
-            {APP_RELEASE_LABEL} • sankahchan
+      <div
+        className={cn(
+          'rounded-[1.5rem] border border-border/70 bg-background/65 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(5,12,26,0.9),rgba(4,10,22,0.78))] dark:shadow-[0_16px_44px_rgba(1,6,20,0.3),inset_0_1px_0_rgba(125,211,252,0.04)]',
+          isCollapsed && 'px-2 py-3'
+        )}
+      >
+        {isCollapsed ? (
+          <p className="text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {APP_RELEASE_LABEL.replace(/^v/i, '')}
           </p>
-        </div>
-      )}
+        ) : (
+          <>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Release
+            </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{APP_RELEASE_LABEL}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Frosted command center for keys, servers, automation, and customer ops.</p>
+          </>
+        )}
+      </div>
     </aside>
   );
 }
@@ -182,20 +212,24 @@ function Header({
       <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
         <div className="flex items-center gap-3 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
             <Atom className="h-5 w-5 text-primary" />
-            <span className="text-sm font-semibold">Atomic-UI</span>
+            <div className="leading-none">
+              <span className="block text-sm font-semibold">Atomic-UI</span>
+              <span className="block pt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Frosted</span>
+            </div>
           </Link>
         </div>
 
-        {/* Left side: tools button on desktop */}
-        <div className="hidden lg:flex items-center">
-          <Button variant="outline" size="sm" asChild className="rounded-full border-border/70 bg-background/65 px-4 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
-            <Link href="/dashboard/tools">
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              {t('nav.tools')}
-            </Link>
-          </Button>
+        {/* Left side: desktop identity */}
+        <div className="hidden min-w-0 items-center gap-3 lg:flex">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[1.3rem] border border-white/50 bg-white/55 shadow-[0_12px_28px_rgba(148,163,184,0.18)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_34px_rgba(0,0,0,0.28)]">
+            <Atom className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Frosted workspace</p>
+            <p className="truncate text-sm font-semibold text-foreground">Operations dashboard</p>
+          </div>
         </div>
 
         {/* Right side: Theme toggle, user menu, logout */}
@@ -385,9 +419,9 @@ export default function DashboardLayout({
 
       {/* Main content area */}
       <div className={cn(
-        'relative flex flex-col min-h-screen transition-all duration-300',
-        'lg:ml-72',
-        sidebarCollapsed && 'lg:ml-20'
+        'relative flex min-h-screen flex-col transition-all duration-300 lg:pb-4 lg:pr-4',
+        'lg:ml-[20.5rem]',
+        sidebarCollapsed && 'lg:ml-[8rem]'
       )}>
         {/* Header */}
         <Header

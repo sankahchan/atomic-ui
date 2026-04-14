@@ -65,6 +65,18 @@ Look for the generated admin credentials in the install/setup output.
 
 This path matches the way the panel is running on your existing VPS.
 
+### Database engine note
+
+Atomic-UI now supports both SQLite and Postgres at Prisma-client generation time. Always use the repo wrappers instead of raw Prisma commands:
+
+```bash
+npm run db:generate
+npm run db:push
+npm run db:migrate
+```
+
+Those commands select the correct Prisma schema provider from `DATABASE_URL`.
+
 ### 0. Fresh VPS bootstrap from your workstation
 
 For a brand-new VPS, prefer the remote bootstrap wrapper instead of hand-running the install steps:
@@ -158,6 +170,8 @@ DEPLOY_PASSWORD=your-password \
 bash scripts/deploy-vps.sh
 ```
 
+If you are moving an existing host off SQLite, use [docs/postgres-cutover.md](docs/postgres-cutover.md) before you change the production `DATABASE_URL`.
+
 ## Configuring HTTPS
 
 ### Bare IP (default installer path)
@@ -206,6 +220,12 @@ docker-compose up -d --build
 ```
 Your database (`data/atomic-ui.db`) is persisted in a Docker volume, so data is safe during updates.
 
+For Postgres-backed Docker builds, pass a Postgres build arg so Prisma generates the correct client:
+
+```bash
+docker build --build-arg PRISMA_DATABASE_URL='postgresql://user:pass@host:5432/atomic_ui' -t atomic-ui .
+```
+
 For direct VPS deployments:
 
 ```bash
@@ -231,6 +251,12 @@ Before major upgrades:
 2. Copy it off the server.
 3. Restore it in a staging/disposable instance.
 4. Run the smoke test against that restored instance.
+
+For SQLite-to-Postgres migrations, replace the dashboard backup/restore steps with:
+
+1. `npm run db:cutover:export`
+2. `npm run db:cutover:import`
+3. `npm run db:cutover:verify`
 
 If a direct VPS deploy fails:
 

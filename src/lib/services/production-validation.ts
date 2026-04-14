@@ -32,6 +32,16 @@ export function loadEnvFile(envPath: string): Record<string, string> {
     }, {});
 }
 
+export function applyEnvFileToProcessEnv(envPath: string) {
+  const fileEnv = loadEnvFile(envPath);
+  for (const [key, value] of Object.entries(fileEnv)) {
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+  return fileEnv;
+}
+
 export function isHttpUrl(value: string | undefined): boolean {
   if (!value) return false;
 

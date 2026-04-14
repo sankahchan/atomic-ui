@@ -25,7 +25,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'relative overflow-hidden rounded-[1.75rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(246,249,252,0.84))] text-card-foreground shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur-[var(--glass-blur-lg)] [-webkit-backdrop-filter:blur(var(--glass-blur-lg))] transition-all duration-200 dark:border-[rgba(34,211,238,0.18)] dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.11),transparent_24%),linear-gradient(180deg,rgba(4,10,23,0.94),rgba(6,14,28,0.82))] dark:shadow-[0_24px_70px_rgba(1,6,20,0.5),0_0_0_1px_rgba(34,211,238,0.04),inset_0_1px_0_rgba(125,211,252,0.06)]',
+      'relative overflow-hidden rounded-[1.9rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.34))] text-card-foreground shadow-[0_30px_80px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-[28px] [-webkit-backdrop-filter:blur(28px)] transition-all duration-200 dark:border-[rgba(214,227,255,0.14)] dark:bg-[radial-gradient(circle_at_top_right,rgba(118,172,255,0.14),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,193,132,0.08),transparent_18%),linear-gradient(180deg,rgba(12,18,31,0.66),rgba(8,12,22,0.42))] dark:shadow-[0_34px_90px_rgba(0,3,12,0.48),inset_0_1px_0_rgba(255,255,255,0.08)]',
       className
     )}
     {...props}

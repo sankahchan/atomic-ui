@@ -15,7 +15,7 @@ echo "[build-low-memory] heap=${NODE_HEAP_MB}MB"
 export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB}"
 export NEXT_PUBLIC_APP_VERSION
 
-npx prisma generate --schema prisma/schema.prisma >/dev/null
+sh scripts/prisma-command.sh generate >/dev/null
 rm -rf .next/standalone
 npx next build
 

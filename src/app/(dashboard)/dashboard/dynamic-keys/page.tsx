@@ -2537,28 +2537,118 @@ export default function DynamicKeysPage() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-3 p-4">
-              <div>
-                <p className="ops-section-heading">{t('dynamic_keys.title')}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{t('dynamic_keys.desc')}</p>
+            <div className="space-y-3">
+              <div className="ops-hero-aside space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="ops-section-heading">Routing control</p>
+                    <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
+                    <p className="text-sm text-muted-foreground">{t('dynamic_keys.desc')}</p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                    <Shuffle className="mr-1 h-3.5 w-3.5" />
+                    Adaptive
+                  </Badge>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Active keys
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total routing identities</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Online now
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Live users with recent traffic</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Self-managed
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.selfManaged ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{stats?.manual ?? 0} manual routing profiles</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Focused view
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'On' : 'All'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {hasAnyFilters ? 'Filters are narrowing routing results' : 'Showing the full routing fleet'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button onClick={() => setCreateDialogOpen(true)} className="h-10 w-full justify-center rounded-2xl sm:col-span-2">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('dynamic_keys.create')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full justify-center rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    onClick={() => syncAllMutation.mutate()}
+                    disabled={syncAllMutation.isPending}
+                  >
+                    <RefreshCw className={cn('mr-2 h-4 w-4', syncAllMutation.isPending && 'animate-spin')} />
+                    {syncAllMutation.isPending ? t('dynamic_keys.syncing') : t('dynamic_keys.sync_servers')}
+                  </Button>
+                  <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
+                    <Link href="/dashboard/archived">
+                      <Archive className="mr-2 h-4 w-4" />
+                      {t('nav.archived') || 'Archived'}
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <Button onClick={() => setCreateDialogOpen(true)} className="h-10 w-full justify-center rounded-2xl sm:col-span-2 xl:col-span-1">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('dynamic_keys.create')}
-                </Button>
-                <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                  <Link href="/dashboard/archived">
-                    <Archive className="mr-2 h-4 w-4" />
-                    {t('nav.archived') || 'Archived'}
-                  </Link>
-                </Button>
+
+              <div className="ops-support-card space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Routing memory</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Track which guardrails and live routing filters are shaping this view.
+                    </p>
+                  </div>
+                  {hasAnyFilters ? (
+                    <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-[11px]" onClick={clearAllFilters}>
+                      <X className="mr-1 h-3 w-3" />
+                      {t('keys.clear_filters')}
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
+                    <Filter className="h-3.5 w-3.5" />
+                    {hasAnyFilters ? 'Focused routes' : 'All routes'}
+                  </span>
+                  <span className="ops-pill">
+                    <Wifi className="h-3.5 w-3.5" />
+                    {onlineCount} online
+                  </span>
+                  <span className="ops-pill">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {filters.quickFilters.overQuota ? 'Quota watch active' : 'Quota watch ready'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-2 sm:hidden">
+        <div className="ops-mobile-action-stack grid gap-2 sm:hidden">
+          <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/60 bg-background/55 px-3 py-2 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.68)]">
+            <div>
+              <p className="text-sm font-semibold">Routing workspace</p>
+              <p className="text-[11px] text-muted-foreground">Create, sync, and switch between list or grouped routing views.</p>
+            </div>
+            <Badge variant="outline" className="rounded-full">{onlineCount} online</Badge>
+          </div>
           <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
             <Plus className="w-4 h-4 mr-2" />
             {t('dynamic_keys.create')}
@@ -2728,7 +2818,7 @@ export default function DynamicKeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="ops-table-meta hidden md:flex">
+      <div className="ops-chip-cloud hidden md:flex">
         <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t('dynamic_keys.quick_filters.label')}:</span>
         <Button
           variant={filters.quickFilters.online ? 'default' : 'outline'}
@@ -2768,7 +2858,7 @@ export default function DynamicKeysPage() {
         </Button>
         
         {/* Tag filter */}
-        <div className="ml-1.5 flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 dark:bg-white/[0.02]">
+        <div className="ops-chip-field ml-1.5">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('dynamic_keys.quick_filters.tag_placeholder')}
@@ -2779,7 +2869,7 @@ export default function DynamicKeysPage() {
         </div>
         
         {/* Owner filter */}
-        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 dark:bg-white/[0.02]">
+        <div className="ops-chip-field">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('dynamic_keys.quick_filters.owner_placeholder')}

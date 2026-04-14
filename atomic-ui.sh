@@ -417,13 +417,13 @@ setup_database() {
     mkdir -p prisma/data
 
     print_step "Generating Prisma client..."
-    if ! npx prisma generate 2>&1; then
+    if ! sh scripts/prisma-command.sh generate 2>&1; then
         print_error "Prisma generate failed"
         return 1
     fi
 
     print_step "Pushing database schema..."
-    if ! npx prisma db push 2>&1; then
+    if ! sh scripts/prisma-command.sh db push 2>&1; then
         print_error "Prisma db push failed"
         return 1
     fi
@@ -509,8 +509,8 @@ SyslogIdentifier=${SERVICE_NAME}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment=HOSTNAME=0.0.0.0
-Environment=DATABASE_URL=file:${INSTALL_DIR}/prisma/data/atomic-ui.db
 Environment=NODE_OPTIONS=--max-old-space-size=512
+EnvironmentFile=-${INSTALL_DIR}/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -1488,8 +1488,8 @@ update_service() {
     npm install --production=false
     
     print_step "Updating database..."
-    npx prisma generate
-    npx prisma db push
+    sh scripts/prisma-command.sh generate
+    sh scripts/prisma-command.sh db push
     
     print_step "Building application..."
     NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh

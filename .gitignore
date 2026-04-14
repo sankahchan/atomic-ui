@@ -52,3 +52,7 @@ next-env.d.ts
 
 # Prisma
 .prisma/
+prisma/.generated/
+
+# Local cutover artifacts
+storage/cutover/

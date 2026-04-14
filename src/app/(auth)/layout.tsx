@@ -1,3 +1,5 @@
+import { GradientMeshBackground } from '@/components/layout/gradient-mesh-bg';
+
 /**
  * Authentication Layout
  * 
@@ -16,9 +18,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Auth pages render directly without additional chrome */}
-      {children}
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      <GradientMeshBackground />
+      <div className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 }

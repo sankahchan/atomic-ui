@@ -4,10 +4,15 @@ import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 import { getDatabaseRuntimeSummary } from '@/lib/database-engine';
-import { loadEnvFile, validateProductionEnvironment } from '@/lib/services/production-validation';
+import {
+  applyEnvFileToProcessEnv,
+  loadEnvFile,
+  validateProductionEnvironment,
+} from '@/lib/services/production-validation';
 
 async function main() {
   const envPath = path.join(process.cwd(), '.env');
+  applyEnvFileToProcessEnv(envPath);
   const env = {
     ...loadEnvFile(envPath),
     ...Object.fromEntries(Object.entries(process.env).map(([key, value]) => [key, value || undefined])),
@@ -54,10 +59,10 @@ async function main() {
         ? [
             'Create a production Postgres database and set TARGET_DATABASE_URL before cutover.',
             'Run npm run db:cutover:preflight to validate the target and current environment.',
-            'Take a final SQLite backup before switching the production runtime.',
+            'Run npm run db:cutover:export before switching the production runtime.',
           ]
         : [
-            'Runtime is no longer SQLite-backed. Verify backup and restore workflows are Postgres-aware before relying on dashboard exports.',
+            'Runtime is no longer SQLite-backed. Use db:cutover:verify and pg_dump-based backups before relying on the new runtime.',
           ],
   };
 

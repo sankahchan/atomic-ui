@@ -3958,46 +3958,127 @@ export default function KeysPage() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="ops-panel space-y-3 p-4">
-              <div className="space-y-1">
-                <p className="ops-section-heading">{t('dashboard.key_operations_title')}</p>
-                <p className="text-sm text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
+            <div className="space-y-3">
+              <div className="ops-hero-aside space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="ops-section-heading">Live inventory</p>
+                    <p className="text-sm font-semibold">{t('dashboard.key_operations_title')}</p>
+                    <p className="text-sm text-muted-foreground">{t('dashboard.key_operations_desc')}</p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                    <Sparkles className="mr-1 h-3.5 w-3.5" />
+                    Frosted
+                  </Badge>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Active keys
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total inventory</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Online now
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Recent traffic activity</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Device watch
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.deviceLimitOverLimit ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Over configured device caps</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Focused view
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'On' : 'All'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {hasAnyFilters ? 'Filters are narrowing the list' : 'Showing the full inventory'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="h-10 w-full justify-center rounded-2xl"
+                    data-testid="create-access-key"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('keys.create')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full justify-center rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    onClick={() => setBulkCreateDialogOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Bulk create
+                  </Button>
+                  <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
+                    <Link href="/dashboard/templates">
+                      <FileText className="mr-2 h-4 w-4" />
+                      {t('nav.templates') || 'Templates'}
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
+                    <Link href="/dashboard/archived">
+                      <Archive className="mr-2 h-4 w-4" />
+                      {t('nav.archived') || 'Archived'}
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-                <Button
-                  onClick={() => setCreateDialogOpen(true)}
-                  className="h-10 w-full justify-center rounded-2xl sm:col-span-3 xl:col-span-1"
-                  data-testid="create-access-key"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('keys.create')}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-10 w-full justify-center rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] sm:col-span-3 xl:col-span-1"
-                  onClick={() => setBulkCreateDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Bulk create
-                </Button>
-                <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                  <Link href="/dashboard/templates">
-                    <FileText className="mr-2 h-4 w-4" />
-                    {t('nav.templates') || 'Templates'}
-                  </Link>
-                </Button>
-                <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                  <Link href="/dashboard/archived">
-                    <Archive className="mr-2 h-4 w-4" />
-                    {t('nav.archived') || 'Archived'}
-                  </Link>
-                </Button>
+
+              <div className="ops-support-card space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Filter memory</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Keep track of the views and flags currently shaping this workspace.
+                    </p>
+                  </div>
+                  {hasAnyFilters ? (
+                    <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-[11px]" onClick={clearAllFilters}>
+                      <X className="mr-1 h-3 w-3" />
+                      {t('keys.clear_filters')}
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
+                    <Filter className="h-3.5 w-3.5" />
+                    {hasAnyFilters ? 'Focused list' : 'All keys'}
+                  </span>
+                  <span className="ops-pill">
+                    <Activity className="h-3.5 w-3.5" />
+                    {fillTemplate(t('keys.activity.summary'), { count: onlineCount })}
+                  </span>
+                  <span className="ops-pill">
+                    <Smartphone className="h-3.5 w-3.5" />
+                    {stats?.deviceLimitWarned ?? 0} warned
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-2 sm:hidden">
+        <div className="ops-mobile-action-stack grid gap-2 sm:hidden">
+          <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/60 bg-background/55 px-3 py-2 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.68)]">
+            <div>
+              <p className="text-sm font-semibold">Key workspace</p>
+              <p className="text-[11px] text-muted-foreground">Create, bulk-manage, and jump into templates faster.</p>
+            </div>
+            <Badge variant="outline" className="rounded-full">{stats?.active ?? 0} active</Badge>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Button
               onClick={() => setCreateDialogOpen(true)}
@@ -4296,7 +4377,7 @@ export default function KeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="ops-table-meta hidden md:flex">
+      <div className="ops-chip-cloud hidden md:flex">
         <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t('keys.quick_filters.label')}:</span>
         <div className="mr-1.5 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
           <Activity className="h-3.5 w-3.5 text-cyan-300" />
@@ -4368,7 +4449,7 @@ export default function KeysPage() {
         </Button>
         
         {/* Tag filter */}
-        <div className="ml-1.5 flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
+        <div className="ops-chip-field ml-1.5">
           <Tag className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('keys.quick_filters.tag_placeholder')}
@@ -4379,7 +4460,7 @@ export default function KeysPage() {
         </div>
         
         {/* Owner filter */}
-        <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 dark:bg-white/[0.02]">
+        <div className="ops-chip-field">
           <User className="w-3 h-3 text-muted-foreground" />
           <Input
             placeholder={t('keys.quick_filters.owner_placeholder')}

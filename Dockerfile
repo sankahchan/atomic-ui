@@ -21,10 +21,13 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
+ARG PRISMA_DATABASE_URL="file:./data/build.db"
+ENV DATABASE_URL="${PRISMA_DATABASE_URL}"
 
 # Copy package files
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
+COPY scripts/prisma-command.sh scripts/prisma-schema-path.js ./scripts/
 
 # Install all dependencies (including dev for build)
 RUN npm ci
@@ -37,6 +40,7 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG PRISMA_DATABASE_URL="file:./data/build.db"
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -44,9 +48,6 @@ COPY . .
 
 # Create data directory for Prisma during build
 RUN mkdir -p data
-
-# Generate Prisma client
-RUN npx prisma generate
 
 # Ensure public directory exists (required for standalone output)
 RUN mkdir -p public
@@ -56,14 +57,16 @@ RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Provide dummy environment variables for build
-# These are only used during build, not at runtime
-ENV DATABASE_URL="file:./data/build.db"
-ENV JWT_SECRET="build-time-secret-not-used-at-runtime"
+# These are only used during build, not at runtime unless overridden with --build-arg.
+ENV DATABASE_URL="${PRISMA_DATABASE_URL}"
+
+# Generate Prisma client for the selected build database engine
+RUN sh scripts/prisma-command.sh generate
 
 # Build Next.js with standalone output
 # Increase Node.js memory for builds
 ENV NODE_OPTIONS="--max-old-space-size=6144"
-RUN npm run build
+RUN JWT_SECRET="build-time-secret-not-used-at-runtime" npm run build
 
 # Verify standalone output was created
 RUN if [ ! -d ".next/standalone" ]; then \
@@ -133,4 +136,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Start command
 # First initialize the database, then start the server
-CMD ["sh", "-c", "npx prisma db push && npx tsx scripts/setup.ts && node server.js"]
+CMD ["sh", "-c", "sh scripts/prisma-command.sh db push && npx tsx scripts/setup.ts && node server.js"]

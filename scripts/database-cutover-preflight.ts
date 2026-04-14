@@ -2,10 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getDatabaseRuntimeSummary, isPostgresDatabaseUrl } from '@/lib/database-engine';
-import { loadEnvFile, validateProductionEnvironment } from '@/lib/services/production-validation';
+import {
+  applyEnvFileToProcessEnv,
+  loadEnvFile,
+  validateProductionEnvironment,
+} from '@/lib/services/production-validation';
 
 function getMergedEnv() {
   const envPath = path.join(process.cwd(), '.env');
+  applyEnvFileToProcessEnv(envPath);
   return {
     ...loadEnvFile(envPath),
     ...Object.fromEntries(Object.entries(process.env).map(([key, value]) => [key, value || undefined])),
@@ -40,11 +45,11 @@ function main() {
   }
 
   if (runtime.engine === 'sqlite') {
-    warnings.push('Dashboard backup/restore are still SQLite-first. Plan a maintenance window before production cutover.');
+    warnings.push('Plan a maintenance window and use db:cutover:export/import/verify instead of dashboard backup/restore for the production cutover.');
   }
 
   if (targetRuntime.engine === 'postgres') {
-    warnings.push('After cutover, file-based backup and restore routes must be replaced with pg_dump/pg_restore automation.');
+    warnings.push('After cutover, use pg_dump plus the repo Postgres cutover scripts instead of SQLite file-copy backup and restore.');
   }
 
   const result = {

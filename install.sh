@@ -388,13 +388,13 @@ DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
 set_env_var "DATABASE_URL" "file:${DB_PATH}"
 
 echo -e "${BLUE}[*]${NC} Generating Prisma client..."
-if ! npx prisma generate 2>&1; then
+if ! sh scripts/prisma-command.sh generate 2>&1; then
     echo -e "${RED}[✗]${NC} Prisma generate failed"
     exit 1
 fi
 
 echo -e "${BLUE}[*]${NC} Pushing database schema..."
-if ! npx prisma db push 2>&1; then
+if ! sh scripts/prisma-command.sh db push 2>&1; then
     echo -e "${RED}[✗]${NC} Prisma db push failed"
     exit 1
 fi
@@ -443,8 +443,8 @@ RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=${PANEL_PORT}
 Environment=PANEL_PATH=/${PANEL_PATH}
-Environment=DATABASE_URL=file:${DB_PATH}
 Environment=NODE_OPTIONS=--max-old-space-size=384
+EnvironmentFile=-${INSTALL_DIR}/.env
 
 [Install]
 WantedBy=multi-user.target

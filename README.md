@@ -155,7 +155,7 @@ Set these in `.env` before production use:
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` or a Postgres DSN for cutover work |
+| `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` or a Postgres DSN such as `postgresql://user:pass@host:5432/atomic_ui` |
 | `JWT_SECRET` | Yes | Session signing secret |
 | `CRON_SECRET` | Strongly recommended | Protects scheduled task endpoints |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL |
@@ -194,14 +194,18 @@ npm run db:push
 npm run db:migrate
 npm run db:cutover:report
 npm run db:cutover:preflight -- TARGET_DATABASE_URL=postgresql://...
+npm run db:cutover:export
+npm run db:cutover:import -- --dir=storage/cutover/<export-dir>
+npm run db:cutover:verify -- --dir=storage/cutover/<export-dir>
 npm run db:studio
 ```
 
-`db:cutover:report` prints the current database engine, data counts, and production warnings. `db:cutover:preflight` validates a planned SQLite-to-Postgres cutover before you switch production.
+`db:cutover:report` prints the current database engine, data counts, and production warnings. `db:cutover:preflight` validates a planned SQLite-to-Postgres cutover before you switch production. `db:cutover:export`, `db:cutover:import`, and `db:cutover:verify` are the supported SQLite-to-Postgres data move path.
 
 ## Documentation
 
 - [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
+- [docs/postgres-cutover.md](docs/postgres-cutover.md): SQLite to Postgres cutover runbook
 - [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
 - [docs/worker-setup.md](docs/worker-setup.md): usage snapshot worker setup
 
@@ -230,7 +234,7 @@ atomic-ui/
 
 - Next.js 14 (App Router)
 - TypeScript
-- Prisma + SQLite
+- Prisma + SQLite/Postgres
 - tRPC + React Query
 - Tailwind CSS + shadcn/ui
 - Recharts

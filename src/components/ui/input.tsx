@@ -39,7 +39,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         type={type}
         className={cn(
           // Base styles: full width, consistent height, padding, and border radius
-          'flex h-10 w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg-light)] px-3 py-2',
+          'flex h-11 w-full rounded-[1rem] border border-white/55 bg-white/52 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(148,163,184,0.12),inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-[22px] [-webkit-backdrop-filter:blur(22px)] dark:border-[rgba(214,227,255,0.12)] dark:bg-[linear-gradient(180deg,rgba(18,25,40,0.56),rgba(12,18,31,0.34))] dark:shadow-[0_16px_34px_rgba(0,3,12,0.24),inset_0_1px_0_rgba(255,255,255,0.05)]',
           // Typography: consistent text size
           'text-sm',
           // Focus states: ring effect with primary color for accessibility
