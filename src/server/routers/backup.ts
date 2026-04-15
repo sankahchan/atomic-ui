@@ -1,3 +1,4 @@
+import { spawnSync } from 'child_process';
 import { router, adminProcedure } from '../trpc';
 import { z } from 'zod';
 import fs from 'fs';
@@ -7,10 +8,34 @@ import { db } from '@/lib/db';
 import { sendTelegramDocument } from '@/lib/services/telegram-runtime';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
-import { BACKUP_DIR, verifyBackupFile } from '@/lib/services/backup-verification';
+import { verifyBackupFile } from '@/lib/services/backup-verification';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
-import { buildOfflineRestoreCommand } from '@/lib/backup-files';
-import { ensureBackupDirectory } from '@/lib/backup-storage';
+import { ensureBackupDirectory, resolveAppRootDir } from '@/lib/backup-storage';
+import { hasBackupManageScope, hasRestoreManageScope } from '@/lib/admin-scope';
+import {
+    createRestoreJobRecord,
+    hasActiveRestoreJob,
+    listRestoreJobs,
+    writeRestoreJob,
+} from '@/lib/restore-jobs';
+
+function assertBackupManageScope(scope?: string | null) {
+    if (!hasBackupManageScope(scope)) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only owner-scoped admins can manage full backups.',
+        });
+    }
+}
+
+function assertRestoreManageScope(scope?: string | null) {
+    if (!hasRestoreManageScope(scope)) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only owner-scoped admins can restore backups.',
+        });
+    }
+}
 
 function parseVerificationDetails(details: string | null) {
     if (!details) {
@@ -28,7 +53,9 @@ export const backupRouter = router({
     /**
      * List all backups
      */
-    list: adminProcedure.query(async () => {
+    list: adminProcedure.query(async ({ ctx }) => {
+        assertBackupManageScope(ctx.user.adminScope);
+
         try {
             const backupDir = ensureBackupDirectory();
             if (!fs.existsSync(backupDir)) {
@@ -95,6 +122,8 @@ export const backupRouter = router({
      * Create a new backup
      */
     create: adminProcedure.mutation(async ({ ctx }) => {
+        assertBackupManageScope(ctx.user.adminScope);
+
         try {
             const createdBackup = await createRuntimeBackup(ensureBackupDirectory());
             const backupFilename = createdBackup.filename;
@@ -170,7 +199,9 @@ export const backupRouter = router({
 
     verificationHistory: adminProcedure
         .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }).optional())
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            assertBackupManageScope(ctx.user.adminScope);
+
             const items = await db.backupVerification.findMany({
                 orderBy: { verifiedAt: 'desc' },
                 take: input?.limit ?? 20,
@@ -182,9 +213,17 @@ export const backupRouter = router({
             }));
         }),
 
+    restoreJobs: adminProcedure
+        .input(z.object({ limit: z.number().int().min(1).max(20).default(5) }).optional())
+        .query(({ ctx, input }) => {
+            assertRestoreManageScope(ctx.user.adminScope);
+            return listRestoreJobs(input?.limit ?? 5);
+        }),
+
     verify: adminProcedure
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
+            assertBackupManageScope(ctx.user.adminScope);
             return verifyBackupFile(input.filename, {
                 userId: ctx.user.id,
                 ip: ctx.clientIp,
@@ -198,8 +237,11 @@ export const backupRouter = router({
     restore: adminProcedure
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
+            assertRestoreManageScope(ctx.user.adminScope);
+
             try {
-                const backupPath = path.join(ensureBackupDirectory(), input.filename);
+                const backupDir = ensureBackupDirectory();
+                const backupPath = path.join(backupDir, input.filename);
 
                 if (!fs.existsSync(backupPath)) {
                     throw new TRPCError({
@@ -221,23 +263,101 @@ export const backupRouter = router({
                     });
                 }
 
+                if (hasActiveRestoreJob()) {
+                    throw new TRPCError({
+                        code: 'PRECONDITION_FAILED',
+                        message: 'A restore job is already running. Wait for it to finish before scheduling another restore.',
+                    });
+                }
+
+                const safetyBackup = await createRuntimeBackup(backupDir);
+                const appRoot = resolveAppRootDir(process.cwd());
+                const restoreJob = createRestoreJobRecord({
+                    backupFilename: input.filename,
+                    backupPath,
+                    requestedByUserId: ctx.user.id,
+                    requestedByEmail: ctx.user.email,
+                    requestedByIp: ctx.clientIp,
+                    safetyBackupFilename: safetyBackup.filename,
+                });
+                const restoreJobFile = writeRestoreJob(restoreJob, appRoot);
+                const runnerScript = path.join(appRoot, 'scripts', 'run-dashboard-restore.js');
+
+                const scheduleResult = spawnSync(
+                    'systemd-run',
+                    [
+                        '--unit',
+                        restoreJob.unitName,
+                        '--collect',
+                        '--property',
+                        'Type=oneshot',
+                        '--property',
+                        `WorkingDirectory=${appRoot}`,
+                        '--description',
+                        `Atomic-UI restore ${input.filename}`,
+                        process.execPath,
+                        runnerScript,
+                        '--app-root',
+                        appRoot,
+                        '--job-file',
+                        restoreJobFile,
+                        '--job-id',
+                        restoreJob.jobId,
+                        '--backup',
+                        backupPath,
+                        '--backup-filename',
+                        input.filename,
+                    ],
+                    {
+                        encoding: 'utf8',
+                    },
+                );
+
+                if (scheduleResult.error || scheduleResult.status !== 0) {
+                    const errorMessage =
+                        (scheduleResult.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+                            ? 'Dashboard restore requires a Linux host with systemd-run. Use the offline restore command on this environment.'
+                            :
+                        scheduleResult.error?.message ||
+                        scheduleResult.stderr?.trim() ||
+                        scheduleResult.stdout?.trim() ||
+                        'Failed to schedule restore job.';
+                    writeRestoreJob({
+                        ...restoreJob,
+                        status: 'FAILED',
+                        completedAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        error: errorMessage,
+                    }, appRoot);
+
+                    throw new TRPCError({
+                        code: 'INTERNAL_SERVER_ERROR',
+                        message: errorMessage,
+                    });
+                }
+
                 await writeAuditLog({
                     userId: ctx.user.id,
                     ip: ctx.clientIp,
-                    action: 'BACKUP_RESTORE_BLOCKED',
+                    action: 'BACKUP_RESTORE_SCHEDULED',
                     entity: 'BACKUP',
                     entityId: input.filename,
                     details: {
                         filename: input.filename,
                         verificationStatus: verification.status,
-                        restoreCommand: buildOfflineRestoreCommand(input.filename, backupPath),
+                        restoreJobId: restoreJob.jobId,
+                        restoreUnitName: restoreJob.unitName,
+                        safetyBackupFilename: safetyBackup.filename,
                     },
                 });
 
-                throw new TRPCError({
-                    code: 'PRECONDITION_FAILED',
-                    message: `Dashboard restore is disabled while the app is running. Stop the service first, then run: ${buildOfflineRestoreCommand(input.filename, backupPath)}`,
-                });
+                return {
+                    success: true,
+                    scheduled: true,
+                    filename: input.filename,
+                    safetyBackupFilename: safetyBackup.filename,
+                    job: restoreJob,
+                };
             } catch (error: any) {
                 if (error instanceof TRPCError) {
                     throw error;
@@ -256,6 +376,8 @@ export const backupRouter = router({
     delete: adminProcedure
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
+            assertBackupManageScope(ctx.user.adminScope);
+
             try {
                 const backupPath = path.join(ensureBackupDirectory(), input.filename);
 

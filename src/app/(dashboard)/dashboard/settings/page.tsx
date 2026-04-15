@@ -29,7 +29,6 @@ import { APP_RELEASE_VERSION } from '@/lib/app-version';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { withBasePath } from '@/lib/base-path';
-import { buildOfflineRestoreCommand } from '@/lib/backup-files';
 import { BackButton } from '@/components/ui/back-button';
 import { settingsShortcutItems } from '@/components/layout/dashboard-nav';
 import { cn } from '@/lib/utils';
@@ -60,6 +59,7 @@ import Link from 'next/link';
 
 // Section type for the collapsible cards
 type SectionId = 'general' | 'health' | 'balancer' | 'backup' | 'audit' | 'notifications' | 'security' | 'about' | 'subscription' | null;
+type RestoreJobStatus = 'SCHEDULED' | 'STOPPING_SERVICE' | 'RESTORING' | 'STARTING_SERVICE' | 'SUCCEEDED' | 'FAILED';
 
 type AuditAlertRule = {
   id: string;
@@ -103,6 +103,41 @@ type ServerBalancerPolicyFormState = {
 const AUDIT_ALERT_RULE_MAX_THROTTLE_MINUTES = 24 * 60;
 const AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES = 24 * 60;
 const AUDIT_ALERT_RULE_MAX_MIN_MATCHES = 50;
+const ACTIVE_RESTORE_JOB_STATUSES = new Set<RestoreJobStatus>(['SCHEDULED', 'STOPPING_SERVICE', 'RESTORING', 'STARTING_SERVICE']);
+
+function formatRestoreJobStatus(status: RestoreJobStatus) {
+  switch (status) {
+    case 'SCHEDULED':
+      return 'Scheduled';
+    case 'STOPPING_SERVICE':
+      return 'Stopping service';
+    case 'RESTORING':
+      return 'Restoring backup';
+    case 'STARTING_SERVICE':
+      return 'Starting service';
+    case 'SUCCEEDED':
+      return 'Succeeded';
+    case 'FAILED':
+      return 'Failed';
+    default:
+      return status;
+  }
+}
+
+function getRestoreJobBadgeVariant(status: RestoreJobStatus): 'secondary' | 'warning' | 'success' | 'destructive' {
+  switch (status) {
+    case 'SUCCEEDED':
+      return 'success';
+    case 'FAILED':
+      return 'destructive';
+    case 'SCHEDULED':
+    case 'STOPPING_SERVICE':
+    case 'RESTORING':
+    case 'STARTING_SERVICE':
+    default:
+      return 'warning';
+  }
+}
 
 function buildAuditAlertRuleForm(rule?: AuditAlertRule | null): AuditAlertRuleFormState {
   return {
@@ -270,7 +305,7 @@ export default function SettingsPage() {
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
-  const { data: currentUser } = trpc.auth.me.useQuery();
+  const { data: currentUser, isLoading: isCurrentUserLoading } = trpc.auth.me.useQuery();
   const { data: auditRetentionStatus, isLoading: isAuditRetentionLoading } = trpc.audit.retentionStatus.useQuery(undefined, {
     enabled: isAuditSectionOpen,
     refetchOnWindowFocus: false,
@@ -365,6 +400,7 @@ export default function SettingsPage() {
   const [auditRetentionDaysInput, setAuditRetentionDaysInput] = useState('180');
   const [auditRuleDialogOpen, setAuditRuleDialogOpen] = useState(false);
   const [auditRuleForm, setAuditRuleForm] = useState<AuditAlertRuleFormState>(buildAuditAlertRuleForm());
+  const canManageBackups = currentUser?.role === 'ADMIN' && currentUser.adminScope === 'OWNER';
 
   useEffect(() => {
     if (currentUser?.email) {
@@ -408,14 +444,24 @@ export default function SettingsPage() {
 
   // Backup & Restore
   const { data: backups, isLoading: isBackupsLoading, refetch: refetchBackups } = trpc.backup.list.useQuery(undefined, {
-    enabled: isBackupSectionOpen,
+    enabled: isBackupSectionOpen && canManageBackups,
   });
   const {
     data: backupVerificationHistory,
     isLoading: isBackupVerificationHistoryLoading,
     refetch: refetchBackupVerificationHistory,
   } = trpc.backup.verificationHistory.useQuery({ limit: 10 }, {
-    enabled: isBackupSectionOpen,
+    enabled: isBackupSectionOpen && canManageBackups,
+  });
+  const {
+    data: restoreJobs,
+    isLoading: isRestoreJobsLoading,
+    refetch: refetchRestoreJobs,
+  } = trpc.backup.restoreJobs.useQuery({ limit: 5 }, {
+    enabled: isBackupSectionOpen && canManageBackups,
+    refetchInterval: (query) =>
+      query.state.data?.some((job) => ACTIVE_RESTORE_JOB_STATUSES.has(job.status as RestoreJobStatus)) ? 3000 : false,
+    refetchIntervalInBackground: false,
   });
   const { data: auditLogs, isLoading: isAuditLogsLoading } = trpc.audit.list.useQuery({ pageSize: 10 }, {
     enabled: isAuditSectionOpen,
@@ -462,6 +508,25 @@ export default function SettingsPage() {
     onError: (error) => {
       toast({
         title: 'Backup verification failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const restoreBackupMutation = trpc.backup.restore.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: 'Restore scheduled',
+        description: `Atomic-UI will restart while restoring ${result.filename}. Safety backup: ${result.safetyBackupFilename}. You may need to sign in again after it finishes.`,
+      });
+      await Promise.all([
+        refetchBackups(),
+        refetchRestoreJobs(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Restore failed to start',
         description: error.message,
         variant: 'destructive',
       });
@@ -567,12 +632,11 @@ export default function SettingsPage() {
   };
 
   const handleRestoreBackup = (filename: string) => {
-    const restoreCommand = buildOfflineRestoreCommand(filename, `/absolute/path/to/${filename}`);
-    toast({
-      title: 'Restore runs offline only',
-      description: `Stop the service first, then run: ${restoreCommand}`,
-      variant: 'destructive',
-    });
+    if (!confirm('This will overwrite current data, restart Atomic-UI, and may sign you out if the restored backup contains older sessions. A fresh safety backup will be created first. Continue?')) {
+      return;
+    }
+
+    restoreBackupMutation.mutate({ filename });
   };
 
   const handleDeleteBackup = (filename: string) => {
@@ -588,6 +652,10 @@ export default function SettingsPage() {
   const handleVerifyBackup = (filename: string) => {
     verifyBackupMutation.mutate({ filename });
   };
+  const activeRestoreJob = restoreJobs?.find((job) => ACTIVE_RESTORE_JOB_STATUSES.has(job.status as RestoreJobStatus));
+  const isRestoreJobRunning = Boolean(activeRestoreJob);
+  const isRestorePendingForFilename = (filename: string) =>
+    restoreBackupMutation.isPending && restoreBackupMutation.variables?.filename === filename;
 
   const handleSaveSetting = (key: string, value: unknown) => {
     updateMutation.mutate({ key, value });
@@ -1137,290 +1205,365 @@ export default function SettingsPage() {
           onToggle={setOpenSection}
         >
           <div className="space-y-4">
-            <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending} size="sm">
-              {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              <Save className="w-4 h-4 mr-2" />
-              {t('settings.backup.create')}
-            </Button>
-
-            <div className="space-y-3 md:hidden">
-              {isBackupsLoading ? (
-                <div className="flex items-center justify-center rounded-lg border p-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : backups?.length === 0 ? (
-                <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-                  {t('settings.backup.empty')}
-                </div>
-              ) : (
-                backups?.map((backup) => (
-                  <div key={backup.filename} className="rounded-lg border p-4 space-y-3">
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-mono text-xs break-all">{backup.filename}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {Math.round(backup.size / 1024)} KB
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant={
-                            backup.latestVerification
-                              ? backup.latestVerification.restoreReady
-                                ? 'default'
-                                : 'destructive'
-                              : 'secondary'
-                          }
-                        >
-                          {backup.latestVerification
-                            ? backup.latestVerification.restoreReady
-                              ? 'Verified'
-                              : 'Verification failed'
-                            : 'Unverified'}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {backup.latestVerification
-                            ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
-                            : 'No verification recorded yet'}
-                        </span>
-                      </div>
-                      {backup.latestVerification?.error ? (
-                        <p className="text-xs text-destructive">{backup.latestVerification.error}</p>
-                      ) : null}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => handleVerifyBackup(backup.filename)}
-                        disabled={verifyBackupMutation.isPending}
-                      >
-                        {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <TestTube className="w-4 h-4 mr-2" />
-                        )}
-                        Verify
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => handleDownloadBackup(backup.filename)}
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => handleRestoreBackup(backup.filename)}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Offline restore
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteBackup(backup.filename)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="hidden overflow-hidden rounded-lg border md:block">
-              <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
-                <div className="col-span-6">{t('settings.backup.filename')}</div>
-                <div className="col-span-3">{t('settings.backup.size')}</div>
-                <div className="col-span-3 text-right">{t('settings.backup.actions')}</div>
+            {isCurrentUserLoading ? (
+              <div className="flex items-center justify-center rounded-lg border p-6">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {isBackupsLoading ? (
-                  <div className="flex items-center justify-center p-6">
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : backups?.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground text-sm">
-                    {t('settings.backup.empty')}
-                  </div>
-                ) : (
-                  backups?.map((backup) => (
-                    <div key={backup.filename} className="grid grid-cols-12 gap-2 p-3 border-t items-center hover:bg-muted/30 text-sm">
-                      <div className="col-span-6 min-w-0">
-                        <div className="flex items-center gap-2 truncate">
-                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          <span className="font-mono text-xs truncate">{backup.filename}</span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant={
-                              backup.latestVerification
-                                ? backup.latestVerification.restoreReady
-                                  ? 'default'
-                                  : 'destructive'
-                                : 'secondary'
-                            }
-                          >
-                            {backup.latestVerification
-                              ? backup.latestVerification.restoreReady
-                                ? 'Verified'
-                                : 'Verification failed'
-                              : 'Unverified'}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {backup.latestVerification
-                              ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
-                              : 'No verification recorded yet'}
-                          </span>
-                        </div>
-                        {backup.latestVerification?.error ? (
-                          <p className="mt-1 text-xs text-destructive">{backup.latestVerification.error}</p>
-                        ) : null}
-                      </div>
-                      <div className="col-span-3 text-xs text-muted-foreground">
-                        {Math.round(backup.size / 1024)} KB
-                      </div>
-                      <div className="col-span-3 flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleVerifyBackup(backup.filename)}
-                          disabled={verifyBackupMutation.isPending}
-                        >
-                          {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <TestTube className="w-3.5 h-3.5" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleDownloadBackup(backup.filename)}
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleRestoreBackup(backup.filename)}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteBackup(backup.filename)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+            ) : !canManageBackups ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                Only owner-scoped admins can create, download, delete, or restore full backups.
               </div>
-            </div>
-
-            <div className="rounded-lg border p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold">Recent Verification History</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Daily checks validate the newest backups and every restore now performs a verification pre-check.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchBackupVerificationHistory()}
-                  disabled={verifyBackupMutation.isPending}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
+            ) : (
+              <>
+                <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending || isRestoreJobRunning} size="sm">
+                  {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  <Save className="w-4 h-4 mr-2" />
+                  {t('settings.backup.create')}
                 </Button>
-              </div>
 
-              {isBackupVerificationHistoryLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : backupVerificationHistory && backupVerificationHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {backupVerificationHistory.map((verification) => (
-                    <div
-                      key={verification.id}
-                      className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-start sm:justify-between"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{verification.filename}</span>
-                          <Badge
-                            variant={
-                              verification.restoreReady && verification.status === 'SUCCESS'
-                                ? 'default'
-                                : 'destructive'
-                            }
-                          >
-                            {verification.restoreReady && verification.status === 'SUCCESS'
-                              ? 'Restore ready'
-                              : 'Failed'}
-                          </Badge>
-                          <Badge variant="outline">
-                            {verification.triggeredBy || 'manual'}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(verification.verifiedAt).toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          SHA-256: {verification.fileHashSha256 ? `${verification.fileHashSha256.slice(0, 12)}...` : 'n/a'}
-                        </p>
-                        {verification.error ? (
-                          <p className="text-xs text-destructive">{verification.error}</p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            Integrity: {verification.integrityCheck || 'n/a'} | Tables: {verification.tableCount ?? 'n/a'} | Users: {verification.userCount ?? 'n/a'} | Keys: {verification.accessKeyCount ?? 'n/a'}
-                          </p>
-                        )}
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleVerifyBackup(verification.filename)}
-                        disabled={verifyBackupMutation.isPending}
-                      >
-                        {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === verification.filename ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <TestTube className="w-4 h-4 mr-2" />
-                        )}
-                        Verify Again
-                      </Button>
+                <div className="space-y-3 md:hidden">
+                  {isBackupsLoading ? (
+                    <div className="flex items-center justify-center rounded-lg border p-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                     </div>
-                  ))}
+                  ) : backups?.length === 0 ? (
+                    <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                      {t('settings.backup.empty')}
+                    </div>
+                  ) : (
+                    backups?.map((backup) => (
+                      <div key={backup.filename} className="rounded-lg border p-4 space-y-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start gap-2">
+                            <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-mono text-xs break-all">{backup.filename}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {Math.round(backup.size / 1024)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant={
+                                backup.latestVerification
+                                  ? backup.latestVerification.restoreReady
+                                    ? 'default'
+                                    : 'destructive'
+                                  : 'secondary'
+                              }
+                            >
+                              {backup.latestVerification
+                                ? backup.latestVerification.restoreReady
+                                  ? 'Verified'
+                                  : 'Verification failed'
+                                : 'Unverified'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {backup.latestVerification
+                                ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
+                                : 'No verification recorded yet'}
+                            </span>
+                          </div>
+                          {backup.latestVerification?.error ? (
+                            <p className="text-xs text-destructive">{backup.latestVerification.error}</p>
+                          ) : null}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-center"
+                            onClick={() => handleVerifyBackup(backup.filename)}
+                            disabled={verifyBackupMutation.isPending || isRestoreJobRunning}
+                          >
+                            {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <TestTube className="w-4 h-4 mr-2" />
+                            )}
+                            Verify
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-center"
+                            onClick={() => handleDownloadBackup(backup.filename)}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-center"
+                            onClick={() => handleRestoreBackup(backup.filename)}
+                            disabled={restoreBackupMutation.isPending || isRestoreJobRunning}
+                          >
+                            {isRestorePendingForFilename(backup.filename) ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                            )}
+                            {t('settings.backup.restore_btn')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-center text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteBackup(backup.filename)}
+                            disabled={deleteBackupMutation.isPending || isRestoreJobRunning}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              ) : (
-                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  No backup verification history yet.
+
+                <div className="hidden overflow-hidden rounded-lg border md:block">
+                  <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
+                    <div className="col-span-6">{t('settings.backup.filename')}</div>
+                    <div className="col-span-3">{t('settings.backup.size')}</div>
+                    <div className="col-span-3 text-right">{t('settings.backup.actions')}</div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {isBackupsLoading ? (
+                      <div className="flex items-center justify-center p-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : backups?.length === 0 ? (
+                      <div className="p-6 text-center text-muted-foreground text-sm">
+                        {t('settings.backup.empty')}
+                      </div>
+                    ) : (
+                      backups?.map((backup) => (
+                        <div key={backup.filename} className="grid grid-cols-12 gap-2 p-3 border-t items-center hover:bg-muted/30 text-sm">
+                          <div className="col-span-6 min-w-0">
+                            <div className="flex items-center gap-2 truncate">
+                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <span className="font-mono text-xs truncate">{backup.filename}</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant={
+                                  backup.latestVerification
+                                    ? backup.latestVerification.restoreReady
+                                      ? 'default'
+                                      : 'destructive'
+                                    : 'secondary'
+                                }
+                              >
+                                {backup.latestVerification
+                                  ? backup.latestVerification.restoreReady
+                                    ? 'Verified'
+                                    : 'Verification failed'
+                                  : 'Unverified'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {backup.latestVerification
+                                  ? `Checked ${new Date(backup.latestVerification.verifiedAt).toLocaleString()}`
+                                  : 'No verification recorded yet'}
+                              </span>
+                            </div>
+                            {backup.latestVerification?.error ? (
+                              <p className="mt-1 text-xs text-destructive">{backup.latestVerification.error}</p>
+                            ) : null}
+                          </div>
+                          <div className="col-span-3 text-xs text-muted-foreground">
+                            {Math.round(backup.size / 1024)} KB
+                          </div>
+                          <div className="col-span-3 flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleVerifyBackup(backup.filename)}
+                              disabled={verifyBackupMutation.isPending || isRestoreJobRunning}
+                            >
+                              {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === backup.filename ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <TestTube className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleDownloadBackup(backup.filename)}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleRestoreBackup(backup.filename)}
+                              disabled={restoreBackupMutation.isPending || isRestoreJobRunning}
+                            >
+                              {isRestorePendingForFilename(backup.filename) ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteBackup(backup.filename)}
+                              disabled={deleteBackupMutation.isPending || isRestoreJobRunning}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Recent Verification History</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Daily checks validate the newest backups and every restore now performs a verification pre-check.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchBackupVerificationHistory()}
+                      disabled={verifyBackupMutation.isPending}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {isBackupVerificationHistoryLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : backupVerificationHistory && backupVerificationHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {backupVerificationHistory.map((verification) => (
+                        <div
+                          key={verification.id}
+                          className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-start sm:justify-between"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium">{verification.filename}</span>
+                              <Badge
+                                variant={
+                                  verification.restoreReady && verification.status === 'SUCCESS'
+                                    ? 'default'
+                                    : 'destructive'
+                                }
+                              >
+                                {verification.restoreReady && verification.status === 'SUCCESS'
+                                  ? 'Restore ready'
+                                  : 'Failed'}
+                              </Badge>
+                              <Badge variant="outline">
+                                {verification.triggeredBy || 'manual'}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(verification.verifiedAt).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              SHA-256: {verification.fileHashSha256 ? `${verification.fileHashSha256.slice(0, 12)}...` : 'n/a'}
+                            </p>
+                            {verification.error ? (
+                              <p className="text-xs text-destructive">{verification.error}</p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                Integrity: {verification.integrityCheck || 'n/a'} | Tables: {verification.tableCount ?? 'n/a'} | Users: {verification.userCount ?? 'n/a'} | Keys: {verification.accessKeyCount ?? 'n/a'}
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleVerifyBackup(verification.filename)}
+                            disabled={verifyBackupMutation.isPending || isRestoreJobRunning}
+                          >
+                            {verifyBackupMutation.isPending && verifyBackupMutation.variables?.filename === verification.filename ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <TestTube className="w-4 h-4 mr-2" />
+                            )}
+                            Verify Again
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                      No backup verification history yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Restore Job Status</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Dashboard restores run as a detached host job and restart the app when complete.
+                      </p>
+                    </div>
+                    {activeRestoreJob ? (
+                      <Badge variant="warning">Restore in progress</Badge>
+                    ) : null}
+                  </div>
+
+                  {isRestoreJobsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : restoreJobs && restoreJobs.length > 0 ? (
+                    <div className="space-y-2">
+                      {restoreJobs.map((job) => (
+                        <div key={job.jobId} className="rounded-md border p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs break-all">{job.backupFilename}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Requested {new Date(job.requestedAt).toLocaleString()}
+                                {job.requestedByEmail ? ` by ${job.requestedByEmail}` : ''}
+                              </p>
+                            </div>
+                            <Badge variant={getRestoreJobBadgeVariant(job.status as RestoreJobStatus)}>
+                              {formatRestoreJobStatus(job.status as RestoreJobStatus)}
+                            </Badge>
+                          </div>
+                          {job.safetyBackupFilename ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Safety backup: <span className="font-mono">{job.safetyBackupFilename}</span>
+                            </p>
+                          ) : null}
+                          {job.error ? (
+                            <p className="mt-2 text-xs text-destructive">{job.error}</p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                      No restore jobs yet.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </SectionCard>
 
