@@ -29,11 +29,13 @@ test('exact public-route matching does not leak to sibling paths', () => {
   assert.equal(isPublicRoute('/statuspage'), false);
 });
 
-test('stale RSC requests are rejected before Next.js handles them', async () => {
+test('stale server action requests are rejected before Next.js handles them', async () => {
   process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
-  const request = new NextRequest('https://example.com/dashboard?_rsc=abc', {
+  const request = new NextRequest('https://example.com/dashboard', {
+    method: 'POST',
     headers: {
       cookie: `${APP_BUILD_COOKIE_NAME}=old-build`,
+      'next-action': 'x',
     },
   });
 
@@ -41,14 +43,20 @@ test('stale RSC requests are rejected before Next.js handles them', async () => 
 
   assert.equal(response.status, 409);
   assert.equal(response.headers.get('x-atomic-stale-build'), '1');
-  assert.equal(await response.text(), 'STALE_BUILD');
+  assert.deepEqual(await response.json(), {
+    ok: false,
+    error: 'STALE_BUILD',
+    message: 'This tab is using an older deploy and needs to reload.',
+  });
 });
 
-test('fresh RSC requests are not rejected by the stale-build guard', async () => {
+test('fresh server action requests are not rejected by the stale-build guard', async () => {
   process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
-  const request = new NextRequest('https://example.com/dashboard?_rsc=abc', {
+  const request = new NextRequest('https://example.com/dashboard', {
+    method: 'POST',
     headers: {
       cookie: `${APP_BUILD_COOKIE_NAME}=new-build`,
+      'next-action': 'x',
     },
   });
 
@@ -58,12 +66,14 @@ test('fresh RSC requests are not rejected by the stale-build guard', async () =>
   assert.notEqual(response.headers.get('x-atomic-stale-build'), '1');
 });
 
-test('client build header takes precedence over stale build cookie on RSC requests', async () => {
+test('client build header takes precedence over stale build cookie on server action requests', async () => {
   process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
-  const request = new NextRequest('https://example.com/dashboard?_rsc=abc', {
+  const request = new NextRequest('https://example.com/dashboard', {
+    method: 'POST',
     headers: {
       [CLIENT_BUILD_HEADER_NAME]: 'new-build',
       cookie: `${APP_BUILD_COOKIE_NAME}=old-build`,
+      'next-action': 'x',
     },
   });
 
