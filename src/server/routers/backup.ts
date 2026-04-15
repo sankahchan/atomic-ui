@@ -10,10 +10,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { BACKUP_DIR, verifyBackupFile } from '@/lib/services/backup-verification';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
 import { buildOfflineRestoreCommand } from '@/lib/backup-files';
-
-if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
+import { ensureBackupDirectory } from '@/lib/backup-storage';
 
 function parseVerificationDetails(details: string | null) {
     if (!details) {
@@ -33,16 +30,17 @@ export const backupRouter = router({
      */
     list: adminProcedure.query(async () => {
         try {
-            if (!fs.existsSync(BACKUP_DIR)) {
+            const backupDir = ensureBackupDirectory();
+            if (!fs.existsSync(backupDir)) {
                 return [];
             }
 
-            const files = fs.readdirSync(BACKUP_DIR);
+            const files = fs.readdirSync(backupDir);
 
             const backups = files
                 .filter(file => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak') || file.endsWith('.sql') || file.endsWith('.dump'))
                 .map(file => {
-                    const stats = fs.statSync(path.join(BACKUP_DIR, file));
+                    const stats = fs.statSync(path.join(backupDir, file));
                     return {
                         filename: file,
                         size: stats.size,
@@ -98,7 +96,7 @@ export const backupRouter = router({
      */
     create: adminProcedure.mutation(async ({ ctx }) => {
         try {
-            const createdBackup = await createRuntimeBackup(BACKUP_DIR);
+            const createdBackup = await createRuntimeBackup(ensureBackupDirectory());
             const backupFilename = createdBackup.filename;
             const backupPath = createdBackup.filePath;
 
@@ -201,7 +199,7 @@ export const backupRouter = router({
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
             try {
-                const backupPath = path.join(BACKUP_DIR, input.filename);
+                const backupPath = path.join(ensureBackupDirectory(), input.filename);
 
                 if (!fs.existsSync(backupPath)) {
                     throw new TRPCError({
@@ -259,7 +257,7 @@ export const backupRouter = router({
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
             try {
-                const backupPath = path.join(BACKUP_DIR, input.filename);
+                const backupPath = path.join(ensureBackupDirectory(), input.filename);
 
                 if (fs.existsSync(backupPath)) {
                     fs.unlinkSync(backupPath);

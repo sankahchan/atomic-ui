@@ -7,10 +7,14 @@ import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
 import { inferBackupFileKind } from '@/lib/backup-files';
+import {
+  BACKUP_DIR as CANONICAL_BACKUP_DIR,
+  ensureBackupDirectory as ensureCanonicalBackupDirectory,
+} from '@/lib/backup-storage';
 
 const execFileAsync = promisify(execFile);
 
-export const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
+export const BACKUP_DIR = CANONICAL_BACKUP_DIR;
 export const BACKUP_EXPECTED_TABLES = ['User', 'Server', 'AccessKey'] as const;
 
 export interface BackupVerificationSummary {
@@ -29,9 +33,7 @@ export interface BackupVerificationSummary {
 }
 
 function ensureBackupDirectory() {
-  if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  }
+  ensureCanonicalBackupDirectory();
 }
 
 function getBackupPath(filename: string) {
