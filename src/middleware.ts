@@ -203,7 +203,7 @@ export async function middleware(request: NextRequest) {
   const publicShareHost = getPublicShareHost();
   const requestHost = getRequestHost(request);
   const isServerActionRequest = request.headers.has('next-action');
-  const isRscRequest = request.headers.has('rsc');
+  const isRscRequest = request.headers.has('rsc') || request.nextUrl.searchParams.has('_rsc');
 
   if (
     (isServerActionRequest || isRscRequest) &&

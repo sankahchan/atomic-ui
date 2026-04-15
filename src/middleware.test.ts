@@ -34,7 +34,6 @@ test('stale RSC requests are rejected before Next.js handles them', async () => 
   const request = new NextRequest('https://example.com/dashboard?_rsc=abc', {
     headers: {
       cookie: `${APP_BUILD_COOKIE_NAME}=old-build`,
-      rsc: '1',
     },
   });
 
@@ -50,7 +49,6 @@ test('fresh RSC requests are not rejected by the stale-build guard', async () =>
   const request = new NextRequest('https://example.com/dashboard?_rsc=abc', {
     headers: {
       cookie: `${APP_BUILD_COOKIE_NAME}=new-build`,
-      rsc: '1',
     },
   });
 
@@ -66,7 +64,6 @@ test('client build header takes precedence over stale build cookie on RSC reques
     headers: {
       [CLIENT_BUILD_HEADER_NAME]: 'new-build',
       cookie: `${APP_BUILD_COOKIE_NAME}=old-build`,
-      rsc: '1',
     },
   });
 
