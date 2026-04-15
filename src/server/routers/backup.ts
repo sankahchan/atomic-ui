@@ -289,6 +289,7 @@ export const backupRouter = router({
                         '--unit',
                         restoreJob.unitName,
                         '--collect',
+                        '--on-active=5s',
                         '--property',
                         'Type=oneshot',
                         '--property',
