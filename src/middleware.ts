@@ -23,11 +23,10 @@ import { jwtVerify } from 'jose';
 import {
   APP_BUILD_COOKIE_NAME,
   CLIENT_BUILD_HEADER_NAME,
-  shouldRejectStaleServerAction,
+  getCurrentBuildId,
+  shouldRejectStaleBuildRequest,
 } from '@/lib/deploy-guard';
 import { getJwtSecretString } from '@/lib/session-secret';
-
-const CURRENT_BUILD_ID = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || '';
 
 /**
  * Routes that don't require authentication
@@ -175,11 +174,12 @@ function buildRedirectUrl(
 }
 
 function applyBuildCookie(response: NextResponse) {
-  if (!CURRENT_BUILD_ID) {
+  const currentBuildId = getCurrentBuildId();
+  if (!currentBuildId) {
     return response;
   }
 
-  response.cookies.set(APP_BUILD_COOKIE_NAME, CURRENT_BUILD_ID, {
+  response.cookies.set(APP_BUILD_COOKIE_NAME, currentBuildId, {
     path: '/',
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -202,25 +202,27 @@ export async function middleware(request: NextRequest) {
   const normalizedPath = normalizePathname(request, pathname);
   const publicShareHost = getPublicShareHost();
   const requestHost = getRequestHost(request);
-  const isServerActionRequest =
-    request.headers.has('next-action') || request.headers.has('Next-Action');
+  const isServerActionRequest = request.headers.has('next-action');
+  const isRscRequest = request.headers.has('rsc');
 
   if (
-    isServerActionRequest &&
-    shouldRejectStaleServerAction({
-      currentBuildId: CURRENT_BUILD_ID,
+    (isServerActionRequest || isRscRequest) &&
+    shouldRejectStaleBuildRequest({
+      currentBuildId: getCurrentBuildId(),
       headerBuildId: request.headers.get(CLIENT_BUILD_HEADER_NAME),
       cookieBuildId: request.cookies.get(APP_BUILD_COOKIE_NAME)?.value,
     })
   ) {
-    const response = NextResponse.json(
-      {
-        ok: false,
-        error: 'STALE_BUILD',
-        message: 'This tab is using an older deploy and needs to reload.',
-      },
-      { status: 409 }
-    );
+    const response = isServerActionRequest
+      ? NextResponse.json(
+        {
+          ok: false,
+          error: 'STALE_BUILD',
+          message: 'This tab is using an older deploy and needs to reload.',
+        },
+        { status: 409 }
+      )
+      : new NextResponse('STALE_BUILD', { status: 409 });
     response.headers.set('x-atomic-stale-build', '1');
     return applyBuildCookie(response);
   }

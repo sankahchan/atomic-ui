@@ -106,9 +106,11 @@ function buildFetchRequestWithClientBuild(
     return [input, init] as const;
   }
 
-  const request = new Request(input, init);
-  request.headers.set(CLIENT_BUILD_HEADER_NAME, buildId);
-  return [request] as const;
+  const headers = new Headers(
+    init?.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+  headers.set(CLIENT_BUILD_HEADER_NAME, buildId);
+  return [input, { ...init, headers }] as const;
 }
 
 function resolveSubmitMethod(form: HTMLFormElement, submitter: HTMLElement | null) {
@@ -229,10 +231,7 @@ export function DeployGuardProvider({
     window.fetch = async (...args) => {
       const buildId = initialBuildIdRef.current?.trim();
       const requestArgs = buildFetchRequestWithClientBuild(args[0], args[1], buildId);
-      const response =
-        requestArgs.length === 1
-          ? await originalFetch(requestArgs[0])
-          : await originalFetch(requestArgs[0], requestArgs[1]);
+      const response = await originalFetch(requestArgs[0], requestArgs[1]);
 
       if (
         !reloadTriggeredRef.current &&

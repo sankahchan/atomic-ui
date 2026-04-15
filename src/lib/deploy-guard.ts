@@ -5,6 +5,10 @@ export function normalizeBuildId(value: string | null | undefined) {
   return value?.trim() || '';
 }
 
+export function getCurrentBuildId() {
+  return normalizeBuildId(process.env.NEXT_PUBLIC_APP_VERSION);
+}
+
 export function resolveRequestBuildId(options: {
   headerBuildId?: string | null;
   cookieBuildId?: string | null;
@@ -17,7 +21,7 @@ export function resolveRequestBuildId(options: {
   return normalizeBuildId(options.cookieBuildId);
 }
 
-export function shouldRejectStaleServerAction(options: {
+export function shouldRejectStaleBuildRequest(options: {
   currentBuildId?: string | null;
   headerBuildId?: string | null;
   cookieBuildId?: string | null;
@@ -30,3 +34,5 @@ export function shouldRejectStaleServerAction(options: {
 
   return Boolean(currentBuildId && requestBuildId && currentBuildId !== requestBuildId);
 }
+
+export const shouldRejectStaleServerAction = shouldRejectStaleBuildRequest;
