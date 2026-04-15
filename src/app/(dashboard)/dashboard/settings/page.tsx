@@ -517,7 +517,7 @@ export default function SettingsPage() {
     onSuccess: async (result) => {
       toast({
         title: 'Restore scheduled',
-        description: `Atomic-UI will restart while restoring ${result.filename}. Safety backup: ${result.safetyBackupFilename}. You may need to sign in again after it finishes.`,
+        description: `Atomic-UI will restart in a few seconds while restoring ${result.filename}. Safety backup: ${result.safetyBackupFilename}. You may need to sign in again after it finishes.`,
       });
       await Promise.all([
         refetchBackups(),
