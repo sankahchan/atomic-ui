@@ -4,11 +4,11 @@ import path from 'path';
 import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasBackupManageScope } from '@/lib/admin-scope';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
-
-const BACKUP_DIR = path.join(process.cwd(), 'storage', 'backups');
+import { BACKUP_DIR, ensureBackupDirectory } from '@/lib/backup-storage';
 
 export async function GET(req: NextRequest) {
     try {
+        ensureBackupDirectory();
         const { user, response } = await requireAdminRouteScope({
             canAccess: hasBackupManageScope,
             forbiddenMessage: 'Only owner-scoped admins can download backup archives.',

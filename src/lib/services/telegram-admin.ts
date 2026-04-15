@@ -26,6 +26,7 @@ import {
   formatTelegramDateTime,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
+import { ensureBackupDirectory } from '@/lib/backup-storage';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
 import { formatBytes } from '@/lib/utils';
 
@@ -311,10 +312,7 @@ export async function handleBackupCommand(
   await sendTelegramMessage(botToken, chatId, ui.backupCreating);
 
   try {
-    const backupDir = path.join(process.cwd(), 'storage', 'backups');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
+    const backupDir = ensureBackupDirectory();
     const { filename, filePath } = await createRuntimeBackup(backupDir);
 
     const fileBuffer = fs.readFileSync(filePath);
