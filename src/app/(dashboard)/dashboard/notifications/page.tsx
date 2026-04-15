@@ -8928,13 +8928,13 @@ function KeyAlertsCard() {
       hasAlerts ? 'border-orange-500/25 bg-orange-500/[0.06]' : 'border-border/60'
     )}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-xl leading-tight sm:text-2xl">
             <AlertTriangle className={cn(
-              'w-5 h-5',
+              'h-5 w-5 shrink-0',
               hasAlerts ? 'text-orange-500' : 'text-muted-foreground'
             )} />
-            {t('notifications.key_alerts.title')}
+            <span className="min-w-0 break-words">{t('notifications.key_alerts.title')}</span>
           </CardTitle>
           <Button variant="ghost" size="icon" className="rounded-2xl" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
@@ -9948,16 +9948,16 @@ export default function NotificationsPage() {
               <TabsTrigger
                 key={workspace.id}
                 value={workspace.id}
-                className="min-h-[94px] w-full flex-col items-start justify-start gap-2 rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium text-foreground/90 dark:text-slate-200 dark:[&_.workspace-caption]:text-slate-400 dark:[&_.workspace-meta]:text-slate-500 data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:border-cyan-300/20 dark:data-[state=active]:bg-[linear-gradient(135deg,rgba(8,33,49,0.98),rgba(7,75,104,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:[&_.workspace-caption]:text-cyan-100/90 dark:data-[state=active]:[&_.workspace-meta]:text-cyan-200/85 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_34px_rgba(6,182,212,0.18)]"
+                className="min-h-[94px] w-full min-w-0 flex-col items-start justify-start gap-2 overflow-hidden whitespace-normal rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium text-foreground/90 dark:text-slate-200 dark:[&_.workspace-caption]:text-slate-400 dark:[&_.workspace-meta]:text-slate-500 data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:border-cyan-300/20 dark:data-[state=active]:bg-[linear-gradient(135deg,rgba(8,33,49,0.98),rgba(7,75,104,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:[&_.workspace-caption]:text-cyan-100/90 dark:data-[state=active]:[&_.workspace-meta]:text-cyan-200/85 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_34px_rgba(6,182,212,0.18)]"
               >
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <Icon className="h-4 w-4" />
-                  {workspace.title}
+                <span className="flex min-w-0 flex-wrap items-center gap-2 whitespace-normal text-sm font-semibold">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-words">{workspace.title}</span>
                 </span>
-                <span className="workspace-caption text-xs leading-5 text-muted-foreground">
+                <span className="workspace-caption min-w-0 whitespace-normal break-words text-xs leading-5 text-muted-foreground">
                   {workspace.description}
                 </span>
-                <span className="workspace-meta text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="workspace-meta min-w-0 whitespace-normal break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   {workspace.meta}
                 </span>
               </TabsTrigger>
