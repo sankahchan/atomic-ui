@@ -151,6 +151,18 @@ function mapRevenueSummary(revenue: Map<string, number>) {
   }));
 }
 
+function parseTelegramBotSettingsValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 function assertTelegramReviewScope(scope?: string | null) {
   if (!hasTelegramReviewManageScope(scope)) {
     throw new TRPCError({
@@ -389,14 +401,27 @@ export const telegramBotRouter = router({
     .input(telegramSettingsSchema)
     .mutation(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
+      const existingSettings = await db.settings.findUnique({
+        where: { key: 'telegram_bot' },
+        select: { value: true },
+      });
+      const existingConfig = parseTelegramBotSettingsValue(existingSettings?.value);
+      const nextValue = JSON.stringify({
+        ...input,
+        webhookSecretToken: getTelegramWebhookSecret(
+          input.botToken,
+          existingConfig?.webhookSecretToken,
+        ),
+      });
+
       await db.settings.upsert({
         where: { key: 'telegram_bot' },
         create: {
           key: 'telegram_bot',
-          value: JSON.stringify(input),
+          value: nextValue,
         },
         update: {
-          value: JSON.stringify(input),
+          value: nextValue,
         },
       });
 
@@ -1788,7 +1813,10 @@ export const telegramBotRouter = router({
           body: JSON.stringify({
             url: input.webhookUrl,
             allowed_updates: ['message', 'callback_query'],
-            secret_token: getTelegramWebhookSecret(parsed.botToken),
+            secret_token: getTelegramWebhookSecret(
+              parsed.botToken,
+              parsed.webhookSecretToken,
+            ),
           }),
         },
       );

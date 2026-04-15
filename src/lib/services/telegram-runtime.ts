@@ -1,4 +1,3 @@
-import { createHmac } from 'node:crypto';
 import { db } from '@/lib/db';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
@@ -18,6 +17,7 @@ import {
 } from '@/lib/services/telegram-domain-types';
 import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
+import { resolveTelegramWebhookSecret } from '@/lib/telegram-webhook-secret';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 export const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
@@ -439,15 +439,47 @@ export async function getTelegramBotUsername(
   return null;
 }
 
-export function getTelegramWebhookSecret(botToken: string) {
-  const configured = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  if (configured) {
-    return configured;
+export function getTelegramWebhookSecret(botToken: string, persistedSecret?: unknown) {
+  return resolveTelegramWebhookSecret({
+    botToken,
+    persistedSecret,
+    configuredSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+    jwtSecret: getJwtSecretString(),
+  });
+}
+
+async function ensurePersistedTelegramWebhookSecret(config: Record<string, unknown>) {
+  const botToken =
+    typeof config.botToken === 'string' && config.botToken.trim().length > 0
+      ? config.botToken
+      : null;
+  if (!botToken) {
+    return null;
   }
 
-  return createHmac('sha256', getJwtSecretString())
-    .update(`telegram-webhook:${botToken}`)
-    .digest('hex');
+  const storedSecret =
+    typeof config.webhookSecretToken === 'string' && config.webhookSecretToken.trim().length > 0
+      ? config.webhookSecretToken.trim()
+      : null;
+  const webhookSecretToken = getTelegramWebhookSecret(botToken, storedSecret);
+
+  if (!storedSecret) {
+    try {
+      await db.settings.update({
+        where: { key: 'telegram_bot' },
+        data: {
+          value: JSON.stringify({
+            ...config,
+            webhookSecretToken,
+          }),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to persist Telegram webhook secret:', error);
+    }
+  }
+
+  return webhookSecretToken;
 }
 
 export async function getTelegramConfig(): Promise<TelegramConfig | null> {
@@ -465,13 +497,15 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           config.localizedKeyNotFoundMessages,
         );
 
+        const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
+
         return {
           botToken: config.botToken,
           botUsername:
             typeof config.botUsername === 'string' && config.botUsername.trim()
               ? config.botUsername
               : undefined,
-          webhookSecretToken: getTelegramWebhookSecret(config.botToken),
+          webhookSecretToken: webhookSecretToken || getTelegramWebhookSecret(config.botToken),
           adminChatIds: Array.isArray(config.adminChatIds)
             ? config.adminChatIds.filter(
                 (value): value is string => typeof value === 'string' && value.trim().length > 0,
@@ -539,7 +573,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.botUsername === 'string' && config.botUsername.trim()
               ? config.botUsername
               : undefined,
-          webhookSecretToken: getTelegramWebhookSecret(botToken),
+          webhookSecretToken: getTelegramWebhookSecret(botToken, config.webhookSecretToken),
           adminChatIds,
           dailyDigestEnabled: false,
           dailyDigestHour: 9,
