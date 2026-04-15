@@ -6,6 +6,7 @@ import path from 'path';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
+import { inferBackupFileKind } from '@/lib/backup-files';
 
 const execFileAsync = promisify(execFile);
 
@@ -71,39 +72,50 @@ function readSqliteHeader(filePath: string) {
   }
 }
 
-export async function inspectBackupFile(filename: string): Promise<BackupVerificationSummary> {
-  ensureBackupDirectory();
+function buildFailedVerificationSummary(
+  filename: string,
+  fileSizeBytes: bigint,
+  fileHashSha256: string,
+  error: string,
+  details: Record<string, unknown>,
+): BackupVerificationSummary {
+  return {
+    filename,
+    status: 'FAILED',
+    triggeredBy: undefined,
+    fileSizeBytes,
+    fileHashSha256,
+    restoreReady: false,
+    integrityCheck: null,
+    tableCount: null,
+    accessKeyCount: null,
+    userCount: null,
+    error,
+    details,
+  };
+}
 
-  const filePath = getBackupPath(filename);
-  if (!fs.existsSync(filePath)) {
-    throw new Error('Backup file not found.');
-  }
-
-  const stats = fs.statSync(filePath);
-  const fileSizeBytes = BigInt(stats.size);
-  const fileHashSha256 = await hashFileSha256(filePath);
-  const header = readSqliteHeader(filePath);
-
+async function inspectSqliteBackupFile(
+  filename: string,
+  filePath: string,
+  fileSizeBytes: bigint,
+  fileHashSha256: string,
+  header: string,
+): Promise<BackupVerificationSummary> {
   const details: Record<string, unknown> = {
     filePath,
     header,
+    format: 'sqlite',
   };
 
   if (!header.startsWith('SQLite format 3')) {
-    return {
+    return buildFailedVerificationSummary(
       filename,
-      status: 'FAILED',
-      triggeredBy: undefined,
       fileSizeBytes,
       fileHashSha256,
-      restoreReady: false,
-      integrityCheck: null,
-      tableCount: null,
-      accessKeyCount: null,
-      userCount: null,
-      error: 'Backup file is not a valid SQLite database.',
+      'Backup file is not a valid SQLite database.',
       details,
-    };
+    );
   }
 
   try {
@@ -143,21 +155,115 @@ export async function inspectBackupFile(filename: string): Promise<BackupVerific
       details,
     };
   } catch (error) {
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      error instanceof Error ? error.message : 'Backup verification failed.',
+      details,
+    );
+  }
+}
+
+async function inspectPostgresDumpFile(
+  filename: string,
+  filePath: string,
+  fileSizeBytes: bigint,
+  fileHashSha256: string,
+  header: string,
+): Promise<BackupVerificationSummary> {
+  const details: Record<string, unknown> = {
+    filePath,
+    header,
+    format: 'postgres_dump',
+  };
+
+  if (!header.startsWith('PGDMP')) {
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      'Backup file is not a valid Postgres custom dump.',
+      details,
+    );
+  }
+
+  try {
+    const { stdout } = await execFileAsync('pg_restore', ['--list', filePath], {
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    const tocLines = stdout
+      .split('\n')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0 && !value.startsWith(';'));
+    const missingTables = BACKUP_EXPECTED_TABLES.filter((tableName) => {
+      const tablePattern = new RegExp(`\\b(?:TABLE|TABLE DATA)\\b[^\\n]*\\b${tableName}\\b`, 'i');
+      return !tablePattern.test(stdout);
+    });
+    const tableCount = tocLines.filter((line) => /\bTABLE\b/i.test(line) && !/\bTABLE DATA\b/i.test(line)).length;
+    const restoreReady = missingTables.length === 0;
+
+    details.missingTables = missingTables;
+    details.tocEntryCount = tocLines.length;
+
     return {
       filename,
-      status: 'FAILED',
+      status: restoreReady ? 'SUCCESS' : 'FAILED',
       triggeredBy: undefined,
       fileSizeBytes,
       fileHashSha256,
-      restoreReady: false,
-      integrityCheck: null,
-      tableCount: null,
+      restoreReady,
+      integrityCheck: 'pg_restore list ok',
+      tableCount,
       accessKeyCount: null,
       userCount: null,
-      error: error instanceof Error ? error.message : 'Backup verification failed.',
+      error: restoreReady ? null : `Missing expected tables: ${missingTables.join(', ')}`,
       details,
     };
+  } catch (error) {
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      error instanceof Error ? error.message : 'pg_restore failed while inspecting the dump.',
+      details,
+    );
   }
+}
+
+export async function inspectBackupFile(filename: string): Promise<BackupVerificationSummary> {
+  ensureBackupDirectory();
+
+  const filePath = getBackupPath(filename);
+  if (!fs.existsSync(filePath)) {
+    throw new Error('Backup file not found.');
+  }
+
+  const stats = fs.statSync(filePath);
+  const fileSizeBytes = BigInt(stats.size);
+  const fileHashSha256 = await hashFileSha256(filePath);
+  const header = readSqliteHeader(filePath);
+  const fileKind = inferBackupFileKind(filename, header);
+
+  if (fileKind === 'sqlite') {
+    return inspectSqliteBackupFile(filename, filePath, fileSizeBytes, fileHashSha256, header);
+  }
+
+  if (fileKind === 'postgres_dump') {
+    return inspectPostgresDumpFile(filename, filePath, fileSizeBytes, fileHashSha256, header);
+  }
+
+  return buildFailedVerificationSummary(
+    filename,
+    fileSizeBytes,
+    fileHashSha256,
+    'Backup file format is not supported for verification.',
+    {
+      filePath,
+      header,
+      format: fileKind,
+    },
+  );
 }
 
 export async function recordBackupVerification(
@@ -234,7 +340,7 @@ export async function verifyLatestBackups(options?: {
 
   const files = fs.existsSync(BACKUP_DIR)
     ? fs.readdirSync(BACKUP_DIR)
-        .filter((file) => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak'))
+        .filter((file) => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak') || file.endsWith('.dump') || file.endsWith('.sql'))
         .map((file) => ({
           filename: file,
           createdAt: fs.statSync(path.join(BACKUP_DIR, file)).mtime,

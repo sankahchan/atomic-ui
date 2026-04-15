@@ -6,24 +6,13 @@ import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/db';
 import { sendTelegramDocument } from '@/lib/services/telegram-runtime';
 import { logger } from '@/lib/logger';
-import { resolveSqliteDbPath } from '@/lib/sqlite-path';
 import { writeAuditLog } from '@/lib/audit';
 import { BACKUP_DIR, verifyBackupFile } from '@/lib/services/backup-verification';
-import { isSqliteDatabaseUrl } from '@/lib/database-engine';
+import { createRuntimeBackup } from '@/lib/services/runtime-backup';
+import { buildOfflineRestoreCommand } from '@/lib/backup-files';
 
 if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
-
-// Helper to get DB path
-function getDbPath() {
-    if (!isSqliteDatabaseUrl()) {
-        throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'Dashboard backup create/restore currently supports SQLite file databases only. Use the Postgres cutover scripts for production database migration.',
-        });
-    }
-    return resolveSqliteDbPath();
 }
 
 function parseVerificationDetails(details: string | null) {
@@ -109,21 +98,9 @@ export const backupRouter = router({
      */
     create: adminProcedure.mutation(async ({ ctx }) => {
         try {
-            const dbPath = getDbPath();
-
-            if (!fs.existsSync(dbPath)) {
-                throw new TRPCError({
-                    code: 'NOT_FOUND',
-                    message: 'Database file not found',
-                });
-            }
-
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const backupFilename = `backup-${timestamp}.db`;
-            const backupPath = path.join(BACKUP_DIR, backupFilename);
-
-            // Copy file
-            fs.copyFileSync(dbPath, backupPath);
+            const createdBackup = await createRuntimeBackup(BACKUP_DIR);
+            const backupFilename = createdBackup.filename;
+            const backupPath = createdBackup.filePath;
 
             // Send to Telegram Admins (Fire and forget, or await safely)
             try {
@@ -178,9 +155,13 @@ export const backupRouter = router({
             return {
                 success: true,
                 filename: backupFilename,
+                engine: createdBackup.engine,
                 verification,
             };
         } catch (error: any) {
+            if (error instanceof TRPCError) {
+                throw error;
+            }
             logger.error('Failed to create backup:', error);
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
@@ -251,13 +232,13 @@ export const backupRouter = router({
                     details: {
                         filename: input.filename,
                         verificationStatus: verification.status,
-                        restoreCommand: `npm run restore:sqlite -- --backup ${backupPath}`,
+                        restoreCommand: buildOfflineRestoreCommand(input.filename, backupPath),
                     },
                 });
 
                 throw new TRPCError({
                     code: 'PRECONDITION_FAILED',
-                    message: `Dashboard restore is disabled while the app is running. Stop the service first, then run: npm run restore:sqlite -- --backup ${backupPath}`,
+                    message: `Dashboard restore is disabled while the app is running. Stop the service first, then run: ${buildOfflineRestoreCommand(input.filename, backupPath)}`,
                 });
             } catch (error: any) {
                 if (error instanceof TRPCError) {

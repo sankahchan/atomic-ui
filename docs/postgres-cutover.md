@@ -114,6 +114,6 @@ npm run smoke -- --base-url=http://127.0.0.1:2053/your-panel-path --email=admin 
 
 ## Notes
 
-- Dashboard backup and restore APIs remain SQLite-file oriented. For Postgres operations, use the cutover scripts and database-native backups such as `pg_dump`.
+- Dashboard backup creation can emit Postgres `.dump` archives from the settings workspace, but restore is still offline-only. Use `pg_restore --dbname "$DATABASE_URL" /absolute/path/to/backup.dump` when restoring Postgres backups.
 - Keep the SQLite safety backup until you have completed smoke tests and at least one clean production backup on Postgres.
 - Run the export and import from the same Git commit so the manifest model order and Prisma schema stay aligned.

@@ -203,11 +203,18 @@ function Header({
       <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
         <div className="flex items-center gap-3 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
-            <Atom className="h-5 w-5 text-primary" />
-            <div className="leading-none">
-              <span className="block text-sm font-semibold">Atomic-UI</span>
-              <span className="block pt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Frosted</span>
+          <Link
+            href="/dashboard"
+            className="flex min-w-fit shrink-0 items-center gap-2 rounded-[1.1rem] border border-border/70 bg-background/70 px-2.5 py-1.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+          >
+            <Atom className="h-[1.125rem] w-[1.125rem] shrink-0 text-primary" />
+            <div className="min-w-0 leading-none">
+              <span className="block whitespace-nowrap text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+                Atomic-UI
+              </span>
+              <span className="block whitespace-nowrap pt-1 text-[9px] uppercase tracking-[0.24em] text-muted-foreground">
+                Frosted
+              </span>
             </div>
           </Link>
         </div>

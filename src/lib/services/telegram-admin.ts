@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import archiver from 'archiver';
 import si from 'systeminformation';
 import {
   hasFinanceManageScope,
@@ -27,6 +26,7 @@ import {
   formatTelegramDateTime,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
+import { createRuntimeBackup } from '@/lib/services/runtime-backup';
 import { formatBytes } from '@/lib/utils';
 
 export {
@@ -315,32 +315,7 @@ export async function handleBackupCommand(
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `backup-${timestamp}.zip`;
-    const filePath = path.join(backupDir, filename);
-    const output = fs.createWriteStream(filePath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
-
-    await new Promise<void>((resolve, reject) => {
-      output.on('close', () => resolve());
-      archive.on('error', reject);
-      archive.pipe(output);
-
-      const dbUrl = process.env.DATABASE_URL;
-      if (dbUrl && dbUrl.includes('file:')) {
-        const relativePath = dbUrl.replace('file:', '');
-        const dbPath = path.isAbsolute(relativePath)
-          ? relativePath
-          : path.resolve(process.cwd(), 'prisma', relativePath.replace(/^\.\//, ''));
-
-        if (fs.existsSync(dbPath)) {
-          archive.file(dbPath, { name: 'atomic-ui.db' });
-        }
-      }
-
-      archive.finalize();
-    });
+    const { filename, filePath } = await createRuntimeBackup(backupDir);
 
     const fileBuffer = fs.readFileSync(filePath);
     await sendTelegramDocument(

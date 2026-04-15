@@ -3,6 +3,7 @@ import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasRestoreManageScope } from '@/lib/admin-scope';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 import { isSqliteDatabaseUrl } from '@/lib/database-engine';
+import { buildOfflineRestoreCommand } from '@/lib/backup-files';
 import { isMultipartFormDataContentType } from '@/lib/services/restore-upload';
 
 export async function POST(req: NextRequest) {
@@ -22,10 +23,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const restoreCommand = 'npm run restore:sqlite -- --backup /absolute/path/to/backup.zip';
+    const restoreCommand = buildOfflineRestoreCommand('backup.db', '/absolute/path/to/backup.db');
+    const postgresRestoreCommand = buildOfflineRestoreCommand('backup.dump', '/absolute/path/to/backup.dump');
     const errorMessage = isSqliteDatabaseUrl()
       ? `Backup restore is disabled from the running web app. Stop the service first, then run: ${restoreCommand}`
-      : 'Backup restore is disabled from the running web app for Postgres environments. Use pg_restore or a controlled cutover/restore workflow instead.';
+      : `Backup restore is disabled from the running web app for Postgres environments. Stop the service first, then run: ${postgresRestoreCommand}`;
 
     await writeAuditLog({
       userId: user.id,
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
       entity: 'BACKUP',
       details: {
         databaseEngine: isSqliteDatabaseUrl() ? 'sqlite' : 'postgres',
-        restoreCommand: isSqliteDatabaseUrl() ? restoreCommand : null,
+        restoreCommand: isSqliteDatabaseUrl() ? restoreCommand : postgresRestoreCommand,
       },
     });
 

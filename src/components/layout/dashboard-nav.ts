@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 
 export const primaryDashboardNavItems = [
-  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { href: '/dashboard/servers', icon: Server, labelKey: 'nav.servers' },
-  { href: '/dashboard/keys', icon: Key, labelKey: 'nav.keys' },
-  { href: '/dashboard/dynamic-keys', icon: KeyRound, labelKey: 'nav.dynamic_keys' },
-  { href: '/dashboard/settings', icon: Settings, labelKey: 'nav.settings' },
+  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard', mobileLabelKey: 'nav.mobile_dashboard' },
+  { href: '/dashboard/servers', icon: Server, labelKey: 'nav.servers', mobileLabelKey: 'nav.mobile_servers' },
+  { href: '/dashboard/keys', icon: Key, labelKey: 'nav.keys', mobileLabelKey: 'nav.mobile_keys' },
+  { href: '/dashboard/dynamic-keys', icon: KeyRound, labelKey: 'nav.dynamic_keys', mobileLabelKey: 'nav.mobile_dynamic_keys' },
+  { href: '/dashboard/settings', icon: Settings, labelKey: 'nav.settings', mobileLabelKey: 'nav.mobile_settings' },
 ] as const;
 
 export const adminToolNavItems = [
