@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         if (!isSqliteDatabaseUrl()) {
             return NextResponse.json(
                 {
-                    error: 'File-download backups currently support SQLite only. Use the Postgres cutover scripts or pg_dump for Postgres environments.',
+                    error: 'Zip download backups currently support SQLite only. For Postgres, use Dashboard Settings -> Create Backup to generate a .dump file, then download it from the backup list.',
                 },
                 { status: 409 },
             );

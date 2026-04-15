@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Download, ExternalLink, ShieldCheck, Terminal } from "lucide-react";
+import { buildOfflineRestoreCommand } from "@/lib/backup-files";
 import { withBasePath } from "@/lib/base-path";
 
 export function BackupSettings() {
     const { toast } = useToast();
-    const offlineRestoreCommand = "npm run restore:sqlite -- --backup /absolute/path/to/backup.zip";
+    const sqliteRestoreCommand = buildOfflineRestoreCommand('backup.db', '/absolute/path/to/backup.db');
+    const postgresRestoreCommand = buildOfflineRestoreCommand('backup.dump', '/absolute/path/to/backup.dump');
 
     const handleDownload = () => {
         window.location.href = withBasePath('/api/backup');
@@ -22,7 +24,7 @@ export function BackupSettings() {
     const handleShowOfflineRestore = () => {
         toast({
             title: "Restore runs offline only",
-            description: `Stop atomic-ui.service first, then run: ${offlineRestoreCommand}`,
+            description: `SQLite: ${sqliteRestoreCommand} | Postgres: ${postgresRestoreCommand}`,
             variant: "destructive",
         });
     };
@@ -80,13 +82,14 @@ export function BackupSettings() {
                             Stop the service first, then run the CLI restore command on the server.
                         </span>
                         <span className="block mt-2 text-xs text-muted-foreground">
-                            SQLite restores accept a backup archive or copied database file. The safer operator path is:
+                            Use the command that matches the backup format you created in the dashboard settings workspace:
                         </span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="rounded-lg border bg-background/70 p-4 font-mono text-xs sm:text-sm">
-                        {offlineRestoreCommand}
+                    <div className="rounded-lg border bg-background/70 p-4 font-mono text-xs sm:text-sm space-y-2">
+                        <div>{sqliteRestoreCommand}</div>
+                        <div>{postgresRestoreCommand}</div>
                     </div>
                     <p className="text-sm text-muted-foreground">
                         Use the dashboard backup list to download the file first, stop

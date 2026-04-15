@@ -25,7 +25,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'relative overflow-hidden rounded-[1.9rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.34))] text-card-foreground shadow-[0_30px_80px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-[28px] [-webkit-backdrop-filter:blur(28px)] transition-all duration-200 dark:border-[rgba(214,227,255,0.14)] dark:bg-[radial-gradient(circle_at_top_right,rgba(118,172,255,0.14),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,193,132,0.08),transparent_18%),linear-gradient(180deg,rgba(12,18,31,0.66),rgba(8,12,22,0.42))] dark:shadow-[0_34px_90px_rgba(0,3,12,0.48),inset_0_1px_0_rgba(255,255,255,0.08)]',
+      'relative overflow-hidden rounded-[1.9rem] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.34))] text-card-foreground shadow-[0_20px_48px_rgba(148,163,184,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-[14px] [-webkit-backdrop-filter:blur(14px)] transition-all duration-200 md:shadow-[0_30px_80px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.72)] md:backdrop-blur-[28px] md:[-webkit-backdrop-filter:blur(28px)] dark:border-[rgba(214,227,255,0.14)] dark:bg-[radial-gradient(circle_at_top_right,rgba(118,172,255,0.14),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,193,132,0.08),transparent_18%),linear-gradient(180deg,rgba(12,18,31,0.66),rgba(8,12,22,0.42))] dark:shadow-[0_22px_52px_rgba(0,3,12,0.32),inset_0_1px_0_rgba(255,255,255,0.08)] md:dark:shadow-[0_34px_90px_rgba(0,3,12,0.48),inset_0_1px_0_rgba(255,255,255,0.08)]',
       className
     )}
     {...props}

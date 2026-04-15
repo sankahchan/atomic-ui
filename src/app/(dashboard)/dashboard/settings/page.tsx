@@ -29,6 +29,7 @@ import { APP_RELEASE_VERSION } from '@/lib/app-version';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
 import { withBasePath } from '@/lib/base-path';
+import { buildOfflineRestoreCommand } from '@/lib/backup-files';
 import { BackButton } from '@/components/ui/back-button';
 import { settingsShortcutItems } from '@/components/layout/dashboard-nav';
 import { cn } from '@/lib/utils';
@@ -566,9 +567,10 @@ export default function SettingsPage() {
   };
 
   const handleRestoreBackup = (filename: string) => {
+    const restoreCommand = buildOfflineRestoreCommand(filename, `/absolute/path/to/${filename}`);
     toast({
       title: 'Restore runs offline only',
-      description: `Stop the service first, then run: npm run restore:sqlite -- --backup /absolute/path/to/${filename}`,
+      description: `Stop the service first, then run: ${restoreCommand}`,
       variant: 'destructive',
     });
   };
