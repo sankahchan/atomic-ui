@@ -8,6 +8,14 @@ import {
 } from '@/lib/subscription-links';
 import { evaluateTelegramOrderRefundEligibility } from '@/lib/services/telegram-finance';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
+import { buildTelegramCommerceViewCallbackData } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+  buildTelegramCommercePagerRow,
+  paginateTelegramCommerce,
+  truncateTelegramCommerceButtonLabel,
+} from '@/lib/services/telegram-commerce-ui';
 import {
   buildTelegramOrderTimelineChipRow,
   buildTelegramOrderNextStepText,
@@ -66,6 +74,127 @@ function buildTelegramOrdersKeyboard(locale: SupportedLocale, filter: TelegramOr
       ],
     ],
   };
+}
+
+function buildTelegramOrdersCommerceKeyboard(input: {
+  locale: SupportedLocale;
+  filter: TelegramOrdersFilter;
+  orders: TelegramUserOrder[];
+  page: number;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const pagination = paginateTelegramCommerce(input.orders, input.page);
+  const option = (targetFilter: TelegramOrdersFilter, label: string) => ({
+    text: input.filter === targetFilter ? `• ${label}` : label,
+    callback_data: buildTelegramCommerceViewCallbackData(
+      'orders',
+      'filter',
+      targetFilter.toLowerCase(),
+      '1',
+    ),
+  });
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      option('ALL', isMyanmar ? 'အားလုံး' : 'All'),
+      option('ACTION', isMyanmar ? 'လုပ်ဆောင်ရန်' : 'Need action'),
+    ],
+    [
+      option('REVIEW', isMyanmar ? 'စစ်ဆေးနေ' : 'Under review'),
+      option('COMPLETED', isMyanmar ? 'ပြီးဆုံး' : 'Completed'),
+    ],
+  ];
+
+  for (const order of pagination.pageItems) {
+    rows.push([{
+      text: truncateTelegramCommerceButtonLabel(
+        `${input.locale === 'my' ? 'Open' : 'Open'} ${order.orderCode}`,
+        36,
+      ),
+      callback_data: buildTelegramCommerceViewCallbackData(
+        'orders',
+        'detail',
+        order.id,
+        `${input.filter.toLowerCase()},${pagination.page}`,
+      ),
+    }]);
+  }
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'orders',
+    page: pagination.page,
+    totalItems: input.orders.length,
+    secondary: input.filter.toLowerCase(),
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+export function buildTelegramOrdersSummaryMessage(input: {
+  locale: SupportedLocale;
+  filter: TelegramOrdersFilter;
+  attentionOrders: TelegramUserOrder[];
+  reviewOrders: TelegramUserOrder[];
+  completedOrders: TelegramUserOrder[];
+  filteredOrders: TelegramUserOrder[];
+  page: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.filteredOrders, input.page);
+  const cards = pagination.pageItems.map((order) =>
+    buildTelegramCommerceCard(
+      `${formatTelegramOrderStatusIcon(order.status)} <b>${escapeHtml(order.orderCode)}</b>`,
+      [
+        escapeHtml(
+          formatTelegramOrderStateLine({
+            orderCode: order.orderCode,
+            planName: order.planName,
+            planCode: order.planCode,
+            durationMonths: order.durationMonths,
+            durationDays: order.durationDays,
+            requestedName: order.requestedName,
+          }),
+        ),
+        `${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}`,
+        buildTelegramOrderTimelineChipRow({ order }),
+        buildTelegramOrderNextStepText(order, ui)
+          ? `${ui.orderNextStepLabel}: ${escapeHtml(buildTelegramOrderNextStepText(order, ui) || '')}`
+          : null,
+      ],
+    ),
+  );
+
+  return buildTelegramCommerceMessage({
+    title: ui.ordersTitle,
+    statsLine: `${input.attentionOrders.length} need action • ${input.reviewOrders.length} under review • ${input.completedOrders.length} completed`,
+    intro:
+      input.locale === 'my'
+        ? 'Filter ကိုပြောင်းပြီး order summary ကို ဖတ်နိုင်ပြီး Open ကိုနှိပ်ပြီး detail card ကိုဖွင့်နိုင်သည်။'
+        : 'Use the filters for a short order summary, then tap Open for the full status card.',
+    cards: cards.length
+      ? cards
+      : [
+          input.filter === 'ACTION'
+            ? input.locale === 'my'
+              ? '📭 လက်ရှိလုပ်ဆောင်ရန်လိုသော order မရှိသေးပါ။'
+              : '📭 There are no orders that need action right now.'
+            : input.filter === 'REVIEW'
+              ? input.locale === 'my'
+                ? '📭 လက်ရှိ review စောင့်နေသော order မရှိသေးပါ။'
+                : '📭 There are no orders under review right now.'
+              : input.filter === 'COMPLETED'
+                ? input.locale === 'my'
+                  ? '📭 လတ်တလော completed order မရှိသေးပါ။'
+                  : '📭 There are no completed orders yet.'
+                : input.locale === 'my'
+                  ? '📭 Recent order မရှိသေးပါ။'
+                  : '📭 There are no recent orders yet.',
+        ],
+    footerLines: [ui.ordersHint],
+  });
 }
 
 function buildTelegramOrderProgressSummary(input: {
@@ -154,7 +283,7 @@ export async function findTelegramOrderForUser(input: {
   });
 }
 
-export type TelegramUserOrder = Awaited<ReturnType<typeof findTelegramOrderForUser>>;
+export type TelegramUserOrder = NonNullable<Awaited<ReturnType<typeof findTelegramOrderForUser>>>;
 
 export async function listRefundEligibleTelegramOrders(
   chatId: number,
@@ -614,93 +743,125 @@ export async function handleOrdersCommand(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
-  const lines = [
-    ui.ordersTitle,
-    '',
-    `${attentionOrders.length} need action • ${reviewOrders.length} under review • ${completedOrders.length} completed`,
-    '',
-  ];
-  const sections =
-    filter === 'ACTION'
-      ? ([[ui.ordersAttentionTitle, attentionOrders]] as const)
-      : filter === 'REVIEW'
-        ? ([[ui.ordersReviewTitle, reviewOrders]] as const)
-        : filter === 'COMPLETED'
-          ? ([[ui.ordersCompletedTitle, completedOrders]] as const)
-          : ([
-              [ui.ordersAttentionTitle, attentionOrders],
-              [ui.ordersReviewTitle, reviewOrders],
-              [ui.ordersCompletedTitle, completedOrders],
-            ] as const);
-
-  for (const [title, sectionOrders] of sections) {
-    if (sectionOrders.length === 0) {
-      continue;
-    }
-
-    lines.push(title);
-    for (const order of sectionOrders) {
-      const nextStep = buildTelegramOrderNextStepText(order, ui);
-      lines.push(
-        `${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(
-          formatTelegramOrderStateLine({
-            orderCode: order.orderCode,
-            planName: order.planName,
-            planCode: order.planCode,
-            durationMonths: order.durationMonths,
-            durationDays: order.durationDays,
-            requestedName: order.requestedName,
-          }),
-        )}`,
-      );
-      lines.push(
-        `  ${ui.statusLineLabel}: ${escapeHtml(
-          formatTelegramOrderStatusLabel(order.status, ui),
-        )} • ${escapeHtml(formatTelegramDateTime(order.createdAt, input.locale))}`,
-      );
-      lines.push(`  ${buildTelegramOrderTimelineChipRow({ order })}`);
-      if (nextStep) {
-        lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (filteredOrders.length === 0) {
-    lines.push(
-      filter === 'ACTION'
-        ? input.locale === 'my'
-          ? '📭 လက်ရှိလုပ်ဆောင်ရန်လိုသော order မရှိသေးပါ။'
-          : '📭 There are no orders that need action right now.'
-        : filter === 'REVIEW'
-          ? input.locale === 'my'
-            ? '📭 လက်ရှိ review စောင့်နေသော order မရှိသေးပါ။'
-            : '📭 There are no orders under review right now.'
-          : input.locale === 'my'
-            ? '📭 လတ်တလော completed order မရှိသေးပါ။'
-            : '📭 There are no completed orders yet.',
-      '',
-    );
-  }
-
-  lines.push(ui.ordersHint);
-  const summaryMessage = lines.join('\n');
+  const summaryMessage = buildTelegramOrdersSummaryMessage({
+    locale: input.locale,
+    filter,
+    attentionOrders,
+    reviewOrders,
+    completedOrders,
+    filteredOrders,
+    page: 1,
+  });
   const sentSummary = await input.sendTelegramMessage(input.botToken, input.chatId, summaryMessage, {
-    replyMarkup: buildTelegramOrdersKeyboard(input.locale, filter),
+    replyMarkup: buildTelegramOrdersCommerceKeyboard({
+      locale: input.locale,
+      filter,
+      orders: filteredOrders,
+      page: 1,
+    }),
   });
 
-  const latestOrder = filteredOrders[0] || attentionOrders[0] || reviewOrders[0] || orders[0];
-  if (latestOrder) {
+  return sentSummary ? null : summaryMessage;
+}
+
+export async function handleTelegramOrdersCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail' | 'filter';
+  primary?: string | null;
+  secondary?: string | null;
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+  sendTelegramOrderStatusCard: (input: {
+    botToken: string;
+    chatId: number;
+    order: TelegramUserOrder;
+    locale: SupportedLocale;
+    appendLatestHint?: boolean;
+  }) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const orders = await listTelegramOrdersForUser(input.chatId, input.telegramUserId, 12);
+  if (!orders.length) {
+    return ui.ordersEmpty;
+  }
+
+  const filter =
+    input.action === 'filter'
+      ? parseTelegramOrdersFilter(input.primary)
+      : parseTelegramOrdersFilter(input.secondary);
+  const pageSeed =
+    input.action === 'filter'
+      ? input.secondary
+      : input.action === 'detail'
+        ? input.secondary?.split(',')[1]
+        : input.primary;
+  const page = Number.parseInt(pageSeed || '1', 10) || 1;
+  const attentionOrders = orders.filter((order) =>
+    [
+      'AWAITING_KEY_SELECTION',
+      'AWAITING_PLAN',
+      'AWAITING_MONTHS',
+      'AWAITING_SERVER_SELECTION',
+      'AWAITING_PAYMENT_METHOD',
+      'AWAITING_PAYMENT_PROOF',
+      'REJECTED',
+      'CANCELLED',
+    ].includes(order.status),
+  );
+  const reviewOrders = orders.filter((order) => ['PENDING_REVIEW', 'APPROVED'].includes(order.status));
+  const completedOrders = orders.filter((order) => order.status === 'FULFILLED');
+  const filteredOrders =
+    filter === 'ACTION'
+      ? attentionOrders
+      : filter === 'REVIEW'
+        ? reviewOrders
+        : filter === 'COMPLETED'
+          ? completedOrders
+          : orders;
+
+  if (input.action === 'detail') {
+    const order = orders.find((candidate) => candidate.id === input.primary);
+    if (!order) {
+      return ui.orderStatusLatestNotFound;
+    }
     await input.sendTelegramOrderStatusCard({
       botToken: input.botToken,
       chatId: input.chatId,
-      order: latestOrder,
+      order,
       locale: input.locale,
-      appendLatestHint: true,
     });
+    return null;
   }
 
-  return sentSummary ? null : summaryMessage;
+  const message = buildTelegramOrdersSummaryMessage({
+    locale: input.locale,
+    filter,
+    attentionOrders,
+    reviewOrders,
+    completedOrders,
+    filteredOrders,
+    page,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramOrdersCommerceKeyboard({
+      locale: input.locale,
+      filter,
+      orders: filteredOrders,
+      page,
+    }),
+  });
+  return sent ? null : message;
 }
 
 export async function handleOrderStatusCommand(input: {

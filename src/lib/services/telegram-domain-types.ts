@@ -98,6 +98,15 @@ export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
 export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
+export type TelegramCommerceViewSection =
+  | 'buy'
+  | 'keys'
+  | 'premium'
+  | 'premiumregion'
+  | 'supportstatus'
+  | 'orders'
+  | 'renew';
+export type TelegramCommerceViewAction = 'home' | 'page' | 'detail' | 'compare' | 'filter';
 
 export type TelegramAdminMenuAction =
   | 'home'
@@ -208,6 +217,13 @@ export type TelegramNotificationPreferenceCallbackPayload = {
 export type TelegramMenuCallbackPayload = {
   section: TelegramMenuSection;
   action: string;
+};
+
+export type TelegramCommerceViewCallbackPayload = {
+  section: TelegramCommerceViewSection;
+  action: TelegramCommerceViewAction;
+  primary: string | null;
+  secondary: string | null;
 };
 
 export type TelegramSupportQueueCallbackPayload = {
