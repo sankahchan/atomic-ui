@@ -42,7 +42,7 @@ export function ScrollToTop() {
       size="icon"
       onClick={scrollToTop}
       className={cn(
-        'fixed bottom-24 right-4 z-50 h-12 w-12 rounded-full shadow-lg',
+        'fixed bottom-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1rem)] right-4 z-50 h-10 w-10 rounded-full shadow-lg',
         'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] [-webkit-backdrop-filter:blur(var(--glass-blur))] border border-[var(--glass-border)] text-primary hover:bg-[var(--glass-bg-medium)]',
         'transition-all duration-300 ease-in-out',
         'md:bottom-6 md:right-6 md:h-10 md:w-10',

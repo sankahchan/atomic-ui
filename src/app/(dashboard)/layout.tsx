@@ -199,23 +199,18 @@ function Header({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4 md:px-6 lg:px-8 lg:pt-6">
+    <header className="sticky top-0 z-40 px-3 pt-[calc(var(--safe-area-top)+0.55rem)] sm:px-4 md:px-6 lg:px-8 lg:pt-6">
       <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
-        <div className="flex items-center gap-3 lg:hidden">
+        <div className="flex min-w-0 items-center gap-2 lg:hidden">
           <Link
             href="/dashboard"
-            className="flex min-w-fit shrink-0 items-center gap-2 rounded-[1.1rem] border border-border/70 bg-background/70 px-2.5 py-1.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+            className="flex h-9 min-w-0 shrink items-center gap-2 rounded-full border border-border/70 bg-background/70 px-2.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
           >
-            <Atom className="h-[1.125rem] w-[1.125rem] shrink-0 text-primary" />
-            <div className="min-w-0 leading-none">
-              <span className="block whitespace-nowrap text-[13px] font-semibold tracking-[-0.01em] text-foreground">
-                Atomic-UI
-              </span>
-              <span className="block whitespace-nowrap pt-1 text-[9px] uppercase tracking-[0.24em] text-muted-foreground">
-                Frosted
-              </span>
-            </div>
+            <Atom className="h-4 w-4 shrink-0 text-primary" />
+            <span className="block max-w-[4.9rem] truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+              Atomic-UI
+            </span>
           </Link>
         </div>
 
@@ -235,7 +230,7 @@ function Header({
             variant="ghost"
             onClick={onOpenTools}
             title={t('nav.tools')}
-            className="h-10 rounded-full border border-border/70 bg-background/70 px-3 text-muted-foreground shadow-sm hover:text-foreground dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-300 dark:hover:text-cyan-100"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/70 px-0 text-muted-foreground shadow-sm hover:text-foreground sm:h-10 sm:w-auto sm:px-3 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-300 dark:hover:text-cyan-100"
           >
             <LayoutGrid className="h-4 w-4" />
             <span className="ml-2 hidden text-sm font-medium sm:inline">
@@ -245,14 +240,14 @@ function Header({
 
           {mounted && (
             <>
-              <LanguageSelector />
+              <LanguageSelector className="h-9 px-2 sm:h-10 sm:px-2.5 md:px-3" />
               <NotificationBell />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                className="h-9 w-9 rounded-full border border-border/70 bg-background/70 shadow-sm sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
               >
                 {theme === 'dark' ? (
                   <Sun className="h-4 w-4" />
@@ -280,7 +275,7 @@ function Header({
             size="icon"
             onClick={onLogout}
             title="Logout"
-            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -404,7 +399,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden">
+    <div className="ops-mobile-root min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
       {/* Animated gradient mesh background */}
       <GradientMeshBackground />
 
@@ -430,7 +425,7 @@ export default function DashboardLayout({
         />
 
         {/* Page content — extra bottom padding on mobile for tab bar */}
-        <main className="flex-1 px-4 pb-24 pt-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
+        <main className="flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
           <div className="ops-page">
             {children}
           </div>
