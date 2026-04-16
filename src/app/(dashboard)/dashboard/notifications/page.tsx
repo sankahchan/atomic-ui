@@ -9870,13 +9870,16 @@ export default function NotificationsPage() {
 
           <div>
             <div className="ops-hero-aside space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
                   <p className="ops-section-heading">Command rail</p>
                   <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
                   <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
                 </div>
-                <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                <Badge
+                  variant="outline"
+                  className="h-auto w-fit max-w-full self-start whitespace-normal break-words rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 leading-tight dark:text-cyan-200 sm:self-auto"
+                >
                   {workspaces.length} workspaces
                 </Badge>
               </div>
@@ -9917,7 +9920,7 @@ export default function NotificationsPage() {
                       updateWorkspaceUrlState(workspace.id);
                     }}
                     className={cn(
-                      'ops-pill transition-colors',
+                      'ops-pill max-w-full justify-start text-left whitespace-normal break-words transition-colors',
                       activeWorkspace === workspace.id
                         ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200'
                         : 'text-muted-foreground'
