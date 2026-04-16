@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramAdminKeyCallbackData,
+  buildTelegramCommerceViewCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramOrderReviewCallbackData,
   buildTelegramSupportQueueCallbackData,
   getCommandKeyboard,
   parseTelegramAdminKeyCallbackData,
+  parseTelegramCommerceViewCallbackData,
   normalizeTelegramReplyKeyboardCommand,
   parseTelegramMenuCallbackData,
   parseTelegramOrderReviewCallbackData,
@@ -122,6 +124,44 @@ test('telegram menu callbacks support admin and user filters', () => {
     {
       section: 'support',
       action: 'server',
+    },
+  );
+});
+
+test('telegram commerce view callbacks round-trip compact payloads', () => {
+  assert.deepEqual(
+    parseTelegramCommerceViewCallbackData(
+      buildTelegramCommerceViewCallbackData('buy', 'page', '2'),
+    ),
+    {
+      section: 'buy',
+      action: 'page',
+      primary: '2',
+      secondary: null,
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramCommerceViewCallbackData(
+      buildTelegramCommerceViewCallbackData('orders', 'filter', 'review', '2'),
+    ),
+    {
+      section: 'orders',
+      action: 'filter',
+      primary: 'review',
+      secondary: '2',
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramCommerceViewCallbackData(
+      buildTelegramCommerceViewCallbackData('premium', 'detail', 'dak_123'),
+    ),
+    {
+      section: 'premium',
+      action: 'detail',
+      primary: 'dak_123',
+      secondary: null,
     },
   );
 });

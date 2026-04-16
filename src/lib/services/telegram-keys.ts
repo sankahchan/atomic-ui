@@ -7,10 +7,19 @@ import {
 } from '@/lib/subscription-links';
 import { formatBytes } from '@/lib/utils';
 import {
+  buildTelegramCommerceViewCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramOrderActionCallbackData,
   buildTelegramServerChangeActionCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  TELEGRAM_COMMERCE_PAGE_SIZE,
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+  buildTelegramCommercePagerRow,
+  paginateTelegramCommerce,
+  truncateTelegramCommerceButtonLabel,
+} from '@/lib/services/telegram-commerce-ui';
 import {
   ensureAccessKeySubscriptionToken,
   getDynamicKeyMessagingUrls,
@@ -118,15 +127,6 @@ export async function findLinkedDynamicAccessKeys(
   });
 }
 
-function truncateTelegramButtonLabel(value: string, maxLength = 28) {
-  const trimmed = value.trim();
-  if (trimmed.length <= maxLength) {
-    return trimmed;
-  }
-
-  return `${trimmed.slice(0, maxLength - 1)}…`;
-}
-
 function formatTelegramKeyStatusChip(status: string) {
   switch (status) {
     case 'ACTIVE':
@@ -144,6 +144,320 @@ function formatTelegramKeySectionTitle(title: string, count: number) {
   return `${title} (${count})`;
 }
 
+type TelegramCommerceKeyItem = {
+  id: string;
+  kind: 'standard' | 'trial' | 'premium';
+  name: string;
+  status: string;
+  sharePageUrl: string | null;
+  quotaSummary: string;
+  expirationSummary: string;
+  summaryLine: string;
+  detailLines: string[];
+  renewSecondary?: string | null;
+  latestPremiumRequestId?: string | null;
+};
+
+function getTelegramDynamicCurrentRouteLabel(
+  key: Awaited<ReturnType<typeof findLinkedDynamicAccessKeys>>[number],
+  ui: ReturnType<typeof getTelegramUi>,
+) {
+  const currentServer =
+    key.accessKeys.find((accessKey) => accessKey.server?.id === key.lastResolvedServerId)?.server
+    || key.accessKeys[0]?.server
+    || null;
+
+  return currentServer
+    ? `${currentServer.name}${currentServer.countryCode ? ` ${getFlagEmoji(currentServer.countryCode)}` : ''}`
+    : ui.premiumRegionUnknownStatus;
+}
+
+async function buildTelegramCommerceKeyItems(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const [keys, dynamicKeys, premiumRequests] = await Promise.all([
+    findLinkedAccessKeys(input.chatId, input.telegramUserId, true),
+    findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, true),
+    listTelegramPremiumSupportRequestsForUser(input.chatId, input.telegramUserId, 8),
+  ]);
+
+  const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
+  const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
+  const latestPremiumRequestByKey = new Map<string, (typeof premiumRequests)[number]>();
+  for (const request of premiumRequests) {
+    if (!latestPremiumRequestByKey.has(request.dynamicAccessKeyId)) {
+      latestPremiumRequestByKey.set(request.dynamicAccessKeyId, request);
+    }
+  }
+
+  const accessItems = await Promise.all(
+    [...standardKeys, ...trialKeys].map(async (key) => {
+      const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+      const sharePageUrl = key.publicSlug
+        ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
+        : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
+      const isTrial = getTelegramAccessKeyCategory(key.tags) === 'trial';
+      const serverLabel = key.server
+        ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+        : ui.premiumRegionUnknownStatus;
+      return {
+        id: key.id,
+        kind: isTrial ? 'trial' : 'standard',
+        name: key.name,
+        status: key.status,
+        sharePageUrl,
+        quotaSummary: formatTelegramQuotaSummary({
+          usedBytes: key.usedBytes,
+          dataLimitBytes: key.dataLimitBytes,
+          ui,
+        }),
+        expirationSummary: formatExpirationSummary(key, input.locale),
+        summaryLine: `${formatTelegramKeyStatusChip(key.status)} • ${serverLabel}`,
+        detailLines: [
+          `${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+            usedBytes: key.usedBytes,
+            dataLimitBytes: key.dataLimitBytes,
+            ui,
+          })}`,
+          `${ui.expirationLabel}: ${formatExpirationSummary(key, input.locale)}`,
+          `${ui.preferredServerLabel}: ${serverLabel}`,
+        ],
+        renewSecondary: null,
+        latestPremiumRequestId: null,
+      } satisfies TelegramCommerceKeyItem;
+    }),
+  );
+
+  const premiumItems = dynamicKeys.map((key) => {
+    const { sharePageUrl } = getDynamicKeyMessagingUrls(key, 'telegram_mykeys', input.locale);
+    const latestRequest = latestPremiumRequestByKey.get(key.id) || null;
+    const preferredRegions = getDynamicKeyRegionChoices(key);
+    const currentRouteLabel = getTelegramDynamicCurrentRouteLabel(key, ui);
+    const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
+    return {
+      id: key.id,
+      kind: 'premium' as const,
+      name: key.name,
+      status: key.status,
+      sharePageUrl,
+      quotaSummary: formatTelegramQuotaSummary({
+        usedBytes: key.usedBytes,
+        dataLimitBytes: key.dataLimitBytes,
+        ui,
+      }),
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      summaryLine: `${formatTelegramKeyStatusChip(key.status)} • ${currentRouteLabel}`,
+      detailLines: [
+        `${ui.premiumCurrentPoolLabel}: ${poolSummary}`,
+        `${ui.premiumRegionCurrentRouteLabel}: ${currentRouteLabel}`,
+        preferredRegions.length > 0
+          ? `${ui.premiumRequestedRegionLabel}: ${preferredRegions.join(', ')}`
+          : null,
+        `${ui.quotaLabel}: ${formatTelegramQuotaSummary({
+          usedBytes: key.usedBytes,
+          dataLimitBytes: key.dataLimitBytes,
+          ui,
+        })}`,
+        `${ui.expirationLabel}: ${formatExpirationSummary(key, input.locale)}`,
+        latestRequest
+          ? `${ui.premiumThreadStatusLabel}: ${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`
+          : null,
+      ].filter(Boolean) as string[],
+      renewSecondary: 'dynamic',
+      latestPremiumRequestId: latestRequest?.id || null,
+    } satisfies TelegramCommerceKeyItem;
+  });
+
+  return {
+    items: [...accessItems, ...premiumItems],
+    counts: {
+      standard: standardKeys.length,
+      trial: trialKeys.length,
+      premium: dynamicKeys.length,
+    },
+  };
+}
+
+export function buildTelegramKeysSummaryMessage(input: {
+  locale: SupportedLocale;
+  items: TelegramCommerceKeyItem[];
+  counts: {
+    standard: number;
+    trial: number;
+    premium: number;
+  };
+  page: number;
+}) {
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const cards = pagination.pageItems.map((item) =>
+    buildTelegramCommerceCard(
+      `${item.kind === 'premium' ? '💎' : item.kind === 'trial' ? '🎁' : '🔑'} <b>${escapeHtml(item.name)}</b>`,
+      [
+        escapeHtml(item.kind === 'premium' ? 'Premium key' : item.kind === 'trial' ? 'Trial key' : 'Standard key'),
+        escapeHtml(item.summaryLine),
+        `${getTelegramUi(input.locale).quotaLabel}: ${escapeHtml(item.quotaSummary)}`,
+        `${getTelegramUi(input.locale).expirationLabel}: ${escapeHtml(item.expirationSummary)}`,
+      ],
+    ),
+  );
+
+  return buildTelegramCommerceMessage({
+    title: getTelegramUi(input.locale).myKeysTitle,
+    statsLine: `${input.counts.standard} standard • ${input.counts.trial} trial • ${input.counts.premium} premium`,
+    intro:
+      input.locale === 'my'
+        ? 'Key summary ကို အတိုချုံးပြထားသည်။ More / Premium ကိုနှိပ်ပြီး detail ကိုဖွင့်နိုင်သည်။'
+        : 'This is the short key summary. Use More or Premium to open the detailed card.',
+    cards,
+    footerLines: [
+      input.locale === 'my'
+        ? 'Open, Renew, More / Premium buttons ကို တိုက်ရိုက်အသုံးပြုနိုင်သည်။'
+        : 'Use Open, Renew, and More / Premium directly from the buttons below.',
+    ],
+  });
+}
+
+export function buildTelegramKeyDetailMessage(input: {
+  locale: SupportedLocale;
+  item: TelegramCommerceKeyItem;
+}) {
+  return buildTelegramCommerceMessage({
+    title: input.item.kind === 'premium' ? '💎 <b>Premium key detail</b>' : '🔑 <b>Key detail</b>',
+    statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
+    intro: escapeHtml(input.item.summaryLine),
+    cards: [
+      buildTelegramCommerceCard(
+        input.item.kind === 'premium'
+          ? '💎 <b>Premium key</b>'
+          : input.item.kind === 'trial'
+            ? '🎁 <b>Trial key</b>'
+            : '🔑 <b>Standard key</b>',
+        input.item.detailLines.map((line) => escapeHtml(line)),
+      ),
+    ],
+    footerLines: [
+      input.locale === 'my'
+        ? 'Share page, renew, and support actions stay below this detail card.'
+        : 'Share page, renew, and support actions stay below this detail card.',
+    ],
+  });
+}
+
+function buildTelegramKeysSummaryKeyboard(input: {
+  locale: SupportedLocale;
+  items: TelegramCommerceKeyItem[];
+  page: number;
+}) {
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((item) => {
+    const buttons: Array<{ text: string; callback_data?: string; url?: string }> = [];
+    if (item.sharePageUrl) {
+      buttons.push({
+        text: input.locale === 'my' ? 'Open' : 'Open',
+        url: item.sharePageUrl,
+      });
+    }
+    buttons.push({
+      text: input.locale === 'my' ? 'Renew' : 'Renew',
+      callback_data: buildTelegramOrderActionCallbackData(
+        'ky',
+        item.id,
+        item.renewSecondary || undefined,
+      ),
+    });
+    buttons.push({
+      text: item.kind === 'premium' ? 'Premium' : 'More',
+      callback_data: buildTelegramCommerceViewCallbackData(
+        'keys',
+        'detail',
+        item.id,
+        String(pagination.page),
+      ),
+    });
+    return buttons;
+  });
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'keys',
+    page: pagination.page,
+    totalItems: input.items.length,
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+function buildTelegramKeyDetailKeyboard(input: {
+  locale: SupportedLocale;
+  item: TelegramCommerceKeyItem;
+  page: number;
+  supportLink?: string | null;
+}) {
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  const primaryRow: Array<{ text: string; callback_data?: string; url?: string }> = [];
+  if (input.item.sharePageUrl) {
+    primaryRow.push({
+      text: getTelegramUi(input.locale).openSharePage,
+      url: input.item.sharePageUrl,
+    });
+  }
+  primaryRow.push({
+    text: getTelegramUi(input.locale).orderActionRenewKey,
+    callback_data: buildTelegramOrderActionCallbackData(
+      'ky',
+      input.item.id,
+      input.item.renewSecondary || undefined,
+    ),
+  });
+  rows.push(primaryRow);
+
+  if (input.item.kind === 'premium') {
+    rows.push([
+      {
+        text: getTelegramUi(input.locale).premiumChangeRegion,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.item.id),
+      },
+      {
+        text: getTelegramUi(input.locale).myKeysPremiumStatus,
+        callback_data: input.item.latestPremiumRequestId
+          ? buildTelegramDynamicSupportActionCallbackData('st', input.item.latestPremiumRequestId)
+          : buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
+      },
+    ]);
+    rows.push([
+      {
+        text: getTelegramUi(input.locale).premiumReportRouteIssue,
+        callback_data: input.item.latestPremiumRequestId
+          ? buildTelegramDynamicSupportActionCallbackData('rp', input.item.latestPremiumRequestId)
+          : buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
+      },
+      ...(input.supportLink ? [{ text: getTelegramUi(input.locale).myKeysOpenSupport, url: input.supportLink }] : []),
+    ]);
+  } else {
+    rows.push([
+      {
+        text: getTelegramUi(input.locale).myKeysServerIssue,
+        callback_data: buildTelegramServerChangeActionCallbackData('ky', input.item.id),
+      },
+      ...(input.supportLink ? [{ text: getTelegramUi(input.locale).myKeysOpenSupport, url: input.supportLink }] : []),
+    ]);
+  }
+
+  rows.push([{
+    text: input.locale === 'my' ? '← Back to keys' : '← Back to keys',
+    callback_data: buildTelegramCommerceViewCallbackData('keys', 'home', String(input.page)),
+  }]);
+
+  return { inline_keyboard: rows };
+}
+
 function buildTelegramServerChangeKeySelectionKeyboard(input: {
   locale: SupportedLocale;
   keys: Array<{
@@ -156,7 +470,7 @@ function buildTelegramServerChangeKeySelectionKeyboard(input: {
 }) {
   const rows = input.keys.slice(0, 8).map((key) => [
     {
-      text: truncateTelegramButtonLabel(`🛠 ${key.name} • ${key.remainingChanges}/${key.limit}`, 38),
+      text: truncateTelegramCommerceButtonLabel(`🛠 ${key.name} • ${key.remainingChanges}/${key.limit}`, 38),
       callback_data: buildTelegramServerChangeActionCallbackData('ky', key.id),
     },
   ]);
@@ -299,210 +613,88 @@ export async function handleMyKeysCommand(input: {
   botToken: string;
 }) {
   const ui = getTelegramUi(input.locale);
-  const supportLink = await getTelegramSupportLink();
-  const [keys, dynamicKeys, premiumRequests] = await Promise.all([
-    findLinkedAccessKeys(input.chatId, input.telegramUserId, true),
-    findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, true),
-    listTelegramPremiumSupportRequestsForUser(input.chatId, input.telegramUserId, 8),
-  ]);
+  const { items, counts } = await buildTelegramCommerceKeyItems({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    locale: input.locale,
+  });
 
-  if (keys.length === 0 && dynamicKeys.length === 0) {
+  if (items.length === 0) {
     return ui.myKeysEmpty;
   }
 
-  const trialKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'trial');
-  const standardKeys = keys.filter((key) => getTelegramAccessKeyCategory(key.tags) === 'standard');
-  const lines = [
-    ui.myKeysTitle,
-    '',
-    input.locale === 'my'
-      ? `${standardKeys.length} standard • ${trialKeys.length} trial • ${dynamicKeys.length} premium`
-      : `${standardKeys.length} standard • ${trialKeys.length} trial • ${dynamicKeys.length} premium`,
-    '',
-    input.locale === 'my'
-      ? 'လိုအပ်သော key card ကို အောက်တွင် ကြည့်ပါ။ Button များဖြင့် share page ဖွင့်ခြင်း၊ renew လုပ်ခြင်းနှင့် support ရယူခြင်းတို့ကို တိုက်ရိုက် လုပ်နိုင်ပါသည်။'
-      : 'See each key card below. Use the buttons to open the share page, renew, or get support directly.',
-    '',
-  ];
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
-  const latestPremiumRequestByKey = new Map<string, (typeof premiumRequests)[number]>();
-  for (const request of premiumRequests) {
-    if (!latestPremiumRequestByKey.has(request.dynamicAccessKeyId)) {
-      latestPremiumRequestByKey.set(request.dynamicAccessKeyId, request);
-    }
-  }
-
-  if (standardKeys.length > 0) {
-    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionStandard, standardKeys.length), '');
-  }
-
-  for (const key of standardKeys) {
-    const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-    const sharePageUrl = key.publicSlug
-      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
-      : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
-    lines.push(
-      `🔑 <b>${escapeHtml(key.name)}</b>`,
-      `  ${escapeHtml(ui.myKeysTypeStandard)}`,
-      `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
-        usedBytes: key.usedBytes,
-        dataLimitBytes: key.dataLimitBytes,
-        ui,
-      })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  ${input.locale === 'my' ? 'Quick actions: share • renew • support' : 'Quick actions: share • renew • support'}`,
-      '',
-    );
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.openSharePage}: ${key.name}`, 38),
-        url: sharePageUrl,
-      },
-      {
-        text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
-        callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
-      },
-    ]);
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.myKeysServerIssue}: ${key.name}`, 38),
-        callback_data: buildTelegramServerChangeActionCallbackData('ky', key.id),
-      },
-      ...(supportLink
-        ? [
-            {
-              text: truncateTelegramButtonLabel(ui.myKeysOpenSupport, 24),
-              url: supportLink,
-            },
-          ]
-        : []),
-    ]);
-  }
-
-  if (trialKeys.length > 0) {
-    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionTrial, trialKeys.length), '');
-  }
-
-  for (const key of trialKeys) {
-    const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-    const sharePageUrl = key.publicSlug
-      ? buildShortShareUrl(key.publicSlug, { source: 'telegram_mykeys', lang: input.locale })
-      : buildSharePageUrl(token, { source: 'telegram_mykeys', lang: input.locale });
-    lines.push(
-      `🎁 <b>${escapeHtml(key.name)}</b>`,
-      `  ${escapeHtml(ui.myKeysTypeTrial)}`,
-      `  ${formatTelegramKeyStatusChip(key.status)}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
-        usedBytes: key.usedBytes,
-        dataLimitBytes: key.dataLimitBytes,
-        ui,
-      })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      `  ${input.locale === 'my' ? 'Quick actions: share • renew' : 'Quick actions: share • renew'}`,
-      '',
-    );
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.openSharePage}: ${key.name}`, 38),
-        url: sharePageUrl,
-      },
-      {
-        text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
-        callback_data: buildTelegramOrderActionCallbackData('ky', key.id),
-      },
-    ]);
-  }
-
-  if (dynamicKeys.length > 0) {
-    lines.push(formatTelegramKeySectionTitle(ui.myKeysSectionPremium, dynamicKeys.length), '');
-  }
-
-  for (const key of dynamicKeys) {
-    const { sharePageUrl } = getDynamicKeyMessagingUrls(key, 'telegram_mykeys', input.locale);
-    const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
-    const latestRequest = latestPremiumRequestByKey.get(key.id);
-    const preferredRegions = getDynamicKeyRegionChoices(key);
-    lines.push(
-      `💎 <b>${escapeHtml(key.name)}</b>`,
-      `  ${escapeHtml(ui.myKeysTypePremium)}`,
-      `  ${formatTelegramKeyStatusChip(key.status)} • ${escapeHtml(key.type === 'SELF_MANAGED' ? ui.modeSelfManaged : ui.modeManual)}`,
-      `  ${ui.myKeysCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
-      `  ${ui.quotaLabel}: ${formatTelegramQuotaSummary({
-        usedBytes: key.usedBytes,
-        dataLimitBytes: key.dataLimitBytes,
-        ui,
-      })}`,
-      `  ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, input.locale))}`,
-      preferredRegions.length > 0
-        ? `  ${ui.premiumRequestedRegionLabel}: ${escapeHtml(preferredRegions.join(', '))}`
-        : '',
-      latestRequest
-        ? `  ${ui.premiumOpenRequestLabel}: ${escapeHtml(
-            `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
-          )}`
-        : '',
-      latestRequest?.replies?.length
-        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(latestRequest.replies[latestRequest.replies.length - 1]?.message.slice(0, 80) || '')}${(latestRequest.replies[latestRequest.replies.length - 1]?.message.length || 0) > 80 ? '…' : ''}`
-        : '',
-      sharePageUrl
-        ? input.locale === 'my'
-          ? '  Quick actions: share • renew • premium status'
-          : '  Quick actions: share • renew • premium status'
-        : '',
-      '',
-    );
-    inlineKeyboard.push([
-      ...(sharePageUrl
-        ? [
-            {
-              text: truncateTelegramButtonLabel(`${ui.openSharePage}: ${key.name}`, 38),
-              url: sharePageUrl,
-            },
-          ]
-        : []),
-      {
-        text: truncateTelegramButtonLabel(`${ui.orderActionRenewKey}: ${key.name}`, 38),
-        callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic'),
-      },
-    ]);
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.premiumChangeRegion}: ${key.name}`, 38),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
-      },
-      {
-        text: truncateTelegramButtonLabel(
-          `${latestRequest ? ui.premiumReplyToRequest : ui.premiumReportRouteIssue}: ${key.name}`,
-          38,
-        ),
-        callback_data: latestRequest
-          ? buildTelegramDynamicSupportActionCallbackData('rp', latestRequest.id)
-          : buildTelegramDynamicSupportActionCallbackData('is', key.id),
-      },
-    ]);
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.myKeysPremiumStatus}: ${key.name}`, 38),
-        callback_data: latestRequest
-          ? buildTelegramDynamicSupportActionCallbackData('st', latestRequest.id)
-          : buildTelegramDynamicSupportActionCallbackData('is', key.id),
-      },
-      ...(supportLink
-        ? [
-            {
-              text: truncateTelegramButtonLabel(ui.myKeysOpenSupport, 24),
-              url: supportLink,
-            },
-          ]
-        : []),
-    ]);
-  }
-
-  lines.push(ui.myKeysRenewHint);
-  const message = lines.join('\n');
+  const message = buildTelegramKeysSummaryMessage({
+    locale: input.locale,
+    items,
+    counts,
+    page: 1,
+  });
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard.slice(0, 12) } : undefined,
+    replyMarkup: buildTelegramKeysSummaryKeyboard({
+      locale: input.locale,
+      items,
+      page: 1,
+    }),
+  });
+
+  return sent ? null : message;
+}
+
+export async function handleTelegramKeysCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail';
+  primary?: string | null;
+  secondary?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await getTelegramSupportLink();
+  const { items, counts } = await buildTelegramCommerceKeyItems({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    locale: input.locale,
+  });
+
+  if (items.length === 0) {
+    return ui.myKeysEmpty;
+  }
+
+  if (input.action === 'detail') {
+    const item = items.find((candidate) => candidate.id === input.primary);
+    if (!item) {
+      return ui.myKeysEmpty;
+    }
+    const page = Number.parseInt(input.secondary || '1', 10) || 1;
+    const message = buildTelegramKeyDetailMessage({
+      locale: input.locale,
+      item,
+    });
+    const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramKeyDetailKeyboard({
+        locale: input.locale,
+        item,
+        page,
+        supportLink,
+      }),
+    });
+    return sent ? null : message;
+  }
+
+  const page = Number.parseInt(input.primary || '1', 10) || 1;
+  const message = buildTelegramKeysSummaryMessage({
+    locale: input.locale,
+    items,
+    counts,
+    page,
+  });
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramKeysSummaryKeyboard({
+      locale: input.locale,
+      items,
+      page,
+    }),
   });
 
   return sent ? null : message;

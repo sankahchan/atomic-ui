@@ -135,6 +135,9 @@ import {
   createTelegramPremiumSupportRequestRecord,
   findTelegramPremiumSupportRequestByIdForUser,
   handlePremiumCommand,
+  handleTelegramPremiumCommerceView,
+  handleTelegramPremiumRegionCommerceView,
+  handleTelegramPremiumSupportStatusCommerceView,
   handlePremiumRegionStatusCommand,
   handlePremiumSupportFollowUpText,
   handlePremiumSupportStatusCommand,
@@ -144,6 +147,7 @@ import {
   buildTelegramOrderStatusMessage,
   findTelegramOrderForUser,
   handleOrderStatusCommand,
+  handleTelegramOrdersCommerceView,
   handleOrdersCommand,
   handleRefundCommand,
   listRecentTelegramRefundRequests,
@@ -157,8 +161,10 @@ import {
   getActiveTelegramOrder as getActiveTelegramOrderModule,
   handleBuyCommand as handleTelegramBuyCommand,
   handleRenewOrderCommand as handleTelegramRenewOrderCommand,
+  handleTelegramBuyCommerceView,
   handleTelegramOrderProofMessage as handleTelegramOrderProofMessageModule,
   handleTelegramOrderTextMessage as handleTelegramOrderTextMessageModule,
+  handleTelegramRenewCommerceView,
   sendTelegramOrderReceiptConfirmation as sendTelegramOrderReceiptConfirmationModule,
 } from '@/lib/services/telegram-order-state';
 import {
@@ -170,6 +176,7 @@ import {
   handleMyKeysCommand,
   handleSubscriptionLinksCommand,
   handleSupportCommand,
+  handleTelegramKeysCommerceView,
   handleUsageCommand,
   handleUserServerCommand,
 } from '@/lib/services/telegram-keys';
@@ -270,6 +277,7 @@ import {
 } from '@/lib/services/telegram-reminders';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import {
+  buildTelegramCommerceViewCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
   buildTelegramLocaleSelectorKeyboard,
@@ -285,6 +293,7 @@ import {
   parseTelegramMenuCallbackData,
   parseTelegramAdminKeyCallbackData,
   normalizeTelegramReplyKeyboardCommand,
+  parseTelegramCommerceViewCallbackData,
   parseTelegramDynamicSupportActionCallbackData,
   parseTelegramOrderActionCallbackData,
   parseTelegramOrderReviewCallbackData,
@@ -7092,6 +7101,113 @@ export async function handleTelegramCallbackQuery(
         await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
         return null;
       }
+    }
+
+    const commerceViewAction = parseTelegramCommerceViewCallbackData(callbackQuery.data);
+    if (commerceViewAction) {
+      const locale = await getTelegramConversationLocale({
+        telegramUserId: callbackQuery.from.id,
+        telegramChatId: chatId,
+      });
+      const ui = getTelegramUi(locale);
+      let response: string | null = null;
+
+      switch (commerceViewAction.section) {
+        case 'buy':
+          response = await handleTelegramBuyCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page' | 'detail' | 'compare',
+            primary: commerceViewAction.primary,
+            secondary: commerceViewAction.secondary,
+          });
+          break;
+        case 'renew':
+          response = await handleTelegramRenewCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page',
+            primary: commerceViewAction.primary,
+          });
+          break;
+        case 'keys':
+          response = await handleTelegramKeysCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page' | 'detail',
+            primary: commerceViewAction.primary,
+            secondary: commerceViewAction.secondary,
+          });
+          break;
+        case 'premium':
+          response = await handleTelegramPremiumCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page' | 'detail',
+            primary: commerceViewAction.primary,
+            secondary: commerceViewAction.secondary,
+            getTelegramSupportLink,
+            findLinkedDynamicAccessKeys,
+            getDynamicKeyMessagingUrls,
+            sendTelegramMessage,
+          });
+          break;
+        case 'premiumregion':
+          response = await handleTelegramPremiumRegionCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page',
+            primary: commerceViewAction.primary,
+            getTelegramSupportLink,
+            findLinkedDynamicAccessKeys,
+            sendTelegramMessage,
+          });
+          break;
+        case 'supportstatus':
+          response = await handleTelegramPremiumSupportStatusCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page' | 'detail',
+            primary: commerceViewAction.primary,
+            secondary: commerceViewAction.secondary,
+            getTelegramSupportLink,
+            sendTelegramMessage,
+          });
+          break;
+        case 'orders':
+          response = await handleTelegramOrdersCommerceView({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
+            action: commerceViewAction.action as 'home' | 'page' | 'detail' | 'filter',
+            primary: commerceViewAction.primary,
+            secondary: commerceViewAction.secondary,
+            sendTelegramMessage,
+            sendTelegramOrderStatusCard,
+          });
+          break;
+        default:
+          break;
+      }
+
+      if (response) {
+        await sendTelegramMessage(config.botToken, chatId, response);
+      }
+      await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
+      return null;
     }
 
     const supportThreadAction = parseTelegramSupportThreadCallbackData(callbackQuery.data);

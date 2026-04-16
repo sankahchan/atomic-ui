@@ -2,6 +2,9 @@ import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
   type TelegramAdminKeyCallbackPayload,
   type TelegramAdminMenuAction,
+  type TelegramCommerceViewAction,
+  type TelegramCommerceViewCallbackPayload,
+  type TelegramCommerceViewSection,
   type TelegramDynamicSupportActionCallbackPayload,
   type TelegramDynamicSupportUserAction,
   type TelegramInboxMenuAction,
@@ -31,6 +34,9 @@ import {
 export type {
   TelegramAdminKeyCallbackPayload,
   TelegramAdminMenuAction,
+  TelegramCommerceViewAction,
+  TelegramCommerceViewCallbackPayload,
+  TelegramCommerceViewSection,
   TelegramDynamicSupportActionCallbackPayload,
   TelegramDynamicSupportUserAction,
   TelegramInboxMenuAction,
@@ -66,6 +72,7 @@ const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 const TELEGRAM_MENU_CALLBACK_PREFIX = 'tgmenu';
+const TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX = 'tgcv';
 const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
 const TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX = 'supthread';
 const TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX = 'admkey';
@@ -515,6 +522,111 @@ export function buildTelegramMenuCallbackData(
   action: string,
 ) {
   return `${TELEGRAM_MENU_CALLBACK_PREFIX}:${section}:${action}`;
+}
+
+const TELEGRAM_COMMERCE_VIEW_SECTION_CODES: Record<TelegramCommerceViewSection, string> = {
+  buy: 'b',
+  keys: 'k',
+  premium: 'p',
+  premiumregion: 'r',
+  supportstatus: 's',
+  orders: 'o',
+  renew: 'n',
+};
+
+const TELEGRAM_COMMERCE_VIEW_ACTION_CODES: Record<TelegramCommerceViewAction, string> = {
+  home: 'h',
+  page: 'p',
+  detail: 'd',
+  compare: 'c',
+  filter: 'f',
+};
+
+function decodeTelegramCommerceViewSection(code?: string | null): TelegramCommerceViewSection | null {
+  switch (code) {
+    case 'b':
+      return 'buy';
+    case 'k':
+      return 'keys';
+    case 'p':
+      return 'premium';
+    case 'r':
+      return 'premiumregion';
+    case 's':
+      return 'supportstatus';
+    case 'o':
+      return 'orders';
+    case 'n':
+      return 'renew';
+    default:
+      return null;
+  }
+}
+
+function decodeTelegramCommerceViewAction(code?: string | null): TelegramCommerceViewAction | null {
+  switch (code) {
+    case 'h':
+      return 'home';
+    case 'p':
+      return 'page';
+    case 'd':
+      return 'detail';
+    case 'c':
+      return 'compare';
+    case 'f':
+      return 'filter';
+    default:
+      return null;
+  }
+}
+
+export function buildTelegramCommerceViewCallbackData(
+  section: TelegramCommerceViewSection,
+  action: TelegramCommerceViewAction,
+  primary?: string | null,
+  secondary?: string | null,
+) {
+  const parts = [
+    TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX,
+    TELEGRAM_COMMERCE_VIEW_SECTION_CODES[section],
+    TELEGRAM_COMMERCE_VIEW_ACTION_CODES[action],
+  ];
+
+  if (primary) {
+    parts.push(primary);
+  }
+
+  if (secondary) {
+    parts.push(secondary);
+  }
+
+  return parts.join(':');
+}
+
+export function parseTelegramCommerceViewCallbackData(
+  data?: string | null,
+): TelegramCommerceViewCallbackPayload | null {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const section = decodeTelegramCommerceViewSection(parts[1]);
+  const action = decodeTelegramCommerceViewAction(parts[2]);
+  if (!section || !action) {
+    return null;
+  }
+
+  return {
+    section,
+    action,
+    primary: parts[3]?.trim() || null,
+    secondary: parts[4]?.trim() || null,
+  };
 }
 
 export function parseTelegramMenuCallbackData(data?: string | null): TelegramMenuCallbackPayload | null {
