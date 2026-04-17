@@ -36,6 +36,21 @@ import { formatBytes } from '@/lib/utils';
 
 type TelegramOrdersFilter = 'ALL' | 'ACTION' | 'REVIEW' | 'COMPLETED';
 
+function buildTelegramOrdersCountsLine(input: {
+  attentionCount: number;
+  reviewCount: number;
+  completedCount: number;
+  totalCount: number;
+}) {
+  const segments = [
+    input.attentionCount > 0 ? `${input.attentionCount} need action` : null,
+    input.reviewCount > 0 ? `${input.reviewCount} under review` : null,
+    input.completedCount > 0 ? `${input.completedCount} completed` : null,
+  ].filter(Boolean) as string[];
+
+  return segments.join(' • ') || `${input.totalCount} recent`;
+}
+
 function parseTelegramOrdersFilter(argsText?: string | null): TelegramOrdersFilter {
   const normalized = argsText?.trim().toLowerCase() || '';
   switch (normalized) {
@@ -153,9 +168,9 @@ export function buildTelegramOrdersSummaryMessage(input: {
       durationDays: order.durationDays,
       requestedName: order.requestedName,
     });
-    const duplicatedPrefix = `#${order.orderCode} • `;
+    const duplicatedPrefix = `#${order.orderCode}`;
     const trimmedStateLine = stateLine.startsWith(duplicatedPrefix)
-      ? stateLine.slice(duplicatedPrefix.length)
+      ? stateLine.slice(duplicatedPrefix.length).replace(/^\s*•\s*/, '')
       : stateLine;
 
     return trimmedStateLine.trim() || formatTelegramOrderKindLabel(order.kind, ui);
@@ -173,11 +188,16 @@ export function buildTelegramOrdersSummaryMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.ordersTitle,
-    statsLine: `${input.attentionOrders.length} need action • ${input.reviewOrders.length} under review • ${input.completedOrders.length} completed`,
+    statsLine: buildTelegramOrdersCountsLine({
+      attentionCount: input.attentionOrders.length,
+      reviewCount: input.reviewOrders.length,
+      completedCount: input.completedOrders.length,
+      totalCount: input.filteredOrders.length,
+    }),
     intro:
       input.locale === 'my'
-        ? 'Filter ကိုပြောင်းပြီး order summary ကို ဖတ်နိုင်ပြီး Open ကိုနှိပ်ပြီး detail card ကိုဖွင့်နိုင်သည်။'
-        : 'Use the filters for a short order summary, then tap Open for the full status card.',
+        ? 'Filter ကိုပြောင်းပြီး Open ကိုနှိပ်ကာ detail card ကိုဖွင့်နိုင်သည်။'
+        : 'Use filters, then tap Open for the detail card.',
     cards: cards.length
       ? cards
       : [
@@ -197,7 +217,6 @@ export function buildTelegramOrdersSummaryMessage(input: {
                   ? '📭 Recent order မရှိသေးပါ။'
                   : '📭 There are no recent orders yet.',
         ],
-    footerLines: [ui.ordersHint],
   });
 }
 
