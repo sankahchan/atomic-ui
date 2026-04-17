@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildTelegramBuySummaryMessage } from '@/lib/services/telegram-order-state';
+import {
+  buildTelegramBuySummaryMessage,
+  buildTelegramRenewSummaryMessage,
+} from '@/lib/services/telegram-order-state';
 import { buildTelegramKeysSummaryMessage } from '@/lib/services/telegram-keys';
 import { buildTelegramPremiumHubMessage } from '@/lib/services/telegram-premium';
 import { buildTelegramOrdersSummaryMessage } from '@/lib/services/telegram-orders';
@@ -239,4 +242,37 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
   assert.match(message, /Premium \/ 1 Month \/ 200 GB • 1m • Two/);
   assert.match(message, /Flow ended • restart available/);
   assert.match(message, /Step 4\/4 • Delivered/);
+});
+
+test('renew summary stays compact and removes repeated key-type copy', () => {
+  const message = buildTelegramRenewSummaryMessage({
+    locale: 'en',
+    orderCode: 'ORD-RENEW',
+    page: 1,
+    keys: [
+      {
+        id: 'key_1',
+        name: 'Ninety',
+        kind: 'access',
+        status: 'ACTIVE',
+        expirationSummary: '73 day(s) left (6/29/2026)',
+        serverLabel: 'SG-2 🇸🇬',
+      },
+      {
+        id: 'dak_1',
+        name: 'Onn',
+        kind: 'dynamic',
+        status: 'ACTIVE',
+        expirationSummary: '12 day(s) left (4/28/2026)',
+        serverLabel: null,
+      },
+    ],
+  });
+
+  assert.doesNotMatch(message, /Normal access key/);
+  assert.doesNotMatch(message, /Premium dynamic key/);
+  assert.doesNotMatch(message, /Preferred server:/);
+  assert.match(message, /Status: <b>ACTIVE<\/b>/);
+  assert.match(message, /73 day\(s\) left \(6\/29\/2026\) • SG-2/);
+  assert.ok(message.split('\n').length < 18);
 });
