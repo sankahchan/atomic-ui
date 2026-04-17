@@ -13,7 +13,7 @@ import {
   sendTelegramMessage,
   TelegramUpdate
 } from '@/lib/services/telegram-bot';
-import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/services/telegram-runtime';
+import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/telegram-webhook-secret';
 import { getConfiguredPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
 import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasTelegramAnnouncementManageScope } from '@/lib/admin-scope';

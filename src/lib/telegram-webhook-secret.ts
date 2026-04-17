@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto';
 
+export const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
+
 function normalizeSecret(value: unknown) {
   if (typeof value !== 'string') {
     return null;
