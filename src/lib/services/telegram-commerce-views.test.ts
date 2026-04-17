@@ -112,7 +112,7 @@ test('buy summary preserves concise numbering in myanmar locale', () => {
   assert.doesNotMatch(message, /How buying works/);
 });
 
-test('my keys summary omits raw urls and latest reply dumps', () => {
+test('my keys summary stays compact and omits raw urls and latest reply dumps', () => {
   const message = buildTelegramKeysSummaryMessage({
     locale: 'en',
     counts: { standard: 1, trial: 0, premium: 1 },
@@ -147,9 +147,13 @@ test('my keys summary omits raw urls and latest reply dumps', () => {
     ],
   });
 
-  assert.match(message, /standard • 0 trial • 1 premium/);
+  assert.match(message, /1 standard • 1 premium/);
+  assert.doesNotMatch(message, /Standard key/);
+  assert.doesNotMatch(message, /Premium key/);
+  assert.match(message, /Quota: 0 B \/ 150 GB • 30 day\(s\) left/);
   assert.doesNotMatch(message, /https?:\/\//);
   assert.doesNotMatch(message, /Latest reply/i);
+  assert.ok(message.split('\n').length < 16);
 });
 
 test('premium hub summary keeps links out of the text body', () => {

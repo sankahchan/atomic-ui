@@ -158,6 +158,22 @@ type TelegramCommerceKeyItem = {
   latestPremiumRequestId?: string | null;
 };
 
+function buildTelegramKeyCountsLine(input: {
+  counts: {
+    standard: number;
+    trial: number;
+    premium: number;
+  };
+}) {
+  const segments = [
+    input.counts.standard > 0 ? `${input.counts.standard} standard` : null,
+    input.counts.trial > 0 ? `${input.counts.trial} trial` : null,
+    input.counts.premium > 0 ? `${input.counts.premium} premium` : null,
+  ].filter(Boolean) as string[];
+
+  return segments.join(' • ');
+}
+
 function getTelegramDynamicCurrentRouteLabel(
   key: Awaited<ReturnType<typeof findLinkedDynamicAccessKeys>>[number],
   ui: ReturnType<typeof getTelegramUi>,
@@ -291,32 +307,26 @@ export function buildTelegramKeysSummaryMessage(input: {
   };
   page: number;
 }) {
+  const ui = getTelegramUi(input.locale);
   const pagination = paginateTelegramCommerce(input.items, input.page);
   const cards = pagination.pageItems.map((item) =>
     buildTelegramCommerceCard(
       `${item.kind === 'premium' ? '💎' : item.kind === 'trial' ? '🎁' : '🔑'} <b>${escapeHtml(item.name)}</b>`,
       [
-        escapeHtml(item.kind === 'premium' ? 'Premium key' : item.kind === 'trial' ? 'Trial key' : 'Standard key'),
         escapeHtml(item.summaryLine),
-        `${getTelegramUi(input.locale).quotaLabel}: ${escapeHtml(item.quotaSummary)}`,
-        `${getTelegramUi(input.locale).expirationLabel}: ${escapeHtml(item.expirationSummary)}`,
+        `${ui.quotaLabel}: ${escapeHtml(item.quotaSummary)} • ${escapeHtml(item.expirationSummary)}`,
       ],
     ),
   );
 
   return buildTelegramCommerceMessage({
-    title: getTelegramUi(input.locale).myKeysTitle,
-    statsLine: `${input.counts.standard} standard • ${input.counts.trial} trial • ${input.counts.premium} premium`,
+    title: ui.myKeysTitle,
+    statsLine: buildTelegramKeyCountsLine({ counts: input.counts }),
     intro:
       input.locale === 'my'
-        ? 'Key summary ကို အတိုချုံးပြထားသည်။ More / Premium ကိုနှိပ်ပြီး detail ကိုဖွင့်နိုင်သည်။'
-        : 'This is the short key summary. Use More or Premium to open the detailed card.',
+        ? 'Key တစ်ခုချင်းအောက်က button များဖြင့် open, renew, detail ကို ဆက်လုပ်နိုင်သည်။'
+        : 'Use the buttons below each key to open, renew, or view details.',
     cards,
-    footerLines: [
-      input.locale === 'my'
-        ? 'Open, Renew, More / Premium buttons ကို တိုက်ရိုက်အသုံးပြုနိုင်သည်။'
-        : 'Use Open, Renew, and More / Premium directly from the buttons below.',
-    ],
   });
 }
 
