@@ -144,25 +144,29 @@ export function buildTelegramOrdersSummaryMessage(input: {
 }) {
   const ui = getTelegramUi(input.locale);
   const pagination = paginateTelegramCommerce(input.filteredOrders, input.page);
+  const compactStateLine = (order: TelegramUserOrder) => {
+    const stateLine = formatTelegramOrderStateLine({
+      orderCode: order.orderCode,
+      planName: order.planName,
+      planCode: order.planCode,
+      durationMonths: order.durationMonths,
+      durationDays: order.durationDays,
+      requestedName: order.requestedName,
+    });
+    const duplicatedPrefix = `#${order.orderCode} • `;
+    const trimmedStateLine = stateLine.startsWith(duplicatedPrefix)
+      ? stateLine.slice(duplicatedPrefix.length)
+      : stateLine;
+
+    return trimmedStateLine.trim() || formatTelegramOrderKindLabel(order.kind, ui);
+  };
   const cards = pagination.pageItems.map((order) =>
     buildTelegramCommerceCard(
       `${formatTelegramOrderStatusIcon(order.status)} <b>${escapeHtml(order.orderCode)}</b>`,
       [
-        escapeHtml(
-          formatTelegramOrderStateLine({
-            orderCode: order.orderCode,
-            planName: order.planName,
-            planCode: order.planCode,
-            durationMonths: order.durationMonths,
-            durationDays: order.durationDays,
-            requestedName: order.requestedName,
-          }),
-        ),
+        escapeHtml(compactStateLine(order)),
         `${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}`,
-        buildTelegramOrderTimelineChipRow({ order }),
-        buildTelegramOrderNextStepText(order, ui)
-          ? `${ui.orderNextStepLabel}: ${escapeHtml(buildTelegramOrderNextStepText(order, ui) || '')}`
-          : null,
+        buildTelegramOrderProgressSummary({ order, locale: input.locale }),
       ],
     ),
   );
