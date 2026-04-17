@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { buildTelegramBuySummaryMessage } from '@/lib/services/telegram-order-state';
 import { buildTelegramKeysSummaryMessage } from '@/lib/services/telegram-keys';
 import { buildTelegramPremiumHubMessage } from '@/lib/services/telegram-premium';
+import { buildTelegramOrdersSummaryMessage } from '@/lib/services/telegram-orders';
 
 const samplePlans = [
   {
@@ -172,4 +173,70 @@ test('premium hub summary keeps links out of the text body', () => {
   assert.match(message, /Premium center/);
   assert.doesNotMatch(message, /https?:\/\//);
   assert.doesNotMatch(message, /Latest reply/i);
+});
+
+test('orders summary keeps timeline and next-step detail out of the list view', () => {
+  const message = buildTelegramOrdersSummaryMessage({
+    locale: 'en',
+    filter: 'ALL',
+    page: 1,
+    attentionOrders: [
+      {
+        id: 'ord_1',
+        orderCode: 'ORD-1',
+        kind: 'NEW',
+        status: 'REJECTED',
+        planName: 'Premium / 1 Month / 200 GB',
+        planCode: 'premium_1m_200gb',
+        durationMonths: 1,
+        durationDays: null,
+        requestedName: 'Two',
+      },
+    ] as any,
+    reviewOrders: [],
+    completedOrders: [
+      {
+        id: 'ord_2',
+        orderCode: 'ORD-2',
+        kind: 'NEW',
+        status: 'FULFILLED',
+        planName: 'Free Trial / 1 Day / 3 GB',
+        planCode: 'trial_1d_3gb',
+        durationMonths: null,
+        durationDays: 1,
+        requestedName: 'One',
+      },
+    ] as any,
+    filteredOrders: [
+      {
+        id: 'ord_1',
+        orderCode: 'ORD-1',
+        kind: 'NEW',
+        status: 'REJECTED',
+        planName: 'Premium / 1 Month / 200 GB',
+        planCode: 'premium_1m_200gb',
+        durationMonths: 1,
+        durationDays: null,
+        requestedName: 'Two',
+      },
+      {
+        id: 'ord_2',
+        orderCode: 'ORD-2',
+        kind: 'NEW',
+        status: 'FULFILLED',
+        planName: 'Free Trial / 1 Day / 3 GB',
+        planCode: 'trial_1d_3gb',
+        durationMonths: null,
+        durationDays: 1,
+        requestedName: 'One',
+      },
+    ] as any,
+  });
+
+  assert.doesNotMatch(message, /#ORD-1/);
+  assert.doesNotMatch(message, /\[Created\]/);
+  assert.doesNotMatch(message, /Next step:/);
+  assert.match(message, /Premium \/ 1 Month \/ 200 GB • 1m • Two/);
+  assert.match(message, /Flow ended • restart available/);
+  assert.match(message, /Step 4\/4 • Delivered/);
 });
