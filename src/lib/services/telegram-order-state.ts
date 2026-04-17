@@ -266,8 +266,8 @@ type TelegramRenewableKeySummary = {
   name: string;
   kind: 'access' | 'dynamic';
   status: string;
-  detailLine: string;
-  extraLine: string | null;
+  expirationSummary: string;
+  serverLabel: string | null;
 };
 
 function isTelegramTrialPlan(plan: TelegramSalesPlanOption) {
@@ -660,9 +660,12 @@ export function buildTelegramRenewSummaryMessage(input: {
     buildTelegramCommerceCard(
       `${pagination.startIndex + index + 1}. ${key.kind === 'dynamic' ? '💎' : '🔑'} <b>${escapeHtml(key.name)}</b>`,
       [
-        escapeHtml(key.detailLine),
         `${ui.statusLineLabel}: <b>${escapeHtml(key.status)}</b>`,
-        key.extraLine ? escapeHtml(key.extraLine) : null,
+        escapeHtml(
+          key.serverLabel
+            ? `${key.expirationSummary} • ${key.serverLabel}`
+            : key.expirationSummary,
+        ),
       ],
     ),
   );
@@ -672,13 +675,13 @@ export function buildTelegramRenewSummaryMessage(input: {
     statsLine: `${input.keys.length} key(s) • ${accessCount} standard • ${premiumCount} premium`,
     intro:
       input.locale === 'my'
-        ? 'Renew လုပ်မည့် key ကို အောက်တွင် ရွေးပါ။'
+        ? 'သက်တမ်းတိုးလိုသော key ကို အောက်တွင် ရွေးပါ။'
         : 'Choose the key you want to renew.',
     cards,
     footerLines: [
       input.locale === 'my'
-        ? 'Button ကိုနှိပ်ပါ သို့မဟုတ် key နံပါတ်ကို reply လုပ်နိုင်ပါသည်။ ရွေးပြီးနောက် renewal package များကို ဆက်ပြပါမည်။'
-        : 'Tap a key button or reply with its number. Renewal packages will appear after you choose one.',
+        ? 'Button ကိုနှိပ်ပါ သို့မဟုတ် key နံပါတ်ကို reply လုပ်နိုင်ပါသည်။ ရွေးပြီးနောက် plan များကို ဆက်ပြပါမည်။'
+        : 'Tap a key button or reply with its number. Plans appear after you choose one.',
     ],
   });
 }
@@ -869,9 +872,9 @@ export async function handleTelegramRenewCommerceView(input: {
       name: key.name,
       kind: 'access' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypeStandard} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: key.server
-        ? `${ui.preferredServerLabel}: ${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: key.server
+        ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
         : null,
     })),
     ...dynamicKeys.map((key) => ({
@@ -879,8 +882,8 @@ export async function handleTelegramRenewCommerceView(input: {
       name: key.name,
       kind: 'dynamic' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypePremium} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: null,
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: null,
     })),
   ];
 
@@ -1458,9 +1461,9 @@ export async function handleRenewOrderCommand(input: {
       name: key.name,
       kind: 'access' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypeStandard} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: key.server
-        ? `${ui.preferredServerLabel}: ${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: key.server
+        ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
         : null,
     })),
     ...dynamicKeys.map((key) => ({
@@ -1468,8 +1471,8 @@ export async function handleRenewOrderCommand(input: {
       name: key.name,
       kind: 'dynamic' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypePremium} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: null,
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: null,
     })),
   ];
 
