@@ -17,10 +17,12 @@ import {
 } from '@/lib/services/telegram-domain-types';
 import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
-import { resolveTelegramWebhookSecret } from '@/lib/telegram-webhook-secret';
+import {
+  resolveTelegramWebhookSecret,
+  TELEGRAM_WEBHOOK_SECRET_HEADER,
+} from '@/lib/telegram-webhook-secret';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
-export const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
 export type TelegramParseMode = 'HTML' | 'Markdown';
 
