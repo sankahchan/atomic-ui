@@ -237,13 +237,28 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
         durationDays: 1,
         requestedName: 'One',
       },
+      {
+        id: 'ord_3',
+        orderCode: 'ORD-3',
+        kind: 'NEW',
+        status: 'AWAITING_PLAN',
+        planName: null,
+        planCode: null,
+        durationMonths: null,
+        durationDays: null,
+        requestedName: null,
+      },
     ] as any,
   });
 
   assert.doesNotMatch(message, /#ORD-1/);
+  assert.doesNotMatch(message, /#ORD-3/);
   assert.doesNotMatch(message, /\[Created\]/);
   assert.doesNotMatch(message, /Next step:/);
+  assert.doesNotMatch(message, /Use \/order ORDER-CODE/);
   assert.match(message, /Premium \/ 1 Month \/ 200 GB • 1m • Two/);
+  assert.match(message, /Status: Awaiting plan selection/);
+  assert.match(message, /\nNew\nStatus: Awaiting plan selection/);
   assert.match(message, /Flow ended • restart available/);
   assert.match(message, /Step 4\/4 • Delivered/);
 });
