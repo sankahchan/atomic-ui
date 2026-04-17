@@ -7,7 +7,7 @@
  * Tap a section to expand and see its details.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +54,7 @@ import {
   Palette,
   Pencil,
   TestTube,
+  Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -302,6 +303,8 @@ export default function SettingsPage() {
   const [balancerPolicyForm, setBalancerPolicyForm] = useState<ServerBalancerPolicyFormState>(
     buildServerBalancerPolicyForm(),
   );
+  const backupUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingBackup, setIsUploadingBackup] = useState(false);
 
   // Fetch current settings
   const { data: settings, isLoading, refetch } = trpc.settings.getAll.useQuery();
@@ -629,6 +632,61 @@ export default function SettingsPage() {
 
   const handleCreateBackup = () => {
     createBackupMutation.mutate();
+  };
+
+  const handleTriggerBackupUpload = () => {
+    backupUploadInputRef.current?.click();
+  };
+
+  const handleBackupUploadSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!selectedFile) {
+      return;
+    }
+
+    setIsUploadingBackup(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('backup', selectedFile);
+
+      const response = await fetch(withBasePath('/api/backup/upload'), {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string' && payload.error.trim().length > 0
+            ? payload.error
+            : 'Backup upload failed.',
+        );
+      }
+
+      toast({
+        title: t('settings.backup.upload_success'),
+        description:
+          payload?.verification?.restoreReady
+            ? `${payload.filename} is ready to restore from the backup list.`
+            : payload?.verification?.error || `${payload.filename} uploaded, but verification failed.`,
+        variant: payload?.verification?.restoreReady ? 'default' : 'destructive',
+      });
+      await Promise.all([
+        refetchBackups(),
+        refetchBackupVerificationHistory(),
+      ]);
+    } catch (error) {
+      toast({
+        title: 'Backup upload failed',
+        description: error instanceof Error ? error.message : 'Backup upload failed.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingBackup(false);
+    }
   };
 
   const handleRestoreBackup = (filename: string) => {
@@ -1215,11 +1273,40 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                <Button onClick={handleCreateBackup} disabled={createBackupMutation.isPending || isRestoreJobRunning} size="sm">
-                  {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  <Save className="w-4 h-4 mr-2" />
-                  {t('settings.backup.create')}
-                </Button>
+                <input
+                  ref={backupUploadInputRef}
+                  type="file"
+                  accept=".db,.sqlite,.bak,.dump,.sql,.zip"
+                  className="hidden"
+                  onChange={handleBackupUploadSelection}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={handleCreateBackup}
+                    disabled={createBackupMutation.isPending || isRestoreJobRunning || isUploadingBackup}
+                    size="sm"
+                  >
+                    {createBackupMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    <Save className="w-4 h-4 mr-2" />
+                    {t('settings.backup.create')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleTriggerBackupUpload}
+                    disabled={isUploadingBackup || createBackupMutation.isPending || isRestoreJobRunning}
+                    size="sm"
+                  >
+                    {isUploadingBackup ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {t('settings.backup.upload')}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload a downloaded <code>.db</code>, <code>.dump</code>, <code>.sql</code>, or legacy <code>.zip</code> backup to add it back to this restore list.
+                </p>
 
                 <div className="space-y-3 md:hidden">
                   {isBackupsLoading ? (

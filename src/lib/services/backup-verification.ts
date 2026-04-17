@@ -1,8 +1,10 @@
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import AdmZip from 'adm-zip';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
@@ -167,6 +169,110 @@ async function inspectSqliteBackupFile(
   }
 }
 
+async function inspectSqliteArchiveBackupFile(
+  filename: string,
+  filePath: string,
+  fileSizeBytes: bigint,
+  fileHashSha256: string,
+): Promise<BackupVerificationSummary> {
+  const details: Record<string, unknown> = {
+    filePath,
+    format: 'sqlite_archive',
+  };
+
+  try {
+    const archive = new AdmZip(filePath);
+    const entries = archive.getEntries().filter((entry) => !entry.isDirectory);
+    details.archiveEntries = entries.map((entry) => entry.entryName);
+
+    const dbEntry = entries.find((entry) => {
+      const basename = path.posix.basename(entry.entryName).toLowerCase();
+      return basename === 'atomic-ui.db'
+        || basename.endsWith('.db')
+        || basename.endsWith('.sqlite')
+        || basename.endsWith('.bak');
+    });
+
+    if (!dbEntry) {
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        'Backup archive does not contain a SQLite database file.',
+        details,
+      );
+    }
+
+    const dbBuffer = dbEntry.getData();
+    const header = dbBuffer.subarray(0, 16).toString('utf8');
+    details.archiveDbEntry = dbEntry.entryName;
+    details.header = header;
+    details.restoredEnvAvailable = entries.some((entry) => entry.entryName === '.env');
+
+    if (!header.startsWith('SQLite format 3')) {
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        'Backup archive does not contain a valid SQLite database.',
+        details,
+      );
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-backup-verify-'));
+    const tempDbPath = path.join(tempDir, `${randomUUID()}.db`);
+    fs.writeFileSync(tempDbPath, dbBuffer);
+
+    try {
+      const [integrityCheck, tableNamesRaw, accessKeyCountRaw, userCountRaw] = await Promise.all([
+        runSqliteQuery(tempDbPath, 'PRAGMA integrity_check;'),
+        runSqliteQuery(tempDbPath, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"),
+        runSqliteQuery(tempDbPath, 'SELECT COUNT(*) FROM "AccessKey";'),
+        runSqliteQuery(tempDbPath, 'SELECT COUNT(*) FROM "User";'),
+      ]);
+
+      const tableNames = tableNamesRaw
+        .split('\n')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const missingTables = BACKUP_EXPECTED_TABLES.filter((tableName) => !tableNames.includes(tableName));
+      const restoreReady = integrityCheck === 'ok' && missingTables.length === 0;
+
+      details.tableNames = tableNames;
+      details.missingTables = missingTables;
+
+      return {
+        filename,
+        status: restoreReady ? 'SUCCESS' : 'FAILED',
+        triggeredBy: undefined,
+        fileSizeBytes,
+        fileHashSha256,
+        restoreReady,
+        integrityCheck,
+        tableCount: tableNames.length,
+        accessKeyCount: Number.parseInt(accessKeyCountRaw || '0', 10),
+        userCount: Number.parseInt(userCountRaw || '0', 10),
+        error: restoreReady
+          ? null
+          : missingTables.length > 0
+            ? `Missing expected tables: ${missingTables.join(', ')}`
+            : `SQLite integrity check failed: ${integrityCheck}`,
+        details,
+      };
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  } catch (error) {
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      error instanceof Error ? error.message : 'Backup archive verification failed.',
+      details,
+    );
+  }
+}
+
 async function inspectPostgresDumpFile(
   filename: string,
   filePath: string,
@@ -249,6 +355,10 @@ export async function inspectBackupFile(filename: string): Promise<BackupVerific
 
   if (fileKind === 'sqlite') {
     return inspectSqliteBackupFile(filename, filePath, fileSizeBytes, fileHashSha256, header);
+  }
+
+  if (fileKind === 'sqlite_archive') {
+    return inspectSqliteArchiveBackupFile(filename, filePath, fileSizeBytes, fileHashSha256);
   }
 
   if (fileKind === 'postgres_dump') {
@@ -342,7 +452,7 @@ export async function verifyLatestBackups(options?: {
 
   const files = fs.existsSync(BACKUP_DIR)
     ? fs.readdirSync(BACKUP_DIR)
-        .filter((file) => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak') || file.endsWith('.dump') || file.endsWith('.sql'))
+        .filter((file) => inferBackupFileKind(file) !== 'unknown')
         .map((file) => ({
           filename: file,
           createdAt: fs.statSync(path.join(BACKUP_DIR, file)).mtime,
