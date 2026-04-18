@@ -1,4 +1,9 @@
-export type BackupFileKind = 'sqlite' | 'postgres_dump' | 'postgres_sql' | 'unknown';
+export type BackupFileKind =
+  | 'sqlite'
+  | 'sqlite_archive'
+  | 'postgres_dump'
+  | 'postgres_sql'
+  | 'unknown';
 
 function normalizeBackupFilename(filename: string) {
   return filename.trim().toLowerCase();
@@ -14,6 +19,10 @@ export function inferBackupFileKind(filename: string, header?: string | null): B
 
   if (normalizedHeader.startsWith('PGDMP')) {
     return 'postgres_dump';
+  }
+
+  if (normalizedFilename.endsWith('.zip')) {
+    return 'sqlite_archive';
   }
 
   if (
@@ -43,9 +52,14 @@ export function buildOfflineRestoreCommand(filename: string, absolutePath: strin
       return `pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$DATABASE_URL" ${absolutePath}`;
     case 'postgres_sql':
       return `psql "$DATABASE_URL" < ${absolutePath}`;
+    case 'sqlite_archive':
     case 'sqlite':
     case 'unknown':
     default:
       return `npm run restore:sqlite -- --backup ${absolutePath}`;
   }
+}
+
+export function isSupportedBackupFileKind(fileKind: BackupFileKind) {
+  return fileKind !== 'unknown';
 }

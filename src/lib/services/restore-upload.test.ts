@@ -50,7 +50,6 @@ test('parseRestoreUploadFormData returns 400 for malformed multipart uploads', a
   assert.equal(result.formData, null);
   assert.deepEqual(result.error, {
     status: 400,
-    error: 'Invalid backup upload. Please choose a backup .zip file and try again.',
+    error: 'Invalid backup upload. Please choose a .db, .dump, .sql, or .zip backup file and try again.',
   });
 });
-

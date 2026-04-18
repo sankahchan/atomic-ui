@@ -5,6 +5,7 @@ import { buildOfflineRestoreCommand, inferBackupFileKind } from './backup-files'
 test('inferBackupFileKind detects sqlite files', () => {
   assert.equal(inferBackupFileKind('backup-2026-04-15.db'), 'sqlite');
   assert.equal(inferBackupFileKind('backup-2026-04-15.anything', 'SQLite format 3'), 'sqlite');
+  assert.equal(inferBackupFileKind('backup-2026-04-15.zip'), 'sqlite_archive');
 });
 
 test('inferBackupFileKind detects postgres dump files', () => {
@@ -24,5 +25,9 @@ test('buildOfflineRestoreCommand returns engine-specific commands', () => {
   assert.equal(
     buildOfflineRestoreCommand('backup.db', '/tmp/backup.db'),
     'npm run restore:sqlite -- --backup /tmp/backup.db',
+  );
+  assert.equal(
+    buildOfflineRestoreCommand('backup.zip', '/tmp/backup.zip'),
+    'npm run restore:sqlite -- --backup /tmp/backup.zip',
   );
 });

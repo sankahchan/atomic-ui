@@ -12,6 +12,7 @@ import { verifyBackupFile } from '@/lib/services/backup-verification';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
 import { ensureBackupDirectory, resolveAppRootDir } from '@/lib/backup-storage';
 import { hasBackupManageScope, hasRestoreManageScope } from '@/lib/admin-scope';
+import { inferBackupFileKind } from '@/lib/backup-files';
 import {
     createRestoreJobRecord,
     hasActiveRestoreJob,
@@ -65,7 +66,7 @@ export const backupRouter = router({
             const files = fs.readdirSync(backupDir);
 
             const backups = files
-                .filter(file => file.endsWith('.db') || file.endsWith('.sqlite') || file.endsWith('.bak') || file.endsWith('.sql') || file.endsWith('.dump'))
+                .filter(file => inferBackupFileKind(file) !== 'unknown')
                 .map(file => {
                     const stats = fs.statSync(path.join(backupDir, file));
                     return {
