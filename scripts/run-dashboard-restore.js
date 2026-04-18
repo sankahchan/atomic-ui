@@ -112,6 +112,24 @@ function runCommand(command, args, options = {}) {
   return result;
 }
 
+function formatMissingPostgresCliMessage(command) {
+  return `${command} is not installed on this server. Install the PostgreSQL client tools (for example: apt-get install -y postgresql-client) and try again.`;
+}
+
+function formatPostgresRestoreError(error, command, fallback) {
+  const message = error instanceof Error ? error.message || '' : String(error || '');
+
+  if (
+    (error && typeof error === 'object' && error.code === 'ENOENT') ||
+    message.includes(`spawn ${command} ENOENT`) ||
+    message.includes(`${command}: command not found`)
+  ) {
+    return formatMissingPostgresCliMessage(command);
+  }
+
+  return message.trim() || fallback;
+}
+
 function waitForServiceActive(serviceName) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const result = spawnSync('systemctl', ['is-active', '--quiet', serviceName], {
@@ -133,15 +151,25 @@ function restorePostgresDump(backupPath) {
     throw new Error('DATABASE_URL is not configured for Postgres restore.');
   }
 
-  runCommand('pg_restore', [
-    '--clean',
-    '--if-exists',
-    '--no-owner',
-    '--no-privileges',
-    '--dbname',
-    process.env.DATABASE_URL,
-    backupPath,
-  ]);
+  try {
+    runCommand('pg_restore', [
+      '--clean',
+      '--if-exists',
+      '--no-owner',
+      '--no-privileges',
+      '--dbname',
+      process.env.DATABASE_URL,
+      backupPath,
+    ]);
+  } catch (error) {
+    throw new Error(
+      formatPostgresRestoreError(
+        error,
+        'pg_restore',
+        'pg_restore failed while restoring the backup.',
+      ),
+    );
+  }
 }
 
 function restorePostgresSql(backupPath) {
@@ -149,12 +177,22 @@ function restorePostgresSql(backupPath) {
     throw new Error('DATABASE_URL is not configured for Postgres restore.');
   }
 
-  runCommand('/bin/bash', ['-lc', 'psql "$DATABASE_URL" < "$BACKUP_PATH"'], {
-    env: {
-      ...process.env,
-      BACKUP_PATH: backupPath,
-    },
-  });
+  try {
+    runCommand('/bin/bash', ['-lc', 'psql "$DATABASE_URL" < "$BACKUP_PATH"'], {
+      env: {
+        ...process.env,
+        BACKUP_PATH: backupPath,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      formatPostgresRestoreError(
+        error,
+        'psql',
+        'psql failed while restoring the backup.',
+      ),
+    );
+  }
 }
 
 function restoreSqlite(appRoot, backupPath) {

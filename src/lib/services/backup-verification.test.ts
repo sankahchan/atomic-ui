@@ -123,3 +123,38 @@ test('inspectBackupFile validates a healthy SQLite archive backup', async (t) =>
   assert.equal(result.accessKeyCount, 1);
   assert.equal(result.error, null);
 });
+
+test('inspectBackupFile rejects Postgres dumps on SQLite runtimes with a clear message', async (t) => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = 'file:./data/atomic-ui.db';
+  t.after(() => {
+    if (typeof previousDatabaseUrl === 'undefined') {
+      delete process.env.DATABASE_URL;
+      return;
+    }
+
+    process.env.DATABASE_URL = previousDatabaseUrl;
+  });
+
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const filename = `test-postgres-backup-${process.pid}-${Date.now()}.dump`;
+  const filePath = path.join(BACKUP_DIR, filename);
+  t.after(() => {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  });
+
+  const header = Buffer.alloc(32);
+  header.write('PGDMP');
+  fs.writeFileSync(filePath, header);
+
+  const result = await inspectBackupFile(filename);
+
+  assert.equal(result.status, 'FAILED');
+  assert.equal(result.restoreReady, false);
+  assert.equal(
+    result.error,
+    'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+  );
+});

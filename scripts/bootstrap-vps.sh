@@ -82,7 +82,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 ${SUDO} apt-get update -qq
-${SUDO} apt-get install -y -qq curl wget git ca-certificates >/dev/null
+${SUDO} apt-get install -y -qq curl wget git ca-certificates postgresql-client >/dev/null
 
 INSTALLER_PATH="/tmp/atomic-ui-install.sh"
 curl -fsSL "https://raw.githubusercontent.com/${BOOTSTRAP_REPO}/${BOOTSTRAP_INSTALL_REF}/install.sh" -o "${INSTALLER_PATH}"

@@ -145,7 +145,7 @@ fi
 # Install dependencies
 echo -e "${BLUE}[*]${NC} Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq git curl wget unzip openssl lsof > /dev/null
+apt-get install -y -qq git curl wget unzip openssl lsof postgresql-client > /dev/null
 
 # Ensure swap exists for low-memory VPS (1GB RAM)
 echo -e "${BLUE}[*]${NC} Checking memory and swap..."

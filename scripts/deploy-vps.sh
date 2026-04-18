@@ -47,6 +47,10 @@ fi
 set -euo pipefail
 
 cd "${APP_DIR}"
+if ! command -v pg_restore >/dev/null 2>&1 || ! command -v pg_dump >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq postgresql-client >/dev/null
+fi
 git pull --ff-only origin "${BRANCH}"
 
 restart_service() {
