@@ -9,10 +9,15 @@ import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
 import { inferBackupFileKind } from '@/lib/backup-files';
+import { resolveDatabaseEngine } from '@/lib/database-engine';
 import {
   BACKUP_DIR as CANONICAL_BACKUP_DIR,
   ensureBackupDirectory as ensureCanonicalBackupDirectory,
 } from '@/lib/backup-storage';
+import {
+  resolveBackupRuntimeCompatibilityMessage,
+  resolvePostgresCliErrorMessage,
+} from '@/lib/services/postgres-cli-errors';
 
 const execFileAsync = promisify(execFile);
 
@@ -110,6 +115,7 @@ async function inspectSqliteBackupFile(
     filePath,
     header,
     format: 'sqlite',
+    runtimeEngine: resolveDatabaseEngine(),
   };
 
   if (!header.startsWith('SQLite format 3')) {
@@ -135,10 +141,14 @@ async function inspectSqliteBackupFile(
       .map((value) => value.trim())
       .filter(Boolean);
     const missingTables = BACKUP_EXPECTED_TABLES.filter((tableName) => !tableNames.includes(tableName));
-    const restoreReady = integrityCheck === 'ok' && missingTables.length === 0;
+    const compatibilityError = resolveBackupRuntimeCompatibilityMessage('sqlite');
+    const restoreReady = integrityCheck === 'ok' && missingTables.length === 0 && !compatibilityError;
 
     details.tableNames = tableNames;
     details.missingTables = missingTables;
+    if (compatibilityError) {
+      details.runtimeCompatibilityError = compatibilityError;
+    }
 
     return {
       filename,
@@ -151,11 +161,13 @@ async function inspectSqliteBackupFile(
       tableCount: tableNames.length,
       accessKeyCount: Number.parseInt(accessKeyCountRaw || '0', 10),
       userCount: Number.parseInt(userCountRaw || '0', 10),
-      error: restoreReady
-        ? null
-        : missingTables.length > 0
-          ? `Missing expected tables: ${missingTables.join(', ')}`
-          : `SQLite integrity check failed: ${integrityCheck}`,
+      error:
+        compatibilityError ||
+        (restoreReady
+          ? null
+          : missingTables.length > 0
+            ? `Missing expected tables: ${missingTables.join(', ')}`
+            : `SQLite integrity check failed: ${integrityCheck}`),
       details,
     };
   } catch (error) {
@@ -178,6 +190,7 @@ async function inspectSqliteArchiveBackupFile(
   const details: Record<string, unknown> = {
     filePath,
     format: 'sqlite_archive',
+    runtimeEngine: resolveDatabaseEngine(),
   };
 
   try {
@@ -236,10 +249,14 @@ async function inspectSqliteArchiveBackupFile(
         .map((value) => value.trim())
         .filter(Boolean);
       const missingTables = BACKUP_EXPECTED_TABLES.filter((tableName) => !tableNames.includes(tableName));
-      const restoreReady = integrityCheck === 'ok' && missingTables.length === 0;
+      const compatibilityError = resolveBackupRuntimeCompatibilityMessage('sqlite_archive');
+      const restoreReady = integrityCheck === 'ok' && missingTables.length === 0 && !compatibilityError;
 
       details.tableNames = tableNames;
       details.missingTables = missingTables;
+      if (compatibilityError) {
+        details.runtimeCompatibilityError = compatibilityError;
+      }
 
       return {
         filename,
@@ -252,11 +269,13 @@ async function inspectSqliteArchiveBackupFile(
         tableCount: tableNames.length,
         accessKeyCount: Number.parseInt(accessKeyCountRaw || '0', 10),
         userCount: Number.parseInt(userCountRaw || '0', 10),
-        error: restoreReady
-          ? null
-          : missingTables.length > 0
-            ? `Missing expected tables: ${missingTables.join(', ')}`
-            : `SQLite integrity check failed: ${integrityCheck}`,
+        error:
+          compatibilityError ||
+          (restoreReady
+            ? null
+            : missingTables.length > 0
+              ? `Missing expected tables: ${missingTables.join(', ')}`
+              : `SQLite integrity check failed: ${integrityCheck}`),
         details,
       };
     } finally {
@@ -284,6 +303,7 @@ async function inspectPostgresDumpFile(
     filePath,
     header,
     format: 'postgres_dump',
+    runtimeEngine: resolveDatabaseEngine(),
   };
 
   if (!header.startsWith('PGDMP')) {
@@ -292,6 +312,18 @@ async function inspectPostgresDumpFile(
       fileSizeBytes,
       fileHashSha256,
       'Backup file is not a valid Postgres custom dump.',
+      details,
+    );
+  }
+
+  const compatibilityError = resolveBackupRuntimeCompatibilityMessage('postgres_dump');
+  if (compatibilityError) {
+    details.runtimeCompatibilityError = compatibilityError;
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      compatibilityError,
       details,
     );
   }
@@ -333,7 +365,11 @@ async function inspectPostgresDumpFile(
       filename,
       fileSizeBytes,
       fileHashSha256,
-      error instanceof Error ? error.message : 'pg_restore failed while inspecting the dump.',
+      resolvePostgresCliErrorMessage(
+        error,
+        'pg_restore',
+        'pg_restore failed while inspecting the dump.',
+      ),
       details,
     );
   }

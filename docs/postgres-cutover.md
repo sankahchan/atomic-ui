@@ -115,5 +115,6 @@ npm run smoke -- --base-url=http://127.0.0.1:2053/your-panel-path --email=admin 
 ## Notes
 
 - Dashboard backup creation can emit Postgres `.dump` archives from the settings workspace, but restore is still offline-only. Use `pg_restore --dbname "$DATABASE_URL" /absolute/path/to/backup.dump` when restoring Postgres backups.
+- The target Atomic-UI instance must also be running on Postgres, and the host needs PostgreSQL client tools installed (`pg_dump`, `pg_restore`, `psql`). On Debian/Ubuntu, install them with `apt-get install -y postgresql-client`.
 - Keep the SQLite safety backup until you have completed smoke tests and at least one clean production backup on Postgres.
 - Run the export and import from the same Git commit so the manifest model order and Prisma schema stay aligned.

@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { resolveDatabaseEngine, resolveSqliteDbPathFromUrl } from '@/lib/database-engine';
+import { resolvePostgresCliErrorMessage } from '@/lib/services/postgres-cli-errors';
 
 const execFileAsync = promisify(execFile);
 
@@ -103,9 +104,11 @@ export async function createRuntimeBackup(outputDir: string, databaseUrl = proce
       }
 
       throw new Error(
-        error instanceof Error
-          ? error.message
-          : 'pg_dump failed while creating the Postgres backup.',
+        resolvePostgresCliErrorMessage(
+          error,
+          'pg_dump',
+          'pg_dump failed while creating the Postgres backup.',
+        ),
       );
     }
 
