@@ -27,6 +27,7 @@ For turning a fresh server into a restored copy of an existing production server
    - panel domain only
    - panel domain + public share subdomain
 5. Choose non-default admin credentials for production.
+6. Decide whether the VPS should start on `sqlite` or `postgres`.
 
 ## Quick usage
 
@@ -55,6 +56,23 @@ BOOTSTRAP_TELEGRAM_BOT_TOKEN='123456:ABCDEF' \
 bash scripts/bootstrap-vps.sh
 ```
 
+### Replacement server bootstrap directly to Postgres
+
+Use this when the new VPS is intended to restore a production Postgres `.dump` later:
+
+```bash
+BOOTSTRAP_HOST=152.42.255.135 \
+BOOTSTRAP_PASSWORD='your-vps-password' \
+BOOTSTRAP_DATABASE_ENGINE='postgres' \
+BOOTSTRAP_POSTGRES_DB='atomic_ui' \
+BOOTSTRAP_POSTGRES_USER='atomic_ui_app' \
+BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='temporary-password' \
+bash scripts/bootstrap-vps.sh
+```
+
+If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` instead.
+
 ## Supported inputs
 
 | Variable | Purpose |
@@ -65,6 +83,13 @@ bash scripts/bootstrap-vps.sh
 | `BOOTSTRAP_REPO` | GitHub repo slug. Defaults to `sankahchan/atomic-ui`. |
 | `BOOTSTRAP_INSTALL_REF` | Branch, tag, or commit SHA to install. Defaults to `main`. |
 | `BOOTSTRAP_INSTALL_HTTPS` | `auto`, `require`, or `false`. Defaults to `auto`. |
+| `BOOTSTRAP_DATABASE_ENGINE` | `sqlite` or `postgres`. Defaults to `sqlite`. |
+| `BOOTSTRAP_DATABASE_URL` | Optional Postgres connection string. If set, the installer uses it instead of creating a local Postgres database. |
+| `BOOTSTRAP_POSTGRES_HOST` | Host for installer-managed Postgres. Defaults to `127.0.0.1`. |
+| `BOOTSTRAP_POSTGRES_PORT` | Port for installer-managed Postgres. Defaults to `5432`. |
+| `BOOTSTRAP_POSTGRES_DB` | Database name for installer-managed Postgres. Defaults to `atomic_ui`. |
+| `BOOTSTRAP_POSTGRES_USER` | User name for installer-managed Postgres. Defaults to `atomic_ui_app`. |
+| `BOOTSTRAP_POSTGRES_PASSWORD` | Optional password for installer-managed Postgres. If omitted, the installer generates one and writes it into `.env`. |
 | `BOOTSTRAP_ACME_EMAIL` | Email used for certificate setup. |
 | `BOOTSTRAP_PANEL_DOMAIN` | Canonical admin domain. Optional. |
 | `BOOTSTRAP_PUBLIC_SHARE_DOMAIN` | Public share/client host. Optional. |
@@ -82,6 +107,7 @@ bash scripts/bootstrap-vps.sh
    - login page loads
    - dashboard loads
    - share page host is correct
+   - database engine matches what you asked for
 5. If Telegram is configured, sign in to the dashboard Notifications workspace and use the webhook set/reset controls there.
 6. Confirm inbound Telegram delivery against the public panel URL after the webhook is set.
 

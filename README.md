@@ -96,6 +96,7 @@ bash scripts/bootstrap-vps.sh
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS examples and the full checklist.
 
 If the new server needs to become a restored copy of an existing production server, follow [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
+You can now bootstrap directly onto Postgres with `BOOTSTRAP_DATABASE_ENGINE=postgres`.
 
 ## Production Workflow
 

@@ -27,6 +27,13 @@ GITHUB_REPO="sankahchan/atomic-ui"
 DEFAULT_PORT=2053  # Fixed port like 3x-ui
 CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
+INSTALL_DATABASE_ENGINE_INPUT="${INSTALL_DATABASE_ENGINE:-${DATABASE_ENGINE:-sqlite}}"
+INSTALL_DATABASE_URL_INPUT="${INSTALL_DATABASE_URL:-}"
+INSTALL_POSTGRES_HOST_INPUT="${INSTALL_POSTGRES_HOST:-127.0.0.1}"
+INSTALL_POSTGRES_PORT_INPUT="${INSTALL_POSTGRES_PORT:-5432}"
+INSTALL_POSTGRES_DB_INPUT="${INSTALL_POSTGRES_DB:-atomic_ui}"
+INSTALL_POSTGRES_USER_INPUT="${INSTALL_POSTGRES_USER:-atomic_ui_app}"
+INSTALL_POSTGRES_PASSWORD_INPUT="${INSTALL_POSTGRES_PASSWORD:-}"
 ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
 PANEL_DOMAIN_INPUT="${PANEL_DOMAIN:-}"
 PUBLIC_SHARE_DOMAIN_INPUT="${PUBLIC_SHARE_DOMAIN:-}"
@@ -47,6 +54,25 @@ normalize_host() {
     value="${value#https://}"
     value="${value%%/*}"
     echo "${value,,}"
+}
+
+normalize_database_engine() {
+    case "${1,,}" in
+        postgres|postgresql) echo "postgres" ;;
+        ""|sqlite) echo "sqlite" ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+require_simple_postgres_identifier() {
+    local label="$1"
+    local value="$2"
+    if [[ ! "${value}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo -e "${RED}[✗]${NC} ${label} must match ^[A-Za-z_][A-Za-z0-9_]*$ for installer-managed Postgres"
+        exit 1
+    fi
 }
 
 set_env_var() {
@@ -110,6 +136,26 @@ fi
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN_INPUT}")"
 PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN_INPUT}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK_INPUT}")"
+INSTALL_DATABASE_ENGINE="$(normalize_database_engine "${INSTALL_DATABASE_ENGINE_INPUT}")"
+
+if [ -z "${INSTALL_DATABASE_ENGINE}" ]; then
+    echo -e "${RED}[✗]${NC} INSTALL_DATABASE_ENGINE must be sqlite or postgres"
+    exit 1
+fi
+
+if [ -n "${INSTALL_DATABASE_URL_INPUT}" ] && [[ ! "${INSTALL_DATABASE_URL_INPUT}" =~ ^postgres(ql)?:// ]]; then
+    echo -e "${RED}[✗]${NC} INSTALL_DATABASE_URL must be a Postgres connection string"
+    exit 1
+fi
+
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ] && [ -z "${INSTALL_DATABASE_URL_INPUT}" ]; then
+    require_simple_postgres_identifier "INSTALL_POSTGRES_DB" "${INSTALL_POSTGRES_DB_INPUT}"
+    require_simple_postgres_identifier "INSTALL_POSTGRES_USER" "${INSTALL_POSTGRES_USER_INPUT}"
+    if [[ ! "${INSTALL_POSTGRES_PORT_INPUT}" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}[✗]${NC} INSTALL_POSTGRES_PORT must be numeric"
+        exit 1
+    fi
+fi
 
 if [ -n "${PANEL_DOMAIN}" ] && [ "${PUBLIC_SHARE_DOMAIN}" = "${PANEL_DOMAIN}" ]; then
     echo -e "${RED}[✗]${NC} PUBLIC_SHARE_DOMAIN must be different from PANEL_DOMAIN"
@@ -145,7 +191,11 @@ fi
 # Install dependencies
 echo -e "${BLUE}[*]${NC} Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq git curl wget unzip openssl lsof postgresql-client > /dev/null
+SYSTEM_PACKAGES=(git curl wget unzip openssl lsof postgresql-client)
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ]; then
+    SYSTEM_PACKAGES+=(postgresql)
+fi
+apt-get install -y -qq "${SYSTEM_PACKAGES[@]}" > /dev/null
 
 # Ensure swap exists for low-memory VPS (1GB RAM)
 echo -e "${BLUE}[*]${NC} Checking memory and swap..."
@@ -385,7 +435,53 @@ fi
 echo -e "${BLUE}[*]${NC} Setting up database..."
 mkdir -p prisma/data
 DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
-set_env_var "DATABASE_URL" "file:${DB_PATH}"
+DATABASE_URL_VALUE="file:${DB_PATH}"
+INSTALL_DATABASE_MODE_NOTE="SQLite"
+INSTALL_DATABASE_SUMMARY_LABEL="SQLite file"
+INSTALL_DATABASE_SUMMARY_VALUE="${DB_PATH}"
+
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ]; then
+    echo -e "${BLUE}[*]${NC} Preparing Postgres runtime..."
+    if [ -n "${INSTALL_DATABASE_URL_INPUT}" ]; then
+        DATABASE_URL_VALUE="${INSTALL_DATABASE_URL_INPUT}"
+        INSTALL_DATABASE_MODE_NOTE="Postgres (custom DATABASE_URL)"
+        INSTALL_DATABASE_SUMMARY_LABEL="Postgres URL source"
+        INSTALL_DATABASE_SUMMARY_VALUE="Provided by INSTALL_DATABASE_URL"
+    else
+        POSTGRES_PASSWORD="${INSTALL_POSTGRES_PASSWORD_INPUT}"
+        if [ -z "${POSTGRES_PASSWORD}" ]; then
+            POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+        fi
+        POSTGRES_USER="${INSTALL_POSTGRES_USER_INPUT}"
+        POSTGRES_DB="${INSTALL_POSTGRES_DB_INPUT}"
+        POSTGRES_HOST="${INSTALL_POSTGRES_HOST_INPUT}"
+        POSTGRES_PORT="${INSTALL_POSTGRES_PORT_INPUT}"
+
+        systemctl enable --now postgresql > /dev/null 2>&1
+
+        su postgres -c "psql -v ON_ERROR_STOP=1" <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${POSTGRES_USER}') THEN
+    CREATE ROLE "${POSTGRES_USER}" LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  ELSE
+    ALTER ROLE "${POSTGRES_USER}" WITH LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  END IF;
+END
+\$\$;
+SELECT 'CREATE DATABASE "${POSTGRES_DB}" OWNER "${POSTGRES_USER}"'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${POSTGRES_DB}')\gexec
+ALTER DATABASE "${POSTGRES_DB}" OWNER TO "${POSTGRES_USER}";
+SQL
+
+        DATABASE_URL_VALUE="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        INSTALL_DATABASE_MODE_NOTE="Postgres (local managed database)"
+        INSTALL_DATABASE_SUMMARY_LABEL="Postgres database"
+        INSTALL_DATABASE_SUMMARY_VALUE="${POSTGRES_DB} (${POSTGRES_USER}@${POSTGRES_HOST}:${POSTGRES_PORT})"
+    fi
+fi
+
+set_env_var "DATABASE_URL" "${DATABASE_URL_VALUE}"
 
 echo -e "${BLUE}[*]${NC} Generating Prisma client..."
 if ! sh scripts/prisma-command.sh generate 2>&1; then
@@ -553,6 +649,8 @@ echo -e "${CYAN}│${NC}  ${YELLOW}Share host:${NC} ${GREEN}${PUBLIC_SHARE_DOMAI
 fi
 echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Database engine:${NC} ${GREEN}${INSTALL_DATABASE_MODE_NOTE}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}${INSTALL_DATABASE_SUMMARY_LABEL}:${NC} ${GREEN}${INSTALL_DATABASE_SUMMARY_VALUE}${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Initial login credentials:${NC}"
 echo -e "${CYAN}│${NC}  Username: ${GREEN}${DEFAULT_ADMIN_USERNAME_INPUT}${NC}"
