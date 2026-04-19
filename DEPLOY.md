@@ -101,6 +101,7 @@ bash scripts/bootstrap-vps.sh
 ```
 
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the full checklist and all supported inputs.
+If the new host must restore a production backup and become a replacement server, continue with [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
 
 ### 1. First-time install
 
@@ -257,6 +258,8 @@ For SQLite-to-Postgres migrations, replace the dashboard backup/restore steps wi
 1. `npm run db:cutover:export`
 2. `npm run db:cutover:import`
 3. `npm run db:cutover:verify`
+
+If you are standing up a separate replacement VPS from an existing production Postgres backup instead of migrating one host in place, use [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md).
 
 If a direct VPS deploy fails:
 
