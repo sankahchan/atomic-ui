@@ -41,11 +41,14 @@ This server is using SQLite. Postgres backups can only be restored on servers co
 
 ### 1. Bootstrap the new VPS
 
+Preferred path now: bootstrap the new VPS directly on Postgres so it is restore-ready from the start.
+
 Use the workstation bootstrap wrapper:
 
 ```bash
 BOOTSTRAP_HOST=your-server-ip \
 BOOTSTRAP_PASSWORD='your-vps-password' \
+BOOTSTRAP_DATABASE_ENGINE='postgres' \
 BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
 BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='temporary-password' \
 bash scripts/bootstrap-vps.sh
@@ -83,6 +86,8 @@ cp prisma/data/atomic-ui.db "${SAFETY_DIR}/atomic-ui-pre-postgres.db"
 ```
 
 ### 3. Convert the target server to Postgres
+
+Skip this step if you already bootstrapped with `BOOTSTRAP_DATABASE_ENGINE=postgres`.
 
 Install the required packages:
 
