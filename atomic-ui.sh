@@ -340,32 +340,6 @@ setup_repository() {
     cd "$INSTALL_DIR" || return 1
 }
 
-# Install npm dependencies
-install_npm_deps() {
-    print_step "Installing npm dependencies (clean install)..."
-    cd "$INSTALL_DIR" || return 1
-    rm -rf node_modules .next package-lock.json
-
-    print_step "Running npm install (this may take a few minutes)..."
-    if ! npm install --production=false 2>&1; then
-        print_error "npm install failed"
-        print_info "Trying with --legacy-peer-deps..."
-        if ! npm install --production=false --legacy-peer-deps 2>&1; then
-            print_error "npm install failed even with --legacy-peer-deps"
-            print_info "Please check your Node.js version and try again"
-            return 1
-        fi
-    fi
-
-    # Verify node_modules was created
-    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-        print_error "node_modules directory not found after npm install"
-        return 1
-    fi
-
-    print_success "npm dependencies installed"
-}
-
 # Setup environment
 setup_environment() {
     local NEW_PORT=$1
@@ -411,6 +385,32 @@ setup_environment() {
     fi
 
     print_success "Environment configured with port ${NEW_PORT}"
+}
+
+# Install npm dependencies
+install_npm_deps() {
+    print_step "Installing npm dependencies (clean install)..."
+    cd "$INSTALL_DIR" || return 1
+    rm -rf node_modules .next package-lock.json
+
+    print_step "Running npm install (this may take a few minutes)..."
+    if ! npm install --production=false 2>&1; then
+        print_error "npm install failed"
+        print_info "Trying with --legacy-peer-deps..."
+        if ! npm install --production=false --legacy-peer-deps 2>&1; then
+            print_error "npm install failed even with --legacy-peer-deps"
+            print_info "Please check your Node.js version and try again"
+            return 1
+        fi
+    fi
+
+    # Verify node_modules was created
+    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
+        print_error "node_modules directory not found after npm install"
+        return 1
+    fi
+
+    print_success "npm dependencies installed"
 }
 
 # Setup database
@@ -1634,14 +1634,14 @@ install_full() {
         return 1
     fi
     
-    if ! install_npm_deps; then
-        print_error "Failed to install npm dependencies"
+    if ! setup_environment "$NEW_PORT"; then
+        print_error "Failed to setup environment"
         cleanup_failed_install
         return 1
     fi
-    
-    if ! setup_environment "$NEW_PORT"; then
-        print_error "Failed to setup environment"
+
+    if ! install_npm_deps; then
+        print_error "Failed to install npm dependencies"
         cleanup_failed_install
         return 1
     fi
