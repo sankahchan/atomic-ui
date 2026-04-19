@@ -95,6 +95,8 @@ bash scripts/bootstrap-vps.sh
 
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS examples and the full checklist.
 
+If the new server needs to become a restored copy of an existing production server, follow [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
+
 ## Production Workflow
 
 ### Validate, typecheck, build
@@ -217,6 +219,7 @@ npm run db:studio
 - [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
 - [docs/postgres-cutover.md](docs/postgres-cutover.md): SQLite to Postgres cutover runbook
 - [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
+- [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md): recovery server from a production backup
 - [docs/worker-setup.md](docs/worker-setup.md): usage snapshot worker setup
 
 ## Project Structure

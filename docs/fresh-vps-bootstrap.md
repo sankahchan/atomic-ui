@@ -15,6 +15,7 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 It is intended for **first-time installs** on a clean VPS.
 
 For updates on an existing server, use `scripts/deploy-vps.sh` instead.
+For turning a fresh server into a restored copy of an existing production server, continue with [new-server-from-production-backup.md](new-server-from-production-backup.md) after bootstrap.
 
 ## Before you run it
 
@@ -98,3 +99,4 @@ Atomic-UI registers Telegram webhooks with a secret token and rejects incoming w
 
 - use `scripts/deploy-vps.sh` for normal updates
 - use `install.sh` directly if you are already logged into the VPS and want to install from inside the server
+- use [new-server-from-production-backup.md](new-server-from-production-backup.md) when the fresh server must restore a production backup and become a live replacement
