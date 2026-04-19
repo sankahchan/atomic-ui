@@ -71,6 +71,8 @@ docker-compose up -d --build
 wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
+Fresh VPS installs now default to a local Postgres runtime so production `.dump` backups can be restored onto replacement servers without an extra database conversion step.
+
 The installer now prefers HTTPS by default. If HTTPS setup fails, it falls back to HTTP and prints the next steps.
 
 Useful install-time overrides:
@@ -80,6 +82,7 @@ sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubuserconte
 sudo env INSTALL_HTTPS=false bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_DATABASE_ENGINE=sqlite bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 ```
 
 ### Fresh VPS bootstrap from your workstation
@@ -96,7 +99,7 @@ bash scripts/bootstrap-vps.sh
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS examples and the full checklist.
 
 If the new server needs to become a restored copy of an existing production server, follow [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
-You can now bootstrap directly onto Postgres with `BOOTSTRAP_DATABASE_ENGINE=postgres`.
+Fresh VPS bootstrap now defaults to Postgres too. If you intentionally want SQLite instead, set `BOOTSTRAP_DATABASE_ENGINE=sqlite`.
 
 ## Production Workflow
 

@@ -27,7 +27,7 @@ You need:
 
 ## Important rule
 
-Fresh Atomic-UI installs still default to SQLite.
+Fresh VPS installs through `install.sh` and `scripts/bootstrap-vps.sh` now default to Postgres.
 
 A Postgres `.dump` backup can only be restored onto a server that is also configured with a Postgres `DATABASE_URL`.
 
@@ -48,7 +48,6 @@ Use the workstation bootstrap wrapper:
 ```bash
 BOOTSTRAP_HOST=your-server-ip \
 BOOTSTRAP_PASSWORD='your-vps-password' \
-BOOTSTRAP_DATABASE_ENGINE='postgres' \
 BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
 BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='temporary-password' \
 bash scripts/bootstrap-vps.sh
@@ -64,14 +63,14 @@ Verify after bootstrap:
 
 ### 2. Take a safety snapshot of the new server
 
-Before you change database engines, keep a rollback copy of the fresh server state.
+Before you restore production data, keep a rollback copy of the fresh server state.
 
 Recommended items to save:
 
 - `/opt/atomic-ui/.env`
 - `/opt/atomic-ui/.panel_path`
 - `/opt/atomic-ui/.panel_port`
-- `/opt/atomic-ui/prisma/data/atomic-ui.db`
+- `/opt/atomic-ui/prisma/data/atomic-ui.db` if a SQLite file exists
 
 Example:
 
@@ -79,15 +78,15 @@ Example:
 cd /opt/atomic-ui
 SAFETY_DIR="storage/migration-safety/$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 mkdir -p "${SAFETY_DIR}"
-cp .env "${SAFETY_DIR}/.env.pre-postgres"
+cp .env "${SAFETY_DIR}/.env.pre-restore"
 cp .panel_path "${SAFETY_DIR}/.panel_path" 2>/dev/null || true
 cp .panel_port "${SAFETY_DIR}/.panel_port" 2>/dev/null || true
-cp prisma/data/atomic-ui.db "${SAFETY_DIR}/atomic-ui-pre-postgres.db"
+cp prisma/data/atomic-ui.db "${SAFETY_DIR}/atomic-ui-pre-restore.db" 2>/dev/null || true
 ```
 
 ### 3. Convert the target server to Postgres
 
-Skip this step if you already bootstrapped with `BOOTSTRAP_DATABASE_ENGINE=postgres`.
+Skip this step unless the target is an older SQLite install or you explicitly opted into `BOOTSTRAP_DATABASE_ENGINE=sqlite`.
 
 Install the required packages:
 
