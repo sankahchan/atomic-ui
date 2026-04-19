@@ -39,6 +39,20 @@ export interface BackupVerificationSummary {
   details: Record<string, unknown>;
 }
 
+type BackupVerificationRecordLike = {
+  id: string;
+  filename: string;
+  status: string;
+  fileHashSha256: string | null;
+  restoreReady: boolean;
+  integrityCheck: string | null;
+  tableCount: number | null;
+  accessKeyCount: number | null;
+  userCount: number | null;
+  error: string | null;
+  verifiedAt: Date;
+};
+
 function ensureBackupDirectory() {
   ensureCanonicalBackupDirectory();
 }
@@ -102,6 +116,30 @@ function buildFailedVerificationSummary(
     error,
     details,
   };
+}
+
+export function shouldReuseSchedulerFailureVerification(
+  summary: BackupVerificationSummary,
+  latest: BackupVerificationRecordLike | null,
+) {
+  if (!latest) {
+    return false;
+  }
+
+  if (summary.status !== 'FAILED' || latest.status !== 'FAILED') {
+    return false;
+  }
+
+  return (
+    latest.filename === summary.filename &&
+    latest.fileHashSha256 === summary.fileHashSha256 &&
+    latest.restoreReady === summary.restoreReady &&
+    latest.integrityCheck === summary.integrityCheck &&
+    latest.tableCount === summary.tableCount &&
+    latest.accessKeyCount === summary.accessKeyCount &&
+    latest.userCount === summary.userCount &&
+    latest.error === summary.error
+  );
 }
 
 async function inspectSqliteBackupFile(
@@ -471,6 +509,35 @@ export async function verifyBackupFile(
 ) {
   const summary = await inspectBackupFile(filename);
   summary.triggeredBy = options?.triggeredBy ?? summary.triggeredBy;
+
+  if (options?.triggeredBy === 'scheduler') {
+    const latestVerification = await db.backupVerification.findFirst({
+      where: { filename },
+      orderBy: { verifiedAt: 'desc' },
+      select: {
+        id: true,
+        filename: true,
+        status: true,
+        fileHashSha256: true,
+        restoreReady: true,
+        integrityCheck: true,
+        tableCount: true,
+        accessKeyCount: true,
+        userCount: true,
+        error: true,
+        verifiedAt: true,
+      },
+    });
+
+    if (latestVerification && shouldReuseSchedulerFailureVerification(summary, latestVerification)) {
+      return {
+        ...summary,
+        id: latestVerification.id,
+        verifiedAt: latestVerification.verifiedAt,
+      };
+    }
+  }
+
   const verification = await recordBackupVerification(summary, options);
 
   return {

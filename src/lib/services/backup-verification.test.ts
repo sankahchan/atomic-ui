@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import AdmZip from 'adm-zip';
-import { BACKUP_DIR, inspectBackupFile } from './backup-verification';
+import {
+  BACKUP_DIR,
+  inspectBackupFile,
+  shouldReuseSchedulerFailureVerification,
+  type BackupVerificationSummary,
+} from './backup-verification';
 
 function ensureSqliteCli() {
   const result = spawnSync('sqlite3', ['-version'], { encoding: 'utf8' });
@@ -156,5 +161,59 @@ test('inspectBackupFile rejects Postgres dumps on SQLite runtimes with a clear m
   assert.equal(
     result.error,
     'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+  );
+});
+
+test('shouldReuseSchedulerFailureVerification only reuses identical failed summaries', () => {
+  const summary: BackupVerificationSummary = {
+    filename: 'backup.dump',
+    status: 'FAILED',
+    triggeredBy: 'scheduler',
+    fileSizeBytes: BigInt(123),
+    fileHashSha256: 'abc123',
+    restoreReady: false,
+    integrityCheck: null,
+    tableCount: null,
+    accessKeyCount: null,
+    userCount: null,
+    error: 'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+    details: {
+      format: 'postgres_dump',
+      runtimeEngine: 'sqlite',
+    },
+  };
+
+  assert.equal(
+    shouldReuseSchedulerFailureVerification(summary, {
+      id: 'verification-1',
+      filename: 'backup.dump',
+      status: 'FAILED',
+      fileHashSha256: 'abc123',
+      restoreReady: false,
+      integrityCheck: null,
+      tableCount: null,
+      accessKeyCount: null,
+      userCount: null,
+      error: 'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+      verifiedAt: new Date('2026-04-19T09:00:00.000Z'),
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldReuseSchedulerFailureVerification(summary, {
+      id: 'verification-2',
+      filename: 'backup.dump',
+      status: 'FAILED',
+      fileHashSha256: 'changed',
+      restoreReady: false,
+      integrityCheck: null,
+      tableCount: null,
+      accessKeyCount: null,
+      userCount: null,
+      error: 'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+      verifiedAt: new Date('2026-04-19T09:00:00.000Z'),
+    }),
+    false,
   );
 });
