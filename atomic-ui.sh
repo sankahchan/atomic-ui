@@ -401,10 +401,13 @@ setup_environment() {
     # Save port to file
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
 
-    if grep -q "^DATABASE_URL=" .env; then
+    CURRENT_DATABASE_URL=$(grep "^DATABASE_URL=" .env | cut -d'=' -f2- | tr -d '"' || true)
+    if [ -z "${CURRENT_DATABASE_URL}" ]; then
+        echo "DATABASE_URL=file:${DB_PATH}" >> .env
+    elif [[ "${CURRENT_DATABASE_URL}" == file:* ]]; then
         sed -i "s|^DATABASE_URL=.*|DATABASE_URL=file:${DB_PATH}|g" .env
     else
-        echo "DATABASE_URL=file:${DB_PATH}" >> .env
+        print_info "Preserving existing non-SQLite DATABASE_URL"
     fi
 
     print_success "Environment configured with port ${NEW_PORT}"
@@ -491,35 +494,13 @@ create_service() {
         WORKING_DIR="${INSTALL_DIR}"
     fi
 
-    cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
-[Unit]
-Description=Atomic-UI - Outline VPN Management Panel
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${WORKING_DIR}
-ExecStart=${EXEC_START}
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${SERVICE_NAME}
-Environment=NODE_ENV=production
-Environment=PORT=${PORT}
-Environment=HOSTNAME=0.0.0.0
-Environment=NODE_OPTIONS=--max-old-space-size=512
-EnvironmentFile=-${INSTALL_DIR}/.env
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    if ! systemctl daemon-reload; then
-        print_error "Failed to reload systemd daemon"
-        return 1
-    fi
+    APP_DIR="${INSTALL_DIR}" \
+    SERVICE_NAME="${SERVICE_NAME}.service" \
+    PORT_FALLBACK="${PORT}" \
+    NODE_OPTIONS_VALUE="--max-old-space-size=512" \
+    EXEC_START="${EXEC_START}" \
+    WORKING_DIR="${WORKING_DIR}" \
+        bash "${INSTALL_DIR}/scripts/sync-systemd-service.sh"
 
     if ! systemctl enable ${SERVICE_NAME} 2>&1; then
         print_error "Failed to enable service"
@@ -1395,10 +1376,11 @@ change_port() {
     
     # Save new port
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
-    
-    # Update systemd service
-    sed -i "s|Environment=PORT=.*|Environment=PORT=${NEW_PORT}|g" /etc/systemd/system/${SERVICE_NAME}.service
-    systemctl daemon-reload
+
+    if ! create_service "${NEW_PORT}"; then
+        print_error "Failed to refresh systemd service"
+        return 1
+    fi
     
     # Add new firewall rule
     setup_firewall "${NEW_PORT}"
@@ -1493,6 +1475,11 @@ update_service() {
     
     print_step "Building application..."
     NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+
+    if ! create_service "${CURRENT_PORT}"; then
+        print_error "Failed to refresh systemd service"
+        exit 1
+    fi
     
     # Update management script
     cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui.tmp
