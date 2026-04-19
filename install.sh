@@ -27,7 +27,7 @@ GITHUB_REPO="sankahchan/atomic-ui"
 DEFAULT_PORT=2053  # Fixed port like 3x-ui
 CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
-INSTALL_DATABASE_ENGINE_INPUT="${INSTALL_DATABASE_ENGINE:-${DATABASE_ENGINE:-sqlite}}"
+INSTALL_DATABASE_ENGINE_INPUT="${INSTALL_DATABASE_ENGINE:-${DATABASE_ENGINE:-postgres}}"
 INSTALL_DATABASE_URL_INPUT="${INSTALL_DATABASE_URL:-}"
 INSTALL_POSTGRES_HOST_INPUT="${INSTALL_POSTGRES_HOST:-127.0.0.1}"
 INSTALL_POSTGRES_PORT_INPUT="${INSTALL_POSTGRES_PORT:-5432}"
@@ -63,6 +63,13 @@ normalize_database_engine() {
         *)
             echo ""
             ;;
+    esac
+}
+
+is_local_postgres_host() {
+    case "${1,,}" in
+        127.0.0.1|localhost|::1|'[::1]') return 0 ;;
+        *) return 1 ;;
     esac
 }
 
@@ -153,6 +160,10 @@ if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ] && [ -z "${INSTALL_DATABASE_URL
     require_simple_postgres_identifier "INSTALL_POSTGRES_USER" "${INSTALL_POSTGRES_USER_INPUT}"
     if [[ ! "${INSTALL_POSTGRES_PORT_INPUT}" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[✗]${NC} INSTALL_POSTGRES_PORT must be numeric"
+        exit 1
+    fi
+    if ! is_local_postgres_host "${INSTALL_POSTGRES_HOST_INPUT}"; then
+        echo -e "${RED}[✗]${NC} INSTALL_POSTGRES_HOST must be local when installer manages Postgres; use INSTALL_DATABASE_URL for remote Postgres"
         exit 1
     fi
 fi

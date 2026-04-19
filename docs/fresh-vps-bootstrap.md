@@ -8,7 +8,7 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 - installs the minimal system packages needed to run the installer
 - downloads `install.sh` from the GitHub ref you choose
 - runs the normal Atomic-UI installer with your panel/share domain settings
-- applies the Prisma schema through the repo's non-interactive safety wrapper so fresh SQLite installs do not stall on a confirmation prompt
+- applies the Prisma schema through the repo's non-interactive safety wrapper so fresh installs do not stall on a confirmation prompt
 - verifies that `atomic-ui.service` is running
 - probes the local panel route before finishing
 
@@ -27,11 +27,13 @@ For turning a fresh server into a restored copy of an existing production server
    - panel domain only
    - panel domain + public share subdomain
 5. Choose non-default admin credentials for production.
-6. Decide whether the VPS should start on `sqlite` or `postgres`.
+6. Decide whether to keep the default Postgres runtime or explicitly opt into SQLite.
 
 ## Quick usage
 
 ### Bare IP install
+
+This now installs onto local Postgres by default:
 
 ```bash
 BOOTSTRAP_HOST=152.42.255.135 \
@@ -56,22 +58,20 @@ BOOTSTRAP_TELEGRAM_BOT_TOKEN='123456:ABCDEF' \
 bash scripts/bootstrap-vps.sh
 ```
 
-### Replacement server bootstrap directly to Postgres
+### Opt into SQLite instead
 
-Use this when the new VPS is intended to restore a production Postgres `.dump` later:
+Use this only when you explicitly want a SQLite runtime on the fresh VPS:
 
 ```bash
 BOOTSTRAP_HOST=152.42.255.135 \
 BOOTSTRAP_PASSWORD='your-vps-password' \
-BOOTSTRAP_DATABASE_ENGINE='postgres' \
-BOOTSTRAP_POSTGRES_DB='atomic_ui' \
-BOOTSTRAP_POSTGRES_USER='atomic_ui_app' \
+BOOTSTRAP_DATABASE_ENGINE='sqlite' \
 BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
-BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='temporary-password' \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
 bash scripts/bootstrap-vps.sh
 ```
 
-If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` instead.
+If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` instead of using the installer-managed local Postgres defaults.
 
 ## Supported inputs
 
@@ -83,9 +83,9 @@ If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` i
 | `BOOTSTRAP_REPO` | GitHub repo slug. Defaults to `sankahchan/atomic-ui`. |
 | `BOOTSTRAP_INSTALL_REF` | Branch, tag, or commit SHA to install. Defaults to `main`. |
 | `BOOTSTRAP_INSTALL_HTTPS` | `auto`, `require`, or `false`. Defaults to `auto`. |
-| `BOOTSTRAP_DATABASE_ENGINE` | `sqlite` or `postgres`. Defaults to `sqlite`. |
+| `BOOTSTRAP_DATABASE_ENGINE` | `postgres` or `sqlite`. Defaults to `postgres` for fresh VPS installs. |
 | `BOOTSTRAP_DATABASE_URL` | Optional Postgres connection string. If set, the installer uses it instead of creating a local Postgres database. |
-| `BOOTSTRAP_POSTGRES_HOST` | Host for installer-managed Postgres. Defaults to `127.0.0.1`. |
+| `BOOTSTRAP_POSTGRES_HOST` | Host for installer-managed Postgres. Keep this local (`127.0.0.1` or `localhost`). |
 | `BOOTSTRAP_POSTGRES_PORT` | Port for installer-managed Postgres. Defaults to `5432`. |
 | `BOOTSTRAP_POSTGRES_DB` | Database name for installer-managed Postgres. Defaults to `atomic_ui`. |
 | `BOOTSTRAP_POSTGRES_USER` | User name for installer-managed Postgres. Defaults to `atomic_ui_app`. |
