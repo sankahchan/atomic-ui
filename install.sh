@@ -428,30 +428,13 @@ echo -e "${GREEN}[✓]${NC} Build complete"
 
 # Create service with random port (using standalone for low memory)
 echo -e "${BLUE}[*]${NC} Creating systemd service..."
-cat > /etc/systemd/system/atomic-ui.service << EOF
-[Unit]
-Description=Atomic-UI - Outline VPN Management Panel
-After=network.target
+APP_DIR="${INSTALL_DIR}" \
+SERVICE_NAME="atomic-ui.service" \
+PORT_FALLBACK="${PANEL_PORT}" \
+NODE_OPTIONS_VALUE="--max-old-space-size=384" \
+EXEC_START="/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js" \
+    bash "${INSTALL_DIR}/scripts/sync-systemd-service.sh"
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
-Environment=PORT=${PANEL_PORT}
-Environment=PANEL_PATH=/${PANEL_PATH}
-Environment=NODE_OPTIONS=--max-old-space-size=384
-EnvironmentFile=-${INSTALL_DIR}/.env
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable atomic-ui > /dev/null 2>&1
 systemctl start atomic-ui
 
 # Service startup verification with retry

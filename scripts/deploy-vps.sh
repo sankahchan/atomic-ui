@@ -63,6 +63,7 @@ systemctl stop "${SERVICE_NAME}"
 node scripts/prisma-safe-db-push.js
 sh scripts/prisma-command.sh generate
 NODE_HEAP_MB="${NODE_HEAP_MB}" PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+APP_DIR="${APP_DIR}" SERVICE_NAME="${SERVICE_NAME}" PORT_FALLBACK="${PANEL_PORT:-${PORT_FALLBACK}}" bash scripts/sync-systemd-service.sh
 trap - ERR
 
 systemctl start "${SERVICE_NAME}"
